@@ -103,14 +103,36 @@ else:
 
     elif menu == "💬 Historique":
         st.title("💬 Journal des Échanges")
-        with st.expander("✍️ Note"):
-            qui_e = st.selectbox("Qui ?", [c['Nom'] for c in contacts])
-            comm = st.text_area("Commentaires")
-            if st.button("Enregistrer"):
-                echanges.append({"Nom": qui_e, "Date": datetime.now().strftime("%d/%m/%Y"), "Note": comm})
-                sauvegarder_donnees('echanges.json', echanges); st.rerun()
+        
+        # Formulaire avec bouton qui se verrouille
+        with st.expander("✍️ Note", expanded=True):
+            with st.form("form_echange", clear_on_submit=True):
+                qui_e = st.selectbox("Contact concerné", [c['Nom'] for c in contacts])
+                type_e = st.selectbox("Type", ["📞 Téléphone", "🤝 Rencontre", "📧 Relance Email", "⚓ Autre"])
+                comm = st.text_area("Commentaires")
+                
+                # Le bouton submit d'un formulaire Streamlit évite naturellement les doubles envois
+                submitted = st.form_submit_button("💾 Enregistrer l'échange")
+                
+                if submitted:
+                    if comm:  # On vérifie qu'il y a un texte pour éviter les notes vides
+                        nouvel_echange = {
+                            "Nom": qui_e, 
+                            "Date": datetime.now().strftime("%d/%m/%Y %H:%M"), 
+                            "Type": type_e, 
+                            "Note": comm
+                        }
+                        echanges.append(nouvel_echange)
+                        sauvegarder_donnees('echanges.json', echanges)
+                        st.success("Échange enregistré !")
+                        st.rerun()
+                    else:
+                        st.error("Veuillez écrire un commentaire avant d'enregistrer.")
+
+        st.divider()
         for e in reversed(echanges):
-            st.info(f"📅 {e['Date']} - **{e['Nom']}**"); st.write(e['Note'])
+            st.info(f"📅 {e['Date']} - **{e['Nom']}** ({e.get('Type', 'Échange')})")
+            st.write(e['Note'])
 
     elif menu == "📋 Checklists":
         st.title("📋 Checklists Personnalisables")
@@ -137,3 +159,4 @@ else:
         with c_arr:
             st.subheader("⚓ Arrivée")
             for item in check_data["Arrivée"]: st.checkbox(item, key=f"run_arr_{item}")
+
