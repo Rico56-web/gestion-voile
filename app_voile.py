@@ -44,6 +44,10 @@ else:
 
     elif menu == "Carnet d'adresses":
         st.title("🗂️ Gestion des Contacts")
+        
+        # --- BARRE DE RECHERCHE ---
+        search = st.text_input("🔍 Rechercher un nom...")
+        
         if "edit_idx" not in st.session_state: st.session_state.edit_idx = -1
 
         with st.expander("📝 Ajouter/Modifier un contact", expanded=(st.session_state.edit_idx != -1)):
@@ -63,18 +67,30 @@ else:
                     st.rerun()
 
         st.divider()
+        
+        # Filtrage des contacts selon la recherche
         for i, c in enumerate(contacts):
-            col1, col2, col3 = st.columns([3, 1, 1])
-            mail = c.get('Email', 'Pas d\'email')
-            tel = c.get('Tél', '')
-            col1.write(f"**{c['Nom']}** | {tel} | {mail}")
-            if col2.button("✏️", key=f"ed_{i}"):
-                st.session_state.edit_idx = i
-                st.rerun()
-            if col3.button("🗑️", key=f"del_{i}"):
-                contacts.pop(i)
-                sauvegarder_donnees('contacts.json', contacts)
-                st.rerun()
+            if search.lower() in c['Nom'].lower():
+                col1, col2, col3 = st.columns([3, 1, 1])
+                
+                mail = c.get('Email', '')
+                tel = c.get('Tél', '')
+                
+                # Création des liens cliquables en Markdown
+                link_tel = f"📞 [{tel}](tel:{tel.replace(' ', '')})" if tel else "Pas de tel"
+                link_mail = f"✉️ [{mail}](mailto:{mail})" if mail else "Pas d'email"
+                
+                col1.markdown(f"**{c['Nom']}**")
+                col1.markdown(f"{link_tel} | {link_mail}")
+                
+                if col2.button("✏️", key=f"ed_{i}"):
+                    st.session_state.edit_idx = i
+                    st.rerun()
+                if col3.button("🗑️", key=f"del_{i}"):
+                    contacts.pop(i)
+                    sauvegarder_donnees('contacts.json', contacts)
+                    st.rerun()
+                st.write("---")
 
     elif menu == "Suivi des Demandes":
         st.title("⛵ Demandes de Navigation")
