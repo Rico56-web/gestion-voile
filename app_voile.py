@@ -48,15 +48,31 @@ else:
 
     elif menu == "Carnet d'adresses":
         st.title("🗂️ Carnet d'adresses")
+        # Formulaire d'ajout
         with st.expander("➕ Ajouter un équipier"):
             nom = st.text_input("Nom et Prénom")
             tel = st.text_input("Téléphone")
-            urgence = st.text_input("Contact d'urgence (Nom/Tél)")
+            urgence = st.text_input("Contact d'urgence")
             if st.button("Enregistrer le marin"):
                 contacts.append({"Nom": nom, "Tél": tel, "Urgence": urgence})
                 sauvegarder_donnees('contacts.json', contacts)
                 st.success("Ajouté !")
                 st.rerun()
+        
+        st.divider()
+
+        # Liste avec option de suppression
+        if contacts:
+            for i, c in enumerate(contacts):
+                col1, col2 = st.columns([4, 1])
+                col1.write(f"**{c['Nom']}** - {c['Tél']}")
+                # On crée un bouton supprimer unique pour chaque marin
+                if col2.button("🗑️", key=f"del_{i}"):
+                    contacts.pop(i) # Enlever le marin de la liste
+                    sauvegarder_donnees('contacts.json', contacts)
+                    st.rerun()
+        else:
+            st.info("Le carnet est vide.")
         
         if contacts:
             st.table(pd.DataFrame(contacts))
@@ -77,3 +93,4 @@ else:
             st.write(f"**{s['Date']}** - {s['Nom']}")
             st.write(f"Équipage : {', '.join(s['Equipage'])}")
             st.divider()
+
