@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 import json
-from datetime import datetime
 import os
+from datetime import datetime
 
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Skipper Manager", layout="wide", page_icon="⛵")
@@ -31,11 +31,11 @@ if not st.session_state["authentifie"]:
         else:
             st.error("Code incorrect.")
 else:
-    # --- CHARGEMENT DES DONNÉES ---
+    # Chargement
     contacts = charger_donnees('contacts.json')
     sorties = charger_donnees('sorties.json')
 
-    # --- BARRE LATÉRALE (MENU) ---
+    # --- MENU ---
     st.sidebar.title("⚓ Navigation")
     menu = st.sidebar.radio("Aller à :", ["Tableau de bord", "Carnet d'adresses", "Planifier une sortie", "Historique"])
 
@@ -48,49 +48,70 @@ else:
 
     elif menu == "Carnet d'adresses":
         st.title("🗂️ Carnet d'adresses")
-        # Formulaire d'ajout
-        with st.expander("➕ Ajouter un équipier"):
-            nom = st.text_input("Nom et Prénom")
-            tel = st.text_input("Téléphone")
-            urgence = st.text_input("Contact d'urgence")
-            if st.button("Enregistrer le marin"):
-                contacts.append({"Nom": nom, "Tél": tel, "Urgence": urgence})
-                sauvegarder_donnees('contacts.json', contacts)
-                st.success("Ajouté !")
-                st.rerun()
         
-        st.divider()
+        # Formulaire d'ajout ou de modification
+        if "edit_index" not in st.session_state:
+            st.session_state.edit_index = -1
 
-        # Liste avec option de suppression
+        titre_form = "➕ Ajouter un équipier" if st.session_state.edit_index == -1 else "✏️ Modifier l'équipier"
+        with st.expander(titre_form, expanded=(st.session_state.edit_index != -1)):
+            default_nom = "" if st.session_state.edit_index == -1 else contacts[st.session_state.edit_index]['Nom']
+            default_tel = "" if st.session_state.edit_index == -1 else contacts[st.session_state.edit_index]['Tél']
+            default_urg = "" if st.session_state.edit_index == -1 else contacts[st.session_state.edit_index]['Urgence']
+            
+            new_nom = st.text_input("Nom et Prénom", value=default_nom)
+            new_tel = st.text_input("Téléphone", value=default_tel)
+            new_urg = st.text_input("Contact d'urgence", value=default_urg)
+            
+            c1, c2 = st.columns(2)
+            if c1.button("Enregistrer"):
+                new_data = {"Nom": new_nom, "Tél": new_tel, "Urgence": new_urg}
+                if st.session_state.edit_index == -1:
+                    contacts.append(new_data)
+                else:
+                    contacts[st.session_state.edit_index] = new_data
+                    st.session_state.edit_index = -1
+                sauvegarder_donnees('contacts.json', contacts)
+                st.rerun()
+            if st.session_state.edit_index != -1:
+                if c2.button("Annuler"):
+                    st.session_state.edit_index = -1
+                    st.rerun()
+
+        st.divider()
         if contacts:
             for i, c in enumerate(contacts):
-                col1, col2 = st.columns([4, 1])
-                col1.write(f"**{c['Nom']}** - {c['Tél']}")
-                # On crée un bouton supprimer unique pour chaque marin
-                if col2.button("🗑️", key=f"del_{i}"):
-                    contacts.pop(i) # Enlever le marin de la liste
+                col_n, col_m, col_s = st.columns([3, 1, 1])
+                col_n.write(f"**{c['Nom']}** ({c['Tél']})")
+                if col_m.button("✏️", key=f"edit_{i}"):
+                    st.session_state.edit_index = i
+                    st.rerun()
+                if col_s.button("🗑️", key=f"del_{i}"):
+                    contacts.pop(i)
                     sauvegarder_donnees('contacts.json', contacts)
                     st.rerun()
-        else:
-            st.info("Le carnet est vide.")
-        
-        if contacts:
-            st.table(pd.DataFrame(contacts))
 
     elif menu == "Planifier une sortie":
         st.title("⛵ Nouvelle sortie")
-        nom_sortie = st.text_input("Nom de la navigation")
-        date_sortie = st.date_input("Date", datetime.now())
-        selection = st.multiselect("Qui est à bord ?", [c['Nom'] for c in contacts])
+        n_sortie = st.text_input("Nom de la navigation")
+        d_sortie = st.date_input("Date", datetime.now())
+        sel = st.multiselect("Qui est à bord ?", [c['Nom'] for c in contacts])
         if st.button("Valider la sortie"):
-            sorties.append({"Date": str(date_sortie), "Nom": nom_sortie, "Equipage": selection})
+            sorties.append({"Date": str(d_sortie), "Nom": n_sortie, "Equipage": sel})
             sauvegarder_donnees('sorties.json', sorties)
             st.success("Sortie enregistrée !")
 
     elif menu == "Historique":
-        st.title("📜 Historique des navigations")
-        for s in reversed(sorties):
-            st.write(f"**{s['Date']}** - {s['Nom']}")
-            st.write(f"Équipage : {', '.join(s['Equipage'])}")
-            st.divider()
-
+        st.title("📜 Historique")
+        if sorties:
+            for i, s in enumerate(reversed(sorties)):
+                idx = len(sorties) - 1 - i
+                col_h, col_del = st.columns([4, 1])
+                col_h.write(f"**{s['Date']}** - {s['Nom']} ({', '.join(s['Equipage'])})")
+                if col_del.button("🗑️", key=f"del_s_{idx}"):
+                    sorties.pop(idx)
+                    sauvegarder_donnees('sorties.json', sorties)
+                    st.rerun()
+                st.divider()
+        else:
+            st.write("Aucune sortie enregistrée.")
