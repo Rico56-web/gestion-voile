@@ -68,7 +68,9 @@ else:
         st.divider()
         for i, c in enumerate(contacts):
             col1, col2, col3 = st.columns([3, 1, 1])
-            col1.write(f"**{c['Nom']}** | {c['Tél']} | {c['Email']}")
+            # .get('Email', '') permet de ne pas planter si l'email n'existe pas encore
+email_affichage = c.get('Email', 'Pas d\'email')
+col1.write(f"**{c['Nom']}** | {c['Tél']} | {email_affichage}")
             if col2.button("✏️", key=f"ed_{i}"):
                 st.session_state.edit_idx = i
                 st.rerun()
@@ -118,5 +120,6 @@ else:
         for i, e in enumerate(reversed(echanges)):
             st.info(f"📅 {e['Date']} - **{e['Nom']}** ({e['Type']})")
             st.write(e['Note'])
+
 
 
