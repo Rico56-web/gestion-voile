@@ -1,4 +1,4 @@
-Python
+
 import streamlit as st
 import pandas as pd
 import json
@@ -94,4 +94,5 @@ if verifier_mot_de_passe():
         st.title("📜 Historique")
         for s in reversed(sorties):
             with st.expander(f"{s['date']} - {s['nom']}"):
+
                 st.write(f"Équipage : {', '.join(s['equipage'])}")
