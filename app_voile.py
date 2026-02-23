@@ -32,29 +32,26 @@ else:
     echanges = charger_donnees('echanges.json')
     demandes = charger_donnees('demandes.json')
 
-    # --- MENU ---
     st.sidebar.title("⚓ Vesta Navigation")
     menu = st.sidebar.radio("Aller à :", ["Tableau de bord", "Carnet d'adresses", "Suivi des Demandes", "Historique des Échanges"])
 
-    # --- 1. TABLEAU DE BORD ---
     if menu == "Tableau de bord":
         st.title("📊 Vesta Dashboard")
         col1, col2, col3 = st.columns(3)
         col1.metric("Contacts", len(contacts))
-        col2.metric("Échanges notés", len(echanges))
-        col3.metric("Demandes en cours", len([d for d in demandes if d['Statut'] == 'En attente']))
+        col2.metric("Échanges", len(echanges))
+        col3.metric("Demandes", len([d for d in demandes if d.get('Statut') == 'En attente']))
 
-    # --- 2. CARNET D'ADRESSES (AVEC EMAIL) ---
     elif menu == "Carnet d'adresses":
         st.title("🗂️ Gestion des Contacts")
         if "edit_idx" not in st.session_state: st.session_state.edit_idx = -1
 
         with st.expander("📝 Ajouter/Modifier un contact", expanded=(st.session_state.edit_idx != -1)):
             c_edit = contacts[st.session_state.edit_idx] if st.session_state.edit_idx != -1 else {"Nom": "", "Tél": "", "Email": "", "Urgence": ""}
-            n = st.text_input("Nom", value=c_edit['Nom'])
-            t = st.text_input("Tél", value=c_edit['Tél'])
-            e = st.text_input("Email", value=c_edit['Email'])
-            u = st.text_input("Urgence", value=c_edit['Urgence'])
+            n = st.text_input("Nom", value=c_edit.get('Nom', ''))
+            t = st.text_input("Tél", value=c_edit.get('Tél', ''))
+            e = st.text_input("Email", value=c_edit.get('Email', ''))
+            u = st.text_input("Urgence", value=c_edit.get('Urgence', ''))
             
             if st.button("Enregistrer le contact"):
                 if n:
@@ -68,9 +65,9 @@ else:
         st.divider()
         for i, c in enumerate(contacts):
             col1, col2, col3 = st.columns([3, 1, 1])
-            # .get('Email', '') permet de ne pas planter si l'email n'existe pas encore
-email_affichage = c.get('Email', 'Pas d\'email')
-col1.write(f"**{c['Nom']}** | {c['Tél']} | {email_affichage}")
+            mail = c.get('Email', 'Pas d\'email')
+            tel = c.get('Tél', '')
+            col1.write(f"**{c['Nom']}** | {tel} | {mail}")
             if col2.button("✏️", key=f"ed_{i}"):
                 st.session_state.edit_idx = i
                 st.rerun()
@@ -79,47 +76,49 @@ col1.write(f"**{c['Nom']}** | {c['Tél']} | {email_affichage}")
                 sauvegarder_donnees('contacts.json', contacts)
                 st.rerun()
 
-    # --- 3. SUIVI DES DEMANDES (VALIDÉ / REFUSÉ) ---
     elif menu == "Suivi des Demandes":
         st.title("⛵ Demandes de Navigation")
         with st.expander("🆕 Enregistrer une demande"):
-            qui = st.selectbox("Qui demande ?", [c['Nom'] for c in contacts])
-            date_d = st.date_input("Pour quand ?", datetime.now())
-            statut = st.selectbox("Décision", ["En attente", "OK", "Refusé"])
-            cause = st.text_input("Motif / Cause (si refusé ou spécial)")
-            if st.button("Valider la demande"):
-                demandes.append({"Nom": qui, "Date": str(date_d), "Statut": statut, "Cause": cause})
-                sauvegarder_donnees('demandes.json', demandes)
-                st.rerun()
+            if not contacts:
+                st.warning("Ajoutez d'abord des contacts !")
+            else:
+                qui = st.selectbox("Qui demande ?", [c['Nom'] for c in contacts])
+                date_d = st.date_input("Pour quand ?", datetime.now())
+                statut = st.selectbox("Décision", ["En attente", "OK", "Refusé"])
+                cause = st.text_input("Motif / Cause")
+                if st.button("Valider la demande"):
+                    demandes.append({"Nom": qui, "Date": str(date_d), "Statut": statut, "Cause": cause})
+                    sauvegarder_donnees('demandes.json', demandes)
+                    st.rerun()
 
         st.divider()
         for i, d in enumerate(reversed(demandes)):
             idx = len(demandes) - 1 - i
             color = "🟢" if d['Statut'] == "OK" else "🔴" if d['Statut'] == "Refusé" else "🟡"
             st.write(f"{color} **{d['Nom']}** - {d['Date']} : **{d['Statut']}**")
-            if d['Cause']: st.caption(f"Motif : {d['Cause']}")
+            if d.get('Cause'): st.caption(f"Motif : {d['Cause']}")
             if st.button("Effacer", key=f"deld_{idx}"):
                 demandes.pop(idx)
                 sauvegarder_donnees('demandes.json', demandes)
                 st.rerun()
-            st.write("---")
 
-    # --- 4. HISTORIQUE DES ÉCHANGES (COMMENTAIRES) ---
     elif menu == "Historique des Échanges":
         st.title("💬 Journal des Échanges")
-        with st.expander("✍️ Noter un échange (Appel, Relance...)"):
-            qui_e = st.selectbox("Contact concerné", [c['Nom'] for c in contacts])
-            type_e = st.selectbox("Type", ["Téléphone", "Rencontre", "Relance Email", "Autre"])
-            comm = st.text_area("Commentaires / Détails")
-            if st.button("Enregistrer l'échange"):
-                echanges.append({"Nom": qui_e, "Date": str(datetime.now().strftime("%d/%m/%Y")), "Type": type_e, "Note": comm})
-                sauvegarder_donnees('echanges.json', echanges)
-                st.rerun()
+        with st.expander("✍️ Noter un échange"):
+            if not contacts:
+                st.warning("Ajoutez d'abord des contacts !")
+            else:
+                qui_e = st.selectbox("Contact concerné", [c['Nom'] for c in contacts])
+                type_e = st.selectbox("Type", ["Téléphone", "Rencontre", "Relance Email", "Autre"])
+                comm = st.text_area("Commentaires")
+                if st.button("Enregistrer l'échange"):
+                    echanges.append({"Nom": qui_e, "Date": str(datetime.now().strftime("%d/%m/%Y")), "Type": type_e, "Note": comm})
+                    sauvegarder_donnees('echanges.json', echanges)
+                    st.rerun()
 
         st.divider()
-        for i, e in enumerate(reversed(echanges)):
+        for e in reversed(echanges):
             st.info(f"📅 {e['Date']} - **{e['Nom']}** ({e['Type']})")
             st.write(e['Note'])
-
 
 
