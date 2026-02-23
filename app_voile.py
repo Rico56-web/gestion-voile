@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="Skipper Manager", layout="wide", page_icon="⛵")
+st.set_page_config(page_title="VESTA Manager", layout="wide", page_icon="⛵")
 
 def charger_donnees(fichier):
     if os.path.exists(fichier):
@@ -22,7 +22,7 @@ if "authentifie" not in st.session_state:
     st.session_state["authentifie"] = False
 
 if not st.session_state["authentifie"]:
-    st.title("🔐 Accès Skipper Manager")
+    st.title("🔐 Accès VESTA Manager")
     mdp = st.text_input("Entrez le code d'accès au bord", type="password")
     if st.button("Monter à bord"):
         if mdp == "SKIPPER2026":
@@ -128,4 +128,5 @@ else:
                 st.divider()
         else:
             st.write("Aucune sortie enregistrée.")
+
 
