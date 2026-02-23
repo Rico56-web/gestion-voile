@@ -66,13 +66,26 @@ else:
             c1, c2 = st.columns(2)
             if c1.button("Enregistrer"):
                 new_data = {"Nom": new_nom, "Tél": new_tel, "Urgence": new_urg}
-                if st.session_state.edit_index == -1:
-                    contacts.append(new_data)
-                else:
+                
+                # --- SÉCURITÉ ANTI-DOUBLON ---
+                # On vérifie si le nom existe déjà (seulement pour un nouvel ajout)
+                noms_existants = [c['Nom'].lower().strip() for c in contacts]
+                
+                if st.session_state.edit_index == -1: # Si c'est un nouvel ajout
+                    if new_nom.lower().strip() in noms_existants:
+                        st.error("⚠️ Ce marin est déjà dans la liste !")
+                    elif new_nom.strip() == "":
+                        st.error("⚠️ Le nom ne peut pas être vide.")
+                    else:
+                        contacts.append(new_data)
+                        sauvegarder_donnees('contacts.json', contacts)
+                        st.rerun()
+                else: # Si c'est une modification
                     contacts[st.session_state.edit_index] = new_data
                     st.session_state.edit_index = -1
-                sauvegarder_donnees('contacts.json', contacts)
-                st.rerun()
+                    sauvegarder_donnees('contacts.json', contacts)
+                    st.rerun()
+            
             if st.session_state.edit_index != -1:
                 if c2.button("Annuler"):
                     st.session_state.edit_index = -1
@@ -115,3 +128,4 @@ else:
                 st.divider()
         else:
             st.write("Aucune sortie enregistrée.")
+
