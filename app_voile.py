@@ -9,7 +9,7 @@ st.set_page_config(page_title="Vesta Gestion v2", layout="wide")
 
 # --- FONCTIONS GITHUB ---
 def charger_donnees_github(nom_fichier):
-   repo = st.secrets["GITHUB_REPO"]
+    repo = st.secrets["GITHUB_REPO"]
     token = st.secrets["GITHUB_TOKEN"]
     url = f"https://api.github.com/repos/{repo}/contents/{nom_fichier}.json"
     headers = {"Authorization": f"token {token}"}
@@ -110,6 +110,7 @@ else:
                 del st.session_state.edit_index
                 del st.session_state.edit_data
                 st.rerun()
+
 
 
 
