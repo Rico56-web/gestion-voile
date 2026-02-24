@@ -46,12 +46,16 @@ if not st.session_state.authenticated:
         st.session_state.authenticated = True
         st.rerun()
 else:
-    # --- CHARGEMENT DES DONNÉES ---
-    # On ajoute 'Statut' et 'Demande' aux colonnes
+    # --- CHARGEMENT ET RÉPARATION DES DONNÉES ---
     cols_contacts = ["Nom", "Prénom", "Téléphone", "Email", "Rôle", "Statut", "Demande", "Historique"]
     df_contacts = charger_data("contacts", cols_contacts)
-    df_check = charger_data("checklist", ["Tâche", "Statut"])
 
+    # Sécurité : Si une colonne manque dans le fichier JSON, on la crée à la volée
+    for col in cols_contacts:
+        if col not in df_contacts.columns:
+            df_contacts[col] = "🟡 Attente" if col == "Statut" else ""
+
+    df_check = charger_data("checklist", ["Tâche", "Statut"])
     # --- MENU PRINCIPAL ---
     tabs = st.tabs(["📅 Demandes de Navigation", "✅ Check-list", "⚙️ Ajouter/Modifier"])
 
@@ -166,6 +170,7 @@ else:
                 del st.session_state.edit_idx
                 del st.session_state.edit_data
                 st.rerun()
+
 
 
 
