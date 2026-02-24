@@ -68,15 +68,25 @@ else:
         st.dataframe(df_contacts, use_container_width=True)
 
     with tab2:
-        with st.form("nouveau_contact"):
+        with st.form("nouveau_contact", clear_on_submit=True):
             nom = st.text_input("Nom")
             prenom = st.text_input("Prénom")
             tel = st.text_input("Téléphone")
             role = st.selectbox("Rôle", ["Skipper", "Équipier", "Propriétaire", "Maintenance"])
             
             if st.form_submit_button("Enregistrer"):
-                nouveau = pd.DataFrame([{"Nom": nom, "Prénom": prenom, "Téléphone": tel, "Rôle": role}])
-                df_contacts = pd.concat([df_contacts, nouveau], ignore_index=True)
-                sauvegarder_donnees_github(df_contacts, "contacts")
-                st.success(f"Contact {prenom} {nom} enregistré avec succès sur GitHub !")
-                st.rerun()
+                if nom and prenom:
+                    # Vérifier si le contact existe déjà
+                    existe_deja = not df_contacts[(df_contacts['Nom'] == nom) & (df_contacts['Prénom'] == prenom)].empty
+                    
+                    if existe_deja:
+                        st.warning(f"Le contact {prenom} {nom} existe déjà dans la liste.")
+                    else:
+                        nouveau = pd.DataFrame([{"Nom": nom, "Prénom": prenom, "Téléphone": tel, "Rôle": role}])
+                        df_contacts = pd.concat([df_contacts, nouveau], ignore_index=True)
+                        sauvegarder_donnees_github(df_contacts, "contacts")
+                        st.success(f"Contact {prenom} {nom} enregistré !")
+                        st.rerun()
+                else:
+                    st.error("Veuillez remplir au moins le nom et le prénom.")
+
