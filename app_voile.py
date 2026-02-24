@@ -1,63 +1,82 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
-from datetime import datetime
+import json
+import base64
+import requests
 
-# --- CONFIGURATION ---
-st.set_page_config(page_title="Vesta Manager", layout="wide", page_icon="⛵")
+# Configuration de la page
+st.set_page_config(page_title="Vesta Gestion", layout="wide")
 
-# Connexion à Google Sheets
-conn = st.connection("gsheets", type=GSheetsConnection)
+# --- FONCTIONS DE SAUVEGARDE GITHUB ---
+def charger_donnees_github(nom_fichier):
+    repo = st.secrets["GITHUB_REPO"]
+    token = st.secrets["GITHUB_TOKEN"]
+    url = f"https://api.github.com/repos/{repo}/contents/{nom_fichier}.json"
+    headers = {"Authorization": f"token {token}"}
+    
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        content = response.json()
+        decoded_content = base64.b64decode(content['content']).decode('utf-8')
+        return pd.DataFrame(json.loads(decoded_content))
+    else:
+        return pd.DataFrame(columns=["Nom", "Prénom", "Téléphone", "Rôle"])
 
-# --- FONCTIONS DE DONNÉES ---
-def charger_onglet(nom_onglet):
-    try:
-        return conn.read(worksheet=nom_onglet).dropna(how="all")
-    except:
-        return pd.DataFrame()
+def sauvegarder_donnees_github(df, nom_fichier):
+    repo = st.secrets["GITHUB_REPO"]
+    token = st.secrets["GITHUB_TOKEN"]
+    url = f"https://api.github.com/repos/{repo}/contents/{nom_fichier}.json"
+    headers = {"Authorization": f"token {token}"}
+    
+    # Récupérer le SHA du fichier s'il existe (nécessaire pour modifier sur GitHub)
+    res = requests.get(url, headers=headers)
+    sha = res.json().get('sha') if res.status_code == 200 else None
+    
+    json_data = df.to_json(orient="records", indent=4)
+    content_b64 = base64.b64encode(json_data.encode('utf-8')).decode('utf-8')
+    
+    data = {
+        "message": f"Mise à jour de {nom_fichier}",
+        "content": content_b64
+    }
+    if sha:
+        data["sha"] = sha
+        
+    requests.put(url, headers=headers, json=data)
 
-def sauvegarder_onglet(df, nom_onglet):
-    conn.update(worksheet=nom_onglet, data=df)
-    st.cache_data.clear() # Force la mise à jour de l'affichage
+# --- APPLICATION ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
 
-# --- CSS COMPACT IPHONE ---
-st.markdown("""
-    <style>
-    .stButton > button { padding: 2px 8px !important; font-size: 14px !important; border-radius: 5px !important; }
-    .note-box { background-color: #e7f3fe; padding: 10px; border-radius: 8px; border-left: 5px solid #2196f3; margin-bottom: 5px; font-size: 14px; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- AUTHENTIFICATION ---
-if "authentifie" not in st.session_state:
-    st.session_state["authentifie"] = False
-
-if not st.session_state["authentifie"]:
-    st.title("🔐 Accès Vesta")
-    mdp = st.text_input("Code d'accès", type="password")
-    if st.button("Monter à bord"):
-        if mdp == "SKIPPER2026":
-            st.session_state["authentifie"] = True
-            st.rerun()
+if not st.session_state.authenticated:
+    pwd = st.text_input("Code d'accès", type="password")
+    if pwd == st.secrets["PASSWORD"]:
+        st.session_state.authenticated = True
+        st.rerun()
+    elif pwd:
+        st.error("Code incorrect")
 else:
-    # Chargement des données depuis Sheets
-    df_contacts = charger_onglet("contacts")
-    df_notes = charger_onglet("echanges")
+    st.title("⚓ Gestion de l'équipage - Vesta")
+    
+    # Chargement
+    df_contacts = charger_donnees_github("contacts")
 
-    st.sidebar.title("⚓ Vesta")
-    menu = st.sidebar.radio("Menu", ["🗂️ Contacts", "💬 Historique", "📋 Checklists"])
+    tab1, tab2 = st.tabs(["Liste des contacts", "Ajouter un contact"])
 
-    # --- 🗂️ CONTACTS ---
-    if menu == "🗂️ Contacts":
-        st.title("🗂️ Carnet")
-        with st.expander("📝 Nouveau Contact"):
-            with st.form("add_contact"):
-                n = st.text_input("Nom")
-                t = st.text_input("Tél")
-                e = st.text_input("Email")
-                if st.form_submit_button("Enregistrer"):
-                    new_row = pd.DataFrame([{"Nom": n, "Tél": t, "Email": e}])
-                    df_contacts = pd.concat([df_contacts, new_row], ignore_index=True)
-                    sauvegarder_onglet(df_contacts, "contacts")
-                    st.success("Contact enregistré dans Google Sheets !")
-                    st.rerun()
+    with tab1:
+        st.subheader("Membres enregistrés")
+        st.dataframe(df_contacts, use_container_width=True)
+
+    with tab2:
+        with st.form("nouveau_contact"):
+            nom = st.text_input("Nom")
+            prenom = st.text_input("Prénom")
+            tel = st.text_input("Téléphone")
+            role = st.selectbox("Rôle", ["Skipper", "Équipier", "Propriétaire", "Maintenance"])
+            
+            if st.form_submit_button("Enregistrer"):
+                nouveau = pd.DataFrame([{"Nom": nom, "Prénom": prenom, "Téléphone": tel, "Rôle": role}])
+                df_contacts = pd.concat([df_contacts, nouveau], ignore_index=True)
+                sauvegarder_donnees_github(df_contacts, "contacts")
+                st.success(f"Contact {prenom} {nom} enregistré avec succès sur GitHub !")
+                st.rerun()
