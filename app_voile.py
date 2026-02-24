@@ -3,12 +3,13 @@ import pandas as pd
 import json
 import base64
 import requests
+from datetime import datetime
 
 # Configuration
-st.set_page_config(page_title="Vesta Gestion Pro", layout="wide")
+st.set_page_config(page_title="Vesta Master", layout="wide")
 
-# --- FONCTIONS GITHUB ---
-def charger_donnees_github(nom_fichier):
+# --- FONCTIONS GITHUB (Génériques) ---
+def charger_data(nom_fichier, colonnes):
     repo = st.secrets["GITHUB_REPO"]
     token = st.secrets["GITHUB_TOKEN"]
     url = f"https://api.github.com/repos/{repo}/contents/{nom_fichier}.json"
@@ -19,10 +20,9 @@ def charger_donnees_github(nom_fichier):
         decoded = base64.b64decode(content['content']).decode('utf-8')
         if decoded.strip():
             return pd.DataFrame(json.loads(decoded))
-    return pd.DataFrame(columns=["Nom", "Prénom", "Téléphone", "Email", "Rôle", "Commentaire"])
+    return pd.DataFrame(columns=colonnes)
 
-def sauvegarder_donnees_github(df, nom_fichier):
-    df = df.drop_duplicates(subset=['Nom', 'Prénom'], keep='last')
+def sauvegarder_data(df, nom_fichier):
     repo = st.secrets["GITHUB_REPO"]
     token = st.secrets["GITHUB_TOKEN"]
     url = f"https://api.github.com/repos/{repo}/contents/{nom_fichier}.json"
@@ -40,98 +40,83 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    pwd = st.text_input("Code d'accès", type="password")
+    st.title("⚓ Accès Vesta")
+    pwd = st.text_input("Code d'accès Skipper", type="password")
     if pwd == st.secrets["PASSWORD"]:
         st.session_state.authenticated = True
         st.rerun()
 else:
-    st.title("⚓ Vesta - Annuaire Interactif")
-    df = charger_donnees_github("contacts")
+    # --- CHARGEMENT DES DONNÉES ---
+    df_contacts = charger_data("contacts", ["Nom", "Prénom", "Téléphone", "Email", "Rôle", "Commentaire"])
+    df_check = charger_data("checklist", ["Tâche", "Statut"])
+    df_histo = charger_data("historique", ["Date", "Événement", "Note"])
 
-    tab1, tab2 = st.tabs(["📋 Liste & Recherche", "➕ Nouveau / Modifier"])
+    # --- MENU PRINCIPAL ---
+    tabs = st.tabs(["👥 Annuaire", "✅ Check-list", "📖 Historique", "⚙️ Gestion"])
 
-    with tab1:
-        # --- BARRE DE RECHERCHE ---
-        search = st.text_input("🔍 Rechercher un nom ou un prénom...")
+    # --- ONGLET 1 : ANNUAIRE ---
+    with tabs[0]:
+        search = st.text_input("🔍 Rechercher...")
+        filt = df_contacts[(df_contacts['Nom'].str.contains(search, case=False)) | (df_contacts['Prénom'].str.contains(search, case=False))] if search else df_contacts
         
-        filtered_df = df
-        if search:
-            filtered_df = df[
-                df['Nom'].str.contains(search, case=False, na=False) | 
-                df['Prénom'].str.contains(search, case=False, na=False)
-            ]
+        for idx, row in filt.iterrows():
+            with st.expander(f"👤 {row['Prénom']} {row['Nom']}"):
+                col1, col2 = st.columns([2,1])
+                with col1:
+                    st.write(f"**{row['Rôle']}** | 📞 {row['Téléphone']} | 📧 {row['Email']}")
+                    st.info(f"Note : {row['Commentaire']}")
+                with col2:
+                    t_l = f"tel:{row['Téléphone']}".replace(" ", "")
+                    m_l = f"mailto:{row['Email']}"
+                    st.markdown(f'<a href="{t_l}"><button style="width:100%; background:#2e7d32; color:white; border:none; padding:5px; border-radius:5px;">📞 Appeler</button></a>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="margin-top:5px;"><a href="{m_l}"><button style="width:100%; background:#1565c0; color:white; border:none; padding:5px; border-radius:5px;">📧 Email</button></a></div>', unsafe_allow_html=True)
 
-        st.subheader(f"Équipage ({len(filtered_df)})")
+    # --- ONGLET 2 : CHECK-LIST ---
+    with tabs[1]:
+        st.subheader("État du Navire")
+        new_task = st.text_input("Nouvelle tâche (ex: Vérifier niveau huile)")
+        if st.button("Ajouter à la liste"):
+            df_check = pd.concat([df_check, pd.DataFrame([{"Tâche": new_task, "Statut": "À faire"}])], ignore_index=True)
+            sauvegarder_data(df_check, "checklist")
+            st.rerun()
         
-        if filtered_df.empty:
-            st.info("Aucun contact trouvé.")
-        else:
-            for index, row in filtered_df.iterrows():
-                with st.expander(f"👤 {row['Prénom']} {row['Nom']} - {row['Rôle']}"):
-                    c1, c2, c3 = st.columns([2, 2, 1])
-                    
-                    with c1:
-                        st.write(f"**📞 Tel:** {row['Téléphone']}")
-                        st.write(f"**📧 Email:** {row.get('Email', '-')}")
-                        st.write(f"**📝 Note:** {row.get('Commentaire', '')}")
-                    
-                    with c2:
-                        # Liens de contact direct
-                        tel_link = f"tel:{row['Téléphone']}".replace(" ", "")
-                        mail_link = f"mailto:{row.get('Email', '')}"
-                        
-                        st.markdown(f"""
-                            <a href="{tel_link}" style="text-decoration:none;">
-                                <button style="width:100%; padding:10px; background-color:#2e7d32; color:white; border:none; border-radius:5px; cursor:pointer; margin-bottom:5px;">📞 Appeler</button>
-                            </a>
-                            <a href="{mail_link}" style="text-decoration:none;">
-                                <button style="width:100%; padding:10px; background-color:#1565c0; color:white; border:none; border-radius:5px; cursor:pointer;">📧 Envoyer Email</button>
-                            </a>
-                        """, unsafe_allow_html=True)
-                    
-                    with c3:
-                        if st.button(f"✏️ Modifier", key=f"edit_{index}"):
-                            st.session_state.edit_index = index
-                            st.session_state.edit_data = row.to_dict()
-                            st.success("Prêt pour modification ! Allez dans l'onglet d'ajout.")
-                        
-                        if st.button(f"🗑️ Supprimer", key=f"del_{index}"):
-                            df = df.drop(index)
-                            sauvegarder_donnees_github(df, "contacts")
-                            st.rerun()
-
-    with tab2:
-        title = "Modifier le contact" if "edit_index" in st.session_state else "Ajouter un contact"
-        st.subheader(title)
-        
-        init = st.session_state.get("edit_data", {"Nom":"", "Prénom":"", "Téléphone":"", "Email":"", "Rôle":"Équipier", "Commentaire":""})
-
-        with st.form("form_contact", clear_on_submit=True):
-            col_a, col_b = st.columns(2)
-            with col_a:
-                f_nom = st.text_input("Nom", value=init["Nom"])
-                f_prenom = st.text_input("Prénom", value=init["Prénom"])
-                f_tel = st.text_input("Téléphone", value=init["Téléphone"])
-            with col_b:
-                f_email = st.text_input("Email", value=init.get("Email", ""))
-                f_role = st.selectbox("Rôle", ["Skipper", "Équipier", "Propriétaire", "Maintenance"], 
-                                     index=["Skipper", "Équipier", "Propriétaire", "Maintenance"].index(init["Rôle"]))
-            
-            f_comm = st.text_area("Commentaires", value=init["Commentaire"])
-            
-            if st.form_submit_button("Enregistrer sur le cloud"):
-                new_row = {"Nom": f_nom, "Prénom": f_prenom, "Téléphone": f_tel, "Email": f_email, "Rôle": f_role, "Commentaire": f_comm}
-                
-                if "edit_index" in st.session_state:
-                    df.iloc[st.session_state.edit_index] = new_row
-                    del st.session_state.edit_index
-                    del st.session_state.edit_data
-                else:
-                    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-                
-                sauvegarder_donnees_github(df, "contacts")
-                st.success("Mise à jour réussie !")
+        for idx, row in df_check.iterrows():
+            c1, c2, c3 = st.columns([3, 1, 1])
+            c1.write(f"• {row['Tâche']}")
+            if c2.button("Terminé", key=f"check_{idx}"):
+                df_check = df_check.drop(idx)
+                sauvegarder_data(df_check, "checklist")
                 st.rerun()
+
+    # --- ONGLET 3 : HISTORIQUE ---
+    with tabs[2]:
+        st.subheader("Journal de bord")
+        with st.form("journal"):
+            ev = st.text_input("Événement / Sortie")
+            nt = st.text_area("Détails")
+            if st.form_submit_button("Inscrire au journal"):
+                now = datetime.now().strftime("%d/%m/%Y")
+                df_histo = pd.concat([df_histo, pd.DataFrame([{"Date": now, "Événement": ev, "Note": nt}])], ignore_index=True)
+                sauvegarder_data(df_histo, "historique")
+                st.rerun()
+        st.table(df_histo.iloc[::-1]) # Affiche du plus récent au plus ancien
+
+    # --- ONGLET 4 : GESTION DES CONTACTS ---
+    with tabs[3]:
+        st.subheader("Ajouter / Modifier un contact")
+        with st.form("add_contact"):
+            f_n = st.text_input("Nom")
+            f_p = st.text_input("Prénom")
+            f_t = st.text_input("Tel")
+            f_e = st.text_input("Email")
+            f_r = st.selectbox("Rôle", ["Skipper", "Équipier", "Maintenance", "Proprio"])
+            f_c = st.text_area("Note")
+            if st.form_submit_button("Enregistrer Contact"):
+                df_contacts = pd.concat([df_contacts, pd.DataFrame([{"Nom":f_n, "Prénom":f_p, "Téléphone":f_t, "Email":f_e, "Rôle":f_r, "Commentaire":f_c}])], ignore_index=True)
+                sauvegarder_data(df_contacts, "contacts")
+                st.success("Contact ajouté !")
+                st.rerun()
+
 
 
 
