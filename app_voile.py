@@ -34,6 +34,10 @@ def sauvegarder_data(df, nom_fichier):
     if sha: data["sha"] = sha
     requests.put(url, headers=headers, json=data)
 
+# --- GESTION DE L'ONGLET ACTIF ---
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = 0
+
 # --- AUTHENTIFICATION ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -44,15 +48,18 @@ if not st.session_state.authenticated:
         st.session_state.authenticated = True
         st.rerun()
 else:
-    # --- DATA ---
+    # --- CHARGEMENT DES DONNÉES ---
     cols = ["Nom", "Prénom", "Téléphone", "Email", "Rôle", "Statut", "Demande", "Historique"]
     df_contacts = charger_data("contacts", cols)
     for c in cols: 
         if c not in df_contacts.columns: df_contacts[c] = ""
 
-    t1, t2, t3 = st.tabs(["👥 DEMANDES & CONTACTS", "✅ CHECK-LIST", "⚙️ AJOUTER / MODIFIER"])
+    # Utilisation de session_state pour forcer l'onglet
+    tab_list = ["👥 DEMANDES & CONTACTS", "✅ CHECK-LIST", "⚙️ AJOUTER / MODIFIER"]
+    st.session_state.active_tab = st.radio("Navigation", range(len(tab_list)), format_func=lambda x: tab_list[x], horizontal=True, label_visibility="collapsed")
 
-    with t1:
+    # --- ONGLET 1 : LISTE ---
+    if st.session_state.active_tab == 0:
         st.subheader("Tableau de Bord Navigation")
         search = st.text_input("🔍 Rechercher un nom...")
         
@@ -61,11 +68,8 @@ else:
             filt = filt[(filt['Nom'].str.contains(search, case=False)) | (filt['Prénom'].str.contains(search, case=False))]
 
         for idx, row in filt.iterrows():
-            # Couleur du bandeau
             color = "#c8e6c9" if "🟢" in str(row['Statut']) else "#fff9c4" if "🟡" in str(row['Statut']) else "#ffcdd2"
-            
             with st.container():
-                # Affichage du bandeau principal
                 st.markdown(f"""
                 <div style="background-color:{color}; padding:10px; border-radius:10px; border:1px solid #999; margin-top:10px;">
                     <h3 style="margin:0; color:black;">{row['Statut']} {row['Prénom']} {row['Nom']}</h3>
@@ -73,37 +77,31 @@ else:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # --- BOUTONS D'ACTION DIRECTS ---
-                col_call, col_mail, col_edit, col_del = st.columns([1,1,1,1])
-                
-                with col_call:
+                c_call, c_mail, c_edit, c_del = st.columns([1,1,1,1])
+                with c_call:
                     t_url = f"tel:{row['Téléphone']}".replace(" ", "")
                     st.markdown(f'<a href="{t_url}"><button style="width:100%; background:#2e7d32; color:white; border:none; padding:10px; border-radius:5px; cursor:pointer;">📞 APPELER</button></a>', unsafe_allow_html=True)
-                
-                with col_mail:
+                with c_mail:
                     m_url = f"mailto:{row['Email']}"
                     st.markdown(f'<a href="{m_url}"><button style="width:100%; background:#1565c0; color:white; border:none; padding:10px; border-radius:5px; cursor:pointer;">📧 EMAIL</button></a>', unsafe_allow_html=True)
-                
-                with col_edit:
+                with c_edit:
                     if st.button(f"✏️ MODIFIER", key=f"ed_{idx}"):
                         st.session_state.edit_idx = idx
                         st.session_state.edit_data = row.to_dict()
-                        st.success("Prêt ! Allez dans le 3ème onglet.")
-                
-                with col_del:
+                        st.session_state.active_tab = 2 # Force le passage à l'onglet modif
+                        st.rerun()
+                with c_del:
                     if st.button(f"🗑️ SUPPRIMER", key=f"del_{idx}"):
                         df_contacts = df_contacts.drop(idx)
                         sauvegarder_data(df_contacts, "contacts")
                         st.rerun()
-                
-                # --- DÉTAILS CACHÉS ---
-                with st.expander("📝 Voir la demande et l'historique"):
+                with st.expander("📝 Détails & Historique"):
                     st.write("**Demande :**", row['Demande'])
                     st.write("**Historique :**", row['Historique'])
 
-    with t2:
+    # --- ONGLET 2 : CHECK-LIST ---
+    elif st.session_state.active_tab == 1:
         st.subheader("Check-list Technique")
-        # (Code Check-list simplifié pour rester compact)
         df_check = charger_data("checklist", ["Tâche"])
         nt = st.text_input("Nouvelle tâche")
         if st.button("Ajouter"):
@@ -115,12 +113,12 @@ else:
             if c2.button("Fait", key=f"ch_{i}"):
                 df_check = df_check.drop(i); sauvegarder_data(df_check, "checklist"); st.rerun()
 
-    with t3:
+    # --- ONGLET 3 : FORMULAIRE (AVEC BOUTON COLORE) ---
+    elif st.session_state.active_tab == 2:
         is_edit = "edit_idx" in st.session_state
-        st.subheader("⚙️ " + ("Modifier" if is_edit else "Nouveau Contact"))
+        st.subheader("⚙️ " + ("Modifier la fiche" if is_edit else "Nouveau Contact"))
         init = st.session_state.get("edit_data", {c: "" for c in cols})
         if not init.get("Statut"): init["Statut"] = "🟡 Attente"
-        if not init.get("Rôle"): init["Rôle"] = "Équipier"
 
         with st.form("f_contact"):
             f_nom = st.text_input("Nom", value=init["Nom"])
@@ -132,15 +130,35 @@ else:
             f_dem = st.text_area("Demande", value=init["Demande"])
             f_his = st.text_area("Historique", value=init["Historique"])
             
-            if st.form_submit_button("SAUVEGARDER"):
+            # Le bouton de sauvegarde stylisé
+            st.markdown("""
+                <style>
+                div.stButton > button:first-child {
+                    background-color: #002b5c;
+                    color: white;
+                    height: 3em;
+                    width: 100%;
+                    border-radius: 10px;
+                    border: 2px solid #001a38;
+                    font-weight: bold;
+                    font-size: 20px;
+                }
+                </style>""", unsafe_allow_html=True)
+            
+            save = st.form_submit_button("💾 SAUVEGARDER ET RETOURNER À LA LISTE")
+            
+            if save:
                 new_d = {"Nom":f_nom,"Prénom":f_pre,"Téléphone":f_tel,"Email":f_ema,"Rôle":f_rol,"Statut":f_sta,"Demande":f_dem,"Historique":f_his}
                 if is_edit:
                     df_contacts.iloc[st.session_state.edit_idx] = new_d
                     del st.session_state.edit_idx; del st.session_state.edit_data
                 else:
                     df_contacts = pd.concat([df_contacts, pd.DataFrame([new_d])], ignore_index=True)
+                
                 sauvegarder_data(df_contacts, "contacts")
+                st.session_state.active_tab = 0 # Retour automatique à la liste
                 st.rerun()
+
 
 
 
