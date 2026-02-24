@@ -5,7 +5,7 @@ import base64
 import requests
 
 # Configuration
-st.set_page_config(page_title="Vesta Gestion v2", layout="wide")
+st.set_page_config(page_title="Vesta Gestion Pro", layout="wide")
 
 # --- FONCTIONS GITHUB ---
 def charger_donnees_github(nom_fichier):
@@ -14,17 +14,15 @@ def charger_donnees_github(nom_fichier):
     url = f"https://api.github.com/repos/{repo}/contents/{nom_fichier}.json"
     headers = {"Authorization": f"token {token}"}
     res = requests.get(url, headers=headers)
-    
     if res.status_code == 200:
         content = res.json()
         decoded = base64.b64decode(content['content']).decode('utf-8')
-        # On vérifie si le texte n'est pas vide avant de le lire
         if decoded.strip():
             return pd.DataFrame(json.loads(decoded))
-    
-    # Si le fichier n'existe pas ou est vide, on renvoie un tableau vide
-    return pd.DataFrame(columns=["Nom", "Prénom", "Téléphone", "Rôle", "Commentaire"])
+    return pd.DataFrame(columns=["Nom", "Prénom", "Téléphone", "Email", "Rôle", "Commentaire"])
+
 def sauvegarder_donnees_github(df, nom_fichier):
+    df = df.drop_duplicates(subset=['Nom', 'Prénom'], keep='last')
     repo = st.secrets["GITHUB_REPO"]
     token = st.secrets["GITHUB_TOKEN"]
     url = f"https://api.github.com/repos/{repo}/contents/{nom_fichier}.json"
@@ -47,52 +45,82 @@ if not st.session_state.authenticated:
         st.session_state.authenticated = True
         st.rerun()
 else:
-    st.title("⚓ Vesta - Gestion Complète")
+    st.title("⚓ Vesta - Annuaire Interactif")
     df = charger_donnees_github("contacts")
 
-    tab1, tab2 = st.tabs(["📋 Liste & Actions", "➕ Nouveau Contact"])
+    tab1, tab2 = st.tabs(["📋 Liste & Recherche", "➕ Nouveau / Modifier"])
 
     with tab1:
-        st.subheader("Équipage et Contacts")
-        if df.empty:
-            st.info("Aucun contact enregistré.")
+        # --- BARRE DE RECHERCHE ---
+        search = st.text_input("🔍 Rechercher un nom ou un prénom...")
+        
+        filtered_df = df
+        if search:
+            filtered_df = df[
+                df['Nom'].str.contains(search, case=False, na=False) | 
+                df['Prénom'].str.contains(search, case=False, na=False)
+            ]
+
+        st.subheader(f"Équipage ({len(filtered_df)})")
+        
+        if filtered_df.empty:
+            st.info("Aucun contact trouvé.")
         else:
-            for index, row in df.iterrows():
+            for index, row in filtered_df.iterrows():
                 with st.expander(f"👤 {row['Prénom']} {row['Nom']} - {row['Rôle']}"):
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.write(f"**Tel:** {row['Téléphone']}")
-                        st.write(f"**Note:** {row.get('Commentaire', '')}")
-                    with col2:
+                    c1, c2, c3 = st.columns([2, 2, 1])
+                    
+                    with c1:
+                        st.write(f"**📞 Tel:** {row['Téléphone']}")
+                        st.write(f"**📧 Email:** {row.get('Email', '-')}")
+                        st.write(f"**📝 Note:** {row.get('Commentaire', '')}")
+                    
+                    with c2:
+                        # Liens de contact direct
+                        tel_link = f"tel:{row['Téléphone']}".replace(" ", "")
+                        mail_link = f"mailto:{row.get('Email', '')}"
+                        
+                        st.markdown(f"""
+                            <a href="{tel_link}" style="text-decoration:none;">
+                                <button style="width:100%; padding:10px; background-color:#2e7d32; color:white; border:none; border-radius:5px; cursor:pointer; margin-bottom:5px;">📞 Appeler</button>
+                            </a>
+                            <a href="{mail_link}" style="text-decoration:none;">
+                                <button style="width:100%; padding:10px; background-color:#1565c0; color:white; border:none; border-radius:5px; cursor:pointer;">📧 Envoyer Email</button>
+                            </a>
+                        """, unsafe_allow_html=True)
+                    
+                    with c3:
+                        if st.button(f"✏️ Modifier", key=f"edit_{index}"):
+                            st.session_state.edit_index = index
+                            st.session_state.edit_data = row.to_dict()
+                            st.success("Prêt pour modification ! Allez dans l'onglet d'ajout.")
+                        
                         if st.button(f"🗑️ Supprimer", key=f"del_{index}"):
                             df = df.drop(index)
                             sauvegarder_donnees_github(df, "contacts")
                             st.rerun()
-                        
-                        if st.button(f"✏️ Modifier", key=f"edit_{index}"):
-                            st.session_state.edit_index = index
-                            st.session_state.edit_data = row.to_dict()
-                            st.info("Passez à l'onglet 'Nouveau Contact' pour modifier.")
 
     with tab2:
         title = "Modifier le contact" if "edit_index" in st.session_state else "Ajouter un contact"
         st.subheader(title)
         
-        # Pré-remplissage si modification
-        initial_data = st.session_state.get("edit_data", {"Nom":"", "Prénom":"", "Téléphone":"", "Rôle":"Équipier", "Commentaire":""})
+        init = st.session_state.get("edit_data", {"Nom":"", "Prénom":"", "Téléphone":"", "Email":"", "Rôle":"Équipier", "Commentaire":""})
 
         with st.form("form_contact", clear_on_submit=True):
-            f_nom = st.text_input("Nom", value=initial_data["Nom"])
-            f_prenom = st.text_input("Prénom", value=initial_data["Prénom"])
-            f_tel = st.text_input("Téléphone", value=initial_data["Téléphone"])
-            f_role = st.selectbox("Rôle", ["Skipper", "Équipier", "Propriétaire", "Maintenance"], 
-                                  index=["Skipper", "Équipier", "Propriétaire", "Maintenance"].index(initial_data["Rôle"]))
-            f_comm = st.text_area("Commentaires / Notes", value=initial_data["Commentaire"])
+            col_a, col_b = st.columns(2)
+            with col_a:
+                f_nom = st.text_input("Nom", value=init["Nom"])
+                f_prenom = st.text_input("Prénom", value=init["Prénom"])
+                f_tel = st.text_input("Téléphone", value=init["Téléphone"])
+            with col_b:
+                f_email = st.text_input("Email", value=init.get("Email", ""))
+                f_role = st.selectbox("Rôle", ["Skipper", "Équipier", "Propriétaire", "Maintenance"], 
+                                     index=["Skipper", "Équipier", "Propriétaire", "Maintenance"].index(init["Rôle"]))
             
-            submit = st.form_submit_button("Valider l'enregistrement")
+            f_comm = st.text_area("Commentaires", value=init["Commentaire"])
             
-            if submit:
-                new_row = {"Nom": f_nom, "Prénom": f_prenom, "Téléphone": f_tel, "Rôle": f_role, "Commentaire": f_comm}
+            if st.form_submit_button("Enregistrer sur le cloud"):
+                new_row = {"Nom": f_nom, "Prénom": f_prenom, "Téléphone": f_tel, "Email": f_email, "Rôle": f_role, "Commentaire": f_comm}
                 
                 if "edit_index" in st.session_state:
                     df.iloc[st.session_state.edit_index] = new_row
@@ -102,14 +130,9 @@ else:
                     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                 
                 sauvegarder_donnees_github(df, "contacts")
-                st.success("Données mises à jour !")
+                st.success("Mise à jour réussie !")
                 st.rerun()
-        
-        if "edit_index" in st.session_state:
-            if st.button("Annuler la modification"):
-                del st.session_state.edit_index
-                del st.session_state.edit_data
-                st.rerun()
+
 
 
 
