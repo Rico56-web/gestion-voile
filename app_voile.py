@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import json
@@ -6,7 +5,7 @@ import base64
 import requests
 
 # Configuration
-st.set_page_config(page_title="Vesta Nav Manager", layout="wide")
+st.set_page_config(page_title="Vesta - Planning Nav", layout="wide")
 
 # --- FONCTIONS GITHUB ---
 def charger_data(nom_fichier, colonnes):
@@ -31,146 +30,131 @@ def sauvegarder_data(df, nom_fichier):
     sha = res.json().get('sha') if res.status_code == 200 else None
     json_data = df.to_json(orient="records", indent=4)
     content_b64 = base64.b64encode(json_data.encode('utf-8')).decode('utf-8')
-    data = {"message": "Update data", "content": content_b64}
+    data = {"message": "Update Nav Data", "content": content_b64}
     if sha: data["sha"] = sha
     requests.put(url, headers=headers, json=data)
 
-# --- INITIALISATION SESSION ---
+# --- SESSION STATE ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-if "onglet_actuel" not in st.session_state:
-    st.session_state.onglet_actuel = "LISTE"
+if "page" not in st.session_state:
+    st.session_state.page = "LISTE"
 
-# --- AUTHENTIFICATION ---
+# --- AUTH ---
 if not st.session_state.authenticated:
     st.title("⚓ Accès Vesta")
-    pwd = st.text_input("Code d'accès", type="password")
+    pwd = st.text_input("Code Skipper", type="password")
     if pwd == st.secrets["PASSWORD"]:
         st.session_state.authenticated = True
         st.rerun()
 else:
-    # --- STRUCTURE DES DONNÉES ---
-    cols = ["Nom", "Prénom", "Téléphone", "Email", "Rôle", "Statut", "DateNav", "Motif", "Demande", "Historique"]
-    df_contacts = charger_data("contacts", cols)
-    # Réparation automatique si colonnes manquantes
+    cols = ["DateNav", "Statut", "Nom", "Prénom", "Téléphone", "Email", "Cause", "Demande", "Historique"]
+    df = charger_data("contacts", cols)
     for c in cols:
-        if c not in df_contacts.columns: df_contacts[c] = ""
+        if c not in df.columns: df[c] = ""
 
-    # --- BARRE DE NAVIGATION (BOUTONS) ---
-    c_nav1, c_nav2, c_nav3 = st.columns(3)
-    if c_nav1.button("👥 LISTE DES DEMANDES", use_container_width=True):
-        st.session_state.onglet_actuel = "LISTE"
+    # Navigation
+    c1, c2, c3 = st.columns(3)
+    if c1.button("📅 TOUTES LES DEMANDES", use_container_width=True):
+        st.session_state.page = "LISTE"
         st.rerun()
-    if c_nav2.button("✅ CHECK-LIST", use_container_width=True):
-        st.session_state.onglet_actuel = "CHECK"
-        st.rerun()
-    if c_nav3.button("➕ NOUVELLE DEMANDE", use_container_width=True):
+    if c2.button("➕ NOUVELLE DEMANDE", use_container_width=True):
         if "edit_idx" in st.session_state: del st.session_state.edit_idx
-        if "edit_data" in st.session_state: del st.session_state.edit_data
-        st.session_state.onglet_actuel = "FORM"
+        st.session_state.page = "FORM"
+        st.rerun()
+    if c3.button("✅ CHECK-LIST", use_container_width=True):
+        st.session_state.page = "CHECK"
         st.rerun()
 
-    # --- ONGLET 1 : LISTE ---
-    if st.session_state.onglet_actuel == "LISTE":
-        st.subheader("Tableau de Bord des Navigations")
-        search = st.text_input("🔍 Rechercher...")
+    # --- PAGE LISTE ---
+    if st.session_state.page == "LISTE":
+        st.subheader("Planning des demandes par date")
         
-        filt = df_contacts.copy()
-        if search:
-            filt = filt[(filt['Nom'].str.contains(search, case=False)) | (filt['Prénom'].str.contains(search, case=False))]
-
-        for idx, row in filt.iterrows():
-            # Couleur selon statut
+        # Filtre par statut pour s'y retrouver
+        f_statut = st.multiselect("Filtrer l'affichage", ["🟢 OK", "🟡 Attente", "🔴 Pas OK"], default=["🟢 OK", "🟡 Attente", "🔴 Pas OK"])
+        
+        df_display = df[df['Statut'].isin(f_statut)].copy()
+        # Optionnel: trier par date si le format est standard
+        
+        for idx, row in df_display.iterrows():
             bg = "#c8e6c9" if "🟢" in str(row['Statut']) else "#fff9c4" if "🟡" in str(row['Statut']) else "#ffcdd2"
             
             st.markdown(f"""
-            <div style="background-color:{bg}; padding:12px; border-radius:10px; border:1px solid #999; margin-top:10px;">
-                <h3 style="margin:0; color:black;">{row['Statut']} {row['Prénom']} {row['Nom']}</h3>
-                <p style="margin:0; color:black;">📅 <b>Date : {row['DateNav']}</b> | 👤 {row['Rôle']}</p>
-                <p style="margin:0; color:#444; font-style:italic;">{row['Motif']}</p>
+            <div style="background-color:{bg}; padding:10px; border-radius:8px; border:1px solid #777; margin-bottom:5px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color:black; font-weight:bold; font-size:18px;">📅 {row['DateNav']}</span>
+                    <span style="color:black; font-weight:bold;">{row['Statut']}</span>
+                </div>
+                <div style="color:black; font-size:16px;">👤 {row['Prénom']} {row['Nom']}</div>
+                <div style="color:#333; font-size:14px; font-style:italic;">💬 Motif : {row['Cause']}</div>
             </div>
             """, unsafe_allow_html=True)
             
-            c1, c2, c3, c4 = st.columns(4)
-            with c1:
-                t_url = f"tel:{row['Téléphone']}".replace(" ", "")
-                st.markdown(f'<a href="{t_url}"><button style="width:100%; background:#2e7d32; color:white; border:none; padding:8px; border-radius:5px;">📞 Appel</button></a>', unsafe_allow_html=True)
-            with c2:
-                m_url = f"mailto:{row['Email']}"
-                st.markdown(f'<a href="{m_url}"><button style="width:100%; background:#1565c0; color:white; border:none; padding:8px; border-radius:5px;">📧 Email</button></a>', unsafe_allow_html=True)
-            with c3:
-                if st.button("✏️ Modifier", key=f"btn_ed_{idx}", use_container_width=True):
+            b1, b2, b3, b4 = st.columns(4)
+            with b1:
+                st.markdown(f'<a href="tel:{row["Téléphone"]}"><button style="width:100%; background:#2e7d32; color:white; border:none; padding:5px; border-radius:5px;">📞 Appel</button></a>', unsafe_allow_html=True)
+            with b2:
+                if st.button("✏️ Modifier", key=f"ed_{idx}", use_container_width=True):
                     st.session_state.edit_idx = idx
-                    st.session_state.edit_data = row.to_dict()
-                    st.session_state.onglet_actuel = "FORM"
+                    st.session_state.page = "FORM"
                     st.rerun()
-            with c4:
-                if st.button("🗑️ Supprimer", key=f"btn_del_{idx}", use_container_width=True):
-                    df_contacts = df_contacts.drop(idx)
-                    sauvegarder_data(df_contacts, "contacts")
+            with b3:
+                if st.button("🗑️ Supprimer", key=f"del_{idx}", use_container_width=True):
+                    df = df.drop(idx)
+                    sauvegarder_data(df, "contacts")
                     st.rerun()
-            
-            with st.expander("Détails de la demande & Historique"):
-                st.write("**📝 Demande complète :**", row['Demande'])
-                st.write("**📜 Historique Skipper :**", row['Historique'])
+            with b4:
+                with st.expander("Détails"):
+                    st.write("**Email:**", row['Email'])
+                    st.write("**Détails demande:**", row['Demande'])
+                    st.write("**Notes historiques:**", row['Historique'])
 
-    # --- ONGLET 2 : CHECK-LIST ---
-    elif st.session_state.onglet_actuel == "CHECK":
+    # --- PAGE FORMULAIRE ---
+    elif st.session_state.page == "FORM":
+        idx = st.session_state.get("edit_idx")
+        st.subheader("📝 Détails de la navigation")
+        
+        init = df.iloc[idx].to_dict() if idx is not None else {c: "" for c in cols}
+        if not init.get("Statut"): init["Statut"] = "🟡 Attente"
+
+        with st.form("form_nav"):
+            c_left, c_right = st.columns(2)
+            with c_left:
+                f_date = st.text_input("Date prévue (ex: 14 Juillet)", value=init["DateNav"])
+                f_statut = st.selectbox("Décision pour cette date", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init["Statut"]))
+                f_cause = st.text_input("Motif du statut (ex: En attente météo / Bateau complet)", value=init["Cause"])
+            with c_right:
+                f_nom = st.text_input("Nom de l'équipier", value=init["Nom"])
+                f_pre = st.text_input("Prénom", value=init["Prénom"])
+                f_tel = st.text_input("Téléphone", value=init["Téléphone"])
+            
+            f_ema = st.text_input("Email", value=init["Email"])
+            f_dem = st.text_area("Précisions sur la demande", value=init["Demande"])
+            f_his = st.text_area("Notes générales sur ce contact", value=init["Historique"])
+            
+            st.markdown("""<style> div.stButton > button { background-color: #002b5c !important; color: white !important; font-size: 18px !important; width: 100% !important; border-radius: 10px !important; } </style>""", unsafe_allow_html=True)
+            
+            if st.form_submit_button("💾 ENREGISTRER CETTE NAVIGATION"):
+                new_row = {"DateNav":f_date, "Statut":f_statut, "Nom":f_nom, "Prénom":f_pre, "Téléphone":f_tel, "Email":f_ema, "Cause":f_cause, "Demande":f_dem, "Historique":f_his}
+                if idx is not None:
+                    df.iloc[idx] = new_row
+                else:
+                    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                sauvegarder_data(df, "contacts")
+                st.session_state.page = "LISTE"
+                st.rerun()
+
+    # --- PAGE CHECKLIST ---
+    elif st.session_state.page == "CHECK":
         st.subheader("Check-list Technique")
-        df_check = charger_data("checklist", ["Tâche"])
+        df_c = charger_data("checklist", ["Tâche"])
         nt = st.text_input("Ajouter une tâche")
         if st.button("Ajouter"):
-            if nt:
-                df_check = pd.concat([df_check, pd.DataFrame([{"Tâche": nt}])], ignore_index=True)
-                sauvegarder_data(df_check, "checklist")
-                st.rerun()
-        for i, r in df_check.iterrows():
+            df_c = pd.concat([df_c, pd.DataFrame([{"Tâche": nt}])], ignore_index=True)
+            sauvegarder_data(df_c, "checklist"); st.rerun()
+        for i, r in df_c.iterrows():
             col1, col2 = st.columns([4,1])
             col1.write(f"• {r['Tâche']}")
             if col2.button("Fait", key=f"done_{i}"):
-                df_check = df_check.drop(i)
-                sauvegarder_data(df_check, "checklist")
-                st.rerun()
-
-    # --- ONGLET 3 : FORMULAIRE ---
-    elif st.session_state.onglet_actuel == "FORM":
-        is_edit = "edit_idx" in st.session_state
-        st.subheader("📝 " + ("Modifier la fiche" if is_edit else "Nouvelle Demande"))
-        
-        # Pré-remplissage
-        init = st.session_state.get("edit_data", {c: "" for c in cols})
-        if not init.get("Statut"): init["Statut"] = "🟡 Attente"
-
-        with st.form("form_val"):
-            c_a, c_b = st.columns(2)
-            with c_a:
-                f_nom = st.text_input("Nom", value=init["Nom"])
-                f_pre = st.text_input("Prénom", value=init["Prénom"])
-                f_dat = st.text_input("Date de navigation (ex: 15/08/2026)", value=init["DateNav"])
-            with c_b:
-                f_tel = st.text_input("Téléphone", value=init["Téléphone"])
-                f_ema = st.text_input("Email", value=init["Email"])
-                f_sta = st.selectbox("Statut de la demande", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init["Statut"]))
-            
-            f_mot = st.text_input("Cause/Motif du statut (ex: Bateau complet, Dossier validé...)", value=init["Motif"])
-            f_rol = st.selectbox("Rôle", ["Équipier", "Skipper", "Maintenance", "Invité"], index=0)
-            f_dem = st.text_area("Détails de la demande", value=init["Demande"])
-            f_his = st.text_area("Historique / Notes privées", value=init["Historique"])
-            
-            # Style du bouton SAUVEGARDER
-            st.markdown("""<style> div.stButton > button { background-color: #002b5c !important; color: white !important; font-weight: bold !important; height: 3em !important; width: 100% !important; border-radius: 10px !important; } </style>""", unsafe_allow_html=True)
-            
-            if st.form_submit_button("💾 SAUVEGARDER ET RETOURNER À LA LISTE"):
-                new_d = {"Nom":f_nom,"Prénom":f_pre,"Téléphone":f_tel,"Email":f_ema,"Rôle":f_rol,"Statut":f_sta,"DateNav":f_dat,"Motif":f_mot,"Demande":f_dem,"Historique":f_his}
-                
-                if is_edit:
-                    df_contacts.iloc[st.session_state.edit_idx] = new_d
-                    del st.session_state.edit_idx
-                    del st.session_state.edit_data
-                else:
-                    df_contacts = pd.concat([df_contacts, pd.DataFrame([new_d])], ignore_index=True)
-                
-                sauvegarder_data(df_contacts, "contacts")
-                st.session_state.onglet_actuel = "LISTE"
-                st.rerun()
+                df_c = df_c.drop(i); sauvegarder_data(df_c, "checklist"); st.rerun()
 
