@@ -1,4 +1,4 @@
-Import streamlit as st
+import streamlit as st
 import pandas as pd
 import json
 import base64
@@ -20,7 +20,6 @@ def charger_data(nom_fichier, colonnes):
         decoded = base64.b64decode(content['content']).decode('utf-8')
         if decoded.strip():
             df_load = pd.DataFrame(json.loads(decoded))
-            # S'assurer que les colonnes numériques ne sont pas vides
             if 'PrixJour' in df_load.columns:
                 df_load['PrixJour'] = df_load['PrixJour'].replace('', '0')
             if 'Jours' in df_load.columns:
@@ -37,13 +36,11 @@ def sauvegarder_data(df, nom_fichier):
     sha = res.json().get('sha') if res.status_code == 200 else None
     df_save = df.copy()
     if 'temp_date' in df_save.columns: df_save = df_save.drop(columns=['temp_date'])
-    # Suppression des colonnes de calcul temporaires avant sauvegarde
     for c in ['J_num', 'P_num', 'TotalFiche']:
         if c in df_save.columns: df_save = df_save.drop(columns=[c])
-    
     json_data = df_save.to_json(orient="records", indent=4)
     content_b64 = base64.b64encode(json_data.encode('utf-8')).decode('utf-8')
-    data = {"message": "Update Vesta Robust Calculations", "content": content_b64}
+    data = {"message": "Fix syntax and robust calculations", "content": content_b64}
     if sha: data["sha"] = sha
     requests.put(url, headers=headers, json=data)
 
@@ -80,7 +77,6 @@ else:
     # --- PAGE CALENDRIER & FINANCES ---
     if st.session_state.page == "CALENDRIER":
         st.subheader("💰 Bilan Financier & Occupation")
-        
         df['temp_date'] = pd.to_datetime(df['DateNav'], dayfirst=True, errors='coerce')
         df['J_num'] = pd.to_numeric(df['Jours'], errors='coerce').fillna(0)
         df['P_num'] = pd.to_numeric(df['PrixJour'], errors='coerce').fillna(0)
@@ -98,7 +94,6 @@ else:
             m = (now.month + i - 1) % 12 + 1
             y = now.year + (now.month + i - 1) // 12
             month_name = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"][m-1]
-            
             month_navs = df[(df['temp_date'].dt.month == m) & (df['temp_date'].dt.year == y) & (df['Statut'] == "🟢 OK")]
             total_jours = month_navs['J_num'].sum()
             total_mensuel_du = month_navs['TotalFiche'].sum()
@@ -116,7 +111,6 @@ else:
     elif st.session_state.page == "LISTE":
         st.subheader("Planning Vesta")
         vue_temps = st.selectbox("Période :", ["🚀 Prochaines Navigations", "📜 Archives", "🌍 Tout voir"])
-        
         filt_df = df.copy()
         filt_df['temp_date'] = pd.to_datetime(filt_df['DateNav'], dayfirst=True, errors='coerce')
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -131,16 +125,13 @@ else:
         for idx, row in filt_df.iterrows():
             bg = "#c8e6c9" if "🟢" in str(row['Statut']) else "#fff9c4" if "🟡" in str(row['Statut']) else "#ffcdd2"
             p_icon = "✅💰" if str(row['Paye']) == "Oui" else "⏳"
-            
-            # CALCUL SÉCURISÉ POUR L'AFFICHAGE
             try:
-                val_prix = float(str(row['PrixJour']).replace(',', '.') or 0)
-                val_jours = float(str(row['Jours']).replace(',', '.') or 0)
-                total_fiche = int(val_prix * val_jours)
-            except:
-                total_fiche = 0
+                v_p = float(str(row['PrixJour']).replace(',', '.') or 0)
+                v_j = float(str(row['Jours']).replace(',', '.') or 0)
+                total_f = int(v_p * v_j)
+            except: total_f = 0
             
-            st.markdown(f'<div style="background-color:{bg}; padding:10px; border-radius:10px; border:1px solid #999; margin-bottom:5px; color:black;"><b>{row["DateNav"]}</b> | {row["Prénom"]} {row["Nom"]} | <b>{total_fiche}€</b> {p_icon}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="background-color:{bg}; padding:10px; border-radius:10px; border:1px solid #999; margin-bottom:5px; color:black;"><b>{row["DateNav"]}</b> | {row["Prénom"]} {row["Nom"]} | <b>{total_f}€</b> {p_icon}</div>', unsafe_allow_html=True)
             c_edit, c_pay, c_det = st.columns(3)
             with c_edit:
                 if st.button("✏️ Modif", key=f"e_{idx}", use_container_width=True):
@@ -160,7 +151,6 @@ else:
         idx = st.session_state.get("edit_idx")
         st.subheader("📝 Fiche Contact & Tarif")
         init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols}
-        
         with st.form("f_nav"):
             c1, c2 = st.columns(2)
             with c1:
@@ -171,17 +161,12 @@ else:
                 f_nom = st.text_input("Nom", value=init.get("Nom", ""))
                 f_pre = st.text_input("Prénom", value=init.get("Prénom", ""))
                 f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut", "🟡 Attente")))
-            
             f_paye = st.checkbox("Participation déjà réglée", value=(str(init.get("Paye")) == "Oui"))
             f_tel = st.text_input("Téléphone", value=init.get("Téléphone", ""))
             f_ema = st.text_input("Email", value=init.get("Email", ""))
             f_dem = st.text_area("Précisions", value=init.get("Demande", ""))
-            
             if st.form_submit_button("💾 ENREGISTRER"):
-                # Nettoyage des virgules en points pour les calculs
-                clean_jours = f_jours.replace(',', '.')
-                clean_prix = f_prix.replace(',', '.')
-                new_row = {**init, "DateNav": f_date, "Jours": clean_jours, "PrixJour": clean_prix, "Statut": f_stat, "Nom": f_nom, "Prénom": f_pre, "Paye": "Oui" if f_paye else "Non", "Téléphone": f_tel, "Email": f_ema, "Demande": f_dem}
+                new_row = {**init, "DateNav": f_date, "Jours": f_jours.replace(',','.'), "PrixJour": f_prix.replace(',','.'), "Statut": f_stat, "Nom": f_nom, "Prénom": f_pre, "Paye": "Oui" if f_paye else "Non", "Téléphone": f_tel, "Email": f_ema, "Demande": f_dem}
                 if idx is not None: df.loc[idx] = new_row
                 else: df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                 sauvegarder_data(df, "contacts"); st.session_state.page = "LISTE"; st.rerun()
@@ -202,6 +187,7 @@ else:
 
 
             
+
 
 
 
