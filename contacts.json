@@ -8,7 +8,8 @@
         "Email":"eric.clavreul@gmail.com",
         "Cause":"c'est le skipper",
         "Demande":"c'est son bateau",
-        "Historique":"excellent"
+        "Historique":"excellent",
+        "Jours":"3"
     },
     {
         "DateNav":"2026\/02\/30",
@@ -19,7 +20,8 @@
         "Email":"",
         "Cause":"R\u00e9servation click And boat",
         "Demande":"Viens avec sa fille maelis",
-        "Historique":""
+        "Historique":"",
+        "Jours":""
     },
     {
         "DateNav":"2026\/03\/15",
@@ -30,7 +32,8 @@
         "Email":"",
         "Cause":"",
         "Demande":"Pr\u00eat pour cette sortie",
-        "Historique":""
+        "Historique":"",
+        "Jours":""
     },
     {
         "DateNav":"2026\/06\/01",
@@ -41,7 +44,8 @@
         "Email":"lebato@hotmail.fr",
         "Cause":"",
         "Demande":"int\u00e9resse pour le retour (8 jours)",
-        "Historique":""
+        "Historique":"",
+        "Jours":""
     },
     {
         "DateNav":"2026\/03\/15",
@@ -52,7 +56,8 @@
         "Email":"benoit2106-co@gmail.com",
         "Cause":"a confirmer",
         "Demande":"nav prevue initialement le 15\/02",
-        "Historique":""
+        "Historique":"",
+        "Jours":""
     },
     {
         "DateNav":"2026\/03\/15",
@@ -63,6 +68,7 @@
         "Email":"",
         "Cause":"a rappeler",
         "Demande":"habite la suisse. 44 ans",
-        "Historique":""
+        "Historique":"",
+        "Jours":""
     }
 ]
