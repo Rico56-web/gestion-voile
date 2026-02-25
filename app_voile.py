@@ -1,16 +1,3 @@
-C'est le défi de l'affichage sur iPad : quand on ajoute des colonnes (comme le prix et les calculs), Streamlit a tendance à "comprimer" ou cacher le reste pour que ça tienne dans la largeur de l'écran.
-
-Pour régler cela, j'ai réorganisé l'affichage de chaque fiche sous forme de blocs verticaux. Au lieu d'essayer de tout mettre sur une seule ligne, les informations sont maintenant empilées de façon claire.
-
-🛠️ Ce que j'ai corrigé pour la visibilité :
-Affichage hiérarchique : Le Statut (couleur) et l'Email sont désormais écrits en gros dans le corps de la fiche, pas seulement dans les petits menus.
-
-Champs prioritaires : J'ai forcé l'apparition de l'Email, du Téléphone et du Statut dès l'ouverture de la fiche.
-
-Boutons larges : Plus faciles à cliquer sur tablette.
-
-🚀 Copiez ce code (Version "Haute Visibilité") :
-Python
 import streamlit as st
 import pandas as pd
 import json
@@ -212,6 +199,7 @@ else:
                 df_c = df_c.drop(i); sauvegarder_data(df_c, "checklist"); st.rerun()
 
             
+
 
 
 
