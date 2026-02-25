@@ -73,19 +73,19 @@ else:
     if st.session_state.page == "LISTE":
         st.subheader("Gestion des navigations")
         
-        # --- LIGNE 1 : FILTRES DE TEMPS ET DE TRI ---
+        # --- LIGNE 1 : PÉRIODE ET TRI ---
         col_time, col_sort = st.columns(2)
         with col_time:
             vue_temps = st.selectbox("Période :", ["🚀 Prochaines Navigations", "📜 Archives (Passées)", "🌍 Tout voir"])
         with col_sort:
             tri_mode = st.selectbox("Trier par :", ["📅 Date", "🔤 Nom de famille"])
 
-        # --- LIGNE 2 : RECHERCHE ET STATUT ---
+        # --- LIGNE 2 : RECHERCHE ET FILTRE COULEUR ---
         col_search, col_filt = st.columns([2, 1])
         with col_search:
             search = st.text_input("🔍 Rechercher un nom...")
         with col_filt:
-            # S'assure que les 3 statuts sont sélectionnés par défaut
+            # ICI : Correction pour que tout soit coché par défaut
             options_statut = ["🟢 OK", "🟡 Attente", "🔴 Pas OK"]
             f_statut = st.multiselect("Statuts :", options_statut, default=options_statut)
         
@@ -94,9 +94,9 @@ else:
         filt_df['temp_date'] = pd.to_datetime(filt_df['DateNav'], errors='coerce')
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-        # 1. Filtrage par Période
+        # 1. Filtrage par Période (Uniquement si la date est valide)
         if vue_temps == "🚀 Prochaines Navigations":
-            filt_df = filt_df[filt_df['temp_date'] >= today]
+            filt_df = filt_df[(filt_df['temp_date'] >= today) | (filt_df['temp_date'].isna())]
         elif vue_temps == "📜 Archives (Passées)":
             filt_df = filt_df[filt_df['temp_date'] < today]
 
@@ -107,11 +107,10 @@ else:
         if search:
             filt_df = filt_df[(filt_df['Nom'].str.contains(search, case=False)) | (filt_df['Prénom'].str.contains(search, case=False))]
 
-        # 4. LOGIQUE DE TRI
+        # 4. Logique de Tri
         if tri_mode == "📅 Date":
-            # Si on est en archives, on met la plus récente en haut, sinon la plus proche
             asc = True if vue_temps != "📜 Archives (Passées)" else False
-            filt_df = filt_df.sort_values(by="temp_date", ascending=asc)
+            filt_df = filt_df.sort_values(by="temp_date", ascending=asc, na_position='last')
         else:
             filt_df = filt_df.sort_values(by="Nom", ascending=True)
 
@@ -120,8 +119,9 @@ else:
             st.info(f"Aucune donnée pour ces critères.")
         else:
             for idx, row in filt_df.iterrows():
+                # Détermination de la couleur
                 bg = "#c8e6c9" if "🟢" in str(row['Statut']) else "#fff9c4" if "🟡" in str(row['Statut']) else "#ffcdd2"
-                duree = f"({row['Jours']}j)" if row['Jours'] else ""
+                duree = f"({row['Jours']}j)" if row['Jours'] and str(row['Jours']) != "0" else ""
                 
                 st.markdown(f"""
                 <div style="background-color:{bg}; padding:10px; border-radius:10px; border:1px solid #777; margin-bottom:5px; color:black;">
@@ -136,7 +136,7 @@ else:
                 
                 b1, b2, b3, b4 = st.columns(4)
                 with b1:
-                    st.markdown(f'<a href="tel:{row["Téléphone"]}"><button style="width:100%; background:#2e7d32; color:white; border:none; padding:8px; border-radius:5px;">📞 Appel</button></a>', unsafe_allow_html=True)
+                    st.markdown(f'<a href="tel:{row["Téléphone"]}"><button style="width:100%; background:#2e7d32; color:white; border:none; padding:8px; border-radius:5px; cursor:pointer;">📞 Appel</button></a>', unsafe_allow_html=True)
                 with b2:
                     if st.button("✏️ Modif", key=f"ed_{idx}", use_container_width=True):
                         st.session_state.edit_idx = idx
@@ -204,6 +204,7 @@ else:
             if col2.button("Fait", key=f"done_{i}"):
                 df_c = df_c.drop(i); sauvegarder_data(df_c, "checklist"); st.rerun()
             
+
 
 
 
