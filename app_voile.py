@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import json
@@ -29,7 +30,6 @@ def sauvegarder_data(df, nom_fichier):
     headers = {"Authorization": f"token {token}"}
     res = requests.get(url, headers=headers)
     sha = res.json().get('sha') if res.status_code == 200 else None
-    # Nettoyage avant sauvegarde : on s'assure que tout est en texte
     df_save = df.copy()
     if 'temp_date' in df_save.columns: df_save = df_save.drop(columns=['temp_date'])
     json_data = df_save.to_json(orient="records", indent=4)
@@ -76,7 +76,6 @@ else:
     if st.session_state.page == "LISTE":
         st.subheader("Planning Vesta")
         
-        # Filtres
         c_p, c_t = st.columns(2)
         with c_p:
             vue_temps = st.selectbox("Période :", ["🚀 Prochaines Navigations", "📜 Archives", "🌍 Tout voir"])
@@ -87,35 +86,28 @@ else:
         f_statut = st.multiselect("Statuts à afficher :", options_statut, default=options_statut)
         search = st.text_input("🔍 Chercher un nom...")
         
-        # --- LOGIQUE DE TRI ET FILTRAGE ---
         filt_df = df.copy()
         
-        # Conversion robuste des dates pour le tri interne
+        # LOGIQUE DE DATE CORRIGÉE
         filt_df['temp_date'] = pd.to_datetime(filt_df['DateNav'], dayfirst=True, errors='coerce')
-        today = datetime.now().normalize()
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-        # Filtrage Statut
         filt_df = filt_df[filt_df['Statut'].isin(f_statut)]
         
-        # Filtrage Temps
         if vue_temps == "🚀 Prochaines Navigations":
-            # On garde ce qui est aujourd'hui/futur OU ce qui n'a pas de date valide (pour ne pas le perdre)
             filt_df = filt_df[(filt_df['temp_date'] >= today) | (filt_df['temp_date'].isna())]
         elif vue_temps == "📜 Archives":
             filt_df = filt_df[filt_df['temp_date'] < today]
 
-        # Recherche
         if search:
             filt_df = filt_df[filt_df['Nom'].str.contains(search, case=False) | filt_df['Prénom'].str.contains(search, case=False)]
 
-        # Tri Final
         if tri_mode == "📅 Date":
             ordre = True if vue_temps != "📜 Archives" else False
             filt_df = filt_df.sort_values(by="temp_date", ascending=ordre, na_position='last')
         else:
             filt_df = filt_df.sort_values(by="Nom")
 
-        # Affichage
         if filt_df.empty:
             st.warning("Aucun résultat pour ces filtres.")
         else:
@@ -163,7 +155,7 @@ else:
         with st.form("form_nav"):
             c1, c2 = st.columns(2)
             with c1:
-                f_date = st.text_input("Date (Format recommandé: JJ/MM/AAAA)", value=init.get("DateNav", ""))
+                f_date = st.text_input("Date (Ex: 15/07/2026)", value=init.get("DateNav", ""))
                 f_jours = st.number_input("Nombre de jours", min_value=0, value=int(init.get("Jours", 0)) if init.get("Jours") else 0)
                 f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init["Statut"]))
             with c2:
@@ -200,6 +192,7 @@ else:
 
 
             
+
 
 
 
