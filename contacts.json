@@ -16,7 +16,7 @@
     },
     {
         "DateNav":"2026\/03\/15",
-        "Statut":"\ud83d\udfe1 Attente",
+        "Statut":"\ud83d\udfe2 OK",
         "Nom":"Boudant",
         "Pr\u00e9nom":"Francois",
         "T\u00e9l\u00e9phone":"0625121729",
@@ -24,7 +24,7 @@
         "Cause":"",
         "Demande":"Pr\u00eat pour cette sortie",
         "Historique":"",
-        "Jours":"2",
+        "Jours":"1",
         "Paye":"Non",
         "PrixJour":"70",
         "Passagers":"0"
