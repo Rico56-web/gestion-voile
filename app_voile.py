@@ -42,11 +42,11 @@ def sauvegarder_data(df, nom_fichier):
     res = requests.get(url, headers=headers)
     sha = res.json().get('sha') if res.status_code == 200 else None
     df_save = df.copy()
-    for c in ['temp_date_obj', 'prix_num', 'pass_num']:
+    for c in ['temp_date_obj', 'prix_num']:
         if c in df_save.columns: df_save = df_save.drop(columns=[c])
     json_data = df_save.to_json(orient="records", indent=4)
     content_b64 = base64.b64encode(json_data.encode('utf-8')).decode('utf-8')
-    data = {"message": "Vesta: Correction Stats et Couleurs", "content": content_b64}
+    data = {"message": "Vesta: Correction Cumul et Détails", "content": content_b64}
     if sha: data["sha"] = sha
     requests.put(url, headers=headers, json=data)
 
@@ -65,10 +65,16 @@ if not st.session_state.authenticated:
 else:
     cols = ["DateNav", "Statut", "Nom", "Prénom", "Téléphone", "Email", "Paye", "PrixJour", "Passagers", "Historique"]
     df = charger_data("contacts", cols)
-    # Nettoyage des données pour le calcul
+    
+    # Nettoyage profond pour le calcul des recettes
+    def clean_prix(val):
+        if pd.isna(val) or val == "": return 0.0
+        s = str(val).replace('€', '').replace(' ', '').replace(',', '.').strip()
+        try: return float(s)
+        except: return 0.0
+
     df['temp_date_obj'] = pd.to_datetime(df['DateNav'], dayfirst=True, errors='coerce')
-    df['prix_num'] = pd.to_numeric(df['PrixJour'].astype(str).str.replace(',', '.').str.replace('€', '').str.strip(), errors='coerce').fillna(0)
-    df['pass_num'] = pd.to_numeric(df['Passagers'], errors='coerce').fillna(0)
+    df['prix_num'] = df['PrixJour'].apply(clean_prix)
 
     # Navigation
     st.markdown("---")
@@ -85,36 +91,34 @@ else:
     if st.session_state.page == "LISTE":
         c_search, c_filter = st.columns([2, 1])
         with c_search: search = st.text_input("🔍 Rechercher un nom...")
-        opts_stat = ["🟢 OK", "🟡 Attente", "🔴 Pas OK"]
-        with c_filter: f_statut = st.multiselect("Filtrer par Statut :", opts_stat, default=opts_stat)
+        with c_filter: f_statut = st.multiselect("Filtrer :", ["🟢 OK", "🟡 Attente", "🔴 Pas OK"], default=["🟢 OK", "🟡 Attente", "🔴 Pas OK"])
 
         filt_df = df.copy()
-        if search:
-            filt_df = filt_df[filt_df['Nom'].str.contains(search, case=False) | filt_df['Prénom'].str.contains(search, case=False)]
+        if search: filt_df = filt_df[filt_df['Nom'].str.contains(search, case=False) | filt_df['Prénom'].str.contains(search, case=False)]
         filt_df = filt_df[filt_df['Statut'].isin(f_statut)]
         
-        # Tri par date (les plus proches en premier)
         for idx, row in filt_df.sort_values('temp_date_obj', ascending=True).iterrows():
             stat = row['Statut'] if row['Statut'] else "🟡 Attente"
             bg = "#c8e6c9" if "🟢" in stat else "#fff9c4" if "🟡" in stat else "#ffcdd2"
             st.markdown(f'<div style="background-color:{bg}; padding:10px; border-radius:10px; border:1px solid #333; margin-bottom:5px; color:black;"><b>📅 {row["DateNav"]}</b> — {row["Nom"]} {row["Prénom"]} ({stat})</div>', unsafe_allow_html=True)
-            if st.button(f"👁️ Voir Détails / Modifier {row['Nom']}", key=f"e_{idx}", use_container_width=True):
+            if st.button(f"👁️ Détails / Modifier {row['Nom']}", key=f"e_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
 
-    # --- PAGE PLANNING (STATS + COULEURS OK) ---
+    # --- PAGE PLANNING (CUMUL + DÉTAILS) ---
     elif st.session_state.page == "CALENDRIER":
         mois_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-        c_m, c_y = st.columns(2)
-        m_nom = c_m.selectbox("Mois", mois_fr, index=datetime.now().month-1)
-        m_idx = mois_fr.index(m_nom) + 1
-        y_sel = c_y.selectbox("Année", list(range(2024, 2030)), index=list(range(2024, 2030)).index(datetime.now().year))
+        cm, cy = st.columns(2)
+        m_idx = mois_fr.index(cm.selectbox("Mois", mois_fr, index=datetime.now().month-1)) + 1
+        y_sel = cy.selectbox("Année", list(range(2024, 2030)), index=list(range(2024, 2030)).index(datetime.now().year))
         
-        # CALCUL FINANCIER SÉCURISÉ
-        rec_m = df[(df['temp_date_obj'].dt.month == m_idx) & (df['temp_date_obj'].dt.year == y_sel) & (df['Statut'] == "🟢 OK")]['prix_num'].sum()
-        rec_a = df[(df['temp_date_obj'].dt.year == y_sel) & (df['Statut'] == "🟢 OK")]['prix_num'].sum()
+        # CALCULS MATHÉMATIQUES PRÉCIS
+        mask_m = (df['temp_date_obj'].dt.month == m_idx) & (df['temp_date_obj'].dt.year == y_sel) & (df['Statut'] == "🟢 OK")
+        mask_a = (df['temp_date_obj'].dt.year == y_sel) & (df['Statut'] == "🟢 OK")
+        rec_m = df[mask_m]['prix_num'].sum()
+        rec_a = df[mask_a]['prix_num'].sum()
         
         st.markdown(f"""<div style="background-color:#003366; color:white; padding:15px; border-radius:10px; text-align:center; margin-bottom:15px;">
-        💰 Recettes {m_nom} : <b>{rec_m:,.0f} €</b> | 📈 Cumul Annuel {y_sel} : <b>{rec_a:,.0f} €</b></div>""", unsafe_allow_html=True)
+        💰 Recettes {mois_fr[m_idx-1]} : <b>{rec_m:,.2f} €</b> | 📈 Cumul Annuel {y_sel} : <b>{rec_a:,.2f} €</b></div>""", unsafe_allow_html=True)
 
         cal = calendar.monthcalendar(y_sel, m_idx)
         cols_h = st.columns(7)
@@ -130,26 +134,32 @@ else:
                     
                     btn_label = str(day)
                     if not occ.empty:
-                        total_p = occ['pass_num'].sum()
-                        # Système d'icônes pour les couleurs
-                        if total_p == 1: icon = "🔴"
-                        elif total_p <= 3: icon = "🟠"
-                        else: icon = "🟢"
+                        total_p = sum(pd.to_numeric(occ['Passagers'], errors='coerce').fillna(0))
+                        icon = "🔴" if total_p == 1 else "🟠" if total_p <= 3 else "🟢"
                         btn_label = f"{icon} {day} ({int(total_p)}p)"
                     
                     if cols_w[i].button(btn_label, key=f"b_{d_str}", use_container_width=True):
                         st.session_state.cal_date_sel = d_str
 
+        # PANNEAU DE DÉTAILS SI DATE CLIQUÉE
         if st.session_state.cal_date_sel:
             st.markdown("---")
-            st.write(f"🔍 **Détails du {st.session_state.cal_date_sel}**")
+            st.subheader(f"⚓ Réservations du {st.session_state.cal_date_sel}")
             sel_date = pd.to_datetime(st.session_state.cal_date_sel, dayfirst=True).date()
             details = df[(df['temp_date_obj'].dt.date == sel_date) & (df['Statut'] == "🟢 OK")]
-            for _, r in details.iterrows():
-                st.info(f"👤 **{r['Nom']} {r['Prénom']}** | 📞 {r['Téléphone']} | 💰 {r['PrixJour']}€")
-            if st.button("Fermer"): st.session_state.cal_date_sel = None; st.rerun()
+            
+            if details.empty:
+                st.write("Aucune réservation validée (🟢 OK) pour ce jour.")
+            else:
+                for _, r in details.iterrows():
+                    with st.expander(f"👤 {r['Nom']} {r['Prénom']} - {r['Passagers']} pers.", expanded=True):
+                        st.write(f"📞 **Tel:** {r['Téléphone']} | 📧 **Email:** {r['Email']}")
+                        st.write(f"💰 **Prix:** {r['PrixJour']}€ | ✅ **Payé:** {r['Paye']}")
+                        st.write(f"📝 **Notes:** {r['Historique']}")
+            if st.button("Fermer les détails"):
+                st.session_state.cal_date_sel = None; st.rerun()
 
-    # --- PAGE FORMULAIRE (SÉCURISÉE) ---
+    # --- PAGE FORMULAIRE (DATE ET ORDRE CORRIGÉS) ---
     elif st.session_state.page == "FORM":
         idx = st.session_state.get("edit_idx")
         st.subheader("📝 Fiche Contact")
@@ -162,32 +172,26 @@ else:
 
         with st.form("fiche_nav"):
             c1, c2 = st.columns(2)
-            f_nom = c1.text_input("NOM", value=init.get("Nom", ""), placeholder="NOM")
-            f_pre = c2.text_input("Prénom", value=init.get("Prénom", ""), placeholder="Prénom")
-            f_tel = c1.text_input("Téléphone", value=init.get("Téléphone", ""), placeholder="Téléphone")
-            f_email = c2.text_input("Email", value=init.get("Email", ""), placeholder="Email")
-            
+            f_nom = c1.text_input("NOM", value=init.get("Nom", ""))
+            f_pre = c2.text_input("Prénom", value=init.get("Prénom", ""))
+            f_tel = c1.text_input("Téléphone", value=init.get("Téléphone", ""))
+            f_email = c2.text_input("Email", value=init.get("Email", ""))
             st.markdown("---")
             c3, c4 = st.columns(2)
-            f_date = c3.text_input("Date (JJ/MM/AAAA)", value=date_aff, placeholder="JJ/MM/AAAA")
-            f_pass = c4.number_input("Nombre de Passagers", min_value=1, value=int(float(str(init.get("Passagers", 1)).replace(',','.'))) if init.get("Passagers") else 1)
-            f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], 
-                                  index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut", "🟡 Attente") if init.get("Statut") in ["🟡 Attente", "🟢 OK", "🔴 Pas OK"] else "🟡 Attente"))
-            
+            f_date = c3.text_input("Date Navigation (JJ/MM/AAAA)", value=date_aff)
+            f_pass = c4.number_input("Passagers", min_value=1, value=int(float(str(init.get("Passagers", 1)).replace(',','.'))) if init.get("Passagers") else 1)
+            f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=0)
             st.markdown("---")
             c5, c6 = st.columns([2, 1])
-            f_prix = c5.text_input("Forfait (€)", value=str(init.get("PrixJour", "0")), placeholder="0")
+            f_prix = c5.text_input("Forfait (€)", value=str(init.get("PrixJour", "0")))
             f_paye = c6.checkbox("✅ PAYÉ", value=(init.get("Paye") == "Oui"))
-            
             st.markdown("---")
             f_his = st.text_area("Historique (D: / R:)", value=init.get("Historique", ""), height=100)
             
             if st.form_submit_button("💾 ENREGISTRER"):
                 try:
-                    # Nettoyage strict de la date
-                    clean_d = f_date.strip().replace('-', '/')
-                    d_obj = datetime.strptime(clean_d, '%d/%m/%Y')
-                    
+                    d_clean = f_date.strip().replace('-', '/')
+                    d_obj = datetime.strptime(d_clean, '%d/%m/%Y')
                     new_rec = {
                         "DateNav": d_obj.strftime('%d/%m/%Y'),
                         "Nom": f_nom.upper(), "Prénom": f_pre.capitalize(),
@@ -199,15 +203,12 @@ else:
                         for k, v in new_rec.items(): df.at[idx, k] = v
                     else:
                         df = pd.concat([df, pd.DataFrame([new_rec])], ignore_index=True)
-                    
-                    sauvegarder_data(df, "contacts")
-                    st.session_state.page = "LISTE"
-                    st.rerun()
-                except:
-                    st.error("⚠️ FORMAT DATE : Utilisez JJ/MM/AAAA (ex: 25/05/2026)")
+                    sauvegarder_data(df, "contacts"); st.session_state.page = "LISTE"; st.rerun()
+                except: st.error("⚠️ FORMAT DATE : Utilisez JJ/MM/AAAA (ex: 25/05/2026)"
 
 
             
+
 
 
 
