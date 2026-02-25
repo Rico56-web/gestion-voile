@@ -36,7 +36,7 @@ def sauvegarder_data(df, nom_fichier):
     if 'temp_date' in df_save.columns: df_save = df_save.drop(columns=['temp_date'])
     json_data = df_save.to_json(orient="records", indent=4)
     content_b64 = base64.b64encode(json_data.encode('utf-8')).decode('utf-8')
-    data = {"message": "Vesta Update: Charges forfaits & Delete btn", "content": content_b64}
+    data = {"message": "Vesta: Statut filters restored", "content": content_b64}
     if sha: data["sha"] = sha
     requests.put(url, headers=headers, json=data)
 
@@ -52,7 +52,6 @@ if not st.session_state.authenticated:
         st.session_state.authenticated = True
         st.rerun()
 else:
-    # On utilise "PrixJour" comme montant forfaitaire global maintenant
     cols = ["DateNav", "Jours", "Statut", "Nom", "Prénom", "Téléphone", "Email", "Cause", "Demande", "Historique", "Paye", "PrixJour"]
     df = charger_data("contacts", cols)
 
@@ -69,15 +68,24 @@ else:
 
     # --- PAGE LISTE ---
     if st.session_state.page == "LISTE":
-        search = st.text_input("🔍 Rechercher un nom...")
-        vue_temps = st.selectbox("Période :", ["🚀 Prochaines Navigations", "📜 Archives", "🌍 Tout voir"])
+        # FILTRES DE RECHERCHE ET STATUTS
+        c_search, c_view = st.columns([2, 1])
+        with c_search: search = st.text_input("🔍 Rechercher un nom...")
+        with c_view: vue_temps = st.selectbox("Période :", ["🚀 Prochaines Navigations", "📜 Archives", "🌍 Tout voir"])
         
+        # Le retour des boutons de filtrage par statut
+        options_statut = ["🟢 OK", "🟡 Attente", "🔴 Pas OK"]
+        filtre_statut = st.multiselect("Filtrer par statuts :", options_statut, default=options_statut)
+
         filt_df = df.copy()
         filt_df['temp_date'] = pd.to_datetime(filt_df['DateNav'], dayfirst=True, errors='coerce')
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
+        # Application des filtres
         if search:
             filt_df = filt_df[filt_df['Nom'].str.contains(search, case=False) | filt_df['Prénom'].str.contains(search, case=False)]
+        
+        filt_df = filt_df[filt_df['Statut'].isin(filtre_statut)]
         
         if vue_temps == "🚀 Prochaines Navigations":
             filt_df = filt_df[(filt_df['temp_date'] >= today) | (filt_df['temp_date'].isna())]
@@ -90,7 +98,6 @@ else:
             stat = str(row['Statut']) if row['Statut'] else "🟡 Attente"
             bg = "#c8e6c9" if "🟢" in stat else "#fff9c4" if "🟡" in stat else "#ffcdd2"
             
-            # Montant forfaitaire (PrixJour est utilisé comme total global maintenant)
             try:
                 total = int(float(str(row['PrixJour']).replace(',','.')))
             except: total = 0
@@ -120,7 +127,7 @@ else:
                     st.write(f"**Motif :** {row['Cause']}")
                     st.write(f"**Historique :** {row['Historique']}")
 
-    # --- PAGE FORMULAIRE (MODIFIÉ) ---
+    # --- PAGE FORMULAIRE ---
     elif st.session_state.page == "FORM":
         idx = st.session_state.get("edit_idx")
         st.subheader("📝 Fiche Contact")
@@ -129,9 +136,8 @@ else:
             c1, c2 = st.columns(2)
             f_date = c1.text_input("Date (JJ/MM/AAAA)", value=init.get("DateNav", ""))
             f_jours = c1.text_input("Nombre de jours", value=str(init.get("Jours", "0")))
-            # Changement libellé ici pour plus de clarté
             f_prix = c1.text_input("MONTANT FORFAITAIRE GLOBAL (€)", value=str(init.get("PrixJour", "0")))
-            f_stat = c1.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut", "🟡 Attente")))
+            f_stat = c1.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut", "🟡 Attente") if init.get("Statut") in ["🟡 Attente", "🟢 OK", "🔴 Pas OK"] else "🟡 Attente"))
             f_nom = c2.text_input("Nom", value=init.get("Nom", ""))
             f_pre = c2.text_input("Prénom", value=init.get("Prénom", ""))
             f_tel = c2.text_input("Téléphone", value=init.get("Téléphone", ""))
@@ -141,13 +147,13 @@ else:
             f_dem = st.text_area("Demande", value=init.get("Demande", ""))
             f_his = st.text_area("Historique / Notes", value=init.get("Historique", ""))
             
-            if st.form_submit_button("💾 ENREGISTRER LA FICHE"):
+            if st.form_submit_button("💾 ENREGISTRER"):
                 new = {"DateNav": f_date, "Jours": f_jours, "PrixJour": f_prix.replace(',','.'), "Statut": f_stat, "Nom": f_nom, "Prénom": f_pre, "Paye": "Oui" if f_paye else "Non", "Téléphone": f_tel, "Email": f_ema, "Demande": f_dem, "Cause": f_cau, "Historique": f_his}
                 if idx is not None: df.loc[idx] = new
                 else: df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
                 sauvegarder_data(df, "contacts"); st.session_state.page = "LISTE"; st.rerun()
 
-    # --- PAGE FINANCES & CHECKLIST (IDENTIQUES) ---
+    # --- PAGE FINANCES ---
     elif st.session_state.page == "CALENDRIER":
         st.subheader("💰 Finances")
         df['Total'] = pd.to_numeric(df['PrixJour'], errors='coerce').fillna(0)
@@ -155,11 +161,12 @@ else:
         att = df[df['Statut'] == "🟢 OK"]['Total'].sum()
         st.metric("ENCAISSÉ GLOBAL (OK)", f"{int(enc)} €", f"sur {int(att)} €")
 
+    # --- PAGE CHECKLIST ---
     elif st.session_state.page == "CHECK":
         st.subheader("Check-list")
         df_c = charger_data("checklist", ["Tâche"])
         nt = st.text_input("Ajouter tâche")
-        if st.button("OK"):
+        if st.button("Ajouter"):
             df_c = pd.concat([df_c, pd.DataFrame([{"Tâche": nt}])], ignore_index=True)
             sauvegarder_data(df_c, "checklist"); st.rerun()
         for i, r in df_c.iterrows():
@@ -167,6 +174,7 @@ else:
                 df_c = df_c.drop(i); sauvegarder_data(df_c, "checklist"); st.rerun()
 
             
+
 
 
 
