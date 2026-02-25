@@ -36,7 +36,7 @@ def sauvegarder_data(df, nom_fichier):
     if 'temp_date' in df_save.columns: df_save = df_save.drop(columns=['temp_date'])
     json_data = df_save.to_json(orient="records", indent=4)
     content_b64 = base64.b64encode(json_data.encode('utf-8')).decode('utf-8')
-    data = {"message": "Vesta: Statut filters restored", "content": content_b64}
+    data = {"message": "Vesta: Red alert for unpaid", "content": content_b64}
     if sha: data["sha"] = sha
     requests.put(url, headers=headers, json=data)
 
@@ -68,12 +68,10 @@ else:
 
     # --- PAGE LISTE ---
     if st.session_state.page == "LISTE":
-        # FILTRES DE RECHERCHE ET STATUTS
         c_search, c_view = st.columns([2, 1])
         with c_search: search = st.text_input("🔍 Rechercher un nom...")
         with c_view: vue_temps = st.selectbox("Période :", ["🚀 Prochaines Navigations", "📜 Archives", "🌍 Tout voir"])
         
-        # Le retour des boutons de filtrage par statut
         options_statut = ["🟢 OK", "🟡 Attente", "🔴 Pas OK"]
         filtre_statut = st.multiselect("Filtrer par statuts :", options_statut, default=options_statut)
 
@@ -81,7 +79,6 @@ else:
         filt_df['temp_date'] = pd.to_datetime(filt_df['DateNav'], dayfirst=True, errors='coerce')
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-        # Application des filtres
         if search:
             filt_df = filt_df[filt_df['Nom'].str.contains(search, case=False) | filt_df['Prénom'].str.contains(search, case=False)]
         
@@ -98,6 +95,11 @@ else:
             stat = str(row['Statut']) if row['Statut'] else "🟡 Attente"
             bg = "#c8e6c9" if "🟢" in stat else "#fff9c4" if "🟡" in stat else "#ffcdd2"
             
+            # Gestion de la couleur du paiement
+            est_paye = str(row['Paye']) == "Oui"
+            pay_text = "✅ PAYÉ" if est_paye else "⏳ À PAYER"
+            pay_color = "#1b5e20" if est_paye else "#d32f2f" # Vert foncé ou Rouge
+            
             try:
                 total = int(float(str(row['PrixJour']).replace(',','.')))
             except: total = 0
@@ -109,7 +111,9 @@ else:
                     <span style="background: white; padding: 2px 8px; border-radius: 5px; border: 1px solid black;">{stat}</span>
                 </div>
                 <div style="font-size:1.3em; margin-top:8px;">👤 <b>{row['Nom']}</b> {row['Prénom']}</div>
-                <div style="margin-top:8px; font-weight:bold;">💰 FORFAIT : {total}€ ({'✅ PAYÉ' if row['Paye'] == 'Oui' else '⏳ À PAYER'})</div>
+                <div style="margin-top:8px; font-weight:bold; font-size:1.1em; color:{pay_color};">
+                    💰 FORFAIT : {total}€ — {pay_text}
+                </div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -122,10 +126,9 @@ else:
                     df = df.drop(idx)
                     sauvegarder_data(df, "contacts"); st.rerun()
             with c_ex:
-                with st.expander("📝 Détails & Contact"):
+                with st.expander("📝 Détails"):
                     st.write(f"📞 {row['Téléphone']} | 📧 {row['Email']}")
                     st.write(f"**Motif :** {row['Cause']}")
-                    st.write(f"**Historique :** {row['Historique']}")
 
     # --- PAGE FORMULAIRE ---
     elif st.session_state.page == "FORM":
@@ -174,6 +177,7 @@ else:
                 df_c = df_c.drop(i); sauvegarder_data(df_c, "checklist"); st.rerun()
 
             
+
 
 
 
