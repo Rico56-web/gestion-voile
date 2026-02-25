@@ -85,7 +85,9 @@ else:
         with col_search:
             search = st.text_input("🔍 Rechercher un nom...")
         with col_filt:
-            f_statut = st.multiselect("Statuts :", ["🟢 OK", "🟡 Attente", "🔴 Pas OK"], default=["🟢 OK", "🟡 Attente", "🔴 Pas OK"])
+            # S'assure que les 3 statuts sont sélectionnés par défaut
+            options_statut = ["🟢 OK", "🟡 Attente", "🔴 Pas OK"]
+            f_statut = st.multiselect("Statuts :", options_statut, default=options_statut)
         
         # Préparation du DataFrame
         filt_df = df.copy()
@@ -202,6 +204,7 @@ else:
             if col2.button("Fait", key=f"done_{i}"):
                 df_c = df_c.drop(i); sauvegarder_data(df_c, "checklist"); st.rerun()
             
+
 
 
 
