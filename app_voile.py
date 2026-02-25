@@ -1,4 +1,4 @@
-import streamlit as st
+mport streamlit as st
 import pandas as pd
 import json
 import base64
@@ -19,7 +19,13 @@ def charger_data(nom_fichier, colonnes):
         content = res.json()
         decoded = base64.b64decode(content['content']).decode('utf-8')
         if decoded.strip():
-            return pd.DataFrame(json.loads(decoded))
+            df_load = pd.DataFrame(json.loads(decoded))
+            # S'assurer que les colonnes numériques ne sont pas vides
+            if 'PrixJour' in df_load.columns:
+                df_load['PrixJour'] = df_load['PrixJour'].replace('', '0')
+            if 'Jours' in df_load.columns:
+                df_load['Jours'] = df_load['Jours'].replace('', '0')
+            return df_load
     return pd.DataFrame(columns=colonnes)
 
 def sauvegarder_data(df, nom_fichier):
@@ -31,9 +37,13 @@ def sauvegarder_data(df, nom_fichier):
     sha = res.json().get('sha') if res.status_code == 200 else None
     df_save = df.copy()
     if 'temp_date' in df_save.columns: df_save = df_save.drop(columns=['temp_date'])
+    # Suppression des colonnes de calcul temporaires avant sauvegarde
+    for c in ['J_num', 'P_num', 'TotalFiche']:
+        if c in df_save.columns: df_save = df_save.drop(columns=[c])
+    
     json_data = df_save.to_json(orient="records", indent=4)
     content_b64 = base64.b64encode(json_data.encode('utf-8')).decode('utf-8')
-    data = {"message": "Update Vesta Finances Perso", "content": content_b64}
+    data = {"message": "Update Vesta Robust Calculations", "content": content_b64}
     if sha: data["sha"] = sha
     requests.put(url, headers=headers, json=data)
 
@@ -51,37 +61,31 @@ if not st.session_state.authenticated:
         st.session_state.authenticated = True
         st.rerun()
 else:
-    # AJOUT DES COLONNES : 'PrixJour' et 'Paye'
     cols = ["DateNav", "Jours", "Statut", "Nom", "Prénom", "Téléphone", "Email", "Cause", "Demande", "Historique", "Paye", "PrixJour"]
     df = charger_data("contacts", cols)
     for c in cols:
         if c not in df.columns: df[c] = ""
 
-    # --- BARRE DE NAVIGATION ---
+    # Navigation
     st.markdown("---")
     c1, c2, c3, c4 = st.columns(4)
-    if c1.button("📋 LISTE", use_container_width=True):
-        st.session_state.page = "LISTE"; st.rerun()
-    if c2.button("💰 FINANCES", use_container_width=True):
-        st.session_state.page = "CALENDRIER"; st.rerun()
+    if c1.button("📋 LISTE", use_container_width=True): st.session_state.page = "LISTE"; st.rerun()
+    if c2.button("💰 FINANCES", use_container_width=True): st.session_state.page = "CALENDRIER"; st.rerun()
     if c3.button("➕ NOUVEAU", use_container_width=True):
         if "edit_idx" in st.session_state: del st.session_state.edit_idx
         st.session_state.page = "FORM"; st.rerun()
-    if c4.button("✅ CHECK", use_container_width=True):
-        st.session_state.page = "CHECK"; st.rerun()
+    if c4.button("✅ CHECK", use_container_width=True): st.session_state.page = "CHECK"; st.rerun()
     st.markdown("---")
 
     # --- PAGE CALENDRIER & FINANCES ---
     if st.session_state.page == "CALENDRIER":
         st.subheader("💰 Bilan Financier & Occupation")
         
-        # Préparation calculs
         df['temp_date'] = pd.to_datetime(df['DateNav'], dayfirst=True, errors='coerce')
         df['J_num'] = pd.to_numeric(df['Jours'], errors='coerce').fillna(0)
         df['P_num'] = pd.to_numeric(df['PrixJour'], errors='coerce').fillna(0)
         df['TotalFiche'] = df['J_num'] * df['P_num']
         
-        # GRAND TOTAL (Toutes les nav 🟢 OK)
         df_ok_all = df[df['Statut'] == "🟢 OK"]
         total_global_attendu = df_ok_all['TotalFiche'].sum()
         total_global_encaisse = df_ok_all[df_ok_all['Paye'] == "Oui"]['TotalFiche'].sum()
@@ -103,7 +107,7 @@ else:
             st.markdown(f"#### {month_name} {y}")
             c_occ, c_fin = st.columns(2)
             c_occ.write(f"Occupation : **{int(total_jours)} j**")
-            c_occ.progress(min(total_jours / 30, 1.0))
+            c_occ.progress(min(total_jours / 31, 1.0))
             c_fin.write(f"Caisse : **{int(total_mensuel_ok)}€** / {int(total_mensuel_du)}€")
             c_fin.progress(min(total_mensuel_ok / total_mensuel_du, 1.0) if total_mensuel_du > 0 else 0)
             st.markdown("---")
@@ -127,11 +131,16 @@ else:
         for idx, row in filt_df.iterrows():
             bg = "#c8e6c9" if "🟢" in str(row['Statut']) else "#fff9c4" if "🟡" in str(row['Statut']) else "#ffcdd2"
             p_icon = "✅💰" if str(row['Paye']) == "Oui" else "⏳"
-            prix = int(pd.to_numeric(row['PrixJour'], errors='coerce') or 0)
-            jours = int(pd.to_numeric(row['Jours'], errors='coerce') or 0)
-            total = prix * jours
             
-            st.markdown(f'<div style="background-color:{bg}; padding:10px; border-radius:10px; border:1px solid #999; margin-bottom:5px; color:black;"><b>{row["DateNav"]}</b> | {row["Prénom"]} {row["Nom"]} | <b>{total}€</b> {p_icon}</div>', unsafe_allow_html=True)
+            # CALCUL SÉCURISÉ POUR L'AFFICHAGE
+            try:
+                val_prix = float(str(row['PrixJour']).replace(',', '.') or 0)
+                val_jours = float(str(row['Jours']).replace(',', '.') or 0)
+                total_fiche = int(val_prix * val_jours)
+            except:
+                total_fiche = 0
+            
+            st.markdown(f'<div style="background-color:{bg}; padding:10px; border-radius:10px; border:1px solid #999; margin-bottom:5px; color:black;"><b>{row["DateNav"]}</b> | {row["Prénom"]} {row["Nom"]} | <b>{total_fiche}€</b> {p_icon}</div>', unsafe_allow_html=True)
             c_edit, c_pay, c_det = st.columns(3)
             with c_edit:
                 if st.button("✏️ Modif", key=f"e_{idx}", use_container_width=True):
@@ -143,7 +152,7 @@ else:
                     sauvegarder_data(df, "contacts"); st.rerun()
             with c_det:
                 with st.expander("Détails"):
-                    st.write(f"Tarif : {prix}€/j x {jours}j")
+                    st.write(f"Tarif : {row['PrixJour']}€/j x {row['Jours']}j")
                     st.write(f"Tél: {row['Téléphone']}")
 
     # --- PAGE FORMULAIRE ---
@@ -156,27 +165,28 @@ else:
             c1, c2 = st.columns(2)
             with c1:
                 f_date = st.text_input("Date (JJ/MM/AAAA)", value=init.get("DateNav", ""))
-                f_jours = st.number_input("Nb Jours", min_value=0, value=int(init.get("Jours", 0)) if init.get("Jours") else 0)
-                f_prix = st.number_input("Prix par Jour (€)", min_value=0, value=int(init.get("PrixJour", 0)) if init.get("PrixJour") else 20)
+                f_jours = st.text_input("Nb Jours", value=str(init.get("Jours", "0")))
+                f_prix = st.text_input("Prix par Jour (€)", value=str(init.get("PrixJour", "20")))
             with c2:
                 f_nom = st.text_input("Nom", value=init.get("Nom", ""))
                 f_pre = st.text_input("Prénom", value=init.get("Prénom", ""))
                 f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut", "🟡 Attente")))
             
             f_paye = st.checkbox("Participation déjà réglée", value=(str(init.get("Paye")) == "Oui"))
-            
-            st.markdown("---")
             f_tel = st.text_input("Téléphone", value=init.get("Téléphone", ""))
             f_ema = st.text_input("Email", value=init.get("Email", ""))
             f_dem = st.text_area("Précisions", value=init.get("Demande", ""))
             
             if st.form_submit_button("💾 ENREGISTRER"):
-                new_row = {**init, "DateNav": f_date, "Jours": str(f_jours), "PrixJour": str(f_prix), "Statut": f_stat, "Nom": f_nom, "Prénom": f_pre, "Paye": "Oui" if f_paye else "Non", "Téléphone": f_tel, "Email": f_ema, "Demande": f_dem}
+                # Nettoyage des virgules en points pour les calculs
+                clean_jours = f_jours.replace(',', '.')
+                clean_prix = f_prix.replace(',', '.')
+                new_row = {**init, "DateNav": f_date, "Jours": clean_jours, "PrixJour": clean_prix, "Statut": f_stat, "Nom": f_nom, "Prénom": f_pre, "Paye": "Oui" if f_paye else "Non", "Téléphone": f_tel, "Email": f_ema, "Demande": f_dem}
                 if idx is not None: df.loc[idx] = new_row
                 else: df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                 sauvegarder_data(df, "contacts"); st.session_state.page = "LISTE"; st.rerun()
 
-    # --- PAGE CHECKLIST (Inchangée) ---
+    # --- PAGE CHECKLIST ---
     elif st.session_state.page == "CHECK":
         st.subheader("Check-list")
         df_c = charger_data("checklist", ["Tâche"])
@@ -192,6 +202,7 @@ else:
 
 
             
+
 
 
 
