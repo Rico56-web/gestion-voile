@@ -1,16 +1,4 @@
-C'est un véritable carnet de bord professionnel que nous sommes en train de peaufiner ! J'ai intégré toutes vos demandes de structure, de mise en forme automatique et de suivi financier.
 
-🛠️ Les nouveautés de cette version :
-Tableau de Bord Financier : Un bandeau bleu en haut du calendrier calcule en temps réel votre chiffre d'affaires (basé sur les statuts "🟢 OK").
-
-Mise en forme Intelligente : Peu importe comment vous tapez, le NOM devient MAJUSCULE et le Prénom prend sa Majuscule initiale.
-
-Réorganisation de la Fiche : L'ordre est désormais : Identité > Contact > Passagers > Forfait & Paiement.
-
-Couleurs du Calendrier : Comme Streamlit ne permet pas nativement de colorer chaque bouton différemment, j'ai utilisé une astuce : le bouton affiche le nombre de passagers et change de style pour être immédiatement repérable.
-
-🚀 Copiez ce code complet :
-Python
 import streamlit as st
 import pandas as pd
 import json
@@ -211,9 +199,10 @@ else:
                     
                     sauvegarder_data(df, "contacts"); st.session_state.page = "LISTE"; st.rerun()
                 except: st.error("⚠️ Date invalide (Format attendu : JJ/MM/AAAA)")
-⚓ Les points clés pour vous :
+
 
             
+
 
 
 
