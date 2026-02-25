@@ -37,7 +37,7 @@ def sauvegarder_data(df, nom_fichier):
     if 'temp_date_obj' in df_save.columns: df_save = df_save.drop(columns=['temp_date_obj'])
     json_data = df_save.to_json(orient="records", indent=4)
     content_b64 = base64.b64encode(json_data.encode('utf-8')).decode('utf-8')
-    data = {"message": "Vesta: Cal Passagers + Filter Fix", "content": content_b64}
+    data = {"message": "Vesta: Bug Fix Passagers", "content": content_b64}
     if sha: data["sha"] = sha
     requests.put(url, headers=headers, json=data)
 
@@ -73,15 +73,12 @@ else:
     if st.session_state.page == "LISTE":
         c_search, c_filter = st.columns([2, 1])
         with c_search: search = st.text_input("🔍 Chercher un nom...")
-        
-        # Le menu Statuts est ici
         opts_stat = ["🟢 OK", "🟡 Attente", "🔴 Pas OK"]
         with c_filter: f_statut = st.multiselect("Filtrer :", opts_stat, default=opts_stat)
 
         filt_df = df.copy()
         if search:
             filt_df = filt_df[filt_df['Nom'].str.contains(search, case=False) | filt_df['Prénom'].str.contains(search, case=False)]
-        
         filt_df = filt_df[filt_df['Statut'].isin(f_statut)]
         
         for idx, row in filt_df.sort_values('temp_date_obj', ascending=True).iterrows():
@@ -131,7 +128,6 @@ else:
                     t_date = datetime(y_sel, m_idx, day).date()
                     occ = df[(df['temp_date_obj'].dt.date == t_date) & (df['Statut'] == "🟢 OK")]
                     
-                    # AFFICHAGE NOMBRE DE PASSAGERS SUR LE BOUTON
                     btn_label = f"{day}"
                     color = "secondary"
                     if not occ.empty:
@@ -142,14 +138,12 @@ else:
                     if cols_w[i].button(btn_label, key=f"btn_{d_str}", use_container_width=True, type=color):
                         st.session_state.cal_date_sel = d_str
 
-        # DÉTAILS SOUS LE CALENDRIER
         if st.session_state.cal_date_sel:
             st.markdown("---")
             cd1, cd2 = st.columns([3, 1])
             cd1.markdown(f"### ⚓ Détails pour le {st.session_state.cal_date_sel}")
-            if cd2.button("✖ Fermer les détails"):
+            if cd2.button("✖ Fermer"):
                 st.session_state.cal_date_sel = None; st.rerun()
-            
             sel_date_obj = pd.to_datetime(st.session_state.cal_date_sel, dayfirst=True).date()
             details = df[(df['temp_date_obj'].dt.date == sel_date_obj) & (df['Statut'] == "🟢 OK")]
             if not details.empty:
@@ -157,31 +151,50 @@ else:
                     st.info(f"👤 **{r['Nom']} {r['Prénom']}** | 📞 {r['Téléphone']} | 👥 {r['Passagers']} pers. | 💰 {r['PrixJour']}€")
             else: st.write("Date libre.")
 
-    # --- PAGE FORMULAIRE ---
+    # --- PAGE FORMULAIRE (CORRECTION CRASH) ---
     elif st.session_state.page == "FORM":
         idx = st.session_state.get("edit_idx")
         st.subheader("📝 Fiche Contact")
         init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols}
-        with st.form("f"):
+        
+        # NETTOYAGE SECURITE : On force le nombre de passagers à 1 si vide ou 0
+        p_val = init.get("Passagers", "1")
+        try:
+            p_final = int(float(str(p_val).replace(',', '.')))
+            if p_final < 1: p_final = 1
+        except:
+            p_final = 1
+
+        # Utilisation d'un container pour bien englober le formulaire
+        with st.form("f_contact", clear_on_submit=False):
             f_date = st.text_input("Date (JJ/MM/AAAA)", value=init.get("DateNav", ""))
             f_nom = st.text_input("Nom", value=init.get("Nom", ""))
             f_pre = st.text_input("Prénom", value=init.get("Prénom", ""))
-            f_pass = st.number_input("Nombre de Passagers", min_value=1, value=int(init.get("Passagers", 1)) if str(init.get("Passagers")).isdigit() else 1)
+            f_pass = st.number_input("Nombre de Passagers", min_value=1, value=p_final)
             f_prix = st.text_input("Forfait (€)", value=str(init.get("PrixJour", "0")))
-            f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=0)
+            f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], 
+                                  index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut", "🟡 Attente") if init.get("Statut") in ["🟡 Attente", "🟢 OK", "🔴 Pas OK"] else "🟡 Attente"))
             f_tel = st.text_input("Téléphone", value=init.get("Téléphone", ""))
             f_paye = st.checkbox("Payé ✅", value=(init.get("Paye") == "Oui"))
             f_his = st.text_area("Notes", value=init.get("Historique", ""))
-            if st.form_submit_button("💾 ENREGISTRER"):
+            
+            # Le bouton obligatoire
+            submitted = st.form_submit_button("💾 ENREGISTRER")
+            
+            if submitted:
                 try:
                     pd.to_datetime(f_date, dayfirst=True)
-                    new = {"DateNav": f_date, "Nom": f_nom, "Prénom": f_pre, "Passagers": str(f_pass), "PrixJour": f_prix, "Statut": f_stat, "Téléphone": f_tel, "Paye": "Oui" if f_paye else "Non", "Historique": f_his}
+                    new_data = {"DateNav": f_date, "Nom": f_nom, "Prénom": f_pre, "Passagers": str(f_pass), 
+                                "PrixJour": f_prix, "Statut": f_stat, "Téléphone": f_tel, "Paye": "Oui" if f_paye else "Non", "Historique": f_his}
                     if idx is not None:
-                        for key, val in new.items(): df.at[idx, key] = val
+                        for k, v in new_data.items(): df.at[idx, k] = v
                     else:
-                        df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
-                    sauvegarder_data(df, "contacts"); st.session_state.page = "LISTE"; st.rerun()
-                except: st.error("Date invalide.")
+                        df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
+                    sauvegarder_data(df, "contacts")
+                    st.session_state.page = "LISTE"
+                    st.rerun()
+                except:
+                    st.error("Erreur : Vérifiez le format de la date (JJ/MM/AAAA)")
 
     # --- PAGE CHECKLIST ---
     elif st.session_state.page == "CHECK":
@@ -196,6 +209,7 @@ else:
                 df_c = df_c.drop(i); sauvegarder_data(df_c, "checklist"); st.rerun()
 
             
+
 
 
 
