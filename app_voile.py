@@ -42,11 +42,12 @@ def sauvegarder_data(df, nom_fichier):
     res = requests.get(url, headers=headers)
     sha = res.json().get('sha') if res.status_code == 200 else None
     df_save = df.copy()
+    # On retire les colonnes de calcul temporaires avant de sauvegarder sur GitHub
     for c in ['temp_date_obj', 'prix_num']:
         if c in df_save.columns: df_save = df_save.drop(columns=[c])
     json_data = df_save.to_json(orient="records", indent=4)
     content_b64 = base64.b64encode(json_data.encode('utf-8')).decode('utf-8')
-    data = {"message": "Vesta: Correction Cumul et Détails", "content": content_b64}
+    data = {"message": "Vesta: Mise à jour", "content": content_b64}
     if sha: data["sha"] = sha
     requests.put(url, headers=headers, json=data)
 
@@ -66,7 +67,7 @@ else:
     cols = ["DateNav", "Statut", "Nom", "Prénom", "Téléphone", "Email", "Paye", "PrixJour", "Passagers", "Historique"]
     df = charger_data("contacts", cols)
     
-    # Nettoyage profond pour le calcul des recettes
+    # --- NETTOYAGE POUR CALCULS ---
     def clean_prix(val):
         if pd.isna(val) or val == "": return 0.0
         s = str(val).replace('€', '').replace(' ', '').replace(',', '.').strip()
@@ -76,7 +77,7 @@ else:
     df['temp_date_obj'] = pd.to_datetime(df['DateNav'], dayfirst=True, errors='coerce')
     df['prix_num'] = df['PrixJour'].apply(clean_prix)
 
-    # Navigation
+    # --- BARRE DE NAVIGATION ---
     st.markdown("---")
     c1, c2, c3, c4 = st.columns(4)
     if c1.button("📋 LISTE", use_container_width=True): st.session_state.page = "LISTE"; st.rerun()
@@ -111,7 +112,7 @@ else:
         m_idx = mois_fr.index(cm.selectbox("Mois", mois_fr, index=datetime.now().month-1)) + 1
         y_sel = cy.selectbox("Année", list(range(2024, 2030)), index=list(range(2024, 2030)).index(datetime.now().year))
         
-        # CALCULS MATHÉMATIQUES PRÉCIS
+        # CALCULS FINANCIERS
         mask_m = (df['temp_date_obj'].dt.month == m_idx) & (df['temp_date_obj'].dt.year == y_sel) & (df['Statut'] == "🟢 OK")
         mask_a = (df['temp_date_obj'].dt.year == y_sel) & (df['Statut'] == "🟢 OK")
         rec_m = df[mask_m]['prix_num'].sum()
@@ -141,7 +142,6 @@ else:
                     if cols_w[i].button(btn_label, key=f"b_{d_str}", use_container_width=True):
                         st.session_state.cal_date_sel = d_str
 
-        # PANNEAU DE DÉTAILS SI DATE CLIQUÉE
         if st.session_state.cal_date_sel:
             st.markdown("---")
             st.subheader(f"⚓ Réservations du {st.session_state.cal_date_sel}")
@@ -149,7 +149,7 @@ else:
             details = df[(df['temp_date_obj'].dt.date == sel_date) & (df['Statut'] == "🟢 OK")]
             
             if details.empty:
-                st.write("Aucune réservation validée (🟢 OK) pour ce jour.")
+                st.info("Aucune réservation validée (🟢 OK) pour ce jour.")
             else:
                 for _, r in details.iterrows():
                     with st.expander(f"👤 {r['Nom']} {r['Prénom']} - {r['Passagers']} pers.", expanded=True):
@@ -159,7 +159,7 @@ else:
             if st.button("Fermer les détails"):
                 st.session_state.cal_date_sel = None; st.rerun()
 
-    # --- PAGE FORMULAIRE (DATE ET ORDRE CORRIGÉS) ---
+    # --- PAGE FORMULAIRE ---
     elif st.session_state.page == "FORM":
         idx = st.session_state.get("edit_idx")
         st.subheader("📝 Fiche Contact")
@@ -180,7 +180,8 @@ else:
             c3, c4 = st.columns(2)
             f_date = c3.text_input("Date Navigation (JJ/MM/AAAA)", value=date_aff)
             f_pass = c4.number_input("Passagers", min_value=1, value=int(float(str(init.get("Passagers", 1)).replace(',','.'))) if init.get("Passagers") else 1)
-            f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=0)
+            f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], 
+                                  index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut", "🟡 Attente") if init.get("Statut") in ["🟡 Attente", "🟢 OK", "🔴 Pas OK"] else "🟡 Attente"))
             st.markdown("---")
             c5, c6 = st.columns([2, 1])
             f_prix = c5.text_input("Forfait (€)", value=str(init.get("PrixJour", "0")))
@@ -204,10 +205,11 @@ else:
                     else:
                         df = pd.concat([df, pd.DataFrame([new_rec])], ignore_index=True)
                     sauvegarder_data(df, "contacts"); st.session_state.page = "LISTE"; st.rerun()
-                except: st.error("⚠️ FORMAT DATE : Utilisez JJ/MM/AAAA (ex: 25/05/2026)"
+                except: st.error("⚠️ FORMAT DATE : Utilisez JJ/MM/AAAA (ex: 25/05/2026)")
 
 
             
+
 
 
 
