@@ -6,7 +6,7 @@ import requests
 from datetime import datetime
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="Vesta - Gestion & Finances", layout="wide")
+st.set_page_config(page_title="Vesta - Gestion Totale", layout="wide")
 
 # --- FONCTIONS GITHUB ---
 def charger_data(nom_fichier, colonnes):
@@ -20,10 +20,10 @@ def charger_data(nom_fichier, colonnes):
         decoded = base64.b64decode(content['content']).decode('utf-8')
         if decoded.strip():
             df_load = pd.DataFrame(json.loads(decoded))
-            if 'PrixJour' in df_load.columns:
-                df_load['PrixJour'] = df_load['PrixJour'].replace('', '0')
-            if 'Jours' in df_load.columns:
-                df_load['Jours'] = df_load['Jours'].replace('', '0')
+            # Sécurité sur les colonnes numériques
+            for col in ['PrixJour', 'Jours']:
+                if col in df_load.columns:
+                    df_load[col] = df_load[col].replace('', '0').fillna('0')
             return df_load
     return pd.DataFrame(columns=colonnes)
 
@@ -40,15 +40,13 @@ def sauvegarder_data(df, nom_fichier):
         if c in df_save.columns: df_save = df_save.drop(columns=[c])
     json_data = df_save.to_json(orient="records", indent=4)
     content_b64 = base64.b64encode(json_data.encode('utf-8')).decode('utf-8')
-    data = {"message": "Fix syntax and robust calculations", "content": content_b64}
+    data = {"message": "Vesta Full Update", "content": content_b64}
     if sha: data["sha"] = sha
     requests.put(url, headers=headers, json=data)
 
 # --- SESSION STATE ---
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-if "page" not in st.session_state:
-    st.session_state.page = "LISTE"
+if "authenticated" not in st.session_state: st.session_state.authenticated = False
+if "page" not in st.session_state: st.session_state.page = "LISTE"
 
 # --- AUTH ---
 if not st.session_state.authenticated:
@@ -58,12 +56,13 @@ if not st.session_state.authenticated:
         st.session_state.authenticated = True
         st.rerun()
 else:
+    # TOUTES LES COLONNES HISTORIQUES + NOUVELLES
     cols = ["DateNav", "Jours", "Statut", "Nom", "Prénom", "Téléphone", "Email", "Cause", "Demande", "Historique", "Paye", "PrixJour"]
     df = charger_data("contacts", cols)
     for c in cols:
         if c not in df.columns: df[c] = ""
 
-    # Navigation
+    # --- NAVIGATION ---
     st.markdown("---")
     c1, c2, c3, c4 = st.columns(4)
     if c1.button("📋 LISTE", use_container_width=True): st.session_state.page = "LISTE"; st.rerun()
@@ -74,53 +73,40 @@ else:
     if c4.button("✅ CHECK", use_container_width=True): st.session_state.page = "CHECK"; st.rerun()
     st.markdown("---")
 
-    # --- PAGE CALENDRIER & FINANCES ---
-    if st.session_state.page == "CALENDRIER":
-        st.subheader("💰 Bilan Financier & Occupation")
-        df['temp_date'] = pd.to_datetime(df['DateNav'], dayfirst=True, errors='coerce')
-        df['J_num'] = pd.to_numeric(df['Jours'], errors='coerce').fillna(0)
-        df['P_num'] = pd.to_numeric(df['PrixJour'], errors='coerce').fillna(0)
-        df['TotalFiche'] = df['J_num'] * df['P_num']
+    # --- PAGE LISTE (AVEC RECHERCHE ET FILTRES) ---
+    if st.session_state.page == "LISTE":
+        st.subheader("Planning & Recherche")
         
-        df_ok_all = df[df['Statut'] == "🟢 OK"]
-        total_global_attendu = df_ok_all['TotalFiche'].sum()
-        total_global_encaisse = df_ok_all[df_ok_all['Paye'] == "Oui"]['TotalFiche'].sum()
+        # Filtres de recherche
+        col_search, col_time = st.columns([2, 1])
+        with col_search:
+            search = st.text_input("🔍 Rechercher un nom ou prénom...")
+        with col_time:
+            vue_temps = st.selectbox("Période :", ["🚀 Prochaines Navigations", "📜 Archives", "🌍 Tout voir"])
         
-        st.metric("SOLDE TOTAL ENCAISSÉ", f"{int(total_global_encaisse)} €", f"sur {int(total_global_attendu)} € attendus")
-        st.markdown("---")
+        col_stat, col_tri = st.columns(2)
+        with col_stat:
+            options_statut = ["🟢 OK", "🟡 Attente", "🔴 Pas OK"]
+            f_statut = st.multiselect("Filtrer statuts :", options_statut, default=options_statut)
+        with col_tri:
+            tri_mode = st.selectbox("Trier par :", ["📅 Date", "🔤 Nom"])
 
-        now = datetime.now()
-        for i in range(6):
-            m = (now.month + i - 1) % 12 + 1
-            y = now.year + (now.month + i - 1) // 12
-            month_name = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"][m-1]
-            month_navs = df[(df['temp_date'].dt.month == m) & (df['temp_date'].dt.year == y) & (df['Statut'] == "🟢 OK")]
-            total_jours = month_navs['J_num'].sum()
-            total_mensuel_du = month_navs['TotalFiche'].sum()
-            total_mensuel_ok = month_navs[month_navs['Paye'] == "Oui"]['TotalFiche'].sum()
-
-            st.markdown(f"#### {month_name} {y}")
-            c_occ, c_fin = st.columns(2)
-            c_occ.write(f"Occupation : **{int(total_jours)} j**")
-            c_occ.progress(min(total_jours / 31, 1.0))
-            c_fin.write(f"Caisse : **{int(total_mensuel_ok)}€** / {int(total_mensuel_du)}€")
-            c_fin.progress(min(total_mensuel_ok / total_mensuel_du, 1.0) if total_mensuel_du > 0 else 0)
-            st.markdown("---")
-
-    # --- PAGE LISTE ---
-    elif st.session_state.page == "LISTE":
-        st.subheader("Planning Vesta")
-        vue_temps = st.selectbox("Période :", ["🚀 Prochaines Navigations", "📜 Archives", "🌍 Tout voir"])
         filt_df = df.copy()
         filt_df['temp_date'] = pd.to_datetime(filt_df['DateNav'], dayfirst=True, errors='coerce')
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
+        # Application des filtres
+        if search:
+            filt_df = filt_df[filt_df['Nom'].str.contains(search, case=False) | filt_df['Prénom'].str.contains(search, case=False)]
+        
+        filt_df = filt_df[filt_df['Statut'].isin(f_statut)]
+        
         if vue_temps == "🚀 Prochaines Navigations":
             filt_df = filt_df[(filt_df['temp_date'] >= today) | (filt_df['temp_date'].isna())]
         elif vue_temps == "📜 Archives":
             filt_df = filt_df[filt_df['temp_date'] < today]
 
-        filt_df = filt_df.sort_values(by="temp_date", ascending=(vue_temps != "📜 Archives"))
+        filt_df = filt_df.sort_values(by="temp_date" if tri_mode == "📅 Date" else "Nom", ascending=(vue_temps != "📜 Archives"))
 
         for idx, row in filt_df.iterrows():
             bg = "#c8e6c9" if "🟢" in str(row['Statut']) else "#fff9c4" if "🟡" in str(row['Statut']) else "#ffcdd2"
@@ -134,39 +120,74 @@ else:
             st.markdown(f'<div style="background-color:{bg}; padding:10px; border-radius:10px; border:1px solid #999; margin-bottom:5px; color:black;"><b>{row["DateNav"]}</b> | {row["Prénom"]} {row["Nom"]} | <b>{total_f}€</b> {p_icon}</div>', unsafe_allow_html=True)
             c_edit, c_pay, c_det = st.columns(3)
             with c_edit:
-                if st.button("✏️ Modif", key=f"e_{idx}", use_container_width=True):
+                if st.button("✏️ Modifier", key=f"e_{idx}", use_container_width=True):
                     st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
             with c_pay:
-                label_p = "Marquer Payé" if str(row['Paye']) != "Oui" else "Annuler Payé"
+                label_p = "💰 Encaissé" if str(row['Paye']) != "Oui" else "🔄 Annuler"
                 if st.button(label_p, key=f"p_{idx}", use_container_width=True):
                     df.at[idx, 'Paye'] = "Oui" if str(row['Paye']) != "Oui" else "Non"
                     sauvegarder_data(df, "contacts"); st.rerun()
             with c_det:
-                with st.expander("Détails"):
-                    st.write(f"Tarif : {row['PrixJour']}€/j x {row['Jours']}j")
-                    st.write(f"Tél: {row['Téléphone']}")
+                with st.expander("Détails & Notes"):
+                    st.write(f"📞 {row['Téléphone']} | 📧 {row['Email']}")
+                    st.write(f"💬 **Motif :** {row['Cause']}")
+                    st.write(f"📝 **Demande :** {row['Demande']}")
+                    st.write(f"📜 **Historique :** {row['Historique']}")
 
-    # --- PAGE FORMULAIRE ---
+    # --- PAGE CALENDRIER & FINANCES ---
+    elif st.session_state.page == "CALENDRIER":
+        st.subheader("💰 Bilan Financier")
+        df['temp_date'] = pd.to_datetime(df['DateNav'], dayfirst=True, errors='coerce')
+        df['J_num'] = pd.to_numeric(df['Jours'], errors='coerce').fillna(0)
+        df['P_num'] = pd.to_numeric(df['PrixJour'], errors='coerce').fillna(0)
+        df['TotalFiche'] = df['J_num'] * df['P_num']
+        
+        df_ok_all = df[df['Statut'] == "🟢 OK"]
+        encaisse = df_ok_all[df_ok_all['Paye'] == "Oui"]['TotalFiche'].sum()
+        attendu = df_ok_all['TotalFiche'].sum()
+        
+        st.metric("TOTAL CAISSE DE BORD", f"{int(encaisse)} €", f"sur {int(attendu)} € prévus")
+        st.markdown("---")
+
+        now = datetime.now()
+        for i in range(6):
+            m, y = (now.month + i - 1) % 12 + 1, now.year + (now.month + i - 1) // 12
+            month_name = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"][m-1]
+            m_navs = df[(df['temp_date'].dt.month == m) & (df['temp_date'].dt.year == y) & (df['Statut'] == "🟢 OK")]
+            t_j = m_navs['J_num'].sum()
+            t_du = m_navs['TotalFiche'].sum()
+            t_ok = m_navs[m_navs['Paye'] == "Oui"]['TotalFiche'].sum()
+
+            st.write(f"**{month_name} {y}** : {int(t_j)}j occupés | {int(t_ok)}€ / {int(t_du)}€")
+            st.progress(min(t_j / 31, 1.0))
+            st.markdown("---")
+
+    # --- PAGE FORMULAIRE (COMPLET) ---
     elif st.session_state.page == "FORM":
         idx = st.session_state.get("edit_idx")
-        st.subheader("📝 Fiche Contact & Tarif")
+        st.subheader("📝 Fiche Complète")
         init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols}
-        with st.form("f_nav"):
+        
+        with st.form("f_full"):
             c1, c2 = st.columns(2)
             with c1:
                 f_date = st.text_input("Date (JJ/MM/AAAA)", value=init.get("DateNav", ""))
-                f_jours = st.text_input("Nb Jours", value=str(init.get("Jours", "0")))
-                f_prix = st.text_input("Prix par Jour (€)", value=str(init.get("PrixJour", "20")))
+                f_jours = st.text_input("Nombre de jours", value=str(init.get("Jours", "0")))
+                f_prix = st.text_input("Tarif / Jour (€)", value=str(init.get("PrixJour", "20")))
+                f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut", "🟡 Attente")))
             with c2:
                 f_nom = st.text_input("Nom", value=init.get("Nom", ""))
                 f_pre = st.text_input("Prénom", value=init.get("Prénom", ""))
-                f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut", "🟡 Attente")))
-            f_paye = st.checkbox("Participation déjà réglée", value=(str(init.get("Paye")) == "Oui"))
-            f_tel = st.text_input("Téléphone", value=init.get("Téléphone", ""))
-            f_ema = st.text_input("Email", value=init.get("Email", ""))
-            f_dem = st.text_area("Précisions", value=init.get("Demande", ""))
-            if st.form_submit_button("💾 ENREGISTRER"):
-                new_row = {**init, "DateNav": f_date, "Jours": f_jours.replace(',','.'), "PrixJour": f_prix.replace(',','.'), "Statut": f_stat, "Nom": f_nom, "Prénom": f_pre, "Paye": "Oui" if f_paye else "Non", "Téléphone": f_tel, "Email": f_ema, "Demande": f_dem}
+                f_tel = st.text_input("Téléphone", value=init.get("Téléphone", ""))
+                f_ema = st.text_input("Email", value=init.get("Email", ""))
+            
+            f_paye = st.checkbox("Participation réglée", value=(str(init.get("Paye")) == "Oui"))
+            f_cau = st.text_input("Motif Statut (Cause)", value=init.get("Cause", ""))
+            f_dem = st.text_area("Précisions demande", value=init.get("Demande", ""))
+            f_his = st.text_area("Historique / Notes", value=init.get("Historique", ""))
+            
+            if st.form_submit_button("💾 ENREGISTRER TOUT"):
+                new_row = {"DateNav": f_date, "Jours": f_jours.replace(',','.'), "PrixJour": f_prix.replace(',','.'), "Statut": f_stat, "Nom": f_nom, "Prénom": f_pre, "Paye": "Oui" if f_paye else "Non", "Téléphone": f_tel, "Email": f_ema, "Demande": f_dem, "Cause": f_cau, "Historique": f_his}
                 if idx is not None: df.loc[idx] = new_row
                 else: df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                 sauvegarder_data(df, "contacts"); st.session_state.page = "LISTE"; st.rerun()
@@ -185,8 +206,8 @@ else:
             if c_b.button("Fait", key=f"c_{i}"):
                 df_c = df_c.drop(i); sauvegarder_data(df_c, "checklist"); st.rerun()
 
-
             
+
 
 
 
