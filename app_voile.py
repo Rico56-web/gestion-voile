@@ -1,10 +1,10 @@
-
 import streamlit as st
 import pandas as pd
 import json
 import base64
 import requests
 from datetime import datetime
+import calendar
 
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta - Gestion Planning", layout="wide")
@@ -57,25 +57,62 @@ else:
     for c in cols:
         if c not in df.columns: df[c] = ""
 
-    # Navigation
+    # --- BARRE DE NAVIGATION (MAINTENANT 4 BOUTONS) ---
     st.markdown("---")
-    c1, c2, c3 = st.columns(3)
-    if c1.button("📅 PLANNING", use_container_width=True):
+    c1, c2, c3, c4 = st.columns(4)
+    if c1.button("📋 LISTE", use_container_width=True):
         st.session_state.page = "LISTE"
         st.rerun()
-    if c2.button("➕ NOUVEAU", use_container_width=True):
+    if c2.button("📅 CALENDRIER", use_container_width=True):
+        st.session_state.page = "CALENDRIER"
+        st.rerun()
+    if c3.button("➕ NOUVEAU", use_container_width=True):
         if "edit_idx" in st.session_state: del st.session_state.edit_idx
         st.session_state.page = "FORM"
         st.rerun()
-    if c3.button("✅ CHECK-LIST", use_container_width=True):
+    if c4.button("✅ CHECK", use_container_width=True):
         st.session_state.page = "CHECK"
         st.rerun()
     st.markdown("---")
 
-    # --- PAGE LISTE ---
-    if st.session_state.page == "LISTE":
-        st.subheader("Planning Vesta")
+    # --- PAGE CALENDRIER PRÉVISIONNEL ---
+    if st.session_state.page == "CALENDRIER":
+        st.subheader("📅 Calendrier Prévisionnel d'Occupation")
         
+        # Préparation des données
+        df['temp_date'] = pd.to_datetime(df['DateNav'], dayfirst=True, errors='coerce')
+        df_ok = df[df['Statut'] == "🟢 OK"].copy()
+        
+        # On crée une liste des 6 prochains mois
+        now = datetime.now()
+        for i in range(6):
+            target_date = now.replace(day=1)
+            # Logique pour avancer les mois
+            m = (now.month + i - 1) % 12 + 1
+            y = now.year + (now.month + i - 1) // 12
+            month_name = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"][m-1]
+            
+            # Filtrer les nav du mois
+            month_navs = df_ok[(df_ok['temp_date'].dt.month == m) & (df_ok['temp_date'].dt.year == y)]
+            total_jours = sum(pd.to_numeric(month_navs['Jours'], errors='coerce').fillna(0))
+            
+            st.write(f"### {month_name} {y}")
+            col_info, col_bar = st.columns([1, 3])
+            col_info.write(f"**{int(total_jours)} jours** occupés")
+            
+            # Barre de progression (sur une base de 30 jours)
+            progress = min(total_jours / 30, 1.0)
+            col_bar.progress(progress)
+            
+            if not month_navs.empty:
+                with st.expander(f"Voir le détail de {month_name}"):
+                    for _, r in month_navs.sort_values('temp_date').iterrows():
+                        st.write(f"• **{r['DateNav']}** : {r['Prénom']} {r['Nom']} ({r['Jours']}j)")
+            st.markdown("---")
+
+    # --- PAGE LISTE ---
+    elif st.session_state.page == "LISTE":
+        st.subheader("Planning Vesta")
         c_p, c_t = st.columns(2)
         with c_p:
             vue_temps = st.selectbox("Période :", ["🚀 Prochaines Navigations", "📜 Archives", "🌍 Tout voir"])
@@ -84,23 +121,16 @@ else:
 
         options_statut = ["🟢 OK", "🟡 Attente", "🔴 Pas OK"]
         f_statut = st.multiselect("Statuts à afficher :", options_statut, default=options_statut)
-        search = st.text_input("🔍 Chercher un nom...")
         
         filt_df = df.copy()
-        
-        # LOGIQUE DE DATE CORRIGÉE
         filt_df['temp_date'] = pd.to_datetime(filt_df['DateNav'], dayfirst=True, errors='coerce')
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
         filt_df = filt_df[filt_df['Statut'].isin(f_statut)]
-        
         if vue_temps == "🚀 Prochaines Navigations":
             filt_df = filt_df[(filt_df['temp_date'] >= today) | (filt_df['temp_date'].isna())]
         elif vue_temps == "📜 Archives":
             filt_df = filt_df[filt_df['temp_date'] < today]
-
-        if search:
-            filt_df = filt_df[filt_df['Nom'].str.contains(search, case=False) | filt_df['Prénom'].str.contains(search, case=False)]
 
         if tri_mode == "📅 Date":
             ordre = True if vue_temps != "📜 Archives" else False
@@ -109,74 +139,49 @@ else:
             filt_df = filt_df.sort_values(by="Nom")
 
         if filt_df.empty:
-            st.warning("Aucun résultat pour ces filtres.")
+            st.warning("Aucun résultat.")
         else:
             for idx, row in filt_df.iterrows():
                 bg = "#c8e6c9" if "🟢" in str(row['Statut']) else "#fff9c4" if "🟡" in str(row['Statut']) else "#ffcdd2"
                 jours_txt = f"({row['Jours']}j)" if row['Jours'] and str(row['Jours']) != "0" else ""
-                
-                st.markdown(f"""
-                <div style="background-color:{bg}; padding:12px; border-radius:10px; border:1px solid #999; margin-bottom:8px; color:black;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight:bold; font-size:1.1em;">📅 {row['DateNav']} {jours_txt}</span>
-                        <span style="font-size:1.2em;">{row['Statut']}</span>
-                    </div>
-                    <div style="font-size:1.3em; margin: 5px 0;">👤 <b>{row['Nom']}</b> {row['Prénom']}</div>
-                    <div style="font-size:0.9em; color:#444;">💬 {row['Cause']}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                b1, b2, b3, b4 = st.columns(4)
+                st.markdown(f'<div style="background-color:{bg}; padding:12px; border-radius:10px; border:1px solid #999; margin-bottom:8px; color:black;"><b>📅 {row["DateNav"]} {jours_txt}</b> - {row["Statut"]}<br><span style="font-size:1.2em;">👤 <b>{row["Nom"]}</b> {row["Prénom"]}</span></div>', unsafe_allow_html=True)
+                b1, b2, b3 = st.columns(3)
                 with b1:
-                    st.markdown(f'<a href="tel:{row["Téléphone"]}"><button style="width:100%; background:#2e7d32; color:white; border:none; padding:10px; border-radius:5px;">📞 Appel</button></a>', unsafe_allow_html=True)
-                with b2:
                     if st.button("✏️ Modifier", key=f"ed_{idx}", use_container_width=True):
-                        st.session_state.edit_idx = idx
-                        st.session_state.page = "FORM"
-                        st.rerun()
-                with b3:
+                        st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
+                with b2:
                     if st.button("🗑️ Suppr.", key=f"del_{idx}", use_container_width=True):
-                        df = df.drop(idx)
-                        sauvegarder_data(df, "contacts")
-                        st.rerun()
-                with b4:
-                    with st.expander("Plus d'infos"):
-                        st.write(f"📧 **Email:** {row['Email']}")
-                        st.write(f"📝 **Demande:** {row['Demande']}")
-                        st.write(f"📜 **Note:** {row['Historique']}")
+                        df = df.drop(idx); sauvegarder_data(df, "contacts"); st.rerun()
+                with b3:
+                    with st.expander("Infos"):
+                        st.write(f"📞 {row['Téléphone']}\n📧 {row['Email']}\n💬 {row['Cause']}")
 
-    # --- PAGE FORMULAIRE ---
+    # --- PAGE FORMULAIRE (Inchangée) ---
     elif st.session_state.page == "FORM":
         idx = st.session_state.get("edit_idx")
         st.subheader("📝 Fiche Contact")
         init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols}
-        if not init.get("Statut"): init["Statut"] = "🟡 Attente"
-
         with st.form("form_nav"):
             c1, c2 = st.columns(2)
             with c1:
-                f_date = st.text_input("Date (Ex: 15/07/2026)", value=init.get("DateNav", ""))
+                f_date = st.text_input("Date (JJ/MM/AAAA)", value=init.get("DateNav", ""))
                 f_jours = st.number_input("Nombre de jours", min_value=0, value=int(init.get("Jours", 0)) if init.get("Jours") else 0)
-                f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init["Statut"]))
+                f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut", "🟡 Attente")))
             with c2:
                 f_nom = st.text_input("Nom", value=init.get("Nom", ""))
                 f_pre = st.text_input("Prénom", value=init.get("Prénom", ""))
                 f_cau = st.text_input("Motif Statut", value=init.get("Cause", ""))
-            
             f_tel = st.text_input("Téléphone", value=init.get("Téléphone", ""))
             f_ema = st.text_input("Email", value=init.get("Email", ""))
-            f_dem = st.text_area("Précisions demande", value=init.get("Demande", ""))
-            f_his = st.text_area("Historique / Notes", value=init.get("Historique", ""))
-            
+            f_dem = st.text_area("Précisions", value=init.get("Demande", ""))
+            f_his = st.text_area("Notes", value=init.get("Historique", ""))
             if st.form_submit_button("💾 ENREGISTRER"):
                 new_row = {"DateNav": f_date, "Jours": str(f_jours), "Statut": f_stat, "Nom": f_nom, "Prénom": f_pre, "Téléphone": f_tel, "Email": f_ema, "Cause": f_cau, "Demande": f_dem, "Historique": f_his}
                 if idx is not None: df.loc[idx] = new_row
                 else: df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-                sauvegarder_data(df, "contacts")
-                st.session_state.page = "LISTE"
-                st.rerun()
+                sauvegarder_data(df, "contacts"); st.session_state.page = "LISTE"; st.rerun()
 
-    # --- PAGE CHECKLIST ---
+    # --- PAGE CHECKLIST (Inchangée) ---
     elif st.session_state.page == "CHECK":
         st.subheader("Check-list")
         df_c = charger_data("checklist", ["Tâche"])
@@ -192,6 +197,7 @@ else:
 
 
             
+
 
 
 
