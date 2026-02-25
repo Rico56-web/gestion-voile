@@ -73,43 +73,49 @@ else:
     if st.session_state.page == "LISTE":
         st.subheader("Gestion des navigations")
         
-        # --- FILTRES DE TEMPS ET STATUT ---
-        col_time, col_filt = st.columns(2)
+        # --- LIGNE 1 : FILTRES DE TEMPS ET DE TRI ---
+        col_time, col_sort = st.columns(2)
         with col_time:
-            vue_temps = st.selectbox("Afficher :", ["🚀 Prochaines Navigations", "📜 Archives (Passées)", "🌍 Tout voir"])
+            vue_temps = st.selectbox("Période :", ["🚀 Prochaines Navigations", "📜 Archives (Passées)", "🌍 Tout voir"])
+        with col_sort:
+            tri_mode = st.selectbox("Trier par :", ["📅 Date", "🔤 Nom de famille"])
+
+        # --- LIGNE 2 : RECHERCHE ET STATUT ---
+        col_search, col_filt = st.columns([2, 1])
+        with col_search:
+            search = st.text_input("🔍 Rechercher un nom...")
         with col_filt:
-            f_statut = st.multiselect("Filtrer par statut :", ["🟢 OK", "🟡 Attente", "🔴 Pas OK"], default=["🟢 OK", "🟡 Attente", "🔴 Pas OK"])
-        
-        search = st.text_input("🔍 Rechercher un nom...")
+            f_statut = st.multiselect("Statuts :", ["🟢 OK", "🟡 Attente", "🔴 Pas OK"], default=["🟢 OK", "🟡 Attente", "🔴 Pas OK"])
         
         # Préparation du DataFrame
         filt_df = df.copy()
-        
-        # Conversion temporaire pour le tri et filtrage de date
-        # On essaie de convertir DateNav en format date réel
         filt_df['temp_date'] = pd.to_datetime(filt_df['DateNav'], errors='coerce')
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-        # Filtrage par Temps
+        # 1. Filtrage par Période
         if vue_temps == "🚀 Prochaines Navigations":
             filt_df = filt_df[filt_df['temp_date'] >= today]
-            filt_df = filt_df.sort_values(by="temp_date", ascending=True) # Plus proche en premier
         elif vue_temps == "📜 Archives (Passées)":
             filt_df = filt_df[filt_df['temp_date'] < today]
-            filt_df = filt_df.sort_values(by="temp_date", ascending=False) # Plus récent en premier
-        else:
-            filt_df = filt_df.sort_values(by="temp_date", ascending=True)
 
-        # Filtrage par Statut
+        # 2. Filtrage par Statut
         filt_df = filt_df[filt_df['Statut'].isin(f_statut)]
         
-        # Recherche textuelle
+        # 3. Recherche
         if search:
             filt_df = filt_df[(filt_df['Nom'].str.contains(search, case=False)) | (filt_df['Prénom'].str.contains(search, case=False))]
 
+        # 4. LOGIQUE DE TRI
+        if tri_mode == "📅 Date":
+            # Si on est en archives, on met la plus récente en haut, sinon la plus proche
+            asc = True if vue_temps != "📜 Archives (Passées)" else False
+            filt_df = filt_df.sort_values(by="temp_date", ascending=asc)
+        else:
+            filt_df = filt_df.sort_values(by="Nom", ascending=True)
+
         # Affichage
         if filt_df.empty:
-            st.info(f"Aucune navigation dans la catégorie : {vue_temps}")
+            st.info(f"Aucune donnée pour ces critères.")
         else:
             for idx, row in filt_df.iterrows():
                 bg = "#c8e6c9" if "🟢" in str(row['Statut']) else "#fff9c4" if "🟡" in str(row['Statut']) else "#ffcdd2"
@@ -146,7 +152,7 @@ else:
                         st.write(f"📝 {row['Demande']}")
                         st.write(f"📜 {row['Historique']}")
 
-    # --- PAGE FORMULAIRE (Inchangée) ---
+    # --- PAGES FORM ET CHECK (Inchangées) ---
     elif st.session_state.page == "FORM":
         idx = st.session_state.get("edit_idx")
         st.subheader("📝 Fiche Navigation")
@@ -183,7 +189,6 @@ else:
                 st.session_state.page = "LISTE"
                 st.rerun()
 
-    # --- PAGE CHECKLIST (Inchangée) ---
     elif st.session_state.page == "CHECK":
         st.subheader("Check-list Bateau")
         df_c = charger_data("checklist", ["Tâche"])
@@ -197,5 +202,6 @@ else:
             if col2.button("Fait", key=f"done_{i}"):
                 df_c = df_c.drop(i); sauvegarder_data(df_c, "checklist"); st.rerun()
             
+
 
 
