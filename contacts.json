@@ -46,7 +46,7 @@
     },
     {
         "DateNav":"15\/03\/2026",
-        "Statut":"\ud83d\udfe1 Attente",
+        "Statut":"\ud83d\udfe2 OK",
         "Nom":"COURONNE",
         "Pr\u00e9nom":"Benoit",
         "T\u00e9l\u00e9phone":"0608921723",
@@ -56,7 +56,7 @@
         "Historique":"",
         "Jours":"1",
         "Paye":"Non",
-        "PrixJour":"",
+        "PrixJour":"70",
         "Passagers":"1"
     },
     {
