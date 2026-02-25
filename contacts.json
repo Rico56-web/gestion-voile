@@ -9,7 +9,9 @@
         "Cause":"c'est le skipper",
         "Demande":"c'est son bateau",
         "Historique":"excellent",
-        "Jours":"3"
+        "Jours":"3",
+        "Paye":"Non",
+        "PrixJour":"30"
     },
     {
         "DateNav":"2026\/02\/28",
@@ -21,7 +23,9 @@
         "Cause":"R\u00e9servation click And boat",
         "Demande":"Viens avec sa fille maelis",
         "Historique":"",
-        "Jours":"3"
+        "Jours":"3",
+        "Paye":"",
+        "PrixJour":""
     },
     {
         "DateNav":"2026\/03\/15",
@@ -33,7 +37,9 @@
         "Cause":"",
         "Demande":"Pr\u00eat pour cette sortie",
         "Historique":"",
-        "Jours":"2"
+        "Jours":"2",
+        "Paye":"",
+        "PrixJour":""
     },
     {
         "DateNav":"2026\/06\/01",
@@ -45,7 +51,9 @@
         "Cause":"",
         "Demande":"int\u00e9resse pour le retour (8 jours)",
         "Historique":"",
-        "Jours":"7"
+        "Jours":"7",
+        "Paye":"",
+        "PrixJour":""
     },
     {
         "DateNav":"2026\/03\/15",
@@ -57,7 +65,9 @@
         "Cause":"a confirmer",
         "Demande":"nav prevue initialement le 15\/02",
         "Historique":"",
-        "Jours":"2"
+        "Jours":"2",
+        "Paye":"",
+        "PrixJour":""
     },
     {
         "DateNav":"2026\/03\/15",
@@ -69,7 +79,9 @@
         "Cause":"a rappeler",
         "Demande":"habite la suisse. 44 ans",
         "Historique":"",
-        "Jours":"2"
+        "Jours":"2",
+        "Paye":"",
+        "PrixJour":""
     },
     {
         "DateNav":"2026\/02\/15",
@@ -81,6 +93,8 @@
         "Cause":"",
         "Demande":"test",
         "Historique":"ras",
-        "Jours":"2"
+        "Jours":"2",
+        "Paye":"",
+        "PrixJour":""
     }
 ]
