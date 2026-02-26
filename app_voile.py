@@ -10,40 +10,45 @@ import re
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta", layout="wide")
 
-# CSS ADAPTATIF (iPhone + PC)
+# CSS ADAPTATIF + COMPATIBILITÉ MODE SOMBRE
 st.markdown("""
     <style>
-    /* 1. RÉGLAGES POUR TOUS LES ÉCRANS */
-    .stButton > button {
-        border-radius: 8px !important;
-        font-weight: bold !important;
-    }
+    /* 1. FORCER LE CONTRASTE (iPad/iPhone Mode Sombre) */
     .client-card {
-        background-color: #ffffff; padding: 10px; border-radius: 8px; 
-        margin-bottom: 8px; border: 1px solid #eee; border-left: 8px solid #ccc;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        background-color: #ffffff !important; 
+        color: #1a1a1a !important; /* Texte quasi noir pour être lisible sur blanc */
+        padding: 10px; border-radius: 8px; 
+        margin-bottom: 8px; border: 1px solid #ddd; border-left: 8px solid #ccc;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
-    .status-ok { border-left-color: #2ecc71 !important; }
-    .status-attente { border-left-color: #f1c40f !important; }
-    .status-non { border-left-color: #e74c3c !important; }
-    .price-tag { float: right; font-weight: bold; color: #1e3799; }
+    
+    /* On force la couleur des sous-infos et du prix pour le mode sombre */
+    .client-card b, .client-card div, .client-card span {
+        color: #1a1a1a !important;
+    }
+    
+    .price-tag { 
+        float: right; font-weight: bold; 
+        color: #1e3799 !important; 
+    }
+    
+    .info-sub { 
+        font-size: 0.85rem; 
+        color: #444 !important; 
+    }
 
-    /* 2. RÉGLAGES SPÉCIFIQUES IPHONE (Écrans de moins de 768px) */
+    /* 2. RÉGLAGES IPHONE / IPAD PORTRAIT */
     @media only screen and (max-width: 768px) {
         html, body, [class*="css"] { font-size: 0.9rem; }
         .stButton > button { height: 40px !important; font-size: 0.8rem !important; }
-        .block-container { padding-top: 1rem !important; }
         .price-tag { font-size: 0.9rem; }
-        .info-sub { font-size: 0.8rem; }
     }
 
-    /* 3. RÉGLAGES SPÉCIFIQUES PC (Écrans larges) */
+    /* 3. RÉGLAGES PC / IPAD PAYSAGE */
     @media only screen and (min-width: 769px) {
         html, body, [class*="css"] { font-size: 1.05rem; }
         .stButton > button { height: 45px !important; font-size: 1rem !important; }
         .price-tag { font-size: 1.2rem; }
-        .info-sub { font-size: 0.95rem; }
-        .client-card { margin-bottom: 15px; padding: 15px; }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -109,7 +114,7 @@ if not st.session_state.auth:
         st.rerun()
     st.stop()
 
-# --- MENU FIXÉ ---
+# --- MENU ---
 m1, m2, m3 = st.columns(3)
 if m1.button("📋 LISTE", use_container_width=True): st.session_state.page = "LISTE"; st.rerun()
 if m2.button("🗓️ PLAN", use_container_width=True): st.session_state.page = "PLAN"; st.rerun()
@@ -121,7 +126,7 @@ cols_v = ["DateNav", "NbJours", "Statut", "Nom", "Prénom", "Téléphone", "Emai
 for c in cols_v:
     if c not in df.columns: df[c] = ""
 
-# --- LOGIQUE DES PAGES (LISTE / FORM / PLAN) ---
+# --- LOGIQUE ---
 if st.session_state.page == "LISTE":
     df['dt'] = df['DateNav'].apply(parse_date)
     auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
