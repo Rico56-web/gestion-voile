@@ -9,7 +9,7 @@ import calendar
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta", layout="wide")
 
-# Style CSS
+# Style CSS pour des boutons propres
 st.markdown("""
     <style>
     .client-card {
@@ -19,11 +19,15 @@ st.markdown("""
     .status-ok { border-left-color: #2ecc71 !important; }
     .status-attente { border-left-color: #f1c40f !important; }
     .status-non { border-left-color: #e74c3c !important; }
+    .month-header {
+        text-align: center; font-weight: bold; font-size: 1.2em;
+        background-color: #f0f2f6; padding: 10px; border-radius: 5px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 # --- FONCTIONS GITHUB ---
-@st.cache_data(ttl=20) # Cache court pour fluidité
+@st.cache_data(ttl=20)
 def charger_data(nom_fichier, colonnes):
     try:
         repo = st.secrets["GITHUB_REPO"]
@@ -61,6 +65,7 @@ def sauvegarder_data(df, nom_fichier):
 # --- SESSION & NAVIGATION ---
 if "authenticated" not in st.session_state: st.session_state.authenticated = False
 if "page" not in st.session_state: st.session_state.page = "LISTE"
+if "m_idx" not in st.session_state: st.session_state.m_idx = datetime.now().month
 
 def nav(p):
     if "edit_idx" in st.session_state: del st.session_state.edit_idx
@@ -105,9 +110,7 @@ else:
                 cl = "status-ok" if "🟢" in str(r['Statut']) else "status-attente" if "🟡" in str(r['Statut']) else "status-non"
                 st.markdown(f'<div class="client-card {cl}"><b>{r["Nom"]} {r["Prénom"]}</b><br><small>📅 {r["DateNav"]} | 👤 {r["Passagers"]}p</small></div>', unsafe_allow_html=True)
                 if st.button(f"Ouvrir {r['Nom']}", key=f"b_{idx}", use_container_width=True):
-                    st.session_state.edit_idx = idx
-                    st.session_state.page = "FORM"
-                    st.rerun()
+                    st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
         with tab2:
             p_df = df[df['sort_date'] < auj_str].sort_values('sort_date', ascending=False).head(10)
             for idx, r in p_df.iterrows():
@@ -143,14 +146,25 @@ else:
             sauvegarder_data(df, "contacts")
             nav("LISTE")
 
-    # --- PLANNING ---
+    # --- PLANNING OPTIMISÉ IPHONE (SANS CLAVIER) ---
     elif st.session_state.page == "CALENDRIER":
         st.subheader("🗓️ Planning")
         mois_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
         
-        # Sélecteur de mois optimisé
-        m_nom = st.selectbox("Mois", mois_fr, index=datetime.now().month-1, key="select_mois_plan")
-        m_idx = mois_fr.index(m_nom) + 1
+        # Navigation par boutons pour éviter le clavier
+        col_prev, col_m, col_next = st.columns([1, 2, 1])
+        
+        if col_prev.button("◀️", use_container_width=True):
+            st.session_state.m_idx = 12 if st.session_state.m_idx == 1 else st.session_state.m_idx - 1
+            st.rerun()
+            
+        col_m.markdown(f'<div class="month-header">{mois_fr[st.session_state.m_idx - 1]}</div>', unsafe_allow_html=True)
+        
+        if col_next.button("▶️", use_container_width=True):
+            st.session_state.m_idx = 1 if st.session_state.m_idx == 12 else st.session_state.m_idx + 1
+            st.rerun()
+            
+        m_idx = st.session_state.m_idx
         y_sel = datetime.now().year
         
         cal = calendar.monthcalendar(y_sel, m_idx)
@@ -164,13 +178,14 @@ else:
                     if cols[i].button(btn_t, key=f"d_{d_s}", use_container_width=True):
                         if not occ.empty:
                             for _, r in occ.iterrows(): st.info(f"⚓ {r['Nom']} ({r['Passagers']}p)")
-                        else: st.write("Libre")
+                        else: st.write(f"Libre le {d_s}")
 
     # --- CHECK ---
     elif st.session_state.page == "CHECK":
         st.write("### ✅ Checklist")
         for it in ["Vannes", "Niveaux", "Gilets", "Gaz", "Briefing"]: st.checkbox(it, key=f"chk_{it}")
             
+
 
 
 
