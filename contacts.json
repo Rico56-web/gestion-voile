@@ -29,14 +29,14 @@
     },
     {
         "DateNav":"01\/06\/2026",
-        "NbJours":"",
+        "NbJours":"2",
         "Statut":"🟡 Attente",
         "Nom":"M.",
         "Prénom":"Batiste",
         "Téléphone":"0608745734",
         "Email":"lebato@hotmail.fr",
-        "Paye":"Non",
-        "PrixJour":"",
+        "Paye":null,
+        "PrixJour":"70",
         "Passagers":"1",
         "Historique":"",
         "Société":""
