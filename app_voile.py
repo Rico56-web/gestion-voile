@@ -161,8 +161,7 @@ else:
         if st.button("🔙 ANNULER"): 
             st.session_state.page = "LISTE"
             st.rerun()
-
-    # 3. PAGE PLANNING (AVEC BOUTON JAUNE SI ATTENTE)
+# 3. PAGE PLANNING (AVEC INDICATEUR MIXTE)
     elif st.session_state.page == "PLAN":
         if "m_idx" not in st.session_state: st.session_state.m_idx = datetime.now().month
         m_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
@@ -192,13 +191,26 @@ else:
                 if day != 0:
                     d_s = f"{day:02d}/{st.session_state.m_idx:02d}/2026"
                     label = str(day)
+                    
                     if d_s in occu:
-                        label = "🟢" if any("🟢" in str(x['Statut']) for x in occu[d_s]) else "🟡"
+                        has_ok = any("🟢" in str(x['Statut']) for x in occu[d_s])
+                        has_attente = any("🟡" in str(x['Statut']) for x in occu[d_s])
+                        
+                        if has_ok and has_attente:
+                            label = "🟢+🟡" # Indique qu'il y a un OK ET des attentes
+                        elif has_ok:
+                            label = "🟢"
+                        elif has_attente:
+                            label = "🟡"
                     
                     if cols[i].button(label, key=f"p_{d_s}", use_container_width=True):
                         if d_s in occu:
-                            for x in occu[d_s]: st.info(f"{x['Statut']} {x['Nom']} ({x['Passagers']}p)")
+                            st.write(f"--- Détails du {d_s} ---")
+                            for x in occu[d_s]: 
+                                st.info(f"{x['Statut']} {x['Prénom']} {x['Nom']} ({x['Passagers']}p)")
+                                if x['Téléphone']: st.write(f"📞 {x['Téléphone']}")
                         else: st.write("Libre")
+
 
 
 
