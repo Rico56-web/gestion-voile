@@ -42,8 +42,8 @@
         "Prénom":"Benoit",
         "Téléphone":"0608921723",
         "Email":"benoit2106-co@gmail.com",
-        "Paye":"Non",
-        "PrixJour":"70",
+        "Paye":"Oui",
+        "PrixJour":"0",
         "Passagers":"1",
         "Historique":""
     },
