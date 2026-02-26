@@ -29,7 +29,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- FONCTIONS GITHUB ---
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=20)
 def charger_data(nom_fichier, colonnes):
     try:
         repo = st.secrets["GITHUB_REPO"]
@@ -42,7 +42,6 @@ def charger_data(nom_fichier, colonnes):
             df_l = pd.DataFrame(json.loads(decoded))
             for c in colonnes:
                 if c not in df_l.columns: df_l[c] = ""
-            if "NbJours" not in df_l.columns: df_l["NbJours"] = "1"
             return df_l
     except: pass
     return pd.DataFrame(columns=colonnes)
@@ -93,8 +92,8 @@ else:
 
     # --- LISTE ---
     if st.session_state.page == "LISTE":
-        st.markdown(f'<div style="text-align:right; color:gray;">Total : {len(df)} fiches</div>', unsafe_allow_html=True)
-        search = st.text_input("🔍 Rechercher un nom...")
+        st.markdown(f'<div style="text-align:right; color:gray; font-size:0.8em;">Base : {len(df)} fiches</div>', unsafe_allow_html=True)
+        search = st.text_input("🔍 Rechercher...")
         tab1, tab2 = st.tabs(["🚀 PROCHAINES", "📂 ARCHIVES"])
         
         df['sort_key'] = df['DateNav'].apply(lambda x: "".join(reversed(x.split('/'))) if '/' in str(x) else "0")
@@ -103,22 +102,19 @@ else:
         def afficher_cartes(df_tab):
             for idx, r in df_tab.iterrows():
                 cl = "status-ok" if "🟢" in str(r['Statut']) else "status-attente" if "🟡" in str(r['Statut']) else "status-non"
-                nb_j = f"({r['NbJours']} jours)" if str(r['NbJours']) != "1" else ""
                 st.markdown(f"""
                 <div class="client-card {cl}">
                     <span class="price-tag">{r['PrixJour']}€</span>
                     <b>{r['Nom']} {r['Prénom']}</b><br>
-                    <small>📅 {r['DateNav']} {nb_j} | 👤 {r['Passagers']} pers.</small>
+                    <small>📅 {r['DateNav']} ({r.get('NbJours', 1)}j) | 👤 {r['Passagers']}p</small>
                 </div>
                 """, unsafe_allow_html=True)
-                # Bouton avec Prénom NOM
-                label_btn = f"Modifier {r['Prénom']} {r['Nom']}"
-                if st.button(label_btn, key=f"btn_{idx}", use_container_width=True):
+                if st.button(f"Modifier {r['Prénom']} {r['Nom']}", key=f"btn_{idx}", use_container_width=True):
                     st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
 
         with tab1:
             f_df = df[df['sort_key'] >= auj].sort_values('sort_key')
-            if search: f_df = f_df[f_df['Nom'].str.contains(search, case=False)]
+            if search: f_df = f_df[f_df['Nom'].str.contains(search, case=False) | f_df['Prénom'].str.contains(search, case=False)]
             afficher_cartes(f_df)
         with tab2:
             p_df = df[df['sort_key'] < auj].sort_values('sort_key', ascending=False).head(10)
@@ -129,36 +125,39 @@ else:
         idx = st.session_state.get("edit_idx")
         init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols_base}
         
-        with st.form("form_v3"):
-            st.subheader("📝 Fiche Navigation")
+        with st.form("form_vesta"):
+            st.subheader("📝 Fiche Contact")
             c1, c2 = st.columns(2)
             f_nom = c1.text_input("NOM", value=init.get("Nom", ""))
             f_pre = c2.text_input("Prénom", value=init.get("Prénom", ""))
-            f_tel = c1.text_input("Téléphone", value=init.get("Téléphone", ""))
-            f_mail = c2.text_input("Email", value=init.get("Email", ""))
+            
+            c3, c4 = st.columns(2)
+            f_tel = c3.text_input("Téléphone", value=init.get("Téléphone", ""))
+            f_mail = c4.text_input("Email", value=init.get("Email", ""))
             
             st.markdown("---")
-            c3, c4, c5, c6 = st.columns([2,1,1,1])
-            f_date = c3.text_input("Date Début (JJ/MM/AAAA)", value=init.get("DateNav", ""))
-            f_nbj = c4.number_input("Nombre de jours", min_value=1, value=int(init.get("NbJours", 1)) if init.get("NbJours") else 1)
-            f_pass = c5.number_input("Passagers", min_value=1, value=int(float(str(init.get("Passagers") or 1))))
-            f_prix = c6.text_input("Total €", value=init.get("PrixJour", "0"))
+            c5, c6, c7, c8 = st.columns([2,1,1,1])
+            f_date = c5.text_input("Date Début (JJ/MM/AAAA)", value=init.get("DateNav", ""))
+            f_nbj = c6.number_input("Nombre de jours", min_value=1, value=int(init.get("NbJours", 1)) if init.get("NbJours") else 1)
+            f_pass = c7.number_input("Pers.", min_value=1, value=int(float(str(init.get("Passagers") or 1))))
+            f_prix = c8.text_input("Total €", value=init.get("PrixJour", "0"))
             
-            f_stat = st.selectbox("Statut Dossier", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], 
-                                  index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut", "🟡 Attente") if init.get("Statut") in ["🟡 Attente", "🟢 OK", "🔴 Pas OK"] else "🟡 Attente"))
+            # Retour du Menu Statut complet
+            f_stat = st.selectbox("Statut du dossier", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], 
+                                  index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut") if init.get("Statut") in ["🟡 Attente", "🟢 OK", "🔴 Pas OK"] else "🟡 Attente"))
             
             f_his = st.text_area("Notes", value=init.get("Historique", ""))
             
             if st.form_submit_button("💾 ENREGISTRER"):
                 try:
                     datetime.strptime(f_date.strip(), '%d/%m/%Y')
-                    new = {
+                    new_rec = {
                         "DateNav": f_date.strip(), "NbJours": str(f_nbj), "Nom": f_nom.upper(), "Prénom": f_pre.capitalize(),
                         "Statut": f_stat, "PrixJour": f_prix, "Passagers": str(f_pass),
                         "Téléphone": f_tel, "Email": f_mail, "Paye": "Oui" if "🟢" in f_stat else "Non", "Historique": f_his
                     }
-                    if idx is not None: df.loc[idx] = new
-                    else: df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
+                    if idx is not None: df.loc[idx] = new_rec
+                    else: df = pd.concat([df, pd.DataFrame([new_rec])], ignore_index=True)
                     sauvegarder_data(df, "contacts")
                     nav("LISTE")
                 except: st.error("Format date invalide")
@@ -167,7 +166,7 @@ else:
         if idx is not None and st.button("🗑️ SUPPRIMER"):
             df = df.drop(index=idx); sauvegarder_data(df, "contacts"); nav("LISTE")
 
-    # --- PLANNING MULTI-JOURS ---
+    # --- PLANNING AVEC ROND JAUNE ---
     elif st.session_state.page == "CALENDRIER":
         mois_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
         c1, c2, c3 = st.columns([1,2,1])
@@ -179,16 +178,23 @@ else:
             st.session_state.m_idx = 1 if st.session_state.m_idx == 12 else st.session_state.m_idx + 1
             st.rerun()
 
-        # Construction de la liste des jours occupés
-        occu_dates = {}
-        for _, r in df[df['Statut'] == "🟢 OK"].iterrows():
+        # Calcul des dates occupées (Vert ou Jaune)
+        occu_green = {} # Pour les OK
+        occu_yellow = {} # Pour les Attentes
+        
+        for _, r in df.iterrows():
+            if r['Statut'] not in ["🟢 OK", "🟡 Attente"]: continue
             try:
                 start = datetime.strptime(r['DateNav'], '%d/%m/%Y')
-                jours = int(r['NbJours'] or 1)
+                jours = int(r.get('NbJours', 1))
                 for j in range(jours):
-                    d_occ = (start + timedelta(days=j)).strftime('%d/%m/%Y')
-                    if d_occ not in occu_dates: occu_dates[d_occ] = []
-                    occu_dates[d_occ].append(f"{r['Prénom']} {r['Nom']}")
+                    d_cur = (start + timedelta(days=j)).strftime('%d/%m/%Y')
+                    if "🟢" in r['Statut']:
+                        if d_cur not in occu_green: occu_green[d_cur] = []
+                        occu_green[d_cur].append(f"{r['Prénom']} {r['Nom']}")
+                    elif "🟡" in r['Statut']:
+                        if d_cur not in occu_yellow: occu_yellow[d_cur] = []
+                        occu_yellow[d_cur].append(f"{r['Prénom']} {r['Nom']}")
             except: pass
 
         cal = calendar.monthcalendar(datetime.now().year, st.session_state.m_idx)
@@ -197,11 +203,29 @@ else:
             for i, day in enumerate(week):
                 if day != 0:
                     d_s = f"{day:02d}/{st.session_state.m_idx:02d}/{datetime.now().year}"
-                    est_occupe = d_s in occu_dates
-                    if cols[i].button(f"🟢" if est_occupe else str(day), key=f"d_{d_s}", use_container_width=True):
-                        if est_occupe:
-                            for client in occu_dates[d_s]: st.info(f"⚓ {client}")
-                        else: st.write(f"Libre le {d_s}")
+                    
+                    # Priorité au vert si conflit, sinon jaune
+                    if d_s in occu_green:
+                        btn_txt = f"🟢"
+                    elif d_s in occu_yellow:
+                        btn_txt = f"🟡"
+                    else:
+                        btn_txt = str(day)
+                        
+                    if cols[i].button(btn_txt, key=f"d_{d_s}", use_container_width=True):
+                        if d_s in occu_green:
+                            for c in occu_green[d_s]: st.success(f"⚓ Confirmé : {c}")
+                        if d_s in occu_yellow:
+                            for c in occu_yellow[d_s]: st.warning(f"⏳ En attente : {c}")
+                        if d_s not in occu_green and d_s not in occu_yellow:
+                            st.write(f"Libre le {d_s}")
+
+    # --- CHECKLIST ---
+    elif st.session_state.page == "CHECK":
+        st.subheader("✅ Checklist")
+        for it in ["Vannes", "Niveaux", "Gilets", "Gaz", "Briefing"]:
+            st.checkbox(it, key=f"ch_{it}")
+
 
 
 
