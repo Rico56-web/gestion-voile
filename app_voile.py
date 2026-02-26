@@ -76,14 +76,12 @@ def sauvegarder_data(df, nom_fichier):
     if sha: data["sha"] = sha
     
     put_res = requests.put(url, headers=headers, json=data)
-    if put_res.status_code in [200, 201]:
-        st.success("✅ Données synchronisées")
-    else:
-        st.error(f"❌ Erreur GitHub : {put_res.text}")
+    return put_res.status_code in [200, 201]
 
 # --- INITIALISATION ---
 if "authenticated" not in st.session_state: st.session_state.authenticated = False
 if "page" not in st.session_state: st.session_state.page = "LISTE"
+if "confirm_delete" not in st.session_state: st.session_state.confirm_delete = False
 
 # --- AUTH ---
 if not st.session_state.authenticated:
@@ -117,15 +115,13 @@ else:
 
     # --- PAGE LISTE ---
     if st.session_state.page == "LISTE":
-        total_fiches = len(df)
-        st.markdown(f'<div class="stats-banner">📊 Base Vesta : <b>{total_fiches} fiches</b></div>', unsafe_allow_html=True)
-
+        st.markdown(f'<div class="stats-banner">📊 Base Vesta : <b>{len(df)} fiches</b></div>', unsafe_allow_html=True)
         c_search, c_filter = st.columns([2, 1])
         with c_search: search = st.text_input("🔍 Rechercher...")
         with c_filter: f_statut = st.multiselect("Statut:", ["🟢 OK", "🟡 Attente", "🔴 Pas OK"], default=["🟢 OK", "🟡 Attente", "🔴 Pas OK"])
 
         auj = pd.Timestamp(datetime.now().date())
-        tab1, tab2, tab3 = st.tabs(["🚀 PROCHAINES SORTIES", "📂 ARCHIVES", "⚠️ ERREURS"])
+        tab1, tab2 = st.tabs(["🚀 PROCHAINES SORTIES", "📂 ARCHIVES"])
 
         with tab1:
             f_df = df[df['temp_date_obj'] >= auj].copy().sort_values('temp_date_obj')
@@ -146,23 +142,14 @@ else:
                 if st.button(f"Archive {row['Nom']}", key=f"p_{idx}"):
                     st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
 
-        with tab3:
-            e_df = df[df['temp_date_obj'].isna()].copy()
-            for idx, row in e_df.iterrows():
-                st.error(f"{row['Nom']} | Date: {row['DateNav']}")
-                if st.button(f"Fix {row['Nom']}", key=f"e_{idx}"):
-                    st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
-
     # --- PAGE PLANNING ---
     elif st.session_state.page == "CALENDRIER":
         mois_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
         m_sel = st.selectbox("Mois", mois_fr, index=datetime.now().month-1)
         m_idx = mois_fr.index(m_sel) + 1
         y_sel = datetime.now().year
-        
         mask = (df['temp_date_obj'].dt.month == m_idx) & (df['temp_date_obj'].dt.year == y_sel) & (df['Statut'] == "🟢 OK")
-        st.info(f"CA Mensuel estimé : {df[mask]['prix_num'].sum():,.2f} €")
-
+        st.info(f"💰 CA Mensuel : {df[mask]['prix_num'].sum():,.2f} €")
         cal = calendar.monthcalendar(y_sel, m_idx)
         for week in cal:
             cols_w = st.columns(7)
@@ -170,23 +157,22 @@ else:
                 if day != 0:
                     d_str = f"{day:02d}/{m_idx:02d}/{y_sel}"
                     occ = df[(df['temp_date_obj'].dt.date == datetime(y_sel, m_idx, day).date()) & (df['Statut'] == "🟢 OK")]
-                    btn_txt = str(day)
-                    if not occ.empty: btn_txt = f"🟢 {day}"
+                    btn_txt = f"🟢 {day}" if not occ.empty else str(day)
                     if cols_w[i].button(btn_txt, key=f"c_{d_str}"):
-                        st.write(occ[["Nom", "Prénom", "Téléphone"]])
+                        for _, r in occ.iterrows(): st.write(f"⚓ **{r['Nom']}** ({r['Passagers']} pers.)")
 
-    # --- PAGE FORMULAIRE (CORRIGÉE) ---
+    # --- PAGE FORMULAIRE ---
     elif st.session_state.page == "FORM":
         idx = st.session_state.get("edit_idx")
         init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols_base}
         
-        # SÉCURITÉ : On s'assure que pass_val est au moins 1 pour éviter le crash
         try:
             raw_pass = str(init.get("Passagers", "1")).replace(',', '.')
             pass_val = max(1, int(float(raw_pass))) if raw_pass and raw_pass != "" else 1
-        except:
-            pass_val = 1
+        except: pass_val = 1
 
+        st.subheader("📝 Fiche Passager")
+        
         with st.form("vesta_form"):
             c1, c2 = st.columns(2)
             f_nom = c1.text_input("NOM", value=init.get("Nom", ""))
@@ -195,37 +181,66 @@ else:
             f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], 
                                   index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut", "🟡 Attente") if init.get("Statut") in ["🟡 Attente", "🟢 OK", "🔴 Pas OK"] else "🟡 Attente"))
             f_prix = st.text_input("Prix (€)", value=init.get("PrixJour", "0"))
-            
-            # Application de la valeur sécurisée
             f_pass = st.number_input("Passagers", min_value=1, value=pass_val)
-            
             f_tel = st.text_input("Téléphone", value=init.get("Téléphone", ""))
             f_his = st.text_area("Historique", value=init.get("Historique", ""))
             
             submit = st.form_submit_button("💾 ENREGISTRER")
-            
-            if submit:
-                try:
-                    d_clean = f_date.strip().replace('-', '/')
-                    datetime.strptime(d_clean, '%d/%m/%Y') 
-                    new = {
-                        "DateNav": d_clean, "Nom": f_nom.upper(), "Prénom": f_pre.capitalize(),
-                        "Statut": f_stat, "PrixJour": f_prix, "Passagers": str(f_pass),
-                        "Téléphone": f_tel, "Email": init.get("Email", ""), 
-                        "Paye": "Oui" if "🟢" in f_stat else "Non", "Historique": f_his
-                    }
-                    if idx is not None: df.loc[idx] = new
-                    else: df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
+
+        # --- BOUTONS HORS FORMULAIRE (ANNULER / SUPPRIMER) ---
+        col_ann, col_sup = st.columns(2)
+        
+        if col_ann.button("❌ ANNULER / SORTIR", use_container_width=True):
+            st.session_state.page = "LISTE"; st.rerun()
+
+        if idx is not None:
+            if not st.session_state.confirm_delete:
+                if col_sup.button("🗑️ SUPPRIMER LA FICHE", use_container_width=True):
+                    st.session_state.confirm_delete = True; st.rerun()
+            else:
+                st.warning("⚠️ Confirmer la suppression ?")
+                c_y, c_n = st.columns(2)
+                if c_y.button("OUI, SUPPRIMER", type="primary", use_container_width=True):
+                    df = df.drop(index=idx)
                     sauvegarder_data(df, "contacts")
+                    st.session_state.confirm_delete = False
                     st.session_state.page = "LISTE"; st.rerun()
-                except: st.error("Format date invalide")
+                if c_n.button("NON, GARDER", use_container_width=True):
+                    st.session_state.confirm_delete = False; st.rerun()
 
+        if submit:
+            try:
+                d_clean = f_date.strip().replace('-', '/')
+                datetime.strptime(d_clean, '%d/%m/%Y') 
+                new = {
+                    "DateNav": d_clean, "Nom": f_nom.upper(), "Prénom": f_pre.capitalize(),
+                    "Statut": f_stat, "PrixJour": f_prix, "Passagers": str(f_pass),
+                    "Téléphone": f_tel, "Email": init.get("Email", ""), 
+                    "Paye": "Oui" if "🟢" in f_stat else "Non", "Historique": f_his
+                }
+                if idx is not None: df.loc[idx] = new
+                else: df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
+                
+                if sauvegarder_data(df, "contacts"):
+                    st.session_state.page = "LISTE"; st.rerun()
+            except:
+                st.error("⚠️ FORMAT DATE : Utilisez JJ/MM/AAAA")
+
+    # --- PAGE CHECKLIST ---
     elif st.session_state.page == "CHECK":
-        st.subheader("✅ Checklist")
-        st.write("Section prête.")
+        st.title("⚓ Checklist Avant Départ")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.subheader("⚙️ Technique")
+            for item in ["Huile/Eau", "Vannes", "Batteries", "Gasoil"]: st.checkbox(item)
+        with c2:
+            st.subheader("🛡️ Sécurité")
+            for item in ["Gilets", "Fusées", "Briefing", "VHF"]: st.checkbox(item)
+        if st.button("RAZ"): st.rerun()
 
 
             
+
 
 
 
