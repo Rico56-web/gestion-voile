@@ -5,6 +5,7 @@ import base64
 import requests
 from datetime import datetime, timedelta
 import calendar
+import re
 
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper", layout="wide")
@@ -61,9 +62,18 @@ def sauvegarder_data(df):
         st.error(f"Erreur de sauvegarde : {e}")
 
 # --- UTILS ---
+def format_tel(tel):
+    if not tel: return ""
+    nums = re.sub(r'\D', '', str(tel))
+    return " ".join(nums[i:i+2] for i in range(0, len(nums), 2))
+
 def parse_date(d):
-    try: return datetime.strptime(str(d).strip().replace(" ", ""), '%d/%m/%Y')
-    except: return datetime(2000, 1, 1)
+    try: 
+        # Nettoyage strict de la date
+        s = str(d).strip().replace(" ", "").replace("-", "/")
+        return datetime.strptime(s, '%d/%m/%Y')
+    except: 
+        return datetime(2000, 1, 1)
 
 def to_int(v):
     try:
@@ -102,9 +112,8 @@ else:
     for c in cols_v:
         if c not in df.columns: df[c] = ""
 
-    # --- ROUTAGE DES PAGES ---
+    # --- ROUTAGE ---
     
-    # 1. PAGE LISTE
     if st.session_state.page == "LISTE":
         df['dt'] = df['DateNav'].apply(parse_date)
         auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -119,7 +128,7 @@ else:
                     <b>{r['Prénom']} {r['Nom']}</b><br>
                     <div class="info-sub">
                         📅 <b>{r['DateNav']}</b> ({r['NbJours']}j) — 👤 {r['Passagers']}p<br>
-                        📞 {r['Téléphone']} | ✉️ {r['Email']}
+                        📞 <b>{format_tel(r['Téléphone'])}</b> | ✉️ {r['Email']}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -131,7 +140,6 @@ else:
         with tab1: render_fiches(df[df['dt'] >= auj].sort_values('dt'))
         with tab2: render_fiches(df[df['dt'] < auj].sort_values('dt', ascending=False).head(20))
 
-    # 2. PAGE FORMULAIRE
     elif st.session_state.page == "FORM":
         idx = st.session_state.edit_idx
         init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols_v}
@@ -161,7 +169,7 @@ else:
         if st.button("🔙 ANNULER"): 
             st.session_state.page = "LISTE"
             st.rerun()
-# 3. PAGE PLANNING (AVEC INDICATEUR MIXTE)
+
     elif st.session_state.page == "PLAN":
         if "m_idx" not in st.session_state: st.session_state.m_idx = datetime.now().month
         m_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
@@ -175,6 +183,7 @@ else:
             st.session_state.m_idx = 1 if st.session_state.m_idx == 12 else st.session_state.m_idx + 1
             st.rerun()
 
+        # Construction propre de la map d'occupation
         occu = {}
         for _, r in df.iterrows():
             d_obj = parse_date(r['DateNav'])
@@ -193,23 +202,22 @@ else:
                     label = str(day)
                     
                     if d_s in occu:
+                        # LOGIQUE DE COULEUR AMÉLIORÉE
                         has_ok = any("🟢" in str(x['Statut']) for x in occu[d_s])
-                        has_attente = any("🟡" in str(x['Statut']) for x in occu[d_s])
+                        has_at = any("🟡" in str(x['Statut']) for x in occu[d_s])
                         
-                        if has_ok and has_attente:
-                            label = "🟢+🟡" # Indique qu'il y a un OK ET des attentes
-                        elif has_ok:
-                            label = "🟢"
-                        elif has_attente:
-                            label = "🟡"
+                        if has_ok and has_at: label = "🟢+🟡"
+                        elif has_ok: label = "🟢"
+                        elif has_at: label = "🟡"
                     
                     if cols[i].button(label, key=f"p_{d_s}", use_container_width=True):
                         if d_s in occu:
-                            st.write(f"--- Détails du {d_s} ---")
+                            st.write(f"**Journée du {d_s}**")
                             for x in occu[d_s]: 
                                 st.info(f"{x['Statut']} {x['Prénom']} {x['Nom']} ({x['Passagers']}p)")
-                                if x['Téléphone']: st.write(f"📞 {x['Téléphone']}")
-                        else: st.write("Libre")
+                                if x['Téléphone']: st.write(f"📞 {format_tel(x['Téléphone'])}")
+                        else: st.write("Date libre")
+
 
 
 
