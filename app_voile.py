@@ -10,37 +10,41 @@ import re
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta", layout="wide")
 
-# CSS OPTIMISÉ POUR IPHONE (Plus petit et compact)
+# CSS ADAPTATIF (iPhone + PC)
 st.markdown("""
     <style>
-    /* Réduction globale de la taille du texte */
-    html, body, [class*="css"]  {
-        font-size: 0.9rem; 
-    }
-    /* Boutons de menu plus fins */
+    /* 1. RÉGLAGES POUR TOUS LES ÉCRANS */
     .stButton > button {
         border-radius: 8px !important;
-        height: 35px !important;
-        font-size: 0.85rem !important;
-        padding: 0px 5px !important;
+        font-weight: bold !important;
     }
-    /* Cartes clients plus compactes */
     .client-card {
-        background-color: #ffffff; padding: 8px 12px; border-radius: 8px; 
-        margin-bottom: 6px; border: 1px solid #eee; border-left: 6px solid #ccc;
+        background-color: #ffffff; padding: 10px; border-radius: 8px; 
+        margin-bottom: 8px; border: 1px solid #eee; border-left: 8px solid #ccc;
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
     .status-ok { border-left-color: #2ecc71 !important; }
     .status-attente { border-left-color: #f1c40f !important; }
     .status-non { border-left-color: #e74c3c !important; }
-    
-    .price-tag { float: right; font-weight: bold; color: #1e3799; font-size: 0.9rem; }
-    .info-sub { font-size: 0.8rem; color: #555; line-height: 1.2; margin-top: 2px; }
-    
-    /* Réduction des espaces entre les blocs Streamlit */
-    .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; }
-    div[data-testid="stForm"] { padding: 10px !important; }
-    h3 { font-size: 1.1rem !important; margin-bottom: 5px !important; }
+    .price-tag { float: right; font-weight: bold; color: #1e3799; }
+
+    /* 2. RÉGLAGES SPÉCIFIQUES IPHONE (Écrans de moins de 768px) */
+    @media only screen and (max-width: 768px) {
+        html, body, [class*="css"] { font-size: 0.9rem; }
+        .stButton > button { height: 40px !important; font-size: 0.8rem !important; }
+        .block-container { padding-top: 1rem !important; }
+        .price-tag { font-size: 0.9rem; }
+        .info-sub { font-size: 0.8rem; }
+    }
+
+    /* 3. RÉGLAGES SPÉCIFIQUES PC (Écrans larges) */
+    @media only screen and (min-width: 769px) {
+        html, body, [class*="css"] { font-size: 1.05rem; }
+        .stButton > button { height: 45px !important; font-size: 1rem !important; }
+        .price-tag { font-size: 1.2rem; }
+        .info-sub { font-size: 0.95rem; }
+        .client-card { margin-bottom: 15px; padding: 15px; }
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -105,18 +109,19 @@ if not st.session_state.auth:
         st.rerun()
     st.stop()
 
-# --- MENU ---
+# --- MENU FIXÉ ---
 m1, m2, m3 = st.columns(3)
 if m1.button("📋 LISTE", use_container_width=True): st.session_state.page = "LISTE"; st.rerun()
 if m2.button("🗓️ PLAN", use_container_width=True): st.session_state.page = "PLAN"; st.rerun()
 if m3.button("➕ NEW", use_container_width=True): st.session_state.page = "FORM"; st.session_state.edit_idx = None; st.rerun()
+st.markdown("---")
 
 df = charger_data()
 cols_v = ["DateNav", "NbJours", "Statut", "Nom", "Prénom", "Téléphone", "Email", "PrixJour", "Passagers", "Historique"]
 for c in cols_v:
     if c not in df.columns: df[c] = ""
 
-# --- LISTE ---
+# --- LOGIQUE DES PAGES (LISTE / FORM / PLAN) ---
 if st.session_state.page == "LISTE":
     df['dt'] = df['DateNav'].apply(parse_date)
     auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -131,8 +136,8 @@ if st.session_state.page == "LISTE":
                 <div class="price-tag">{r['PrixJour']}€</div>
                 <b>{r['Prénom']} {r['Nom']}</b>
                 <div class="info-sub">
-                    {r['DateNav']} ({r['NbJours']}j) • {r['Passagers']}p<br>
-                    {format_tel(r['Téléphone'])}
+                    📅 {r['DateNav']} ({r['NbJours']}j) • 👤 {r['Passagers']}p<br>
+                    📞 <b>{format_tel(r['Téléphone'])}</b>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -142,25 +147,21 @@ if st.session_state.page == "LISTE":
     with tab1: render_fiches(df[df['dt'] >= auj].sort_values('dt'))
     with tab2: render_fiches(df[df['dt'] < auj].sort_values('dt', ascending=False).head(15))
 
-# --- FORMULAIRE ---
 elif st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
     init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols_v}
-    with st.form("f_compact"):
+    with st.form("f_form"):
         f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut", "🟡 Attente")))
         c_n, c_p = st.columns(2)
         f_nom = c_n.text_input("NOM", value=init.get("Nom", ""))
         f_pre = c_p.text_input("Prénom", value=init.get("Prénom", ""))
         f_tel = st.text_input("Tel", value=init.get("Téléphone", ""))
-        
-        st.markdown("---")
         c1, c2, c3 = st.columns([2,1,1])
         f_date = c1.text_input("Date", value=init.get("DateNav", ""))
         f_nbj = c2.number_input("J", value=to_int(init.get("NbJours", 1)))
         f_pass = c3.number_input("P", value=to_int(init.get("Passagers", 1)))
         f_prix = st.text_input("Prix €", value=init.get("PrixJour", "0"))
         f_his = st.text_area("Notes", value=init.get("Historique", ""))
-        
         if st.form_submit_button("💾 ENREGISTRER"):
             new = {"DateNav": f_date.strip(), "NbJours": str(f_nbj), "Nom": f_nom.upper(), "Prénom": f_pre, "Statut": f_stat, "Email": init.get("Email",""), "Téléphone": f_tel, "PrixJour": f_prix, "Passagers": str(f_pass), "Historique": f_his}
             if idx is not None: df.loc[idx] = new
@@ -168,14 +169,12 @@ elif st.session_state.page == "FORM":
             sauvegarder_data(df); st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 RETOUR"): st.session_state.page = "LISTE"; st.rerun()
 
-# --- PLANNING ---
 elif st.session_state.page == "PLAN":
-    m_fr = ["Jan.", "Fév.", "Mars", "Avril", "Mai", "Juin", "Juil.", "Août", "Sept.", "Oct.", "Nov.", "Déc."]
+    m_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     c1, c2, c3 = st.columns([1,2,1])
     if c1.button("◀️"): st.session_state.m_idx = 12 if st.session_state.m_idx == 1 else st.session_state.m_idx - 1; st.rerun()
     c2.markdown(f"<h3 style='text-align:center;'>{m_fr[st.session_state.m_idx-1]} 2026</h3>", unsafe_allow_html=True)
     if c3.button("▶️"): st.session_state.m_idx = 1 if st.session_state.m_idx == 12 else st.session_state.m_idx + 1; st.rerun()
-
     occu = {}
     for _, r in df.iterrows():
         d_obj = parse_date(r['DateNav'])
@@ -184,7 +183,6 @@ elif st.session_state.page == "PLAN":
                 d_c = (d_obj + timedelta(days=j)).strftime('%d/%m/%Y')
                 if d_c not in occu: occu[d_c] = []
                 occu[d_c].append(r)
-
     cal = calendar.monthcalendar(2026, st.session_state.m_idx)
     for week in cal:
         cols = st.columns(7)
@@ -195,14 +193,11 @@ elif st.session_state.page == "PLAN":
                 if d_s in occu:
                     v, j = any("🟢" in str(x['Statut']) for x in occu[d_s]), any("🟡" in str(x['Statut']) for x in occu[d_s])
                     label = "🟢+🟡" if v and j else "🟢" if v else "🟡"
-                if cols[i].button(label, key=f"p_{d_s}", use_container_width=True):
-                    st.session_state.sel_date = d_s
-
+                if cols[i].button(label, key=f"p_{d_s}", use_container_width=True): st.session_state.sel_date = d_s
     if st.session_state.sel_date:
         st.markdown(f"**Détails {st.session_state.sel_date}**")
         if st.session_state.sel_date in occu:
-            for x in occu[st.session_state.sel_date]:
-                st.info(f"{x['Statut']} {x['Nom']} ({x['Passagers']}p)\n{format_tel(x['Téléphone'])}")
+            for x in occu[st.session_state.sel_date]: st.info(f"{x['Statut']} {x['Nom']} ({x['Passagers']}p) - {format_tel(x['Téléphone'])}")
         if st.button("Fermer"): st.session_state.sel_date = None; st.rerun()
 
 
