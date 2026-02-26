@@ -58,16 +58,16 @@
     {
         "DateNav":"01\/06\/2026",
         "NbJours":"2",
-        "Statut":"🟢 OK",
+        "Statut":"🟡 Attente",
         "Nom":"BANDIM FAUSTINO",
         "Prénom":"Pedro",
         "Téléphone":"+41762218767",
         "Email":"",
         "Paye":null,
-        "PrixJour":"",
+        "PrixJour":"70",
         "Passagers":"1",
         "Historique":"",
-        "Société":""
+        "Société":"VOG"
     },
     {
         "DateNav":"15\/02\/2026",
