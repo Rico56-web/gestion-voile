@@ -25,6 +25,7 @@ st.markdown("""
     .status-attente { border-left-color: #f1c40f !important; }
     .price-tag { float: right; font-weight: bold; color: #1e3799 !important; }
     .info-sub { font-size: 0.85rem; color: #444 !important; line-height: 1.3; }
+    .societe-tag { color: #e67e22 !important; font-weight: bold; font-size: 0.8rem; text-transform: uppercase; }
 
     @media only screen and (max-width: 768px) {
         html, body, [class*="css"] { font-size: 0.9rem; }
@@ -102,7 +103,8 @@ if m3.button("➕ NEW", use_container_width=True): st.session_state.page = "FORM
 st.markdown("---")
 
 df = charger_data()
-cols_v = ["DateNav", "NbJours", "Statut", "Nom", "Prénom", "Téléphone", "Email", "PrixJour", "Passagers", "Historique"]
+# Ajout de "Société" dans les colonnes par défaut
+cols_v = ["DateNav", "NbJours", "Statut", "Nom", "Prénom", "Société", "Téléphone", "Email", "PrixJour", "Passagers", "Historique"]
 for c in cols_v:
     if c not in df.columns: df[c] = ""
 
@@ -116,10 +118,13 @@ if st.session_state.page == "LISTE":
         for idx, r in data_f.iterrows():
             st_str = str(r['Statut'])
             cl = "status-ok" if "🟢" in st_str else "status-attente" if "🟡" in st_str else "status-non"
+            soc = f"<div class='societe-tag'>🏢 {r['Société']}</div>" if r['Société'] else ""
+            
             st.markdown(f"""
             <div class="client-card {cl}">
                 <div class="price-tag">{r['PrixJour']}€</div>
                 <b>{r['Prénom']} {r['Nom']}</b>
+                {soc}
                 <div class="info-sub">
                     📅 {r['DateNav']} ({r['NbJours']}j) • 👤 {r['Passagers']}p<br>
                     📞 {format_tel(r['Téléphone'])}<br>
@@ -133,17 +138,21 @@ if st.session_state.page == "LISTE":
     with tab1: render_fiches(df[df['dt'] >= auj].sort_values('dt'))
     with tab2: render_fiches(df[df['dt'] < auj].sort_values('dt', ascending=False).head(15))
 
-# --- FORMULAIRE (EMAIL RÉTABLI) ---
+# --- FORMULAIRE (AVEC CHAMP SOCIÉTÉ) ---
 elif st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
     init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols_v}
     with st.form("f_complet"):
         f_stat = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init.get("Statut", "🟡 Attente")))
+        
         c_n, c_p = st.columns(2)
         f_nom = c_n.text_input("NOM", value=init.get("Nom", ""))
         f_pre = c_p.text_input("Prénom", value=init.get("Prénom", ""))
+        
+        f_soc = st.text_input("SOCIÉTÉ (Optionnel)", value=init.get("Société", "")) # <-- NOUVEAU
+        
         f_tel = st.text_input("Téléphone", value=init.get("Téléphone", ""))
-        f_mail = st.text_input("Email", value=init.get("Email", "")) # <-- IL EST REVENU !
+        f_mail = st.text_input("Email", value=init.get("Email", ""))
         
         st.markdown("---")
         c1, c2, c3 = st.columns([2,1,1])
@@ -154,7 +163,12 @@ elif st.session_state.page == "FORM":
         f_his = st.text_area("Notes / Historique", value=init.get("Historique", ""))
         
         if st.form_submit_button("💾 ENREGISTRER"):
-            new = {"DateNav": f_date.strip(), "NbJours": str(f_nbj), "Nom": f_nom.upper(), "Prénom": f_pre, "Statut": f_stat, "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix, "Passagers": str(f_pass), "Historique": f_his}
+            new = {
+                "DateNav": f_date.strip(), "NbJours": str(f_nbj), 
+                "Nom": f_nom.upper(), "Prénom": f_pre, "Société": f_soc.upper(),
+                "Statut": f_stat, "Email": f_mail, "Téléphone": f_tel, 
+                "PrixJour": f_prix, "Passagers": str(f_pass), "Historique": f_his
+            }
             if idx is not None: df.loc[idx] = new
             else: df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
             sauvegarder_data(df); st.session_state.page = "LISTE"; st.rerun()
@@ -168,7 +182,6 @@ elif st.session_state.page == "PLAN":
     c2.markdown(f"<h3 style='text-align:center;'>{m_fr[st.session_state.m_idx-1]} 2026</h3>", unsafe_allow_html=True)
     if c3.button("▶️"): st.session_state.m_idx = 1 if st.session_state.m_idx == 12 else st.session_state.m_idx + 1; st.rerun()
     
-    # Construction Planning
     occu = {}
     for _, r in df.iterrows():
         d_obj = parse_date(r['DateNav'])
@@ -194,7 +207,7 @@ elif st.session_state.page == "PLAN":
         st.markdown(f"**Détails {st.session_state.sel_date}**")
         if st.session_state.sel_date in occu:
             for x in occu[st.session_state.sel_date]:
-                st.info(f"{x['Statut']} {x['Nom']} ({x['Passagers']}p)\n📞 {format_tel(x['Téléphone'])}\n✉️ {x['Email']}")
+                st.info(f"{x['Statut']} {x['Nom']} {f'({x['Société']})' if x['Société'] else ''} - {format_tel(x['Téléphone'])}")
         if st.button("Fermer"): st.session_state.sel_date = None; st.rerun()
 
 
