@@ -1,6 +1,7 @@
 [
     {
         "DateNav":"01\/03\/2026",
+        "NbJours":"3",
         "Statut":"🟢 OK",
         "Nom":"PHILIPPE",
         "Prénom":"Elisabeth",
@@ -13,6 +14,7 @@
     },
     {
         "DateNav":"15\/03\/2026",
+        "NbJours":"",
         "Statut":"🟡 Attente",
         "Nom":"BOUDANT",
         "Prénom":"Francois",
@@ -25,6 +27,7 @@
     },
     {
         "DateNav":"01\/06\/2026",
+        "NbJours":"",
         "Statut":"🟡 Attente",
         "Nom":"M.",
         "Prénom":"Batiste",
@@ -37,6 +40,7 @@
     },
     {
         "DateNav":"15\/03\/2026",
+        "NbJours":"",
         "Statut":"🟡 Attente",
         "Nom":"COURONNE",
         "Prénom":"Benoit",
@@ -49,6 +53,7 @@
     },
     {
         "DateNav":"15\/03\/2026",
+        "NbJours":"",
         "Statut":"🟡 Attente",
         "Nom":"BANDIM FAUSTINO",
         "Prénom":"Pedro",
@@ -61,6 +66,7 @@
     },
     {
         "DateNav":"15\/02\/2026",
+        "NbJours":"",
         "Statut":"🟡 Attente",
         "Nom":"CLAVREUL",
         "Prénom":"Lionel",
