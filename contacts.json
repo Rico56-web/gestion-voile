@@ -211,14 +211,14 @@
     },
     {
         "DateNav":"14\/05\/2026",
-        "NbJours":"1",
+        "NbJours":"4",
         "Statut":"🟡 Attente",
         "Nom":"CMN",
         "Prénom":"Cmn",
         "Téléphone":"",
         "Email":"",
         "Paye":null,
-        "PrixJour":"",
+        "PrixJour":"900",
         "Passagers":"",
         "Historique":"",
         "Société":"CMN"
