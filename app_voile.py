@@ -10,6 +10,27 @@ import re
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper", layout="wide")
 
+# CSS POUR LES FICHES DÉTAILLÉES (Style "Cartes")
+st.markdown("""
+    <style>
+    .client-card {
+        background-color: #ffffff !important; 
+        color: #1a1a1a !important; 
+        padding: 15px; border-radius: 12px; 
+        margin-bottom: 12px; border: 1px solid #eee; border-left: 10px solid #ccc;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .status-ok { border-left-color: #2ecc71 !important; }
+    .status-attente { border-left-color: #f1c40f !important; }
+    .status-non { border-left-color: #e74c3c !important; }
+    
+    .price-tag { float: right; font-weight: bold; color: #2c3e50 !important; font-size: 1.2rem; }
+    .soc-text { color: #d35400 !important; font-weight: bold; font-size: 0.9rem; text-transform: uppercase; }
+    .info-line { font-size: 0.9rem; color: #444; margin-top: 5px; }
+    .notes-box { background: #f9f9f9; padding: 8px; border-radius: 5px; margin-top: 10px; font-style: italic; font-size: 0.85rem; border: 1px dashed #ddd; }
+    </style>
+    """, unsafe_allow_html=True)
+
 # --- FONCTIONS GITHUB ---
 @st.cache_data(ttl=30)
 def charger_data():
@@ -91,7 +112,7 @@ for c in cols_v:
 # --- PAGE LISTE ---
 if st.session_state.page == "LISTE":
     c_search, c_add = st.columns([2, 1])
-    search = c_search.text_input("🔍 Rechercher un nom...", placeholder="Ex: MARTIN ou VESTA").upper()
+    search = c_search.text_input("🔍 Rechercher...", placeholder="NOM ou SOCIETE").upper()
     
     with c_add:
         if st.button("➕ NOUVEAU CLIENT", use_container_width=True, type="primary"):
@@ -102,42 +123,44 @@ if st.session_state.page == "LISTE":
     df['dt'] = df['DateNav'].apply(parse_date)
     auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     
-    if search:
-        df_base = df[df['Nom'].str.contains(search, na=False) | df['Société'].str.contains(search, na=False)]
-    else:
-        df_base = df
+    df_base = df[df['Nom'].str.contains(search, na=False) | df['Société'].str.contains(search, na=False)] if search else df
 
     t1, t2 = st.tabs(["🚀 PROCHAINES", "📂 ARCHIVES"])
     
-    def afficher_fiches(data_f, inverse=False):
+    def afficher_cartes(data_f, inverse=False):
         data_f = data_f.sort_values('dt', ascending=not inverse)
-        if inverse: data_f = data_f.head(30) # Limite pour les archives
+        if inverse: data_f = data_f.head(40)
         
         for idx, r in data_f.iterrows():
-            titre = f"{r['Statut']} {r['DateNav']} - {r['Nom']} {r['Prénom']}"
-            with st.expander(titre):
-                c1, c2 = st.columns(2)
-                c1.write(f"🏢 **Société:** {r['Société']}")
-                c1.write(f"📞 **Tél:** {r['Téléphone']}")
-                c1.write(f"✉️ **Email:** {r['Email']}")
-                c2.write(f"💰 **Prix:** {r['PrixJour']}€")
-                c2.write(f"👥 **Passagers:** {r['Passagers']}")
-                c2.write(f"⏱️ **Durée:** {r['NbJours']} jour(s)")
-                st.info(f"📝 **Notes:** {r['Historique']}")
-                if st.button("✏️ Modifier cette fiche", key=f"ed_{idx}"):
-                    st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
+            st_str = str(r['Statut'])
+            cl = "status-ok" if "🟢" in st_str else "status-attente" if "🟡" in st_str else "status-non"
+            v_soc = clean_val(r['Société'])
+            
+            # HTML DE LA FICHE
+            st.markdown(f"""
+                <div class="client-card {cl}">
+                    <div class="price-tag">{r['PrixJour']}€</div>
+                    <div style="font-size:1.2rem;"><b>{r['Prénom']} {r['Nom']}</b></div>
+                    {f'<div class="soc-text">🏢 {v_soc}</div>' if v_soc else ''}
+                    <div class="info-line">
+                        📅 <b>{r['DateNav']}</b> ({r['NbJours']}j) &nbsp;&nbsp; 👤 {r['Passagers']} pers.<br>
+                        📞 {r['Téléphone']} &nbsp;&nbsp; ✉️ {r['Email']}
+                    </div>
+                    {f'<div class="notes-box"><b>Note :</b> {r["Historique"]}</div>' if clean_val(r["Historique"]) else ''}
+                </div>
+            """, unsafe_allow_html=True)
+            
+            if st.button(f"✏️ Modifier {r['Nom']}", key=f"ed_{idx}", use_container_width=True):
+                st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
 
-    with t1: afficher_fiches(df_base[df_base['dt'] >= auj])
-    with t2: afficher_fiches(df_base[df_base['dt'] < auj], inverse=True)
+    with t1: afficher_cartes(df_base[df_base['dt'] >= auj])
+    with t2: afficher_cartes(df_base[df_base['dt'] < auj], inverse=True)
 
-# --- PAGE FORMULAIRE ---
+# --- PAGE FORMULAIRE (Identique pour sécurité) ---
 elif st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
-    if idx is not None:
-        init = df.loc[idx].to_dict()
-    else:
-        init = {c: "" for c in cols_v}
-        init["Statut"], init["NbJours"], init["Passagers"] = "🟡 Attente", "1", "1"
+    if idx is not None: init = df.loc[idx].to_dict()
+    else: init = {c: "" for c in cols_v}; init["Statut"], init["NbJours"], init["Passagers"] = "🟡 Attente", "1", "1"
 
     st.subheader("📝 Fiche Client")
     with st.form("f_client"):
@@ -148,21 +171,14 @@ elif st.session_state.page == "FORM":
         f_soc = st.text_input("SOCIÉTÉ", value=init["Société"])
         f_tel = st.text_input("Téléphone", value=init["Téléphone"])
         f_mail = st.text_input("Email", value=init["Email"])
-        st.markdown("---")
         c1, c2, c3 = st.columns([2,1,1])
         f_date = c1.text_input("Date (JJ/MM/AAAA)", value=init["DateNav"])
         f_nbj = c2.number_input("Jours", value=to_int(init["NbJours"]), min_value=1)
         f_pass = c3.number_input("Pers.", value=to_int(init["Passagers"]), min_value=1)
         f_prix = st.text_input("Prix Total €", value=init["PrixJour"])
         f_his = st.text_area("Notes / Historique", value=init["Historique"])
-        
         if st.form_submit_button("💾 ENREGISTRER"):
-            new_row = {
-                "DateNav": f_date, "NbJours": str(f_nbj), "Nom": f_nom.upper(), 
-                "Prénom": f_pre, "Société": f_soc.upper(), "Statut": f_stat, 
-                "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix, 
-                "Passagers": str(f_pass), "Historique": f_his
-            }
+            new_row = {"DateNav": f_date, "NbJours": str(f_nbj), "Nom": f_nom.upper(), "Prénom": f_pre, "Société": f_soc.upper(), "Statut": f_stat, "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix, "Passagers": str(f_pass), "Historique": f_his}
             if idx is not None: df.loc[idx] = new_row
             else: df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             if sauvegarder_data(df): st.session_state.page = "LISTE"; st.rerun()
@@ -176,7 +192,7 @@ elif st.session_state.page == "PLAN":
     c2.markdown(f"<h3 style='text-align:center;'>{m_fr[st.session_state.m_idx-1]} 2026</h3>", unsafe_allow_html=True)
     if c3.button("▶️"): st.session_state.m_idx = 1 if st.session_state.m_idx == 12 else st.session_state.m_idx + 1; st.rerun()
 
-    # DASHBOARD FINANCIER DU MOIS
+    # DASHBOARD FINANCIER
     ca_ok, ca_att = 0.0, 0.0
     for _, r in df.iterrows():
         dt = parse_date(r['DateNav'])
@@ -185,15 +201,10 @@ elif st.session_state.page == "PLAN":
             if "🟢" in str(r['Statut']): ca_ok += p
             elif "🟡" in str(r['Statut']): ca_att += p
     
-    # Affichage stylé des finances
-    st.markdown("#### 💰 Bilan du mois")
-    f1, f2, f3 = st.columns(3)
-    f1.metric("Encaissé", f"{ca_ok:,.0f}€".replace(","," "))
-    f2.metric("En attente", f"{ca_att:,.0f}€".replace(","," "))
-    f3.metric("Total", f"{(ca_ok+ca_att):,.0f}€".replace(","," "))
+    st.info(f"💰 **Encaissé : {ca_ok:,.0f}€** | ⏳ Attente : {ca_att:,.0f}€ | 📊 Total : {ca_ok+ca_att:,.0f}€".replace(",", " "))
     st.markdown("---")
 
-    # Calendrier visuel
+    # CALENDRIER VISUEL
     occu = {}
     for _, r in df.iterrows():
         d_obj = parse_date(r['DateNav'])
@@ -209,13 +220,13 @@ elif st.session_state.page == "PLAN":
         for i, day in enumerate(week):
             if day != 0:
                 d_s = f"{day:02d}/{st.session_state.m_idx:02d}/2026"
-                btn_label = str(day)
+                btn_l = str(day)
                 if d_s in occu:
-                    has_ok = any("🟢" in str(x['Statut']) for x in occu[d_s])
-                    btn_label = f"{day} 🟢" if has_ok else f"{day} 🟡"
-                if cols[i].button(btn_label, key=f"p_{d_s}", use_container_width=True):
-                    st.toast(f"Journée du {d_s}")
-                    for x in occu.get(d_s, []): st.sidebar.info(f"{x['Statut']} {x['Nom']}")
+                    btn_l = f"{day} 🟢" if any("🟢" in str(x['Statut']) for x in occu[d_s]) else f"{day} 🟡"
+                if cols[i].button(btn_l, key=f"p_{d_s}", use_container_width=True):
+                    st.write(f"**Détails du {d_s} :**")
+                    for x in occu.get(d_s, []): st.write(f"{x['Statut']} {x['Nom']} {x['Prénom']} ({x['PrixJour']}€)")
+
 
 
 
