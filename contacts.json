@@ -292,5 +292,19 @@
         "Passagers":"",
         "Historique":"Prix actuellement à 2600 négociable à 2000",
         "Société":"PERSO "
+    },
+    {
+        "DateNav":"07\/02\/2026",
+        "NbJours":"2",
+        "Statut":"🟢 OK",
+        "Nom":"CMN",
+        "Prénom":"Cmn",
+        "Téléphone":"",
+        "Email":"",
+        "Paye":null,
+        "PrixJour":"450",
+        "Passagers":"",
+        "Historique":"",
+        "Société":"CMN"
     }
 ]
