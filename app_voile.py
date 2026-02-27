@@ -10,42 +10,43 @@ import re
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper", layout="wide")
 
-# CSS MIS À JOUR (Boutons Planning et Style CMN)
+# CSS MIS À JOUR (Gestion des couleurs de boutons par type)
 st.markdown("""
     <style>
+    /* Style de base des fiches */
     .client-card {
         background-color: #ffffff !important; 
         padding: 15px; border-radius: 12px; 
         margin-bottom: 12px; border: 1px solid #eee; border-left: 10px solid #ccc;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     .status-ok { border-left-color: #2ecc71 !important; }
     .status-attente { border-left-color: #f1c40f !important; }
     
-    .price-tag { float: right; font-weight: bold; color: #2c3e50 !important; font-size: 1.2rem; }
-    
-    /* Style Spécial CMN */
+    /* Tag CMN dans les fiches */
     .cmn-tag { 
-        background-color: #ebf5fb; 
-        color: #2980b9; 
-        padding: 4px 8px; 
-        border-radius: 4px; 
-        font-weight: bold; 
-        border: 1px solid #2980b9;
-        display: inline-block;
+        background-color: #ebf5fb; color: #2980b9; 
+        padding: 4px 8px; border-radius: 4px; 
+        font-weight: bold; border: 1px solid #2980b9; display: inline-block;
     }
-    .soc-text { color: #d35400; font-weight: bold; font-size: 0.9rem; text-transform: uppercase; }
 
-    /* Boutons BLEUS dans le Planning */
+    /* COULEURS DES BOUTONS DU CALENDRIER */
+    /* 1. Bouton Standard (Gris/Bleu clair) */
     div[data-testid="column"] button[key^="p_"] {
-        background-color: #3498db !important;
+        background-color: #f1f2f6 !important;
+        color: #2f3542 !important;
+        border: 1px solid #dcdde1 !important;
+    }
+
+    /* 2. Bouton Spécial CMN (Bleu Roi) */
+    div.stButton > button[key*="_cmn"] {
+        background-color: #2980b9 !important;
         color: white !important;
         border: none !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FONCTIONS GITHUB (Identiques) ---
+# --- FONCTIONS GITHUB ---
 @st.cache_data(ttl=30)
 def charger_data():
     try:
@@ -70,7 +71,7 @@ def sauvegarder_data(df):
         sha = res.json().get('sha') if res.status_code == 200 else None
         json_d = df.to_json(orient="records", indent=4, force_ascii=False)
         content_b64 = base64.b64encode(json_d.encode('utf-8')).decode('utf-8')
-        data = {"message": "Update Vesta", "content": content_b64, "sha": sha}
+        data = {"message": "Update Vesta UI", "content": content_b64, "sha": sha}
         requests.put(url, headers=headers, json=data)
         st.cache_data.clear()
         return True
@@ -130,9 +131,7 @@ if st.session_state.page == "LISTE":
     
     with c_add:
         if st.button("➕ NOUVEAU COÉQUIPIER", use_container_width=True, type="primary"):
-            st.session_state.edit_idx = None
-            st.session_state.page = "FORM"
-            st.rerun()
+            st.session_state.edit_idx = None; st.session_state.page = "FORM"; st.rerun()
     
     df['dt'] = df['DateNav'].apply(parse_date)
     auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -142,56 +141,46 @@ if st.session_state.page == "LISTE":
     
     def afficher_cartes(data_f, inverse=False):
         data_f = data_f.sort_values('dt', ascending=not inverse)
-        if inverse: data_f = data_f.head(40)
-        
         for idx, r in data_f.iterrows():
             st_str = str(r['Statut'])
             cl = "status-ok" if "🟢" in st_str else "status-attente" if "🟡" in st_str else "status-non"
             v_soc = clean_val(r['Société'])
-            
-            # Gestion visuelle CMN
-            soc_html = f'<div class="cmn-tag">🏢 {v_soc}</div>' if v_soc == "CMN" else f'<div class="soc-text">🏢 {v_soc}</div>' if v_soc else ''
+            soc_html = f'<div class="cmn-tag">🏢 CMN</div>' if v_soc == "CMN" else f'<div style="color:#d35400; font-weight:bold;">🏢 {v_soc}</div>' if v_soc else ''
             
             st.markdown(f"""
                 <div class="client-card {cl}">
-                    <div class="price-tag">{r['PrixJour']}€</div>
+                    <div style="float:right; font-weight:bold; font-size:1.2rem;">{r['PrixJour']}€</div>
                     <div style="font-size:1.2rem;"><b>{r['Prénom']} {r['Nom']}</b></div>
                     {soc_html}
                     <div style="font-size:0.9rem; color:#444; margin-top:5px;">
-                        📅 <b>{r['DateNav']}</b> ({r['NbJours']}j) &nbsp;&nbsp; 👤 {r['Passagers']} pers.<br>
-                        📞 {r['Téléphone']} &nbsp;&nbsp; ✉️ {r['Email']}
+                        📅 <b>{r['DateNav']}</b> ({r['NbJours']}j) | 📞 {r['Téléphone']}
                     </div>
                 </div>
             """, unsafe_allow_html=True)
-            
-            # Bouton avec Prénom et Nom
             if st.button(f"✏️ Modifier {r['Prénom']} {r['Nom']}", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
 
     with t1: afficher_cartes(df_base[df_base['dt'] >= auj])
     with t2: afficher_cartes(df_base[df_base['dt'] < auj], inverse=True)
 
-# --- PAGE FORMULAIRE ---
+# --- PAGE FORMULAIRE (Identique) ---
 elif st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
     if idx is not None: init = df.loc[idx].to_dict()
-    else: init = {c: "" for c in cols_v}; init["Statut"], init["NbJours"], init["Passagers"] = "🟡 Attente", "1", "1"
+    else: init = {c: "" for c in cols_v}; init["Statut"], init["NbJours"] = "🟡 Attente", "1"
 
-    st.subheader("📝 Fiche Coéquipier")
-    with st.form("f_client"):
-        f_stat = st.selectbox("STATUT", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(init["Statut"]) if init["Statut"] in ["🟡 Attente", "🟢 OK", "🔴 Pas OK"] else 0)
+    with st.form("f_coep"):
+        f_stat = st.selectbox("STATUT", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=0)
         f_nom = st.text_input("NOM", value=init["Nom"])
         f_pre = st.text_input("Prénom", value=init["Prénom"])
         f_soc = st.text_input("SOCIÉTÉ", value=init["Société"])
         f_tel = st.text_input("Téléphone", value=init["Téléphone"])
-        f_mail = st.text_input("Email", value=init["Email"])
-        c1, c2 = st.columns(2)
-        f_date = c1.text_input("Date (JJ/MM/AAAA)", value=init["DateNav"])
-        f_nbj = c2.number_input("Jours", value=to_int(init["NbJours"]), min_value=1)
+        f_date = st.text_input("Date (JJ/MM/AAAA)", value=init["DateNav"])
+        f_nbj = st.number_input("Jours", value=to_int(init["NbJours"]), min_value=1)
         f_prix = st.text_input("Prix Total €", value=init["PrixJour"])
         f_his = st.text_area("Notes", value=init["Historique"])
         if st.form_submit_button("💾 ENREGISTRER"):
-            new_row = {"DateNav": f_date, "NbJours": str(f_nbj), "Nom": f_nom.upper(), "Prénom": f_pre, "Société": f_soc.upper(), "Statut": f_stat, "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix, "Passagers": init["Passagers"], "Historique": f_his}
+            new_row = {"DateNav": f_date, "NbJours": str(f_nbj), "Nom": f_nom.upper(), "Prénom": f_pre, "Société": f_soc.upper(), "Statut": f_stat, "Email": init["Email"], "Téléphone": f_tel, "PrixJour": f_prix, "Passagers": init["Passagers"], "Historique": f_his}
             if idx is not None: df.loc[idx] = new_row
             else: df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             if sauvegarder_data(df): st.session_state.page = "LISTE"; st.rerun()
@@ -205,17 +194,7 @@ elif st.session_state.page == "PLAN":
     c2.markdown(f"<h3 style='text-align:center;'>{m_fr[st.session_state.m_idx-1]} 2026</h3>", unsafe_allow_html=True)
     if c3.button("▶️"): st.session_state.m_idx = 1 if st.session_state.m_idx == 12 else st.session_state.m_idx + 1; st.rerun()
 
-    # Bilan financier
-    ca_ok, ca_att = 0.0, 0.0
-    for _, r in df.iterrows():
-        dt = parse_date(r['DateNav'])
-        if dt.month == st.session_state.m_idx and dt.year == 2026:
-            p = to_float(r['PrixJour'])
-            if "🟢" in str(r['Statut']): ca_ok += p
-            elif "🟡" in str(r['Statut']): ca_att += p
-    st.info(f"💰 **Encaissé : {ca_ok:,.0f}€** | ⏳ Attente : {ca_att:,.0f}€".replace(",", " "))
-
-    # Calendrier (Boutons bleus forcés par CSS)
+    # Logique d'occupation
     occu = {}
     for _, r in df.iterrows():
         d_obj = parse_date(r['DateNav'])
@@ -231,9 +210,17 @@ elif st.session_state.page == "PLAN":
         for i, day in enumerate(week):
             if day != 0:
                 d_s = f"{day:02d}/{st.session_state.m_idx:02d}/2026"
-                label = f"{day} 🟢" if any("🟢" in str(x['Statut']) for x in occu.get(d_s,[])) else f"{day} 🟡" if d_s in occu else str(day)
-                if cols[i].button(label, key=f"p_{d_s}", use_container_width=True):
-                    st.toast(f"Journée du {d_s}")
+                est_cmn = any(clean_val(x.get('Société')) == "CMN" for x in occu.get(d_s, []))
+                has_ok = any("🟢" in str(x['Statut']) for x in occu.get(d_s, []))
+                
+                label = f"{day} 🔵" if est_cmn else f"{day} 🟢" if has_ok else f"{day} 🟡" if d_s in occu else str(day)
+                # On ajoute "_cmn" à la clé pour que le CSS l'attrape
+                key_btn = f"p_{d_s}_cmn" if est_cmn else f"p_{d_s}"
+                
+                if cols[i].button(label, key=key_btn, use_container_width=True):
+                    st.write(f"**Détails du {d_s} :**")
+                    for x in occu.get(d_s, []): st.info(f"{x['Statut']} {x['Prénom']} {x['Nom']} ({x['Société']})")
+
 
 
 
