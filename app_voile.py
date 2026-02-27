@@ -10,50 +10,34 @@ import re
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper", layout="wide")
 
-# CSS PERSONNALISÉ (COULEURS ET TAILLES)
+# CSS SIMPLIFIÉ ET ROBUSTE
 st.markdown("""
     <style>
     .stApp { background-color: #f8f9fa; }
     
-    /* Couleurs spécifiques demandées */
-    div.stButton > button:first-child[style*="background-color"] { border: none; }
-    
-    /* Bouton + NOUVEAU en Vert */
-    .btn-vert > div[data-testid="stButton"] > button {
-        background-color: #27ae60 !important;
-        color: white !important;
-        border: none !important;
-    }
-    
-    /* Bouton PLANNING en Bleu */
-    .btn-bleu > div[data-testid="stButton"] > button {
-        background-color: #2980b9 !important;
-        color: white !important;
-        border: none !important;
-    }
-
-    /* Cartes clients améliorées */
+    /* Cartes clients */
     .client-card {
         background-color: #ffffff !important; 
         color: #1a1a1a !important; 
         padding: 15px; border-radius: 12px; 
         margin-bottom: 5px; border: 1px solid #eee; border-left: 10px solid #ccc;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     .status-ok { border-left-color: #2ecc71 !important; }
     .status-attente { border-left-color: #f1c40f !important; }
     .status-non { border-left-color: #e74c3c !important; }
     
-    .price-tag { float: right; font-weight: bold; color: #2c3e50 !important; font-size: 1.1rem; background: #f1f2f6; padding: 2px 8px; border-radius: 5px; }
-    .societe-tag { color: #d35400 !important; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; }
+    /* Forcer les couleurs des boutons via leurs balises */
+    button[kind="primary"] {
+        background-color: #27ae60 !important; /* Vert pour Nouveau */
+        border-color: #27ae60 !important;
+        color: white !important;
+    }
     
-    /* Bouton modifier miniature */
-    .btn-edit > div[data-testid="stButton"] > button {
-        height: 25px !important;
-        font-size: 0.7rem !important;
-        color: #95a5a6 !important;
-        border: 1px solid #ecf0f1 !important;
-        margin-top: -10px;
+    /* Style pour le bouton Planning spécifiquement */
+    .plan-btn button {
+        background-color: #2980b9 !important; /* Bleu pour Planning */
+        color: white !important;
+        border: none !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -133,7 +117,7 @@ with col_m1:
     if st.button("📋 LISTE CLIENTS", use_container_width=True): 
         st.session_state.page = "LISTE"; st.rerun()
 with col_m2:
-    st.markdown('<div class="btn-bleu">', unsafe_allow_html=True)
+    st.markdown('<div class="plan-btn">', unsafe_allow_html=True)
     if st.button("🗓️ PLANNING", use_container_width=True): 
         st.session_state.page = "PLAN"; st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
@@ -151,12 +135,11 @@ if st.session_state.page == "LISTE":
     search = c_search.text_input("🔍 Rechercher...", placeholder="Nom ou Société").upper()
     
     with c_add:
-        st.markdown('<div class="btn-vert">', unsafe_allow_html=True)
-        if st.button("➕ NOUVEAU", use_container_width=True):
+        # Le bouton "Primary" sera Vert grâce au CSS en haut
+        if st.button("➕ NOUVEAU", use_container_width=True, type="primary"):
             st.session_state.edit_idx = None
             st.session_state.page = "FORM"
             st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
     
     df['dt'] = df['DateNav'].apply(parse_date)
     auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -171,11 +154,11 @@ if st.session_state.page == "LISTE":
             st_str = str(r['Statut'])
             cl = "status-ok" if "🟢" in st_str else "status-attente" if "🟡" in st_str else "status-non"
             v_soc, v_tel, v_mail = clean_val(r['Société']), format_tel(r['Téléphone']), clean_val(r['Email'])
-            soc_h = f"<div class='societe-tag'>🏢 {v_soc}</div>" if v_soc else ""
+            soc_h = f"<div style='color:#d35400; font-weight:bold; font-size:0.85rem;'>🏢 {v_soc}</div>" if v_soc else ""
             
             st.markdown(f'''
                 <div class="client-card {cl}">
-                    <div class="price-tag">{r["PrixJour"]}€</div>
+                    <div style="float:right; font-weight:bold; color:#2c3e50;">{r["PrixJour"]}€</div>
                     <b>{clean_val(r["Prénom"])} {clean_val(r["Nom"])}</b>
                     {soc_h}
                     <div style="font-size:0.85rem; color:#555;">
@@ -184,15 +167,13 @@ if st.session_state.page == "LISTE":
                     </div>
                 </div>
             ''', unsafe_allow_html=True)
-            st.markdown('<div class="btn-edit">', unsafe_allow_html=True)
-            if st.button(f"Modifier {r['Nom']}", key=f"ed_{idx}"):
+            if st.button(f"Modifier {r['Nom']}", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
     
     with t1: render(df[df['dt'] >= auj].sort_values('dt'))
     with t2: render(df[df['dt'] < auj].sort_values('dt', ascending=False).head(20))
 
-# --- PAGE FORMULAIRE ---
+# (Pages FORM et PLAN identiques...)
 elif st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
     if idx is not None and idx < len(df):
@@ -201,21 +182,19 @@ elif st.session_state.page == "FORM":
         init = {c: "" for c in cols_v}
         init["Statut"] = "🟡 Attente"
 
-    st.subheader("📝 Fiche Client" if idx is None else "✏️ Modifier Client")
+    st.subheader("📝 Fiche Client")
     with st.form("f_v"):
         stat_list = ["🟡 Attente", "🟢 OK", "🔴 Pas OK"]
         curr_val = clean_val(init.get("Statut", "🟡 Attente"))
         idx_stat = stat_list.index(curr_val) if curr_val in stat_list else 0
         f_stat = st.selectbox("STATUT", stat_list, index=idx_stat)
-        c_n, c_p = st.columns(2)
-        f_nom = c_n.text_input("NOM", value=clean_val(init.get("Nom", "")))
-        f_pre = c_p.text_input("Prénom", value=clean_val(init.get("Prénom", "")))
+        f_nom = st.text_input("NOM", value=clean_val(init.get("Nom", "")))
+        f_pre = st.text_input("Prénom", value=clean_val(init.get("Prénom", "")))
         f_soc = st.text_input("SOCIÉTÉ", value=clean_val(init.get("Société", "")))
         f_tel = st.text_input("Tél", value=clean_val(init.get("Téléphone", "")))
         f_mail = st.text_input("Email", value=clean_val(init.get("Email", "")))
-        st.markdown("---")
         c1, c2, c3 = st.columns([2,1,1])
-        f_date = c1.text_input("Date (JJ/MM/AAAA)", value=clean_val(init.get("DateNav", "")))
+        f_date = c1.text_input("Date", value=clean_val(init.get("DateNav", "")))
         f_nbj = c2.number_input("Jours", value=to_int(init.get("NbJours", 1)), min_value=1)
         f_pass = c3.number_input("Pers.", value=to_int(init.get("Passagers", 1)), min_value=1)
         f_prix = st.text_input("Prix Total €", value=clean_val(init.get("PrixJour", "0")))
@@ -227,7 +206,6 @@ elif st.session_state.page == "FORM":
             if sauvegarder_data(df): st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 ANNULER"): st.session_state.page = "LISTE"; st.rerun()
 
-# --- PAGE PLANNING ---
 elif st.session_state.page == "PLAN":
     m_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     c1, c2, c3 = st.columns([1,2,1])
@@ -260,6 +238,7 @@ elif st.session_state.page == "PLAN":
         if st.session_state.sel_date in occu:
             for x in occu[st.session_state.sel_date]: st.info(f"{x['Statut']} {x['Nom']} {f'({x.get('Société','')})' if x.get('Société','') else ''}")
         if st.button("Fermer"): st.session_state.sel_date = None; st.rerun()
+
 
 
 
