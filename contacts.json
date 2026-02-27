@@ -71,16 +71,16 @@
     },
     {
         "DateNav":"15\/02\/2026",
-        "NbJours":"",
+        "NbJours":"1",
         "Statut":"🟡 Attente",
         "Nom":"CLAVREUL",
         "Prénom":"Lionel",
         "Téléphone":"0772020678",
         "Email":"l.clavreul@gmail.com",
-        "Paye":"Non",
+        "Paye":null,
         "PrixJour":"",
         "Passagers":"1",
         "Historique":"ras",
-        "Société":""
+        "Société":"PERSO"
     }
 ]
