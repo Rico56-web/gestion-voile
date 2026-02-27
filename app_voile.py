@@ -13,40 +13,52 @@ st.set_page_config(page_title="Vesta Skipper", layout="wide")
 # CSS PERSONNALISÉ (COULEURS ET TAILLES)
 st.markdown("""
     <style>
-    /* Fond de l'application */
     .stApp { background-color: #f8f9fa; }
     
-    /* Cartes clients */
+    /* Couleurs spécifiques demandées */
+    div.stButton > button:first-child[style*="background-color"] { border: none; }
+    
+    /* Bouton + NOUVEAU en Vert */
+    .btn-vert > div[data-testid="stButton"] > button {
+        background-color: #27ae60 !important;
+        color: white !important;
+        border: none !important;
+    }
+    
+    /* Bouton PLANNING en Bleu */
+    .btn-bleu > div[data-testid="stButton"] > button {
+        background-color: #2980b9 !important;
+        color: white !important;
+        border: none !important;
+    }
+
+    /* Cartes clients améliorées */
     .client-card {
         background-color: #ffffff !important; 
         color: #1a1a1a !important; 
         padding: 15px; border-radius: 12px; 
-        margin-bottom: 12px; border: 1px solid #eee; border-left: 10px solid #ccc;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        margin-bottom: 5px; border: 1px solid #eee; border-left: 10px solid #ccc;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    .status-ok { border-left-color: #2ecc71 !important; border-top: 1px solid #2ecc71; }
-    .status-attente { border-left-color: #f1c40f !important; border-top: 1px solid #f1c40f; }
-    .status-non { border-left-color: #e74c3c !important; border-top: 1px solid #e74c3c; }
+    .status-ok { border-left-color: #2ecc71 !important; }
+    .status-attente { border-left-color: #f1c40f !important; }
+    .status-non { border-left-color: #e74c3c !important; }
     
-    /* Textes dans les cartes */
-    .price-tag { float: right; font-weight: bold; color: #2c3e50 !important; font-size: 1.2rem; background: #f1f2f6; padding: 2px 8px; border-radius: 5px; }
-    .societe-tag { color: #d35400 !important; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    .price-tag { float: right; font-weight: bold; color: #2c3e50 !important; font-size: 1.1rem; background: #f1f2f6; padding: 2px 8px; border-radius: 5px; }
+    .societe-tag { color: #d35400 !important; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; }
     
-    /* Boutons de navigation */
-    .stButton > button { border-radius: 8px; font-weight: 600; }
-    
-    /* Style spécifique pour le bouton Modifier (plus discret) */
-    div[data-testid="column"] button[key^="ed_"] {
-        background-color: #f8f9fa;
-        color: #7f8c8d;
-        border: 1px solid #dee2e6;
-        height: 30px !important;
-        font-size: 0.8rem !important;
+    /* Bouton modifier miniature */
+    .btn-edit > div[data-testid="stButton"] > button {
+        height: 25px !important;
+        font-size: 0.7rem !important;
+        color: #95a5a6 !important;
+        border: 1px solid #ecf0f1 !important;
+        margin-top: -10px;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FONCTIONS GITHUB (Identiques) ---
+# --- FONCTIONS GITHUB ---
 @st.cache_data(ttl=30)
 def charger_data():
     try:
@@ -71,13 +83,13 @@ def sauvegarder_data(df):
         sha = res.json().get('sha') if res.status_code == 200 else None
         json_d = df.to_json(orient="records", indent=4, force_ascii=False)
         content_b64 = base64.b64encode(json_d.encode('utf-8')).decode('utf-8')
-        data = {"message": "Design Update", "content": content_b64, "sha": sha}
+        data = {"message": "Update UI", "content": content_b64, "sha": sha}
         requests.put(url, headers=headers, json=data)
         st.cache_data.clear()
         return True
     except: return False
 
-# --- UTILS (Identiques) ---
+# --- UTILS ---
 def clean_val(val):
     if val is None or str(val).lower() == "none" or str(val).strip() == "": return ""
     return str(val).strip()
@@ -99,11 +111,12 @@ def to_int(v):
     except: return 1
 
 # --- SESSION ---
-if "auth" not in st.session_state: st.session_state.auth = False
-if "page" not in st.session_state: st.session_state.page = "LISTE"
-if "m_idx" not in st.session_state: st.session_state.m_idx = datetime.now().month
-if "sel_date" not in st.session_state: st.session_state.sel_date = None
-if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
+for k in ["auth", "page", "m_idx", "sel_date", "edit_idx"]:
+    if k not in st.session_state:
+        if k == "auth": st.session_state[k] = False
+        elif k == "page": st.session_state[k] = "LISTE"
+        elif k == "m_idx": st.session_state[k] = datetime.now().month
+        else: st.session_state[k] = None
 
 # --- AUTH ---
 if not st.session_state.auth:
@@ -115,14 +128,16 @@ if not st.session_state.auth:
     st.stop()
 
 # --- MENU PRINCIPAL ---
-m1, m2 = st.columns(2)
-style_l = "primary" if st.session_state.page == "LISTE" else "secondary"
-style_p = "primary" if st.session_state.page == "PLAN" else "secondary"
+col_m1, col_m2 = st.columns(2)
+with col_m1:
+    if st.button("📋 LISTE CLIENTS", use_container_width=True): 
+        st.session_state.page = "LISTE"; st.rerun()
+with col_m2:
+    st.markdown('<div class="btn-bleu">', unsafe_allow_html=True)
+    if st.button("🗓️ PLANNING", use_container_width=True): 
+        st.session_state.page = "PLAN"; st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-if m1.button("📋 LISTE CLIENTS", use_container_width=True, type=style_l): 
-    st.session_state.page = "LISTE"; st.rerun()
-if m2.button("🗓️ PLANNING", use_container_width=True, type=style_p): 
-    st.session_state.page = "PLAN"; st.rerun()
 st.markdown("---")
 
 df = charger_data()
@@ -132,14 +147,16 @@ for c in cols_v:
 
 # --- PAGE LISTE ---
 if st.session_state.page == "LISTE":
-    # Barre de recherche et Bouton Ajouter sur la même ligne
-    c_search, c_add = st.columns([3, 1])
+    c_search, c_add = st.columns([2, 1])
     search = c_search.text_input("🔍 Rechercher...", placeholder="Nom ou Société").upper()
     
-    if c_add.button("➕ NOUVEAU", use_container_width=True, type="primary"):
-        st.session_state.edit_idx = None
-        st.session_state.page = "FORM"
-        st.rerun()
+    with c_add:
+        st.markdown('<div class="btn-vert">', unsafe_allow_html=True)
+        if st.button("➕ NOUVEAU", use_container_width=True):
+            st.session_state.edit_idx = None
+            st.session_state.page = "FORM"
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
     
     df['dt'] = df['DateNav'].apply(parse_date)
     auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -147,38 +164,35 @@ if st.session_state.page == "LISTE":
     if search:
         df = df[df['Nom'].str.contains(search, na=False) | df['Société'].str.contains(search, na=False)]
 
-    t1, t2 = st.tabs(["🚀 PROCHAINES NAVIGATIONS", "📂 ARCHIVES"])
+    t1, t2 = st.tabs(["🚀 PROCHAINES", "📂 ARCHIVES"])
     
     def render(data_f):
-        if data_f.empty:
-            st.write("Aucun client trouvé.")
-            return
         for idx, r in data_f.iterrows():
             st_str = str(r['Statut'])
             cl = "status-ok" if "🟢" in st_str else "status-attente" if "🟡" in st_str else "status-non"
             v_soc, v_tel, v_mail = clean_val(r['Société']), format_tel(r['Téléphone']), clean_val(r['Email'])
             soc_h = f"<div class='societe-tag'>🏢 {v_soc}</div>" if v_soc else ""
-            tel_h = f"📞 {v_tel} " if v_tel else ""
-            mail_h = f"✉️ {v_mail}" if v_mail else ""
             
             st.markdown(f'''
                 <div class="client-card {cl}">
                     <div class="price-tag">{r["PrixJour"]}€</div>
-                    <div style="font-size:1.1rem; color:#2c3e50;"><b>{clean_val(r["Prénom"])} {clean_val(r["Nom"])}</b></div>
+                    <b>{clean_val(r["Prénom"])} {clean_val(r["Nom"])}</b>
                     {soc_h}
-                    <div class="info-sub">
-                        📅 <b>{r["DateNav"]}</b> ({r["NbJours"]}j) • 👤 {r["Passagers"]} pers.<br>
-                        {tel_h} {mail_h}
+                    <div style="font-size:0.85rem; color:#555;">
+                        📅 {r["DateNav"]} ({r["NbJours"]}j) • 👤 {r["Passagers"]}p<br>
+                        {f"📞 {v_tel}" if v_tel else ""} {f"✉️ {v_mail}" if v_mail else ""}
                     </div>
                 </div>
             ''', unsafe_allow_html=True)
-            if st.button(f"✏️ Modifier {r['Nom']}", key=f"ed_{idx}", use_container_width=False):
+            st.markdown('<div class="btn-edit">', unsafe_allow_html=True)
+            if st.button(f"Modifier {r['Nom']}", key=f"ed_{idx}"):
                 st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
     
     with t1: render(df[df['dt'] >= auj].sort_values('dt'))
     with t2: render(df[df['dt'] < auj].sort_values('dt', ascending=False).head(20))
 
-# --- PAGE FORMULAIRE (Inchangée mais sécurisée) ---
+# --- PAGE FORMULAIRE ---
 elif st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
     if idx is not None and idx < len(df):
@@ -213,7 +227,7 @@ elif st.session_state.page == "FORM":
             if sauvegarder_data(df): st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 ANNULER"): st.session_state.page = "LISTE"; st.rerun()
 
-# --- PAGE PLANNING (Inchangée) ---
+# --- PAGE PLANNING ---
 elif st.session_state.page == "PLAN":
     m_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     c1, c2, c3 = st.columns([1,2,1])
@@ -246,6 +260,8 @@ elif st.session_state.page == "PLAN":
         if st.session_state.sel_date in occu:
             for x in occu[st.session_state.sel_date]: st.info(f"{x['Statut']} {x['Nom']} {f'({x.get('Société','')})' if x.get('Société','') else ''}")
         if st.button("Fermer"): st.session_state.sel_date = None; st.rerun()
+
+
 
 
 
