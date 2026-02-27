@@ -27,7 +27,6 @@ st.markdown("""
     .price-tag { float: right; font-weight: bold; color: #1e3799 !important; font-size: 1.1rem; }
     .info-sub { font-size: 0.85rem; color: #444 !important; line-height: 1.4; margin-top: 4px; }
     .societe-tag { color: #e67e22 !important; font-weight: bold; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 2px; }
-
     @media only screen and (max-width: 768px) {
         html, body, [class*="css"] { font-size: 0.9rem; }
         .stButton > button { height: 42px !important; font-size: 0.85rem !important; }
@@ -60,7 +59,7 @@ def sauvegarder_data(df):
         sha = res.json().get('sha') if res.status_code == 200 else None
         json_d = df.to_json(orient="records", indent=4, force_ascii=False)
         content_b64 = base64.b64encode(json_d.encode('utf-8')).decode('utf-8')
-        data = {"message": "Maj Vesta", "content": content_b64, "sha": sha}
+        data = {"message": "Update Vesta", "content": content_b64, "sha": sha}
         requests.put(url, headers=headers, json=data)
         st.cache_data.clear()
         return True
@@ -118,8 +117,16 @@ for c in cols_v:
 
 # --- PAGES ---
 if st.session_state.page == "LISTE":
+    # --- BARRE DE RECHERCHE ---
+    search = st.text_input("🔍 Rechercher un Nom ou une Société").upper()
+    
     df['dt'] = df['DateNav'].apply(parse_date)
     auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Filtrage selon la recherche
+    if search:
+        df = df[df['Nom'].str.contains(search, na=False) | df['Société'].str.contains(search, na=False)]
+
     t1, t2 = st.tabs(["🚀 PROCHAINES", "📂 ARCHIVES"])
     def render(data_f):
         for idx, r in data_f.iterrows():
@@ -132,6 +139,7 @@ if st.session_state.page == "LISTE":
             st.markdown(f'<div class="client-card {cl}"><div class="price-tag">{r["PrixJour"]}€</div><b>{clean_val(r["Prénom"])} {clean_val(r["Nom"])}</b>{soc_h}<div class="info-sub">📅 {r["DateNav"]} ({r["NbJours"]}j) • 👤 {r["Passagers"]}p<br>{tel_h}{mail_h}</div></div>', unsafe_allow_html=True)
             if st.button(f"Modifier {r['Nom']}", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
+    
     with t1: render(df[df['dt'] >= auj].sort_values('dt'))
     with t2: render(df[df['dt'] < auj].sort_values('dt', ascending=False).head(20))
 
@@ -185,6 +193,7 @@ elif st.session_state.page == "PLAN":
         if st.session_state.sel_date in occu:
             for x in occu[st.session_state.sel_date]: st.info(f"{x['Statut']} {x['Nom']} {f'({x.get('Société','')})' if x.get('Société','') else ''}")
         if st.button("Fermer"): st.session_state.sel_date = None; st.rerun()
+
 
 
 
