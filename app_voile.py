@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import json
@@ -10,11 +11,23 @@ import re
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper", layout="wide")
 
-# CSS SIMPLIFIÉ ET ROBUSTE
+# CSS FORCE POUR LES COULEURS
 st.markdown("""
     <style>
-    .stApp { background-color: #f8f9fa; }
+    /* Bouton PLANNING (Bleu) */
+    div[data-testid="column"]:nth-child(2) button {
+        background-color: #2980b9 !important;
+        color: white !important;
+        border: none !important;
+    }
     
+    /* Bouton NOUVEAU (Vert) */
+    button[kind="primary"] {
+        background-color: #27ae60 !important;
+        color: white !important;
+        border: none !important;
+    }
+
     /* Cartes clients */
     .client-card {
         background-color: #ffffff !important; 
@@ -25,20 +38,6 @@ st.markdown("""
     .status-ok { border-left-color: #2ecc71 !important; }
     .status-attente { border-left-color: #f1c40f !important; }
     .status-non { border-left-color: #e74c3c !important; }
-    
-    /* Forcer les couleurs des boutons via leurs balises */
-    button[kind="primary"] {
-        background-color: #27ae60 !important; /* Vert pour Nouveau */
-        border-color: #27ae60 !important;
-        color: white !important;
-    }
-    
-    /* Style pour le bouton Planning spécifiquement */
-    .plan-btn button {
-        background-color: #2980b9 !important; /* Bleu pour Planning */
-        color: white !important;
-        border: none !important;
-    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -67,7 +66,7 @@ def sauvegarder_data(df):
         sha = res.json().get('sha') if res.status_code == 200 else None
         json_d = df.to_json(orient="records", indent=4, force_ascii=False)
         content_b64 = base64.b64encode(json_d.encode('utf-8')).decode('utf-8')
-        data = {"message": "Update UI", "content": content_b64, "sha": sha}
+        data = {"message": "Update UI Colors", "content": content_b64, "sha": sha}
         requests.put(url, headers=headers, json=data)
         st.cache_data.clear()
         return True
@@ -112,15 +111,13 @@ if not st.session_state.auth:
     st.stop()
 
 # --- MENU PRINCIPAL ---
-col_m1, col_m2 = st.columns(2)
-with col_m1:
+m_col1, m_col2 = st.columns(2)
+with m_col1:
     if st.button("📋 LISTE CLIENTS", use_container_width=True): 
         st.session_state.page = "LISTE"; st.rerun()
-with col_m2:
-    st.markdown('<div class="plan-btn">', unsafe_allow_html=True)
+with m_col2:
     if st.button("🗓️ PLANNING", use_container_width=True): 
         st.session_state.page = "PLAN"; st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -135,7 +132,6 @@ if st.session_state.page == "LISTE":
     search = c_search.text_input("🔍 Rechercher...", placeholder="Nom ou Société").upper()
     
     with c_add:
-        # Le bouton "Primary" sera Vert grâce au CSS en haut
         if st.button("➕ NOUVEAU", use_container_width=True, type="primary"):
             st.session_state.edit_idx = None
             st.session_state.page = "FORM"
@@ -173,7 +169,7 @@ if st.session_state.page == "LISTE":
     with t1: render(df[df['dt'] >= auj].sort_values('dt'))
     with t2: render(df[df['dt'] < auj].sort_values('dt', ascending=False).head(20))
 
-# (Pages FORM et PLAN identiques...)
+# --- PAGE FORMULAIRE ---
 elif st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
     if idx is not None and idx < len(df):
@@ -194,7 +190,7 @@ elif st.session_state.page == "FORM":
         f_tel = st.text_input("Tél", value=clean_val(init.get("Téléphone", "")))
         f_mail = st.text_input("Email", value=clean_val(init.get("Email", "")))
         c1, c2, c3 = st.columns([2,1,1])
-        f_date = c1.text_input("Date", value=clean_val(init.get("DateNav", "")))
+        f_date = c1.text_input("Date (JJ/MM/AAAA)", value=clean_val(init.get("DateNav", "")))
         f_nbj = c2.number_input("Jours", value=to_int(init.get("NbJours", 1)), min_value=1)
         f_pass = c3.number_input("Pers.", value=to_int(init.get("Passagers", 1)), min_value=1)
         f_prix = st.text_input("Prix Total €", value=clean_val(init.get("PrixJour", "0")))
@@ -206,6 +202,7 @@ elif st.session_state.page == "FORM":
             if sauvegarder_data(df): st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 ANNULER"): st.session_state.page = "LISTE"; st.rerun()
 
+# --- PAGE PLANNING ---
 elif st.session_state.page == "PLAN":
     m_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     c1, c2, c3 = st.columns([1,2,1])
