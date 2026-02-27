@@ -253,14 +253,14 @@
     },
     {
         "DateNav":"31\/05\/2026",
-        "NbJours":"30",
+        "NbJours":"15",
         "Statut":"🟡 Attente",
         "Nom":"RIOU",
         "Prénom":"Francoise",
         "Téléphone":"0622568174",
         "Email":"",
         "Paye":null,
-        "PrixJour":"900",
+        "PrixJour":"450",
         "Passagers":"",
         "Historique":"",
         "Société":"PERSO"
