@@ -87,12 +87,11 @@ def to_int(v):
     except: return 1
 
 # --- SESSION ---
-for key in ["auth", "page", "m_idx", "sel_date", "edit_idx"]:
-    if key not in st.session_state:
-        if key == "auth": st.session_state[key] = False
-        elif key == "page": st.session_state[key] = "LISTE"
-        elif key == "m_idx": st.session_state[key] = datetime.now().month
-        else: st.session_state[key] = None
+if "auth" not in st.session_state: st.session_state.auth = False
+if "page" not in st.session_state: st.session_state.page = "LISTE"
+if "m_idx" not in st.session_state: st.session_state.m_idx = datetime.now().month
+if "sel_date" not in st.session_state: st.session_state.sel_date = None
+if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
 
 # --- AUTH ---
 if not st.session_state.auth:
@@ -103,11 +102,12 @@ if not st.session_state.auth:
         st.rerun()
     st.stop()
 
-# --- MENU ---
-m1, m2, m3 = st.columns(3)
-if m1.button("📋 LISTE", use_container_width=True): st.session_state.page = "LISTE"; st.rerun()
-if m2.button("🗓️ PLAN", use_container_width=True): st.session_state.page = "PLAN"; st.rerun()
-if m3.button("➕ NEW", use_container_width=True): st.session_state.page = "FORM"; st.session_state.edit_idx = None; st.rerun()
+# --- MENU PRINCIPAL (PLUS QUE 2 BOUTONS) ---
+m1, m2 = st.columns(2)
+if m1.button("📋 LISTE & RECHERCHE", use_container_width=True): 
+    st.session_state.page = "LISTE"; st.rerun()
+if m2.button("🗓️ PLANNING", use_container_width=True): 
+    st.session_state.page = "PLAN"; st.rerun()
 st.markdown("---")
 
 df = charger_data()
@@ -115,15 +115,22 @@ cols_v = ["DateNav", "NbJours", "Statut", "Nom", "Prénom", "Société", "Télé
 for c in cols_v:
     if c not in df.columns: df[c] = ""
 
-# --- PAGES ---
+# --- PAGE LISTE ---
 if st.session_state.page == "LISTE":
-    # --- BARRE DE RECHERCHE ---
+    # Barre de recherche
     search = st.text_input("🔍 Rechercher un Nom ou une Société").upper()
+    
+    # BOUTON AJOUTER (Sous-menu cohérent)
+    if st.button("➕ AJOUTER UN NOUVEAU CLIENT", use_container_width=True, type="primary"):
+        st.session_state.edit_idx = None
+        st.session_state.page = "FORM"
+        st.rerun()
+    
+    st.markdown("---")
     
     df['dt'] = df['DateNav'].apply(parse_date)
     auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     
-    # Filtrage selon la recherche
     if search:
         df = df[df['Nom'].str.contains(search, na=False) | df['Société'].str.contains(search, na=False)]
 
@@ -143,32 +150,65 @@ if st.session_state.page == "LISTE":
     with t1: render(df[df['dt'] >= auj].sort_values('dt'))
     with t2: render(df[df['dt'] < auj].sort_values('dt', ascending=False).head(20))
 
+# --- PAGE FORMULAIRE (SÉCURISÉE) ---
 elif st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
-    init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols_v}
+    # INITIALISATION SÉCURISÉE
+    if idx is not None and idx < len(df):
+        init = df.loc[idx].to_dict()
+    else:
+        init = {c: "" for c in cols_v}
+        init["Statut"] = "🟡 Attente"
+
+    st.subheader("📝 Fiche Client" if idx is None else "✏️ Modifier Client")
+    
     with st.form("f_v"):
-        f_stat = st.selectbox("STATUT", ["🟡 Attente", "🟢 OK", "🔴 Pas OK"], index=["🟡 Attente", "🟢 OK", "🔴 Pas OK"].index(clean_val(init.get("Statut", "🟡 Attente"))))
+        stat_list = ["🟡 Attente", "🟢 OK", "🔴 Pas OK"]
+        curr_val = clean_val(init.get("Statut", "🟡 Attente"))
+        idx_stat = stat_list.index(curr_val) if curr_val in stat_list else 0
+        
+        f_stat = st.selectbox("STATUT", stat_list, index=idx_stat)
+        
         c_n, c_p = st.columns(2)
-        f_nom, f_pre = c_n.text_input("NOM", value=clean_val(init.get("Nom", ""))), c_p.text_input("Prénom", value=clean_val(init.get("Prénom", "")))
+        f_nom = c_n.text_input("NOM", value=clean_val(init.get("Nom", "")))
+        f_pre = c_p.text_input("Prénom", value=clean_val(init.get("Prénom", "")))
         f_soc = st.text_input("SOCIÉTÉ", value=clean_val(init.get("Société", "")))
-        f_tel, f_mail = st.text_input("Tél", value=clean_val(init.get("Téléphone", ""))), st.text_input("Email", value=clean_val(init.get("Email", "")))
+        f_tel = st.text_input("Tél", value=clean_val(init.get("Téléphone", "")))
+        f_mail = st.text_input("Email", value=clean_val(init.get("Email", "")))
         st.markdown("---")
         c1, c2, c3 = st.columns([2,1,1])
-        f_date, f_nbj, f_pass = c1.text_input("Date", value=clean_val(init.get("DateNav", ""))), c2.number_input("Jours", value=to_int(init.get("NbJours", 1)), min_value=1), c3.number_input("Pers.", value=to_int(init.get("Passagers", 1)), min_value=1)
-        f_prix, f_his = st.text_input("Prix €", value=clean_val(init.get("PrixJour", "0"))), st.text_area("Notes", value=clean_val(init.get("Historique", "")))
+        f_date = c1.text_input("Date (JJ/MM/AAAA)", value=clean_val(init.get("DateNav", "")))
+        f_nbj = c2.number_input("Jours", value=to_int(init.get("NbJours", 1)), min_value=1)
+        f_pass = c3.number_input("Pers.", value=to_int(init.get("Passagers", 1)), min_value=1)
+        f_prix = st.text_input("Prix Total €", value=clean_val(init.get("PrixJour", "0")))
+        f_his = st.text_area("Notes", value=clean_val(init.get("Historique", "")))
+        
         if st.form_submit_button("💾 ENREGISTRER"):
-            new = {"DateNav": f_date.strip(), "NbJours": str(f_nbj), "Nom": f_nom.upper(), "Prénom": f_pre, "Société": f_soc.upper(), "Statut": f_stat, "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix, "Passagers": str(f_pass), "Historique": f_his}
-            if idx is not None: df.loc[idx] = new
-            else: df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
-            if sauvegarder_data(df): st.session_state.page = "LISTE"; st.rerun()
-    if st.button("🔙 RETOUR"): st.session_state.page = "LISTE"; st.rerun()
+            new_row = {
+                "DateNav": f_date.strip(), "NbJours": str(f_nbj), "Nom": f_nom.upper(), 
+                "Prénom": f_pre, "Société": f_soc.upper(), "Statut": f_stat, 
+                "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix, 
+                "Passagers": str(f_pass), "Historique": f_his
+            }
+            if idx is not None:
+                df.loc[idx] = new_row
+            else:
+                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            
+            if sauvegarder_data(df):
+                st.success("Enregistré !"); st.session_state.page = "LISTE"; st.rerun()
+                
+    if st.button("🔙 RETOUR"):
+        st.session_state.page = "LISTE"; st.rerun()
 
+# --- PAGE PLANNING ---
 elif st.session_state.page == "PLAN":
     m_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     c1, c2, c3 = st.columns([1,2,1])
     if c1.button("◀️"): st.session_state.m_idx = 12 if st.session_state.m_idx == 1 else st.session_state.m_idx - 1; st.rerun()
     c2.markdown(f"<h3 style='text-align:center;'>{m_fr[st.session_state.m_idx-1]} 2026</h3>", unsafe_allow_html=True)
     if c3.button("▶️"): st.session_state.m_idx = 1 if st.session_state.m_idx == 12 else st.session_state.m_idx + 1; st.rerun()
+    
     occu = {}
     for _, r in df.iterrows():
         d_obj = parse_date(r['DateNav'])
@@ -177,6 +217,7 @@ elif st.session_state.page == "PLAN":
                 d_c = (d_obj + timedelta(days=j)).strftime('%d/%m/%Y')
                 if d_c not in occu: occu[d_c] = []
                 occu[d_c].append(r)
+                
     cal = calendar.monthcalendar(2026, st.session_state.m_idx)
     for week in cal:
         cols = st.columns(7)
@@ -193,6 +234,7 @@ elif st.session_state.page == "PLAN":
         if st.session_state.sel_date in occu:
             for x in occu[st.session_state.sel_date]: st.info(f"{x['Statut']} {x['Nom']} {f'({x.get('Société','')})' if x.get('Société','') else ''}")
         if st.button("Fermer"): st.session_state.sel_date = None; st.rerun()
+
 
 
 
