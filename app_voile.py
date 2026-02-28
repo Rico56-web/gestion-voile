@@ -9,66 +9,46 @@ import calendar
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper", layout="wide")
 
-# --- STYLE CSS (LE VERROU POUR IPHONE) ---
+# --- STYLE CSS (OPTIMISÉ ANTI-CLAVIER) ---
 st.markdown("""
     <style>
-    .main-title { text-align: center; color: #2c3e50; margin-bottom: 15px; font-family: sans-serif; font-size: 1.4rem; }
+    .main-title { text-align: center; color: #2c3e50; margin-bottom: 10px; font-family: sans-serif; font-size: 1.3rem; }
     
     .client-card {
         background-color: #ffffff !important; 
-        padding: 12px; border-radius: 12px; 
-        margin-bottom: 10px; border: 1px solid #eee; border-left: 10px solid #ccc;
+        padding: 10px; border-radius: 10px; 
+        margin-bottom: 8px; border: 1px solid #eee; border-left: 8px solid #ccc;
     }
     .status-ok { border-left-color: #2ecc71 !important; }
     .status-attente { border-left-color: #f1c40f !important; }
     
     .cmn-tag { 
-        background-color: #ebf5fb; color: #2980b9; 
-        padding: 2px 8px; border-radius: 4px; 
-        font-weight: bold; border: 1px solid #2980b9; display: inline-block;
-        font-size: 0.7rem;
+        background-color: #ebf5fb; color: #2980b9; padding: 2px 6px; border-radius: 4px; 
+        font-weight: bold; border: 1px solid #2980b9; font-size: 0.65rem;
     }
 
     .finance-banner {
-        background-color: #e8f4fd;
-        padding: 8px; border-radius: 10px;
-        border: 1px solid #3498db; margin-bottom: 15px;
+        background-color: #e8f4fd; padding: 8px; border-radius: 10px;
+        border: 1px solid #3498db; margin-bottom: 10px;
     }
 
-    /* TABLEAU CALENDRIER SANS ESPACE VIDE */
-    .cal-table { 
-        width: 100%; 
-        border-collapse: collapse; 
-        table-layout: fixed; 
-        background: white; 
-    }
-    .cal-table th { 
-        padding: 5px 0; border: 1px solid #eee; background: #f8f9fa; 
-        font-size: 0.6rem; color: #7f8c8d;
-    }
-    .cal-table td { 
-        border: 1px solid #eee; 
-        height: 42px; 
-        padding: 0 !important;
-        margin: 0 !important;
-    }
+    .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: white; }
+    .cal-table th { padding: 4px 0; border: 1px solid #eee; background: #f8f9fa; font-size: 0.6rem; color: #7f8c8d; }
+    .cal-table td { border: 1px solid #eee; height: 38px; padding: 0 !important; }
     
-    /* CONTENEUR QUI BLOQUE LE TEXTE SUR UNE SEULE LIGNE */
-    .day-wrapper {
+    .day-wrapper { display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; }
+    .day-num { font-weight: bold; font-size: 0.85rem; white-space: nowrap; letter-spacing: -0.5px; line-height: 1; }
+
+    /* Style pour la liste auto sous le calendrier */
+    .detail-item {
+        padding: 6px 10px;
+        border-bottom: 1px solid #eee;
+        font-size: 0.85rem;
         display: flex;
-        justify-content: center;
+        justify-content: space-between;
         align-items: center;
-        width: 100%;
-        height: 100%;
     }
-    .day-num { 
-        font-weight: bold; 
-        font-size: 0.85rem; 
-        white-space: nowrap; /* INTERDIT LE RETOUR LIGNE */
-        letter-spacing: -0.5px; /* RESSERRE LES CHIFFRES */
-        line-height: 1;
-        display: inline-block;
-    }
+    .detail-date { font-weight: bold; color: #2c3e50; min-width: 35px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -166,21 +146,21 @@ if st.session_state.page == "LISTE":
         for idx, r in data_f.iterrows():
             cl = "status-ok" if "🟢" in str(r['Statut']) else "status-attente"
             v_soc = clean_val(r['Société'])
-            soc_html = f'<div class="cmn-tag">🏢 CMN</div>' if v_soc == "CMN" else f'<div style="color:#d35400; font-weight:bold; font-size:0.75rem;">🏢 {v_soc}</div>' if v_soc else ''
+            soc_html = f'<div class="cmn-tag">🏢 CMN</div>' if v_soc == "CMN" else f'<div style="color:#d35400; font-weight:bold; font-size:0.7rem;">🏢 {v_soc}</div>' if v_soc else ''
             st.markdown(f'<div class="client-card {cl}"><div style="float:right; font-weight:bold; font-size:0.85rem;">{r["PrixJour"]}€</div><div><b>{r["Prénom"]} {r["Nom"]}</b></div>{soc_html}<div style="font-size:0.75rem; color:#444; margin-top:5px;">📅 {r["DateNav"]} ({r["NbJours"]}j)</div></div>', unsafe_allow_html=True)
             if st.button(f"✏️ Modifier {r['Prénom']}", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
     with t1: afficher_cartes(df_base[df_base['dt'] >= auj])
     with t2: afficher_cartes(df_base[df_base['dt'] < auj], inverse=True)
 
-# --- PAGE PLANNING (VERSION ANTI-RETOUR LIGNE) ---
+# --- PAGE PLANNING (VERSION LISTE AUTO SANS CLAVIER) ---
 elif st.session_state.page == "PLAN":
     m_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     jours_lettres = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
     
     c1, c2, c3 = st.columns([1,2,1])
     if c1.button("◀️"): st.session_state.m_idx = 12 if st.session_state.m_idx == 1 else st.session_state.m_idx - 1; st.rerun()
-    c2.markdown(f"<h4 style='text-align:center;'>{m_fr[st.session_state.m_idx-1]} 2026</h4>", unsafe_allow_html=True)
+    c2.markdown(f"<h4 style='text-align:center; margin:0;'>{m_fr[st.session_state.m_idx-1]} 2026</h4>", unsafe_allow_html=True)
     if c3.button("▶️"): st.session_state.m_idx = 1 if st.session_state.m_idx == 12 else st.session_state.m_idx + 1; st.rerun()
 
     # Finances
@@ -189,7 +169,7 @@ elif st.session_state.page == "PLAN":
         dt = parse_date(r['DateNav'])
         if dt.month == st.session_state.m_idx and dt.year == 2026:
             p = to_float(r['PrixJour']); ca_ok += p if "🟢" in str(r['Statut']) else 0; ca_att += p if "🟡" in str(r['Statut']) else 0
-    st.markdown(f'<div class="finance-banner"><div style="display:flex; justify-content:space-around; text-align:center; font-size:0.75rem;"><div><b>Encaissé</b><br>{ca_ok:,.0f}€</div><div><b>Attente</b><br>{ca_att:,.0f}€</div><div><b>Total</b><br>{(ca_ok+ca_att):,.0f}€</div></div></div>'.replace(",", " "), unsafe_allow_html=True)
+    st.markdown(f'<div class="finance-banner"><div style="display:flex; justify-content:space-around; text-align:center; font-size:0.7rem;"><div><b>Encaissé</b><br>{ca_ok:,.0f}€</div><div><b>Attente</b><br>{ca_att:,.0f}€</div><div><b>Total</b><br>{(ca_ok+ca_att):,.0f}€</div></div></div>'.replace(",", " "), unsafe_allow_html=True)
 
     # Occupations
     occu = {}
@@ -219,18 +199,31 @@ elif st.session_state.page == "PLAN":
                     if any(clean_val(x.get('Société')) == "CMN" for x in data_j): bg, col = "#2980b9", "white"
                     elif any("🟢" in str(x['Statut']) for x in data_j): bg, col = "#2ecc71", "white"
                     else: bg, col = "#f1c40f", "black"
-                
-                # LIGNE CRITIQUE : AUCUN ESPACE ENTRE LES BALISES POUR EVITER LES BUGS IPHONE
                 html_cal += f'<td style="background:{bg};color:{col};"><div class="day-wrapper"><span class="day-num">{day_str}</span></div></td>'
         html_cal += '</tr>'
     st.markdown(html_cal + '</table>', unsafe_allow_html=True)
 
+    # --- LISTE AUTOMATIQUE DES DÉTAILS (ZÉRO CLAVIER) ---
     st.markdown("---")
-    jours_m = sorted([d for d in occu.keys() if int(d.split('/')[1]) == st.session_state.m_idx], key=lambda x: int(x.split('/')[0]))
-    if jours_m:
-        sel = st.selectbox("Détails d'une journée :", ["Choisir..."] + jours_m)
-        if sel != "Choisir...":
-            for x in occu[sel]: st.info(f"⚓ **{x['Prénom']} {x['Nom']}** ({x['Société']})")
+    st.markdown("<h5 style='font-size:0.9rem; margin-bottom:10px;'>📅 Programme du mois :</h5>", unsafe_allow_html=True)
+    
+    jours_occupes = sorted([d for d in occu.keys() if int(d.split('/')[1]) == st.session_state.m_idx], key=lambda x: int(x.split('/')[0]))
+    
+    if not jours_occupes:
+        st.write("Aucune sortie ce mois-ci.")
+    else:
+        # On affiche chaque jour occupé sous forme de petite ligne élégante
+        for jour in jours_occupes:
+            jour_court = jour.split('/')[0] # On ne garde que le "05" de "05/03/2026"
+            for x in occu[jour]:
+                symbole = "🔵" if x['Société'] == "CMN" else ("🟢" if "🟢" in x['Statut'] else "🟡")
+                st.markdown(f'''
+                    <div class="detail-item">
+                        <span class="detail-date">{jour_court}</span>
+                        <span style="flex-grow:1; margin-left:10px;">{symbole} {x['Prénom']} {x['Nom']}</span>
+                        <span style="color:#7f8c8d; font-size:0.75rem;">{x['Société'] if x['Société'] else '-'}</span>
+                    </div>
+                ''', unsafe_allow_html=True)
 
 # --- PAGE FORMULAIRE ---
 elif st.session_state.page == "FORM":
@@ -254,6 +247,7 @@ elif st.session_state.page == "FORM":
             else: df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
             if sauvegarder_data(df): st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 Annuler"): st.session_state.page = "LISTE"; st.rerun()
+
 
 
 
