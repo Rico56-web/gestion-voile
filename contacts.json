@@ -11,7 +11,9 @@
         "PrixJour":"479",
         "Passagers":null,
         "Historique":"",
-        "Société":"CLICK"
+        "Société":"CLICK",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"15\/03\/2026",
@@ -25,7 +27,9 @@
         "PrixJour":"105",
         "Passagers":"1",
         "Historique":"27\/02\/2027\nD: je l’appelle au tel: toujours ok pour le 15 mars \nR: lundi il me rappelle ",
-        "Société":"VOG"
+        "Société":"VOG",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"01\/06\/2026",
@@ -39,7 +43,9 @@
         "PrixJour":"210",
         "Passagers":"1",
         "Historique":"",
-        "Société":"VOG"
+        "Société":"VOG",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"15\/03\/2026",
@@ -53,7 +59,9 @@
         "PrixJour":"70",
         "Passagers":"1",
         "Historique":"",
-        "Société":"VOG"
+        "Société":"VOG",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"15\/03\/2026",
@@ -67,7 +75,9 @@
         "PrixJour":"70",
         "Passagers":"1",
         "Historique":"",
-        "Société":"VOG"
+        "Société":"VOG",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"15\/02\/2026",
@@ -81,7 +91,9 @@
         "PrixJour":"",
         "Passagers":"1",
         "Historique":"ras",
-        "Société":"PERSO"
+        "Société":"PERSO",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"7\/03\/2026",
@@ -95,7 +107,9 @@
         "PrixJour":"450",
         "Passagers":"",
         "Historique":"",
-        "Société":"CMN"
+        "Société":"CMN",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"21\/03\/2026",
@@ -109,7 +123,9 @@
         "PrixJour":"450",
         "Passagers":"",
         "Historique":"",
-        "Société":"CMN"
+        "Société":"CMN",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"",
@@ -123,7 +139,9 @@
         "PrixJour":"",
         "Passagers":"",
         "Historique":"",
-        "Société":""
+        "Société":"",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"28\/03\/2026",
@@ -137,7 +155,9 @@
         "PrixJour":"450",
         "Passagers":"",
         "Historique":"",
-        "Société":"CMN"
+        "Société":"CMN",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"04\/04\/2026",
@@ -151,7 +171,9 @@
         "PrixJour":"540",
         "Passagers":"",
         "Historique":"",
-        "Société":"PERSO"
+        "Société":"PERSO",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"12\/04\/2026",
@@ -165,7 +187,9 @@
         "PrixJour":"281",
         "Passagers":"",
         "Historique":"",
-        "Société":"CLICK"
+        "Société":"CLICK",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"18\/04\/2026",
@@ -179,7 +203,9 @@
         "PrixJour":"450",
         "Passagers":"",
         "Historique":"",
-        "Société":"CMN"
+        "Société":"CMN",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"1\/05\/2026",
@@ -193,7 +219,9 @@
         "PrixJour":"675",
         "Passagers":"",
         "Historique":"",
-        "Société":"CMN"
+        "Société":"CMN",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"4\/05\/2026",
@@ -207,7 +235,9 @@
         "PrixJour":"140",
         "Passagers":"",
         "Historique":"",
-        "Société":"PERSO"
+        "Société":"PERSO",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"14\/05\/2026",
@@ -221,7 +251,9 @@
         "PrixJour":"900",
         "Passagers":"",
         "Historique":"",
-        "Société":"CMN"
+        "Société":"CMN",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"31\/05\/2026",
@@ -235,7 +267,9 @@
         "PrixJour":"900",
         "Passagers":"",
         "Historique":"",
-        "Société":"PERSO"
+        "Société":"PERSO",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"31\/05\/2026",
@@ -249,7 +283,9 @@
         "PrixJour":"900",
         "Passagers":"",
         "Historique":"",
-        "Société":"PERSO"
+        "Société":"PERSO",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"31\/05\/2026",
@@ -263,7 +299,9 @@
         "PrixJour":"450",
         "Passagers":"",
         "Historique":"",
-        "Société":"PERSO"
+        "Société":"PERSO",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"31\/05\/2026",
@@ -277,7 +315,9 @@
         "PrixJour":"450",
         "Passagers":"",
         "Historique":"",
-        "Société":"PERSO"
+        "Société":"PERSO",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     },
     {
         "DateNav":"01\/08\/2026",
@@ -289,9 +329,11 @@
         "Email":"",
         "Paye":null,
         "PrixJour":"2000",
-        "Passagers":"",
-        "Historique":"Prix actuellement à 2600 négociable à 2000",
-        "Société":"PERSO "
+        "Passagers":null,
+        "Historique":null,
+        "Société":"PERSO ",
+        "Milles":"0.0",
+        "HeuresMoteur":"0.0"
     },
     {
         "DateNav":"07\/02\/2026",
@@ -305,6 +347,8 @@
         "PrixJour":"450",
         "Passagers":"",
         "Historique":"",
-        "Société":"CMN"
+        "Société":"CMN",
+        "Milles":"0",
+        "HeuresMoteur":"0"
     }
 ]
