@@ -9,12 +9,12 @@ import calendar
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper", layout="wide")
 
-# --- STYLE CSS (Optimisé pour iPad, PC et iPhone) ---
+# --- STYLE CSS (Optimisé iPhone/iPad/PC) ---
 st.markdown("""
     <style>
     .main-title { text-align: center; color: #2c3e50; margin-bottom: 20px; font-family: sans-serif; }
     
-    /* Style des fiches Coéquipiers */
+    /* Fiches Coéquipiers */
     .client-card {
         background-color: #ffffff !important; 
         padding: 15px; border-radius: 12px; 
@@ -37,12 +37,11 @@ st.markdown("""
         border: 1px solid #3498db; margin-bottom: 20px;
     }
 
-    /* TABLEAU CALENDRIER HORIZONTAL FORCE */
+    /* TABLEAU CALENDRIER (Format Grille Fixe) */
     .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: white; }
     .cal-table th { padding: 8px 2px; border: 1px solid #eee; background: #f8f9fa; font-size: 0.75rem; color: #7f8c8d; }
-    .cal-table td { border: 1px solid #eee; text-align: center; vertical-align: middle; height: 50px; position: relative; }
-    .day-num { font-weight: bold; font-size: 1.1rem; }
-    .day-dot { font-size: 0.7rem; display: block; }
+    .cal-table td { border: 1px solid #eee; text-align: center; vertical-align: middle; height: 55px; }
+    .day-num { font-weight: bold; font-size: 1.2rem; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -111,7 +110,7 @@ if not st.session_state.auth:
         st.rerun()
     st.stop()
 
-# --- DATA ---
+# --- CHARGEMENT DONNEES ---
 df = charger_data()
 cols_v = ["DateNav", "NbJours", "Statut", "Nom", "Prénom", "Société", "Téléphone", "Email", "PrixJour", "Passagers", "Historique"]
 for c in cols_v:
@@ -147,7 +146,7 @@ if st.session_state.page == "LISTE":
     with t1: afficher_cartes(df_base[df_base['dt'] >= auj])
     with t2: afficher_cartes(df_base[df_base['dt'] < auj], inverse=True)
 
-# --- PAGE PLANNING (FORMAT HORIZONTAL IPHONE) ---
+# --- PAGE PLANNING (FORMAT GRILLE EPUREE) ---
 elif st.session_state.page == "PLAN":
     m_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     jours_lettres = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
@@ -165,7 +164,7 @@ elif st.session_state.page == "PLAN":
             p = to_float(r['PrixJour']); ca_ok += p if "🟢" in str(r['Statut']) else 0; ca_att += p if "🟡" in str(r['Statut']) else 0
     st.markdown(f'<div class="finance-banner"><div style="display:flex; justify-content:space-around; text-align:center; font-size:0.9rem;"><div><b>Encaissé</b><br>{ca_ok:,.0f}€</div><div><b>Attente</b><br>{ca_att:,.0f}€</div><div><b>Total</b><br>{(ca_ok+ca_att):,.0f}€</div></div></div>'.replace(",", " "), unsafe_allow_html=True)
 
-    # Construction du tableau HTML
+    # Calcul des occupations
     occu = {}
     for _, r in df.iterrows():
         d_obj = parse_date(r['DateNav'])
@@ -175,6 +174,7 @@ elif st.session_state.page == "PLAN":
                 if d_c not in occu: occu[d_c] = []
                 occu[d_c].append(r)
 
+    # Grille HTML
     cal = calendar.monthcalendar(2026, st.session_state.m_idx)
     html_cal = '<table class="cal-table"><tr>'
     for j in jours_lettres: html_cal += f'<th>{j}</th>'
@@ -183,26 +183,26 @@ elif st.session_state.page == "PLAN":
     for week in cal:
         html_cal += '<tr>'
         for day in week:
-            if day == 0: html_cal += '<td></td>'
+            if day == 0: html_cal += '<td style="background:#fafafa;"></td>'
             else:
                 d_s = f"{day:02d}/{st.session_state.m_idx:02d}/2026"
                 data_j = occu.get(d_s, [])
-                bg, col, dot = "white", "black", ""
+                bg, col = "white", "black"
                 if data_j:
-                    if any(clean_val(x.get('Société')) == "CMN" for x in data_j): bg, col, dot = "#2980b9", "white", "🔵"
-                    elif any("🟢" in str(x['Statut']) for x in data_j): bg, col, dot = "#2ecc71", "white", "🟢"
-                    else: bg, col, dot = "#f1c40f", "black", "🟡"
-                html_cal += f'<td style="background:{bg}; color:{col};"><span class="day-num">{day}</span><br><span class="day-dot">{dot}</span></td>'
+                    if any(clean_val(x.get('Société')) == "CMN" for x in data_j): bg, col = "#2980b9", "white"
+                    elif any("🟢" in str(x['Statut']) for x in data_j): bg, col = "#2ecc71", "white"
+                    else: bg, col = "#f1c40f", "black"
+                html_cal += f'<td style="background:{bg}; color:{col}; border: 1px solid #eee;"><span class="day-num">{day}</span></td>'
         html_cal += '</tr>'
     st.markdown(html_cal + '</table>', unsafe_allow_html=True)
 
-    # Détails sous le calendrier
+    # Détails
     st.markdown("---")
     jours_m = sorted([d for d in occu.keys() if int(d.split('/')[1]) == st.session_state.m_idx], key=lambda x: int(x.split('/')[0]))
     if jours_m:
-        sel = st.selectbox("Détails d'un jour occupé :", ["Choisir..."] + jours_m)
-        if sel != "Choisir...":
-            for x in occu[sel]: st.info(f"**{x['Prénom']} {x['Nom']}** ({x['Société']}) - {x['Statut']}")
+        sel = st.selectbox("Voir les détails d'une journée :", ["Choisir une date..."] + jours_m)
+        if sel != "Choisir une date...":
+            for x in occu[sel]: st.info(f"⚓ **{x['Prénom']} {x['Nom']}** ({x['Société']})")
 
 # --- PAGE FORMULAIRE ---
 elif st.session_state.page == "FORM":
@@ -214,11 +214,11 @@ elif st.session_state.page == "FORM":
         f_stat = st.selectbox("STATUT", ["🟡 Attente", "🟢 OK", "🔴 Annulé"], index=0)
         f_nom = st.text_input("NOM", value=init["Nom"]).upper()
         f_pre = st.text_input("Prénom", value=init["Prénom"])
-        f_soc = st.text_input("SOCIÉTÉ (Tapez CMN pour le bleu)", value=init["Société"]).upper()
+        f_soc = st.text_input("SOCIÉTÉ (CMN pour le bleu)", value=init["Société"]).upper()
         f_tel = st.text_input("Téléphone", value=init["Téléphone"])
         f_date = st.text_input("Date (JJ/MM/AAAA)", value=init["DateNav"])
-        f_nbj = st.number_input("Jours", value=to_int(init["NbJours"]), min_value=1)
-        f_prix = st.text_input("Prix Total €", value=init["PrixJour"])
+        f_nbj = st.number_input("Nombre de jours", value=to_int(init["NbJours"]), min_value=1)
+        f_prix = st.text_input("Prix Total (€)", value=init["PrixJour"])
         f_his = st.text_area("Notes", value=init["Historique"])
         if st.form_submit_button("💾 ENREGISTRER"):
             new = {"DateNav": f_date, "NbJours": str(f_nbj), "Nom": f_nom, "Prénom": f_pre, "Société": f_soc, "Statut": f_stat, "Email": init.get("Email",""), "Téléphone": f_tel, "PrixJour": f_prix, "Passagers": "1", "Historique": f_his}
@@ -226,6 +226,7 @@ elif st.session_state.page == "FORM":
             else: df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
             if sauvegarder_data(df): st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 Annuler"): st.session_state.page = "LISTE"; st.rerun()
+
 
 
 
