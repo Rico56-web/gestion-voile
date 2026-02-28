@@ -9,7 +9,7 @@ import calendar
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper", layout="wide")
 
-# --- STYLE CSS (OPTIMISÉ 3 ANS) ---
+# --- STYLE CSS (OPTIMISÉ IPHONE & RÉTINA) ---
 st.markdown("""
     <style>
     .main-title { text-align: center; color: #2c3e50; margin-bottom: 10px; font-family: sans-serif; font-size: 1.3rem; }
@@ -103,10 +103,13 @@ def to_int(v):
     try: return int(float(str(v)))
     except: return 1
 
-# --- AUTH & NAVIGATION ---
+# --- NAVIGATION DYNAMIQUE 2026-2028 ---
+ANNEES_DISPO = [2026, 2027, 2028]
+
 if "page" not in st.session_state: st.session_state.page = "LISTE"
 if "m_idx" not in st.session_state: st.session_state.m_idx = datetime.now().month
-if "y_idx" not in st.session_state: st.session_state.y_idx = datetime.now().year
+# Initialisation sur l'année en cours (2026)
+if "y_idx" not in st.session_state: st.session_state.y_idx = 2026
 if "auth" not in st.session_state: st.session_state.auth = False
 
 if not st.session_state.auth:
@@ -153,31 +156,35 @@ if st.session_state.page == "LISTE":
     with t1: afficher_cartes(df_base[df_base['dt'] >= auj])
     with t2: afficher_cartes(df_base[df_base['dt'] < auj], inverse=True)
 
-# --- PAGE PLANNING (MULTI-ANNÉES) ---
+# --- PAGE PLANNING (2026-2028) ---
 elif st.session_state.page == "PLAN":
     m_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     jours_lettres = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
     
-    # Sélecteur Année + Mois
-    c_y1, c_y2 = st.columns([1,1])
-    st.session_state.y_idx = c_y1.selectbox("Année", [2025, 2026, 2027], index=[2025, 2026, 2027].index(st.session_state.y_idx))
+    # Sélecteur d'année glissante
+    c_y1, _ = st.columns([1,1])
+    st.session_state.y_idx = c_y1.selectbox("Année", ANNEES_DISPO, index=ANNEES_DISPO.index(st.session_state.y_idx))
     
     c1, c2, c3 = st.columns([1,2,1])
     if c1.button("◀️"): 
         if st.session_state.m_idx == 1:
-            st.session_state.m_idx = 12
-            st.session_state.y_idx = max(2025, st.session_state.y_idx - 1)
+            if st.session_state.y_idx > ANNEES_DISPO[0]:
+                st.session_state.m_idx = 12
+                st.session_state.y_idx -= 1
         else: st.session_state.m_idx -= 1
         st.rerun()
+        
     c2.markdown(f"<h4 style='text-align:center; margin:0;'>{m_fr[st.session_state.m_idx-1]} {st.session_state.y_idx}</h4>", unsafe_allow_html=True)
+    
     if c3.button("▶️"): 
         if st.session_state.m_idx == 12:
-            st.session_state.m_idx = 1
-            st.session_state.y_idx = min(2027, st.session_state.y_idx + 1)
+            if st.session_state.y_idx < ANNEES_DISPO[-1]:
+                st.session_state.m_idx = 1
+                st.session_state.y_idx += 1
         else: st.session_state.m_idx += 1
         st.rerun()
 
-    # Finances
+    # Finances Mois
     ca_ok, ca_att = 0.0, 0.0
     for _, r in df.iterrows():
         dt = parse_date(r['DateNav'])
@@ -217,24 +224,24 @@ elif st.session_state.page == "PLAN":
         html_cal += '</tr>'
     st.markdown(html_cal + '</table>', unsafe_allow_html=True)
 
-    # Détails
+    # Détails liste
     st.markdown("---")
     jours_m = sorted([d for d in occu.keys() if int(d.split('/')[1]) == st.session_state.m_idx and int(d.split('/')[2]) == st.session_state.y_idx], key=lambda x: int(x.split('/')[0]))
-    if not jours_m: st.write("Aucune sortie ce mois-ci.")
+    if not jours_m: st.write("Rien de prévu ce mois-ci.")
     else:
         for jour in jours_m:
             for x in occu[jour]:
                 symbole = "🔵" if x['Société'] == "CMN" else ("🟢" if "🟢" in x['Statut'] else "🟡")
                 st.markdown(f'<div class="detail-item"><span class="detail-date">{jour.split("/")[0]}</span><span style="flex-grow:1; margin-left:10px;">{symbole} {x["Prénom"]} {x["Nom"]}</span><span style="color:#7f8c8d; font-size:0.7rem;">{x["Société"]}</span></div>', unsafe_allow_html=True)
 
-# --- PAGE BUDGET (MULTI-ANNÉES) ---
+# --- PAGE BUDGET (2026-2028) ---
 elif st.session_state.page == "BUDGET":
-    y_budget = st.selectbox("Choisir l'année budget", [2025, 2026, 2027], index=[2025, 2026, 2027].index(st.session_state.y_idx))
-    st.markdown(f"<h4 style='text-align:center;'>💰 Récapitulatif {y_budget}</h4>", unsafe_allow_html=True)
+    y_budget = st.selectbox("Récapitulatif de l'année", ANNEES_DISPO, index=ANNEES_DISPO.index(st.session_state.y_idx))
+    st.markdown(f"<h4 style='text-align:center;'>💰 Finances {y_budget}</h4>", unsafe_allow_html=True)
     m_fr = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"]
     
     total_an_ok, total_an_att = 0.0, 0.0
-    st.markdown("""<div style="display:flex; font-weight:bold; background:#f8f9fa; padding:10px; border-radius:5px; font-size:0.75rem; margin-bottom:5px;"><div style="flex:1;">MOIS</div><div style="flex:1; text-align:right; color:#2ecc71;">ENCAISSÉ</div><div style="flex:1; text-align:right; color:#f1c40f;">ATTENTE</div><div style="flex:1; text-align:right;">TOTAL</div></div>""", unsafe_allow_html=True)
+    st.markdown("""<div style="display:flex; font-weight:bold; background:#f8f9fa; padding:10px; border-radius:5px; font-size:0.75rem; margin-bottom:5px;"><div style="flex:1;">MOIS</div><div style="flex:1; text-align:right; color:#2ecc71;">OK</div><div style="flex:1; text-align:right; color:#f1c40f;">ATT.</div><div style="flex:1; text-align:right;">TOTAL</div></div>""", unsafe_allow_html=True)
 
     for i in range(1, 13):
         m_ok, m_att = 0.0, 0.0
@@ -271,6 +278,7 @@ elif st.session_state.page == "FORM":
             else: df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
             if sauvegarder_data(df): st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 Annuler"): st.session_state.page = "LISTE"; st.rerun()
+
 
 
 
