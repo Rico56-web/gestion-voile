@@ -2,15 +2,15 @@
     {
         "DateNav":"01\/03\/2026",
         "NbJours":"4",
-        "Statut":"🟡 Attente",
+        "Statut":"🟢 OK",
         "Nom":"PHILIPPE",
         "Prénom":"Elisabeth",
         "Téléphone":"0602468634",
         "Email":"sgfsgsg@gmail.com",
         "Paye":null,
         "PrixJour":"479",
-        "Passagers":"1",
-        "Historique":"26\/02\/26\nD: décalage de début de nav au dimanche cause mauvais temps\nR: OK\n\n",
+        "Passagers":null,
+        "Historique":"",
         "Société":"CLICK"
     },
     {
