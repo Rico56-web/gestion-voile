@@ -39,7 +39,7 @@ st.markdown("""
 
     .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: white; margin-top: 10px; }
     .cal-table th { font-size: 0.65rem; padding: 6px 0; background: #f8f9fa; border: 1px solid #eee; color: #7f8c8d; text-align: center; }
-    .cal-table td { border: 1px solid #eee; height: 45px; text-align: center; font-size: 0.9rem; font-weight: bold; vertical-align: middle; }
+    .cal-table td { border: 1px solid #eee; height: 45px; text-align: center; font-size: 0.8rem; font-weight: bold; vertical-align: middle; }
     
     .client-card { background-color: #ffffff; padding: 12px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #e1e8ed; border-left: 8px solid #ccc; }
     .status-ok { border-left-color: #2ecc71 !important; }
@@ -49,8 +49,11 @@ st.markdown("""
     .contact-bar a { text-decoration: none; color: white !important; background: #1a2a6c; padding: 8px 12px; border-radius: 8px; display: inline-block; margin-right: 5px; font-size: 0.8rem; font-weight: bold; }
     .btn-marine button { background-color: #1a2a6c !important; color: white !important; border: none !important; height: 45px !important; font-size: 0.85rem !important; }
     
-    /* Navigation Mois/Année */
     .nav-label { text-align: center; font-weight: bold; color: #1a2a6c; font-size: 1.1rem; line-height: 38px; }
+    
+    /* Recap Budget */
+    .recap-box { background: #f1f2f6; padding: 10px; border-radius: 10px; border: 1px solid #dfe4ea; margin-bottom: 15px; }
+    .recap-val { font-size: 1.1rem; font-weight: bold; color: #2f3542; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -168,7 +171,6 @@ if st.session_state.page == "LISTE":
 
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="section-confirm">🗓️ PLANNING DES SORTIES</div>', unsafe_allow_html=True)
-    
     cp, cm, cn = st.columns([1, 2, 1])
     with cp:
         if st.button("◀️", key="p_prev"):
@@ -214,7 +216,6 @@ elif st.session_state.page == "PLANNING":
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="section-confirm">💰 STATISTIQUES</div>', unsafe_allow_html=True)
-    
     cp, cm, cn = st.columns([1, 2, 1])
     with cp:
         if st.button("◀️ ", key="s_prev"): st.session_state.stat_year -= 1; st.rerun()
@@ -225,7 +226,31 @@ elif st.session_state.page == "BUDGET":
 
     df['dt'] = df['DateNav'].apply(parse_date)
     df_y = df[(df['dt'].dt.year == st.session_state.stat_year) & (df['Statut'].str.contains("🟢"))]
-    st.metric("Total CA Annuel", f"{sum(df_y['PrixJour'].apply(to_float)):,.0f} €")
+    
+    # Calcul des frais de l'année
+    if not df_frais.empty:
+        df_frais['dt'] = df_frais['Date'].apply(parse_date)
+        total_frais = df_frais[df_frais['dt'].dt.year == st.session_state.stat_year]['Montant'].sum()
+    else: total_frais = 0
+    
+    total_ca = sum(df_y['PrixJour'].apply(to_float))
+    benefice = total_ca - total_frais
+
+    # Recap financier
+    st.markdown(f"""
+        <div class="recap-box">
+            <div style="display:flex; justify-content:space-between;">
+                <span>CA Encaissé:</span> <span class="recap-val">{total_ca:,.0f} €</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; color:#e74c3c;">
+                <span>Frais:</span> <span class="recap-val">- {total_frais:,.0f} €</span>
+            </div>
+            <hr style="margin:5px 0;">
+            <div style="display:flex; justify-content:space-between; color:#27ae60;">
+                <span>SOLDE NET:</span> <span class="recap-val">{benefice:,.0f} €</span>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
     
     ht = '<table class="cal-table"><thead><tr><th>Mois</th><th>Jours</th><th>NM</th><th>CA €</th></tr></thead><tbody>'
     for i, m in enumerate(["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"], 1):
@@ -239,14 +264,18 @@ elif st.session_state.page == "FRAIS":
     with st.form("f_frais"):
         d, t, m = st.text_input("Date (JJ/MM/AAAA)"), st.selectbox("Type", ["Moteur", "Entretien", "Divers"]), st.number_input("Montant", 0.0)
         if st.form_submit_button("VALIDER"):
-            new_f = pd.DataFrame([{"Date": d, "Type": t, "Montant": m, "Annee": parse_date(d).year}])
+            new_f = pd.DataFrame([{"Date": d, "Type": t, "Montant": m}])
             df_frais = pd.concat([df_frais, new_f], ignore_index=True)
             sauvegarder_data(df_frais, "frais.json"); st.rerun()
     
-    for i, r in df_frais.iterrows():
-        st.write(f"{r['Date']} - {r['Type']} : {r['Montant']}€")
-        if st.button("Supprimer", key=f"f_{i}"):
-            df_frais = df_frais.drop(i); sauvegarder_data(df_frais, "frais.json"); st.rerun()
+    if not df_frais.empty:
+        st.markdown("### Historique des frais")
+        for i, r in df_frais.iloc[::-1].iterrows(): # Affiche du plus récent au plus vieux
+            with st.container():
+                st.markdown(f"**{r['Date']}** - {r['Type']} : **{r['Montant']}€**")
+                if st.button("Supprimer", key=f"f_{i}"):
+                    df_frais = df_frais.drop(i); sauvegarder_data(df_frais, "frais.json"); st.rerun()
+                st.markdown("---")
 
 elif st.session_state.page == "FORM":
     st.markdown('<div class="section-confirm">✏️ FICHE DÉTAILLÉE</div>', unsafe_allow_html=True)
@@ -276,6 +305,7 @@ elif st.session_state.page == "FORM":
             sauvegarder_data(df); st.session_state.page = "LISTE"; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     if st.button("🔙 Retour"): st.session_state.page = "LISTE"; st.rerun()
+
 
 
 
