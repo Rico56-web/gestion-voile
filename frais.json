@@ -5,5 +5,12 @@
         "Libelle":"",
         "Montant":0.0,
         "Annee":2026
+    },
+    {
+        "Date":"28\/02\/2026",
+        "Type":"Divers",
+        "Libelle":"",
+        "Montant":20.0,
+        "Annee":2026
     }
 ]
