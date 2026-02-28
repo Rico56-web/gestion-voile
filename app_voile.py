@@ -9,7 +9,7 @@ import calendar
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper Pro", layout="wide")
 
-# --- STYLE CSS (Visibilité & Mobile) ---
+# --- STYLE CSS (Optimisé Mobile & Couleurs) ---
 st.markdown("""
     <style>
     .header-container { text-align: center; margin-bottom: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 15px; border: 1px solid #e1e8ed; }
@@ -111,38 +111,33 @@ cols = ["DateNav", "NbJours", "Statut", "Nom", "Prénom", "Société", "Téléph
 for c in cols:
     if c not in df.columns: df[c] = ""
 
-# --- TITRE ET DATE DU JOUR ---
-now = datetime.now()
-date_str = now.strftime("%d/%m/%Y")
+# --- BANDEAU TITRE & DATE ---
+date_du_jour = datetime.now().strftime("%d/%m/%Y")
 st.markdown(f"""
     <div class="header-container">
         <div class="main-title">⚓ VESTA SKIPPER</div>
-        <div class="today-date">🗓️ {date_str}</div>
+        <div class="today-date">🗓️ {date_du_jour}</div>
     </div>
     """, unsafe_allow_html=True)
 
 # --- MENU PRINCIPAL ---
 m1, m2, m3, m4 = st.columns(4)
-
 with m1:
     if st.button("📋\\nLISTE", use_container_width=True): st.session_state.page = "LISTE"; st.rerun()
     if st.session_state.page == "LISTE": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(1) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
-
 with m2:
     if st.button("🗓️\\nPLANNING", use_container_width=True): st.session_state.page = "PLANNING"; st.rerun()
     if st.session_state.page == "PLANNING": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(2) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
-
 with m3:
     if st.button("💰\\nSTATS", use_container_width=True): st.session_state.page = "BUDGET"; st.rerun()
     if st.session_state.page == "BUDGET": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(3) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
-
 with m4:
     if st.button("🔧\\nFRAIS", use_container_width=True): st.session_state.page = "FRAIS"; st.rerun()
     if st.session_state.page == "FRAIS": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(4) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
 
 st.markdown("---")
 
-# --- PAGES ---
+# --- LOGIQUE DES PAGES ---
 
 if st.session_state.page == "LISTE":
     c_fut, c_arc = st.columns(2)
@@ -183,7 +178,7 @@ elif st.session_state.page == "PLANNING":
                 if d_c not in occu: occu[d_c] = []
                 occu[d_c].append(r)
     cal = calendar.monthcalendar(y_p, m_p)
-    h_c = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
+    h_c = '<table class="cal-table"><thead><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr></thead><tbody>'
     for w in cal:
         h_c += '<tr>'
         for d in w:
@@ -198,14 +193,15 @@ elif st.session_state.page == "PLANNING":
                     else: bg, color = "#f1c40f", "black"
                 h_c += f'<td style="background:{bg}; color:{color};">{d}</td>'
         h_c += '</tr>'
-    st.markdown(h_c + '</table>', unsafe_allow_html=True)
+    st.markdown(h_c + '</tbody></table>', unsafe_allow_html=True)
     st.caption("🔵 CMN | 🟢 OK | 🟡 Attente")
 
 elif st.session_state.page == "BUDGET":
-    y_b = st.selectbox("Année", [2026, 2027, 2028])
+    y_b = st.selectbox("Sélectionner l'Année", [2026, 2027, 2028])
     df['dt'] = df['DateNav'].apply(parse_date)
     df_y = df[(df['dt'].dt.year == y_b) & (df['Statut'].str.contains("🟢"))]
-    st.metric("Total CA Annuel", f"{sum(df_y['PrixJour'].apply(to_float)):,.0f} €")
+    st.metric("Total CA Annuel Validé", f"{sum(df_y['PrixJour'].apply(to_float)):,.0f} €")
+    
     ht = '<table class="cal-table"><thead><tr><th>Mois</th><th>Jours</th><th>NM</th><th>CA €</th></tr></thead><tbody>'
     for i, m in enumerate(["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"], 1):
         df_m = df_y[df_y['dt'].dt.month == i]
@@ -216,14 +212,24 @@ elif st.session_state.page == "BUDGET":
 elif st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
     init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols}
+    
     with st.form("f_edit"):
-        f_stat = st.selectbox("STATUT", ["🟡 Attente", "🟢 OK", "🔴 Annulé"], index=["🟡 Attente", "🟢 OK", "🔴 Annulé"].index(init.get("Statut", "🟡 Attente")))
-        f_nom, f_pre = st.text_input("NOM", value=init.get("Nom", "")).upper(), st.text_input("Prénom", value=init.get("Prénom", ""))
-        f_soc = st.text_input("SOCIÉTÉ", value=init.get("Société", "")).upper()
-        f_milles, f_heures = st.number_input("Milles", value=to_float(init.get("Milles", 0))), st.number_input("Heures", value=to_float(init.get("HeuresMoteur", 0)))
-        f_tel, f_mail = st.text_input("Tél", value=init.get("Téléphone", "")), st.text_input("Email", value=init.get("Email", ""))
-        f_date, f_nbj = st.text_input("Date (JJ/MM/AAAA)", value=init.get("DateNav", "")), st.number_input("Jours", value=to_int(init.get("NbJours", 1)))
-        f_prix = st.text_input("Prix Total (€)", value=init.get("PrixJour", ""))
+        status_options = ["🟡 Attente", "🟢 OK", "🔴 Annulé"]
+        curr_status = init.get("Statut", "🟡 Attente")
+        def_idx = status_options.index(curr_status) if curr_status in status_options else 0
+        
+        f_stat = st.selectbox("STATUT", status_options, index=def_idx)
+        f_nom = st.text_input("NOM", value=str(init.get("Nom", ""))).upper()
+        f_pre = st.text_input("Prénom", value=str(init.get("Prénom", "")))
+        f_soc = st.text_input("SOCIÉTÉ", value=str(init.get("Société", ""))).upper()
+        f_milles = st.number_input("Milles", value=to_float(init.get("Milles", 0)))
+        f_heures = st.number_input("Heures Moteur", value=to_float(init.get("HeuresMoteur", 0)))
+        f_tel = st.text_input("Tél", value=str(init.get("Téléphone", "")))
+        f_mail = st.text_input("Email", value=str(init.get("Email", "")))
+        f_date = st.text_input("Date (JJ/MM/AAAA)", value=str(init.get("DateNav", "")))
+        f_nbj = st.number_input("Jours", value=to_int(init.get("NbJours", 1)), min_value=1)
+        f_prix = st.text_input("Prix Total (€)", value=str(init.get("PrixJour", "")))
+        
         st.markdown('<div class="btn-marine">', unsafe_allow_html=True)
         if st.form_submit_button("💾 ENREGISTRER LA FICHE", use_container_width=True):
             row = {"DateNav": f_date, "NbJours": str(f_nbj), "Nom": f_nom, "Prénom": f_pre, "Société": f_soc, "Statut": f_stat, "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix, "Milles": str(f_milles), "HeuresMoteur": str(f_heures)}
@@ -234,7 +240,7 @@ elif st.session_state.page == "FORM":
     if st.button("🔙 Retour"): st.session_state.page = "LISTE"; st.rerun()
 
 elif st.session_state.page == "FRAIS":
-    st.subheader("🔧 Frais")
+    st.subheader("🔧 Gestion des Frais")
     with st.form("f_frais"):
         d, t, m = st.text_input("Date (JJ/MM/AAAA)"), st.selectbox("Type", ["Moteur", "Entretien", "Divers"]), st.number_input("Montant", 0.0)
         if st.form_submit_button("VALIDER"):
@@ -246,6 +252,7 @@ elif st.session_state.page == "FRAIS":
         if st.button("Supprimer", key=f"f_{i}"):
             df_frais = df_frais.drop(i)
             sauvegarder_data(df_frais, "frais.json"); st.rerun()
+
 
 
 
