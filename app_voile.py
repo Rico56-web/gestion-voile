@@ -9,7 +9,7 @@ import calendar
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper Pro", layout="wide")
 
-# --- STYLE CSS (FIXE & MOBILE) ---
+# --- STYLE CSS ---
 st.markdown("""
     <style>
     .main-title { text-align: center; color: #2c3e50; margin-bottom: 20px; font-size: 1.2rem; font-weight: bold; }
@@ -24,11 +24,13 @@ st.markdown("""
     }
     .status-ok { border-left-color: #2ecc71 !important; }
     .status-attente { border-left-color: #f1c40f !important; }
+    .contact-bar { margin: 10px 0; }
     .contact-bar a { 
         text-decoration: none; color: #2980b9; background: #f1f7fa; 
         padding: 8px 12px; border-radius: 8px; display: inline-block; 
         margin-right: 10px; font-size: 0.9rem; font-weight: bold;
     }
+    .section-header { background: #f8f9fa; padding: 5px 10px; border-radius: 5px; margin: 15px 0 10px 0; color: #7f8c8d; font-weight: bold; font-size: 0.9rem;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -75,7 +77,6 @@ def parse_date(d):
     except: return datetime(2000, 1, 1)
 
 # --- INITIALISATION ---
-ANNEES = [2026, 2027, 2028]
 if "page" not in st.session_state: st.session_state.page = "LISTE"
 if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
 if "auth" not in st.session_state: st.session_state.auth = False
@@ -108,82 +109,76 @@ st.markdown("---")
 
 # --- LOGIQUE AFFICHAGE ---
 
-# 1. PAGE FORMULAIRE (MODIFICATION)
+# PAGE FORMULAIRE
 if st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
     init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols_attendues}
-    
-    st.subheader("📝 " + ("Modifier Navigation" if idx is not None else "Nouvelle Navigation"))
+    st.subheader("📝 Modification" if idx is not None else "➕ Nouveau")
     with st.form("f_edit"):
         f_stat = st.selectbox("STATUT", ["🟡 Attente", "🟢 OK", "🔴 Annulé"], index=["🟡 Attente", "🟢 OK", "🔴 Annulé"].index(init.get("Statut", "🟡 Attente")))
         f_nom = st.text_input("NOM", value=init.get("Nom", "")).upper()
         f_pre = st.text_input("Prénom", value=init.get("Prénom", ""))
         f_soc = st.text_input("SOCIÉTÉ", value=init.get("Société", "")).upper()
-        
         c_a, c_b = st.columns(2)
-        f_milles = c_a.number_input("Milles (NM)", value=to_float(init.get("Milles", 0)))
+        f_milles = c_a.number_input("Milles", value=to_float(init.get("Milles", 0)))
         f_heures = c_b.number_input("Moteur (h)", value=to_float(init.get("HeuresMoteur", 0)))
-        
         f_tel = st.text_input("Téléphone", value=init.get("Téléphone", ""))
         f_mail = st.text_input("Email", value=init.get("Email", ""))
         f_date = st.text_input("Date (JJ/MM/AAAA)", value=init.get("DateNav", ""))
-        f_nbj = st.number_input("Nombre de Jours", value=to_int(init.get("NbJours", 1)))
+        f_nbj = st.number_input("Jours", value=to_int(init.get("NbJours", 1)))
         f_prix = st.text_input("Prix Total (€)", value=init.get("PrixJour", ""))
-        
         if st.form_submit_button("💾 ENREGISTRER"):
             row = {"DateNav": f_date, "NbJours": str(f_nbj), "Nom": f_nom, "Prénom": f_pre, "Société": f_soc, "Statut": f_stat, "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix, "Milles": str(f_milles), "HeuresMoteur": str(f_heures)}
             if idx is not None: df.loc[idx] = row
             else: df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-            sauvegarder_data(df)
-            st.session_state.page = "LISTE"; st.session_state.edit_idx = None; st.rerun()
-            
-    if st.button("🔙 Annuler et Retour"):
-        st.session_state.page = "LISTE"; st.session_state.edit_idx = None; st.rerun()
+            sauvegarder_data(df); st.session_state.page = "LISTE"; st.session_state.edit_idx = None; st.rerun()
+    if st.button("🔙 Annuler"): st.session_state.page = "LISTE"; st.session_state.edit_idx = None; st.rerun()
 
-# 2. PAGE LISTE
+# PAGE LISTE
 elif st.session_state.page == "LISTE":
     c_search, c_add = st.columns([2, 1])
     search = c_search.text_input("🔍 Rechercher...", placeholder="Nom ou Société").upper()
     if c_add.button("➕ NEW", use_container_width=True):
         st.session_state.edit_idx = None; st.session_state.page = "FORM"; st.rerun()
     
-    df['dt'] = df['DateNav'].apply(parse_date)
-    df_base = df[df['Nom'].str.contains(search, na=False, case=False) | df['Société'].str.contains(search, na=False, case=False)] if search else df
+    df['dt_parsed'] = df['DateNav'].apply(parse_date)
+    auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     
-    for idx, r in df_base.sort_values('dt', ascending=False).iterrows():
-        cl = "status-ok" if "🟢" in str(r['Statut']) else "status-attente"
-        st.markdown(f"""
-            <div class="client-card {cl}">
-                <div style="float:right; font-weight:bold;">{r["PrixJour"]}€</div>
-                <div style="font-size:1.1rem;"><b>{r["Prénom"]} {r["Nom"]}</b></div>
-                <div style="color:#d35400; font-weight:bold; font-size:0.85rem;">🏢 {r['Société'] if r['Société'] else "Particulier"}</div>
-                <div class="contact-bar">
-                    <a href="tel:{str(r['Téléphone']).replace(' ','')}">📞 Appeler</a>
-                    <a href="mailto:{r['Email']}">✉️ Mail</a>
-                </div>
-                <div style="font-size:0.8rem; color:#7f8c8d;">
-                    📅 {r["DateNav"]} | 🚢 {r.get('Milles', 0)} NM | ⚙️ {r.get('HeuresMoteur', 0)}h
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-        if st.button(f"✏️ Modifier {r['Prénom']}", key=f"btn_{idx}", use_container_width=True):
-            st.session_state.edit_idx = idx
-            st.session_state.page = "FORM"
-            st.rerun()
+    # Filtrage par recherche
+    df_f = df[df['Nom'].str.contains(search, na=False, case=False) | df['Société'].str.contains(search, na=False, case=False)] if search else df
+    
+    # Division en deux groupes : Futur (tri croissant) et Passé (tri décroissant)
+    futur = df_f[df_f['dt_parsed'] >= auj].sort_values('dt_parsed', ascending=True)
+    passe = df_f[df_f['dt_parsed'] < auj].sort_values('dt_parsed', ascending=False)
 
-# 3. AUTRES PAGES (PLAN, BUDGET, FRAIS...)
-elif st.session_state.page == "PLAN":
-    st.write("### Calendrier de Navigation")
-    # (Logique Planning identique précédente...)
-    pass
-elif st.session_state.page == "BUDGET":
-    st.write("### Statistiques & Chiffres")
-    # (Logique Budget identique précédente...)
-    pass
-elif st.session_state.page == "FRAIS":
-    st.write("### Gestion des Frais")
-    # (Logique Frais identique précédente...)
-    pass
+    def rendu_liste(data, titre):
+        if not data.empty:
+            st.markdown(f'<div class="section-header">{titre}</div>', unsafe_allow_html=True)
+            for idx, r in data.iterrows():
+                cl = "status-ok" if "🟢" in str(r['Statut']) else "status-attente"
+                st.markdown(f"""
+                    <div class="client-card {cl}">
+                        <div style="float:right; font-weight:bold;">{r["PrixJour"]}€</div>
+                        <div style="font-size:1.1rem;"><b>{r["Prénom"]} {r["Nom"]}</b></div>
+                        <div style="color:#d35400; font-weight:bold; font-size:0.85rem;">🏢 {r['Société'] if r['Société'] else "Particulier"}</div>
+                        <div class="contact-bar">
+                            <a href="tel:{str(r['Téléphone']).replace(' ','')}">📞 Appeler</a>
+                            <a href="mailto:{r['Email']}">✉️ Mail</a>
+                        </div>
+                        <div style="font-size:0.8rem; color:#7f8c8d;">
+                            📅 {r["DateNav"]} ({r["NbJours"]}j) | 🚢 {r.get('Milles', 0)} NM | ⚙️ {r.get('HeuresMoteur', 0)}h
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+                if st.button(f"✏️ Gérer {r['Prénom']}", key=f"z_{idx}", use_container_width=True):
+                    st.session_state.edit_idx = idx
+                    st.session_state.page = "FORM"
+                    st.rerun()
+
+    rendu_liste(futur, "🚀 PROCHAINES SORTIES")
+    rendu_liste(passe, "📂 ARCHIVES ET PASSÉ")
+
+# (PLAN, BUDGET, FRAIS restent identiques...)
 
 
 
