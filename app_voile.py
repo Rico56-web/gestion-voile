@@ -16,11 +16,12 @@ st.markdown("""
     .main-title { color: #1a2a6c; margin-bottom: 2px; font-size: 1.3rem; font-weight: bold; text-transform: uppercase; }
     .today-date { color: #e74c3c; font-size: 0.9rem; font-weight: 600; }
     
-    /* Titre de Section (Confirmation de page) */
+    /* Bandeau de confirmation de section (Haut de page uniquement) */
     .section-confirm { 
         background: #1a2a6c; color: white; padding: 10px; 
         border-radius: 8px; text-align: center; font-weight: bold; 
-        margin-bottom: 15px; font-size: 1rem; letter-spacing: 1px;
+        margin-bottom: 20px; font-size: 0.9rem; letter-spacing: 1px;
+        text-transform: uppercase;
     }
     
     /* Menu Principal compact */
@@ -44,7 +45,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- FONCTIONS GITHUB ---
+# --- FONCTIONS GITHUB (Identiques) ---
 @st.cache_data(ttl=5)
 def charger_data(file="contacts.json"):
     try:
@@ -121,9 +122,9 @@ with m4:
 
 st.markdown("---")
 
-# --- PAGES AVEC TITRE DE CONFIRMATION ---
+# --- PAGES ---
 if st.session_state.page == "LISTE":
-    st.markdown('<div class="section-confirm">📋 MENU : LISTE DES FICHES</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-confirm">📋 LISTE DES FICHES</div>', unsafe_allow_html=True)
     c_fut, c_arc = st.columns(2)
     with c_fut:
         if st.button("🚀 PROCHAINES", use_container_width=True): st.session_state.view_mode = "FUTUR"; st.rerun()
@@ -148,7 +149,7 @@ if st.session_state.page == "LISTE":
         st.markdown('</div>', unsafe_allow_html=True)
 
 elif st.session_state.page == "PLANNING":
-    st.markdown('<div class="section-confirm">🗓️ MENU : PLANNING</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-confirm">🗓️ PLANNING DES SORTIES</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     y_p, m_p = c1.selectbox("Année", [2026, 2027, 2028]), c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
     occu = {}
@@ -178,7 +179,7 @@ elif st.session_state.page == "PLANNING":
     st.markdown(h_c + '</tbody></table>', unsafe_allow_html=True)
 
 elif st.session_state.page == "BUDGET":
-    st.markdown('<div class="section-confirm">💰 MENU : STATISTIQUES</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-confirm">💰 STATISTIQUES ET CHIFFRE D\'AFFAIRES</div>', unsafe_allow_html=True)
     y_b = st.selectbox("Année", [2026, 2027, 2028])
     df['dt'] = df['DateNav'].apply(parse_date)
     df_y = df[(df['dt'].dt.year == y_b) & (df['Statut'].str.contains("🟢"))]
@@ -191,7 +192,7 @@ elif st.session_state.page == "BUDGET":
     st.markdown(ht + '</tbody></table>', unsafe_allow_html=True)
 
 elif st.session_state.page == "FORM":
-    st.markdown('<div class="section-confirm">✏️ MODIFICATION / AJOUT</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-confirm">✏️ FICHE DÉTAILLÉE</div>', unsafe_allow_html=True)
     idx = st.session_state.edit_idx
     init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols}
     with st.form("f_edit"):
@@ -219,7 +220,7 @@ elif st.session_state.page == "FORM":
     if st.button("🔙 Retour"): st.session_state.page = "LISTE"; st.rerun()
 
 elif st.session_state.page == "FRAIS":
-    st.markdown('<div class="section-confirm">🔧 MENU : FRAIS MOTEUR / MAINTENANCE</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-confirm">🔧 FRAIS ET MAINTENANCE</div>', unsafe_allow_html=True)
     with st.form("f_frais"):
         d, t, m = st.text_input("Date (JJ/MM/AAAA)"), st.selectbox("Type", ["Moteur", "Entretien", "Divers"]), st.number_input("Montant", 0.0)
         if st.form_submit_button("VALIDER"):
@@ -231,6 +232,7 @@ elif st.session_state.page == "FRAIS":
         if st.button("Supprimer", key=f"f_{i}"):
             df_frais = df_frais.drop(i)
             sauvegarder_data(df_frais, "frais.json"); st.rerun()
+
 
 
 
