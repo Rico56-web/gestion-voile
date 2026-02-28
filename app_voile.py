@@ -30,7 +30,10 @@ st.markdown("""
     .status-ok { border-left-color: #2ecc71 !important; }
     
     .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 10px; }
+    .cal-table th { background: #f8f9fa; font-size: 0.7rem; padding: 5px; border: 1px solid #eee; }
     .cal-table td { border: 1px solid #eee; height: 40px; text-align: center; font-size: 0.8rem; font-weight: bold; }
+    
+    .recap-box { background: #f1f2f6; padding: 10px; border-radius: 8px; border: 1px solid #dfe4ea; margin-bottom: 15px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -88,7 +91,7 @@ if not st.session_state.auth:
 df = charger_data("contacts.json")
 df_frais = charger_data("frais.json")
 
-# --- MENU PRINCIPAL (COULEURS RÉTABLIES) ---
+# --- MENU PRINCIPAL ---
 st.markdown('<div class="header-container"><div class="main-title">⚓ VESTA SKIPPER</div></div>', unsafe_allow_html=True)
 m1, m2, m3, m4 = st.columns(4)
 with m1: 
@@ -164,26 +167,43 @@ elif st.session_state.page == "PLANNING":
     st.markdown("---")
     jours_nav = sorted([int(k.split('/')[0]) for k in occu.keys() if f"/{st.session_state.cal_month:02d}" in k])
     if jours_nav:
-        sel_d = st.selectbox("Sélectionner un jour pour voir l'équipage :", jours_nav)
+        sel_d = st.selectbox("Voir l'équipage du :", jours_nav)
         ds_sel = f"{sel_d:02d}/{st.session_state.cal_month:02d}/{st.session_state.cal_year}"
         for res in occu.get(ds_sel, []):
             st.info(f"👤 **{res.get('Prénom')} {res.get('Nom')}**\n🏢 {res.get('Société')}\n⏱️ {res.get('HeuresMoteur')}h | ⚓ {res.get('Milles')} NM")
-    else:
-        st.write("Aucune navigation enregistrée ce mois-ci.")
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATISTIQUES</div>', unsafe_allow_html=True)
+    
+    df['dt_obj'] = df['DateNav'].apply(parse_date)
     df_ok = df[df['Statut'].str.contains("🟢", na=False)]
-    ca = sum(df_ok['PrixJour'].apply(to_float))
-    fr = sum(df_frais['Montant'].apply(to_float)) if not df_frais.empty else 0
+    
+    total_ca = sum(df_ok['PrixJour'].apply(to_float))
+    total_frais = sum(df_frais['Montant'].apply(to_float)) if not df_frais.empty else 0
+    
     st.markdown(f"""
         <div class="recap-box">
-            <div style="display:flex; justify-content:space-between;"><span>Chiffre d'Affaires:</span><b>{ca:.2f} €</b></div>
-            <div style="display:flex; justify-content:space-between; color:#e74c3c;"><span>Frais réels:</span><b>- {fr:.2f} €</b></div>
+            <div style="display:flex; justify-content:space-between;"><span>CA Encaissé:</span><b>{total_ca:.2f} €</b></div>
+            <div style="display:flex; justify-content:space-between; color:#e74c3c;"><span>Total Frais:</span><b>- {total_frais:.2f} €</b></div>
             <hr>
-            <div style="display:flex; justify-content:space-between; color:#27ae60;"><span>BÉNÉFICE NET:</span><b>{(ca-fr):.2f} €</b></div>
+            <div style="display:flex; justify-content:space-between; color:#27ae60; font-size:1.1rem;"><span>BÉNÉFICE NET:</span><b>{(total_ca - total_frais):.2f} €</b></div>
         </div>
     """, unsafe_allow_html=True)
+
+    # TABLEAU RÉCAPITULATIF MENSUEL
+    st.markdown("**Récapitulatif par mois :**")
+    mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Août", "Sept", "Oct", "Nov", "Déc"]
+    h_t = '<table class="cal-table"><thead><tr><th>Mois</th><th>Jours</th><th>NM</th><th>CA €</th></tr></thead><tbody>'
+    
+    for i, m_nom in enumerate(mois_noms, 1):
+        df_m = df_ok[df_ok['dt_obj'].dt.month == i]
+        if not df_m.empty:
+            m_jours = sum(df_m['NbJours'].apply(to_int))
+            m_milles = sum(df_m['Milles'].apply(to_float))
+            m_ca = sum(df_m['PrixJour'].apply(to_float))
+            h_t += f'<tr><td>{m_nom}</td><td>{m_jours}</td><td>{m_milles:.1f}</td><td>{m_ca:.2f}</td></tr>'
+    
+    st.markdown(h_t + '</tbody></table>', unsafe_allow_html=True)
 
 elif st.session_state.page == "FRAIS":
     st.markdown('<div class="page-title">🔧 MAINTENANCE & FRAIS</div>', unsafe_allow_html=True)
@@ -200,7 +220,6 @@ elif st.session_state.page == "FRAIS":
         st.write(f"**{r['Date']}** | {r['Type']} | **{to_float(r['Montant']):.2f}€**")
         if st.button("🗑️ Supprimer", key=f"dfr_{i}", use_container_width=True):
             df_frais = df_frais.drop(i); sauvegarder_data(df_frais, "frais.json"); st.rerun()
-        st.markdown("---")
 
 elif st.session_state.page == "FORM":
     st.markdown('<div class="page-title">📝 FICHE DÉTAILLÉE</div>', unsafe_allow_html=True)
@@ -222,7 +241,7 @@ elif st.session_state.page == "FORM":
             if idx is not None: df.loc[idx] = row
             else: df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
             sauvegarder_data(df); st.session_state.page = "LISTE"; st.rerun()
-    if st.button("🔙 Retour"): st.session_state.page = "LISTE"; st.rerun()
+
 
 
 
