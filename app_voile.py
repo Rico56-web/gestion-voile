@@ -115,19 +115,19 @@ st.markdown('<h1 class="main-title">⚓ Vesta Skipper Pro</h1>', unsafe_allow_ht
 m1, m2, m3, m4 = st.columns(4)
 
 with m1:
-    if st.button("📋\nLISTE", use_container_width=True): st.session_state.page = "LISTE"; st.rerun()
+    if st.button("📋\\nLISTE", use_container_width=True): st.session_state.page = "LISTE"; st.rerun()
     if st.session_state.page == "LISTE": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(1) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
 
 with m2:
-    if st.button("🗓️\nPLANNING", use_container_width=True): st.session_state.page = "PLANNING"; st.rerun()
+    if st.button("🗓️\\nPLANNING", use_container_width=True): st.session_state.page = "PLANNING"; st.rerun()
     if st.session_state.page == "PLANNING": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(2) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
 
 with m3:
-    if st.button("💰\nSTATS", use_container_width=True): st.session_state.page = "BUDGET"; st.rerun()
+    if st.button("💰\\nSTATS", use_container_width=True): st.session_state.page = "BUDGET"; st.rerun()
     if st.session_state.page == "BUDGET": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(3) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
 
 with m4:
-    if st.button("🔧\nFRAIS", use_container_width=True): st.session_state.page = "FRAIS"; st.rerun()
+    if st.button("🔧\\nFRAIS", use_container_width=True): st.session_state.page = "FRAIS"; st.rerun()
     if st.session_state.page == "FRAIS": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(4) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
 
 st.markdown("---")
@@ -150,10 +150,8 @@ if st.session_state.page == "LISTE":
     df['dt_obj'] = df['DateNav'].apply(parse_date)
     auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     df_f = df[df['Nom'].str.contains(search, na=False, case=False) | df['Société'].str.contains(search, na=False, case=False)].copy()
-
     data = df_f[df_f['dt_obj'] >= auj].sort_values('dt_obj', ascending=True) if st.session_state.view_mode == "FUTUR" else df_f[df_f['dt_obj'] < auj].sort_values('dt_obj', ascending=False)
     st.markdown(f'<div class="section-header">{"🚀 PROCHAINES" if st.session_state.view_mode == "FUTUR" else "📂 ARCHIVES"}</div>', unsafe_allow_html=True)
-
     for i, r in data.iterrows():
         cl = "cmn-style" if "CMN" in str(r['Société']).upper() else ("status-ok" if "🟢" in str(r['Statut']) else "status-attente")
         st.markdown(f'<div class="client-card {cl}"><div style="float:right; font-weight:bold;">{r["PrixJour"]}€</div><b>{r["Prénom"]} {r["Nom"]}</b><br><span style="color:#d35400; font-weight:bold; font-size:0.8rem;">🏢 {r["Société"]}</span><div class="contact-bar"><a href="tel:{r["Téléphone"]}">📞 Appeler</a> <a href="mailto:{r["Email"]}">✉️ Mail</a></div><small>📅 {r["DateNav"]} | {r["Milles"]} NM</small></div>', unsafe_allow_html=True)
@@ -226,15 +224,20 @@ elif st.session_state.page == "FORM":
 
 elif st.session_state.page == "FRAIS":
     st.subheader("🔧 Frais")
-    with st.form("f"):
-        d, t, m = st.text_input("Date"), st.selectbox("Type", ["Moteur", "Entretien", "Divers"]), st.number_input("Montant", 0.0)
+    with st.form("f_frais"):
+        d, t, m = st.text_input("Date (JJ/MM/AAAA)"), st.selectbox("Type", ["Moteur", "Entretien", "Divers"]), st.number_input("Montant", 0.0)
         if st.form_submit_button("VALIDER"):
             new_f = pd.DataFrame([{"Date": d, "Type": t, "Montant": m, "Annee": parse_date(d).year}])
             df_frais = pd.concat([df_frais, new_f], ignore_index=True)
-            sauvegarder_data(df_frais, "frais.json"); st.rerun()
+            sauvegarder_data(df_frais, "frais.json")
+            st.rerun()
     for i, r in df_frais.iterrows():
         st.write(f"{r['Date']} - {r['Type']} : {r['Montant']}€")
-        if st.button("Suppr", key=f"f_{i}"): df_frais = df_frais.drop(i); sauvegarder_data(df_frais
+        if st.button("Suppr", key=f"f_{i}"):
+            df_frais = df_frais.drop(i)
+            sauvegarder_data(df_frais, "frais.json")
+            st.rerun()
+
 
 
 
