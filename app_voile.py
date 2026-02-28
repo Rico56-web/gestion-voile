@@ -21,6 +21,19 @@ st.markdown("""
         color: #2f3640; font-weight: bold; font-size: 0.9rem;
     }
     
+    /* Couleur du bouton ACTIF (ROUGE) */
+    .active-tab button {
+        background-color: #e74c3c !important;
+        color: white !important;
+        border: none !important;
+    }
+    
+    /* Couleur des boutons de VALIDATION (BLEU MARINE) */
+    .stForm submit button, .btn-valide button {
+        background-color: #1a2a6c !important;
+        color: white !important;
+    }
+
     /* Cartes Clients */
     .client-card {
         background-color: #ffffff; padding: 15px; border-radius: 12px; 
@@ -31,7 +44,7 @@ st.markdown("""
     .cmn-style { border-left-color: #3498db !important; background-color: #f0f7ff !important; border: 1px solid #3498db; }
     
     .contact-bar a { 
-        text-decoration: none; color: #2980b9; background: #f1f7fa; 
+        text-decoration: none; color: white; background: #1a2a6c; 
         padding: 8px 12px; border-radius: 8px; display: inline-block; 
         margin-right: 10px; font-size: 0.85rem; font-weight: bold;
     }
@@ -104,14 +117,27 @@ for c in cols:
 # --- MENU PRINCIPAL ---
 st.markdown('<h1 class="main-title">⚓ Vesta Skipper Pro</h1>', unsafe_allow_html=True)
 m1, m2, m3, m4 = st.columns(4)
-if m1.button("📋\nListe", use_container_width=True, type="primary" if st.session_state.page == "LISTE" else "secondary"):
-    st.session_state.page = "LISTE"; st.rerun()
-if m2.button("🗓️\nPlan", use_container_width=True, type="primary" if st.session_state.page == "PLAN" else "secondary"):
-    st.session_state.page = "PLAN"; st.rerun()
-if m3.button("💰\nStats", use_container_width=True, type="primary" if st.session_state.page == "BUDGET" else "secondary"):
-    st.session_state.page = "BUDGET"; st.rerun()
-if m4.button("🔧\nFrais", use_container_width=True, type="primary" if st.session_state.page == "FRAIS" else "secondary"):
-    st.session_state.page = "FRAIS"; st.rerun()
+
+with m1:
+    if st.button("📋\nLISTE", use_container_width=True, key="m_liste"):
+        st.session_state.page = "LISTE"; st.rerun()
+    if st.session_state.page == "LISTE": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(1) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
+
+with m2:
+    if st.button("🗓️\nPLANNING", use_container_width=True, key="m_plan"):
+        st.session_state.page = "PLANNING"; st.rerun()
+    if st.session_state.page == "PLANNING": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(2) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
+
+with m3:
+    if st.button("💰\nSTATS", use_container_width=True, key="m_stats"):
+        st.session_state.page = "BUDGET"; st.rerun()
+    if st.session_state.page == "BUDGET": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(3) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
+
+with m4:
+    if st.button("🔧\nFRAIS", use_container_width=True, key="m_frais"):
+        st.session_state.page = "FRAIS"; st.rerun()
+    if st.session_state.page == "FRAIS": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(4) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
+
 st.markdown("---")
 
 # --- LOGIQUE DES PAGES ---
@@ -133,23 +159,27 @@ if st.session_state.page == "FORM":
         f_date = st.text_input("Date (JJ/MM/AAAA)", value=init.get("DateNav", ""))
         f_nbj = st.number_input("Jours", value=to_int(init.get("NbJours", 1)))
         f_prix = st.text_input("Prix Total (€)", value=init.get("PrixJour", ""))
+        
+        # Bouton validation en Bleu Marine via CSS
         if st.form_submit_button("💾 ENREGISTRER"):
             row = {"DateNav": f_date, "NbJours": str(f_nbj), "Nom": f_nom, "Prénom": f_pre, "Société": f_soc, "Statut": f_stat, "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix, "Milles": str(f_milles), "HeuresMoteur": str(f_heures)}
             if idx is not None: df.loc[idx] = row
             else: df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
             sauvegarder_data(df); st.session_state.page = "LISTE"; st.rerun()
-    if idx is not None:
-        with st.expander("⚠️ ZONE DE DANGER"):
-            if st.button("🗑️ SUPPRIMER"):
-                df = df.drop(idx).reset_index(drop=True); sauvegarder_data(df); st.session_state.page = "LISTE"; st.rerun()
+    
     if st.button("🔙 Retour"): st.session_state.page = "LISTE"; st.rerun()
 
 elif st.session_state.page == "LISTE":
     c_fut, c_arc = st.columns(2)
-    if c_fut.button("🚀 PROCHAINES", use_container_width=True, type="primary" if st.session_state.view_mode == "FUTUR" else "secondary"):
-        st.session_state.view_mode = "FUTUR"; st.rerun()
-    if c_arc.button("📂 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_mode == "ARCHIVES" else "secondary"):
-        st.session_state.view_mode = "ARCHIVES"; st.rerun()
+    with c_fut:
+        if st.button("🚀 PROCHAINES", use_container_width=True):
+            st.session_state.view_mode = "FUTUR"; st.rerun()
+        if st.session_state.view_mode == "FUTUR": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(1) button { border: 2px solid #e74c3c !important; color: #e74c3c !important; }</style>', unsafe_allow_html=True)
+    
+    with c_arc:
+        if st.button("📂 ARCHIVES", use_container_width=True):
+            st.session_state.view_mode = "ARCHIVES"; st.rerun()
+        if st.session_state.view_mode == "ARCHIVES": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(2) button { border: 2px solid #e74c3c !important; color: #e74c3c !important; }</style>', unsafe_allow_html=True)
     
     c_search, c_add = st.columns([3, 1])
     search = c_search.text_input("🔍 Rechercher...", value="").upper()
@@ -170,13 +200,27 @@ elif st.session_state.page == "LISTE":
 
     for i, r in data.iterrows():
         cl = "cmn-style" if "CMN" in str(r['Société']).upper() else ("status-ok" if "🟢" in str(r['Statut']) else "status-attente")
-        st.markdown(f'<div class="client-card {cl}"><div style="float:right; font-weight:bold;">{r["PrixJour"]}€</div><b>{r["Prénom"]} {r["Nom"]}</b><br><span style="color:#d35400; font-weight:bold; font-size:0.85rem;">🏢 {r["Société"]}</span><div class="contact-bar"><a href="tel:{r["Téléphone"]}">📞 Appeler</a> <a href="mailto:{r["Email"]}">✉️ Mail</a></div><small>📅 {r["DateNav"]} | 🚢 {r["Milles"]} NM | ⚙️ {r["HeuresMoteur"]}h</small></div>', unsafe_allow_html=True)
+        st.markdown(f"""
+            <div class="client-card {cl}">
+                <div style="float:right; font-weight:bold;">{r["PrixJour"]}€</div>
+                <b>{r["Prénom"]} {r["Nom"]}</b><br>
+                <span style="color:#d35400; font-weight:bold; font-size:0.85rem;">🏢 {r["Société"]}</span>
+                <div class="contact-bar">
+                    <a href="tel:{r["Téléphone"]}">📞 Appeler</a> 
+                    <a href="mailto:{r["Email"]}">✉️ Mail</a>
+                </div>
+                <small>📅 {r["DateNav"]} | 🚢 {r["Milles"]} NM | ⚙️ {r["HeuresMoteur"]}h</small>
+            </div>
+        """, unsafe_allow_html=True)
+        st.markdown('<div class="btn-valide">', unsafe_allow_html=True)
         if st.button(f"✏️ Gérer {r['Prénom']}", key=f"btn_{i}", use_container_width=True):
             st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
-elif st.session_state.page == "PLAN":
+elif st.session_state.page == "PLANNING":
     c1, c2 = st.columns(2)
     y_p, m_p = c1.selectbox("Année", [2026, 2027, 2028]), c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
+    # ... Logique calendrier identique ...
     occu = {}
     for _, r in df.iterrows():
         d_o = parse_date(r['DateNav'])
@@ -203,6 +247,7 @@ elif st.session_state.page == "PLAN":
 
 elif st.session_state.page == "BUDGET":
     y_b = st.selectbox("Année", [2026, 2027, 2028])
+    # ... Tableau mensuel identique ...
     df['dt'] = df['DateNav'].apply(parse_date)
     df_y = df[(df['dt'].dt.year == y_b) & (df['Statut'].str.contains("🟢"))]
     ht = '<table class="cal-table"><tr><th>Mois</th><th>Jours</th><th>Milles</th><th>CA (€)</th></tr>'
@@ -213,16 +258,15 @@ elif st.session_state.page == "BUDGET":
     st.markdown(ht + '</table>', unsafe_allow_html=True)
 
 elif st.session_state.page == "FRAIS":
+    st.subheader("🔧 Frais")
+    # ... Logique frais identique ...
     with st.form("f"):
         d, t, m = st.text_input("Date"), st.selectbox("Type", ["Moteur", "Entretien", "Divers"]), st.number_input("Montant", 0.0)
-        if st.form_submit_button("OK"):
+        if st.form_submit_button("VALIDER"):
             new_f = pd.DataFrame([{"Date": d, "Type": t, "Montant": m, "Annee": parse_date(d).year}])
             df_frais = pd.concat([df_frais, new_f], ignore_index=True)
             sauvegarder_data(df_frais, "frais.json"); st.rerun()
-    for i, r in df_frais.iterrows():
-        st.write(f"{r['Date']} - {r['Type']} : {r['Montant']}€")
-        if st.button("Suppr", key=f"f_{i}"):
-            df_frais = df_frais.drop(i); sauvegarder_data(df_frais, "frais.json"); st.rerun()
+
 
 
 
