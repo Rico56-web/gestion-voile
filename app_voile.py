@@ -9,12 +9,11 @@ import calendar
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper", layout="wide")
 
-# --- STYLE CSS (CORRECTIF FINAL IPHONE) ---
+# --- STYLE CSS (LE VERROU POUR IPHONE) ---
 st.markdown("""
     <style>
-    .main-title { text-align: center; color: #2c3e50; margin-bottom: 15px; font-family: sans-serif; font-size: 1.5rem; }
+    .main-title { text-align: center; color: #2c3e50; margin-bottom: 15px; font-family: sans-serif; font-size: 1.4rem; }
     
-    /* Fiches Coéquipiers */
     .client-card {
         background-color: #ffffff !important; 
         padding: 12px; border-radius: 12px; 
@@ -30,45 +29,45 @@ st.markdown("""
         font-size: 0.7rem;
     }
 
-    /* Bandeau financier */
     .finance-banner {
         background-color: #e8f4fd;
-        padding: 10px; border-radius: 10px;
+        padding: 8px; border-radius: 10px;
         border: 1px solid #3498db; margin-bottom: 15px;
     }
 
-    /* TABLEAU CALENDRIER FORCE HORIZONTAL */
+    /* TABLEAU CALENDRIER SANS ESPACE VIDE */
     .cal-table { 
         width: 100%; 
         border-collapse: collapse; 
-        table-layout: fixed; /* Force les 7 colonnes égales */
+        table-layout: fixed; 
         background: white; 
     }
     .cal-table th { 
         padding: 5px 0; border: 1px solid #eee; background: #f8f9fa; 
-        font-size: 0.6rem; color: #7f8c8d; text-transform: uppercase;
+        font-size: 0.6rem; color: #7f8c8d;
     }
     .cal-table td { 
         border: 1px solid #eee; 
-        height: 40px; 
+        height: 42px; 
         padding: 0 !important;
+        margin: 0 !important;
     }
     
-    /* CONTENEUR FLEX POUR EVITER LE RETOUR A LA LIGNE */
+    /* CONTENEUR QUI BLOQUE LE TEXTE SUR UNE SEULE LIGNE */
     .day-wrapper {
         display: flex;
-        flex-direction: row;
         justify-content: center;
         align-items: center;
         width: 100%;
         height: 100%;
-        overflow: hidden;
     }
     .day-num { 
         font-weight: bold; 
-        font-size: 0.85rem; /* Taille adaptée pour tenir sur une ligne */
-        white-space: nowrap; /* INTERDIT LE RETOUR A LA LIGNE */
-        display: block;
+        font-size: 0.85rem; 
+        white-space: nowrap; /* INTERDIT LE RETOUR LIGNE */
+        letter-spacing: -0.5px; /* RESSERRE LES CHIFFRES */
+        line-height: 1;
+        display: inline-block;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -77,7 +76,7 @@ st.markdown("""
 st.markdown('<h1 class="main-title">⚓ Vesta Skipper</h1>', unsafe_allow_html=True)
 
 # --- FONCTIONS GITHUB ---
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=5)
 def charger_data():
     try:
         repo = st.secrets["GITHUB_REPO"]
@@ -126,7 +125,7 @@ def to_int(v):
     try: return int(float(str(v)))
     except: return 1
 
-# --- SESSION & AUTH ---
+# --- AUTH ---
 if "page" not in st.session_state: st.session_state.page = "LISTE"
 if "m_idx" not in st.session_state: st.session_state.m_idx = datetime.now().month
 if "auth" not in st.session_state: st.session_state.auth = False
@@ -174,7 +173,7 @@ if st.session_state.page == "LISTE":
     with t1: afficher_cartes(df_base[df_base['dt'] >= auj])
     with t2: afficher_cartes(df_base[df_base['dt'] < auj], inverse=True)
 
-# --- PAGE PLANNING (FIX IPHONE RETOUR LIGNE) ---
+# --- PAGE PLANNING (VERSION ANTI-RETOUR LIGNE) ---
 elif st.session_state.page == "PLAN":
     m_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     jours_lettres = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
@@ -220,14 +219,9 @@ elif st.session_state.page == "PLAN":
                     if any(clean_val(x.get('Société')) == "CMN" for x in data_j): bg, col = "#2980b9", "white"
                     elif any("🟢" in str(x['Statut']) for x in data_j): bg, col = "#2ecc71", "white"
                     else: bg, col = "#f1c40f", "black"
-                # UTILISATION DU WRAPPER FLEX POUR BLOQUER LE RETOUR LIGNE
-                html_cal += f'''
-                    <td style="background:{bg}; color:{col};">
-                        <div class="day-wrapper">
-                            <span class="day-num">{day_str}</span>
-                        </div>
-                    </td>
-                '''
+                
+                # LIGNE CRITIQUE : AUCUN ESPACE ENTRE LES BALISES POUR EVITER LES BUGS IPHONE
+                html_cal += f'<td style="background:{bg};color:{col};"><div class="day-wrapper"><span class="day-num">{day_str}</span></div></td>'
         html_cal += '</tr>'
     st.markdown(html_cal + '</table>', unsafe_allow_html=True)
 
@@ -260,6 +254,7 @@ elif st.session_state.page == "FORM":
             else: df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
             if sauvegarder_data(df): st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 Annuler"): st.session_state.page = "LISTE"; st.rerun()
+
 
 
 
