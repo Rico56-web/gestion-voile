@@ -12,20 +12,18 @@ st.set_page_config(page_title="Vesta Skipper Pro", layout="wide")
 # --- STYLE CSS ---
 st.markdown("""
     <style>
+    /* Ancrage pour remontée automatique */
+    #top { margin-bottom: 0px; }
+    
     .header-container { text-align: center; margin-bottom: 15px; padding: 8px; background-color: #f8f9fa; border-radius: 12px; border: 1px solid #e1e8ed; }
     .main-title { color: #1a2a6c; margin-bottom: 2px; font-size: 1.3rem; font-weight: bold; text-transform: uppercase; }
     .today-date { color: #e74c3c; font-size: 0.9rem; font-weight: 600; }
     
-    /* Boutons Menu Principal plus petits pour iPhone */
+    /* Boutons Menu Principal compacts */
     div.stButton > button { 
-        border-radius: 8px; 
-        height: 38px; 
-        padding: 0px 5px;
-        border: 1px solid #dcdde1; 
-        background-color: white; 
-        color: #2f3640; 
-        font-weight: bold; 
-        font-size: 0.75rem; 
+        border-radius: 8px; height: 38px; padding: 0px 5px;
+        border: 1px solid #dcdde1; background-color: white; 
+        color: #2f3640; font-weight: bold; font-size: 0.75rem; 
     }
     div.stButton > button:focus, div.stButton > button:active { color: white !important; }
     
@@ -43,6 +41,9 @@ st.markdown("""
     .section-header { background: #34495e; padding: 6px; border-radius: 6px; margin-bottom: 8px; color: white; font-weight: bold; text-align: center; font-size: 0.85rem; }
     </style>
     """, unsafe_allow_html=True)
+
+# --- ANCRAGE HAUT DE PAGE ---
+st.markdown('<div id="top"></div>', unsafe_allow_html=True)
 
 # --- FONCTIONS GITHUB ---
 @st.cache_data(ttl=5)
@@ -108,7 +109,7 @@ for c in cols:
 # --- BANDEAU TITRE ---
 st.markdown(f'<div class="header-container"><div class="main-title">⚓ VESTA SKIPPER</div><div class="today-date">🗓️ {datetime.now().strftime("%d/%m/%Y")}</div></div>', unsafe_allow_html=True)
 
-# --- MENU (Compact sans \n) ---
+# --- MENU COMPACT ---
 m1, m2, m3, m4 = st.columns(4)
 with m1:
     if st.button("📋 LISTE", use_container_width=True): st.session_state.page = "LISTE"; st.rerun()
@@ -195,7 +196,6 @@ elif st.session_state.page == "FORM":
         status_options = ["🟡 Attente", "🟢 OK", "🔴 Annulé"]
         curr_status = init.get("Statut", "🟡 Attente")
         def_idx = status_options.index(curr_status) if curr_status in status_options else 0
-        
         f_stat = st.selectbox("STATUT", status_options, index=def_idx)
         f_nom = st.text_input("NOM", value=str(init.get("Nom", ""))).upper()
         f_pre = st.text_input("Prénom", value=str(init.get("Prénom", "")))
@@ -207,17 +207,13 @@ elif st.session_state.page == "FORM":
         f_date = st.text_input("Date (JJ/MM/AAAA)", value=str(init.get("DateNav", "")))
         f_nbj = st.number_input("Jours", value=to_int(init.get("NbJours", 1)), min_value=1)
         f_prix = st.text_input("Prix Total (€)", value=str(init.get("PrixJour", "")))
-        
         st.markdown('<div class="btn-marine">', unsafe_allow_html=True)
-        btn_submit = st.form_submit_button("💾 ENREGISTRER LA FICHE", use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        if btn_submit:
+        if st.form_submit_button("💾 ENREGISTRER LA FICHE", use_container_width=True):
             row = {"DateNav": f_date, "NbJours": str(f_nbj), "Nom": f_nom, "Prénom": f_pre, "Société": f_soc, "Statut": f_stat, "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix, "Milles": str(f_milles), "HeuresMoteur": str(f_heures)}
             if idx is not None: df.loc[idx] = row
             else: df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
             sauvegarder_data(df); st.session_state.page = "LISTE"; st.rerun()
-            
+        st.markdown('</div>', unsafe_allow_html=True)
     if st.button("🔙 Retour"): st.session_state.page = "LISTE"; st.rerun()
 
 elif st.session_state.page == "FRAIS":
@@ -233,6 +229,8 @@ elif st.session_state.page == "FRAIS":
         if st.button("Supprimer", key=f"f_{i}"):
             df_frais = df_frais.drop(i)
             sauvegarder_data(df_frais, "frais.json"); st.rerun()
+
+
 
 
 
