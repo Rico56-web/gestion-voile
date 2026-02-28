@@ -1,5 +1,5 @@
 import streamlit as st
-import pd
+import pandas as pd
 import json
 import base64
 import requests
@@ -46,7 +46,7 @@ st.markdown("""
     
     .contact-bar a { text-decoration: none; color: white !important; background: #1a2a6c; padding: 8px 12px; border-radius: 8px; display: inline-block; margin-right: 5px; font-size: 0.8rem; font-weight: bold; }
     .btn-marine button { background-color: #1a2a6c !important; color: white !important; border: none !important; height: 45px !important; font-size: 0.85rem !important; }
-    .btn-delete button { background-color: #e74c3c !important; color: white !important; border: none !important; margin-top: 5px; }
+    .btn-delete button { background-color: #e74c3c !important; color: white !important; border: none !important; }
     
     .recap-box { background: #f1f2f6; padding: 10px; border-radius: 10px; border: 1px solid #dfe4ea; margin-bottom: 15px; }
     .recap-val { font-size: 1.1rem; font-weight: bold; color: #2f3542; }
@@ -173,7 +173,7 @@ if st.session_state.page == "LISTE":
             st.markdown('</div>', unsafe_allow_html=True)
         with c2:
             st.markdown('<div class="btn-delete">', unsafe_allow_html=True)
-            if st.button(f"🗑️ Suppr.", key=f"del_{i}", use_container_width=True):
+            if st.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
                 df = df.drop(i); sauvegarder_data(df); st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -222,13 +222,13 @@ elif st.session_state.page == "PLANNING":
         h_c += '</tr>'
     st.markdown(h_c + '</tbody></table>', unsafe_allow_html=True)
 
-    # --- AFFICHAGE DES DETAILS AU CLIC ---
     jours_occupes = [int(k.split('/')[0]) for k in occu.keys() if f"/{st.session_state.cal_month:02d}/{st.session_state.cal_year}" in k]
     if jours_occupes:
-        sel_d = st.selectbox("Voir les détails du jour :", sorted(list(set(jours_occupes))))
+        st.markdown("---")
+        sel_d = st.selectbox("Détails du jour :", sorted(list(set(jours_occupes))))
         ds_sel = f"{sel_d:02d}/{st.session_state.cal_month:02d}/{st.session_state.cal_year}"
         for r in occu.get(ds_sel, []):
-            st.info(f"⚓ **{r['Prénom']} {r['Nom']}** ({r['Société']})")
+            st.info(f"⚓ **{r['Prénom']} {r['Nom']}**\n🏢 {r['Société']}\n⏱️ {r['HeuresMoteur']}h | ⚓ {r['Milles']} NM")
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="section-confirm">💰 STATISTIQUES</div>', unsafe_allow_html=True)
@@ -253,10 +253,10 @@ elif st.session_state.page == "BUDGET":
 
     st.markdown(f"""
         <div class="recap-box">
-            <div style="display:flex; justify-content:space-between;"><span>CA:</span><span class="recap-val">{fmt_euro(total_ca)} €</span></div>
-            <div style="display:flex; justify-content:space-between; color:#e74c3c;"><span>Frais:</span><span class="recap-val">- {fmt_euro(total_frais)} €</span></div>
+            <div style="display:flex; justify-content:space-between;"><span>Chiffre Affaires:</span><span class="recap-val">{fmt_euro(total_ca)} €</span></div>
+            <div style="display:flex; justify-content:space-between; color:#e74c3c;"><span>Total Frais:</span><span class="recap-val">- {fmt_euro(total_frais)} €</span></div>
             <hr style="margin:5px 0;">
-            <div style="display:flex; justify-content:space-between; color:#27ae60;"><span>NET:</span><span class="recap-val">{fmt_euro(benefice)} €</span></div>
+            <div style="display:flex; justify-content:space-between; color:#27ae60;"><span>RÉSULTAT NET:</span><span class="recap-val">{fmt_euro(benefice)} €</span></div>
         </div>
     """, unsafe_allow_html=True)
     
@@ -278,13 +278,11 @@ elif st.session_state.page == "FRAIS":
     
     if not df_frais.empty:
         for i, r in df_frais.iloc[::-1].iterrows():
-            c1, c2 = st.columns([3, 1])
+            c1, c2 = st.columns([4, 1])
             c1.write(f"**{r['Date']}** - {r['Type']} : **{fmt_euro(r['Montant'])}€**")
             with c2:
-                st.markdown('<div class="btn-delete" style="margin-top:-10px;">', unsafe_allow_html=True)
                 if st.button("🗑️", key=f"fdel_{i}"):
                     df_frais = df_frais.drop(i); sauvegarder_data(df_frais, "frais.json"); st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
             st.markdown("---")
 
 elif st.session_state.page == "FORM":
@@ -298,11 +296,11 @@ elif st.session_state.page == "FORM":
         f_soc = st.text_input("SOCIÉTÉ", value=str(init.get("Société", ""))).upper()
         f_milles = st.number_input("Milles", value=to_float(init.get("Milles", 0)))
         f_heures = st.number_input("Heures Moteur", value=to_float(init.get("HeuresMoteur", 0)))
-        f_tel = st.text_input("Tél", value=str(init.get("Téléphone", "")))
+        f_tel = st.text_input("Téléphone", value=str(init.get("Téléphone", "")))
         f_mail = st.text_input("Email", value=str(init.get("Email", "")))
         f_date = st.text_input("Date (JJ/MM/AAAA)", value=str(init.get("DateNav", "")))
-        f_nbj = st.number_input("Jours", value=to_int(init.get("NbJours", 1)), min_value=1)
-        f_prix = st.text_input("Prix Total (€)", value=str(init.get("PrixJour", "")))
+        f_nbj = st.number_input("Nombre Jours", value=to_int(init.get("NbJours", 1)), min_value=1)
+        f_prix = st.text_input("Montant Total (€)", value=str(init.get("PrixJour", "")))
         
         if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
             row = {"DateNav": f_date, "NbJours": str(f_nbj), "Nom": f_nom, "Prénom": f_pre, "Société": f_soc, "Statut": f_stat, "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix.replace(",", "."), "Milles": str(f_milles), "HeuresMoteur": str(f_heures)}
@@ -310,6 +308,7 @@ elif st.session_state.page == "FORM":
             else: df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
             sauvegarder_data(df); st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 Retour"): st.session_state.page = "LISTE"; st.rerun()
+
 
 
 
