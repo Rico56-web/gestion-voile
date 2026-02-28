@@ -128,22 +128,6 @@
         "HeuresMoteur":"0"
     },
     {
-        "DateNav":"",
-        "NbJours":"1",
-        "Statut":"🟡 Attente",
-        "Nom":"",
-        "Prénom":"",
-        "Téléphone":"",
-        "Email":"",
-        "Paye":null,
-        "PrixJour":"",
-        "Passagers":"",
-        "Historique":"",
-        "Société":"",
-        "Milles":"0",
-        "HeuresMoteur":"0"
-    },
-    {
         "DateNav":"28\/03\/2026",
         "NbJours":"2",
         "Statut":"🟡 Attente",
