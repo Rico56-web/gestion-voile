@@ -9,7 +9,7 @@ import calendar
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper", layout="wide")
 
-# --- STYLE CSS (OPTIMISÉ IPHONE) ---
+# --- STYLE CSS (OPTIMISÉ 3 ANS) ---
 st.markdown("""
     <style>
     .main-title { text-align: center; color: #2c3e50; margin-bottom: 10px; font-family: sans-serif; font-size: 1.3rem; }
@@ -45,7 +45,6 @@ st.markdown("""
     }
     .detail-date { font-weight: bold; color: #2c3e50; min-width: 35px; }
 
-    /* Style Budget */
     .budget-row { padding: 8px; border-bottom: 1px solid #eee; font-size: 0.8rem; }
     .total-row { background: #2c3e50; color: white; padding: 10px; border-radius: 5px; margin-top: 10px; font-weight: bold; }
     </style>
@@ -104,9 +103,10 @@ def to_int(v):
     try: return int(float(str(v)))
     except: return 1
 
-# --- AUTH ---
+# --- AUTH & NAVIGATION ---
 if "page" not in st.session_state: st.session_state.page = "LISTE"
 if "m_idx" not in st.session_state: st.session_state.m_idx = datetime.now().month
+if "y_idx" not in st.session_state: st.session_state.y_idx = datetime.now().year
 if "auth" not in st.session_state: st.session_state.auth = False
 
 if not st.session_state.auth:
@@ -146,42 +146,58 @@ if st.session_state.page == "LISTE":
         for idx, r in data_f.iterrows():
             cl = "status-ok" if "🟢" in str(r['Statut']) else "status-attente"
             v_soc = clean_val(r['Société'])
-            soc_html = f'<div class="cmn-tag">🏢 CMN</div>' if v_soc == "CMN" else f'<div style="color:#d35400; font-weight:bold; font-size:0.7rem;">🏢 {v_soc}</div>' if v_soc else ''
+            soc_html = f'<div class="cmn-tag">🏢 CMN</div>' if v_soc == "CMN" else f'<div style="color:#d35400; font-weight:bold; font-size:0.75rem;">🏢 {v_soc}</div>' if v_soc else ''
             st.markdown(f'<div class="client-card {cl}"><div style="float:right; font-weight:bold; font-size:0.85rem;">{r["PrixJour"]}€</div><div><b>{r["Prénom"]} {r["Nom"]}</b></div>{soc_html}<div style="font-size:0.75rem; color:#444; margin-top:5px;">📅 {r["DateNav"]} ({r["NbJours"]}j)</div></div>', unsafe_allow_html=True)
             if st.button(f"✏️ Modifier {r['Prénom']}", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
     with t1: afficher_cartes(df_base[df_base['dt'] >= auj])
     with t2: afficher_cartes(df_base[df_base['dt'] < auj], inverse=True)
 
-# --- PAGE PLANNING ---
+# --- PAGE PLANNING (MULTI-ANNÉES) ---
 elif st.session_state.page == "PLAN":
     m_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     jours_lettres = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
     
+    # Sélecteur Année + Mois
+    c_y1, c_y2 = st.columns([1,1])
+    st.session_state.y_idx = c_y1.selectbox("Année", [2025, 2026, 2027], index=[2025, 2026, 2027].index(st.session_state.y_idx))
+    
     c1, c2, c3 = st.columns([1,2,1])
-    if c1.button("◀️"): st.session_state.m_idx = 12 if st.session_state.m_idx == 1 else st.session_state.m_idx - 1; st.rerun()
-    c2.markdown(f"<h4 style='text-align:center; margin:0;'>{m_fr[st.session_state.m_idx-1]} 2026</h4>", unsafe_allow_html=True)
-    if c3.button("▶️"): st.session_state.m_idx = 1 if st.session_state.m_idx == 12 else st.session_state.m_idx + 1; st.rerun()
+    if c1.button("◀️"): 
+        if st.session_state.m_idx == 1:
+            st.session_state.m_idx = 12
+            st.session_state.y_idx = max(2025, st.session_state.y_idx - 1)
+        else: st.session_state.m_idx -= 1
+        st.rerun()
+    c2.markdown(f"<h4 style='text-align:center; margin:0;'>{m_fr[st.session_state.m_idx-1]} {st.session_state.y_idx}</h4>", unsafe_allow_html=True)
+    if c3.button("▶️"): 
+        if st.session_state.m_idx == 12:
+            st.session_state.m_idx = 1
+            st.session_state.y_idx = min(2027, st.session_state.y_idx + 1)
+        else: st.session_state.m_idx += 1
+        st.rerun()
 
-    # Finances Mois Courant
+    # Finances
     ca_ok, ca_att = 0.0, 0.0
     for _, r in df.iterrows():
         dt = parse_date(r['DateNav'])
-        if dt.month == st.session_state.m_idx and dt.year == 2026:
-            p = to_float(r['PrixJour']); ca_ok += p if "🟢" in str(r['Statut']) else 0; ca_att += p if "🟡" in str(r['Statut']) else 0
+        if dt.month == st.session_state.m_idx and dt.year == st.session_state.y_idx:
+            p = to_float(r['PrixJour'])
+            if "🟢" in str(r['Statut']): ca_ok += p
+            elif "🟡" in str(r['Statut']): ca_att += p
     st.markdown(f'<div class="finance-banner"><div style="display:flex; justify-content:space-around; text-align:center; font-size:0.7rem;"><div><b>Encaissé</b><br>{ca_ok:,.0f}€</div><div><b>Attente</b><br>{ca_att:,.0f}€</div><div><b>Total</b><br>{(ca_ok+ca_att):,.0f}€</div></div></div>'.replace(",", " "), unsafe_allow_html=True)
 
     # Occupations
     occu = {}
     for _, r in df.iterrows():
         d_obj = parse_date(r['DateNav'])
-        if d_obj.year == 2026:
+        if d_obj.year == st.session_state.y_idx:
             for j in range(to_int(r['NbJours'])):
                 d_c = (d_obj + timedelta(days=j)).strftime('%d/%m/%Y')
                 if d_c not in occu: occu[d_c] = []
                 occu[d_c].append(r)
 
-    cal = calendar.monthcalendar(2026, st.session_state.m_idx)
+    cal = calendar.monthcalendar(st.session_state.y_idx, st.session_state.m_idx)
     html_cal = '<table class="cal-table"><tr>'
     for j in jours_lettres: html_cal += f'<th>{j}</th>'
     html_cal += '</tr>'
@@ -190,7 +206,7 @@ elif st.session_state.page == "PLAN":
         for day in week:
             if day == 0: html_cal += '<td style="background:#fafafa;"></td>'
             else:
-                d_s, day_str = f"{day:02d}/{st.session_state.m_idx:02d}/2026", f"{day:02d}"
+                d_s, day_str = f"{day:02d}/{st.session_state.m_idx:02d}/{st.session_state.y_idx}", f"{day:02d}"
                 data_j = occu.get(d_s, [])
                 bg, col = "white", "black"
                 if data_j:
@@ -201,78 +217,44 @@ elif st.session_state.page == "PLAN":
         html_cal += '</tr>'
     st.markdown(html_cal + '</table>', unsafe_allow_html=True)
 
-    # Liste automatique du mois
+    # Détails
     st.markdown("---")
-    jours_occupes = sorted([d for d in occu.keys() if int(d.split('/')[1]) == st.session_state.m_idx], key=lambda x: int(x.split('/')[0]))
-    if not jours_occupes: st.write("Aucune sortie ce mois-ci.")
+    jours_m = sorted([d for d in occu.keys() if int(d.split('/')[1]) == st.session_state.m_idx and int(d.split('/')[2]) == st.session_state.y_idx], key=lambda x: int(x.split('/')[0]))
+    if not jours_m: st.write("Aucune sortie ce mois-ci.")
     else:
-        for jour in jours_occupes:
+        for jour in jours_m:
             for x in occu[jour]:
                 symbole = "🔵" if x['Société'] == "CMN" else ("🟢" if "🟢" in x['Statut'] else "🟡")
                 st.markdown(f'<div class="detail-item"><span class="detail-date">{jour.split("/")[0]}</span><span style="flex-grow:1; margin-left:10px;">{symbole} {x["Prénom"]} {x["Nom"]}</span><span style="color:#7f8c8d; font-size:0.7rem;">{x["Société"]}</span></div>', unsafe_allow_html=True)
 
-# --- PAGE BUDGET (NOUVEAU) ---
+# --- PAGE BUDGET (MULTI-ANNÉES) ---
 elif st.session_state.page == "BUDGET":
-    st.markdown("<h4 style='text-align:center;'>💰 Récapitulatif 2026</h4>", unsafe_allow_html=True)
+    y_budget = st.selectbox("Choisir l'année budget", [2025, 2026, 2027], index=[2025, 2026, 2027].index(st.session_state.y_idx))
+    st.markdown(f"<h4 style='text-align:center;'>💰 Récapitulatif {y_budget}</h4>", unsafe_allow_html=True)
     m_fr = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"]
     
     total_an_ok, total_an_att = 0.0, 0.0
-    
-    # Header du tableau budget
-    st.markdown("""
-        <div style="display:flex; font-weight:bold; background:#f8f9fa; padding:10px; border-radius:5px; font-size:0.75rem; margin-bottom:5px;">
-            <div style="flex:1;">MOIS</div>
-            <div style="flex:1; text-align:right; color:#2ecc71;">ENCAISSÉ</div>
-            <div style="flex:1; text-align:right; color:#f1c40f;">ATTENTE</div>
-            <div style="flex:1; text-align:right;">TOTAL</div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown("""<div style="display:flex; font-weight:bold; background:#f8f9fa; padding:10px; border-radius:5px; font-size:0.75rem; margin-bottom:5px;"><div style="flex:1;">MOIS</div><div style="flex:1; text-align:right; color:#2ecc71;">ENCAISSÉ</div><div style="flex:1; text-align:right; color:#f1c40f;">ATTENTE</div><div style="flex:1; text-align:right;">TOTAL</div></div>""", unsafe_allow_html=True)
 
     for i in range(1, 13):
         m_ok, m_att = 0.0, 0.0
         for _, r in df.iterrows():
             dt = parse_date(r['DateNav'])
-            if dt.month == i and dt.year == 2026:
+            if dt.month == i and dt.year == y_budget:
                 p = to_float(r['PrixJour'])
                 if "🟢" in str(r['Statut']): m_ok += p
                 elif "🟡" in str(r['Statut']): m_att += p
-        
-        total_an_ok += m_ok
-        total_an_att += m_att
-        
-        # Affichage de la ligne (si CA > 0)
         if (m_ok + m_att) > 0:
-            st.markdown(f"""
-                <div class="budget-row" style="display:flex;">
-                    <div style="flex:1; font-weight:bold;">{m_fr[i-1]}</div>
-                    <div style="flex:1; text-align:right;">{m_ok:,.0f}€</div>
-                    <div style="flex:1; text-align:right;">{m_att:,.0f}€</div>
-                    <div style="flex:1; text-align:right; font-weight:bold;">{(m_ok+m_att):,.0f}€</div>
-                </div>
-            """.replace(",", " "), unsafe_allow_html=True)
+            total_an_ok += m_ok; total_an_att += m_att
+            st.markdown(f"""<div class="budget-row" style="display:flex;"><div style="flex:1; font-weight:bold;">{m_fr[i-1]}</div><div style="flex:1; text-align:right;">{m_ok:,.0f}€</div><div style="flex:1; text-align:right;">{m_att:,.0f}€</div><div style="flex:1; text-align:right; font-weight:bold;">{(m_ok+m_att):,.0f}€</div></div>""".replace(",", " "), unsafe_allow_html=True)
 
-    # Total Annuel Cumulé
-    st.markdown(f"""
-        <div class="total-row">
-            <div style="display:flex; justify-content:space-between;">
-                <span>TOTAL ANNUEL</span>
-                <span>{(total_an_ok + total_an_att):,.0f} €</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; font-size:0.7rem; font-weight:normal; margin-top:5px; color:#bdc3c7;">
-                <span>Cumul Encaissé : {total_an_ok:,.0f} €</span>
-                <span>En attente : {total_an_att:,.0f} €</span>
-            </div>
-        </div>
-    """.replace(",", " "), unsafe_allow_html=True)
-    
-    st.info("💡 Prochainement : Intégration des coûts de maintenance et frais de gestion.")
+    st.markdown(f"""<div class="total-row"><div style="display:flex; justify-content:space-between;"><span>TOTAL {y_budget}</span><span>{(total_an_ok + total_an_att):,.0f} €</span></div><div style="display:flex; justify-content:space-between; font-size:0.7rem; font-weight:normal; margin-top:5px; color:#bdc3c7;"><span>Encaissé : {total_an_ok:,.0f} €</span><span>Attente : {total_an_att:,.0f} €</span></div></div>""".replace(",", " "), unsafe_allow_html=True)
 
 # --- PAGE FORMULAIRE ---
 elif st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
     init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols_v}
     if idx is None: init["Statut"], init["NbJours"] = "🟡 Attente", "1"
-    
     with st.form("f_coep"):
         f_stat = st.selectbox("STATUT", ["🟡 Attente", "🟢 OK", "🔴 Annulé"], index=0)
         f_nom = st.text_input("NOM", value=init["Nom"]).upper()
@@ -289,6 +271,7 @@ elif st.session_state.page == "FORM":
             else: df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
             if sauvegarder_data(df): st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 Annuler"): st.session_state.page = "LISTE"; st.rerun()
+
 
 
 
