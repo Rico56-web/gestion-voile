@@ -16,13 +16,19 @@ st.markdown("""
     .main-title { color: #1a2a6c; margin-bottom: 2px; font-size: 1.3rem; font-weight: bold; text-transform: uppercase; }
     .today-date { color: #e74c3c; font-size: 0.9rem; font-weight: 600; }
     
+    /* Titre de Section (Confirmation de page) */
+    .section-confirm { 
+        background: #1a2a6c; color: white; padding: 10px; 
+        border-radius: 8px; text-align: center; font-weight: bold; 
+        margin-bottom: 15px; font-size: 1rem; letter-spacing: 1px;
+    }
+    
     /* Menu Principal compact */
     div.stButton > button { 
         border-radius: 8px; height: 38px; padding: 0px 5px;
         border: 1px solid #dcdde1; background-color: white; 
         color: #2f3640; font-weight: bold; font-size: 0.75rem; 
     }
-    div.stButton > button:focus, div.stButton > button:active { color: white !important; }
     
     .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: white; margin-top: 10px; }
     .cal-table th { font-size: 0.65rem; padding: 6px 0; background: #f8f9fa; border: 1px solid #eee; color: #7f8c8d; text-align: center; }
@@ -35,7 +41,6 @@ st.markdown("""
     
     .contact-bar a { text-decoration: none; color: white !important; background: #1a2a6c; padding: 8px 12px; border-radius: 8px; display: inline-block; margin-right: 5px; font-size: 0.8rem; font-weight: bold; }
     .btn-marine button { background-color: #1a2a6c !important; color: white !important; border: none !important; height: 45px !important; font-size: 0.85rem !important; }
-    .section-header { background: #34495e; padding: 6px; border-radius: 6px; margin-bottom: 8px; color: white; font-weight: bold; text-align: center; font-size: 0.85rem; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -103,26 +108,22 @@ for c in cols:
 # --- BANDEAU TITRE ---
 st.markdown(f'<div class="header-container"><div class="main-title">⚓ VESTA SKIPPER</div><div class="today-date">🗓️ {datetime.now().strftime("%d/%m/%Y")}</div></div>', unsafe_allow_html=True)
 
-# --- MENU COMPACT (avec reset scroll via query_params) ---
+# --- MENU COMPACT ---
 m1, m2, m3, m4 = st.columns(4)
-def nav_to(p):
-    st.session_state.page = p
-    st.query_params["p"] = p # Force le navigateur à recharger la vue
-    st.rerun()
-
 with m1:
-    if st.button("📋 LISTE", use_container_width=True): nav_to("LISTE")
+    if st.button("📋 LISTE", use_container_width=True): st.session_state.page = "LISTE"; st.rerun()
 with m2:
-    if st.button("🗓️ PLAN", use_container_width=True): nav_to("PLANNING")
+    if st.button("🗓️ PLAN", use_container_width=True): st.session_state.page = "PLANNING"; st.rerun()
 with m3:
-    if st.button("💰 STATS", use_container_width=True): nav_to("BUDGET")
+    if st.button("💰 STATS", use_container_width=True): st.session_state.page = "BUDGET"; st.rerun()
 with m4:
-    if st.button("🔧 FRAIS", use_container_width=True): nav_to("FRAIS")
+    if st.button("🔧 FRAIS", use_container_width=True): st.session_state.page = "FRAIS"; st.rerun()
 
 st.markdown("---")
 
-# --- PAGES ---
+# --- PAGES AVEC TITRE DE CONFIRMATION ---
 if st.session_state.page == "LISTE":
+    st.markdown('<div class="section-confirm">📋 MENU : LISTE DES FICHES</div>', unsafe_allow_html=True)
     c_fut, c_arc = st.columns(2)
     with c_fut:
         if st.button("🚀 PROCHAINES", use_container_width=True): st.session_state.view_mode = "FUTUR"; st.rerun()
@@ -138,7 +139,6 @@ if st.session_state.page == "LISTE":
     df_f = df[df['Nom'].str.contains(search, na=False, case=False) | df['Société'].str.contains(search, na=False, case=False)].copy()
     data = df_f[df_f['dt_obj'] >= auj].sort_values('dt_obj', ascending=True) if st.session_state.view_mode == "FUTUR" else df_f[df_f['dt_obj'] < auj].sort_values('dt_obj', ascending=False)
     
-    st.markdown(f'<div class="section-header">{"🚀 PROCHAINES" if st.session_state.view_mode == "FUTUR" else "📂 ARCHIVES"}</div>', unsafe_allow_html=True)
     for i, r in data.iterrows():
         cl = "cmn-style" if "CMN" in str(r['Société']).upper() else ("status-ok" if "🟢" in str(r['Statut']) else "status-attente")
         st.markdown(f'<div class="client-card {cl}"><div style="float:right; font-weight:bold;">{r["PrixJour"]}€</div><b>{r["Prénom"]} {r["Nom"]}</b><br><span style="color:#d35400; font-weight:bold; font-size:0.8rem;">🏢 {r["Société"]}</span><div class="contact-bar"><a href="tel:{r["Téléphone"]}">📞 Appeler</a> <a href="mailto:{r["Email"]}">✉️ Mail</a></div><small>📅 {r["DateNav"]} | {r["Milles"]} NM</small></div>', unsafe_allow_html=True)
@@ -148,6 +148,7 @@ if st.session_state.page == "LISTE":
         st.markdown('</div>', unsafe_allow_html=True)
 
 elif st.session_state.page == "PLANNING":
+    st.markdown('<div class="section-confirm">🗓️ MENU : PLANNING</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     y_p, m_p = c1.selectbox("Année", [2026, 2027, 2028]), c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
     occu = {}
@@ -177,6 +178,7 @@ elif st.session_state.page == "PLANNING":
     st.markdown(h_c + '</tbody></table>', unsafe_allow_html=True)
 
 elif st.session_state.page == "BUDGET":
+    st.markdown('<div class="section-confirm">💰 MENU : STATISTIQUES</div>', unsafe_allow_html=True)
     y_b = st.selectbox("Année", [2026, 2027, 2028])
     df['dt'] = df['DateNav'].apply(parse_date)
     df_y = df[(df['dt'].dt.year == y_b) & (df['Statut'].str.contains("🟢"))]
@@ -189,6 +191,7 @@ elif st.session_state.page == "BUDGET":
     st.markdown(ht + '</tbody></table>', unsafe_allow_html=True)
 
 elif st.session_state.page == "FORM":
+    st.markdown('<div class="section-confirm">✏️ MODIFICATION / AJOUT</div>', unsafe_allow_html=True)
     idx = st.session_state.edit_idx
     init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols}
     with st.form("f_edit"):
@@ -213,10 +216,10 @@ elif st.session_state.page == "FORM":
             else: df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
             sauvegarder_data(df); st.session_state.page = "LISTE"; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
-    if st.button("🔙 Retour"): nav_to("LISTE")
+    if st.button("🔙 Retour"): st.session_state.page = "LISTE"; st.rerun()
 
 elif st.session_state.page == "FRAIS":
-    st.subheader("🔧 Frais")
+    st.markdown('<div class="section-confirm">🔧 MENU : FRAIS MOTEUR / MAINTENANCE</div>', unsafe_allow_html=True)
     with st.form("f_frais"):
         d, t, m = st.text_input("Date (JJ/MM/AAAA)"), st.selectbox("Type", ["Moteur", "Entretien", "Divers"]), st.number_input("Montant", 0.0)
         if st.form_submit_button("VALIDER"):
@@ -228,6 +231,7 @@ elif st.session_state.page == "FRAIS":
         if st.button("Supprimer", key=f"f_{i}"):
             df_frais = df_frais.drop(i)
             sauvegarder_data(df_frais, "frais.json"); st.rerun()
+
 
 
 
