@@ -9,7 +9,7 @@ import calendar
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper Pro", layout="wide")
 
-# --- STYLE CSS OPTIMISÉ POUR ÉCRANS ÉTROITS ---
+# --- STYLE CSS FINAL OPTIMISÉ ---
 st.markdown("""
     <style>
     .main-title { text-align: center; color: #2c3e50; margin-bottom: 15px; font-size: 1.2rem; font-weight: bold; }
@@ -19,9 +19,13 @@ st.markdown("""
         border-radius: 10px; height: 50px;
         border: 1px solid #dcdde1; background-color: white;
         color: #2f3640; font-weight: bold; font-size: 0.8rem;
-        padding: 0px !important;
     }
     
+    /* Correction Visibilité Texte sur bouton Rouge */
+    div.stButton > button:focus, div.stButton > button:active {
+        color: white !important;
+    }
+
     /* Cartes Clients */
     .client-card {
         background-color: #ffffff; padding: 12px; border-radius: 10px; 
@@ -32,23 +36,17 @@ st.markdown("""
     .cmn-style { border-left-color: #3498db !important; background-color: #f0f7ff !important; border: 1px solid #3498db; }
     
     .contact-bar a { 
-        text-decoration: none; color: white; background: #1a2a6c; 
-        padding: 6px 10px; border-radius: 6px; display: inline-block; 
+        text-decoration: none; color: white !important; background: #1a2a6c; 
+        padding: 8px 12px; border-radius: 8px; display: inline-block; 
         margin-right: 5px; font-size: 0.8rem; font-weight: bold;
     }
     
-    /* PLANNING OPTIMISÉ : Police réduite et largeur 100% */
-    .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: white; }
-    .cal-table th { font-size: 0.7rem; padding: 4px 0; background: #f8f9fa; border: 1px solid #eee; }
-    .cal-table td { 
-        border: 1px solid #eee; 
-        height: 40px; 
-        text-align: center; 
-        font-size: 0.8rem; 
-        font-weight: bold;
-        vertical-align: middle;
-    }
+    /* PLANNING OPTIMISÉ */
+    .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: white; margin-top: 10px; }
+    .cal-table th { font-size: 0.7rem; padding: 5px 0; background: #f8f9fa; border: 1px solid #eee; color: #7f8c8d; }
+    .cal-table td { border: 1px solid #eee; height: 45px; text-align: center; font-size: 0.85rem; font-weight: bold; vertical-align: middle; }
     
+    .btn-marine button { background-color: #1a2a6c !important; color: white !important; border: none !important; }
     .section-header { background: #34495e; padding: 6px; border-radius: 6px; margin-bottom: 8px; color: white; font-weight: bold; text-align: center; font-size: 0.85rem; }
     </style>
     """, unsafe_allow_html=True)
@@ -112,81 +110,42 @@ cols = ["DateNav", "NbJours", "Statut", "Nom", "Prénom", "Société", "Téléph
 for c in cols:
     if c not in df.columns: df[c] = ""
 
-# --- MENU PRINCIPAL (AVEC COULEUR ACTIVE ROUGE) ---
+# --- MENU PRINCIPAL ---
 st.markdown('<h1 class="main-title">⚓ Vesta Skipper Pro</h1>', unsafe_allow_html=True)
 m1, m2, m3, m4 = st.columns(4)
 
 with m1:
-    if st.button("📋\nLISTE", use_container_width=True, key="m_liste"):
-        st.session_state.page = "LISTE"; st.rerun()
+    if st.button("📋\nLISTE", use_container_width=True): st.session_state.page = "LISTE"; st.rerun()
     if st.session_state.page == "LISTE": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(1) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
 
 with m2:
-    if st.button("🗓️\nPLANNING", use_container_width=True, key="m_plan"):
-        st.session_state.page = "PLANNING"; st.rerun()
+    if st.button("🗓️\nPLANNING", use_container_width=True): st.session_state.page = "PLANNING"; st.rerun()
     if st.session_state.page == "PLANNING": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(2) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
 
 with m3:
-    if st.button("💰\nSTATS", use_container_width=True, key="m_stats"):
-        st.session_state.page = "BUDGET"; st.rerun()
+    if st.button("💰\nSTATS", use_container_width=True): st.session_state.page = "BUDGET"; st.rerun()
     if st.session_state.page == "BUDGET": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(3) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
 
 with m4:
-    if st.button("🔧\nFRAIS", use_container_width=True, key="m_frais"):
-        st.session_state.page = "FRAIS"; st.rerun()
+    if st.button("🔧\nFRAIS", use_container_width=True): st.session_state.page = "FRAIS"; st.rerun()
     if st.session_state.page == "FRAIS": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(4) button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
 
 st.markdown("---")
 
-# --- PAGE PLANNING (VERSION COMPACTE) ---
-if st.session_state.page == "PLANNING":
-    c1, c2 = st.columns(2)
-    y_p = c1.selectbox("Année", [2026, 2027, 2028])
-    m_p = c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
-    
-    occu = {}
-    for _, r in df.iterrows():
-        d_o = parse_date(r['DateNav'])
-        if d_o.year == y_p:
-            for j in range(to_int(r['NbJours'])):
-                d_c = (d_o + timedelta(days=j)).strftime('%d/%m/%Y')
-                if d_c not in occu: occu[d_c] = []
-                occu[d_c].append(r)
-    
-    cal = calendar.monthcalendar(y_p, m_p)
-    # Rendu HTML avec classes compactes
-    h_c = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
-    for w in cal:
-        h_c += '<tr>'
-        for d in w:
-            if d == 0: h_c += '<td style="background:#f9f9f9;"></td>'
-            else:
-                ds = f"{d:02d}/{m_p:02d}/{y_p}"
-                dat = occu.get(ds, [])
-                bg = "white"
-                color = "black"
-                if dat:
-                    if any("CMN" in str(x['Société']).upper() for x in dat): bg = "#3498db"; color = "white"
-                    elif any("🟢" in str(x['Statut']) for x in dat): bg = "#2ecc71"; color = "white"
-                    else: bg = "#f1c40f"; color = "black"
-                h_c += f'<td style="background:{bg}; color:{color};">{d}</td>'
-        h_c += '</tr>'
-    st.markdown(h_c + '</table>', unsafe_allow_html=True)
-    st.info("Bleu: CMN | Vert: OK | Jaune: Attente")
+# --- PAGES ---
 
-# --- PAGE LISTE (CONSERVÉE) ---
-elif st.session_state.page == "LISTE":
+if st.session_state.page == "LISTE":
     c_fut, c_arc = st.columns(2)
     with c_fut:
         if st.button("🚀 PROCHAINES", use_container_width=True): st.session_state.view_mode = "FUTUR"; st.rerun()
-        if st.session_state.view_mode == "FUTUR": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(1) button { border: 2px solid #e74c3c !important; color: #e74c3c !important; }</style>', unsafe_allow_html=True)
+        if st.session_state.view_mode == "FUTUR": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(1) > div > div > button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
     with c_arc:
         if st.button("📂 ARCHIVES", use_container_width=True): st.session_state.view_mode = "ARCHIVES"; st.rerun()
-        if st.session_state.view_mode == "ARCHIVES": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(2) button { border: 2px solid #e74c3c !important; color: #e74c3c !important; }</style>', unsafe_allow_html=True)
+        if st.session_state.view_mode == "ARCHIVES": st.markdown('<style>div[data-testid="stColumn"]:nth-of-type(2) > div > div > button { background-color: #e74c3c !important; color: white !important; }</style>', unsafe_allow_html=True)
     
-    c_search, c_add = st.columns([3, 1])
-    search = c_search.text_input("🔍 Rechercher...", value="").upper()
-    if c_add.button("➕ NEW", use_container_width=True): st.session_state.edit_idx = None; st.session_state.page = "FORM"; st.rerun()
+    search = st.text_input("🔍 Rechercher...", value="").upper()
+    if st.button("➕ NOUVELLE FICHE", use_container_width=True):
+        st.session_state.edit_idx = None; st.session_state.page = "FORM"; st.rerun()
     
     df['dt_obj'] = df['DateNav'].apply(parse_date)
     auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -198,23 +157,48 @@ elif st.session_state.page == "LISTE":
     for i, r in data.iterrows():
         cl = "cmn-style" if "CMN" in str(r['Société']).upper() else ("status-ok" if "🟢" in str(r['Statut']) else "status-attente")
         st.markdown(f'<div class="client-card {cl}"><div style="float:right; font-weight:bold;">{r["PrixJour"]}€</div><b>{r["Prénom"]} {r["Nom"]}</b><br><span style="color:#d35400; font-weight:bold; font-size:0.8rem;">🏢 {r["Société"]}</span><div class="contact-bar"><a href="tel:{r["Téléphone"]}">📞 Appeler</a> <a href="mailto:{r["Email"]}">✉️ Mail</a></div><small>📅 {r["DateNav"]} | {r["Milles"]} NM</small></div>', unsafe_allow_html=True)
-        if st.button(f"✏️ Gérer {r['Prénom']}", key=f"btn_{i}", use_container_width=True): st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
+        st.markdown('<div class="btn-marine">', unsafe_allow_html=True)
+        if st.button(f"✏️ Gérer {r['Prénom']}", key=f"btn_{i}", use_container_width=True):
+            st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# --- AUTRES PAGES ---
+# ... (Le reste du code PLANNING, BUDGET, FRAIS reste identique) ...
+
+elif st.session_state.page == "PLANNING":
+    c1, c2 = st.columns(2)
+    y_p, m_p = c1.selectbox("Année", [2026, 2027, 2028]), c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
+    occu = {}
+    for _, r in df.iterrows():
+        d_o = parse_date(r['DateNav'])
+        if d_o.year == y_p:
+            for j in range(to_int(r['NbJours'])):
+                d_c = (d_o + timedelta(days=j)).strftime('%d/%m/%Y')
+                if d_c not in occu: occu[d_c] = []
+                occu[d_c].append(r)
+    cal = calendar.monthcalendar(y_p, m_p)
+    h_c = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
+    for w in cal:
+        h_c += '<tr>'
+        for d in w:
+            if d == 0: h_c += '<td style="background:#f9f9f9;"></td>'
+            else:
+                ds = f"{d:02d}/{m_p:02d}/{y_p}"
+                dat = occu.get(ds, [])
+                bg, color = "white", "black"
+                if dat:
+                    if any("CMN" in str(x['Société']).upper() for x in dat): bg, color = "#3498db", "white"
+                    elif any("🟢" in str(x['Statut']) for x in dat): bg, color = "#2ecc71", "white"
+                    else: bg, color = "#f1c40f", "black"
+                h_c += f'<td style="background:{bg}; color:{color};">{d}</td>'
+        h_c += '</tr>'
+    st.markdown(h_c + '</table>', unsafe_allow_html=True)
+
 elif st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
     init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols}
     with st.form("f_edit"):
-        f_stat = st.selectbox("STATUT", ["🟡 Attente", "🟢 OK", "🔴 Annulé"], index=["🟡 Attente", "🟢 OK", "🔴 Annulé"].index(init.get("Statut", "🟡 Attente")))
-        f_nom, f_pre = st.text_input("NOM", value=init.get("Nom", "")).upper(), st.text_input("Prénom", value=init.get("Prénom", ""))
-        f_soc = st.text_input("SOCIÉTÉ", value=init.get("Société", "")).upper()
-        f_milles, f_heures = st.number_input("Milles", value=to_float(init.get("Milles", 0))), st.number_input("Heures", value=to_float(init.get("HeuresMoteur", 0)))
-        f_tel, f_mail = st.text_input("Tél", value=init.get("Téléphone", "")), st.text_input("Email", value=init.get("Email", ""))
-        f_date, f_nbj = st.text_input("Date (JJ/MM/AAAA)", value=init.get("DateNav", "")), st.number_input("Jours", value=to_int(init.get("NbJours", 1)))
-        f_prix = st.text_input("Prix Total (€)", value=init.get("PrixJour", ""))
-        if st.form_submit_button("💾 ENREGISTRER"):
-            row = {"DateNav": f_date, "NbJours": str(f_nbj), "Nom": f_nom, "Prénom": f_pre, "Société": f_soc, "Statut": f_stat, "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix, "Milles": str(f_milles), "HeuresMoteur": str(f_heures)}
-            if idx is not None: df.loc[idx] = row
+        f_stat = st.selectbox("STATUT", ["🟡 Attente", "🟢 OK", "🔴 Annulé"], index=["🟡 Attente", "🟢 OK", "🔴
+
 
 
 
