@@ -21,12 +21,6 @@ st.markdown("""
         color: #2f3640; font-weight: bold; font-size: 0.9rem;
     }
     
-    /* Sous-Menu Archives/Futur */
-    .sub-menu-btn button {
-        height: 40px !important;
-        font-size: 0.8rem !important;
-    }
-
     /* Cartes Clients */
     .client-card {
         background-color: #ffffff; padding: 15px; border-radius: 12px; 
@@ -87,14 +81,12 @@ def to_int(v):
     try: return int(float(str(v)))
     except: return 0
 def parse_date(d):
-    try:
-        return datetime.strptime(str(d).strip().replace("-", "/"), '%d/%m/%Y')
-    except:
-        return datetime(2000, 1, 1)
+    try: return datetime.strptime(str(d).strip().replace("-", "/"), '%d/%m/%Y')
+    except: return datetime(2000, 1, 1)
 
 # --- INITIALISATION ---
 if "page" not in st.session_state: st.session_state.page = "LISTE"
-if "view_mode" not in st.session_state: st.session_state.view_mode = "FUTUR" # Mode par défaut
+if "view_mode" not in st.session_state: st.session_state.view_mode = "FUTUR"
 if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
 if "auth" not in st.session_state: st.session_state.auth = False
 
@@ -122,64 +114,9 @@ if m4.button("🔧\nFrais", use_container_width=True, type="primary" if st.sessi
     st.session_state.page = "FRAIS"; st.rerun()
 st.markdown("---")
 
-# --- PAGE LISTE AVEC SOUS-MENU ---
-if st.session_state.page == "LISTE":
-    # Sous-menu ARCHIVES / FUTUR
-    c_fut, c_arc = st.columns(2)
-    if c_fut.button("🚀 PROCHAINES", use_container_width=True, type="primary" if st.session_state.view_mode == "FUTUR" else "secondary"):
-        st.session_state.view_mode = "FUTUR"; st.rerun()
-    if c_arc.button("📂 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_mode == "ARCHIVES" else "secondary"):
-        st.session_state.view_mode = "ARCHIVES"; st.rerun()
+# --- LOGIQUE DES PAGES ---
 
-    # Barre de recherche et Nouveau
-    c_search, c_add = st.columns([3, 1])
-    search = c_search.text_input("🔍 Rechercher...", value="").upper()
-    if c_add.button("➕ NEW", use_container_width=True):
-        st.session_state.edit_idx = None; st.session_state.page = "FORM"; st.rerun()
-    
-    df['dt_obj'] = df['DateNav'].apply(parse_date)
-    auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    # Filtrage
-    mask = df['Nom'].str.contains(search, na=False, case=False) | df['Société'].str.contains(search, na=False, case=False)
-    df_f = df[mask].copy()
-
-    if st.session_state.view_mode == "FUTUR":
-        data_to_show = df_f[df_f['dt_obj'] >= auj].sort_values('dt_obj', ascending=True)
-        titre_section = "🚀 NAVIGATIONS À VENIR"
-    else:
-        data_to_show = df_f[df_f['dt_obj'] < auj].sort_values('dt_obj', ascending=False)
-        titre_section = "📂 HISTORIQUE / ARCHIVES"
-
-    st.markdown(f'<div class="section-header">{titre_section}</div>', unsafe_allow_html=True)
-
-    if data_to_show.empty:
-        st.info("Aucune fiche trouvée.")
-    else:
-        for i, r in data_to_show.iterrows():
-            cl_style = ""
-            if "CMN" in str(r['Société']).upper(): cl_style = "cmn-style"
-            elif "🟢" in str(r['Statut']): cl_style = "status-ok"
-            elif "🟡" in str(r['Statut']): cl_style = "status-attente"
-            
-            st.markdown(f"""
-                <div class="client-card {cl_style}">
-                    <div style="float:right; font-weight:bold;">{r["PrixJour"]}€</div>
-                    <b>{r["Prénom"]} {r["Nom"]}</b><br>
-                    <span style="color:#d35400; font-weight:bold; font-size:0.85rem;">🏢 {r["Société"]}</span>
-                    <div class="contact-bar">
-                        <a href="tel:{r["Téléphone"]}">📞 Appeler</a> 
-                        <a href="mailto:{r["Email"]}">✉️ Mail</a>
-                    </div>
-                    <small>📅 {r["DateNav"]} | 🚢 {r["Milles"]} NM | ⚙️ {r["HeuresMoteur"]}h</small>
-                </div>
-            """, unsafe_allow_html=True)
-            if st.button(f"✏️ Gérer {r['Prénom']}", key=f"btn_{i}", use_container_width=True):
-                st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
-
-# --- AUTRES PAGES (FORM, PLAN, BUDGET, FRAIS) ---
-# [Le reste du code reste identique pour assurer la stabilité des fonctions Plan et Stats]
-elif st.session_state.page == "FORM":
+if st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
     init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols}
     st.subheader("📝 Fiche Client")
@@ -207,10 +144,39 @@ elif st.session_state.page == "FORM":
                 df = df.drop(idx).reset_index(drop=True); sauvegarder_data(df); st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 Retour"): st.session_state.page = "LISTE"; st.rerun()
 
+elif st.session_state.page == "LISTE":
+    c_fut, c_arc = st.columns(2)
+    if c_fut.button("🚀 PROCHAINES", use_container_width=True, type="primary" if st.session_state.view_mode == "FUTUR" else "secondary"):
+        st.session_state.view_mode = "FUTUR"; st.rerun()
+    if c_arc.button("📂 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_mode == "ARCHIVES" else "secondary"):
+        st.session_state.view_mode = "ARCHIVES"; st.rerun()
+    
+    c_search, c_add = st.columns([3, 1])
+    search = c_search.text_input("🔍 Rechercher...", value="").upper()
+    if c_add.button("➕ NEW", use_container_width=True):
+        st.session_state.edit_idx = None; st.session_state.page = "FORM"; st.rerun()
+    
+    df['dt_obj'] = df['DateNav'].apply(parse_date)
+    auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    mask = df['Nom'].str.contains(search, na=False, case=False) | df['Société'].str.contains(search, na=False, case=False)
+    df_f = df[mask].copy()
+
+    if st.session_state.view_mode == "FUTUR":
+        data = df_f[df_f['dt_obj'] >= auj].sort_values('dt_obj', ascending=True)
+        st.markdown('<div class="section-header">🚀 NAVIGATIONS À VENIR</div>', unsafe_allow_html=True)
+    else:
+        data = df_f[df_f['dt_obj'] < auj].sort_values('dt_obj', ascending=False)
+        st.markdown('<div class="section-header">📂 HISTORIQUE / ARCHIVES</div>', unsafe_allow_html=True)
+
+    for i, r in data.iterrows():
+        cl = "cmn-style" if "CMN" in str(r['Société']).upper() else ("status-ok" if "🟢" in str(r['Statut']) else "status-attente")
+        st.markdown(f'<div class="client-card {cl}"><div style="float:right; font-weight:bold;">{r["PrixJour"]}€</div><b>{r["Prénom"]} {r["Nom"]}</b><br><span style="color:#d35400; font-weight:bold; font-size:0.85rem;">🏢 {r["Société"]}</span><div class="contact-bar"><a href="tel:{r["Téléphone"]}">📞 Appeler</a> <a href="mailto:{r["Email"]}">✉️ Mail</a></div><small>📅 {r["DateNav"]} | 🚢 {r["Milles"]} NM | ⚙️ {r["HeuresMoteur"]}h</small></div>', unsafe_allow_html=True)
+        if st.button(f"✏️ Gérer {r['Prénom']}", key=f"btn_{i}", use_container_width=True):
+            st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
+
 elif st.session_state.page == "PLAN":
     c1, c2 = st.columns(2)
-    y_p = c1.selectbox("Année", [2026, 2027, 2028])
-    m_p = c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
+    y_p, m_p = c1.selectbox("Année", [2026, 2027, 2028]), c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
     occu = {}
     for _, r in df.iterrows():
         d_o = parse_date(r['DateNav'])
@@ -229,14 +195,34 @@ elif st.session_state.page == "PLAN":
                 ds = f"{d:02d}/{m_p:02d}/{y_p}"
                 dat = occu.get(ds, [])
                 bg = "white"
-                txt = "black"
                 if dat:
-                    if any("CMN" in str(x['Société']).upper() for x in dat): bg = "#3498db"; txt = "white"
-                    elif any("🟢" in str(x['Statut']) for x in dat): bg = "#2ecc71"; txt = "white"
-                    else: bg = "#f1c40f"; txt = "black"
-                h_c += f'<td style="background:{bg}; color:{txt};">{d}</td>'
+                    bg = "#3498db" if any("CMN" in str(x['Société']).upper() for x in dat) else ("#2ecc71" if any("🟢" in str(x['Statut']) for x in dat) else "#f1c40f")
+                h_c += f'<td style="background:{bg};">{d}</td>'
         h_c += '</tr>'
-    st.markdown(h_
+    st.markdown(h_c + '</table>', unsafe_allow_html=True)
+
+elif st.session_state.page == "BUDGET":
+    y_b = st.selectbox("Année", [2026, 2027, 2028])
+    df['dt'] = df['DateNav'].apply(parse_date)
+    df_y = df[(df['dt'].dt.year == y_b) & (df['Statut'].str.contains("🟢"))]
+    ht = '<table class="cal-table"><tr><th>Mois</th><th>Jours</th><th>Milles</th><th>CA (€)</th></tr>'
+    for i, m in enumerate(["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"], 1):
+        df_m = df_y[df_y['dt'].dt.month == i]
+        if not df_m.empty:
+            ht += f'<tr><td>{m}</td><td>{sum(df_m["NbJours"].apply(to_int))}j</td><td>{sum(df_m["Milles"].apply(to_float)):,.0f}</td><td>{sum(df_m["PrixJour"].apply(to_float)):,.0f}€</td></tr>'
+    st.markdown(ht + '</table>', unsafe_allow_html=True)
+
+elif st.session_state.page == "FRAIS":
+    with st.form("f"):
+        d, t, m = st.text_input("Date"), st.selectbox("Type", ["Moteur", "Entretien", "Divers"]), st.number_input("Montant", 0.0)
+        if st.form_submit_button("OK"):
+            new_f = pd.DataFrame([{"Date": d, "Type": t, "Montant": m, "Annee": parse_date(d).year}])
+            df_frais = pd.concat([df_frais, new_f], ignore_index=True)
+            sauvegarder_data(df_frais, "frais.json"); st.rerun()
+    for i, r in df_frais.iterrows():
+        st.write(f"{r['Date']} - {r['Type']} : {r['Montant']}€")
+        if st.button("Suppr", key=f"f_{i}"):
+            df_frais = df_frais.drop(i); sauvegarder_data(df_frais, "frais.json"); st.rerun()
 
 
 
