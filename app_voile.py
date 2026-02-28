@@ -25,6 +25,15 @@ st.markdown("""
         border-radius: 8px; height: 50px; font-size: 0.7rem !important; font-weight: bold;
     }
     
+    /* Boutons de contact rapides */
+    .contact-btn {
+        display: inline-block; padding: 8px 12px; border-radius: 5px;
+        text-decoration: none; font-size: 0.8rem; font-weight: bold;
+        text-align: center; margin-right: 5px; margin-top: 5px;
+    }
+    .btn-tel { background-color: #2ecc71; color: white !important; }
+    .btn-mail { background-color: #3498db; color: white !important; }
+    
     .client-card { background: white; padding: 10px; border-radius: 8px; margin-bottom: 5px; border: 1px solid #ddd; border-left: 8px solid #ccc; }
     .cmn-style { border-left-color: #3498db !important; background-color: #f0f7ff !important; }
     .status-ok { border-left-color: #2ecc71 !important; }
@@ -34,9 +43,6 @@ st.markdown("""
     .cal-table td { border: 1px solid #eee; height: 40px; text-align: center; font-size: 0.8rem; font-weight: bold; }
     
     .recap-box { background: #f1f2f6; padding: 10px; border-radius: 8px; border: 1px solid #dfe4ea; margin-bottom: 15px; }
-    
-    /* Style pour les boutons radio horizontaux (segmentés) */
-    div[data-testid="stMarkdownContainer"] > p { font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -112,7 +118,7 @@ with m4:
 
 st.markdown("---")
 
-# --- LOGIQUE DES PAGES ---
+# --- PAGES ---
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 GESTION DES FICHES</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
@@ -132,7 +138,22 @@ if st.session_state.page == "LISTE":
     
     for i, r in data.iterrows():
         cl = "cmn-style" if "CMN" in str(r.get('Société','')).upper() else ("status-ok" if "🟢" in str(r.get('Statut','')) else "status-attente")
-        st.markdown(f'<div class="client-card {cl}"><div style="float:right; font-weight:bold;">{to_float(r.get("PrixJour",0)):.2f}€</div><b>{r.get("Prénom","")} {r.get("Nom","")}</b><br><small>🏢 {r.get("Société","")} | 📅 {r.get("DateNav","")}<br>⚓ {r.get("Milles",0)} NM | ⏱️ {r.get("HeuresMoteur",0)}h</small></div>', unsafe_allow_html=True)
+        tel = str(r.get('Téléphone', '')).replace(' ', '')
+        mail = str(r.get('Email', ''))
+        
+        # Affichage Carte
+        st.markdown(f'''
+            <div class="client-card {cl}">
+                <div style="float:right; font-weight:bold;">{to_float(r.get("PrixJour",0)):.2f}€</div>
+                <b>{r.get("Prénom","")} {r.get("Nom","")}</b><br>
+                <small>🏢 {r.get("Société","")} | 📅 {r.get("DateNav","")}</small><br>
+                <div style="margin-top:5px;">
+                    {"<a href='tel:"+tel+"' class='contact-btn btn-tel'>📞 APPELER</a>" if tel else ""}
+                    {"<a href='mailto:"+mail+"' class='contact-btn btn-mail'>✉️ EMAIL</a>" if mail else ""}
+                </div>
+            </div>
+        ''', unsafe_allow_html=True)
+        
         c1, c2 = st.columns(2)
         if c1.button("✏️ Gérer", key=f"ed_{i}", use_container_width=True):
             st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
@@ -168,19 +189,14 @@ elif st.session_state.page == "PLANNING":
     st.markdown(h_c + '</table>', unsafe_allow_html=True)
     
     st.markdown("---")
-    
     jours_nav = sorted([int(k.split('/')[0]) for k in occu.keys() if f"/{st.session_state.cal_month:02d}" in k])
     if jours_nav:
         st.write("📍 **Toucher un jour de navigation :**")
-        # Sélection par boutons radio (pas de clavier sur iPhone)
         sel_d = st.radio("Jours :", jours_nav, horizontal=True, label_visibility="collapsed")
-        
         if sel_d:
             ds_sel = f"{sel_d:02d}/{st.session_state.cal_month:02d}/{st.session_state.cal_year}"
             for res in occu.get(ds_sel, []):
-                st.info(f"👤 **{res.get('Prénom')} {res.get('Nom')}**\n🏢 {res.get('Société')}\n⏱️ {res.get('HeuresMoteur')}h | ⚓ {res.get('Milles')} NM")
-    else:
-        st.write("Aucune navigation enregistrée ce mois-ci.")
+                st.info(f"👤 **{res.get('Prénom')} {res.get('Nom')}**\n🏢 {res.get('Société')}")
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATISTIQUES</div>', unsafe_allow_html=True)
@@ -191,12 +207,12 @@ elif st.session_state.page == "BUDGET":
     st.markdown(f'<div class="recap-box">CA: {total_ca:.2f}€ | Frais: -{total_frais:.2f}€<hr><b>NET: {(total_ca - total_frais):.2f}€</b></div>', unsafe_allow_html=True)
     
     mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Août", "Sept", "Oct", "Nov", "Déc"]
-    h_t = '<table class="cal-table"><thead><tr><th>Mois</th><th>Jours</th><th>NM</th><th>CA €</th></tr></thead><tbody>'
+    h_t = '<table class="cal-table"><tr><th>Mois</th><th>Jours</th><th>CA €</th></tr>'
     for i, m_nom in enumerate(mois_noms, 1):
         df_m = df_ok[df_ok['dt_obj'].dt.month == i]
         if not df_m.empty:
-            h_t += f"<tr><td>{m_nom}</td><td>{sum(df_m['NbJours'].apply(to_int))}</td><td>{sum(df_m['Milles'].apply(to_float)):.1f}</td><td>{sum(df_m['PrixJour'].apply(to_float)):.2f}</td></tr>"
-    st.markdown(h_t + '</tbody></table>', unsafe_allow_html=True)
+            h_t += f"<tr><td>{m_nom}</td><td>{sum(df_m['NbJours'].apply(to_int))}</td><td>{sum(df_m['PrixJour'].apply(to_float)):.2f}</td></tr>"
+    st.markdown(h_t + '</table>', unsafe_allow_html=True)
 
 elif st.session_state.page == "FRAIS":
     st.markdown('<div class="page-title">🔧 MAINTENANCE</div>', unsafe_allow_html=True)
@@ -208,11 +224,8 @@ elif st.session_state.page == "FRAIS":
             nf = pd.DataFrame([{"Date": d, "Type": t, "Montant": m.replace(",", ".")}])
             df_frais = pd.concat([df_frais, nf], ignore_index=True)
             sauvegarder_data(df_frais, "frais.json"); st.rerun()
-    
     for i, r in df_frais.iloc[::-1].iterrows():
-        st.write(f"**{r['Date']}** | {r['Type']} | **{to_float(r['Montant']):.2f}€**")
-        if st.button("🗑️", key=f"dfr_{i}"):
-            df_frais = df_frais.drop(i); sauvegarder_data(df_frais, "frais.json"); st.rerun()
+        st.write(f"**{r['Date']}** | {to_float(r['Montant']):.2f}€")
 
 elif st.session_state.page == "FORM":
     st.markdown('<div class="page-title">📝 FICHE DÉTAILLÉE</div>', unsafe_allow_html=True)
@@ -221,20 +234,18 @@ elif st.session_state.page == "FORM":
     with st.form("edit"):
         f_nom = st.text_input("NOM", init.get("Nom", "")).upper()
         f_pre = st.text_input("Prénom", init.get("Prénom", ""))
+        f_tel = st.text_input("Téléphone", init.get("Téléphone", ""))
+        f_mail = st.text_input("Email", init.get("Email", ""))
         f_soc = st.text_input("SOCIÉTÉ", init.get("Société", "")).upper()
         f_dat = st.text_input("Date (JJ/MM/AAAA)", init.get("DateNav", ""))
-        f_nbj = st.number_input("Nombre de jours", 1, 30, to_int(init.get("NbJours", 1)))
         f_prix = st.text_input("Prix Total (€)", str(init.get("PrixJour", "0")).replace(",", "."))
-        f_mi = st.number_input("Milles", value=to_float(init.get("Milles", 0)))
-        f_he = st.number_input("Heures", value=to_float(init.get("HeuresMoteur", 0)))
-        f_st = st.selectbox("Statut", ["🟢 OK", "🟡 Attente", "🔴 Annulé"], index=0 if "🟢" in str(init.get("Statut","")) else 1)
-        
         if st.form_submit_button("💾 ENREGISTRER"):
-            row = {"Nom": f_nom, "Prénom": f_pre, "Société": f_soc, "DateNav": f_dat, "NbJours": str(f_nbj), "PrixJour": f_prix, "Milles": str(f_mi), "HeuresMoteur": str(f_he), "Statut": f_st}
+            row = {"Nom": f_nom, "Prénom": f_pre, "Téléphone": f_tel, "Email": f_mail, "Société": f_soc, "DateNav": f_dat, "NbJours": str(init.get("NbJours",1)), "PrixJour": f_prix, "Milles": str(init.get("Milles",0)), "HeuresMoteur": str(init.get("HeuresMoteur",0)), "Statut": init.get("Statut", "🟢 OK")}
             if idx is not None: df.loc[idx] = row
             else: df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
             sauvegarder_data(df); st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 Retour"): st.session_state.page = "LISTE"; st.rerun()
+
 
 
 
