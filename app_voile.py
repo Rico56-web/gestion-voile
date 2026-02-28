@@ -24,7 +24,6 @@ st.markdown("""
     }
     .status-ok { border-left-color: #2ecc71 !important; }
     .status-attente { border-left-color: #f1c40f !important; }
-    .contact-bar { margin: 10px 0; }
     .contact-bar a { 
         text-decoration: none; color: #2980b9; background: #f1f7fa; 
         padding: 8px 12px; border-radius: 8px; display: inline-block; 
@@ -107,47 +106,52 @@ if m4.button("🔧\nFrais", use_container_width=True, type="primary" if st.sessi
     st.session_state.page = "FRAIS"; st.rerun()
 st.markdown("---")
 
-# --- LOGIQUE AFFICHAGE ---
-
-# PAGE FORMULAIRE
+# --- PAGE FORMULAIRE (MODIFICATION / SUPPRESSION) ---
 if st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
     init = df.loc[idx].to_dict() if idx is not None else {c: "" for c in cols_attendues}
-    st.subheader("📝 Modification" if idx is not None else "➕ Nouveau")
+    
+    st.subheader("📝 Modifier" if idx is not None else "➕ Nouveau")
     with st.form("f_edit"):
         f_stat = st.selectbox("STATUT", ["🟡 Attente", "🟢 OK", "🔴 Annulé"], index=["🟡 Attente", "🟢 OK", "🔴 Annulé"].index(init.get("Statut", "🟡 Attente")))
         f_nom = st.text_input("NOM", value=init.get("Nom", "")).upper()
         f_pre = st.text_input("Prénom", value=init.get("Prénom", ""))
         f_soc = st.text_input("SOCIÉTÉ", value=init.get("Société", "")).upper()
+        
         c_a, c_b = st.columns(2)
         f_milles = c_a.number_input("Milles", value=to_float(init.get("Milles", 0)))
         f_heures = c_b.number_input("Moteur (h)", value=to_float(init.get("HeuresMoteur", 0)))
+        
         f_tel = st.text_input("Téléphone", value=init.get("Téléphone", ""))
         f_mail = st.text_input("Email", value=init.get("Email", ""))
         f_date = st.text_input("Date (JJ/MM/AAAA)", value=init.get("DateNav", ""))
         f_nbj = st.number_input("Jours", value=to_int(init.get("NbJours", 1)))
         f_prix = st.text_input("Prix Total (€)", value=init.get("PrixJour", ""))
+        
         if st.form_submit_button("💾 ENREGISTRER"):
             row = {"DateNav": f_date, "NbJours": str(f_nbj), "Nom": f_nom, "Prénom": f_pre, "Société": f_soc, "Statut": f_stat, "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix, "Milles": str(f_milles), "HeuresMoteur": str(f_heures)}
             if idx is not None: df.loc[idx] = row
             else: df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
             sauvegarder_data(df); st.session_state.page = "LISTE"; st.session_state.edit_idx = None; st.rerun()
-    if st.button("🔙 Annuler"): st.session_state.page = "LISTE"; st.session_state.edit_idx = None; st.rerun()
 
-# PAGE LISTE
-elif st.session_state.page == "LISTE":
-    c_search, c_add = st.columns([2, 1])
-    search = c_search.text_input("🔍 Rechercher...", placeholder="Nom ou Société").upper()
-    if c_add.button("➕ NEW", use_container_width=True):
-        st.session_state.edit_idx = None; st.session_state.page = "FORM"; st.rerun()
+    # --- ZONE DE SUPPRESSION (SEULEMENT EN MODIFICATION) ---
+    if idx is not None:
+        st.markdown("---")
+        with st.expander("⚠️ ZONE DE DANGER"):
+            st.write("Voulez-vous supprimer définitivement cette fiche ?")
+            if st.button("🗑️ SUPPRIMER LA FICHE", use_container_width=True):
+                df = df.drop(idx).reset_index(drop=True)
+                sauvegarder_data(df)
+                st.session_state.page = "LISTE"; st.session_state.edit_idx = None; st.rerun()
     
+    if st.button("🔙 Retour"): st.session_state.page = "LISTE"; st.session_state.edit_idx = None; st.rerun()
+
+# --- PAGE LISTE (ORDRE CHRONO) ---
+elif st.session_state.page == "LISTE":
+    # (Même code que le précédent avec le tri futur/passé)
     df['dt_parsed'] = df['DateNav'].apply(parse_date)
     auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    # Filtrage par recherche
-    df_f = df[df['Nom'].str.contains(search, na=False, case=False) | df['Société'].str.contains(search, na=False, case=False)] if search else df
-    
-    # Division en deux groupes : Futur (tri croissant) et Passé (tri décroissant)
+    df_f = df.copy()
     futur = df_f[df_f['dt_parsed'] >= auj].sort_values('dt_parsed', ascending=True)
     passe = df_f[df_f['dt_parsed'] < auj].sort_values('dt_parsed', ascending=False)
 
@@ -161,24 +165,15 @@ elif st.session_state.page == "LISTE":
                         <div style="float:right; font-weight:bold;">{r["PrixJour"]}€</div>
                         <div style="font-size:1.1rem;"><b>{r["Prénom"]} {r["Nom"]}</b></div>
                         <div style="color:#d35400; font-weight:bold; font-size:0.85rem;">🏢 {r['Société'] if r['Société'] else "Particulier"}</div>
-                        <div class="contact-bar">
-                            <a href="tel:{str(r['Téléphone']).replace(' ','')}">📞 Appeler</a>
-                            <a href="mailto:{r['Email']}">✉️ Mail</a>
-                        </div>
-                        <div style="font-size:0.8rem; color:#7f8c8d;">
-                            📅 {r["DateNav"]} ({r["NbJours"]}j) | 🚢 {r.get('Milles', 0)} NM | ⚙️ {r.get('HeuresMoteur', 0)}h
+                        <div style="font-size:0.8rem; color:#7f8c8d; margin-top:5px;">
+                            📅 {r["DateNav"]} | 🚢 {r.get('Milles', 0)} NM | ⚙️ {r.get('HeuresMoteur', 0)}h
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
                 if st.button(f"✏️ Gérer {r['Prénom']}", key=f"z_{idx}", use_container_width=True):
-                    st.session_state.edit_idx = idx
-                    st.session_state.page = "FORM"
-                    st.rerun()
-
+                    st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
     rendu_liste(futur, "🚀 PROCHAINES SORTIES")
-    rendu_liste(passe, "📂 ARCHIVES ET PASSÉ")
-
-# (PLAN, BUDGET, FRAIS restent identiques...)
+    rendu_liste(passe, "📂 ARCHIVES")
 
 
 
