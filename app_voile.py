@@ -9,7 +9,7 @@ import calendar
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper", layout="wide")
 
-# --- STYLE CSS (OPTIMISÉ ANTI-CLAVIER) ---
+# --- STYLE CSS (OPTIMISÉ IPHONE) ---
 st.markdown("""
     <style>
     .main-title { text-align: center; color: #2c3e50; margin-bottom: 10px; font-family: sans-serif; font-size: 1.3rem; }
@@ -39,16 +39,15 @@ st.markdown("""
     .day-wrapper { display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; }
     .day-num { font-weight: bold; font-size: 0.85rem; white-space: nowrap; letter-spacing: -0.5px; line-height: 1; }
 
-    /* Style pour la liste auto sous le calendrier */
     .detail-item {
-        padding: 6px 10px;
-        border-bottom: 1px solid #eee;
-        font-size: 0.85rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        padding: 6px 10px; border-bottom: 1px solid #eee;
+        font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;
     }
     .detail-date { font-weight: bold; color: #2c3e50; min-width: 35px; }
+
+    /* Style Budget */
+    .budget-row { padding: 8px; border-bottom: 1px solid #eee; font-size: 0.8rem; }
+    .total-row { background: #2c3e50; color: white; padding: 10px; border-radius: 5px; margin-top: 10px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -117,16 +116,17 @@ if not st.session_state.auth:
         st.rerun()
     st.stop()
 
-# --- CHARGEMENT ---
+# --- DATA ---
 df = charger_data()
 cols_v = ["DateNav", "NbJours", "Statut", "Nom", "Prénom", "Société", "Téléphone", "Email", "PrixJour", "Passagers", "Historique"]
 for c in cols_v:
     if c not in df.columns: df[c] = ""
 
-# --- MENU ---
-m1, m2 = st.columns(2)
-if m1.button("📋 COÉQUIPIERS", use_container_width=True): st.session_state.page = "LISTE"; st.rerun()
-if m2.button("🗓️ PLANNING", use_container_width=True): st.session_state.page = "PLAN"; st.rerun()
+# --- MENU PRINCIPAL ---
+m1, m2, m3 = st.columns(3)
+if m1.button("📋 LISTE", use_container_width=True): st.session_state.page = "LISTE"; st.rerun()
+if m2.button("🗓️ PLAN", use_container_width=True): st.session_state.page = "PLAN"; st.rerun()
+if m3.button("💰 BUDGET", use_container_width=True): st.session_state.page = "BUDGET"; st.rerun()
 st.markdown("---")
 
 # --- PAGE LISTE ---
@@ -153,7 +153,7 @@ if st.session_state.page == "LISTE":
     with t1: afficher_cartes(df_base[df_base['dt'] >= auj])
     with t2: afficher_cartes(df_base[df_base['dt'] < auj], inverse=True)
 
-# --- PAGE PLANNING (VERSION LISTE AUTO SANS CLAVIER) ---
+# --- PAGE PLANNING ---
 elif st.session_state.page == "PLAN":
     m_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     jours_lettres = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
@@ -163,7 +163,7 @@ elif st.session_state.page == "PLAN":
     c2.markdown(f"<h4 style='text-align:center; margin:0;'>{m_fr[st.session_state.m_idx-1]} 2026</h4>", unsafe_allow_html=True)
     if c3.button("▶️"): st.session_state.m_idx = 1 if st.session_state.m_idx == 12 else st.session_state.m_idx + 1; st.rerun()
 
-    # Finances
+    # Finances Mois Courant
     ca_ok, ca_att = 0.0, 0.0
     for _, r in df.iterrows():
         dt = parse_date(r['DateNav'])
@@ -185,14 +185,12 @@ elif st.session_state.page == "PLAN":
     html_cal = '<table class="cal-table"><tr>'
     for j in jours_lettres: html_cal += f'<th>{j}</th>'
     html_cal += '</tr>'
-
     for week in cal:
         html_cal += '<tr>'
         for day in week:
             if day == 0: html_cal += '<td style="background:#fafafa;"></td>'
             else:
-                d_s = f"{day:02d}/{st.session_state.m_idx:02d}/2026"
-                day_str = f"{day:02d}"
+                d_s, day_str = f"{day:02d}/{st.session_state.m_idx:02d}/2026", f"{day:02d}"
                 data_j = occu.get(d_s, [])
                 bg, col = "white", "black"
                 if data_j:
@@ -203,27 +201,71 @@ elif st.session_state.page == "PLAN":
         html_cal += '</tr>'
     st.markdown(html_cal + '</table>', unsafe_allow_html=True)
 
-    # --- LISTE AUTOMATIQUE DES DÉTAILS (ZÉRO CLAVIER) ---
+    # Liste automatique du mois
     st.markdown("---")
-    st.markdown("<h5 style='font-size:0.9rem; margin-bottom:10px;'>📅 Programme du mois :</h5>", unsafe_allow_html=True)
-    
     jours_occupes = sorted([d for d in occu.keys() if int(d.split('/')[1]) == st.session_state.m_idx], key=lambda x: int(x.split('/')[0]))
-    
-    if not jours_occupes:
-        st.write("Aucune sortie ce mois-ci.")
+    if not jours_occupes: st.write("Aucune sortie ce mois-ci.")
     else:
-        # On affiche chaque jour occupé sous forme de petite ligne élégante
         for jour in jours_occupes:
-            jour_court = jour.split('/')[0] # On ne garde que le "05" de "05/03/2026"
             for x in occu[jour]:
                 symbole = "🔵" if x['Société'] == "CMN" else ("🟢" if "🟢" in x['Statut'] else "🟡")
-                st.markdown(f'''
-                    <div class="detail-item">
-                        <span class="detail-date">{jour_court}</span>
-                        <span style="flex-grow:1; margin-left:10px;">{symbole} {x['Prénom']} {x['Nom']}</span>
-                        <span style="color:#7f8c8d; font-size:0.75rem;">{x['Société'] if x['Société'] else '-'}</span>
-                    </div>
-                ''', unsafe_allow_html=True)
+                st.markdown(f'<div class="detail-item"><span class="detail-date">{jour.split("/")[0]}</span><span style="flex-grow:1; margin-left:10px;">{symbole} {x["Prénom"]} {x["Nom"]}</span><span style="color:#7f8c8d; font-size:0.7rem;">{x["Société"]}</span></div>', unsafe_allow_html=True)
+
+# --- PAGE BUDGET (NOUVEAU) ---
+elif st.session_state.page == "BUDGET":
+    st.markdown("<h4 style='text-align:center;'>💰 Récapitulatif 2026</h4>", unsafe_allow_html=True)
+    m_fr = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"]
+    
+    total_an_ok, total_an_att = 0.0, 0.0
+    
+    # Header du tableau budget
+    st.markdown("""
+        <div style="display:flex; font-weight:bold; background:#f8f9fa; padding:10px; border-radius:5px; font-size:0.75rem; margin-bottom:5px;">
+            <div style="flex:1;">MOIS</div>
+            <div style="flex:1; text-align:right; color:#2ecc71;">ENCAISSÉ</div>
+            <div style="flex:1; text-align:right; color:#f1c40f;">ATTENTE</div>
+            <div style="flex:1; text-align:right;">TOTAL</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    for i in range(1, 13):
+        m_ok, m_att = 0.0, 0.0
+        for _, r in df.iterrows():
+            dt = parse_date(r['DateNav'])
+            if dt.month == i and dt.year == 2026:
+                p = to_float(r['PrixJour'])
+                if "🟢" in str(r['Statut']): m_ok += p
+                elif "🟡" in str(r['Statut']): m_att += p
+        
+        total_an_ok += m_ok
+        total_an_att += m_att
+        
+        # Affichage de la ligne (si CA > 0)
+        if (m_ok + m_att) > 0:
+            st.markdown(f"""
+                <div class="budget-row" style="display:flex;">
+                    <div style="flex:1; font-weight:bold;">{m_fr[i-1]}</div>
+                    <div style="flex:1; text-align:right;">{m_ok:,.0f}€</div>
+                    <div style="flex:1; text-align:right;">{m_att:,.0f}€</div>
+                    <div style="flex:1; text-align:right; font-weight:bold;">{(m_ok+m_att):,.0f}€</div>
+                </div>
+            """.replace(",", " "), unsafe_allow_html=True)
+
+    # Total Annuel Cumulé
+    st.markdown(f"""
+        <div class="total-row">
+            <div style="display:flex; justify-content:space-between;">
+                <span>TOTAL ANNUEL</span>
+                <span>{(total_an_ok + total_an_att):,.0f} €</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:0.7rem; font-weight:normal; margin-top:5px; color:#bdc3c7;">
+                <span>Cumul Encaissé : {total_an_ok:,.0f} €</span>
+                <span>En attente : {total_an_att:,.0f} €</span>
+            </div>
+        </div>
+    """.replace(",", " "), unsafe_allow_html=True)
+    
+    st.info("💡 Prochainement : Intégration des coûts de maintenance et frais de gestion.")
 
 # --- PAGE FORMULAIRE ---
 elif st.session_state.page == "FORM":
@@ -247,6 +289,7 @@ elif st.session_state.page == "FORM":
             else: df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
             if sauvegarder_data(df): st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 Annuler"): st.session_state.page = "LISTE"; st.rerun()
+
 
 
 
