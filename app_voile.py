@@ -9,10 +9,12 @@ import calendar
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper Pro", layout="wide")
 
-# --- STYLE CSS FINAL ---
+# --- STYLE CSS (Visibilité & Mobile) ---
 st.markdown("""
     <style>
-    .main-title { text-align: center; color: #2c3e50; margin-bottom: 15px; font-size: 1.2rem; font-weight: bold; }
+    .header-container { text-align: center; margin-bottom: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 15px; border: 1px solid #e1e8ed; }
+    .main-title { color: #1a2a6c; margin-bottom: 5px; font-size: 1.5rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+    .today-date { color: #e74c3c; font-size: 1rem; font-weight: 600; }
     
     /* Boutons Menu Principal */
     div.stButton > button {
@@ -21,7 +23,6 @@ st.markdown("""
         color: #2f3640; font-weight: bold; font-size: 0.8rem;
     }
     
-    /* État Actif/Focus pour texte blanc sur rouge */
     div.stButton > button:focus, div.stButton > button:active {
         color: white !important;
     }
@@ -110,8 +111,17 @@ cols = ["DateNav", "NbJours", "Statut", "Nom", "Prénom", "Société", "Téléph
 for c in cols:
     if c not in df.columns: df[c] = ""
 
+# --- TITRE ET DATE DU JOUR ---
+now = datetime.now()
+date_str = now.strftime("%d/%m/%Y")
+st.markdown(f"""
+    <div class="header-container">
+        <div class="main-title">⚓ VESTA SKIPPER</div>
+        <div class="today-date">🗓️ {date_str}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
 # --- MENU PRINCIPAL ---
-st.markdown('<h1 class="main-title">⚓ Vesta Skipper Pro</h1>', unsafe_allow_html=True)
 m1, m2, m3, m4 = st.columns(4)
 
 with m1:
@@ -151,6 +161,7 @@ if st.session_state.page == "LISTE":
     auj = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     df_f = df[df['Nom'].str.contains(search, na=False, case=False) | df['Société'].str.contains(search, na=False, case=False)].copy()
     data = df_f[df_f['dt_obj'] >= auj].sort_values('dt_obj', ascending=True) if st.session_state.view_mode == "FUTUR" else df_f[df_f['dt_obj'] < auj].sort_values('dt_obj', ascending=False)
+    
     st.markdown(f'<div class="section-header">{"🚀 PROCHAINES" if st.session_state.view_mode == "FUTUR" else "📂 ARCHIVES"}</div>', unsafe_allow_html=True)
     for i, r in data.iterrows():
         cl = "cmn-style" if "CMN" in str(r['Société']).upper() else ("status-ok" if "🟢" in str(r['Statut']) else "status-attente")
@@ -214,7 +225,7 @@ elif st.session_state.page == "FORM":
         f_date, f_nbj = st.text_input("Date (JJ/MM/AAAA)", value=init.get("DateNav", "")), st.number_input("Jours", value=to_int(init.get("NbJours", 1)))
         f_prix = st.text_input("Prix Total (€)", value=init.get("PrixJour", ""))
         st.markdown('<div class="btn-marine">', unsafe_allow_html=True)
-        if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
+        if st.form_submit_button("💾 ENREGISTRER LA FICHE", use_container_width=True):
             row = {"DateNav": f_date, "NbJours": str(f_nbj), "Nom": f_nom, "Prénom": f_pre, "Société": f_soc, "Statut": f_stat, "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix, "Milles": str(f_milles), "HeuresMoteur": str(f_heures)}
             if idx is not None: df.loc[idx] = row
             else: df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
@@ -229,16 +240,12 @@ elif st.session_state.page == "FRAIS":
         if st.form_submit_button("VALIDER"):
             new_f = pd.DataFrame([{"Date": d, "Type": t, "Montant": m, "Annee": parse_date(d).year}])
             df_frais = pd.concat([df_frais, new_f], ignore_index=True)
-            sauvegarder_data(df_frais, "frais.json")
-            st.rerun()
+            sauvegarder_data(df_frais, "frais.json"); st.rerun()
     for i, r in df_frais.iterrows():
         st.write(f"{r['Date']} - {r['Type']} : {r['Montant']}€")
-        if st.button("Suppr", key=f"f_{i}"):
+        if st.button("Supprimer", key=f"f_{i}"):
             df_frais = df_frais.drop(i)
-            sauvegarder_data(df_frais, "frais.json")
-            st.rerun()
-
-
+            sauvegarder_data(df_frais, "frais.json"); st.rerun()
 
 
 
