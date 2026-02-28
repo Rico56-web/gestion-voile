@@ -5,16 +5,22 @@ import base64
 import requests
 from datetime import datetime, timedelta
 import calendar
+from streamlit.components.v1 import html
 
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper Pro", layout="wide")
 
+# --- SCRIPT DE REMONTÉE AUTOMATIQUE (JS) ---
+# Ce script force le navigateur à remonter tout en haut (0,0) à chaque refresh
+js_scroll = """
+<script>
+    window.parent.document.querySelector('section.main').scrollTo(0, 0);
+</script>
+"""
+
 # --- STYLE CSS ---
 st.markdown("""
     <style>
-    /* Ancrage pour remontée automatique */
-    #top { margin-bottom: 0px; }
-    
     .header-container { text-align: center; margin-bottom: 15px; padding: 8px; background-color: #f8f9fa; border-radius: 12px; border: 1px solid #e1e8ed; }
     .main-title { color: #1a2a6c; margin-bottom: 2px; font-size: 1.3rem; font-weight: bold; text-transform: uppercase; }
     .today-date { color: #e74c3c; font-size: 0.9rem; font-weight: 600; }
@@ -42,8 +48,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- ANCRAGE HAUT DE PAGE ---
-st.markdown('<div id="top"></div>', unsafe_allow_html=True)
+# Exécution du script de scroll
+html(js_scroll, height=0)
 
 # --- FONCTIONS GITHUB ---
 @st.cache_data(ttl=5)
@@ -229,6 +235,7 @@ elif st.session_state.page == "FRAIS":
         if st.button("Supprimer", key=f"f_{i}"):
             df_frais = df_frais.drop(i)
             sauvegarder_data(df_frais, "frais.json"); st.rerun()
+
 
 
 
