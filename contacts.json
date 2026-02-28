@@ -98,18 +98,18 @@
     {
         "DateNav":"7\/03\/2026",
         "NbJours":"2",
-        "Statut":"🟡 Attente",
+        "Statut":"🟢 OK",
         "Nom":"DUROT ",
         "Prénom":"Céline",
         "Téléphone":"00000000",
         "Email":"",
         "Paye":null,
         "PrixJour":"450",
-        "Passagers":"",
-        "Historique":"",
+        "Passagers":null,
+        "Historique":null,
         "Société":"CMN",
-        "Milles":"0",
-        "HeuresMoteur":"0"
+        "Milles":"0.0",
+        "HeuresMoteur":"0.0"
     },
     {
         "DateNav":"21\/03\/2026",
