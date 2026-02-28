@@ -12,14 +12,11 @@ st.set_page_config(page_title="Vesta Skipper Pro", layout="wide")
 # --- STYLE CSS ---
 st.markdown("""
     <style>
-    /* Point d'ancrage invisible tout en haut */
-    #main-anchor { position: absolute; top: 0; left: 0; height: 0; width: 0; }
-    
     .header-container { text-align: center; margin-bottom: 15px; padding: 8px; background-color: #f8f9fa; border-radius: 12px; border: 1px solid #e1e8ed; }
     .main-title { color: #1a2a6c; margin-bottom: 2px; font-size: 1.3rem; font-weight: bold; text-transform: uppercase; }
     .today-date { color: #e74c3c; font-size: 0.9rem; font-weight: 600; }
     
-    /* Menu Principal */
+    /* Menu Principal compact */
     div.stButton > button { 
         border-radius: 8px; height: 38px; padding: 0px 5px;
         border: 1px solid #dcdde1; background-color: white; 
@@ -41,9 +38,6 @@ st.markdown("""
     .section-header { background: #34495e; padding: 6px; border-radius: 6px; margin-bottom: 8px; color: white; font-weight: bold; text-align: center; font-size: 0.85rem; }
     </style>
     """, unsafe_allow_html=True)
-
-# --- ANCRE DE HAUT DE PAGE ---
-st.markdown('<div id="main-anchor"></div>', unsafe_allow_html=True)
 
 # --- FONCTIONS GITHUB ---
 @st.cache_data(ttl=5)
@@ -109,22 +103,21 @@ for c in cols:
 # --- BANDEAU TITRE ---
 st.markdown(f'<div class="header-container"><div class="main-title">⚓ VESTA SKIPPER</div><div class="today-date">🗓️ {datetime.now().strftime("%d/%m/%Y")}</div></div>', unsafe_allow_html=True)
 
-# --- MENU COMPACT ---
+# --- MENU COMPACT (avec reset scroll via query_params) ---
 m1, m2, m3, m4 = st.columns(4)
-def change_page(p):
+def nav_to(p):
     st.session_state.page = p
-    # Utilisation d'un paramètre d'URL pour forcer le refresh du scroll Safari
-    st.query_params["nav"] = p 
+    st.query_params["p"] = p # Force le navigateur à recharger la vue
     st.rerun()
 
 with m1:
-    if st.button("📋 LISTE", use_container_width=True): change_page("LISTE")
+    if st.button("📋 LISTE", use_container_width=True): nav_to("LISTE")
 with m2:
-    if st.button("🗓️ PLAN", use_container_width=True): change_page("PLANNING")
+    if st.button("🗓️ PLAN", use_container_width=True): nav_to("PLANNING")
 with m3:
-    if st.button("💰 STATS", use_container_width=True): change_page("BUDGET")
+    if st.button("💰 STATS", use_container_width=True): nav_to("BUDGET")
 with m4:
-    if st.button("🔧 FRAIS", use_container_width=True): change_page("FRAIS")
+    if st.button("🔧 FRAIS", use_container_width=True): nav_to("FRAIS")
 
 st.markdown("---")
 
@@ -206,7 +199,35 @@ elif st.session_state.page == "FORM":
         f_nom = st.text_input("NOM", value=str(init.get("Nom", ""))).upper()
         f_pre = st.text_input("Prénom", value=str(init.get("Prénom", "")))
         f_soc = st.text_input("SOCIÉTÉ", value=str(init.get("Société", ""))).upper()
-        f_milles = st.number_input("Milles", value=to_float(init.get("
+        f_milles = st.number_input("Milles", value=to_float(init.get("Milles", 0)))
+        f_heures = st.number_input("Heures Moteur", value=to_float(init.get("HeuresMoteur", 0)))
+        f_tel = st.text_input("Tél", value=str(init.get("Téléphone", "")))
+        f_mail = st.text_input("Email", value=str(init.get("Email", "")))
+        f_date = st.text_input("Date (JJ/MM/AAAA)", value=str(init.get("DateNav", "")))
+        f_nbj = st.number_input("Jours", value=to_int(init.get("NbJours", 1)), min_value=1)
+        f_prix = st.text_input("Prix Total (€)", value=str(init.get("PrixJour", "")))
+        st.markdown('<div class="btn-marine">', unsafe_allow_html=True)
+        if st.form_submit_button("💾 ENREGISTRER LA FICHE", use_container_width=True):
+            row = {"DateNav": f_date, "NbJours": str(f_nbj), "Nom": f_nom, "Prénom": f_pre, "Société": f_soc, "Statut": f_stat, "Email": f_mail, "Téléphone": f_tel, "PrixJour": f_prix, "Milles": str(f_milles), "HeuresMoteur": str(f_heures)}
+            if idx is not None: df.loc[idx] = row
+            else: df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+            sauvegarder_data(df); st.session_state.page = "LISTE"; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+    if st.button("🔙 Retour"): nav_to("LISTE")
+
+elif st.session_state.page == "FRAIS":
+    st.subheader("🔧 Frais")
+    with st.form("f_frais"):
+        d, t, m = st.text_input("Date (JJ/MM/AAAA)"), st.selectbox("Type", ["Moteur", "Entretien", "Divers"]), st.number_input("Montant", 0.0)
+        if st.form_submit_button("VALIDER"):
+            new_f = pd.DataFrame([{"Date": d, "Type": t, "Montant": m, "Annee": parse_date(d).year}])
+            df_frais = pd.concat([df_frais, new_f], ignore_index=True)
+            sauvegarder_data(df_frais, "frais.json"); st.rerun()
+    for i, r in df_frais.iterrows():
+        st.write(f"{r['Date']} - {r['Type']} : {r['Montant']}€")
+        if st.button("Supprimer", key=f"f_{i}"):
+            df_frais = df_frais.drop(i)
+            sauvegarder_data(df_frais, "frais.json"); st.rerun()
 
 
 
