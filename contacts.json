@@ -280,13 +280,13 @@
         "Téléphone":"06 48 47 04 38",
         "Email":"",
         "Paye":null,
-        "PrixJour":"2000",
+        "PrixJour":"2400",
         "Passagers":null,
         "Historique":null,
         "Société":"PERSO ",
         "Milles":"0.0",
         "HeuresMoteur":"0.0",
-        "dt_obj":1785542400000.0
+        "dt_obj":null
     },
     {
         "DateNav":"07\/02\/2026",
