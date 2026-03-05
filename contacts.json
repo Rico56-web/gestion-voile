@@ -38,7 +38,7 @@
     {
         "DateNav":"14\/03\/2026",
         "NbJours":"2",
-        "Statut":"🟡 Attente",
+        "Statut":"🟢 OK",
         "Nom":"BANDIM FAUSTINO",
         "Prénom":"Pedro",
         "Téléphone":"+41762218767",
@@ -48,10 +48,10 @@
         "Passagers":null,
         "Historique":null,
         "Société":"VOG",
-        "Milles":"0",
-        "HeuresMoteur":"0",
-        "dt_obj":1773446400000.0,
-        "dt_sort":1773446400000.0
+        "Milles":null,
+        "HeuresMoteur":null,
+        "dt_obj":null,
+        "dt_sort":null
     },
     {
         "DateNav":"21\/03\/2026",
