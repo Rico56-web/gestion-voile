@@ -26,6 +26,7 @@ st.markdown("""
     .note-card { background: #fff9c4; padding: 15px; border-radius: 8px; border-left: 10px solid #fbc02d; margin-bottom: 12px; border: 1px solid #fdd835; color: #333; }
     .recap-line { background: #f8f9fa; padding: 15px; border-radius: 10px; border: 2px solid #1a2a6c; text-align: center; font-weight: bold; font-size: 1.2rem; color: #1a2a6c; margin-bottom: 20px; }
     .contact-link { color: #1a2a6c !important; text-decoration: underline !important; font-weight: bold; }
+    .wa-link { color: #25D366 !important; font-weight: bold; text-decoration: none !important; margin-left: 10px; }
     .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: white; margin-bottom: 20px; }
     .cal-table th { background: #1a2a6c; color: white; padding: 8px; border: 1px solid #ddd; font-size: 0.8rem; text-align: center; }
     .cal-table td { height: 45px; text-align: center; border: 1px solid #ddd; font-weight: bold; vertical-align: middle; }
@@ -67,12 +68,12 @@ def parse_d(d):
     try: return datetime.strptime(str(d).strip().replace("-","/"), '%d/%m/%Y')
     except: return datetime(2000, 1, 1)
 
-# --- CHARGEMENT DES 3 FICHIERS ---
+# --- CHARGEMENT ---
 df = charger_data("contacts.json")
 df_f = charger_data("frais.json")
 df_n = charger_data("notes.json")
 
-# --- MENU PRINCIPAL (5 ONGLETS) ---
+# --- MENU ---
 st.markdown('<div class="main-title">⚓ VESTA SKIPPER PRO</div>', unsafe_allow_html=True)
 c_m = st.columns(5)
 menu_items = [("📋 LISTE","LISTE"), ("🗓️ PLANNING","PLANNING"), ("💰 STATS","BUDGET"), ("🔧 MAINT.","FRAIS"), ("📝 NOTES","NOTES")]
@@ -100,8 +101,20 @@ if st.session_state.page == "LISTE":
         for i, r in data.iterrows():
             st_txt = str(r.get('Statut','🟡'))
             col_s = "#2ecc71" if "OK" in st_txt.upper() or "🟢" in st_txt else ("#e74c3c" if "🔴" in st_txt else "#f1c40f")
-            tel, eml = str(r.get('Téléphone','')), str(r.get('Email',''))
-            st.markdown(f'''<div class="client-card" style="border-left: 12px solid {col_s};"><div style="float:right; font-weight:bold;">{fmt_p(r.get("PrixJour",0))}</div><b>{r.get("Prénom","")} {r.get("Nom","").upper()}</b><br>📅 <b>{r.get("DateNav","")}</b> — ⏱️ <b>{r.get("NbJours","1")} jours</b><br>📞 <a href="tel:{tel}" class="contact-link">{tel}</a> | ✉️ <a href="mailto:{eml}" class="contact-link">{eml}</a><br><span style="color:{col_s}; font-weight:bold;">{st_txt}</span></div>''', unsafe_allow_html=True)
+            tel = str(r.get('Téléphone','')).replace(" ", "").replace("+", "")
+            tel_brut = str(r.get('Téléphone',''))
+            eml = str(r.get('Email',''))
+            st.markdown(f'''
+                <div class="client-card" style="border-left: 12px solid {col_s};">
+                    <div style="float:right; font-weight:bold;">{fmt_p(r.get("PrixJour",0))}</div>
+                    <b>{r.get("Prénom","")} {r.get("Nom","").upper()}</b><br>
+                    📅 <b>{r.get("DateNav","")}</b> — ⏱️ <b>{r.get("NbJours","1")} jours</b><br>
+                    📞 <a href="tel:{tel_brut}" class="contact-link">{tel_brut}</a> 
+                    <a href="https://wa.me/{tel}" class="wa-link">💬 WhatsApp</a><br>
+                    ✉️ <a href="mailto:{eml}" class="contact-link">{eml}</a><br>
+                    <span style="color:{col_s}; font-weight:bold;">{st_txt}</span>
+                </div>
+            ''', unsafe_allow_html=True)
             if st.button("✏️ Modifier", key=f"ed_nav_{i}"): st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
 
 # --- 2. PAGE PLANNING ---
@@ -167,67 +180,7 @@ elif st.session_state.page == "FRAIS":
     if st.button("➕ AJOUTER UN FRAIS", use_container_width=True): st.session_state.edit_f_idx = "NEW"; st.rerun()
     if st.session_state.edit_f_idx is not None:
         idx = st.session_state.edit_f_idx
-        init = df_f.loc[idx].to_dict() if idx != "NEW" else {}
-        with st.form("f_form"):
-            f_d = st.text_input("Date", init.get("Date", datetime.now().strftime("%d/%m/%Y")))
-            f_m = st.text_input("Montant (€)", init.get("Montant", ""))
-            f_n = st.text_area("Note", init.get("Note", ""))
-            if st.form_submit_button("VALIDER"):
-                row = {"Date":f_d, "Montant":f_m, "Note":f_n}
-                if idx != "NEW": df_f.loc[idx] = row
-                else: df_f = pd.concat([df_f, pd.DataFrame([row])], ignore_index=True)
-                sauvegarder_data(df_f, "frais.json"); st.session_state.edit_f_idx = None; st.rerun()
-        if st.button("Annuler"): st.session_state.edit_f_idx = None; st.rerun()
-    if not df_f.empty:
-        for i in range(len(df_f)-1, -1, -1):
-            r = df_f.iloc[i]
-            st.markdown(f'''<div class="frais-card"><div style="float:right; color:red; font-weight:bold;">-{fmt_p(r.get("Montant"))}</div><b>{r.get("Date")}</b><br>{r.get("Note")}</div>''', unsafe_allow_html=True)
-            if st.button("✏️ Modifier", key=f"mf_{i}"): st.session_state.edit_f_idx = i; st.rerun()
-            if st.button("🗑️ Effacer", key=f"df_{i}"): df_f.drop(i).pipe(sauvegarder_data, "frais.json"); st.rerun()
-
-# --- 5. PAGE NOTES ---
-elif st.session_state.page == "NOTES":
-    st.markdown('<div class="page-title">📝 MES MÉMOS & NOTES</div>', unsafe_allow_html=True)
-    if st.button("➕ NOUVELLE NOTE", use_container_width=True): st.session_state.edit_n_idx = "NEW"; st.rerun()
-    if st.session_state.edit_n_idx is not None:
-        idx = st.session_state.edit_n_idx
-        init = df_n.loc[idx].to_dict() if idx != "NEW" else {}
-        with st.form("n_form"):
-            n_t = st.text_input("Titre", init.get("Titre", ""))
-            n_c = st.text_area("Contenu", init.get("Contenu", ""), height=200)
-            if st.form_submit_button("SAUVEGARDER"):
-                row = {"Titre": n_t, "Contenu": n_c, "Date": datetime.now().strftime("%d/%m/%Y")}
-                if idx != "NEW": df_n.loc[idx] = row
-                else: df_n = pd.concat([df_n, pd.DataFrame([row])], ignore_index=True)
-                sauvegarder_data(df_n, "notes.json"); st.session_state.edit_n_idx = None; st.rerun()
-        if st.button("Annuler"): st.session_state.edit_n_idx = None; st.rerun()
-    if not df_n.empty:
-        for i in range(len(df_n)-1, -1, -1):
-            r = df_n.iloc[i]
-            st.markdown(f'''<div class="note-card"><div style="float:right; font-size:0.8rem;">{r.get("Date")}</div><b>{r.get("Titre")}</b><br><div style="white-space: pre-wrap;">{r.get("Contenu")}</div></div>''', unsafe_allow_html=True)
-            if st.button("✏️ Modifier", key=f"mn_{i}"): st.session_state.edit_n_idx = i; st.rerun()
-            if st.button("🗑️ Effacer", key=f"dn_{i}"): df_n.drop(i).pipe(sauvegarder_data, "notes.json"); st.rerun()
-
-# --- 6. FORMULAIRE CLIENT ---
-elif st.session_state.page == "FORM":
-    idx = st.session_state.edit_idx
-    init = df.loc[idx].to_dict() if idx != "NEW" else {}
-    st.markdown('<div class="page-title">✍️ ÉDITION FICHE</div>', unsafe_allow_html=True)
-    with st.form("form_edit"):
-        f_st = st.selectbox("Statut", ["🟢 OK", "🟡 Attente", "🔴 Annulé"], index=0)
-        f_nom = st.text_input("Nom", init.get("Nom",""))
-        f_tel = st.text_input("Téléphone", init.get("Téléphone",""))
-        f_eml = st.text_input("Email", init.get("Email",""))
-        f_dat = st.text_input("Date (JJ/MM/AAAA)", init.get("DateNav",""))
-        f_nbj = st.text_input("Nb Jours", init.get("NbJours","1"))
-        f_pri = st.text_input("Prix Total (€)", init.get("PrixJour","0"))
-        if st.form_submit_button("SAUVEGARDER"):
-            row = {"Nom":f_nom, "Téléphone":f_tel, "Email":f_eml, "DateNav":f_dat, "NbJours":f_nbj, "PrixJour":f_pri, "Statut":f_st}
-            if idx != "NEW": df.loc[idx] = row
-            else: df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-            sauvegarder_data(df, "contacts.json"); st.session_state.page = "LISTE"; st.session_state.edit_idx = None; st.rerun()
-    if st.button("Retour"): st.session_state.page = "LISTE"; st.session_state.edit_idx = None; st.rerun()
-
+        init
 
 
 
