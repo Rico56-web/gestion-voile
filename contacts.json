@@ -324,19 +324,19 @@
     },
     {
         "DateNav":"07\/03\/2026",
-        "NbJours":"1",
+        "NbJours":"2",
         "Statut":"🟢 OK",
         "Nom":"DUROT",
         "Prénom":"Celine",
-        "Téléphone":"",
-        "Email":"",
+        "Téléphone":null,
+        "Email":null,
         "Paye":null,
         "PrixJour":"450",
         "Passagers":null,
         "Historique":null,
         "Société":"CMN",
-        "Milles":"0",
-        "HeuresMoteur":"0",
+        "Milles":null,
+        "HeuresMoteur":null,
         "dt_obj":null
     }
 ]
