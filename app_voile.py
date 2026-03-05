@@ -10,8 +10,10 @@ import calendar
 st.set_page_config(page_title="Vesta Skipper Pro", layout="wide")
 
 # --- 2. INITIALISATION ---
-for key, val in {"page": "LISTE", "view_mode": "FUTURES", "edit_idx": None, "edit_f_idx": None}.items():
-    if key not in st.session_state: st.session_state[key] = val
+if "page" not in st.session_state: st.session_state.page = "LISTE"
+if "view_mode" not in st.session_state: st.session_state.view_mode = "FUTURES"
+if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
+if "edit_f_idx" not in st.session_state: st.session_state.edit_f_idx = None
 
 # --- STYLE CSS ---
 st.markdown("""
@@ -77,7 +79,7 @@ for i, (label, pg) in enumerate(menu_items):
         st.session_state.page = pg; st.rerun()
 st.markdown("---")
 
-# --- 1. PAGE LISTE (Avec Nb Jours) ---
+# --- 1. LISTE ---
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
@@ -109,14 +111,13 @@ if st.session_state.page == "LISTE":
             if st.button("✏️ Modifier", key=f"ed_{i}"):
                 st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
 
-# --- 2. PAGE STATS (Format mémorisé) ---
+# --- 2. STATS (FORMAT MÉMORISÉ) ---
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATISTIQUES FINANCIÈRES</div>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     sel_y = col1.selectbox("Année", [2025, 2026, 2027], index=1)
     sel_m = col2.selectbox("Mois (0 = Année entière)", range(0, 13), index=datetime.now().month)
 
-    # Filtrage CA
     df_view = pd.DataFrame()
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
@@ -124,7 +125,6 @@ elif st.session_state.page == "BUDGET":
         if sel_m > 0: mask &= (df['dt'].dt.month == sel_m)
         df_view = df[mask & df['Statut'].str.contains("OK|🟢", na=False)]
 
-    # Filtrage Frais
     df_f_view = pd.DataFrame()
     if not df_f.empty:
         df_f['dt'] = df_f['Date'].apply(parse_d)
@@ -142,7 +142,7 @@ elif st.session_state.page == "BUDGET":
     st.write("### 📝 Détail de la période")
     if not df_view.empty: st.dataframe(df_view[['DateNav', 'Nom', 'PrixJour']], use_container_width=True)
 
-# --- 3. PAGE MAINTENANCE (Sécurisée) ---
+# --- 3. MAINTENANCE ---
 elif st.session_state.page == "FRAIS":
     st.markdown('<div class="page-title">🔧 MAINTENANCE</div>', unsafe_allow_html=True)
     
@@ -152,8 +152,8 @@ elif st.session_state.page == "FRAIS":
     if st.session_state.edit_f_idx is not None:
         idx = st.session_state.edit_f_idx
         init = df_f.loc[idx].to_dict() if idx != "NEW" else {}
-        with st.form("f_form"):
-            f_d = st.text_input("Date (JJ/MM/AAAA)", init.get("Date", datetime.now().strftime("%d/%m/%Y")))
+        with st.form("f_form_fixed"):
+            f_d = st.text_input("Date", init.get("Date", datetime.now().strftime("%d/%m/%Y")))
             f_m = st.text_input("Montant (€)", init.get("Montant", ""))
             f_n = st.text_area("Note", init.get("Note", ""))
             if st.form_submit_button("VALIDER"):
@@ -176,9 +176,53 @@ elif st.session_state.page == "FRAIS":
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
     y_col, m_col = st.columns(2)
-    p_y = y_col.selectbox("Année", [2025, 2026, 2027], index=1)
+    p_y = y_col.selectbox("Année", [2025, 2026], index=1)
     p_m = m_col.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
-    # [Logique calendrier déjà validée]
+    
+    occu = {}
+    if not df.empty:
+        for i, r in df.iterrows():
+            d_start = parse_d(r.get('DateNav',''))
+            if d_start.year == p_y and d_start.month == p_m:
+                st_val = str(r.get('Statut',''))
+                color = "day-ok" if "OK" in st_val.upper() or "🟢" in st_val else "day-wait"
+                for j in range(int(float(r.get('NbJours', 1)))):
+                    target = d_start + timedelta(days=j)
+                    if target.month == p_m: occu[target.day] = (i, r, color)
+
+    cal = calendar.monthcalendar(p_y, p_m)
+    html = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
+    for week in cal:
+        html += '<tr>'
+        for day in week:
+            bg = f'class="{occu[day][2]}"' if day in occu else ''
+            html += f'<td {bg}>{day if day != 0 else ""}</td>'
+        html += '</tr>'
+    st.markdown(html + '</table>', unsafe_allow_html=True)
+    if occu:
+        for d, (idx, r, cl) in sorted(occu.items()):
+            if st.button(f"{d:02d} : {r.get('Nom')} ({r.get('Statut')})", key=f"p_{d}", use_container_width=True):
+                st.session_state.edit_idx = idx; st.session_state.page = "FORM"; st.rerun()
+
+# --- 5. FORMULAIRE (LISTE) ---
+elif st.session_state.page == "FORM":
+    idx = st.session_state.edit_idx
+    init = df.loc[idx].to_dict() if idx != "NEW" else {}
+    st.markdown('<div class="page-title">✍️ ÉDITION FICHE</div>', unsafe_allow_html=True)
+    with st.form("form_edit"):
+        f_st = st.selectbox("Statut", ["🟢 OK", "🟡 Attente", "🔴 Annulé"], index=0)
+        f_nom = st.text_input("Nom", init.get("Nom",""))
+        f_tel = st.text_input("Téléphone", init.get("Téléphone",""))
+        f_eml = st.text_input("Email", init.get("Email",""))
+        f_dat = st.text_input("Date (JJ/MM/AAAA)", init.get("DateNav",""))
+        f_nbj = st.text_input("Nb Jours", init.get("NbJours","1"))
+        f_pri = st.text_input("Prix Total (€)", init.get("PrixJour","0"))
+        if st.form_submit_button("SAUVEGARDER"):
+            row = {"Nom":f_nom, "Téléphone":f_tel, "Email":f_eml, "DateNav":f_dat, "NbJours":f_nbj, "PrixJour":f_pri, "Statut":f_st}
+            if idx != "NEW": df.loc[idx] = row
+            else: df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+            sauvegarder_data(df, "contacts.json"); st.session_state.page = "LISTE"; st.session_state.edit_idx = None; st.rerun()
+    if st.button("Retour"): st.session_state.page = "LISTE"; st.session_state.edit_idx = None; st.rerun()
 
 
 
