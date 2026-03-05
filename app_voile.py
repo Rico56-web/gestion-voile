@@ -33,7 +33,6 @@ st.markdown("""
     .btn-tel { background-color: #2ecc71; color: white !important; }
     .btn-mail { background-color: #3498db; color: white !important; }
     
-    /* Cartes avec bordures de couleur selon statut */
     .client-card { background: white; padding: 12px; border-radius: 10px; margin-bottom: 8px; border: 1px solid #ddd; border-left: 15px solid #ccc; }
     .status-vert { border-left-color: #2ecc71 !important; } 
     .status-jaune { border-left-color: #f1c40f !important; } 
@@ -107,7 +106,7 @@ if not st.session_state.auth:
 df = charger_data("contacts.json")
 df_frais = charger_data("frais.json")
 
-# --- MENU PRINCIPAL ---
+# --- MENU ---
 st.markdown('<div class="header-container"><div class="main-title">⚓ VESTA SKIPPER</div></div>', unsafe_allow_html=True)
 m1, m2, m3, m4 = st.columns(4)
 with m1: 
@@ -125,7 +124,7 @@ with m4:
 
 st.markdown("---")
 
-# --- PAGES ---
+# --- LOGIQUE DES PAGES ---
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 GESTION DES FICHES</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
@@ -176,7 +175,6 @@ if st.session_state.page == "LISTE":
             if c2.button("🗑️ Suppr.", key=f"del_{i}", use_container_width=True):
                 df = df.drop(i); sauvegarder_data(df); st.rerun()
 
-# --- FORMULAIRE ---
 elif st.session_state.page == "FORM":
     st.markdown('<div class="page-title">📝 FICHE DÉTAILLÉE</div>', unsafe_allow_html=True)
     idx = st.session_state.edit_idx
@@ -186,7 +184,6 @@ elif st.session_state.page == "FORM":
         curr = init.get("Statut", "🟡 Attente")
         idx_opt = 0 if ("OK" in str(curr).upper() or "🟢" in str(curr)) else (2 if ("REFUS" in str(curr).upper() or "🔴" in str(curr)) else 1)
         f_st = st.selectbox("STATUT", opts, index=idx_opt)
-        
         f_nom = st.text_input("NOM", init.get("Nom", "")).upper()
         f_pre = st.text_input("Prénom", init.get("Prénom", ""))
         f_tel = st.text_input("Téléphone", init.get("Téléphone", ""))
@@ -194,20 +191,13 @@ elif st.session_state.page == "FORM":
         f_soc = st.text_input("SOCIÉTÉ", init.get("Société", "")).upper()
         f_dat = st.text_input("Date (JJ/MM/AAAA)", init.get("DateNav", ""))
         f_prix = st.text_input("Prix Total (€)", str(init.get("PrixJour", "0")).replace(",", "."))
-        
         if st.form_submit_button("💾 ENREGISTRER"):
-            row = {
-                "Nom": f_nom, "Prénom": f_pre, "Téléphone": f_tel, "Email": f_mail, 
-                "Société": f_soc, "DateNav": f_dat, "NbJours": str(init.get("NbJours",1)), 
-                "PrixJour": f_prix, "Milles": str(init.get("Milles",0)), 
-                "HeuresMoteur": str(init.get("HeuresMoteur",0)), "Statut": f_st
-            }
+            row = {"Nom": f_nom, "Prénom": f_pre, "Téléphone": f_tel, "Email": f_mail, "Société": f_soc, "DateNav": f_dat, "NbJours": str(init.get("NbJours",1)), "PrixJour": f_prix, "Milles": str(init.get("Milles",0)), "HeuresMoteur": str(init.get("HeuresMoteur",0)), "Statut": f_st}
             if idx is not None: df.loc[idx] = row
             else: df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
             sauvegarder_data(df); st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 Retour"): st.session_state.page = "LISTE"; st.rerun()
 
-# --- AUTRES PAGES ---
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
     cp, cm, cn = st.columns([1,2,1])
@@ -244,7 +234,23 @@ elif st.session_state.page == "PLANNING":
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATISTIQUES</div>', unsafe_allow_html=True)
     df_ok = df[df['Statut'].str.contains("OK|🟢", case=False, na=False)]
-    total_ca = sum(df_ok['PrixJour'].
+    total_ca = sum(df_ok['PrixJour'].apply(to_float))
+    total_frais = sum(df_frais['Montant'].apply(to_float)) if not df_frais.empty else 0
+    st.markdown(f'<div class="recap-box">CA: {total_ca:.2f}€ | Frais: -{total_frais:.2f}€<hr><b>NET: {(total_ca - total_frais):.2f}€</b></div>', unsafe_allow_html=True)
+
+elif st.session_state.page == "FRAIS":
+    st.markdown('<div class="page-title">🔧 MAINTENANCE</div>', unsafe_allow_html=True)
+    with st.form("frais"):
+        d = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
+        t = st.selectbox("Type", ["Moteur", "Entretien", "Divers", "Assurance"])
+        m = st.text_input("Montant (€)", "0.0")
+        if st.form_submit_button("VALIDER"):
+            nf = pd.DataFrame([{"Date": d, "Type": t, "Montant": m.replace(",", ".")}])
+            df_frais = pd.concat([df_frais, nf], ignore_index=True)
+            sauvegarder_data(df_frais, "frais.json"); st.rerun()
+    for i, r in df_frais.iloc[::-1].iterrows():
+        st.write(f"**{r['Date']}** | {r['Type']} | **{to_float(r['Montant']):.2f}€**")
+
 
 
 
