@@ -2,7 +2,7 @@
     {
         "Date":"28\/02\/2026",
         "Type":"Moteur",
-        "Montant":"100",
-        "Note":null
+        "Montant":".10",
+        "Note":"Test"
     }
 ]
