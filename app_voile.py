@@ -28,7 +28,11 @@ st.markdown("""
     .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 10px; }
     .cal-table th { background: #f8f9fa; font-size: 0.7rem; padding: 5px; border: 1px solid #eee; }
     .cal-table td { border: 1px solid #eee; height: 40px; text-align: center; font-size: 0.8rem; font-weight: bold; }
-    .recap-box { background: #f1f2f6; padding: 10px; border-radius: 8px; border: 1px solid #dfe4ea; margin-bottom: 15px; }
+    .recap-box { background: #f1f2f6; padding: 10px; border-radius: 8px; border: 1px solid #dfe4ea; margin-bottom: 15px; text-align: center; }
+    .stats-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .stats-table th { background: #1a2a6c; color: white; padding: 8px; text-align: left; }
+    .stats-table td { padding: 8px; border-bottom: 1px solid #eee; }
+    .stats-table tr:nth-child(even) { background: #f9f9f9; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -110,93 +114,9 @@ with m4:
 
 st.markdown("---")
 
-# --- PLANNING (CORRIGÉ AVEC ARCHIVES) ---
-if st.session_state.page == "PLANNING":
-    st.markdown('<div class="page-title">🗓️ PLANNING COMPLET</div>', unsafe_allow_html=True)
-    cp, cm, cn = st.columns([1,2,1])
-    if cp.button("◀️"): 
-        st.session_state.cal_month -= 1
-        if st.session_state.cal_month < 1: st.session_state.cal_month = 12; st.session_state.cal_year -= 1
-        st.rerun()
-    cm.markdown(f"<center><b>{st.session_state.cal_month:02d} / {st.session_state.cal_year}</b></center>", unsafe_allow_html=True)
-    if cn.button("▶️"): 
-        st.session_state.cal_month += 1
-        if st.session_state.cal_month > 12: st.session_state.cal_month = 1; st.session_state.cal_year += 1
-        st.rerun()
-    
-    occu = {}
-    if not df.empty:
-        # On parcourt TOUTES les fiches (sans filtrer sur OK uniquement) pour avoir l'historique complet
-        for _, r in df.iterrows():
-            d_o = parse_date(r['DateNav'])
-            for j in range(to_int(r.get('NbJours', 1))):
-                d_c = (d_o + timedelta(days=j)).strftime('%d/%m/%Y')
-                if d_c not in occu: occu[d_c] = []
-                occu[d_c].append(r)
-    
-    cal = calendar.monthcalendar(st.session_state.cal_year, st.session_state.cal_month)
-    h_c = '<table class="cal-table"><tr><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
-    for w in cal:
-        h_c += '<tr>'
-        for d in w:
-            if d == 0: h_c += '<td></td>'
-            else:
-                ds = f"{d:02d}/{st.session_state.cal_month:02d}/{st.session_state.cal_year}"
-                bg = "white"
-                if ds in occu:
-                    # Couleur selon société ou statut
-                    if any("CMN" in str(x.get('Société','')).upper() for x in occu[ds]): bg = "#3498db"
-                    elif any("OK" in str(x.get('Statut','')).upper() or "🟢" in str(x.get('Statut','')) for x in occu[ds]): bg = "#2ecc71"
-                    else: bg = "#f1c40f" # Jaune pour les "En attente"
-                h_c += f'<td style="background:{bg}; color:{"white" if bg!="white" else "black"};">{d}</td>'
-        h_c += '</tr>'
-    st.markdown(h_c + '</table>', unsafe_allow_html=True)
-    
-    # Affichage des détails sous le calendrier
-    ds_month = f"/{st.session_state.cal_month:02d}/{st.session_state.cal_year}"
-    jours_nav = sorted([int(k.split('/')[0]) for k in occu.keys() if ds_month in k])
-    if jours_nav:
-        sel_d = st.radio("Détails :", jours_nav, horizontal=True)
-        ds_sel = f"{sel_d:02d}{ds_month}"
-        for res in occu.get(ds_sel, []):
-            st.info(f"👤 **{res.get('Prénom')} {res.get('Nom')}** ({res.get('Statut')})\n🏢 {res.get('Société')}")
+# --- LOGIQUE DES PAGES ---
 
-# --- RESTE DU CODE (MAINTENANCE, LISTE, FORMULAIRE) ---
-elif st.session_state.page == "FRAIS":
-    st.markdown('<div class="page-title">🔧 GESTION MAINTENANCE</div>', unsafe_allow_html=True)
-    if st.session_state.confirm_del_frais is not None:
-        idx_f = st.session_state.confirm_del_frais
-        st.warning(f"⚠️ Supprimer cette dépense ?")
-        c1, c2 = st.columns(2)
-        if c1.button("✅ CONFIRMER", use_container_width=True):
-            df_frais = df_frais.drop(idx_f); sauvegarder_data(df_frais, "frais.json"); st.session_state.confirm_del_frais = None; st.rerun()
-        if c2.button("❌ ANNULER", use_container_width=True):
-            st.session_state.confirm_del_frais = None; st.rerun()
-
-    if st.session_state.form_frais_open or st.session_state.edit_frais_idx is not None:
-        idx = st.session_state.edit_frais_idx
-        init = df_frais.loc[idx].to_dict() if (idx is not None and not df_frais.empty) else {}
-        with st.form("form_frais"):
-            f_dat = st.text_input("Date", init.get("Date", datetime.now().strftime("%d/%m/%Y")))
-            f_typ = st.selectbox("Type", ["Moteur", "Voiles", "Accastillage", "Electronique", "Divers"], index=0)
-            f_mon = st.text_input("Montant (€)", str(init.get("Montant", "0.0")))
-            f_not = st.text_area("Note", init.get("Note", ""))
-            if st.form_submit_button("💾 ENREGISTRER"):
-                row = {"Date": f_dat, "Type": f_typ, "Montant": f_mon, "Note": f_not}
-                if idx is not None: df_frais.loc[idx] = row
-                else: df_frais = pd.concat([df_frais, pd.DataFrame([row])], ignore_index=True)
-                sauvegarder_data(df_frais, "frais.json"); st.session_state.edit_frais_idx = None; st.session_state.form_frais_open = False; st.rerun()
-        if st.button("🔙 Retour"): st.session_state.edit_frais_idx = None; st.session_state.form_frais_open = False; st.rerun()
-    else:
-        if st.button("➕ AJOUTER UNE DÉPENSE", use_container_width=True): st.session_state.form_frais_open = True; st.rerun()
-        if not df_frais.empty:
-            for i, r in df_frais.iloc[::-1].iterrows():
-                st.markdown(f'<div class="frais-card"><div style="float:right; color:#c62828; font-weight:bold;">{to_float(r["Montant"]):.2f}€</div><b>📅 {r["Date"]}</b> | {r["Type"]}<br><small>{r.get("Note","")}</small></div>', unsafe_allow_html=True)
-                c1, c2 = st.columns(2)
-                if c1.button("✏️ Modifier", key=f"ef_{i}"): st.session_state.edit_frais_idx = i; st.rerun()
-                if c2.button("🗑️ Supprimer", key=f"df_{i}"): st.session_state.confirm_del_frais = i; st.rerun()
-
-elif st.session_state.page == "LISTE":
+if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 GESTION DES FICHES</div>', unsafe_allow_html=True)
     if st.session_state.confirm_del is not None:
         idx_to_del = st.session_state.confirm_del
@@ -236,7 +156,7 @@ elif st.session_state.page == "FORM":
         f_nom = st.text_input("NOM", init.get("Nom", "")).upper()
         f_pre = st.text_input("Prénom", init.get("Prénom", ""))
         f_soc = st.text_input("SOCIÉTÉ", init.get("Société", "")).upper()
-        f_dat = st.text_input("Date", init.get("DateNav", ""))
+        f_dat = st.text_input("Date (JJ/MM/AAAA)", init.get("DateNav", ""))
         f_nbj = st.number_input("Nb Jours", min_value=1, value=to_int(init.get("NbJours", 1)))
         f_prix = st.text_input("Prix Total (€)", str(init.get("PrixJour", "0")))
         f_tel = st.text_input("Tél", init.get("Téléphone", ""))
@@ -248,12 +168,137 @@ elif st.session_state.page == "FORM":
             sauvegarder_data(df); st.session_state.page = "LISTE"; st.rerun()
     if st.button("🔙 Retour"): st.session_state.page = "LISTE"; st.rerun()
 
+elif st.session_state.page == "PLANNING":
+    st.markdown('<div class="page-title">🗓️ PLANNING COMPLET</div>', unsafe_allow_html=True)
+    cp, cm, cn = st.columns([1,2,1])
+    if cp.button("◀️"): 
+        st.session_state.cal_month -= 1
+        if st.session_state.cal_month < 1: st.session_state.cal_month = 12; st.session_state.cal_year -= 1
+        st.rerun()
+    cm.markdown(f"<center><b>{st.session_state.cal_month:02d} / {st.session_state.cal_year}</b></center>", unsafe_allow_html=True)
+    if cn.button("▶️"): 
+        st.session_state.cal_month += 1
+        if st.session_state.cal_month > 12: st.session_state.cal_month = 1; st.session_state.cal_year += 1
+        st.rerun()
+    
+    occu = {}
+    if not df.empty:
+        for _, r in df.iterrows():
+            d_o = parse_date(r['DateNav'])
+            for j in range(to_int(r.get('NbJours', 1))):
+                d_c = (d_o + timedelta(days=j)).strftime('%d/%m/%Y')
+                if d_c not in occu: occu[d_c] = []
+                occu[d_c].append(r)
+    
+    cal = calendar.monthcalendar(st.session_state.cal_year, st.session_state.cal_month)
+    h_c = '<table class="cal-table"><tr><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
+    for w in cal:
+        h_c += '<tr>'
+        for d in w:
+            if d == 0: h_c += '<td></td>'
+            else:
+                ds = f"{d:02d}/{st.session_state.cal_month:02d}/{st.session_state.cal_year}"
+                bg = "white"
+                if ds in occu:
+                    if any("CMN" in str(x.get('Société','')).upper() for x in occu[ds]): bg = "#3498db"
+                    elif any("OK" in str(x.get('Statut','')).upper() or "🟢" in str(x.get('Statut','')) for x in occu[ds]): bg = "#2ecc71"
+                    else: bg = "#f1c40f"
+                h_c += f'<td style="background:{bg}; color:{"white" if bg!="white" else "black"};">{d}</td>'
+        h_c += '</tr>'
+    st.markdown(h_c + '</table>', unsafe_allow_html=True)
+
 elif st.session_state.page == "BUDGET":
-    st.markdown('<div class="page-title">💰 STATISTIQUES</div>', unsafe_allow_html=True)
-    df_ok = df[df['Statut'].str.contains("OK|🟢", case=False, na=False)] if not df.empty else pd.DataFrame()
-    total_ca = sum(df_ok['PrixJour'].apply(to_float))
-    total_frais = sum(df_frais['Montant'].apply(to_float)) if not df_frais.empty else 0
-    st.markdown(f'<div class="recap-box">CA: {total_ca:.2f}€ | Frais: -{total_frais:.2f}€<hr><b>NET: {(total_ca - total_frais):.2f}€</b></div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">💰 STATISTIQUES ANNUELLES</div>', unsafe_allow_html=True)
+    
+    # Sélecteur d'année
+    annee_sel = st.selectbox("Année", [2024, 2025, 2026], index=2)
+    
+    # Calcul des totaux par mois (tous les mois même vides)
+    stats_mois = []
+    mois_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+    
+    total_annee_ca = 0
+    total_annee_frais = 0
+    
+    for m in range(1, 13):
+        # Filtrer CA (uniquement OK)
+        if not df.empty:
+            df['dt_obj'] = df['DateNav'].apply(parse_date)
+            ca_m = df[(df['dt_obj'].dt.month == m) & (df['dt_obj'].dt.year == annee_sel) & (df['Statut'].str.contains("OK|🟢", case=False, na=False))]
+            ca_val = sum(ca_m['PrixJour'].apply(to_float))
+        else: ca_val = 0
+        
+        # Filtrer Frais
+        if not df_frais.empty:
+            df_frais['dt_obj'] = df_frais['Date'].apply(parse_date)
+            fr_m = df_frais[(df_frais['dt_obj'].dt.month == m) & (df_frais['dt_obj'].dt.year == annee_sel)]
+            fr_val = sum(fr_m['Montant'].apply(to_float))
+        else: fr_val = 0
+        
+        stats_mois.append({"Mois": mois_noms[m-1], "CA": ca_val, "Frais": fr_val, "Net": ca_val - fr_val})
+        total_annee_ca += ca_val
+        total_annee_frais += fr_val
+
+    # Box récapitulative
+    st.markdown(f'''
+        <div class="recap-box">
+            <h3 style="margin:0; color:#1a2a6c;">BILAN {annee_sel}</h3>
+            <p style="font-size:1.1rem; margin:10px 0;">
+                <b>CA:</b> {total_annee_ca:.2f}€ | <b>Frais:</b> -{total_annee_frais:.2f}€<br>
+                <span style="font-size:1.4rem; color:#2e7d32;"><b>NET: {(total_annee_ca - total_annee_frais):.2f}€</b></span>
+            </p>
+        </div>
+    ''', unsafe_allow_html=True)
+
+    # Tableau détaillé des 12 mois
+    html_table = '<table class="stats-table"><tr><th>MOIS</th><th>CA (€)</th><th>FRAIS (€)</th><th>NET (€)</th></tr>'
+    for s in stats_mois:
+        color_net = "#2e7d32" if s['Net'] >= 0 else "#c62828"
+        html_table += f'''
+            <tr>
+                <td><b>{s['Mois']}</b></td>
+                <td>{s['CA']:.2f}</td>
+                <td>{s['Frais']:.2f}</td>
+                <td style="color:{color_net}; font-weight:bold;">{s['Net']:.2f}</td>
+            </tr>
+        '''
+    html_table += '</table>'
+    st.markdown(html_table, unsafe_allow_html=True)
+
+elif st.session_state.page == "FRAIS":
+    st.markdown('<div class="page-title">🔧 GESTION MAINTENANCE</div>', unsafe_allow_html=True)
+    if st.session_state.confirm_del_frais is not None:
+        idx_f = st.session_state.confirm_del_frais
+        st.warning(f"⚠️ Supprimer cette dépense ?")
+        c1, c2 = st.columns(2)
+        if c1.button("✅ OUI"):
+            df_frais = df_frais.drop(idx_f); sauvegarder_data(df_frais, "frais.json"); st.session_state.confirm_del_frais = None; st.rerun()
+        if c2.button("❌ NON"):
+            st.session_state.confirm_del_frais = None; st.rerun()
+
+    if st.session_state.form_frais_open or st.session_state.edit_frais_idx is not None:
+        idx = st.session_state.edit_frais_idx
+        init = df_frais.loc[idx].to_dict() if (idx is not None and not df_frais.empty) else {}
+        with st.form("form_frais"):
+            f_dat = st.text_input("Date", init.get("Date", datetime.now().strftime("%d/%m/%Y")))
+            f_typ = st.selectbox("Type", ["Moteur", "Voiles", "Accastillage", "Electronique", "Divers"], index=0)
+            f_mon = st.text_input("Montant (€)", str(init.get("Montant", "0.0")))
+            f_not = st.text_area("Note", init.get("Note", ""))
+            if st.form_submit_button("💾 ENREGISTRER"):
+                row = {"Date": f_dat, "Type": f_typ, "Montant": f_mon, "Note": f_not}
+                if idx is not None: df_frais.loc[idx] = row
+                else: df_frais = pd.concat([df_frais, pd.DataFrame([row])], ignore_index=True)
+                sauvegarder_data(df_frais, "frais.json"); st.session_state.edit_frais_idx = None; st.session_state.form_frais_open = False; st.rerun()
+        if st.button("🔙 Retour"): st.session_state.edit_frais_idx = None; st.session_state.form_frais_open = False; st.rerun()
+    else:
+        if st.button("➕ AJOUTER UNE DÉPENSE", use_container_width=True): st.session_state.form_frais_open = True; st.rerun()
+        if not df_frais.empty:
+            for i, r in df_frais.iloc[::-1].iterrows():
+                st.markdown(f'<div class="frais-card"><div style="float:right; color:#c62828; font-weight:bold;">{to_float(r["Montant"]):.2f}€</div><b>📅 {r["Date"]}</b> | {r["Type"]}<br><small>{r.get("Note","")}</small></div>', unsafe_allow_html=True)
+                c1, c2 = st.columns(2)
+                if c1.button("✏️ Modifier", key=f"ef_{i}"): st.session_state.edit_frais_idx = i; st.rerun()
+                if c2.button("🗑️ Supprimer", key=f"df_{i}"): st.session_state.confirm_del_frais = i; st.rerun()
+
 
 
 
