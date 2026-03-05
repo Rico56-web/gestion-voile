@@ -99,38 +99,38 @@ with m2:
 with m3: 
     if st.button("💰\nSTATS", use_container_width=True, type="primary" if st.session_state.page == "BUDGET" else "secondary"): st.session_state.page = "BUDGET"; st.rerun()
 with m4: 
-    if st.button("🔧\nMAINT", use_container_width=True, type="primary" if st.session_state.page == "FRAIS" else "secondary"): st.session_state.page = "FRAIS"; st.rerun()
+    if st.button("🔧\nMAINT", use_container_width=True, type="primary" if st.session_state.page == "FRAIS" else "secondary"): st.session_state.page = "FRAIS"; st.session_state.form_frais_open = False; st.rerun()
 st.markdown("---")
 
 # --- PAGES ---
 if st.session_state.page == "BUDGET":
-    st.markdown('<div class="page-title">💰 BILAN ACTIVITÉ 2026 (RÉALISÉ & PRÉVU)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">💰 BILAN ACTIVITÉ (2026 ET FUTUR)</div>', unsafe_allow_html=True)
     
-    current_year = 2026
+    # SELECTION DE L'ANNEE (Uniquement 2026 et +)
+    annee_choisie = st.selectbox("Choisir l'année à analyser :", [2026, 2027, 2028], index=0)
+    
     mois_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     stats_mois = []
     total_ca = total_fr = 0
 
     for m in range(1, 13):
-        # CA : Uniquement les fiches "OK" de l'année 2026
         ca_m = 0
         if not df.empty:
             df['dt_obj'] = df['DateNav'].apply(parse_date)
-            mask = (df['dt_obj'].dt.month == m) & (df['dt_obj'].dt.year == current_year) & (df['Statut'].str.contains("OK|🟢", case=False, na=False))
+            mask = (df['dt_obj'].dt.month == m) & (df['dt_obj'].dt.year == annee_choisie) & (df['Statut'].str.contains("OK|🟢", case=False, na=False))
             ca_m = sum(df[mask]['PrixJour'].apply(to_float))
         
-        # Frais : Uniquement 2026
         fr_m = 0
         if not df_frais.empty:
             df_frais['dt_obj'] = df_frais['Date'].apply(parse_date)
-            mask_fr = (df_frais['dt_obj'].dt.month == m) & (df_frais['dt_obj'].dt.year == current_year)
+            mask_fr = (df_frais['dt_obj'].dt.month == m) & (df_frais['dt_obj'].dt.year == annee_choisie)
             fr_m = sum(df_frais[mask_fr]['Montant'].apply(to_float))
             
-        stats_mois.append({"Mois": mois_noms[m-1], "CA": ca_m, "Frais": fr_m, "Net": ca_m - fr_m, "is_now": (m == datetime.now().month)})
+        stats_mois.append({"Mois": mois_noms[m-1], "CA": ca_m, "Frais": fr_m, "Net": ca_m - fr_m, "is_now": (m == datetime.now().month and annee_choisie == 2026)})
         total_ca += ca_m
         total_fr += fr_m
 
-    st.markdown(f'<div class="recap-box"><h3 style="margin:0;">TOTAL 2026</h3><p style="font-size:1.2rem;">CA : {total_ca:.2f}€ | Frais : -{total_fr:.2f}€<br><b style="color:#2e7d32; font-size:1.5rem;">NET ESTIMÉ : {(total_ca - total_fr):.2f}€</b></p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="recap-box"><h3 style="margin:0;">BILAN {annee_choisie}</h3><p style="font-size:1.2rem;">CA (Validé/Prévu) : {total_ca:.2f}€ | Frais : -{total_fr:.2f}€<br><b style="color:#2e7d32; font-size:1.5rem;">NET : {(total_ca - total_fr):.2f}€</b></p></div>', unsafe_allow_html=True)
 
     html = '<table class="stats-table"><tr><th>MOIS</th><th>CA (OK)</th><th>MAINT.</th><th>RÉSULTAT</th></tr>'
     for s in stats_mois:
@@ -220,33 +220,21 @@ elif st.session_state.page == "FORM":
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING COMPLET</div>', unsafe_allow_html=True)
     cp, cm, cn = st.columns([1,2,1])
-    if cp.button("◀️"): st.session_state.cal_month -= 1; st.rerun()
+    if cp.button("◀️"): 
+        st.session_state.cal_month -= 1
+        if st.session_state.cal_month < 1: st.session_state.cal_month = 12; st.session_state.cal_year -= 1
+        st.rerun()
     cm.markdown(f"<center><b>{st.session_state.cal_month:02d} / {st.session_state.cal_year}</b></center>", unsafe_allow_html=True)
-    if cn.button("▶️"): st.session_state.cal_month += 1; st.rerun()
+    if cn.button("▶️"): 
+        st.session_state.cal_month += 1
+        if st.session_state.cal_month > 12: st.session_state.cal_month = 1; st.session_state.cal_year += 1
+        st.rerun()
     occu = {}
     if not df.empty:
         for _, r in df.iterrows():
             d_o = parse_date(r['DateNav'])
-            for j in range(to_int(r.get('NbJours', 1))):
-                d_c = (d_o + timedelta(days=j)).strftime('%d/%m/%Y')
-                if d_c not in occu: occu[d_c] = []
-                occu[d_c].append(r)
-    cal = calendar.monthcalendar(st.session_state.cal_year, st.session_state.cal_month)
-    h_c = '<table class="cal-table"><tr><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
-    for w in cal:
-        h_c += '<tr>'
-        for d in w:
-            if d == 0: h_c += '<td></td>'
-            else:
-                ds = f"{d:02d}/{st.session_state.cal_month:02d}/{st.session_state.cal_year}"
-                bg = "white"
-                if ds in occu:
-                    if any("CMN" in str(x.get('Société','')).upper() for x in occu[ds]): bg = "#3498db"
-                    elif any("OK" in str(x.get('Statut','')).upper() or "🟢" in str(x.get('Statut','')) for x in occu[ds]): bg = "#2ecc71"
-                    else: bg = "#f1c40f"
-                h_c += f'<td style="background:{bg}; color:{"white" if bg!="white" else "black"};">{d}</td>'
-        h_c += '</tr>'
-    st.markdown(h_c + '</table>', unsafe_allow_html=True)
+            for j in range(to_int(r.get('Nb
+
 
 
 
