@@ -4,11 +4,5 @@
         "Type":"Moteur",
         "Montant":"100",
         "Note":null
-    },
-    {
-        "Date":"05\/03\/2026",
-        "Type":"Voiles",
-        "Montant":"0.1",
-        "Note":"Test appli"
     }
 ]
