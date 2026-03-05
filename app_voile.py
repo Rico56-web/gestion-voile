@@ -9,7 +9,7 @@ import calendar
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper Pro", layout="wide")
 
-# --- STYLE CSS COMPLET ---
+# --- STYLE CSS ---
 st.markdown("""
     <style>
     .header-container { text-align: center; margin-bottom: 10px; padding: 5px; background-color: #f8f9fa; border-radius: 10px; border: 1px solid #e1e8ed; }
@@ -17,24 +17,15 @@ st.markdown("""
     .page-title { background: #1a2a6c; color: white; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 15px; font-size: 0.9rem; }
     div.stButton > button { border-radius: 8px; height: 50px; font-size: 0.7rem !important; font-weight: bold; }
     
-    /* Fiches Liste & Maint */
-    .client-card { background: white; padding: 12px; border-radius: 10px; margin-bottom: 8px; border: 1px solid #ddd; border-left: 15px solid #ccc; position: relative; }
+    .client-card { background: white; padding: 12px; border-radius: 10px; margin-bottom: 8px; border: 1px solid #ddd; border-left: 15px solid #ccc; }
     .frais-card { background: white; padding: 12px; border-radius: 10px; margin-bottom: 8px; border: 1px solid #ddd; border-left: 10px solid #1a2a6c; }
     
-    /* Calendrier */
     .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 20px; }
     .cal-table th { background: #f8f9fa; font-size: 0.7rem; padding: 8px; border: 1px solid #eee; }
     .cal-table td { border: 1px solid #eee; height: 50px; text-align: center; font-size: 1rem; font-weight: bold; }
     
-    /* Détails sous calendrier */
-    .day-detail { padding: 10px; border-radius: 8px; margin-bottom: 8px; background: #ffffff; border: 1px solid #eee; border-left: 10px solid #ccc; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
-    
-    /* Stats */
+    .day-detail { padding: 10px; border-radius: 8px; margin-bottom: 8px; background: #ffffff; border: 1px solid #eee; border-left: 10px solid #ccc; }
     .recap-box { background: #f1f2f6; padding: 15px; border-radius: 8px; border: 1px solid #dfe4ea; margin-bottom: 15px; text-align: center; }
-    .stats-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    .stats-table th { background: #1a2a6c; color: white; padding: 10px; text-align: left; }
-    .stats-table td { padding: 10px; border-bottom: 1px solid #eee; }
-    .current-month { background: #fffde7 !important; border-left: 5px solid #1a2a6c; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -104,13 +95,48 @@ with m2:
 with m3: 
     if st.button("💰\nSTATS", use_container_width=True, type="primary" if st.session_state.page == "BUDGET" else "secondary"): st.session_state.page = "BUDGET"; st.rerun()
 with m4: 
-    if st.button("🔧\nMAINT", use_container_width=True, type="primary" if st.session_state.page == "FRAIS" else "secondary"): st.session_state.page = "FRAIS"; st.rerun()
+    if st.button("🔧\nMAINT", use_container_width=True, type="primary" if st.session_state.page == "FRAIS" else "secondary"): st.session_state.page = "FRAIS"; st.session_state.form_frais_open = False; st.rerun()
 st.markdown("---")
 
-# --- PAGES ---
+# --- PAGE LISTE ---
+if st.session_state.page == "LISTE":
+    st.markdown('<div class="page-title">📋 LISTE DES NAVIGATIONS</div>', unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    if c1.button("🚀 FUTUR", use_container_width=True): st.session_state.view_mode = "FUTUR"; st.rerun()
+    if c2.button("📂 ARCHIVES", use_container_width=True): st.session_state.view_mode = "ARCHIVES"; st.rerun()
+    
+    if st.button("➕ NOUVELLE FICHE", use_container_width=True): st.session_state.edit_idx = None; st.session_state.page = "FORM"; st.rerun()
+    
+    if not df.empty:
+        df['dt_obj'] = df['DateNav'].apply(parse_date)
+        now = datetime.now().replace(hour=0, minute=0, second=0)
+        data = df[df['dt_obj'] >= now].sort_values('dt_obj') if st.session_state.view_mode == "FUTUR" else df[df['dt_obj'] < now].sort_values('dt_obj', ascending=False)
+        
+        for i, r in data.iterrows():
+            st_txt = str(r.get('Statut', '🟡'))
+            col = "#2ecc71" if "OK" in st_txt.upper() or "🟢" in st_txt else ("#e74c3c" if "🔴" in st_txt else "#f1c40f")
+            
+            # --- AFFICHAGE DÉTAILLÉ AVEC NOMBRE DE JOURS ---
+            st.markdown(f'''
+                <div class="client-card" style="border-left-color:{col};">
+                    <div style="float:right; font-weight:bold; color:#1a2a6c;">{r.get("PrixJour","0")}€</div>
+                    <b style="font-size:1.1rem;">{r.get("Prénom","")} {r.get("Nom","").upper()}</b><br>
+                    <small>🏢 {r.get("Société","").upper()}</small><br>
+                    <div style="margin-top:5px;">
+                        📅 <b>{r.get("DateNav","")}</b> | ⏱️ <b>{r.get("NbJours","1")} jour(s)</b>
+                    </div>
+                    <span style="color:{col}; font-weight:bold; font-size:0.8rem;">{st_txt}</span>
+                </div>
+            ''', unsafe_allow_html=True)
+            
+            cx, cy = st.columns(2)
+            if cx.button("✏️ Modifier", key=f"edit_{i}"): st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
+            if cy.button("🗑️ Supprimer", key=f"del_{i}"):
+                df = df.drop(i); sauvegarder_data(df); st.rerun()
 
-if st.session_state.page == "PLANNING":
-    st.markdown('<div class="page-title">🗓️ PLANNING COMPLET</div>', unsafe_allow_html=True)
+# --- PAGE PLANNING ---
+elif st.session_state.page == "PLANNING":
+    st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
     c_prev, c_mon, c_next = st.columns([1,2,1])
     if c_prev.button("◀️"):
         st.session_state.cal_month -= 1
@@ -156,16 +182,12 @@ if st.session_state.page == "PLANNING":
             for res in occu[d_key]:
                 st_txt = res.get('Statut', '🟡 Attente')
                 c_side = "#2ecc71" if "OK" in str(st_txt).upper() or "🟢" in str(st_txt) else "#f1c40f"
-                st.markdown(f'<div class="day-detail" style="border-left-color:{c_side};"><b>{d_key}</b> : {res.get("Prénom","")} {res.get("Nom","")} ({res.get("Société","")}) <br> <small>Statut: {st_txt}</small></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="day-detail" style="border-left-color:{c_side};"><b>{d_key}</b> : {res.get("Prénom","")} {res.get("Nom","")} ({res.get("Société","")}) <br> <small>Durée: {res.get("NbJours","1")}j | Statut: {st_txt}</small></div>', unsafe_allow_html=True)
     else: st.info("Aucun engagement ce mois-ci.")
 
+# --- PAGE MAINTENANCE ---
 elif st.session_state.page == "FRAIS":
-    st.markdown('<div class="page-title">🔧 MAINTENANCE & FRAIS</div>', unsafe_allow_html=True)
-    if st.session_state.confirm_del_frais is not None:
-        if st.button("CONFIRMER SUPPRESSION"):
-            df_frais = df_frais.drop(st.session_state.confirm_del_frais); sauvegarder_data(df_frais, "frais.json")
-            st.session_state.confirm_del_frais = None; st.rerun()
-    
+    st.markdown('<div class="page-title">🔧 MAINTENANCE</div>', unsafe_allow_html=True)
     if st.session_state.form_frais_open or st.session_state.edit_frais_idx is not None:
         idx = st.session_state.edit_frais_idx
         init = df_frais.loc[idx].to_dict() if (idx is not None and not df_frais.empty) else {}
@@ -181,17 +203,18 @@ elif st.session_state.page == "FRAIS":
                 sauvegarder_data(df_frais, "frais.json"); st.session_state.edit_frais_idx = None; st.session_state.form_frais_open = False; st.rerun()
         if st.button("Annuler"): st.session_state.edit_frais_idx = None; st.session_state.form_frais_open = False; st.rerun()
     else:
-        st.button("➕ AJOUTER UNE FICHE", on_click=lambda: setattr(st.session_state, 'form_frais_open', True), use_container_width=True)
+        st.button("➕ AJOUTER MAINTENANCE", on_click=lambda: setattr(st.session_state, 'form_frais_open', True), use_container_width=True)
         if not df_frais.empty:
             for i, r in df_frais.iloc[::-1].iterrows():
                 st.markdown(f'<div class="frais-card"><div style="float:right; font-weight:bold; color:#c62828;">{to_float(r["Montant"]):.2f}€</div><b>{r["Type"]}</b> - {r["Date"]}<br><p style="font-size:0.85rem;">{r.get("Note","")}</p></div>', unsafe_allow_html=True)
                 c1, c2 = st.columns(2)
-                c1.button("✏️", key=f"ef_{i}", on_click=lambda x=i: setattr(st.session_state, 'edit_frais_idx', x))
-                c2.button("🗑️", key=f"df_{i}", on_click=lambda x=i: setattr(st.session_state, 'confirm_del_frais', x))
+                if c1.button("✏️", key=f"ef_{i}"): st.session_state.edit_frais_idx = i; st.rerun()
+                if c2.button("🗑️", key=f"df_{i}"): df_frais = df_frais.drop(i); sauvegarder_data(df_frais, "frais.json"); st.rerun()
 
+# --- PAGE STATS ---
 elif st.session_state.page == "BUDGET":
-    st.markdown('<div class="page-title">💰 STATS & BILAN 2026+</div>', unsafe_allow_html=True)
-    annee = st.selectbox("Année", [2026, 2027], index=0)
+    st.markdown('<div class="page-title">💰 BILAN 2026</div>', unsafe_allow_html=True)
+    annee = 2026
     total_ca = 0; total_fr = 0; stats = []
     for m in range(1, 13):
         ca = 0; fr = 0
@@ -201,31 +224,14 @@ elif st.session_state.page == "BUDGET":
         if not df_frais.empty:
             df_frais['dt'] = df_frais['Date'].apply(parse_date)
             fr = sum(df_frais[(df_frais['dt'].dt.month == m) & (df_frais['dt'].dt.year == annee)]['Montant'].apply(to_float))
-        stats.append({"Mois": calendar.month_name[m], "CA": ca, "Frais": fr, "Net": ca-fr})
+        stats.append({"Mois": calendar.month_name[m], "CA": f"{ca:.0f}€", "Frais": f"{fr:.0f}€", "Net": f"{ca-fr:.0f}€"})
         total_ca += ca; total_fr += fr
-    
-    st.markdown(f'<div class="recap-box"><h3>BILAN {annee}</h3><b>CA: {total_ca:.0f}€ | FRAIS: {total_fr:.0f}€ | NET: {total_ca-total_fr:.0f}€</b></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="recap-box"><h3>TOTAL 2026</h3><b>CA: {total_ca:.0f}€ | FRAIS: {total_fr:.0f}€ | NET: {total_ca-total_fr:.0f}€</b></div>', unsafe_allow_html=True)
     st.table(pd.DataFrame(stats))
 
-elif st.session_state.page == "LISTE":
-    st.markdown('<div class="page-title">📋 LISTE DES NAVIGATIONS</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    if c1.button("🚀 FUTUR", use_container_width=True): st.session_state.view_mode = "FUTUR"; st.rerun()
-    if c2.button("📂 ARCHIVES", use_container_width=True): st.session_state.view_mode = "ARCHIVES"; st.rerun()
-    
-    if st.button("➕ NOUVELLE FICHE", use_container_width=True): st.session_state.edit_idx = None; st.session_state.page = "FORM"; st.rerun()
-    
-    if not df.empty:
-        df['dt_obj'] = df['DateNav'].apply(parse_date)
-        data = df[df['dt_obj'] >= datetime.now()].sort_values('dt_obj') if st.session_state.view_mode == "FUTUR" else df[df['dt_obj'] < datetime.now()].sort_values('dt_obj', ascending=False)
-        for i, r in data.iterrows():
-            st_txt = str(r.get('Statut', '🟡'))
-            col = "#2ecc71" if "OK" in st_txt.upper() or "🟢" in st_txt else ("#e74c3c" if "🔴" in st_txt else "#f1c40f")
-            st.markdown(f'<div class="client-card" style="border-left-color:{col};"><div style="float:right;"><b>{r.get("PrixJour","0")}€</b></div><b>{r.get("Prénom","")} {r.get("Nom","").upper()}</b><br><small>{r.get("Société","")} | 📅 {r.get("DateNav","")}</small></div>', unsafe_allow_html=True)
-            if st.button("✏️ Modifier", key=f"edit_{i}"): st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
-
+# --- PAGE FORM ---
 elif st.session_state.page == "FORM":
-    st.markdown('<div class="page-title">📝 FICHE NAVIGATION</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">📝 ÉDITION FICHE</div>', unsafe_allow_html=True)
     idx = st.session_state.edit_idx
     init = df.loc[idx].to_dict() if idx is not None else {}
     with st.form("f_nav"):
