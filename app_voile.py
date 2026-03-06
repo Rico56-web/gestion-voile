@@ -125,6 +125,21 @@ if st.session_state.page == "LISTE":
                     sauvegarder_data(df, "contacts.json")
                     st.rerun()
         st.markdown("---")
+        is_annule = "ANNULÉ" in st_txt.upper() or "🔴" in st_txt
+            opacity = "0.5" if is_annule else "1"
+            
+            fiche_html = f"""
+            <div class="client-card" style="border-left:12px solid {col_s}; opacity: {opacity};">
+                <div style="float:right; font-weight:bold; color:{'#e74c3c' if prix_val <= 0 else '#1a2a6c'};">
+                    {prix_str if not is_annule else "---"}
+                </div>
+                <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
+                {l_soc}{l_mail}
+                📅 <b>{r.get('DateNav')}</b> ({r.get('NbJours')}j)<br>
+                <span style="color:{col_s}; font-weight:bold;">{st_txt}</span>
+                {alerte_prix if not is_annule else ""}
+            </div>
+            """
          
           
 elif st.session_state.page == "PLANNING":
@@ -150,6 +165,19 @@ elif st.session_state.page == "PLANNING":
         h += '</tr>'
     st.markdown(h + '</table>', unsafe_allow_html=True)
     for t in txt_p: st.write(t)
+        if not df.empty:
+        for i, r in df.iterrows():
+            st_val = str(r.get('Statut','')).upper()
+            # ON NE TRAITE QUE SI CE N'EST PAS ANNULÉ
+            if "ANNULÉ" not in st_val and "🔴" not in st_val:
+                d_s = parse_d(r.get('DateNav',''))
+                if d_s.year == p_y and d_s.month == p_m:
+                    s_u = str(r.get('Société','')).strip().upper()
+                    cl = "day-cmn" if s_u == "CMN" else ("day-ok" if "OK" in st_val or "🟢" in st_val else "day-wait")
+                    txt_p.append(f"⚓ **{r.get('DateNav')}** : {r.get('Nom')} ({s_u if s_u else r.get('Statut')})")
+                    for j in range(int(float(r.get('NbJours', 1)))):
+                        tg = d_s + timedelta(days=j)
+                        if tg.month == p_m: occu[tg.day] = cl
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS</div>', unsafe_allow_html=True)
@@ -219,6 +247,7 @@ elif st.session_state.page == "FORM":
                     for k,v in row.items(): df.at[idx,k]=v
                 sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
+
 
 
 
