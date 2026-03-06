@@ -102,26 +102,29 @@ elif st.session_state.page == "PLANNING":
         h += '</tr>'
     st.markdown(h + '</table>', unsafe_allow_html=True)
     for t in txt_plan: st.write(t)
-
+        
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 OBJECTIFS & STATS</div>', unsafe_allow_html=True)
-    # CSS pour compacter le tableau et éviter les retours à la ligne
     st.markdown("<style>td, th { white-space: nowrap !important; padding: 4px !important; font-size: 0.85rem !important; } table { width: 100% !important; }</style>", unsafe_allow_html=True)
     
-    # --- SECTION OBJECTIF ANNUEL ---
-    obj_annuel = 10000.0  # Ton objectif annuel
-    s_y = st.selectbox("Année", [2025, 2026], index=1)
+    # --- SECTION OBJECTIF ANNUEL MODIFIABLE ---
+    col_obj1, col_obj2 = st.columns([2, 1])
+    s_y = col_obj1.selectbox("Année", [2025, 2026], index=1)
+    # Champ modifiable pour l'objectif
+    obj_annuel = col_obj2.number_input("Cible €", value=10000, step=1000)
     
     df['dt'], df_f['dt'] = df['DateNav'].apply(parse_d), df_f['Date'].apply(parse_d)
     
-    # Calcul du CA annuel (uniquement les nav 🟢 OK)
+    # Calcul du CA annuel (uniquement 🟢 OK)
     mask_ca_an = (df['dt'].dt.year == s_y) & (df['Statut'].str.contains("OK|🟢", na=False))
     ca_total_an = sum(df[mask_ca_an]['PrixJour'].apply(to_f))
-    progression = min(ca_total_an / obj_annuel, 1.0)
     
-    # Affichage de la barre de progression
-    st.write(f"🎯 **Objectif Annuel : {fmt_p(ca_total_an)} / {fmt_p(obj_annuel)}**")
-    st.progress(progression)
+    # Calcul de la progression (max 100%)
+    prog_val = min(ca_total_an / obj_annuel, 1.0) if obj_annuel > 0 else 0.0
+    percent = (ca_total_an / obj_annuel * 100) if obj_annuel > 0 else 0
+    
+    st.write(f"📊 **Progression : {percent:.1f}%** ({fmt_p(ca_total_an)} / {fmt_p(obj_annuel)})")
+    st.progress(prog_val)
     st.markdown("---")
 
     # --- SECTION TABLEAU MENSUEL ---
@@ -180,6 +183,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
+
 
 
 
