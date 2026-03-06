@@ -145,16 +145,30 @@ elif st.session_state.page == "NOTES":
 
 elif st.session_state.page == "FORM":
     idx = st.session_state.edit_idx; init = df.loc[idx].to_dict() if idx != "NEW" else {}
+    st.markdown('<div class="page-title">✍️ FICHE NAVIGATION</div>', unsafe_allow_html=True)
     with st.form("edit"):
-        st_v = st.selectbox("Statut", ["🟢 OK", "🟡 Attente", "🔴 Annulé"], index=0)
-        p, n, s = st.text_input("Prénom", init.get("Prénom","")), st.text_input("Nom", init.get("Nom","")), st.text_input("Société", init.get("Société",""))
-        t, d, j, pr = st.text_input("Tél", init.get("Téléphone","")), st.text_input("Date", init.get("DateNav","")), st.text_input("Jours", init.get("NbJours","1")), st.text_input("Prix", init.get("PrixJour","0"))
+        st_v = st.selectbox("Statut *", ["🟢 OK", "🟡 Attente", "🔴 Annulé"], index=0)
+        p = st.text_input("Prénom *", init.get("Prénom",""))
+        n = st.text_input("Nom *", init.get("Nom",""))
+        s = st.text_input("Société *", init.get("Société",""))
+        d = st.text_input("Date (JJ/MM/AAAA) *", init.get("DateNav",""))
+        j = st.text_input("Nombre de jours *", init.get("NbJours","1"))
+        
+        # Champs optionnels
+        t = st.text_input("Téléphone", init.get("Téléphone",""))
+        em = st.text_input("Email", init.get("Email",""))
+        pr = st.text_input("Prix Jour (€)", init.get("PrixJour","0"))
+        
         if st.form_submit_button("SAUVEGARDER"):
-            row = {"Prénom":p, "Nom":n, "Société":s, "Téléphone":t, "DateNav":d, "NbJours":j, "PrixJour":pr, "Statut":st_v}
-            if idx=="NEW": df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-            else: 
-                for k,v in row.items(): df.at[idx,k]=v
-            sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
+            # VÉRIFICATION DES CHAMPS OBLIGATOIRES
+            if not all([p, n, s, d, j]):
+                st.error("⚠️ Merci de remplir tous les champs marqués d'une étoile (*)")
+            else:
+                row = {"Prénom":p, "Nom":n, "Société":s, "Téléphone":t, "Email":em, "DateNav":d, "NbJours":j, "PrixJour":pr, "Statut":st_v}
+                if idx=="NEW": df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+                else: 
+                    for k,v in row.items(): df.at[idx,k]=v
+                sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
 
 
