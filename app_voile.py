@@ -12,12 +12,12 @@ st.markdown("""<style>
     .main-title { color: #1a2a6c; font-size: 1.6rem; font-weight: bold; text-align: center; margin-bottom: 20px; }
     .page-title { background: #1a2a6c; color: white; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 15px; }
     .client-card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-left: 12px solid #ccc; }
-    .wa-btn { background-color:#25D366; color:white !important; padding:6px 12px; border-radius:6px; text-decoration:none !important; font-weight:bold; font-size:0.8rem; display:inline-block; margin: 5px 0; }
-    .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: white; }
-    .cal-table td { height: 40px; text-align: center; border: 1px solid #ddd; font-weight: bold; }
+    .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: white; margin-bottom: 10px; }
+    .cal-table td { height: 45px; text-align: center; border: 1px solid #ddd; font-weight: bold; font-size: 0.9rem; }
     .day-ok { background-color: #2ecc71 !important; color: white !important; }
     .day-wait { background-color: #f1c40f !important; color: white !important; }
     .day-cmn { background-color: #3498db !important; color: white !important; }
+    .wa-btn { background-color:#25D366; color:white !important; padding:6px 12px; border-radius:6px; text-decoration:none !important; font-weight:bold; font-size:0.8rem; display:inline-block; margin-top:5px; }
 </style>""", unsafe_allow_html=True)
 
 # --- 2. DATA ---
@@ -57,29 +57,33 @@ for i, (l, p) in enumerate(menu):
         st.session_state.page=p; st.rerun()
 
 # --- 4. PAGES ---
+
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     if c1.button("🚀 FUTURES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): st.session_state.view_mode="FUTURES"; st.rerun()
     if c2.button("📂 PASSÉES", use_container_width=True, type="primary" if st.session_state.view_mode=="PASSÉES" else "secondary"): st.session_state.view_mode="PASSÉES"; st.rerun()
+    
     if st.button("➕ NOUVELLE FICHE", use_container_width=True): st.session_state.edit_idx="NEW"; st.session_state.page="FORM"; st.rerun()
+    
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
         now = datetime.now().replace(hour=0, minute=0, second=0)
         data = df[df['dt'] >= now] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < now]
+        
         for i, r in data.sort_values('dt').iterrows():
             soc, st_t = str(r.get('Société','')).strip(), str(r.get('Statut','🟡'))
             is_an = "ANNULÉ" in st_t.upper() or "🔴" in st_t
-            opac = "0.4" if is_an else "1"
             p_v = to_f(r.get("PrixJour", 0))
-            al = f'<div style="color:#e74c3c;font-weight:bold;font-size:0.8rem;margin-top:5px;border:1px dashed #e74c3c;padding:2px;text-align:center;">⚠️ PRIX MANQUANT</div>' if p_v <= 0 and not is_an else ""
             col_s = "#3498db" if soc.upper() == "CMN" else ("#e74c3c" if is_an else ("#2ecc71" if "OK" in st_t.upper() or "🟢" in st_t else "#f1c40f"))
-            tel = str(r.get('Téléphone',''))
-            fiche = f"""<div class="client-card" style="border-left:12px solid {col_s}; opacity: {opac};">
+            
+            fiche = f"""<div class="client-card" style="border-left:12px solid {col_s}; opacity: {'0.4' if is_an else '1'};">
                 <div style="float:right;font-weight:bold;">{fmt_p(p_v) if not is_an else "---"}</div>
                 <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
-                🏢 {soc}<br>📧 {r.get('Email','')}<br>📅 <b>{r.get('DateNav')}</b> ({r.get('NbJours')}j)<br>
-                📞 {tel}<br><span style="color:{col_s};font-weight:bold;">{st_t}</span>{al}</div>"""
+                🏢 {soc} | 📅 <b>{r.get('DateNav')}</b> ({r.get('NbJours')}j)<br>
+                📧 {r.get('Email','')}<br>📞 {r.get('Téléphone','')}<br>
+                <span style="color:{col_s};font-weight:bold;">{st_t}</span>
+            </div>"""
             st.markdown(fiche, unsafe_allow_html=True)
             ce, cd = st.columns([1, 2])
             if ce.button("✏️", key=f"e_{i}"): st.session_state.edit_idx=i; st.session_state.page="FORM"; st.rerun()
@@ -88,20 +92,27 @@ if st.session_state.page == "LISTE":
 
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
-    y, m = st.columns(2); p_y, p_m = y.selectbox("An", [2025, 2026], index=1), m.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
-    occu = {}
+    y_col, m_col = st.columns(2)
+    p_y = y_col.selectbox("An", [2025, 2026], index=1)
+    p_m = m_col.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
+    
+    occu, details = {}, []
     if not df.empty:
         for i, r in df.iterrows():
             st_v = str(r.get('Statut','')).upper()
             if "ANNULÉ" not in st_v and "🔴" not in st_v:
                 d_s = parse_d(r.get('DateNav',''))
-                if d_s.year == p_y and d_s.month == p_m:
-                    s_u = str(r.get('Société','')).strip().upper()
-                    cl = "day-cmn" if s_u == "CMN" else ("day-ok" if "OK" in st_v or "🟢" in st_v else "day-wait")
-                    for j in range(int(float(r.get('NbJours', 1)))):
-                        tg = d_s + timedelta(days=j)
-                        if tg.month == p_m: occu[tg.day] = cl
-    cal = calendar.monthcalendar(p_y, p_m); h = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
+                nb_j = int(to_f(r.get('NbJours', 1)))
+                for j in range(nb_j):
+                    curr = d_s + timedelta(days=j)
+                    if curr.year == p_y and curr.month == p_m:
+                        s_u = str(r.get('Société','')).strip().upper()
+                        cl = "day-cmn" if s_u == "CMN" else ("day-ok" if "OK" in st_v or "🟢" in st_v else "day-wait")
+                        occu[curr.day] = cl
+                        if j == 0: details.append(f"⚓ **{curr.day}**: {r.get('Nom')} ({s_u if s_u else st_v})")
+
+    cal = calendar.monthcalendar(p_y, p_m)
+    h = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
     for wk in cal:
         h += '<tr>'
         for d in wk:
@@ -109,18 +120,26 @@ elif st.session_state.page == "PLANNING":
             h += f'<td {bg}>{d if d != 0 else ""}</td>'
         h += '</tr>'
     st.markdown(h + '</table>', unsafe_allow_html=True)
+    for t in sorted(details): st.write(t)
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns([2, 1]); s_y, obj = c1.selectbox("Année", [2025, 2026], index=1), c2.number_input("Cible €", value=10000)
-    df['dt'], df_f['dt'] = df['DateNav'].apply(parse_d), df_f['Date'].apply(parse_d)
-    ca = sum(df[(df['dt'].dt.year==s_y) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
-    st.write(f"📊 **{ca/obj*100:.1f}%** ({fmt_p(ca)} / {fmt_p(obj)})"); st.progress(min(ca/obj, 1.0))
+    c1, c2 = st.columns([2, 1])
+    s_y = c1.selectbox("Année", [2025, 2026], index=1)
+    obj = c2.number_input("Objectif €", value=15000)
+    
+    df['dt'] = df['DateNav'].apply(parse_d)
+    df_f['dt'] = df_f['Date'].apply(parse_d)
+    
+    ca_total = sum(df[(df['dt'].dt.year == s_y) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
+    st.write(f"📈 **Objectif : {ca_total/obj*100:.1f}%** ({fmt_p(ca_total)} / {fmt_p(obj)})")
+    st.progress(min(ca_total/obj, 1.0))
+    
     res = []
-    for i in range(1,13):
-        rev = sum(df[(df['dt'].dt.year==s_y) & (df['dt'].dt.month==i) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
-        fr = sum(df_f[(df_f['dt'].dt.year==s_y) & (df_f['dt'].dt.month==i)]['Montant'].apply(to_f))
-        res.append({"Mois": calendar.month_name[i], "Rev": fmt_p(rev), "Frais": fmt_p(fr), "Net": fmt_p(rev-fr)})
+    for i in range(1, 13):
+        rev = sum(df[(df['dt'].dt.year == s_y) & (df['dt'].dt.month == i) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
+        fr = sum(df_f[(df_f['dt'].dt.year == s_y) & (df_f['dt'].dt.month == i)]['Montant'].apply(to_f))
+        res.append({"Mois": calendar.month_name[i], "Revenu": fmt_p(rev), "Frais": fmt_p(fr), "Net": fmt_p(rev-fr)})
     st.table(pd.DataFrame(res).set_index('Mois'))
 
 elif st.session_state.page == "FRAIS":
@@ -129,14 +148,17 @@ elif st.session_state.page == "FRAIS":
         idx = st.session_state.edit_f_idx
         init = df_f.loc[idx].to_dict() if idx != "NEW" else {"Date": datetime.now().strftime("%d/%m/%Y"), "Montant": "0", "Note": ""}
         with st.form("f_form"):
-            d, m, n = st.text_input("Date", init.get("Date")), st.text_input("Montant", init.get("Montant")), st.text_area("Note", init.get("Note"))
+            d = st.text_input("Date", init.get("Date"))
+            m = st.text_input("Montant", init.get("Montant"))
+            n = st.text_area("Note", init.get("Note"))
             if st.form_submit_button("SAUVEGARDER"):
                 row = {"Date": d, "Montant": m, "Note": n}
                 if idx == "NEW": df_f = pd.concat([df_f, pd.DataFrame([row])], ignore_index=True)
-                else: 
+                else:
                     for k,v in row.items(): df_f.at[idx,k]=v
                 sauvegarder_data(df_f, "frais.json"); st.session_state.edit_f_idx = None; st.rerun()
             if st.form_submit_button("Annuler"): st.session_state.edit_f_idx = None; st.rerun()
+
     if st.button("➕ AJOUTER UN FRAIS", use_container_width=True): st.session_state.edit_f_idx = "NEW"; st.rerun()
     for i, r in df_f.sort_index(ascending=False).iterrows():
         st.markdown(f'<div class="client-card"><b>{r.get("Date")} : {fmt_p(r.get("Montant"))}</b><br>{r.get("Note")}</div>', unsafe_allow_html=True)
@@ -151,8 +173,9 @@ elif st.session_state.page == "NOTES":
         idx = st.session_state.edit_n_idx
         init = df_n.loc[idx].to_dict() if idx != "NEW" else {"Titre": "", "Contenu": ""}
         with st.form("n_form"):
-            t, c = st.text_input("Titre", init.get("Titre")), st.text_area("Contenu", init.get("Contenu"))
-            if st.form_submit_button("OK"):
+            t = st.text_input("Titre", init.get("Titre"))
+            c = st.text_area("Contenu", init.get("Contenu"))
+            if st.form_submit_button("SAUVEGARDER"):
                 row = {"Titre":t, "Contenu":c, "Date":datetime.now().strftime("%d/%m/%Y")}
                 if idx=="NEW": df_n = pd.concat([df_n, pd.DataFrame([row])], ignore_index=True)
                 else:
@@ -168,8 +191,9 @@ elif st.session_state.page == "NOTES":
             if st.button("Confirmer", key=f"nb_{i}"): df_n.drop(i).pipe(sauvegarder_data, "notes.json"); st.rerun()
 
 elif st.session_state.page == "FORM":
-    idx = st.session_state.edit_idx; init = df.loc[idx].to_dict() if idx != "NEW" else {}
-    with st.form("edit"):
+    idx = st.session_state.edit_idx
+    init = df.loc[idx].to_dict() if idx != "NEW" else {}
+    with st.form("edit_client"):
         st_v = st.selectbox("Statut *", ["🟢 OK", "🟡 Attente", "🔴 Annulé"], index=0)
         p, n, s = st.text_input("Prénom *", init.get("Prénom","")), st.text_input("Nom *", init.get("Nom","")), st.text_input("Société *", init.get("Société",""))
         d, j = st.text_input("Date (JJ/MM/AAAA) *", init.get("DateNav","")), st.text_input("Nb Jours *", init.get("NbJours","1"))
