@@ -105,15 +105,24 @@ elif st.session_state.page == "PLANNING":
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS DÉTAILLÉES</div>', unsafe_allow_html=True)
+    # CSS pour éviter le retour à la ligne dans le tableau
+    st.markdown("<style>td { white-space: nowrap !important; } th { white-space: nowrap !important; }</style>", unsafe_allow_html=True)
+    
     s_y = st.selectbox("Année", [2025, 2026], index=1)
     df['dt'], df_f['dt'] = df['DateNav'].apply(parse_d), df_f['Date'].apply(parse_d)
+    
+    # Liste des mois en Français
+    mois_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", 
+               "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+    
     res = []
-    for m in range(1, 13):
-        ca = sum(df[(df['dt'].dt.year==s_y) & (df['dt'].dt.month==m) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
-        fr = sum(df_f[(df_f['dt'].dt.year==s_y) & (df_f['dt'].dt.month==m)]['Montant'].apply(to_f))
-        res.append({"Mois": calendar.month_name[m], "CA": fmt_p(ca), "Frais": fmt_p(fr), "Net": fmt_p(ca-fr)})
+    for i, m_name in enumerate(mois_fr):
+        m_num = i + 1
+        ca = sum(df[(df['dt'].dt.year==s_y) & (df['dt'].dt.month==m_num) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
+        fr = sum(df_f[(df_f['dt'].dt.year==s_y) & (df_f['dt'].dt.month==m_num)]['Montant'].apply(to_f))
+        res.append({"Mois": m_name, "Revenus": fmt_p(ca), "Frais": fmt_p(fr), "Net": fmt_p(ca-fr)})
+    
     st.table(pd.DataFrame(res))
-
 elif st.session_state.page == "FRAIS":
     st.markdown('<div class="page-title">🔧 MAINTENANCE</div>', unsafe_allow_html=True)
     if st.button("➕ NOUVEAU FRAIS", use_container_width=True): st.session_state.edit_f_idx="NEW"; st.rerun()
@@ -154,6 +163,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
+
 
 
 
