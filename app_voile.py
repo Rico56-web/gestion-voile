@@ -145,24 +145,29 @@ elif st.session_state.page == "BUDGET":
 elif st.session_state.page == "FRAIS":
     st.markdown('<div class="page-title">🔧 MAINTENANCE</div>', unsafe_allow_html=True)
     
-    # 1. GESTION DU FORMULAIRE (S'affiche en haut si edit_f_idx n'est pas None)
+    # FONCTIONS CALLBACK (Pour forcer Streamlit à enregistrer le clic)
+    def activer_edit_f(idx): st.session_state.edit_f_idx = idx
+    def annuler_edit_f(): st.session_state.edit_f_idx = None
+
+    # 1. LE FORMULAIRE (Toujours en haut si activé)
     if st.session_state.edit_f_idx is not None:
         idx = st.session_state.edit_f_idx
         if idx == "NEW":
             init = {"Date": datetime.now().strftime("%d/%m/%Y"), "Montant": "0", "Note": ""}
             st.subheader("➕ NOUVEAU FRAIS")
         else:
+            # On récupère les données via l'index stocké
             init = df_f.loc[idx].to_dict()
-            st.subheader("✏️ MODIFIER LE FRAIS")
+            st.subheader(f"✏️ MODIFIER LE FRAIS")
+
+        with st.form(key="form_frais_global"):
+            d_f = st.text_input("Date", init.get("Date"))
+            m_f = st.text_input("Montant (€)", str(init.get("Montant")))
+            n_f = st.text_area("Note", init.get("Note"))
             
-        with st.form(key=f"form_frais_{idx}"):
-            d = st.text_input("Date (JJ/MM/AAAA)", init.get("Date"))
-            m = st.text_input("Montant (€)", str(init.get("Montant")))
-            n = st.text_area("Note / Description", init.get("Note"))
-            
-            c_s, c_a = st.columns(2)
-            if c_s.form_submit_button("✅ SAUVEGARDER"):
-                row = {"Date": d, "Montant": m, "Note": n}
+            c_save, c_annul = st.columns(2)
+            if c_save.form_submit_button("✅ ENREGISTRER"):
+                row = {"Date": d_f, "Montant": m_f, "Note": n_f}
                 if idx == "NEW":
                     df_f = pd.concat([df_f, pd.DataFrame([row])], ignore_index=True)
                 else:
@@ -170,22 +175,19 @@ elif st.session_state.page == "FRAIS":
                 sauvegarder_data(df_f, "frais.json")
                 st.session_state.edit_f_idx = None
                 st.rerun()
-            if c_a.form_submit_button("❌ ANNULER"):
-                st.session_state.edit_f_idx = None
+            if c_annul.form_submit_button("❌ ANNULER", on_click=annuler_edit_f):
                 st.rerun()
         st.markdown("---")
 
-    # 2. BOUTON AJOUTER (Visible seulement si on n'est pas en train d'éditer)
+    # 2. BOUTON AJOUTER
     if st.session_state.edit_f_idx is None:
-        if st.button("➕ AJOUTER UN FRAIS", use_container_width=True):
-            st.session_state.edit_f_idx = "NEW"
-            st.rerun()
+        st.button("➕ AJOUTER UN FRAIS", on_click=activer_edit_f, args=("NEW",), use_container_width=True)
 
     # 3. LISTE DES FRAIS
     if not df_f.empty:
-        # On trie pour avoir les plus récents en haut
-        df_f_view = df_f.sort_index(ascending=False)
-        for i, r in df_f_view.iterrows():
+        # On affiche la liste (triée par index décroissant pour voir les derniers en haut)
+        for i in reversed(df_f.index):
+            r = df_f.loc[i]
             st.markdown(f"""
                 <div class="client-card" style="border-left:12px solid #95a5a6;">
                     <div style="float:right; font-weight:bold; color:#e74c3c;">{fmt_p(r.get('Montant'))}</div>
@@ -194,14 +196,13 @@ elif st.session_state.page == "FRAIS":
                 </div>
             """, unsafe_allow_html=True)
             
-            ce, cd = st.columns([1, 2])
-            # Utilisation d'un callback ou d'un bouton direct avec rerun
-            if ce.button("✏️ Modifier", key=f"btn_edit_f_{i}"):
-                st.session_state.edit_f_idx = i
-                st.rerun()
-                
-            if cd.checkbox("🗑️ Supprimer", key=f"chk_del_f_{i}"):
-                if st.button("Confirmer", key=f"btn_conf_f_{i}"):
+            col_ed, col_del = st.columns([1, 2])
+            
+            # Utilisation du paramètre on_click (INDISPENSABLE SUR MOBILE)
+            col_ed.button("✏️ Modifier", key=f"f_edit_btn_{i}", on_click=activer_edit_f, args=(i,))
+            
+            if col_del.checkbox("🗑️ Supprimer", key=f"f_del_chk_{i}"):
+                if st.button("Confirmer suppression", key=f"f_del_btn_{i}"):
                     df_f = df_f.drop(i)
                     sauvegarder_data(df_f, "frais.json")
                     st.rerun()
@@ -247,6 +248,7 @@ elif st.session_state.page == "FORM":
                     for k,v in row.items(): df.at[idx,k]=v
                 sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
+
 
 
 
