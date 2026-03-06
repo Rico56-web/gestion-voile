@@ -335,7 +335,7 @@
         "PrixJour":"450",
         "Passagers":null,
         "Historique":null,
-        "Société":null,
+        "Société":"Cmn",
         "Milles":null,
         "HeuresMoteur":null,
         "dt_obj":null,
