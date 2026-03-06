@@ -74,49 +74,47 @@ if st.session_state.page == "LISTE":
         data = df[df['dt'] >= now] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < now]
         
         for i, r in data.sort_values('dt').iterrows():
-            # Extraction et nettoyage des données
             soc = str(r.get('Société','')).strip()
             st_txt = str(r.get('Statut','🟡'))
             mail = str(r.get('Email','')).strip()
             tel = str(r.get('Téléphone',''))
             tel_clean = "".join(filter(str.isdigit, tel))
             
-            # Logique de couleur : BLEU si CMN, sinon selon Statut
+            # Couleur : Bleu si CMN, sinon selon statut
             if soc.upper() == "CMN":
-                col_s = "#3498db" # Bleu CMN
+                col_s = "#3498db"
             else:
                 col_s = "#2ecc71" if "OK" in st_txt.upper() or "🟢" in st_txt else ("#e74c3c" if "🔴" in st_txt else "#f1c40f")
             
-            # Préparation des lignes conditionnelles
-            l_soc = f"🏢 <b>{soc}</b><br>" if soc else ""
-            l_mail = f"📧 <a href='mailto:{mail}' style='color:#1a2a6c;'>{mail}</a><br>" if mail else ""
+            # Construction sécurisée du HTML
+            html_content = f"""
+            <div class="client-card" style="border-left:12px solid {col_s};">
+                <div style="float:right; font-weight:bold; color:#1a2a6c;">{fmt_p(r.get("PrixJour",0))}</div>
+                <b style="font-size:1.1rem;">{r.get("Prénom","")} {r.get("Nom","").upper()}</b><br>
+                {"🏢 <b>"+soc+"</b><br>" if soc else ""}
+                {"📧 <a href='mailto:"+mail+"' style='color:#1a2a6c;'>"+mail+"</a><br>" if mail else ""}
+                📅 <b>{r.get("DateNav")}</b> ({r.get("NbJours")}j)<br>
+                📞 <a href="tel:{tel}" style="color:#1a2a6c; font-weight:bold; text-decoration:none;">{tel}</a><br>
+                <a href="https://wa.me/{tel_clean}" target="_blank" class="wa-btn">💬 WHATSAPP</a><br>
+                <span style="color:{col_s}; font-weight:bold;">{st_txt}</span>
+            </div>
+            """
+            st.markdown(html_content, unsafe_allow_html=True)
             
-            # Affichage de la Carte Client
-            st.markdown(f'''
-                <div class="client-card" style="border-left:12px solid {col_s};">
-                    <div style="float:right; font-weight:bold; color:#1a2a6c;">{fmt_p(r.get("PrixJour",0))}</div>
-                    <b style="font-size:1.1rem;">{r.get("Prénom","")} {r.get("Nom","").upper()}</b><br>
-                    {l_soc}
-                    {l_mail}
-                    📅 <b>{r.get("DateNav")}</b> ({r.get("NbJours")}j)<br>
-                    📞 <a href="tel:{tel}" style="color:#1a2a6c; font-weight:bold; text-decoration:none;">{tel}</a><br>
-                    <a href="https://wa.me/{tel_clean}" target="_blank" class="wa-btn">💬 WHATSAPP</a><br>
-                    <span style="color:{col_s}; font-weight:bold;">{st_txt}</span>
-                </div>
-            ''', unsafe_allow_html=True)
-            
-            # Boutons d'action
+            # Boutons d'action hors du bloc HTML
             c_ed, c_del = st.columns([1, 2])
             if c_ed.button("✏️ Modifier", key=f"e_{i}"): 
                 st.session_state.edit_idx=i; st.session_state.page="FORM"; st.rerun()
             
             if c_del.checkbox("🗑️ Supprimer", key=f"ck_{i}"):
-                if st.button("Confirmer la suppression définitive", key=f"bt_{i}"): 
+                if st.button("Confirmer", key=f"bt_{i}"): 
                     df = df.drop(i)
                     sauvegarder_data(df, "contacts.json")
                     st.rerun()
         st.markdown("---")
-
+            
+         
+          
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
     y, m = st.columns(2); p_y, p_m = y.selectbox("An", [2025, 2026], index=1), m.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
@@ -209,6 +207,7 @@ elif st.session_state.page == "FORM":
                     for k,v in row.items(): df.at[idx,k]=v
                 sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
+
 
 
 
