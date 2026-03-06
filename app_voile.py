@@ -74,34 +74,38 @@ if st.session_state.page == "LISTE":
         data = df[df['dt'] >= now] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < now]
         
         for i, r in data.sort_values('dt').iterrows():
-            # 1. Préparation des données
+            # 1. Préparation et nettoyage
             soc = str(r.get('Société','')).strip()
             st_txt = str(r.get('Statut','🟡'))
             mail = str(r.get('Email','')).strip()
             tel = str(r.get('Téléphone',''))
             tel_clean = "".join(filter(str.isdigit, tel))
             
-            # 2. Gestion du prix et de l'alerte
+            # 2. Logique d'annulation (Grisage)
+            is_annule = "ANNULÉ" in st_txt.upper() or "🔴" in st_txt
+            opac = "0.4" if is_annule else "1"
+            
+            # 3. Gestion du prix et alerte
             prix_val = to_f(r.get("PrixJour", 0))
             prix_str = fmt_p(prix_val)
-            alerte_prix = ""
-            if prix_val <= 0:
-                alerte_prix = '<div style="color: #e74c3c; font-weight: bold; font-size: 0.85rem; margin-top: 5px; border: 1px dashed #e74c3c; padding: 2px; text-align: center;">⚠️ PRIX NON SAISI !</div>'
+            alerte_p = ""
+            if prix_val <= 0 and not is_annule:
+                alerte_p = '<div style="color: #e74c3c; font-weight: bold; font-size: 0.8rem; margin-top: 5px; border: 1px dashed #e74c3c; padding: 2px; text-align: center;">⚠️ PRIX MANQUANT</div>'
             
-            # 3. Couleur : Bleu si CMN, sinon selon statut
+            # 4. Couleurs
             if soc.upper() == "CMN":
                 col_s = "#3498db"
             else:
-                col_s = "#2ecc71" if "OK" in st_txt.upper() or "🟢" in st_txt else ("#e74c3c" if "🔴" in st_txt else "#f1c40f")
+                col_s = "#2ecc71" if "OK" in st_txt.upper() or "🟢" in st_txt else ("#e74c3c" if is_annule else "#f1c40f")
             
-            # 4. Construction du HTML
+            # 5. HTML de la fiche
             l_soc = f"🏢 <b>{soc}</b><br>" if soc else ""
             l_mail = f"📧 <a href='mailto:{mail}' style='color:#1a2a6c;'>{mail}</a><br>" if mail else ""
             
             fiche_html = f"""
-            <div class="client-card" style="border-left:12px solid {col_s};">
-                <div style="float:right; font-weight:bold; color:{'#e74c3c' if prix_val <= 0 else '#1a2a6c'};">
-                    {prix_str}
+            <div class="client-card" style="border-left:12px solid {col_s}; opacity: {opac};">
+                <div style="float:right; font-weight:bold; color:{'#e74c3c' if prix_val <= 0 and not is_annule else '#1a2a6c'};">
+                    {prix_str if not is_annule else "---"}
                 </div>
                 <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
                 {l_soc}{l_mail}
@@ -109,37 +113,19 @@ if st.session_state.page == "LISTE":
                 📞 <a href="tel:{tel}" style="color:#1a2a6c; font-weight:bold; text-decoration:none;">{tel}</a><br>
                 <a href="https://wa.me/{tel_clean}" target="_blank" class="wa-btn">💬 WHATSAPP</a><br>
                 <span style="color:{col_s}; font-weight:bold;">{st_txt}</span>
-                {alerte_prix}
+                {alerte_p}
             </div>
             """
             st.markdown(fiche_html, unsafe_allow_html=True)
             
-            # 5. Boutons d'action
+            # 6. Boutons d'action
             c_ed, c_del = st.columns([1, 2])
-            if c_ed.button("✏️ Modifier", key=f"e_{i}"): 
+            if c_ed.button("✏️", key=f"e_{i}"): 
                 st.session_state.edit_idx=i; st.session_state.page="FORM"; st.rerun()
-            
-            if c_del.checkbox("🗑️ Supprimer", key=f"ck_{i}"):
+            if c_del.checkbox("🗑️", key=f"ck_{i}"):
                 if st.button("Confirmer", key=f"bt_{i}"): 
-                    df = df.drop(i)
-                    sauvegarder_data(df, "contacts.json")
-                    st.rerun()
+                    df.drop(i).pipe(sauvegarder_data, "contacts.json"); st.rerun()
         st.markdown("---")
-        is_annule = "ANNULÉ" in st_txt.upper() or "🔴" in st_txt
-            opacity = "0.5" if is_annule else "1"
-            
-            fiche_html = f"""
-            <div class="client-card" style="border-left:12px solid {col_s}; opacity: {opacity};">
-                <div style="float:right; font-weight:bold; color:{'#e74c3c' if prix_val <= 0 else '#1a2a6c'};">
-                    {prix_str if not is_annule else "---"}
-                </div>
-                <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
-                {l_soc}{l_mail}
-                📅 <b>{r.get('DateNav')}</b> ({r.get('NbJours')}j)<br>
-                <span style="color:{col_s}; font-weight:bold;">{st_txt}</span>
-                {alerte_prix if not is_annule else ""}
-            </div>
-            """
          
           
 elif st.session_state.page == "PLANNING":
@@ -247,6 +233,7 @@ elif st.session_state.page == "FORM":
                     for k,v in row.items(): df.at[idx,k]=v
                 sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
+
 
 
 
