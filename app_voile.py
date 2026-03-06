@@ -74,31 +74,32 @@ if st.session_state.page == "LISTE":
         data = df[df['dt'] >= now] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < now]
         
         for i, r in data.sort_values('dt').iterrows():
-            # 1. Préparation et nettoyage
             soc = str(r.get('Société','')).strip()
             st_txt = str(r.get('Statut','🟡'))
             mail = str(r.get('Email','')).strip()
             tel = str(r.get('Téléphone',''))
             tel_clean = "".join(filter(str.isdigit, tel))
             
-            # 2. Logique d'annulation (Grisage)
+            # Logique d'annulation (Grisage)
             is_annule = "ANNULÉ" in st_txt.upper() or "🔴" in st_txt
             opac = "0.4" if is_annule else "1"
             
-            # 3. Gestion du prix et alerte
+            # Gestion du prix et alerte
             prix_val = to_f(r.get("PrixJour", 0))
             prix_str = fmt_p(prix_val)
             alerte_p = ""
             if prix_val <= 0 and not is_annule:
                 alerte_p = '<div style="color: #e74c3c; font-weight: bold; font-size: 0.8rem; margin-top: 5px; border: 1px dashed #e74c3c; padding: 2px; text-align: center;">⚠️ PRIX MANQUANT</div>'
             
-            # 4. Couleurs
+            # Couleurs (Bleu si CMN, Rouge si Annulé, Vert si OK)
             if soc.upper() == "CMN":
                 col_s = "#3498db"
+            elif is_annule:
+                col_s = "#e74c3c"
             else:
-                col_s = "#2ecc71" if "OK" in st_txt.upper() or "🟢" in st_txt else ("#e74c3c" if is_annule else "#f1c40f")
+                col_s = "#2ecc71" if "OK" in st_txt.upper() or "🟢" in st_txt else "#f1c40f"
             
-            # 5. HTML de la fiche
+            # HTML de la fiche
             l_soc = f"🏢 <b>{soc}</b><br>" if soc else ""
             l_mail = f"📧 <a href='mailto:{mail}' style='color:#1a2a6c;'>{mail}</a><br>" if mail else ""
             
@@ -118,13 +119,14 @@ if st.session_state.page == "LISTE":
             """
             st.markdown(fiche_html, unsafe_allow_html=True)
             
-            # 6. Boutons d'action
             c_ed, c_del = st.columns([1, 2])
             if c_ed.button("✏️", key=f"e_{i}"): 
                 st.session_state.edit_idx=i; st.session_state.page="FORM"; st.rerun()
             if c_del.checkbox("🗑️", key=f"ck_{i}"):
                 if st.button("Confirmer", key=f"bt_{i}"): 
-                    df.drop(i).pipe(sauvegarder_data, "contacts.json"); st.rerun()
+                    df = df.drop(i)
+                    sauvegarder_data(df, "contacts.json")
+                    st.rerun()
         st.markdown("---")
          
           
@@ -233,6 +235,7 @@ elif st.session_state.page == "FORM":
                     for k,v in row.items(): df.at[idx,k]=v
                 sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
+
 
 
 
