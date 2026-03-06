@@ -105,24 +105,29 @@ elif st.session_state.page == "PLANNING":
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS DÉTAILLÉES</div>', unsafe_allow_html=True)
-    # CSS pour éviter le retour à la ligne dans le tableau
-    st.markdown("<style>td { white-space: nowrap !important; } th { white-space: nowrap !important; }</style>", unsafe_allow_html=True)
+    # CSS pour compacter le tableau et éviter les retours à la ligne
+    st.markdown("<style>td, th { white-space: nowrap !important; padding: 4px !important; font-size: 0.85rem !important; } table { width: 100% !important; }</style>", unsafe_allow_html=True)
     
     s_y = st.selectbox("Année", [2025, 2026], index=1)
     df['dt'], df_f['dt'] = df['DateNav'].apply(parse_d), df_f['Date'].apply(parse_d)
     
-    # Liste des mois en Français
-    mois_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", 
-               "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+    mois_fr = ["Janv.", "Févr.", "Mars", "Avril", "Mai", "Juin", "Juil.", "Août", "Sept.", "Oct.", "Nov.", "Déc."]
     
     res = []
     for i, m_name in enumerate(mois_fr):
         m_num = i + 1
-        ca = sum(df[(df['dt'].dt.year==s_y) & (df['dt'].dt.month==m_num) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
-        fr = sum(df_f[(df_f['dt'].dt.year==s_y) & (df_f['dt'].dt.month==m_num)]['Montant'].apply(to_f))
+        mask_ca = (df['dt'].dt.year == s_y) & (df['dt'].dt.month == m_num) & (df['Statut'].str.contains("OK|🟢", na=False))
+        ca = sum(df[mask_ca]['PrixJour'].apply(to_f))
+        
+        mask_fr = (df_f['dt'].dt.year == s_y) & (df_f['dt'].dt.month == m_num)
+        fr = sum(df_f[mask_fr]['Montant'].apply(to_f))
+        
         res.append({"Mois": m_name, "Revenus": fmt_p(ca), "Frais": fmt_p(fr), "Net": fmt_p(ca-fr)})
     
-    st.table(pd.DataFrame(res))
+    # On affiche le tableau sans la colonne d'index (le numéro 0, 1, 2...)
+    st.table(pd.DataFrame(res).set_index('Mois'))
+
+
 elif st.session_state.page == "FRAIS":
     st.markdown('<div class="page-title">🔧 MAINTENANCE</div>', unsafe_allow_html=True)
     if st.button("➕ NOUVEAU FRAIS", use_container_width=True): st.session_state.edit_f_idx="NEW"; st.rerun()
@@ -163,6 +168,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
+
 
 
 
