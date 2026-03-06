@@ -147,7 +147,43 @@ elif st.session_state.page == "FRAIS":
 
 elif st.session_state.page == "NOTES":
     st.markdown('<div class="page-title">📝 NOTES</div>', unsafe_allow_html=True)
-    if st.session
+    if st.session_state.edit_n_idx is not None:
+        idx = st.session_state.edit_n_idx
+        init = df_n.loc[idx].to_dict() if idx != "NEW" else {"Titre": "", "Contenu": ""}
+        with st.form("n_form"):
+            t, c = st.text_input("Titre", init.get("Titre")), st.text_area("Contenu", init.get("Contenu"))
+            if st.form_submit_button("OK"):
+                row = {"Titre":t, "Contenu":c, "Date":datetime.now().strftime("%d/%m/%Y")}
+                if idx=="NEW": df_n = pd.concat([df_n, pd.DataFrame([row])], ignore_index=True)
+                else:
+                    for k,v in row.items(): df_n.at[idx,k]=v
+                sauvegarder_data(df_n, "notes.json"); st.session_state.edit_n_idx=None; st.rerun()
+            if st.form_submit_button("Annuler"): st.session_state.edit_n_idx=None; st.rerun()
+    if st.button("➕ NOTE", use_container_width=True): st.session_state.edit_n_idx="NEW"; st.rerun()
+    for i, r in df_n.iterrows():
+        st.markdown(f'<div class="client-card"><b>{r.get("Titre")}</b> ({r.get("Date")})<br>{r.get("Contenu")}</div>', unsafe_allow_html=True)
+        ce, cd = st.columns([1, 2])
+        if ce.button("✏️", key=f"ne_{i}"): st.session_state.edit_n_idx=i; st.rerun()
+        if cd.checkbox("🗑️", key=f"nc_{i}"):
+            if st.button("Confirmer", key=f"nb_{i}"): df_n.drop(i).pipe(sauvegarder_data, "notes.json"); st.rerun()
+
+elif st.session_state.page == "FORM":
+    idx = st.session_state.edit_idx; init = df.loc[idx].to_dict() if idx != "NEW" else {}
+    with st.form("edit"):
+        st_v = st.selectbox("Statut *", ["🟢 OK", "🟡 Attente", "🔴 Annulé"], index=0)
+        p, n, s = st.text_input("Prénom *", init.get("Prénom","")), st.text_input("Nom *", init.get("Nom","")), st.text_input("Société *", init.get("Société",""))
+        d, j = st.text_input("Date (JJ/MM/AAAA) *", init.get("DateNav","")), st.text_input("Nb Jours *", init.get("NbJours","1"))
+        t, em = st.text_input("Téléphone", init.get("Téléphone","")), st.text_input("Email", init.get("Email",""))
+        pr = st.text_input("Prix Jour", init.get("PrixJour","0"))
+        if st.form_submit_button("SAUVEGARDER"):
+            if not all([p, n, s, d, j]): st.error("⚠️ Remplir les champs *")
+            else:
+                row = {"Prénom":p, "Nom":n, "Société":s, "Téléphone":t, "Email":em, "DateNav":d, "NbJours":j, "PrixJour":pr, "Statut":st_v}
+                if idx=="NEW": df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+                else: 
+                    for k,v in row.items(): df.at[idx,k]=v
+                sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
+    if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
 
 
 
