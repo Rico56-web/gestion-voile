@@ -137,41 +137,74 @@ elif st.session_state.page == "BUDGET":
         f_m = sum(df_f[(df_f['dt'].dt.year==s_y) & (df_f['dt'].dt.month==i+1)]['Montant'].apply(to_f))
         res.append({"Mois": m_n, "Rev": fmt_p(c_m), "Frais": fmt_p(f_m), "Net": fmt_p(c_m-f_m)})
     st.table(pd.DataFrame(res).set_index('Mois'))
+rerun()
 
 elif st.session_state.page == "FRAIS":
-    st.markdown('<div class="page-title">🔧 MAINTENACE & FRAIS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">🔧 MAINTENANCE & FRAIS</div>', unsafe_allow_html=True)
     
-    # Bouton pour ajouter un nouveau frais
-    if st.button("➕ AJOUTER UN FRAIS", use_container_width=True):
-        st.session_state.edit_f_idx = "NEW"
-        st.rerun()
-
-    # Formulaire d'ajout ou de modification
+    # 1. GESTION DU FORMULAIRE (Affiché si on clique sur + ou sur ✏️)
     if st.session_state.edit_f_idx is not None:
         idx = st.session_state.edit_f_idx
-        # Pré-remplissage si modification
-        init = df_f.loc[idx].to_dict() if idx != "NEW" else {"Date": datetime.now().strftime("%d/%m/%Y"), "Montant": "0", "Note": ""}
+        # On récupère les données existantes si c'est une modification
+        if idx == "NEW":
+            init = {"Date": datetime.now().strftime("%d/%m/%Y"), "Montant": "0", "Note": ""}
+            titre_form = "➕ NOUVEAU FRAIS"
+        else:
+            init = df_f.loc[idx].to_dict()
+            titre_form = "✏️ MODIFIER LE FRAIS"
         
-        with st.form("form_frais"):
-            st.write("📝 Détails du frais" if idx == "NEW" else "✏️ Modifier le frais")
-            d = st.text_input("Date (JJ/MM/AAAA)", init.get("Date"))
-            m = st.text_input("Montant (€)", init.get("Montant"))
-            n = st.text_area("Description / Note", init.get("Note"))
+        with st.form("form_frais_unique"):
+            st.subheader(titre_form)
+            d_f = st.text_input("Date (JJ/MM/AAAA)", init.get("Date"))
+            m_f = st.text_input("Montant (€)", str(init.get("Montant")))
+            n_f = st.text_area("Description", init.get("Note"))
             
-            c1, c2 = st.columns(2)
-            if c1.form_submit_button("SAUVEGARDER"):
-                row = {"Date": d, "Montant": m, "Note": n}
+            col_save, col_annul = st.columns(2)
+            if col_save.form_submit_button("✅ SAUVEGARDER"):
+                new_row = {"Date": d_f, "Montant": m_f, "Note": n_f}
                 if idx == "NEW":
-                    df_f = pd.concat([df_f, pd.DataFrame([row])], ignore_index=True)
+                    df_f = pd.concat([df_f, pd.DataFrame([new_row])], ignore_index=True)
                 else:
-                    for k, v in row.items(): df_f.at[idx, k] = v
+                    for k, v in new_row.items(): df_f.at[idx, k] = v
                 sauvegarder_data(df_f, "frais.json")
+                st.session_state.edit_f_idx = None # On ferme le formulaire
+                st.rerun()
+                
+            if col_annul.form_submit_button("❌ ANNULER"):
                 st.session_state.edit_f_idx = None
                 st.rerun()
-            if c2.form_submit_button("ANNULER"):
-                st.session_state.edit_f_idx = None
-                st.rerun()
+        st.markdown("---") # Séparateur visuel
 
+    # 2. BOUTON D'AJOUT (Visible seulement si on ne modifie pas déjà)
+    if st.session_state.edit_f_idx is None:
+        if st.button("➕ AJOUTER UN FRAIS", use_container_width=True):
+            st.session_state.edit_f_idx = "NEW"
+            st.rerun()
+
+    # 3. LISTE DES FRAIS
+    if not df_f.empty:
+        # On trie pour voir les derniers frais en haut
+        for i, r in df_f.sort_index(ascending=False).iterrows():
+            st.markdown(f"""
+                <div class="client-card" style="border-left: 12px solid #95a5a6;">
+                    <div style="float:right; font-weight:bold; color:#e74c3c;">{fmt_p(r.get('Montant'))}</div>
+                    <b>📅 {r.get('Date')}</b><br>
+                    <div style="font-size:0.9rem; margin-top:5px;">{r.get('Note')}</div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            c_f_ed, c_f_del = st.columns([1, 2])
+            
+            # LE BOUTON CRAYON QUI ACTIVE L'ÉDITION
+            if c_f_ed.button("✏️", key=f"btn_f_ed_{i}"):
+                st.session_state.edit_f_idx = i
+                st.rerun()
+            
+            if c_f_del.checkbox("🗑️", key=f"chk_f_del_{i}"):
+                if st.button("Confirmer suppression", key=f"conf_f_del_{i}"):
+                    df_f = df_f.drop(i)
+                    sauvegarder_data(df_f, "frais.json")
+                    st.rerun()
     # Affichage de la liste des frais
     if not df_f.empty:
         # Tri par date (le plus récent en haut)
@@ -228,6 +261,7 @@ elif st.session_state.page == "FORM":
                     for k,v in row.items(): df.at[idx,k]=v
                 sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
+
 
 
 
