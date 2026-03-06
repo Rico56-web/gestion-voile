@@ -59,24 +59,31 @@ for i, (l, p) in enumerate(menu):
         st.session_state.page=p; st.rerun()
 
 # --- 4. PAGES ---
-if st.session_state.page == "LISTE":
-    st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    if c1.button("🚀 FUTURES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): st.session_state.view_mode="FUTURES"; st.rerun()
-    if c2.button("📂 PASSÉES", use_container_width=True, type="primary" if st.session_state.view_mode=="PASSÉES" else "secondary"): st.session_state.view_mode="PASSÉES"; st.rerun()
-    if st.button("➕ NOUVELLE FICHE", use_container_width=True): st.session_state.edit_idx="NEW"; st.session_state.page="FORM"; st.rerun()
-    if not df.empty:
-        df['dt'] = df['DateNav'].apply(parse_d)
-        data = df[df['dt'] >= datetime.now().replace(hour=0,minute=0,second=0)] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < datetime.now().replace(hour=0,minute=0,second=0)]
-        for i, r in data.sort_values('dt').iterrows():
+for i, r in data.sort_values('dt').iterrows():
             st_txt = str(r.get('Statut','🟡'))
-            col_s = "#2ecc71" if "OK" in st_txt.upper() or "🟢" in st_txt else ("#e74c3c" if "🔴" in st_txt else "#f1c40f")
+            # On récupère la société et on nettoie les espaces
+            societe = str(r.get('Société','')).strip()
+            
+            # Couleur de la barre latérale : BLEU si CMN, sinon selon le statut
+            if societe.upper() == "CMN":
+                col_s = "#3498db" # Bleu CMN
+            else:
+                col_s = "#2ecc71" if "OK" in st_txt.upper() or "🟢" in st_txt else ("#e74c3c" if "🔴" in st_txt else "#f1c40f")
+            
             tel_c = "".join(filter(str.isdigit, str(r.get('Téléphone',''))))
-            st.markdown(f'<div class="client-card" style="border-left:12px solid {col_s};"><div style="float:right; font-weight:bold;">{fmt_p(r.get("PrixJour",0))}</div><b>{r.get("Prénom","")} {r.get("Nom","").upper()}</b><br>📅 {r.get("DateNav")} ({r.get("NbJours")}j)<br>📞 <a href="tel:{r.get("Téléphone")}" style="color:#1a2a6c; font-weight:bold;">{r.get("Téléphone")}</a><br><a href="https://wa.me/{tel_c}" target="_blank" class="wa-btn">💬 WHATSAPP</a><br><span style="color:{col_s}; font-weight:bold;">{st_txt}</span></div>', unsafe_allow_html=True)
-            c_ed, c_del = st.columns([1, 2])
-            if c_ed.button("✏️", key=f"e_{i}"): st.session_state.edit_idx=i; st.session_state.page="FORM"; st.rerun()
-            if c_del.checkbox("🗑️ Supprimer", key=f"ck_{i}"):
-                if st.button("Confirmer suppression", key=f"bt_{i}"): df.drop(i).pipe(sauvegarder_data, "contacts.json"); st.rerun()
+            
+            # Préparation de la ligne Société pour l'affichage
+            ligne_soc = f"🏢 <b>{societe}</b><br>" if societe else ""
+
+            st.markdown(f'''<div class="client-card" style="border-left:12px solid {col_s};">
+                <div style="float:right; font-weight:bold;">{fmt_p(r.get("PrixJour",0))}</div>
+                <b>{r.get("Prénom","")} {r.get("Nom","").upper()}</b><br>
+                {ligne_soc}
+                📅 <b>{r.get("DateNav")}</b> ({r.get("NbJours")}j)<br>
+                📞 <a href="tel:{r.get("Téléphone")}" style="color:#1a2a6c; font-weight:bold;">{r.get("Téléphone")}</a><br>
+                <a href="https://wa.me/{tel_c}" target="_blank" class="wa-btn">💬 WHATSAPP</a><br>
+                <span style="color:{col_s}; font-weight:bold;">{st_txt}</span>
+            </div>''', unsafe_allow_html=True)
 
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING DÉTAILLÉ</div>', unsafe_allow_html=True)
@@ -194,6 +201,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
+
 
 
 
