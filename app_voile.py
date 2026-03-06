@@ -139,15 +139,62 @@ elif st.session_state.page == "BUDGET":
     st.table(pd.DataFrame(res).set_index('Mois'))
 
 elif st.session_state.page == "FRAIS":
-    st.markdown('<div class="page-title">🔧 MAINT.</div>', unsafe_allow_html=True)
-    if st.button("➕ FRAIS", use_container_width=True): st.session_state.edit_f_idx="NEW"; st.rerun()
-    if st.session_state.edit_f_idx:
-        with st.form("f"):
-            d, m, n = st.text_input("Date", datetime.now().strftime("%d/%m/%Y")), st.text_input("Montant"), st.text_area("Note")
-            if st.form_submit_button("OK"):
-                pd.concat([df_f, pd.DataFrame([{"Date":d, "Montant":m, "Note":n}])], ignore_index=True).pipe(sauvegarder_data, "frais.json"); st.session_state.edit_f_idx=None; st.rerun()
-    for i, r in df_f.sort_index(ascending=False).iterrows():
-        st.markdown(f'<div class="client-card"><b>{r.get("Date")} : {fmt_p(r.get("Montant"))}</b><br>{r.get("Note")}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">🔧 MAINTENACE & FRAIS</div>', unsafe_allow_html=True)
+    
+    # Bouton pour ajouter un nouveau frais
+    if st.button("➕ AJOUTER UN FRAIS", use_container_width=True):
+        st.session_state.edit_f_idx = "NEW"
+        st.rerun()
+
+    # Formulaire d'ajout ou de modification
+    if st.session_state.edit_f_idx is not None:
+        idx = st.session_state.edit_f_idx
+        # Pré-remplissage si modification
+        init = df_f.loc[idx].to_dict() if idx != "NEW" else {"Date": datetime.now().strftime("%d/%m/%Y"), "Montant": "0", "Note": ""}
+        
+        with st.form("form_frais"):
+            st.write("📝 Détails du frais" if idx == "NEW" else "✏️ Modifier le frais")
+            d = st.text_input("Date (JJ/MM/AAAA)", init.get("Date"))
+            m = st.text_input("Montant (€)", init.get("Montant"))
+            n = st.text_area("Description / Note", init.get("Note"))
+            
+            c1, c2 = st.columns(2)
+            if c1.form_submit_button("SAUVEGARDER"):
+                row = {"Date": d, "Montant": m, "Note": n}
+                if idx == "NEW":
+                    df_f = pd.concat([df_f, pd.DataFrame([row])], ignore_index=True)
+                else:
+                    for k, v in row.items(): df_f.at[idx, k] = v
+                sauvegarder_data(df_f, "frais.json")
+                st.session_state.edit_f_idx = None
+                st.rerun()
+            if c2.form_submit_button("ANNULER"):
+                st.session_state.edit_f_idx = None
+                st.rerun()
+
+    # Affichage de la liste des frais
+    if not df_f.empty:
+        # Tri par date (le plus récent en haut)
+        for i, r in df_f.sort_index(ascending=False).iterrows():
+            st.markdown(f"""
+                <div class="client-card" style="border-left: 12px solid #95a5a6;">
+                    <div style="float:right; font-weight:bold; color:#e74c3c;">{fmt_p(r.get('Montant'))}</div>
+                    <b>📅 {r.get('Date')}</b><br>
+                    <div style="font-size:0.9rem; margin-top:5px;">{r.get('Note')}</div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Boutons d'action
+            col_ed, col_del = st.columns([1, 2])
+            if col_ed.button("✏️", key=f"f_ed_{i}"):
+                st.session_state.edit_f_idx = i
+                st.rerun()
+            
+            if col_del.checkbox("🗑️", key=f"f_ck_{i}"):
+                if st.button("Confirmer la suppression", key=f"f_bt_{i}"):
+                    df_f = df_f.drop(i)
+                    sauvegarder_data(df_f, "frais.json")
+                    st.rerun()
 
 elif st.session_state.page == "NOTES":
     st.markdown('<div class="page-title">📝 NOTES</div>', unsafe_allow_html=True)
@@ -181,6 +228,7 @@ elif st.session_state.page == "FORM":
                     for k,v in row.items(): df.at[idx,k]=v
                 sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
+
 
 
 
