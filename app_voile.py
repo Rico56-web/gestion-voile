@@ -104,27 +104,39 @@ elif st.session_state.page == "PLANNING":
     for t in txt_plan: st.write(t)
 
 elif st.session_state.page == "BUDGET":
-    st.markdown('<div class="page-title">💰 STATS DÉTAILLÉES</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">💰 OBJECTIFS & STATS</div>', unsafe_allow_html=True)
     # CSS pour compacter le tableau et éviter les retours à la ligne
     st.markdown("<style>td, th { white-space: nowrap !important; padding: 4px !important; font-size: 0.85rem !important; } table { width: 100% !important; }</style>", unsafe_allow_html=True)
     
+    # --- SECTION OBJECTIF ANNUEL ---
+    obj_annuel = 10000.0  # Ton objectif annuel
     s_y = st.selectbox("Année", [2025, 2026], index=1)
+    
     df['dt'], df_f['dt'] = df['DateNav'].apply(parse_d), df_f['Date'].apply(parse_d)
     
-    mois_fr = ["Janv.", "Févr.", "Mars", "Avril", "Mai", "Juin", "Juil.", "Août", "Sept.", "Oct.", "Nov.", "Déc."]
+    # Calcul du CA annuel (uniquement les nav 🟢 OK)
+    mask_ca_an = (df['dt'].dt.year == s_y) & (df['Statut'].str.contains("OK|🟢", na=False))
+    ca_total_an = sum(df[mask_ca_an]['PrixJour'].apply(to_f))
+    progression = min(ca_total_an / obj_annuel, 1.0)
     
+    # Affichage de la barre de progression
+    st.write(f"🎯 **Objectif Annuel : {fmt_p(ca_total_an)} / {fmt_p(obj_annuel)}**")
+    st.progress(progression)
+    st.markdown("---")
+
+    # --- SECTION TABLEAU MENSUEL ---
+    mois_fr = ["Janv.", "Févr.", "Mars", "Avril", "Mai", "Juin", "Juil.", "Août", "Sept.", "Oct.", "Nov.", "Déc."]
     res = []
     for i, m_name in enumerate(mois_fr):
         m_num = i + 1
-        mask_ca = (df['dt'].dt.year == s_y) & (df['dt'].dt.month == m_num) & (df['Statut'].str.contains("OK|🟢", na=False))
-        ca = sum(df[mask_ca]['PrixJour'].apply(to_f))
+        mask_m = (df['dt'].dt.year == s_y) & (df['dt'].dt.month == m_num) & (df['Statut'].str.contains("OK|🟢", na=False))
+        ca_m = sum(df[mask_m]['PrixJour'].apply(to_f))
         
-        mask_fr = (df_f['dt'].dt.year == s_y) & (df_f['dt'].dt.month == m_num)
-        fr = sum(df_f[mask_fr]['Montant'].apply(to_f))
+        mask_f_m = (df_f['dt'].dt.year == s_y) & (df_f['dt'].dt.month == m_num)
+        fr_m = sum(df_f[mask_f_m]['Montant'].apply(to_f))
         
-        res.append({"Mois": m_name, "Revenus": fmt_p(ca), "Frais": fmt_p(fr), "Net": fmt_p(ca-fr)})
+        res.append({"Mois": m_name, "Revenus": fmt_p(ca_m), "Frais": fmt_p(fr_m), "Net": fmt_p(ca_m-fr_m)})
     
-    # On affiche le tableau sans la colonne d'index (le numéro 0, 1, 2...)
     st.table(pd.DataFrame(res).set_index('Mois'))
 
 
@@ -168,6 +180,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
+
 
 
 
