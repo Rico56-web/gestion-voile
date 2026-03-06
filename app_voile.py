@@ -80,18 +80,29 @@ if st.session_state.page == "LISTE":
 
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING DÉTAILLÉ</div>', unsafe_allow_html=True)
+    # Ajout du style pour la couleur CMN (Bleu)
+    st.markdown("<style>.day-cmn { background-color: #3498db !important; color: white !important; }</style>", unsafe_allow_html=True)
+    
     y, m = st.columns(2)
     p_y, p_m = y.selectbox("An", [2025, 2026], index=1), m.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
     occu, txt_plan = {}, []
+    
     if not df.empty:
         for i, r in df.iterrows():
             d_s = parse_d(r.get('DateNav',''))
             if d_s.year == p_y and d_s.month == p_m:
-                cl = "day-ok" if "OK" in str(r.get('Statut','')).upper() or "🟢" in str(r.get('Statut','')) else "day-wait"
-                txt_plan.append(f"⚓ **{r.get('DateNav')}** : {r.get('Nom')} ({r.get('NbJours')}j) - {r.get('Statut')}")
+                # Logique de couleur : CMN en bleu, sinon Vert (OK) ou Jaune (Attente)
+                soc = str(r.get('Société','')).upper()
+                if soc == "CMN":
+                    cl = "day-cmn"
+                else:
+                    cl = "day-ok" if "OK" in str(r.get('Statut','')).upper() or "🟢" in str(r.get('Statut','')) else "day-wait"
+                
+                txt_plan.append(f"⚓ **{r.get('DateNav')}** : {r.get('Nom')} ({r.get('NbJours')}j) - {soc if soc else r.get('Statut')}")
                 for j in range(int(float(r.get('NbJours', 1)))):
                     tg = d_s + timedelta(days=j)
                     if tg.month == p_m: occu[tg.day] = cl
+                    
     cal = calendar.monthcalendar(p_y, p_m)
     h = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
     for wk in cal:
@@ -183,6 +194,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
+
 
 
 
