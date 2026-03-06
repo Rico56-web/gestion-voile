@@ -56,7 +56,7 @@ for i, (l, p) in enumerate(menu):
     if cols[i].button(l, use_container_width=True, type="primary" if st.session_state.page==p else "secondary"):
         st.session_state.page=p; st.rerun()
 
-# --- 4. PAGES ---
+# ---
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
@@ -72,35 +72,25 @@ if st.session_state.page == "LISTE":
         df['dt'] = df['DateNav'].apply(parse_d)
         now = datetime.now().replace(hour=0, minute=0, second=0)
         data = df[df['dt'] >= now] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < now]
-        
         for i, r in data.sort_values('dt').iterrows():
             soc = str(r.get('Société','')).strip()
             st_txt = str(r.get('Statut','🟡'))
             mail = str(r.get('Email','')).strip()
             tel = str(r.get('Téléphone',''))
             tel_clean = "".join(filter(str.isdigit, tel))
-            
-            # Gestion annulation et opacité
             is_annule = "ANNULÉ" in st_txt.upper() or "🔴" in st_txt
             opac = "0.4" if is_annule else "1"
-            
-            # Prix et alerte
             p_val = to_f(r.get("PrixJour", 0))
             p_str = fmt_p(p_val)
             alerte = ""
             if p_val <= 0 and not is_annule:
                 alerte = '<div style="color:#e74c3c;font-weight:bold;font-size:0.8rem;margin-top:5px;border:1px dashed #e74c3c;padding:2px;text-align:center;">⚠️ PRIX MANQUANT</div>'
-            
-            # Couleur barre latérale
             if soc.upper() == "CMN": col_s = "#3498db"
             elif is_annule: col_s = "#e74c3c"
             else: col_s = "#2ecc71" if "OK" in st_txt.upper() or "🟢" in st_txt else "#f1c40f"
-            
             l_soc = f"🏢 <b>{soc}</b><br>" if soc else ""
             l_mail = f"📧 <a href='mailto:{mail}' style='color:#1a2a6c;'>{mail}</a><br>" if mail else ""
-            
-            fiche = f"""
-            <div class="client-card" style="border-left:12px solid {col_s}; opacity: {opac};">
+            fiche = f"""<div class="client-card" style="border-left:12px solid {col_s}; opacity: {opac};">
                 <div style="float:right;font-weight:bold;color:{'#e74c3c' if p_val<=0 and not is_annule else '#1a2a6c'};">{p_str if not is_annule else "---"}</div>
                 <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
                 {l_soc}{l_mail}
@@ -111,16 +101,14 @@ if st.session_state.page == "LISTE":
                 {alerte}
             </div>"""
             st.markdown(fiche, unsafe_allow_html=True)
-            
             c1, c2 = st.columns([1, 2])
             if c1.button("✏️", key=f"e_{i}"):
                 st.session_state.edit_idx=i; st.session_state.page="FORM"; st.rerun()
             if c2.checkbox("🗑️", key=f"ck_{i}"):
                 if st.button("Confirmer", key=f"bt_{i}"):
-                    df = df.drop(i)
-                    sauvegarder_data(df, "contacts.json")
-                    st.rerun()
-        st.markdown("---")
+                    df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
+
+    
 
          
           
@@ -229,6 +217,7 @@ elif st.session_state.page == "FORM":
                     for k,v in row.items(): df.at[idx,k]=v
                 sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     if st.button("Retour"): st.session_state.page="LISTE"; st.rerun()
+
 
 
 
