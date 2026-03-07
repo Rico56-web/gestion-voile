@@ -176,7 +176,7 @@ elif st.session_state.page == "BUDGET":
         st.text_area("Aperçu de la facture", corps_mail, height=200)
         
         # Lien Mailto pour envoi direct
-        mail_dest = "contact@cmn.fr" # Tu peux changer l'adresse ici
+        mail_dest = "tresorier@cmn-asso.fr" # Tu peux changer l'adresse ici
         sujet = f"Facture Skipper - {calendar.month_name[f_m]} {s_y}"
         import urllib.parse
         mail_link = f"mailto:{mail_dest}?subject={urllib.parse.quote(sujet)}&body={urllib.parse.quote(corps_mail)}"
@@ -265,6 +265,7 @@ elif st.session_state.page == "FORM":
             st.rerun()
             
     st.button("Retour", on_click=nav_to, args=("LISTE",))
+
 
 
 
