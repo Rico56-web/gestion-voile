@@ -81,28 +81,45 @@ for i, (l, p) in enumerate(menu):
 
 # --- 5. PAGES ---
 
+# --- 5. PAGES ---
+
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
-    c1.button("🚀 FUTURES", on_click=set_view, args=("FUTURES",), use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary")
-    c2.button("📂 PASSÉES", on_click=set_view, args=("PASSÉES",), use_container_width=True, type="primary" if st.session_state.view_mode=="PASSÉES" else "secondary")
+    c1.button("🚀 FUTURES", on_click=set_view, args=("FUTURES",), use_container_width=True)
+    c2.button("📂 PASSÉES", on_click=set_view, args=("PASSÉES",), use_container_width=True)
     st.button("➕ NOUVELLE FICHE", on_click=edit_nav, args=("NEW",), use_container_width=True)
     
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
         now = datetime.now().replace(hour=0, minute=0, second=0)
         data = df[df['dt'] >= now] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < now]
+        
         for i, r in data.sort_values('dt').iterrows():
             soc, st_t = str(r.get('Société','')).strip(), str(r.get('Statut','🟡'))
             is_an = "ANNULÉ" in st_t.upper() or "🔴" in st_t
             p_v = to_f(r.get("PrixJour", 0))
             col_s = "#3498db" if soc.upper() == "CMN" else ("#e74c3c" if is_an else ("#2ecc71" if "OK" in st_t.upper() or "🟢" in st_t else "#f1c40f"))
-            tel_c = "".join(filter(str.isdigit, str(r.get('Téléphone',''))))
-            al = f'<div style="color:#e74c3c;font-weight:bold;font-size:0.8rem;margin-top:5px;border:1px dashed #e74c3c;padding:2px;text-align:center;">⚠️ PRIX MANQUANT</div>' if p_v <= 0 and not is_an else ""
-import streamlit as st
-import pandas as pd
-import json, base64, requests, calendar
-from datetime import datetime, timedelta
+            
+            # --- LES LIENS CLIQUABLES ICI ---
+            tel = str(r.get('Téléphone','')).strip()
+            mail = str(r.get('Email','')).strip()
+            tel_c = "".join(filter(str.isdigit, tel)) # Nettoie le numéro pour l'iPhone
+            
+            fiche = f"""<div class="client-card" style="border-left:12px solid {col_s}; opacity: {'0.4' if is_an else '1'};">
+                <div style="float:right;font-weight:bold;">{fmt_p(p_v) if not is_an else "---"}</div>
+                <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
+                🏢 {soc} | 📅 <b>{r.get('DateNav')}</b> ({r.get('NbJours')}j)<br>
+                📧 <a href="mailto:{mail}" style="color:#1a2a6c;text-decoration:none;">{mail}</a><br>
+                📞 <a href="tel:{tel_c}" style="color:#1a2a6c;text-decoration:none;font-weight:bold;">{tel}</a><br>
+                <a href="https://wa.me/{tel_c}" target="_blank" class="wa-btn">💬 WHATSAPP</a><br>
+                <span style="color:{col_s};font-weight:bold;">{st_t}</span></div>"""
+            
+            st.markdown(fiche, unsafe_allow_html=True)
+            
+            # Bouton Modifier
+            st.button("✏️ Modifier", key=f"nav_e_{i}", on_click=edit_nav, args=(i,))
+
 
 # --- 1. CONFIGURATION & STYLE ---
 st.set_page_config(page_title="Vesta Skipper Pro", layout="wide")
@@ -408,6 +425,7 @@ elif st.session_state.page == "FORM":
                     for k,v in row.items(): df.at[idx,k]=v
                 sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Retour", on_click=nav_to, args=("LISTE",))
+
 
 
 
