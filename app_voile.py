@@ -99,7 +99,7 @@ if st.session_state.page == "LISTE":
             col_s = "#3498db" if soc.upper() == "CMN" else ("#e74c3c" if is_an else ("#2ecc71" if "OK" in st_t.upper() or "🟢" in st_t else "#f1c40f"))
             tel_c = "".join(filter(str.isdigit, str(r.get('Téléphone',''))))
             al = f'<div style="color:#e74c3c;font-weight:bold;font-size:0.8rem;margin-top:5px;border:1px dashed #e74c3c;padding:2px;text-align:center;">⚠️ PRIX MANQUANT</div>' if p_v <= 0 and not is_an else ""
-       import streamlit as st
+import streamlit as st
 import pandas as pd
 import json, base64, requests, calendar
 from datetime import datetime, timedelta
@@ -408,6 +408,7 @@ elif st.session_state.page == "FORM":
                     for k,v in row.items(): df.at[idx,k]=v
                 sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Retour", on_click=nav_to, args=("LISTE",))
+
 
 
 
