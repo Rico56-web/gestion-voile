@@ -138,18 +138,59 @@ elif st.session_state.page == "PLANNING":
         h += '</tr>'
     st.markdown(h + '</table>', unsafe_allow_html=True)
     for t in sorted(details): st.write(t)
-
+        
 elif st.session_state.page == "BUDGET":
-    st.markdown('<div class="page-title">💰 STATS & BUDGET</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns([2, 1]); s_y = c1.selectbox("Année", [2025, 2026], index=1);obj = c2.number_input("Cible €", value=15000, step=100)
-    df['dt'], df_f['dt'] = df['DateNav'].apply(parse_d), df_f['Date'].apply(parse_d)
+    st.markdown('<div class="page-title">💰 STATS & FACTURATION CMN</div>', unsafe_allow_html=True)
+    
+    c1, c2 = st.columns([2, 1])
+    s_y = c1.selectbox("Année", [2025, 2026], index=1)
+    obj = c2.number_input("Cible €", value=15000, step=100)
+    
+    df['dt'] = df['DateNav'].apply(parse_d)
     ca = sum(df[(df['dt'].dt.year==s_y) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
-    st.write(f"📈 **{ca/obj*100:.1f}%** ({fmt_p(ca)} / {fmt_p(obj)})"); st.progress(min(ca/obj, 1.0))
+    
+    st.write(f"📈 **{ca/obj*100:.1f}%** ({fmt_p(ca)} / {fmt_p(obj)})")
+    st.progress(min(ca/obj, 1.0))
+
+    # --- SECTION FACTURATION CMN ---
+    st.markdown("---")
+    st.subheader("📄 Édition Facture CMN")
+    f_m = st.selectbox("Choisir le mois à facturer", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
+    
+    # Filtrage des prestations CMN pour le mois choisi
+    df_cmn = df[(df['dt'].dt.year == s_y) & 
+                (df['dt'].dt.month == f_m) & 
+                (df['Société'].str.upper() == "CMN") &
+                (df['Statut'].str.contains("OK|🟢", na=False))]
+
+    if not df_cmn.empty:
+        total_cmn = sum(df_cmn['PrixJour'].apply(to_f))
+        
+        # Construction du texte de la facture
+        corps_mail = f"Bonjour,\n\nVoici le détail de mes prestations pour le mois de {calendar.month_name[f_m]} {s_y} :\n\n"
+        for _, r in df_cmn.sort_values('dt').iterrows():
+            corps_mail += f"- Le {r['DateNav']} : {r['NbJours']}j ({fmt_p(r['PrixJour'])}/j)\n"
+        
+        corps_mail += f"\nTOTAL À RÉGLER : {fmt_p(total_cmn)}\n\nMerci,\nCordialement."
+        
+        st.text_area("Aperçu de la facture", corps_mail, height=200)
+        
+        # Lien Mailto pour envoi direct
+        mail_dest = "contact@cmn.fr" # Tu peux changer l'adresse ici
+        sujet = f"Facture Skipper - {calendar.month_name[f_m]} {s_y}"
+        import urllib.parse
+        mail_link = f"mailto:{mail_dest}?subject={urllib.parse.quote(sujet)}&body={urllib.parse.quote(corps_mail)}"
+        
+        st.markdown(f'<a href="{mail_link}" style="background-color:#1a2a6c;color:white;padding:12px;text-decoration:none;border-radius:8px;display:block;text-align:center;font-weight:bold;">📧 ENVOYER LA FACTURE PAR MAIL</a>', unsafe_allow_html=True)
+    else:
+        st.info("Aucune prestation CMN validée (🟢) pour ce mois.")
+
+    # Tableau récapitulatif mensuel (ton tableau actuel)
+    st.markdown("---")
     res = []
     for i in range(1, 13):
         rev = sum(df[(df['dt'].dt.year==s_y) & (df['dt'].dt.month==i) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
-        fr = sum(df_f[(df_f['dt'].dt.year==s_y) & (df_f['dt'].dt.month==i)]['Montant'].apply(to_f))
-        res.append({"Mois": calendar.month_name[i], "Revenu": fmt_p(rev), "Frais": fmt_p(fr), "Net": fmt_p(rev-fr)})
+        res.append({"Mois": calendar.month_name[i], "Revenu": fmt_p(rev)})
     st.table(pd.DataFrame(res).set_index('Mois'))
 
 elif st.session_state.page == "FRAIS":
@@ -224,6 +265,7 @@ elif st.session_state.page == "FORM":
             st.rerun()
             
     st.button("Retour", on_click=nav_to, args=("LISTE",))
+
 
 
 
