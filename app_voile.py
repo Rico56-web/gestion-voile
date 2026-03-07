@@ -14,7 +14,7 @@ if not st.session_state.authenticated:
     st.markdown('<div class="page-title">🔐 ACCÈS SÉCURISÉ</div>', unsafe_allow_html=True)
     password = st.text_input("Entrez le code d'accès :", type="password")
     if st.button("SE CONNECTER", use_container_width=True):
-        if password == "VOTRE_MOT_DE_PASSE": # Remplacez par votre code
+        if password == "SKIPPER2026": # Remplacez par votre code
             st.session_state.authenticated = True
             st.rerun()
         else:
@@ -223,6 +223,7 @@ elif st.session_state.page == "FORM":
                     for k,v in row.items(): df.at[idx,k]=v
                 sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Retour", on_click=nav_to, args=("LISTE",))
+
 
 
 
