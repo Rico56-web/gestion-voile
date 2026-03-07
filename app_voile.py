@@ -6,6 +6,20 @@ from datetime import datetime, timedelta
 # --- 1. CONFIGURATION & STYLE ---
 st.set_page_config(page_title="Vesta Skipper Pro", layout="wide")
 
+# --- VERROUILLAGE PAR MOT DE PASSE ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.markdown('<div class="page-title">🔐 ACCÈS SÉCURISÉ</div>', unsafe_allow_html=True)
+    password = st.text_input("Entrez le code d'accès :", type="password")
+    if st.button("SE CONNECTER", use_container_width=True):
+        if password == "VOTRE_MOT_DE_PASSE": # Remplacez par votre code
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("Code incorrect ❌")
+    st.stop() # Arrête le script ici tant qu'on n'est pas identifié
 # Initialisation stable des variables d'état
 for k, v in {"page":"LISTE", "view_mode":"FUTURES", "edit_idx":None, "edit_f_idx":None, "edit_n_idx":None}.items():
     if k not in st.session_state: st.session_state[k] = v
@@ -209,6 +223,7 @@ elif st.session_state.page == "FORM":
                     for k,v in row.items(): df.at[idx,k]=v
                 sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Retour", on_click=nav_to, args=("LISTE",))
+
 
 
 
