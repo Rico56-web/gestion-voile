@@ -194,19 +194,35 @@ elif st.session_state.page == "NOTES":
             if st.button("✏️", key=f"ne_{i}"): st.session_state.edit_n_idx=i; st.rerun()
 
 elif st.session_state.page == "FORM":
-    idx = st.session_state.edit_idx; init = df.loc[idx].to_dict() if idx != "NEW" else {}
+    idx = st.session_state.edit_idx
+    init = df.loc[idx].to_dict() if idx != "NEW" else {}
+    
+    # --- CORRECTION DU BUG DE STATUT ---
+    options_statut = ["🟢 OK", "🟡 Attente", "🔴 Annulé"]
+    current_statut = init.get("Statut", "🟡 Attente")
+    
+    # On cherche l'index de l'ancien statut, sinon on met 1 (Attente) par défaut pour une nouvelle fiche
+    try:
+        idx_statut = options_statut.index(current_statut)
+    except:
+        idx_statut = 1 
+
     with st.form("edit_nav"):
-        st_v = st.selectbox("Statut", ["🟢 OK", "🟡 Attente", "🔴 Annulé"])
+        st_v = st.selectbox("Statut", options_statut, index=idx_statut)
         p, n, s = st.text_input("Prénom", init.get("Prénom","")), st.text_input("Nom", init.get("Nom","")), st.text_input("Société", init.get("Société",""))
         d, j = st.text_input("Date (JJ/MM/AAAA)", init.get("DateNav","")), st.text_input("Nb Jours", str(init.get("NbJours","1")))
         t, em = st.text_input("Téléphone", init.get("Téléphone","")), st.text_input("Email", init.get("Email",""))
         pr = st.text_input("Prix Jour", str(init.get("PrixJour","0")))
+        
         if st.form_submit_button("SAUVEGARDER"):
             row = {"Prénom":p, "Nom":n, "Société":s, "Téléphone":t, "Email":em, "DateNav":d, "NbJours":j, "PrixJour":pr, "Statut":st_v}
             if idx=="NEW": df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
             else: 
                 for k,v in row.items(): df.at[idx,k]=v
-            sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
+            sauvegarder_data(df, "contacts.json")
+            st.session_state.page="LISTE"
+            st.rerun()
+            
     st.button("Retour", on_click=nav_to, args=("LISTE",))
 
 
