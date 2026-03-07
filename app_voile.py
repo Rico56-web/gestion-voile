@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
 import json, base64, requests, calendar
+import urllib.parse
 from datetime import datetime, timedelta
 
 # --- 1. CONFIGURATION & STYLE ---
-st.set_page_config(page_title="Vesta Skipper Pro", layout="wide")
+st.set_page_config(page_title="Vesta Skipper", layout="wide")
 
 # --- VERROUILLAGE PAR MOT DE PASSE ---
 if "authenticated" not in st.session_state:
@@ -26,7 +27,8 @@ for k, v in {"page":"LISTE", "view_mode":"FUTURES", "edit_idx":None, "edit_f_idx
     if k not in st.session_state: st.session_state[k] = v
 
 st.markdown("""<style>
-    .main-title { color: #1a2a6c; font-size: 1.6rem; font-weight: bold; text-align: center; margin-bottom: 20px; }
+    .main-title { color: #1a2a6c; font-size: 1.6rem; font-weight: bold; text-align: center; margin-bottom: 5px; }
+    .date-subtitle { color: #555; font-size: 0.9rem; text-align: center; margin-bottom: 20px; font-style: italic; }
     .page-title { background: #1a2a6c; color: white; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 15px; }
     .client-card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-left: 12px solid #ccc; }
     .wa-btn { background-color:#25D366; color:white !important; padding:6px 12px; border-radius:6px; text-decoration:none !important; font-weight:bold; font-size:0.8rem; display:inline-block; margin: 5px 0; }
@@ -74,8 +76,17 @@ def edit_nav(i): st.session_state.edit_idx = i; st.session_state.page = "FORM"
 def edit_frais(i): st.session_state.edit_f_idx = i
 def edit_note(i): st.session_state.edit_n_idx = i
 
-# --- 4. MENU ---
-st.markdown('<div class="main-title">⚓ VESTA SKIPPER PRO</div>', unsafe_allow_html=True)
+# --- 4. ENTÊTE ET MENU ---
+st.markdown('<div class="main-title">⚓ VESTA SKIPPER</div>', unsafe_allow_html=True)
+
+# Affichage de la date et l'heure du jour
+now_str = datetime.now().strftime("%A %d %B %Y - %H:%M")
+# Traduction rapide en français (Streamlit/Python utilise souvent l'anglais par défaut)
+trad = {"Monday":"Lundi","Tuesday":"Mardi","Wednesday":"Mercredi","Thursday":"Jeudi","Friday":"Vendredi","Saturday":"Samedi","Sunday":"Dimanche",
+        "January":"Janvier","February":"Février","March":"Mars","April":"Avril","May":"Mai","June":"Juin","July":"Juillet","August":"Août","September":"Septembre","October":"Octobre","November":"Novembre","December":"Décembre"}
+for eng, fra in trad.items(): now_str = now_str.replace(eng, fra)
+st.markdown(f'<div class="date-subtitle">🕒 {now_str}</div>', unsafe_allow_html=True)
+
 cols = st.columns(5); menu = [("📋 LISTE","LISTE"), ("🗓️ PLAN","PLANNING"), ("💰 STATS","BUDGET"), ("🔧 MAINT","FRAIS"), ("📝 NOTES","NOTES")]
 for i, (l, p) in enumerate(menu):
     cols[i].button(l, on_click=nav_to, args=(p,), use_container_width=True, type="primary" if st.session_state.page==p else "secondary")
@@ -90,7 +101,8 @@ if st.session_state.page == "LISTE":
     
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
-        data = df[df['dt'] >= datetime.now().replace(hour=0,minute=0,second=0)] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < datetime.now().replace(hour=0,minute=0,second=0)]
+        today = datetime.now().replace(hour=0, minute=0, second=0)
+        data = df[df['dt'] >= today] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < today]
         for i, r in data.sort_values('dt').iterrows():
             soc, st_t = str(r.get('Société','')).strip(), str(r.get('Statut','🟡'))
             p_v = to_f(r.get("PrixJour", 0))
@@ -138,54 +150,31 @@ elif st.session_state.page == "PLANNING":
         h += '</tr>'
     st.markdown(h + '</table>', unsafe_allow_html=True)
     for t in sorted(details): st.write(t)
-        
+
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS & FACTURATION CMN</div>', unsafe_allow_html=True)
-    
     c1, c2 = st.columns([2, 1])
     s_y = c1.selectbox("Année", [2025, 2026], index=1)
     obj = c2.number_input("Cible €", value=15000, step=100)
-    
-    df['dt'] = df['DateNav'].apply(parse_d)
+    df['dt'], df_f['dt'] = df['DateNav'].apply(parse_d), df_f['Date'].apply(parse_d)
     ca = sum(df[(df['dt'].dt.year==s_y) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
-    
-    st.write(f"📈 **{ca/obj*100:.1f}%** ({fmt_p(ca)} / {fmt_p(obj)})")
-    st.progress(min(ca/obj, 1.0))
+    st.write(f"📈 **{ca/obj*100:.1f}%** ({fmt_p(ca)} / {fmt_p(obj)})"); st.progress(min(ca/obj, 1.0))
 
-    # --- SECTION FACTURATION CMN ---
     st.markdown("---")
     st.subheader("📄 Édition Facture CMN")
-    f_m = st.selectbox("Choisir le mois à facturer", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
-    
-    # Filtrage des prestations CMN pour le mois choisi
-    df_cmn = df[(df['dt'].dt.year == s_y) & 
-                (df['dt'].dt.month == f_m) & 
-                (df['Société'].str.upper() == "CMN") &
-                (df['Statut'].str.contains("OK|🟢", na=False))]
-
+    f_m = st.selectbox("Mois à facturer", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
+    df_cmn = df[(df['dt'].dt.year == s_y) & (df['dt'].dt.month == f_m) & (df['Société'].str.upper() == "CMN") & (df['Statut'].str.contains("OK|🟢", na=False))]
     if not df_cmn.empty:
         total_cmn = sum(df_cmn['PrixJour'].apply(to_f))
-        
-        # Construction du texte de la facture
-        corps_mail = f"Bonjour,\n\nVoici le détail de mes prestations pour le mois de {calendar.month_name[f_m]} {s_y} :\n\n"
+        corps = f"Bonjour,\n\nVoici le détail de mes prestations pour {calendar.month_name[f_m]} {s_y} :\n\n"
         for _, r in df_cmn.sort_values('dt').iterrows():
-            corps_mail += f"- Le {r['DateNav']} : {r['NbJours']}j ({fmt_p(r['PrixJour'])}/j)\n"
-        
-        corps_mail += f"\nTOTAL À RÉGLER : {fmt_p(total_cmn)}\n\nMerci,\nCordialement."
-        
-        st.text_area("Aperçu de la facture", corps_mail, height=200)
-        
-        # Lien Mailto pour envoi direct
-        mail_dest = "tresorier@cmn-asso.fr" # Tu peux changer l'adresse ici
-        sujet = f"Facture Skipper - {calendar.month_name[f_m]} {s_y}"
-        import urllib.parse
-        mail_link = f"mailto:{mail_dest}?subject={urllib.parse.quote(sujet)}&body={urllib.parse.quote(corps_mail)}"
-        
-        st.markdown(f'<a href="{mail_link}" style="background-color:#1a2a6c;color:white;padding:12px;text-decoration:none;border-radius:8px;display:block;text-align:center;font-weight:bold;">📧 ENVOYER LA FACTURE PAR MAIL</a>', unsafe_allow_html=True)
-    else:
-        st.info("Aucune prestation CMN validée (🟢) pour ce mois.")
+            corps += f"- Le {r['DateNav']} : {r['NbJours']}j ({fmt_p(r['PrixJour'])}/j)\n"
+        corps += f"\nTOTAL À RÉGLER : {fmt_p(total_cmn)}\n\nMerci,\nCordialement."
+        st.text_area("Aperçu", corps, height=150)
+        mail_link = f"mailto:contact@cmn.fr?subject=Facture Skipper {calendar.month_name[f_m]}&body={urllib.parse.quote(corps)}"
+        st.markdown(f'<a href="{mail_link}" style="background-color:#1a2a6c;color:white;padding:12px;text-decoration:none;border-radius:8px;display:block;text-align:center;font-weight:bold;">📧 ENVOYER PAR MAIL</a>', unsafe_allow_html=True)
+    else: st.info("Aucune prestation CMN validée ce mois.")
 
-    # Tableau récapitulatif mensuel (ton tableau actuel)
     st.markdown("---")
     res = []
     for i in range(1, 13):
@@ -237,16 +226,10 @@ elif st.session_state.page == "NOTES":
 elif st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
     init = df.loc[idx].to_dict() if idx != "NEW" else {}
-    
-    # --- CORRECTION DU BUG DE STATUT ---
     options_statut = ["🟢 OK", "🟡 Attente", "🔴 Annulé"]
     current_statut = init.get("Statut", "🟡 Attente")
-    
-    # On cherche l'index de l'ancien statut, sinon on met 1 (Attente) par défaut pour une nouvelle fiche
-    try:
-        idx_statut = options_statut.index(current_statut)
-    except:
-        idx_statut = 1 
+    try: idx_statut = options_statut.index(current_statut)
+    except: idx_statut = 1 
 
     with st.form("edit_nav"):
         st_v = st.selectbox("Statut", options_statut, index=idx_statut)
@@ -254,17 +237,14 @@ elif st.session_state.page == "FORM":
         d, j = st.text_input("Date (JJ/MM/AAAA)", init.get("DateNav","")), st.text_input("Nb Jours", str(init.get("NbJours","1")))
         t, em = st.text_input("Téléphone", init.get("Téléphone","")), st.text_input("Email", init.get("Email",""))
         pr = st.text_input("Prix Jour", str(init.get("PrixJour","0")))
-        
         if st.form_submit_button("SAUVEGARDER"):
             row = {"Prénom":p, "Nom":n, "Société":s, "Téléphone":t, "Email":em, "DateNav":d, "NbJours":j, "PrixJour":pr, "Statut":st_v}
             if idx=="NEW": df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
             else: 
                 for k,v in row.items(): df.at[idx,k]=v
-            sauvegarder_data(df, "contacts.json")
-            st.session_state.page="LISTE"
-            st.rerun()
-            
+            sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Retour", on_click=nav_to, args=("LISTE",))
+
 
 
 
