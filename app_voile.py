@@ -141,7 +141,7 @@ elif st.session_state.page == "PLANNING":
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS & BUDGET</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns([2, 1]); s_y = c1.selectbox("Année", [2025, 2026], index=1); obj = c2.number_input("Cible €", value=15000)
+    c1, c2 = st.columns([2, 1]); s_y = c1.selectbox("Année", [2025, 2026], index=1);obj = c2.number_input("Cible €", value=15000, step=100)
     df['dt'], df_f['dt'] = df['DateNav'].apply(parse_d), df_f['Date'].apply(parse_d)
     ca = sum(df[(df['dt'].dt.year==s_y) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
     st.write(f"📈 **{ca/obj*100:.1f}%** ({fmt_p(ca)} / {fmt_p(obj)})"); st.progress(min(ca/obj, 1.0))
@@ -208,6 +208,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Retour", on_click=nav_to, args=("LISTE",))
+
 
 
 
