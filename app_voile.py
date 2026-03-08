@@ -84,6 +84,7 @@ for i, (l, p) in enumerate(menu):
     cols[i].button(l, on_click=nav_to, args=(p,), use_container_width=True, type="primary" if st.session_state.page==p else "secondary")
 
 # --- 5. PAGES ---
+
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
@@ -113,7 +114,7 @@ elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
     y_col, m_col = st.columns(2)
     p_y, p_m = y_col.selectbox("An", [2025, 2026], index=1), m_col.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
-    occu, details = {}, []
+    occu, details_list = {}, []
     if not df.empty:
         for i, r in df.iterrows():
             if "🔴" not in str(r.get('Statut','')):
@@ -121,9 +122,13 @@ elif st.session_state.page == "PLANNING":
                 for j in range(int(to_f(r.get('NbJours', 1)))):
                     curr = d_s + timedelta(days=j)
                     if curr.year == p_y and curr.month == p_m:
-                        cl = "day-cmn" if str(r.get('Société','')).strip().upper() == "CMN" else ("day-ok" if "OK" in str(r.get('Statut','')) or "🟢" in str(r.get('Statut','')) else "day-wait")
+                        soc_u = str(r.get('Société','')).strip().upper()
+                        cl = "day-cmn" if soc_u == "CMN" else ("day-ok" if "OK" in str(r.get('Statut','')) or "🟢" in str(r.get('Statut','')) else "day-wait")
                         occu[curr.day] = cl
-                        if j == 0: details.append(f"⚓ **{curr.day}**: {r.get('Nom')} ({str(r.get('Société','')).upper()})")
+                        if j == 0: 
+                            # On stocke le jour pour trier ensuite
+                            details_list.append({"day": curr.day, "text": f"⚓ **{curr.day}**: {r.get('Nom')} ({soc_u})"})
+    
     cal = calendar.monthcalendar(p_y, p_m); h = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
     for wk in cal:
         h += '<tr>'
@@ -132,7 +137,11 @@ elif st.session_state.page == "PLANNING":
             h += f'<td {bg}>{d if d != 0 else ""}</td>'
         h += '</tr>'
     st.markdown(h + '</table>', unsafe_allow_html=True)
-    for t in sorted(details): st.write(t)
+    
+    # --- TRI CHRONOLOGIQUE DU RÉCAPITULATIF ---
+    st.markdown("### Détails du mois :")
+    for item in sorted(details_list, key=lambda x: x['day']):
+        st.write(item['text'])
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS & BILAN</div>', unsafe_allow_html=True)
@@ -142,8 +151,6 @@ elif st.session_state.page == "BUDGET":
     df['dt'], df_f['dt'] = df['DateNav'].apply(parse_d), df_f['Date'].apply(parse_d)
     ca = sum(df[(df['dt'].dt.year==s_y) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
     st.write(f"📈 **{ca/obj*100:.1f}%** ({fmt_p(ca)} / {fmt_p(obj)})"); st.progress(min(ca/obj, 1.0))
-
-    # --- LE TABLEAU BILAN (REPLACÉ ICI) ---
     st.markdown("---")
     st.subheader("📊 Bilan Mensuel")
     res = []
@@ -152,8 +159,6 @@ elif st.session_state.page == "BUDGET":
         fr = sum(df_f[(df_f['dt'].dt.year==s_y) & (df_f['dt'].dt.month==i)]['Montant'].apply(to_f))
         res.append({"Mois": calendar.month_name[i], "Revenu": fmt_p(rev), "Frais": fmt_p(fr), "Net": fmt_p(rev-fr)})
     st.table(pd.DataFrame(res).set_index('Mois'))
-
-    # --- SECTION FACTURE CMN ---
     st.markdown("---")
     st.subheader("📄 Facture CMN")
     f_m = st.selectbox("Mois à facturer", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
@@ -236,6 +241,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Retour", on_click=nav_to, args=("LISTE",))
+
 
 
 
