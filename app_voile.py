@@ -104,6 +104,25 @@ if st.session_state.page == "LISTE":
             border_color = "#3498db" if soc == "CMN" else "#ccc"
             tel = "".join(filter(str.isdigit, str(r.get('Téléphone',''))))
             
+            # Dans la boucle d'affichage des fiches de la page LISTE :
+    for i, r in data.sort_values('dt').iterrows():
+        soc = str(r.get('Société','')).strip().upper()
+        statut = str(r.get('Statut','🟡 Attente'))
+         nb_jours = str(r.get('NbJours','1')) # Récupération du nombre de jours
+    
+    # ... (le reste du style reste identique)
+    
+    st.markdown(f"""
+        <div class="client-card" style="border-left: 10px solid {border_color};">
+            <div class="status-badge" style="color:{badge_color}; border-color:{badge_color}; background:{badge_color}15;">{statut}</div>
+            <b style="font-size:1.1rem; color:#1a2a6c;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
+            🏢 <b>{soc}</b> | 📅 {r.get('DateNav')} <b>({nb_jours}j)</b><br>
+            📧 <a href="mailto:{r.get('Email','')}">{r.get('Email','')}</a><br>
+            📞 <a href="tel:{tel}">{r.get('Téléphone','')}</a><br>
+            <a href="https://wa.me/{tel}" target="_blank" class="wa-btn-discret">💬 WhatsApp</a>
+        </div>
+    """, unsafe_allow_html=True)
+            
             st.markdown(f"""
                 <div class="client-card" style="border-left: 10px solid {border_color};">
                     <div class="status-badge" style="color:{badge_color}; border-color:{badge_color}; background:{badge_color}15;">{statut}</div>
@@ -273,6 +292,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
