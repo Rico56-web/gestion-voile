@@ -154,7 +154,6 @@ elif st.session_state.page == "PLANNING":
     for item in sorted(details_list, key=lambda x: x['day']): st.write(item['text'])
 
 # --- PAGE STATS ---
-
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS & BILAN</div>', unsafe_allow_html=True)
     
@@ -186,23 +185,27 @@ elif st.session_state.page == "BUDGET":
     total_row = pd.DataFrame([{"M": "TOT", "Rev": int(t_rev), "Frais": int(t_fra), "Net": int(t_net), "Prév": int(t_pre)}])
     full_stats = pd.concat([df_stats, total_row], ignore_index=True).set_index('M')
 
-    # --- APPLICATION DES COULEURS (CORRIGÉE) ---
+    # Application des couleurs
     def style_stats(styler):
-        # On ne cible que les colonnes qui existent encore après le set_index
-        styler.set_properties(subset=['Rev'], **{'color': '#27ae60', 'font-weight': 'bold'}) # Vert
-        styler.set_properties(subset=['Frais'], **{'color': '#e74c3c'}) # Rouge
-        styler.set_properties(subset=['Net'], **{'background-color': '#ebf5fb', 'font-weight': 'bold'}) # Bleu clair
-        styler.set_properties(subset=['Prév'], **{'color': '#f39c12'}) # Orange
+        styler.set_properties(subset=['Rev'], **{'color': '#27ae60', 'font-weight': 'bold'})
+        styler.set_properties(subset=['Frais'], **{'color': '#e74c3c'})
+        styler.set_properties(subset=['Net'], **{'background-color': '#ebf5fb', 'font-weight': 'bold'})
+        styler.set_properties(subset=['Prév'], **{'color': '#f39c12'})
         return styler
 
-    # Affichage du tableau stylisé
     st.table(full_stats.style.pipe(style_stats))
 
     st.markdown("---")
     st.subheader("📄 Facture CMN")
-    # ... (Le reste du code CMN reste identique)
+    f_m = st.selectbox("Mois Facture", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
+    df_c = df[(df['dt'].dt.year == s_y) & (df['dt'].dt.month == f_m) & (df['Société'].str.upper() == "CMN") & (df['Statut'].str.contains("OK|🟢", na=False))]
+    if not df_c.empty:
+        corps = f"Prestations {calendar.month_name[f_m]} {s_y} :\n" + "\n".join([f"- Le {r['DateNav']} : {fmt_p(r['PrixJour'])}" for _, r in df_c.iterrows()])
+        st.text_area("Aperçu", corps, height=100)
+        st.markdown(f'<a href="mailto:tresorier@cmn-asso.fr?subject=Facture&body={urllib.parse.quote(corps)}" style="background-color:#1a2a6c;color:white;padding:12px;display:block;text-align:center;text-decoration:none;border-radius:8px;">📧 ENVOYER AU TRÉSORIER</a>', unsafe_allow_html=True)
 
----PAGE SÉCU ---
+
+# --- PAGE SÉCU ---
 elif st.session_state.page == "SECU":
     st.markdown('<div class="page-title">🛟 GESTION SÉCURITÉ</div>', unsafe_allow_html=True)
     if st.session_state.edit_s_idx is not None:
@@ -301,6 +304,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
