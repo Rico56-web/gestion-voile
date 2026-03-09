@@ -185,14 +185,21 @@ elif st.session_state.page == "BUDGET":
     total_row = pd.DataFrame([{"M": "TOT", "Rev": int(t_rev), "Frais": int(t_fra), "Net": int(t_net), "Prév": int(t_pre)}])
     full_stats = pd.concat([df_stats, total_row], ignore_index=True).set_index('M')
 
-    # Application des couleurs
+# --- APPLICATION DES COULEURS (AVEC EN-TÊTE BLEU) ---
     def style_stats(styler):
-        styler.set_properties(subset=['Rev'], **{'color': '#27ae60', 'font-weight': 'bold'})
-        styler.set_properties(subset=['Frais'], **{'color': '#e74c3c'})
-        styler.set_properties(subset=['Net'], **{'background-color': '#ebf5fb', 'font-weight': 'bold'})
-        styler.set_properties(subset=['Prév'], **{'color': '#f39c12'})
+        # 1. Style de l'en-tête (Ligne des légendes)
+        styler.set_table_styles([
+            {'selector': 'th', 'props': [('background-color', '#d6eaf8'), ('color', '#1a2a6c'), ('font-weight', 'bold')]}
+        ])
+        # 2. Couleurs de texte par colonne
+        styler.set_properties(subset=['Rev'], **{'color': '#27ae60', 'font-weight': 'bold'}) # Vert
+        styler.set_properties(subset=['Frais'], **{'color': '#e74c3c'}) # Rouge
+        styler.set_properties(subset=['Net'], **{'background-color': '#ebf5fb', 'font-weight': 'bold'}) # Bleu très clair pour les données
+        styler.set_properties(subset=['Prév'], **{'color': '#f39c12'}) # Orange
         return styler
 
+    # Affichage du tableau stylisé
+    st.table(full_stats.style.pipe(style_stats))
     st.table(full_stats.style.pipe(style_stats))
 
     st.markdown("---")
@@ -304,6 +311,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
