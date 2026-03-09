@@ -75,13 +75,50 @@ df_f = charger_data("frais.json")
 df_n = charger_data("notes.json")
 df_s = charger_data("secu.json")
 
-# --- 3. MENU ---
-st.markdown('<div class="main-title">⚓ VESTA SKIPPER</div>', unsafe_allow_html=True)
-m_cols = st.columns(6)
-menu = [("📋 LISTE","LISTE"), ("🗓️ PLAN","PLANNING"), ("💰 STATS","BUDGET"), ("🛟 SÉCU","SECU"), ("🔧 MAINT","FRAIS"), ("📝 NOTES","NOTES")]
-for i, (l, p) in enumerate(menu):
-    if m_cols[i].button(l, use_container_width=True, type="primary" if st.session_state.page==p else "secondary"):
-        st.session_state.page = p; st.rerun()
+# --- 3. MENU (Mis à jour avec JOURNAL DE BORD) ---
+elif st.session_state.page == "LOGBOOK":
+    st.markdown('<div class="page-title">📖 JOURNAL DE BORD</div>', unsafe_allow_html=True)
+    
+    with st.form("f_log_complet"):
+        # --- SECTION 1 : DÉPART ---
+        st.subheader("🚩 DÉPART")
+        col1, col2 = st.columns(2)
+        d_lieu = col1.text_input("Lieu (Port/Mouillage)", key="dep_lieu")
+        d_meteo = col2.selectbox("Météo Départ", ["☀️ Beau", "☁️ Couvert", "🌧️ Pluie", "🌬️ Vent fort"], key="dep_met")
+        
+        col3, col4 = col3, col4 = st.columns(2)
+        d_h_mot = col3.number_input("Heures Moteur (Départ)", step=0.1, key="dep_h")
+        d_milles = col4.number_input("Loch / Milles (Départ)", step=0.1, key="dep_m")
+        
+        st.markdown("---")
+        
+        # --- SECTION 2 : EN COURS ---
+        st.subheader("⛵ EN COURS")
+        en_cours_obs = st.text_area("Observations, changements de voiles, météo intermédiaire...", height=100)
+        
+        st.markdown("---")
+        
+        # --- SECTION 3 : ARRIVÉE ---
+        st.subheader("🏁 ARRIVÉE")
+        col5, col6 = st.columns(2)
+        a_lieu = col5.text_input("Lieu (Port/Mouillage)", key="arr_lieu")
+        a_meteo = col6.selectbox("Météo Arrivée", ["☀️ Beau", "☁️ Couvert", "🌧️ Pluie", "🌬️ Vent fort"], key="arr_met")
+        
+        col7, col8 = st.columns(2)
+        a_h_mot = col7.number_input("Heures Moteur (Arrivée)", step=0.1, key="arr_h")
+        a_milles = col8.number_input("Loch / Milles (Arrivée)", step=0.1, key="arr_m")
+
+        # --- VALIDATION ---
+        if st.form_submit_button("⚓ ENREGISTRER L'ÉTAPE DÉFINITIVEMENT", use_container_width=True):
+            # Calculs automatiques
+            diff_h = a_h_mot - d_h_mot
+            diff_m = a_milles - d_milles
+            st.info(f"Résumé : {diff_m:.1f} milles parcourus en {diff_h:.1f}h moteur.")
+            # La sauvegarde GitHub sera activée lors de notre prochaine session
+            st.success("Données prêtes pour l'archivage 💾")
+
+    st.markdown("### 📜 Historique des navigations")
+    st.write("Tes étapes s'afficheront ici avec le calcul automatique de la distance et du temps moteur.")
 
 # --- 4. PAGES ---
 
@@ -245,6 +282,7 @@ elif st.session_state.page == "NOTES":
                 df_n = df_n.drop(i)
                 sauvegarder_data(df_n, "notes.json")
                 st.rerun()
+
 
 
 
