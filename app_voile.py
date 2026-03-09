@@ -126,93 +126,33 @@ if st.session_state.page == "LISTE":
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS & BILAN</div>', unsafe_allow_html=True)
     
-    # 1. Gestion de la mémoire de la cible annuelle
+    # 1. Gestion de la mémoire de la cible
     if "cible_annuelle" not in st.session_state:
         st.session_state.cible_annuelle = 15000.0
 
-    # 2. Sélection de l'année et de la cible
+    # 2. Saisie de l'année et de la cible
     s_y = st.selectbox("Année", [2025, 2026, 2027], index=1)
     
-    # Utilisation du state pour garder la valeur en changeant de page
+    # Le paramètre key="cible_input" aide Streamlit à stabiliser le champ
     obj = st.number_input("Cible annuelle (€)", 
                           value=float(st.session_state.cible_annuelle), 
-                          step=1000.0)
+                          step=1000.0,
+                          key="cible_input")
     st.session_state.cible_annuelle = obj
 
-    # 3. Calculs (Vérifiez bien l'alignement de ces lignes)
+    # 3. Calculs et Analyse (Alignement strict ici)
     df['dt'] = df['DateNav'].apply(parse_d)
     df_f['dt'] = df_f['Date'].apply(parse_d)
 
     ca_total_ok = sum(df[(df['dt'].dt.year == s_y) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
-    st.write(f"📈 **Réalisé (OK) : {int(ca_total_ok)} / {int(obj)}**")
-    st.progress(min(ca_total_ok/obj, 1.0) if obj > 0 else 0.0)
-# --- PAGE STATS ---
-elif st.session_state.page == "BUDGET":
-    st.markdown('<div class="page-title">💰 STATS & BILAN</div>', unsafe_allow_html=True)
     
-    # Sélection de l'année
-    annee_actuelle = 2026
-    s_y = st.selectbox("Année", [annee_actuelle - 1, annee_actuelle, annee_actuelle + 1], index=1)
- # 1. Initialiser la cible dans la mémoire de session si elle n'existe pas
-if "cible_annuelle" not in st.session_state:
-    st.session_state.cible_annuelle = 15000.0
-
-# 2. Utiliser le champ de saisie lié à cette mémoire
-obj = st.number_input("Cible annuelle (€)", 
-                      value=float(st.session_state.cible_annuelle), 
-                      step=1000.0)
-
-# 3. Mettre à jour la mémoire dès que tu changes la valeur
-st.session_state.cible_annuelle = obj
-
-    df['dt'] = df['DateNav'].apply(parse_d)
-    df_f['dt'] = df_f['Date'].apply(parse_d)
-
-    ca_total_ok = sum(df[(df['dt'].dt.year == s_y) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
     st.write(f"📈 **Réalisé (OK) : {int(ca_total_ok)} / {int(obj)}**")
-    st.progress(min(ca_total_ok/obj, 1.0))
+    
+    # Sécurité pour éviter la division par zéro si la cible est à 0
+    ratio = min(ca_total_ok / obj, 1.0) if obj > 0 else 0.0
+    st.progress(ratio)
     
     st.markdown("---")
-    
-    # Préparation des données
-    res, t_rev, t_fra, t_net, t_pre = [], 0, 0, 0, 0
-    for i in range(1, 13):
-        rev = sum(df[(df['dt'].dt.year == s_y) & (df['dt'].dt.month == i) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
-        fr = sum(df_f[(df_f['dt'].dt.year == s_y) & (df_f['dt'].dt.month == i)]['Montant'].apply(to_f))
-        prev = sum(df[(df['dt'].dt.year == s_y) & (df['dt'].dt.month == i) & (df['Statut'].str.contains("OK|🟢|🟡|Attente", na=False))]['PrixJour'].apply(to_f))
-        net = rev - fr
-        t_rev += rev; t_fra += fr; t_net += net; t_pre += prev
-        res.append({"M": i, "Rev": int(rev), "Frais": int(fr), "Net": int(net), "Prév": int(prev)})
-
-    df_stats = pd.DataFrame(res)
-    total_row = pd.DataFrame([{"M": "TOT", "Rev": int(t_rev), "Frais": int(t_fra), "Net": int(t_net), "Prév": int(t_pre)}])
-    full_stats = pd.concat([df_stats, total_row], ignore_index=True).set_index('M')
-
-# --- APPLICATION DES COULEURS (AVEC EN-TÊTE BLEU) ---
-    def style_stats(styler):
-        # 1. Style de l'en-tête (Ligne des légendes)
-        styler.set_table_styles([
-            {'selector': 'th', 'props': [('background-color', '#d6eaf8'), ('color', '#1a2a6c'), ('font-weight', 'bold')]}
-        ])
-        # 2. Couleurs de texte par colonne
-        styler.set_properties(subset=['Rev'], **{'color': '#27ae60', 'font-weight': 'bold'}) # Vert
-        styler.set_properties(subset=['Frais'], **{'color': '#e74c3c'}) # Rouge
-        styler.set_properties(subset=['Net'], **{'background-color': '#ebf5fb', 'font-weight': 'bold'}) # Bleu très clair pour les données
-        styler.set_properties(subset=['Prév'], **{'color': '#f39c12'}) # Orange
-        return styler
-
-    # Affichage du tableau stylisé
-    st.table(full_stats.style.pipe(style_stats))
-
-    st.markdown("---")
-    st.subheader("📄 Facture CMN")
-    f_m = st.selectbox("Mois Facture", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
-    df_c = df[(df['dt'].dt.year == s_y) & (df['dt'].dt.month == f_m) & (df['Société'].str.upper() == "CMN") & (df['Statut'].str.contains("OK|🟢", na=False))]
-    if not df_c.empty:
-        corps = f"Prestations {calendar.month_name[f_m]} {s_y} :\n" + "\n".join([f"- Le {r['DateNav']} : {fmt_p(r['PrixJour'])}" for _, r in df_c.iterrows()])
-        st.text_area("Aperçu", corps, height=100)
-        st.markdown(f'<a href="mailto:tresorier@cmn-asso.fr?subject=Facture&body={urllib.parse.quote(corps)}" style="background-color:#1a2a6c;color:white;padding:12px;display:block;text-align:center;text-decoration:none;border-radius:8px;">📧 ENVOYER AU TRÉSORIER</a>', unsafe_allow_html=True)
-
 
 # --- PAGE SÉCU ---
 elif st.session_state.page == "SECU":
@@ -313,6 +253,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
