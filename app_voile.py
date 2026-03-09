@@ -212,7 +212,6 @@ elif st.session_state.page == "BUDGET":
     st.table(full_stats.style.pipe(style_stats))
 
 elif st.session_state.page == "FACTURE":
-elif st.session_state.page == "FACTURE":
     st.markdown('<div class="page-title">📄 FACTURATION CMN</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     f_y = c1.selectbox("Année", [2025, 2026, 2027], index=1, key="f_y")
@@ -224,7 +223,7 @@ elif st.session_state.page == "FACTURE":
     if not df_c.empty:
         total = sum(df_c['PrixJour'].apply(to_f))
         
-        # --- TEXTE PERSONNALISÉ ---
+        # --- CORPS DU MAIL PERSONNALISÉ ---
         corps = f"Bonjour Jean-Michel,\n\nCi-après le détail de la facturation des sorties CMN de ce mois ({calendar.month_name[f_m]} {f_y}) :\n\n"
         for _, r in df_c.iterrows():
             corps += f"- Le {r['DateNav']} : {fmt_p(r['PrixJour'])}\n"
@@ -233,18 +232,18 @@ elif st.session_state.page == "FACTURE":
         
         txt = st.text_area("Aperçu du message", corps, height=250)
         
-        # --- CONFIGURATION DU MAIL AVEC COPIE (CC) ---
+        # --- PARAMÈTRES D'ENVOI ---
         destinataire = "tresorier@cmn-asso.fr"
-        ma_copie = "eric.clavreul@gmail.com" # Ton adresse pour la mise en copie
+        ma_copie = "eric.clavreul@gmail.com"
         sujet = f"Facturation Skipper - {calendar.month_name[f_m]} {f_y}"
         
-        # Construction du lien avec cc=
+        # Encodage URL (mailto:dest?cc=moi&subject=sujet&body=corps)
         link = f'mailto:{destinataire}?cc={ma_copie}&subject={urllib.parse.quote(sujet)}&body={urllib.parse.quote(txt)}'
         
         st.markdown(f'''
             <a href="{link}" style="background-color:#1a2a6c; color:white; padding:15px; 
             display:block; text-align:center; text-decoration:none; border-radius:10px; font-weight:bold;">
-            📧 ENVOYER À JEAN-MICHEL (AVEC COPIE)
+            📧 ENVOYER À JEAN-MICHEL (COPIE ERIC ACTIVÉE)
             </a>
         ''', unsafe_allow_html=True)
         
@@ -329,6 +328,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
