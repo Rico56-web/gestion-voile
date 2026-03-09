@@ -160,7 +160,17 @@ elif st.session_state.page == "BUDGET":
     # Sélection de l'année
     annee_actuelle = 2026
     s_y = st.selectbox("Année", [annee_actuelle - 1, annee_actuelle, annee_actuelle + 1], index=1)
-    obj = st.number_input("Cible annuelle (€)", value=15000, step=1000)
+ # 1. Initialiser la cible dans la mémoire de session si elle n'existe pas
+if "cible_annuelle" not in st.session_state:
+    st.session_state.cible_annuelle = 15000.0
+
+# 2. Utiliser le champ de saisie lié à cette mémoire
+obj = st.number_input("Cible annuelle (€)", 
+                      value=float(st.session_state.cible_annuelle), 
+                      step=1000.0)
+
+# 3. Mettre à jour la mémoire dès que tu changes la valeur
+st.session_state.cible_annuelle = obj
 
     df['dt'] = df['DateNav'].apply(parse_d)
     df_f['dt'] = df_f['Date'].apply(parse_d)
@@ -310,6 +320,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
