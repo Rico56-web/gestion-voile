@@ -212,6 +212,7 @@ elif st.session_state.page == "BUDGET":
     st.table(full_stats.style.pipe(style_stats))
 
 elif st.session_state.page == "FACTURE":
+elif st.session_state.page == "FACTURE":
     st.markdown('<div class="page-title">📄 FACTURATION CMN</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     f_y = c1.selectbox("Année", [2025, 2026, 2027], index=1, key="f_y")
@@ -223,31 +224,32 @@ elif st.session_state.page == "FACTURE":
     if not df_c.empty:
         total = sum(df_c['PrixJour'].apply(to_f))
         
-        # --- TEXTE PERSONNALISÉ DEMANDÉ ---
+        # --- TEXTE PERSONNALISÉ ---
         corps = f"Bonjour Jean-Michel,\n\nCi-après le détail de la facturation des sorties CMN de ce mois ({calendar.month_name[f_m]} {f_y}) :\n\n"
-        
         for _, r in df_c.iterrows():
             corps += f"- Le {r['DateNav']} : {fmt_p(r['PrixJour'])}\n"
-        
         corps += f"\nTOTAL À RÉGLER : {fmt_p(total)}\n"
         corps += "\nBonne continuation.\n\nEric CLAVREUL"
-        # ----------------------------------
         
-        txt = st.text_area("Aperçu du message à envoyer", corps, height=250)
+        txt = st.text_area("Aperçu du message", corps, height=250)
         
-        # Encodage du sujet et du corps pour l'URL mailto
+        # --- CONFIGURATION DU MAIL AVEC COPIE (CC) ---
+        destinataire = "tresorier@cmn-asso.fr"
+        ma_copie = "eric.clavreul@gmail.com" # Ton adresse pour la mise en copie
         sujet = f"Facturation Skipper - {calendar.month_name[f_m]} {f_y}"
-        link = f'mailto:tresorier@cmn-asso.fr?subject={urllib.parse.quote(sujet)}&body={urllib.parse.quote(txt)}'
+        
+        # Construction du lien avec cc=
+        link = f'mailto:{destinataire}?cc={ma_copie}&subject={urllib.parse.quote(sujet)}&body={urllib.parse.quote(txt)}'
         
         st.markdown(f'''
             <a href="{link}" style="background-color:#1a2a6c; color:white; padding:15px; 
             display:block; text-align:center; text-decoration:none; border-radius:10px; font-weight:bold;">
-            📧 ENVOYER À JEAN-MICHEL ({fmt_p(total)})
+            📧 ENVOYER À JEAN-MICHEL (AVEC COPIE)
             </a>
         ''', unsafe_allow_html=True)
         
     else: 
-        st.info(f"Aucune prestation CMN validée trouvée pour {calendar.month_name[f_m]} {f_y}.")
+        st.info(f"Aucune prestation CMN validée pour {calendar.month_name[f_m]} {f_y}.")
 
 elif st.session_state.page == "SECU":
     st.markdown('<div class="page-title">🛟 SÉCURITÉ</div>', unsafe_allow_html=True)
@@ -327,6 +329,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
