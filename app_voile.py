@@ -238,8 +238,13 @@ elif st.session_state.page == "NOTES":
                 <div style="white-space: pre-wrap; font-size:1rem; line-height:1.4;">{r.get("Contenu")}</div>
             </div>""", unsafe_allow_html=True)
             ce, cd = st.columns([1, 1])
-            if ce.button("✏️", key=f"ne_{i}"): st.session_state.edit_n_idx = i; st.rerun()
-            if cd.button("🗑️",
+            if ce.button("✏️", key=f"ne_{i}"): 
+                st.session_state.edit_n_idx = i
+                st.rerun()
+            if cd.button("🗑️", key=f"nd_{i}"): 
+                df_n = df_n.drop(i)
+                sauvegarder_data(df_n, "notes.json")
+                st.rerun()
 
 
 
