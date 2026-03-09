@@ -213,42 +213,37 @@ elif st.session_state.page == "BUDGET":
 
 elif st.session_state.page == "FACTURE":
     st.markdown('<div class="page-title">📄 FACTURATION CMN</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    f_y = c1.selectbox("Année", [2025, 2026, 2027], index=1, key="f_y")
-    f_m = c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x], key="f_m")
-    
-    df['dt'] = df['DateNav'].apply(parse_d)
-    df_c = df[(df['dt'].dt.year == f_y) & (df['dt'].dt.month == f_m) & (df['Société'].str.upper() == "CMN") & (df['Statut'].str.contains("OK|🟢", na=False))]
+    # ... (garder le début : sélection année/mois et filtrage df_c) ...
     
     if not df_c.empty:
         total = sum(df_c['PrixJour'].apply(to_f))
-        
-        # --- CORPS DU MAIL PERSONNALISÉ ---
         corps = f"Bonjour Jean-Michel,\n\nCi-après le détail de la facturation des sorties CMN de ce mois ({calendar.month_name[f_m]} {f_y}) :\n\n"
         for _, r in df_c.iterrows():
             corps += f"- Le {r['DateNav']} : {fmt_p(r['PrixJour'])}\n"
-        corps += f"\nTOTAL À RÉGLER : {fmt_p(total)}\n"
-        corps += "\nBonne continuation.\n\nEric CLAVREUL"
+        corps += f"\nTOTAL À RÉGLER : {fmt_p(total)}\n\nBonne continuation.\n\nEric CLAVREUL"
         
         txt = st.text_area("Aperçu du message", corps, height=250)
         
         # --- PARAMÈTRES D'ENVOI ---
-        destinataire = "tresorier@cmn-asso.fr"
-        ma_copie = "eric.clavreul@gmail.com"
+        dest = "tresorier@cmn-asso.fr"
+        cc = "eric.clavreul@gmail.com"
         sujet = f"Facturation Skipper - {calendar.month_name[f_m]} {f_y}"
         
-        # Encodage URL (mailto:dest?cc=moi&subject=sujet&body=corps)
-        link = f'mailto:{destinataire}?cc={ma_copie}&subject={urllib.parse.quote(sujet)}&body={urllib.parse.quote(txt)}'
+        # Construction ultra-sécurisée de l'URL
+        # On encode chaque élément séparément pour éviter les conflits de caractères
+        params = urllib.parse.urlencode({
+            'cc': cc,
+            'subject': sujet,
+            'body': txt
+        })
+        link = f"mailto:{dest}?{params}"
         
         st.markdown(f'''
             <a href="{link}" style="background-color:#1a2a6c; color:white; padding:15px; 
             display:block; text-align:center; text-decoration:none; border-radius:10px; font-weight:bold;">
-            📧 ENVOYER À JEAN-MICHEL (COPIE ERIC ACTIVÉE)
+            📧 ENVOYER À JEAN-MICHEL (AVEC CC ERIC)
             </a>
         ''', unsafe_allow_html=True)
-        
-    else: 
-        st.info(f"Aucune prestation CMN validée pour {calendar.month_name[f_m]} {f_y}.")
 
 elif st.session_state.page == "SECU":
     st.markdown('<div class="page-title">🛟 SÉCURITÉ</div>', unsafe_allow_html=True)
@@ -328,6 +323,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
