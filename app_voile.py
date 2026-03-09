@@ -214,26 +214,23 @@ elif st.session_state.page == "BUDGET":
 elif st.session_state.page == "FACTURE":
     st.markdown('<div class="page-title">📄 FACTURATION CMN</div>', unsafe_allow_html=True)
     
-    # 1. Initialisation de sécurité pour éviter le NameError
+    # Initialisation de sécurité
     df_c = pd.DataFrame() 
     
     c1, c2 = st.columns(2)
     f_y = c1.selectbox("Année", [2025, 2026, 2027], index=1, key="f_y")
     f_m = c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x], key="f_m")
     
-    # 2. Filtrage des données
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
-        mask_cmn = (df['dt'].dt.year == f_y) & \
-                   (df['dt'].dt.month == f_m) & \
-                   (df['Société'].str.upper() == "CMN") & \
-                   (df['Statut'].str.contains("OK|🟢", na=False))
+        mask_cmn = (df['dt'].dt.year == f_y) & (df['dt'].dt.month == f_m) & \
+                   (df['Société'].str.upper() == "CMN") & (df['Statut'].str.contains("OK|🟢", na=False))
         df_c = df[mask_cmn]
     
-    # 3. Affichage et Envoi
     if not df_c.empty:
         total = sum(df_c['PrixJour'].apply(to_f))
         
+        # --- CORPS DU MAIL ---
         corps = f"Bonjour Jean-Michel,\n\nCi-après le détail de la facturation des sorties CMN de ce mois ({calendar.month_name[f_m]} {f_y}) :\n\n"
         for _, r in df_c.iterrows():
             corps += f"- Le {r['DateNav']} : {fmt_p(r['PrixJour'])}\n"
@@ -241,20 +238,33 @@ elif st.session_state.page == "FACTURE":
         
         txt = st.text_area("Aperçu du message", corps, height=250)
         
-        # Paramètres d'envoi avec CC
+        # --- PARAMÈTRES ---
         dest = "tresorier@cmn-asso.fr"
         cc = "eric.clavreul@gmail.com"
         sujet = f"Facturation Skipper - {calendar.month_name[f_m]} {f_y}"
         
-        params = urllib.parse.urlencode({'cc': cc, 'subject': sujet, 'body': txt})
-        link = f"mailto:{dest}?{params}"
+        # 1. LIEN CLASSIQUE (Idéal iPhone / iPad)
+        params_mailto = urllib.parse.urlencode({'cc': cc, 'subject': sujet, 'body': txt})
+        link_mailto = f"mailto:{dest}?{params_mailto}"
         
         st.markdown(f'''
-            <a href="{link}" style="background-color:#1a2a6c; color:white; padding:15px; 
-            display:block; text-align:center; text-decoration:none; border-radius:10px; font-weight:bold;">
-            📧 ENVOYER À JEAN-MICHEL (AVEC CC ERIC)
+            <a href="{link_mailto}" style="background-color:#1a2a6c; color:white; padding:15px; 
+            display:block; text-align:center; text-decoration:none; border-radius:10px; font-weight:bold; margin-bottom:10px;">
+            📱 ENVOYER VIA MON SMARTPHONE
             </a>
         ''', unsafe_allow_html=True)
+
+        # 2. LIEN GMAIL WEB (Idéal PC / Navigateur)
+        # On utilise une URL spécifique à Gmail qui force l'ouverture en ligne
+        gmail_url = f"https://mail.google.com/mail/?view=cm&fs=1&to={dest}&cc={cc}&sujet={urllib.parse.quote(sujet)}&body={urllib.parse.quote(txt)}"
+        
+        st.markdown(f'''
+            <a href="{gmail_url}" target="_blank" style="background-color:#db4437; color:white; padding:15px; 
+            display:block; text-align:center; text-decoration:none; border-radius:10px; font-weight:bold;">
+            💻 ENVOYER VIA GMAIL (ORDINATEUR)
+            </a>
+        ''', unsafe_allow_html=True)
+        
     else: 
         st.info(f"Aucune prestation CMN validée pour {calendar.month_name[f_m]} {f_y}.")
 
@@ -336,6 +346,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
