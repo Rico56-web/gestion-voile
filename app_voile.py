@@ -179,8 +179,19 @@ elif st.session_state.page == "BUDGET":
     st.markdown("---")
     res, t_rev, t_fra, t_net, t_pre = [], 0, 0, 0, 0
     for i in range(1, 13):
-        rev = sum(df[(df['dt'].dt.year == s_y) & (df['dt'].dt.month == i) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
-        fr = sum(df_f[(df_f['dt'].dt.year == s_y) &
+        # Filtrage mois par mois
+        m_df = df[(df['dt'].dt.year == s_y) & (df['dt'].dt.month == i)]
+        m_f = df_f[(df_f['dt'].dt.year == s_y) & (df_f['dt'].dt.month == i)]
+        
+        # Calculs des sommes
+        rev = sum(m_df[m_df['Statut'].str.contains("OK|🟢", na=False)]['PrixJour'].apply(to_f))
+        fr = sum(m_f['Montant'].apply(to_f))
+        prev = sum(m_df[m_df['Statut'].str.contains("OK|🟢|🟡|Attente", na=False)]['PrixJour'].apply(to_f))
+        
+        net = rev - fr
+        t_rev += rev; t_fra += fr; t_net += net; t_pre += prev
+        res.append({"M": i, "Rev": int(rev), "Frais": int(fr), "Net": int(net), "Prév": int(prev)})
+
 
 
 
