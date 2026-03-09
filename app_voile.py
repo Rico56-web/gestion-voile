@@ -123,36 +123,29 @@ if st.session_state.page == "LISTE":
                 if st.button("Confirmer", key=f"conf_l_{i}"): df.drop(i).pipe(sauvegarder_data, "contacts.json"); st.rerun()
                     
 # --- PAGE PLANNING ---
-elif st.session_state.page == "PLANNING":
-    st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
-    y_col, m_col = st.columns(2)
-    p_y, p_m = y_col.selectbox("An", [2025, 2026, 2027], index=1), m_col.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
-    occu, details_list = {}, []
-    if not df.empty:
-        for i, r in df.iterrows():
-            if "🔴" not in str(r.get('Statut','')):
-                d_s = parse_d(r.get('DateNav',''))
-                nb_j_val = int(to_f(r.get('NbJours', 1))) # On récupère le nombre de jours ici
-                for j in range(nb_j_val):
-                    curr = d_s + timedelta(days=j)
-                    if curr.year == p_y and curr.month == p_m:
-                        soc_u = str(r.get('Société','')).strip().upper()
-                        occu[curr.day] = "day-cmn" if soc_u == "CMN" else ("day-ok" if "OK" in str(r.get('Statut','')) else "day-wait")
-                        # Ajout du (Xj) dans la liste sous le calendrier
-                        if j == 0: 
-                            details_list.append({"day": curr.day, "text": f"⚓ **{curr.day}**: {r.get('Nom')} ({soc_u}) **({nb_j_val}j)**"})
+elif st.session_state.page == "BUDGET":
+    st.markdown('<div class="page-title">💰 STATS & BILAN</div>', unsafe_allow_html=True)
     
-    cal = calendar.monthcalendar(p_y, p_m)
-    h = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
-    for wk in cal:
-        h += '<tr>'
-        for d in wk:
-            bg = f'class="{occu[d]}"' if d in occu else ''
-            h += f'<td {bg}>{d if d != 0 else ""}</td>'
-        h += '</tr>'
-    st.markdown(h + '</table>', unsafe_allow_html=True)
-    for item in sorted(details_list, key=lambda x: x['day']): st.write(item['text'])
+    # 1. Gestion de la mémoire de la cible annuelle
+    if "cible_annuelle" not in st.session_state:
+        st.session_state.cible_annuelle = 15000.0
 
+    # 2. Sélection de l'année et de la cible
+    s_y = st.selectbox("Année", [2025, 2026, 2027], index=1)
+    
+    # Utilisation du state pour garder la valeur en changeant de page
+    obj = st.number_input("Cible annuelle (€)", 
+                          value=float(st.session_state.cible_annuelle), 
+                          step=1000.0)
+    st.session_state.cible_annuelle = obj
+
+    # 3. Calculs (Vérifiez bien l'alignement de ces lignes)
+    df['dt'] = df['DateNav'].apply(parse_d)
+    df_f['dt'] = df_f['Date'].apply(parse_d)
+
+    ca_total_ok = sum(df[(df['dt'].dt.year == s_y) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
+    st.write(f"📈 **Réalisé (OK) : {int(ca_total_ok)} / {int(obj)}**")
+    st.progress(min(ca_total_ok/obj, 1.0) if obj > 0 else 0.0)
 # --- PAGE STATS ---
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS & BILAN</div>', unsafe_allow_html=True)
@@ -320,6 +313,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
