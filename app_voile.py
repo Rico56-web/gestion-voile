@@ -168,22 +168,32 @@ elif st.session_state.page == "PLANNING":
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS & BILAN</div>', unsafe_allow_html=True)
+    
+    # 1. Année et Cible (Mémoire de session)
     s_y = st.selectbox("Année", [2025, 2026, 2027], index=1)
     obj = st.number_input("Cible annuelle (€)", value=float(st.session_state.cible_annuelle), step=1000.0, key="cible_input")
     st.session_state.cible_annuelle = obj
+
+    # 2. Préparation des dates
     df['dt'] = df['DateNav'].apply(parse_d)
     df_f['dt'] = df_f['Date'].apply(parse_d)
-    ca_total_ok = sum(df[(df['dt'].dt.year == s_y) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f))
+
+    # 3. Calcul du Réalisé Total
+    mask_ok = (df['dt'].dt.year == s_y) & (df['Statut'].str.contains("OK|🟢", na=False))
+    ca_total_ok = sum(df[mask_ok]['PrixJour'].apply(to_f))
+    
     st.write(f"📈 **Réalisé (OK) : {int(ca_total_ok)} / {int(obj)}**")
     st.progress(min(ca_total_ok/obj, 1.0) if obj > 0 else 0.0)
     st.markdown("---")
+
+    # 4. Construction des données du tableau
     res, t_rev, t_fra, t_net, t_pre = [], 0, 0, 0, 0
     for i in range(1, 13):
-        # Filtrage mois par mois
+        # Filtres mensuels
         m_df = df[(df['dt'].dt.year == s_y) & (df['dt'].dt.month == i)]
         m_f = df_f[(df_f['dt'].dt.year == s_y) & (df_f['dt'].dt.month == i)]
         
-        # Calculs des sommes
+        # Sommes par catégorie
         rev = sum(m_df[m_df['Statut'].str.contains("OK|🟢", na=False)]['PrixJour'].apply(to_f))
         fr = sum(m_f['Montant'].apply(to_f))
         prev = sum(m_df[m_df['Statut'].str.contains("OK|🟢|🟡|Attente", na=False)]['PrixJour'].apply(to_f))
@@ -192,6 +202,32 @@ elif st.session_state.page == "BUDGET":
         t_rev += rev; t_fra += fr; t_net += net; t_pre += prev
         res.append({"M": i, "Rev": int(rev), "Frais": int(fr), "Net": int(net), "Prév": int(prev)})
 
+    # 5. Création et affichage du DataFrame de stats
+    df_stats = pd.DataFrame(res)
+    total_row = pd.DataFrame([{"M":"TOT", "Rev":int(t_rev), "Frais":int(t_fra), "Net":int(t_net), "Prév":int(t_pre)}])
+    full_stats = pd.concat([df_stats, total_row], ignore_index=True).set_index('M')
+
+    def style_stats(styler):
+        styler.set_table_styles([{'selector': 'th', 'props': [('background-color', '#d6eaf8'), ('color', '#1a2a6c'), ('font-weight', 'bold')]}])
+        styler.set_properties(subset=['Rev'], **{'color': '#27ae60', 'font-weight': 'bold'})
+        styler.set_properties(subset=['Frais'], **{'color': '#e74c3c'})
+        styler.set_properties(subset=['Net'], **{'background-color': '#ebf5fb', 'font-weight': 'bold'})
+        styler.set_properties(subset=['Prév'], **{'color': '#f39c12'})
+        return styler
+
+    st.table(full_stats.style.pipe(style_stats))
+    st.markdown("---")
+
+    # 6. Section Facture CMN
+    st.subheader("📄 Facture CMN")
+    f_m = st.selectbox("Mois Facture", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
+    mask_cmn = (df['dt'].dt.year == s_y) & (df['dt'].dt.month == f_m) & (df['Société'].str.upper() == "CMN") & (df['Statut'].str.contains("OK|🟢", na=False))
+    df_c = df[mask_cmn]
+    
+    if not df_c.empty:
+        corps = f"Prestations {calendar.month_name[f_m]} {s_y} :\n" + "\n".join([f"- Le {r['DateNav']} : {fmt_p(r['PrixJour'])}" for _, r in df_c.iterrows()])
+        st.text_area("Aperçu", corps, height=100)
+        st.markdown(f'<a href="mailto:tresorier@cmn-asso.fr?subject=Facture&body={urllib.parse.quote(corps)}" style="background-color:#1a2a6c;color:white;padding:12px;display:block;text-align:center;text-decoration:none;border-radius:8px;">📧 ENVOYER</a>', unsafe_allow_html=True)
 
 
 
