@@ -252,7 +252,61 @@ elif st.session_state.page == "SECU":
 
 elif st.session_state.page == "FRAIS":
     st.markdown('<div class="page-title">🔧 MAINTENANCE</div>', unsafe_allow_html=True)
-    if st.session_state.edit_f
+    if st.session_state.edit_f_idx is not None:
+        idx = st.session_state.edit_f_idx
+        init = df_f.loc[idx].to_dict() if (idx != "NEW" and not df_f.empty) else {"Date": datetime.now().strftime("%d/%m/%Y"), "Montant": "0", "Note": ""}
+        with st.form("f_f"):
+            d, m, n = st.text_input("Date", init.get("Date")), st.text_input("Montant", str(init.get("Montant"))), st.text_area("Note", init.get("Note"))
+            if st.form_submit_button("✅"):
+                row = {"Date": d, "Montant": m, "Note": n}
+                if idx == "NEW": df_f = pd.concat([df_f, pd.DataFrame([row])], ignore_index=True)
+                else: 
+                    for k,v in row.items(): df_f.at[idx,k]=v
+                sauvegarder_data(df_f, "frais.json"); st.session_state.edit_f_idx = None; st.rerun()
+    else:
+        st.button("➕ AJOUTER", on_click=lambda: st.session_state.update({"edit_f_idx":"NEW"}), use_container_width=True)
+        if not df_f.empty:
+            for i in reversed(df_f.index):
+                r = df_f.loc[i]
+                st.markdown(f'<div class="client-card"><b>{r.get("Date")} : {fmt_p(r.get("Montant"))}</b><br>{r.get("Note")}</div>', unsafe_allow_html=True)
+                if st.button("🗑️", key=f"fd_{i}"): df_f = df_f.drop(i); sauvegarder_data(df_f, "frais.json"); st.rerun()
+
+elif st.session_state.page == "NOTES":
+    st.markdown('<div class="page-title">📝 NOTES</div>', unsafe_allow_html=True)
+    if st.session_state.edit_n_idx is not None:
+        idx = st.session_state.edit_n_idx
+        with st.form("f_n"):
+            t = st.text_input("Titre", df_n.loc[idx, "Titre"] if (idx != "NEW" and not df_n.empty) else "")
+            c = st.text_area("Contenu", df_n.loc[idx, "Contenu"] if (idx != "NEW" and not df_n.empty) else "", height=200)
+            if st.form_submit_button("✅"):
+                row = {"Titre":t, "Contenu":c, "Date":datetime.now().strftime("%d/%m/%Y")}
+                if idx=="NEW": df_n = pd.concat([df_n, pd.DataFrame([row])], ignore_index=True)
+                else: 
+                    for k,v in row.items(): df_n.at[idx,k]=v
+                sauvegarder_data(df_n, "notes.json"); st.session_state.edit_n_idx=None; st.rerun()
+    else:
+        st.button("➕ AJOUTER", on_click=lambda: st.session_state.update({"edit_n_idx":"NEW"}), use_container_width=True)
+        if not df_n.empty:
+            for i in reversed(df_n.index):
+                r = df_n.loc[i]
+                st.markdown(f'<div class="client-card" style="padding: 20px; border-left: 5px solid #1a2a6c;"><b>{r.get("Titre")}</b><br><small>{r.get("Date")}</small><hr><div style="white-space:pre-wrap;">{r.get("Contenu")}</div></div>', unsafe_allow_html=True)
+                if st.button("🗑️", key=f"nd_{i}"): df_n = df_n.drop(i); sauvegarder_data(df_n, "notes.json"); st.rerun()
+
+elif st.session_state.page == "FORM":
+    idx = st.session_state.edit_idx
+    init = df.loc[idx].to_dict() if (idx != "NEW" and not df.empty) else {}
+    with st.form("f_form"):
+        st_v = st.selectbox("Statut", ["🟢 OK", "🟡 Attente", "🔴 Annulé"], index=1)
+        p, n, s = st.text_input("Prénom", init.get("Prénom","")), st.text_input("Nom", init.get("Nom","")), st.text_input("Société", init.get("Société",""))
+        d, j = st.text_input("Date", init.get("DateNav","")), st.text_input("Jours", str(init.get("NbJours","1")))
+        t, em, pr = st.text_input("Tél", init.get("Téléphone","")), st.text_input("Email", init.get("Email","")), st.text_input("Prix", str(init.get("PrixJour","0")))
+        if st.form_submit_button("SAUVEGARDER"):
+            row = {"Prénom":p, "Nom":n, "Société":s, "Téléphone":t, "Email":em, "DateNav":d, "NbJours":j, "PrixJour":pr, "Statut":st_v}
+            if idx=="NEW": df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+            else: 
+                for k,v in row.items(): df.at[idx,k]=v
+            sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
+    st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
 
 
 
