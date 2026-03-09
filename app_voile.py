@@ -242,7 +242,7 @@ elif st.session_state.page == "NOTES":
         idx = st.session_state.edit_n_idx
         init = df_n.loc[idx].to_dict() if idx != "NEW" else {"Titre": "", "Contenu": ""}
         with st.form("f_n"):
-            t, c = st.text_input("Titre", init.get("Titre")), st.text_area("Contenu", init.get("Contenu"))
+            t, c = st.text_input("Titre", init.get("Titre")), st.text_area("Contenu", init.get("Contenu"), height=200)
             if st.form_submit_button("✅ OK"):
                 row = {"Titre":t, "Contenu":c, "Date":datetime.now().strftime("%d/%m/%Y")}
                 if idx=="NEW": df_n = pd.concat([df_n, pd.DataFrame([row])], ignore_index=True)
@@ -254,11 +254,19 @@ elif st.session_state.page == "NOTES":
         st.button("➕ AJOUTER UNE NOTE", on_click=lambda: st.session_state.update({"edit_n_idx":"NEW"}), use_container_width=True)
         for i in reversed(df_n.index):
             r = df_n.loc[i]
-            st.markdown(f'<div class="client-card"><b>{r.get("Titre")}</b> ({r.get("Date")})<br>{r.get("Contenu")}</div>', unsafe_allow_html=True)
+            # Affichage en mode "Carte large" avec texte complet
+            st.markdown(f"""
+                <div class="client-card" style="padding: 20px; border-left: 5px solid #1a2a6c;">
+                    <b style="font-size:1.2rem; color:#1a2a6c;">{r.get("Titre")}</b> 
+                    <span style="font-size:0.8rem; color:grey; float:right;">{r.get("Date")}</span>
+                    <hr style="margin: 10px 0; border: 0.5px solid #eee;">
+                    <div style="white-space: pre-wrap; font-size:1rem; line-height:1.4;">{r.get("Contenu")}</div>
+                </div>
+            """, unsafe_allow_html=True)
             ce, cd = st.columns([1, 2])
             if ce.button("✏️", key=f"ne_{i}"): st.session_state.edit_n_idx = i; st.rerun()
             if cd.checkbox("🗑️", key=f"nd_{i}"):
-                if st.button("Confirmer", key=f"nc_{i}"): df_n.drop(i).pipe(sauvegarder_data, "notes.json"); st.rerun()
+                if st.button("Confirmer suppression", key=f"nc_{i}"): df_n.drop(i).pipe(sauvegarder_data, "notes.json"); st.rerun()
 
 # --- PAGE FORMULAIRE (Contact/Nav) ---
 elif st.session_state.page == "FORM":
@@ -280,6 +288,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
