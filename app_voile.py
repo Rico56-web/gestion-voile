@@ -154,6 +154,7 @@ elif st.session_state.page == "PLANNING":
     for item in sorted(details_list, key=lambda x: x['day']): st.write(item['text'])
 
 # --- PAGE STATS ---
+
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS & BILAN</div>', unsafe_allow_html=True)
     
@@ -300,6 +301,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
