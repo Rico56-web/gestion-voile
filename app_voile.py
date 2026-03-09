@@ -75,10 +75,11 @@ df_s = charger_data("secu.json")
 
 # --- 3. MENU ---
 st.markdown('<div class="main-title">⚓ VESTA SKIPPER</div>', unsafe_allow_html=True)
-m_cols = st.columns(7)
+m_cols = st.columns(8) # Passé à 8 colonnes
 menu = [
     ("📋 LISTE","LISTE"), ("🗓️ PLAN","PLANNING"), ("💰 STATS","BUDGET"), 
-    ("📖 LOG","LOGBOOK"), ("🛟 SÉCU","SECU"), ("🔧 MAINT","FRAIS"), ("📝 NOTES","NOTES")
+    ("📖 LOG","LOGBOOK"), ("📄 FACT","FACTURE"), ("🛟 SÉCU","SECU"), 
+    ("🔧 MAINT","FRAIS"), ("📝 NOTES","NOTES")
 ]
 for i, (l, p) in enumerate(menu):
     if m_cols[i].button(l, use_container_width=True, type="primary" if st.session_state.page==p else "secondary"):
@@ -320,6 +321,49 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+    elif st.session_state.page == "FACTURE":
+    st.markdown('<div class="page-title">📄 FACTURATION CMN</div>', unsafe_allow_html=True)
+    
+    # Sélection de l'année et du mois
+    c1, c2 = st.columns(2)
+    f_y = c1.selectbox("Année", [2025, 2026, 2027], index=1, key="fact_y")
+    f_m = c2.selectbox("Mois à facturer", range(1, 13), index=datetime.now().month-1, 
+                       format_func=lambda x: calendar.month_name[x], key="fact_m")
+    
+    # Filtrage des données CMN
+    df['dt'] = df['DateNav'].apply(parse_d)
+    mask_cmn = (df['dt'].dt.year == f_y) & (df['dt'].dt.month == f_m) & \
+               (df['Société'].str.upper() == "CMN") & (df['Statut'].str.contains("OK|🟢", na=False))
+    df_c = df[mask_cmn]
+    
+    if not df_c.empty:
+        st.success(f"✅ {len(df_c)} prestations trouvées pour {calendar.month_name[f_m]}.")
+        
+        # Calcul du total
+        total_facture = sum(df_c['PrixJour'].apply(to_f))
+        
+        # Préparation du texte
+        corps = f"Bonjour,\n\nVoici le détail de mes prestations pour {calendar.month_name[f_m]} {f_y} :\n\n"
+        for _, r in df_c.iterrows():
+            corps += f"- Le {r['DateNav']} : {fmt_p(r['PrixJour'])}\n"
+        
+        corps += f"\nTOTAL À RÉGLER : {fmt_p(total_facture)}\n\nMerci d'avance,\nBon vent !"
+        
+        # Zone d'édition
+        final_text = st.text_area("Aperçu du message :", corps, height=250)
+        
+        # Bouton d'envoi
+        mail_link = f'mailto:tresorier@cmn-asso.fr?subject=Facture Skipper - {calendar.month_name[f_m]} {f_y}&body={urllib.parse.quote(final_text)}'
+        
+        st.markdown(f'''
+            <a href="{mail_link}" style="background-color:#1a2a6c; color:white; padding:15px; 
+            display:block; text-align:center; text-decoration:none; border-radius:10px; font-weight:bold;">
+            📧 ENVOYER AU TRÉSORIER ({fmt_p(total_facture)})
+            </a>
+        ''', unsafe_allow_html=True)
+    else:
+        st.info(f"Aucune prestation 'OK' pour CMN en {calendar.month_name[f_m]} {f_y}.")
+
 
 
 
