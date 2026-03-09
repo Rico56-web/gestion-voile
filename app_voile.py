@@ -121,6 +121,7 @@ if st.session_state.page == "LISTE":
             if ce.button("✏️", key=f"ed_l_{i}"): st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
             if cd.checkbox("🗑️", key=f"del_l_{i}"):
                 if st.button("Confirmer", key=f"conf_l_{i}"): df.drop(i).pipe(sauvegarder_data, "contacts.json"); st.rerun()
+                    
 # --- PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
@@ -131,12 +132,16 @@ elif st.session_state.page == "PLANNING":
         for i, r in df.iterrows():
             if "🔴" not in str(r.get('Statut','')):
                 d_s = parse_d(r.get('DateNav',''))
-                for j in range(int(to_f(r.get('NbJours', 1)))):
+                nb_j_val = int(to_f(r.get('NbJours', 1))) # On récupère le nombre de jours ici
+                for j in range(nb_j_val):
                     curr = d_s + timedelta(days=j)
                     if curr.year == p_y and curr.month == p_m:
                         soc_u = str(r.get('Société','')).strip().upper()
                         occu[curr.day] = "day-cmn" if soc_u == "CMN" else ("day-ok" if "OK" in str(r.get('Statut','')) else "day-wait")
-                        if j == 0: details_list.append({"day": curr.day, "text": f"⚓ **{curr.day}**: {r.get('Nom')} ({soc_u})"})
+                        # Ajout du (Xj) dans la liste sous le calendrier
+                        if j == 0: 
+                            details_list.append({"day": curr.day, "text": f"⚓ **{curr.day}**: {r.get('Nom')} ({soc_u}) **({nb_j_val}j)**"})
+    
     cal = calendar.monthcalendar(p_y, p_m)
     h = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
     for wk in cal:
@@ -275,6 +280,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
