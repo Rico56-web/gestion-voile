@@ -145,50 +145,53 @@ elif st.session_state.page == "PLANNING":
     p_m = m_col.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
     
     occu = {}
+    df_mois = pd.DataFrame()
+    
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
-        # On filtre les données du mois sélectionné pour la liste du dessous
+        # Isoler les données du mois pour la liste sous le calendrier
         df_mois = df[(df['dt'].dt.year == p_y) & (df['dt'].dt.month == p_m)].sort_values('dt')
         
         for _, r in df.iterrows():
-            if "🔴" not in str(r.get('Statut','')):
+            statut_str = str(r.get('Statut','')).upper()
+            if "🔴" not in statut_str and "ANNULÉ" not in statut_str:
                 d_s, nb_j = r['dt'], int(to_f(r.get('NbJours', 1)))
                 for j in range(nb_j):
                     curr = d_s + timedelta(days=j)
                     if curr.year == p_y and curr.month == p_m:
                         soc = str(r.get('Société','')).upper()
-                        occu[curr.day] = ("day-cmn" if soc == "CMN" else "day-ok", f"{r.get('Prénom','')} {r.get('Nom','')[:1]}.")
+                        # On ne garde que la classe de couleur, plus de texte
+                        occu[curr.day] = "day-cmn" if soc == "CMN" else "day-ok"
 
-    # --- AFFICHAGE DU CALENDRIER ---
+    # --- AFFICHAGE DU CALENDRIER ÉPURÉ ---
     cal = calendar.monthcalendar(p_y, p_m)
     h = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
     for wk in cal:
         h += '<tr>'
         for d in wk:
-            style, txt = (occu[d][0], f'<br><span style="font-size:0.7rem;">{occu[d][1]}</span>') if d in occu else ('', '')
-            h += f'<td class="{style}">{d if d != 0 else ""}{txt}</td>'
+            style = f'class="{occu[d]}"' if d in occu else ''
+            # On affiche uniquement le chiffre du jour
+            h += f'<td {style}>{d if d != 0 else ""}</td>'
         h += '</tr>'
     st.markdown(h + '</table>', unsafe_allow_html=True)
 
     # --- LISTE DES NOMS DU MOIS (SOUS LE PLANNING) ---
     st.markdown("---")
-    st.subheader(f"👥 Détails de {calendar.month_name[p_m]}")
+    st.subheader(f"👥 Détails de {calendar.month_name[p_m]} {p_y}")
     
-    if not df.empty and not df_mois.empty:
+    if not df_mois.empty:
         for i, r in df_mois.iterrows():
-            statut = str(r.get('Statut','🟡'))
             soc = str(r.get('Société','')).upper()
             tel = str(r.get('Téléphone', r.get('Tel', ''))).strip()
             
-            # Petite ligne compacte pour le planning
             st.markdown(f"""
-            <div style="background:white; padding:10px; border-radius:5px; border-left:5px solid {"#3498db" if soc=="CMN" else "#2ecc71"}; margin-bottom:5px; border:1px solid #eee;">
-                <b>{r.get('DateNav')}</b> : {r.get('Prénom','')} {r.get('Nom','').upper()} 
-                ({r.get('NbJours','1')}j) - <i>{soc}</i> | 📞 {tel}
+            <div style="background:white; padding:12px; border-radius:8px; border-left:8px solid {"#3498db" if soc=="CMN" else "#2ecc71"}; margin-bottom:8px; border:1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.05);">
+                <b style="color:#1a2a6c;">{r.get('DateNav')}</b> : <b>{r.get('Prénom','')} {r.get('Nom','').upper()}</b> <br>
+                🏢 {soc} ({r.get('NbJours','1')}j) | 📞 {tel}
             </div>
             """, unsafe_allow_html=True)
     else:
-        st.write("Aucune navigation prévue ce mois-ci.")
+        st.info(f"Aucune navigation enregistrée pour {calendar.month_name[p_m]}.")
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS & BILAN</div>', unsafe_allow_html=True)
@@ -275,6 +278,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
