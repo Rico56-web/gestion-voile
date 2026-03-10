@@ -106,26 +106,30 @@ if st.session_state.page == "LISTE":
         data = df[df['dt'] < today] if st.session_state.view_mode=="PASSÉES" else df[df['dt'] >= today]
         
         for i, r in data.sort_values('dt', ascending=(st.session_state.view_mode=="FUTURES")).iterrows():
+            # RÉCUPÉRATION FLEXIBLE (cherche avec ou sans accent)
+            tel_brut = str(r.get('Tel', r.get('Tél', r.get('téléphone', '-')))).strip()
+            mail_brut = str(r.get('Mail', r.get('Mél', r.get('Email', '-')))).strip()
             statut = str(r.get('Statut','🟡 Attente'))
             soc = str(r.get('Société','')).upper()
-            tel = str(r.get('Tel','')).strip()
-            mail = str(r.get('Mail','')).strip()
             
-            # Nettoyage du numéro pour WhatsApp (enlève espaces, points, etc.)
-            tel_clean = tel.replace(" ", "").replace(".", "").replace("-", "")
-            if tel_clean.startswith("0"): tel_clean = "33" + tel_clean[1:]
-            
+            # Nettoyage pour les liens (Appel / WhatsApp)
+            tel_clean = tel_brut.replace(" ", "").replace(".", "").replace("-", "")
+            if tel_clean.startswith("0"): 
+                tel_link = "33" + tel_clean[1:]
+            else:
+                tel_link = tel_clean
+
             st.markdown(f"""
             <div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
                 <div class="status-badge">{statut}</div>
                 <b style="font-size:1.2rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
                 📅 {r.get('DateNav')} ({r.get('NbJours','1')}j) | 🏢 {soc}<br>
-                <span style="color:#555;">📞 {tel}</span><br>
-                <span style="color:#555;">✉️ {mail}</span><br><br>
-                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                    <a href="tel:{tel_clean}" style="background:#3498db; color:white; padding:10px 15px; border-radius:5px; text-decoration:none; font-weight:bold;">📞 Appel</a>
-                    <a href="https://wa.me/{tel_clean}" target="_blank" style="background:#25d366; color:white; padding:10px 15px; border-radius:5px; text-decoration:none; font-weight:bold;">💬 WhatsApp</a>
-                    <a href="mailto:{mail}" style="background:#e67e22; color:white; padding:10px 15px; border-radius:5px; text-decoration:none; font-weight:bold;">✉️ Mail</a>
+                <b style="color:#1a2a6c;">📞 TEL : {tel_brut}</b><br>
+                <b style="color:#1a2a6c;">✉️ MAIL : {mail_brut}</b><br><br>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <a href="tel:+{tel_link}" style="background:#3498db; color:white; padding:12px 20px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:0.9rem;">📞 APPELER</a>
+                    <a href="https://wa.me/{tel_link}" target="_blank" style="background:#25d366; color:white; padding:12px 20px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:0.9rem;">💬 WHATSAPP</a>
+                    <a href="mailto:{mail_brut}" style="background:#e67e22; color:white; padding:12px 20px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:0.9rem;">✉️ EMAIL</a>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -262,6 +266,7 @@ elif st.session_state.page == "FORM":
             else: 
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
+
 
 
 
