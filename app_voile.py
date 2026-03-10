@@ -141,32 +141,75 @@ if st.session_state.page == "LISTE":
                     if st.button("Confirmer", key=f"conf_l_{i}"): 
                         df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
 
-  
+  elif st.session_state.page == "LOGBOOK":
+    st.markdown('<div class="page-title">📖 LIVRE DE BORD</div>', unsafe_allow_html=True)
+    
+    # 1. Chargement des données du livre de bord
+    df_log = charger_data("livre_de_bord.json")
+    
+    # --- FORMULAIRE DE SAISIE / ÉDITION ---
+    idx_log = st.session_state.get("edit_log_idx", None)
+    init_log = df_log.loc[idx_log].to_dict() if (idx_log is not None and not df_log.empty) else {}
 
-elif st.session_state.page == "LOGBOOK":
-    st.markdown('<div class="page-title">📖 JOURNAL DE BORD</div>', unsafe_allow_html=True)
-    with st.form("f_log_complet"):
-        st.subheader("🚩 DÉPART")
+    with st.form("f_livre_bord"):
+        st.subheader("🚩 ÉTAPE DE NAVIGATION")
         c1, c2 = st.columns(2)
-        d_lieu = c1.text_input("Port / Mouillage (Départ)", key="d_l")
-        d_met = c2.selectbox("Météo (Départ)", ["☀️ Beau", "☁️ Couvert", "🌧️ Pluie", "🌬️ Vent fort"], key="d_m")
+        date_l = c1.text_input("Date", init_log.get("Date", datetime.now().strftime("%d/%m/%Y")))
+        d_lieu = c2.text_input("Port / Mouillage Départ", init_log.get("LieuD", ""))
+        
         c3, c4 = st.columns(2)
-        d_h = c3.number_input("Heures Moteur (Départ)", step=0.1, key="d_h")
-        d_mi = c4.number_input("Loch / Milles (Départ)", step=0.1, key="d_mi")
+        d_h = c3.number_input("Heures Moteur (Départ)", value=float(init_log.get("HeuresD", 0.0)), step=0.1)
+        d_mi = c4.number_input("Loch / Milles (Départ)", value=float(init_log.get("MillesD", 0.0)), step=0.1)
         
-        st.markdown("--- ⛵ **EN COURS** ---")
-        obs = st.text_area("Observations (Virements, dauphins, technique...)", height=100)
+        obs = st.text_area("Observations (Météo, route, technique...)", init_log.get("Obs", ""), height=100)
         
-        st.markdown("--- 🏁 **ARRIVÉE** ---")
+        st.markdown("---")
         c5, c6 = st.columns(2)
-        a_lieu = c5.text_input("Port / Mouillage (Arrivée)", key="a_l")
-        a_met = c6.selectbox("Météo (Arrivée)", ["☀️ Beau", "☁️ Couvert", "🌧️ Pluie", "🌬️ Vent fort"], key="a_m")
-        c7, c8 = st.columns(2)
-        a_h = c7.number_input("Heures Moteur (Arrivée)", step=0.1, key="a_h")
-        a_mi = c8.number_input("Loch / Milles (Arrivée)", step=0.1, key="a_mi")
+        a_lieu = c5.text_input("Port / Mouillage Arrivée", init_log.get("LieuA", ""))
+        a_mi = c6.number_input("Loch / Milles (Arrivée)", value=float(init_log.get("MillesA", 0.0)), step=0.1)
 
-        if st.form_submit_button("⚓ ENREGISTRER L'ÉTAPE", use_container_width=True):
-            st.success(f"Log enregistré : {a_mi - d_mi:.1f} milles parcourus.")
+        if st.form_submit_button("⚓ ENREGISTRER L'ÉTAPE"):
+            distance = a_mi - d_mi
+            row_log = {
+                "Date": date_l, "LieuD": d_lieu, "HeuresD": d_h, "MillesD": d_mi,
+                "Obs": obs, "LieuA": a_lieu, "MillesA": a_mi, "Dist": distance
+            }
+            import pandas as pd
+            if idx_log is None: # Nouvelle entrée
+                df_log = pd.concat([df_log, pd.DataFrame([row_log])], ignore_index=True)
+            else: # Modification
+                for k, v in row_log.items(): df_log.at[idx_log, k] = v
+                st.session_state.edit_log_idx = None
+            
+            sauvegarder_data(df_log, "livre_de_bord.json")
+            st.success(f"Étape enregistrée ({distance:.1f} mn)")
+            st.rerun()
+
+    if idx_log is not None:
+        if st.button("Annuler modification"):
+            st.session_state.edit_log_idx = None
+            st.rerun()
+
+    # --- AFFICHAGE DE L'HISTORIQUE ---
+    if not df_log.empty:
+        st.markdown("---")
+        st.subheader("📜 Historique des étapes")
+        for i in reversed(df_log.index):
+            l = df_log.loc[i]
+            with st.expander(f"📅 {l['Date']} : {l['LieuD']} ➔ {l['LieuA']} ({l.get('Dist', 0):.1f} mn)"):
+                st.write(f"**Heures moteur départ :** {l['HeuresD']} h")
+                st.write(f"**Notes :** {l['Obs']}")
+                
+                cl1, cl2 = st.columns(2)
+                if cl1.button("✏️ Modifier", key=f"ed_log_{i}"):
+                    st.session_state.edit_log_idx = i
+                    st.rerun()
+                if cl2.button("🗑️ Supprimer", key=f"del_log_{i}"):
+                    df_log = df_log.drop(i)
+                    sauvegarder_data(df_log, "livre_de_bord.json")
+                    st.rerun()
+
+
 
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
@@ -392,6 +435,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
