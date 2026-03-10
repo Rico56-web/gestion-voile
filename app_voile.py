@@ -1,8 +1,30 @@
 import streamlit as st
 import pandas as pd
-import json, base64, requests, calendar
-import urllib.parse
+import json
+import os
 from datetime import datetime, timedelta
+import calendar
+import urllib.parse
+
+# --- 🛠️ FONCTIONS DE SÉCURITÉ (À METTRE EN HAUT) ---
+
+def to_f(val):
+    """ Convertit n'importe quel texte en nombre décimal propre """
+    try: 
+        if pd.isna(val) or val == "": return 0.0
+        return float(str(val).replace(',', '.').replace(' ', '').strip())
+    except: return 0.0
+
+def parse_d(d_str):
+    """ Convertit une date texte (JJ/MM/AAAA) en objet Date utilisable par Python """
+    try: return datetime.strptime(str(d_str), "%d/%m/%Y")
+    except: return datetime(2000, 1, 1)
+
+def fmt_p(v):
+    """ Formate un nombre en euros (ex: 1250,50 €) """
+    return f"{v:,.2f} €".replace(",", " ").replace(".", ",")
+
+# --- FIN DU BLOC DE SÉCURITÉ ---
 
 # --- 1. CONFIGURATION & STYLE ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
@@ -212,7 +234,55 @@ elif st.session_state.page == "PLANNING":
             st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
     else:
         st.info("Aucune navigation ce mois-ci.")
-                
+
+    elif st.session_state.page == "STATS":
+    st.markdown('<div class="page-title">📊 BILAN DES ENCAISSEMENTS</div>', unsafe_allow_html=True)
+    
+    if not df.empty:
+        # --- FILTRAGE : Uniquement ce qui est payé ---
+        # On cherche "Payé", "Paye" ou l'émoji ✅ dans la colonne Statut
+        mask_paye = df['Statut'].str.contains("Payé|Paye|✅", na=False, case=False)
+        df_paye = df[mask_paye].copy()
+        
+        # Calcul du CA encaissé
+        ca_total = sum(df_paye['PrixJour'].apply(to_f))
+        nb_sorties_payees = len(df_paye)
+        
+        # Affichage des indicateurs clés
+        c1, c2 = st.columns(2)
+        c1.metric("Total Encaissé", fmt_p(ca_total))
+        c2.metric("Sorties Réglées", f"{nb_sorties_payees}")
+        
+        st.markdown("---")
+        
+        # --- RÉPARTITION PAR SOCIÉTÉ (PAYÉ UNIQUEMENT) ---
+        st.subheader("🏢 Répartition du CA encaissé")
+        if not df_paye.empty:
+            # Groupement par société pour voir qui rapporte quoi
+            recap_soc = df_paye.groupby('Société')['PrixJour'].apply(lambda x: sum(x.apply(to_f)))
+            
+            # Affichage sous forme de petit tableau propre
+            for soc, montant in recap_soc.items():
+                col_n, col_m = st.columns([2, 1])
+                col_n.write(f"**{soc}**")
+                col_m.write(f"{fmt_p(montant)}")
+            
+            # Petit graphique pour le visuel
+            st.bar_chart(recap_soc)
+        else:
+            st.warning("Aucun encaissement enregistré pour le moment.")
+            
+        # --- RAPPEL DES FRAIS ---
+        st.markdown("---")
+        st.subheader("📉 Rappel des Frais (Dépenses)")
+        df_f = charger_data("frais.json")
+        if not df_f.empty:
+            total_frais = sum(df_f['Montant'].apply(to_f))
+            st.error(f"Total Dépenses : {fmt_p(total_frais)}")
+            st.info(f"Bénéfice Net estimé : {fmt_p(ca_total - total_frais)}")
+    else:
+        st.info("Aucune donnée disponible pour établir les statistiques.")
+        
 elif st.session_state.page == "LOGBOOK":
     st.markdown('<div class="page-title">📖 JOURNAL DE BORD</div>', unsafe_allow_html=True)
     
@@ -525,6 +595,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
