@@ -240,50 +240,69 @@ elif st.session_state.page == "PLANNING":
             st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
     else:
         st.info("Aucune navigation ce mois-ci.")
-
 elif st.session_state.page == "STATS":
-    st.markdown('<div class="page-title">📊 BILAN DES ENCAISSEMENTS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">📊 TABLEAU DE BORD MENSUEL</div>', unsafe_allow_html=True)
     
     if df.empty:
         st.warning("⚠️ Aucune donnée de navigation trouvée.")
     else:
-        # On crée un filtre qui regarde 'Statut' ET 'Paye'
+        # 1. Préparation des données (Dates et Montants)
+        df['dt'] = df['DateNav'].apply(parse_d)
+        df['Mois'] = df['dt'].dt.strftime('%m - %B %Y') # Format: 03 - March 2026
+        
+        # Fonction pour savoir si c'est payé (regarde Statut et Paye)
         def est_paye(r):
-            # On combine le texte des deux colonnes pour chercher le mot clé
-            texte_complet = (str(r.get('Statut', '')) + " " + str(r.get('Paye', ''))).lower()
-            return any(mot in texte_complet for mot in ["payé", "paye", "ok", "✅", "🟢"])
+            txt = (str(r.get('Statut','')) + " " + str(r.get('Paye',''))).lower()
+            return any(m in txt for m in ["payé", "paye", "ok", "✅", "🟢"])
 
-        # Application du filtre
-        df_paye = df[df.apply(est_paye, axis=1)].copy()
+        # 2. Calcul des indicateurs globaux
+        df['is_paye'] = df.apply(est_paye, axis=1)
+        df['Montant'] = df['PrixJour'].apply(to_f)
         
-        # Calculs
-        ca_total = sum(df_paye['PrixJour'].apply(to_f))
+        encaise_total = df[df['is_paye']]['Montant'].sum()
+        prev_total = df[~df['is_paye']]['Montant'].sum()
         
-        # Récupération des frais (MAINT)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("💰 ENCAISSÉ", fmt_p(encaise_total))
+        c2.metric("⏳ PRÉVISIONNEL", fmt_p(prev_total))
+        c3.metric("📈 TOTAL ANNUEL", fmt_p(encaise_total + prev_total))
+
+        st.markdown("---")
+
+        # 3. RÉCAPITULATIF MENSUEL
+        st.subheader("📅 Détail par mois")
+        
+        # On groupe par mois pour calculer Encaissé et Prévisionnel
+        recap_mensuel = []
+        groupes_mois = df.groupby('Mois')
+        
+        for mois, gp in groupes_mois:
+            paye = gp[gp['is_paye']]['Montant'].sum()
+            prev = gp[~gp['is_paye']]['Montant'].sum()
+            total = paye + prev
+            recap_mensuel.append({
+                "Mois": mois,
+                "Encaissé": fmt_p(paye),
+                "Prévisionnel": fmt_p(prev),
+                "Total": fmt_p(total)
+            })
+            
+        if recap_mensuel:
+            # Affichage sous forme de tableau propre
+            df_tab = pd.DataFrame(recap_mensuel).sort_values("Mois")
+            st.table(df_tab)
+            
+            # Petit graphique de performance
+            st.subheader("📈 Évolution des revenus")
+            chart_data = df.groupby('Mois')['Montant'].sum()
+            st.line_chart(chart_data)
+        
+        # 4. RAPPEL DES FRAIS
+        st.markdown("---")
         df_f = charger_data("frais.json")
         total_frais = sum(df_f['Montant'].apply(to_f)) if not df_f.empty else 0.0
-        
-        # Affichage des indicateurs
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Encaissé (Net)", fmt_p(ca_total))
-        c2.metric("Dépenses (Frais)", fmt_p(total_frais))
-        c3.metric("Bénéfice Réel", fmt_p(ca_total - total_frais))
-        
-        st.markdown("---")
-        
-        if not df_paye.empty:
-            st.subheader("🏢 Répartition par client (Payé)")
-            # On groupe par Société
-            recap_soc = df_paye.groupby('Société')['PrixJour'].apply(lambda x: sum(x.apply(to_f)))
-            st.bar_chart(recap_soc)
-            
-            # Petit tableau propre
-            for soc, montant in recap_soc.items():
-                col_n, col_m = st.columns([2, 1])
-                col_n.write(f"**{soc}**")
-                col_m.write(f"{fmt_p(montant)}")
-        else:
-            st.info("💡 Aucune ligne n'est marquée comme payée. Vérifiez vos colonnes 'Statut' ou 'Paye'.")
+        st.write(f"🔧 **Total des frais enregistrés :** {fmt_p(total_frais)}")
+        st.write(f"⚓ **Bénéfice Net Actuel (Encaissé - Frais) :** {fmt_p(encaise_total - total_frais)}")
         
 elif st.session_state.page == "FACTURE":
     st.markdown('<div class="page-title">📄 FACTURATION & ARCHIVES</div>', unsafe_allow_html=True)
@@ -509,6 +528,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
