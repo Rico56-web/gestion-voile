@@ -348,10 +348,18 @@ elif st.session_state.page == "FACTURE":
          prix_nettoye = to_f(r.get('PrixJour', 0))
          corps += f"- Le {r['DateNav']} ({r.get('Nom','')}) : {fmt_p(prix_nettoye)}\n"
             # Construction du corps du mail
-            corps = f"Bonjour Jean-Michel,\n\nCi-après le détail de la facturation des sorties CMN du mois de {calendar.month_name[f_m]} {f_y} :\n\n"
-            
-            corps += f"\nTOTAL À RÉGLER : {fmt_p(total)}\n\nBonne réception,\nEric CLAVREUL"
-            
+           # --- BLOC RECALIBRÉ ---
+        corps = f"Bonjour,\n\nVoici le récapitulatif de vos sorties :\n"
+
+        for i, r in df_fact.iterrows():
+            # On nettoie le prix pour éviter le plantage
+            p_net = to_f(r.get('PrixJour', 0))
+            corps += f"- Le {r['DateNav']} ({r.get('Nom','')}) : {fmt_p(p_net)}\n"
+
+        # On calcule le total proprement
+        total_facture = sum(df_fact['PrixJour'].apply(to_f))
+        corps += f"\nTotal à régler : {fmt_p(total_facture)}\n\nMerci !"
+        # --- FIN DU BLOC ---
             st.info(f"Montant détecté : {fmt_p(total)}")
             txt = st.text_area("Aperçu du message", corps, height=200)
             
@@ -547,6 +555,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
