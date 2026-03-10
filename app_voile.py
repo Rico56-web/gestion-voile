@@ -234,7 +234,7 @@ elif st.session_state.page == "BUDGET":
 elif st.session_state.page == "FACTURE":
     st.markdown('<div class="page-title">📄 FACTURATION CMN</div>', unsafe_allow_html=True)
     
-    # 1. Chargement de l'historique des archives
+    # 1. Chargement de l'historique
     df_arch = charger_data("archives_factures.json")
     
     c1, c2 = st.columns(2)
@@ -247,11 +247,11 @@ elif st.session_state.page == "FACTURE":
         df_c = df[(df['dt'].dt.year == f_y) & (df['dt'].dt.month == f_m) & 
                   (df['Société'].str.upper() == "CMN") & (df['Statut'].str.contains("OK|🟢", na=False))]
     
-if not df_c.empty:
+    if not df_c.empty:
         total = sum(df_c['PrixJour'].apply(to_f))
         current_month_label = f"{calendar.month_name[f_m]} {f_y}"
         
-        # --- VÉRIFICATION DES DOUBLONS ---
+        # --- VÉRIFICATION ANTI-DOUBLON ---
         deja_archive = False
         if not df_arch.empty:
             deja_archive = current_month_label in df_arch['Mois'].values
@@ -275,12 +275,9 @@ if not df_c.empty:
         # --- BOUTON ARCHIVAGE SÉCURISÉ ---
         st.markdown("<br>", unsafe_allow_html=True)
         if deja_archive:
-            st.warning(f"⚠️ La facture de {current_month_label} est déjà présente dans tes archives.")
-            if st.button("📥 RÉ-ARCHIVER QUAND MÊME (DOUBLON)", use_container_width=True):
-                # Cette option reste au cas où tu aurais vraiment besoin de corriger
-                pass 
+            st.warning(f"⚠️ La facture de {current_month_label} est déjà archivée.")
         else:
-            if st.button("🗄️ ARCHIVER & MARQUER COMME ENVOYÉE", use_container_width=True):
+            if st.button("🗄️ ARCHIVER CETTE FACTURE", use_container_width=True):
                 nouvelle_archive = {
                     "Mois": current_month_label,
                     "Montant": total,
@@ -291,29 +288,27 @@ if not df_c.empty:
                 sauvegarder_data(df_arch, "archives_factures.json")
                 st.success(f"Facture de {current_month_label} archivée !")
                 st.rerun()
+    else:
+        st.info("Aucune prestation CMN à facturer ici.")
 
-    # --- 2. AFFICHAGE DE L'HISTORIQUE & POIΝTAGE ---
+    # --- HISTORIQUE (Toujours aligné à gauche) ---
     if not df_arch.empty:
         st.markdown("---")
-        st.subheader("📜 Historique & Paiements")
+        # Calcul du reste à percevoir
+        a_recevoir = sum(df_arch[df_arch['Payée'] == False]['Montant'].apply(to_f))
+        st.subheader(f"📜 Archives (Dû : {fmt_p(a_recevoir)})")
+        
         for i in reversed(df_arch.index):
             arch = df_arch.loc[i]
             is_paid = arch.get("Payée", False)
+            label = "✅ PAYÉE" if is_paid else "⏳ ATTENTE"
             
-            # Mise en forme selon le statut
-            label_statut = "✅ PAYÉE" if is_paid else "⏳ EN ATTENTE"
-            color_statut = "#2ecc71" if is_paid else "#e67e22"
-            
-            with st.expander(f"{arch['Mois']} — {fmt_p(arch['Montant'])} ({label_statut})"):
-                st.write(f"Envoyée le : {arch['DateEnvoi']}")
-                
+            with st.expander(f"{arch['Mois']} — {fmt_p(arch['Montant'])} ({label})"):
                 c1, c2 = st.columns(2)
-                # Bouton pour changer le statut
-                if c1.button("Marquer comme " + ("En attente" if is_paid else "Payée"), key=f"pay_{i}"):
+                if c1.button("Changer statut", key=f"pay_{i}"):
                     df_arch.at[i, "Payée"] = not is_paid
                     sauvegarder_data(df_arch, "archives_factures.json")
                     st.rerun()
-                
                 if c2.button("🗑️ Supprimer", key=f"del_arch_{i}"):
                     df_arch = df_arch.drop(i)
                     sauvegarder_data(df_arch, "archives_factures.json")
@@ -397,6 +392,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
