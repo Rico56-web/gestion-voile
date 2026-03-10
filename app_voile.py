@@ -90,32 +90,52 @@ for i, (l, p) in enumerate(menu):
 
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
+    
+    # Séparation Passées / Futures
     c1, c2 = st.columns(2)
-    if c1.button("📂 PASSÉES", use_container_width=True, type="primary" if st.session_state.view_mode=="PASSÉES" else "secondary"): st.session_state.view_mode="PASSÉES"; st.rerun()
-    if c2.button("🚀 FUTURES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): st.session_state.view_mode="FUTURES"; st.rerun()
+    if c1.button("📂 PASSÉES", use_container_width=True, type="primary" if st.session_state.view_mode=="PASSÉES" else "secondary"): 
+        st.session_state.view_mode="PASSÉES"; st.rerun()
+    if c2.button("🚀 FUTURES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): 
+        st.session_state.view_mode="FUTURES"; st.rerun()
+    
     st.button("➕ NOUVELLE FICHE", on_click=lambda: st.session_state.update({"edit_idx":"NEW", "page":"FORM"}), use_container_width=True)
     
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
         today = datetime.now().replace(hour=0, minute=0, second=0)
         data = df[df['dt'] < today] if st.session_state.view_mode=="PASSÉES" else df[df['dt'] >= today]
+        
         for i, r in data.sort_values('dt', ascending=(st.session_state.view_mode=="FUTURES")).iterrows():
             statut = str(r.get('Statut','🟡 Attente'))
-            b_col = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
             soc = str(r.get('Société','')).upper()
-            st.markdown(f"""<div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
-                <div class="status-badge" style="color:{b_col}; border-color:{b_col}; background:{b_col}15;">{statut}</div>
-                <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
+            tel = str(r.get('Tel','')).strip()
+            mail = str(r.get('Mail','')).strip()
+            
+            # Nettoyage du numéro pour WhatsApp (enlève espaces, points, etc.)
+            tel_clean = tel.replace(" ", "").replace(".", "").replace("-", "")
+            if tel_clean.startswith("0"): tel_clean = "33" + tel_clean[1:]
+            
+            st.markdown(f"""
+            <div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
+                <div class="status-badge">{statut}</div>
+                <b style="font-size:1.2rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
                 📅 {r.get('DateNav')} ({r.get('NbJours','1')}j) | 🏢 {soc}<br>
-                💰 {fmt_p(r.get('PrixJour',0))} | 📞 {r.get('Tel','-')}<br><br>
-                <a href="tel:{r.get('Tel','')}" class="btn-contact" style="background:#3498db;">📞 Appeler</a>
-                <a href="https://wa.me/{str(r.get('Tel','')).replace(' ','')}" class="btn-contact" style="background:#25d366;">💬 WhatsApp</a>
-                <a href="mailto:{r.get('Mail','')}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
-            </div>""", unsafe_allow_html=True)
-            ce, cd = st.columns([1, 4])
-            if ce.button("✏️ Modifier", key=f"ed_l_{i}"): st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
+                <span style="color:#555;">📞 {tel}</span><br>
+                <span style="color:#555;">✉️ {mail}</span><br><br>
+                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                    <a href="tel:{tel_clean}" style="background:#3498db; color:white; padding:10px 15px; border-radius:5px; text-decoration:none; font-weight:bold;">📞 Appel</a>
+                    <a href="https://wa.me/{tel_clean}" target="_blank" style="background:#25d366; color:white; padding:10px 15px; border-radius:5px; text-decoration:none; font-weight:bold;">💬 WhatsApp</a>
+                    <a href="mailto:{mail}" style="background:#e67e22; color:white; padding:10px 15px; border-radius:5px; text-decoration:none; font-weight:bold;">✉️ Mail</a>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            ce, cd = st.columns([1, 3])
+            if ce.button("✏️ MODIFIER", key=f"ed_l_{i}"): 
+                st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
             if cd.checkbox("🗑️ Supprimer", key=f"del_l_{i}"):
-                if st.button("Confirmer", key=f"conf_l_{i}"): df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
+                if st.button("Confirmer suppression", key=f"conf_l_{i}"): 
+                    df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
 
 elif st.session_state.page == "LOGBOOK":
     st.markdown('<div class="page-title">📖 LIVRE DE BORD</div>', unsafe_allow_html=True)
@@ -242,6 +262,7 @@ elif st.session_state.page == "FORM":
             else: 
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
+
 
 
 
