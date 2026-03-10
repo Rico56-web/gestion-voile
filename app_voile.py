@@ -241,68 +241,69 @@ elif st.session_state.page == "PLANNING":
     else:
         st.info("Aucune navigation ce mois-ci.")
 elif st.session_state.page == "STATS":
-    st.markdown('<div class="page-title">📊 TABLEAU DE BORD MENSUEL</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">📊 TABLEAU DE BORD COMPACT</div>', unsafe_allow_html=True)
     
     if df.empty:
-        st.warning("⚠️ Aucune donnée de navigation trouvée.")
+        st.warning("⚠️ Aucune donnée trouvée.")
     else:
-        # 1. Préparation des données (Dates et Montants)
+        # 1. Filtre par Année
         df['dt'] = df['DateNav'].apply(parse_d)
-        df['Mois'] = df['dt'].dt.strftime('%m - %B %Y') # Format: 03 - March 2026
+        list_ans = [2026, 2027, 2028]
+        an_sel = st.selectbox("Choisir l'année", list_ans, index=0)
         
-        # Fonction pour savoir si c'est payé (regarde Statut et Paye)
+        # Filtrage du DataFrame principal pour l'année choisie
+        df_an = df[df['dt'].dt.year == an_sel].copy()
+        
+        # 2. Préparation des données financières
         def est_paye(r):
             txt = (str(r.get('Statut','')) + " " + str(r.get('Paye',''))).lower()
             return any(m in txt for m in ["payé", "paye", "ok", "✅", "🟢"])
 
-        # 2. Calcul des indicateurs globaux
-        df['is_paye'] = df.apply(est_paye, axis=1)
-        df['Montant'] = df['PrixJour'].apply(to_f)
-        
-        encaise_total = df[df['is_paye']]['Montant'].sum()
-        prev_total = df[~df['is_paye']]['Montant'].sum()
-        
-        c1, c2, c3 = st.columns(3)
-        c1.metric("💰 ENCAISSÉ", fmt_p(encaise_total))
-        c2.metric("⏳ PRÉVISIONNEL", fmt_p(prev_total))
-        c3.metric("📈 TOTAL ANNUEL", fmt_p(encaise_total + prev_total))
+        df_an['is_paye'] = df_an.apply(est_paye, axis=1)
+        df_an['Mnt'] = df_an['PrixJour'].apply(to_f)
+        df_an['Mois_Num'] = df_an['dt'].dt.month
 
-        st.markdown("---")
-
-        # 3. RÉCAPITULATIF MENSUEL
-        st.subheader("📅 Détail par mois")
-        
-        # On groupe par mois pour calculer Encaissé et Prévisionnel
-        recap_mensuel = []
-        groupes_mois = df.groupby('Mois')
-        
-        for mois, gp in groupes_mois:
-            paye = gp[gp['is_paye']]['Montant'].sum()
-            prev = gp[~gp['is_paye']]['Montant'].sum()
-            total = paye + prev
-            recap_mensuel.append({
-                "Mois": mois,
-                "Encaissé": fmt_p(paye),
-                "Prévisionnel": fmt_p(prev),
-                "Total": fmt_p(total)
-            })
-            
-        if recap_mensuel:
-            # Affichage sous forme de tableau propre
-            df_tab = pd.DataFrame(recap_mensuel).sort_values("Mois")
-            st.table(df_tab)
-            
-            # Petit graphique de performance
-            st.subheader("📈 Évolution des revenus")
-            chart_data = df.groupby('Mois')['Montant'].sum()
-            st.line_chart(chart_data)
-        
-        # 4. RAPPEL DES FRAIS
-        st.markdown("---")
+        # 3. Chargement et filtrage des frais pour l'année
         df_f = charger_data("frais.json")
-        total_frais = sum(df_f['Montant'].apply(to_f)) if not df_f.empty else 0.0
-        st.write(f"🔧 **Total des frais enregistrés :** {fmt_p(total_frais)}")
-        st.write(f"⚓ **Bénéfice Net Actuel (Encaissé - Frais) :** {fmt_p(encaise_total - total_frais)}")
+        if not df_f.empty:
+            df_f['dt_f'] = df_f['Date'].apply(parse_d)
+            df_f_an = df_f[df_f['dt_f'].dt.year == an_sel].copy()
+            df_f_an['Mnt_F'] = df_f_an['Montant'].apply(to_f)
+            df_f_an['Mois_F'] = df_f_an['dt_f'].dt.month
+        else:
+            df_f_an = pd.DataFrame(columns=['Mnt_F', 'Mois_F'])
+
+        # 4. Construction du tableau compact (1 à 12)
+        recap = []
+        for m in range(1, 13):
+            # Data de navigation pour ce mois
+            d_m = df_an[df_an['Mois_Num'] == m]
+            encaise = int(d_m[d_m['is_paye']]['Mnt'].sum()) # Arrondi inférieur via int()
+            prev = int(d_m[~d_m['is_paye']]['Mnt'].sum())
+            
+            # Frais pour ce mois
+            frais_m = int(df_f_an[df_f_an['Mois_F'] == m]['Mnt_F'].sum()) if not df_f_an.empty else 0
+            
+            # On n'ajoute au tableau que si il y a une activité (CA ou Frais)
+            if (encaise + prev + frais_m) > 0:
+                recap.append({
+                    "M": m,
+                    "Encaissé": encaise,
+                    "Prév.": prev,
+                    "Frais": frais_m,
+                    "Net": encaise - frais_m
+                })
+
+        if recap:
+            # Affichage du tableau compact
+            st.table(pd.DataFrame(recap))
+            
+            # Totaux annuels en bas (arrondis)
+            t_enc = sum(item['Encaissé'] for item in recap)
+            t_frais = sum(item['Frais'] for item in recap)
+            st.info(f"**Total Année {an_sel}** | Recettes : {t_enc} | Frais : {t_frais} | Net : {t_enc - t_frais}")
+        else:
+            st.info(f"Aucune donnée pour l'année {an_sel}")
         
 elif st.session_state.page == "FACTURE":
     st.markdown('<div class="page-title">📄 FACTURATION & ARCHIVES</div>', unsafe_allow_html=True)
@@ -528,6 +529,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
