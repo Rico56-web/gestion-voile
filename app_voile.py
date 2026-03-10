@@ -247,9 +247,16 @@ elif st.session_state.page == "FACTURE":
         df_c = df[(df['dt'].dt.year == f_y) & (df['dt'].dt.month == f_m) & 
                   (df['Société'].str.upper() == "CMN") & (df['Statut'].str.contains("OK|🟢", na=False))]
     
-    if not df_c.empty:
+if not df_c.empty:
         total = sum(df_c['PrixJour'].apply(to_f))
-        corps = f"Bonjour Jean-Michel,\n\nCi-après le détail de la facturation des sorties CMN de ce mois ({calendar.month_name[f_m]} {f_y}) :\n\n"
+        current_month_label = f"{calendar.month_name[f_m]} {f_y}"
+        
+        # --- VÉRIFICATION DES DOUBLONS ---
+        deja_archive = False
+        if not df_arch.empty:
+            deja_archive = current_month_label in df_arch['Mois'].values
+
+        corps = f"Bonjour Jean-Michel,\n\nCi-après le détail de la facturation des sorties CMN de ce mois ({current_month_label}) :\n\n"
         for _, r in df_c.iterrows():
             corps += f"- Le {r['DateNav']} : {fmt_p(r['PrixJour'])}\n"
         corps += f"\nTOTAL : {fmt_p(total)}\n\nBonne continuation.\n\nEric CLAVREUL"
@@ -257,7 +264,7 @@ elif st.session_state.page == "FACTURE":
         st.text_area("Aperçu du message", corps, height=150)
         
         # Options d'envoi
-        dest, cc, sujet = "tresorier@cmn-asso.fr", "eric.clavreul@gmail.com", f"Facturation Skipper {calendar.month_name[f_m]} {f_y}"
+        dest, cc, sujet = "tresorier@cmn-asso.fr", "eric.clavreul@gmail.com", f"Facturation Skipper {current_month_label}"
         params = urllib.parse.urlencode({'cc': cc, 'subject': sujet, 'body': corps})
         
         col_btn1, col_btn2 = st.columns(2)
@@ -265,21 +272,25 @@ elif st.session_state.page == "FACTURE":
         gmail_url = f"https://mail.google.com/mail/?view=cm&fs=1&to={dest}&cc={cc}&sujet={urllib.parse.quote(sujet)}&body={urllib.parse.quote(corps)}"
         col_btn2.markdown(f'<a href="{gmail_url}" target="_blank" style="background-color:#db4437;color:white;padding:12px;display:block;text-align:center;text-decoration:none;border-radius:8px;font-weight:bold;font-size:0.9rem;">💻 GMAIL PC</a>', unsafe_allow_html=True)
         
-        # --- BOUTON ARCHIVAGE ---
+        # --- BOUTON ARCHIVAGE SÉCURISÉ ---
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🗄️ ARCHIVER & MARQUER COMME ENVOYÉE", use_container_width=True):
-            nouvelle_archive = {
-                "Mois": f"{calendar.month_name[f_m]} {f_y}",
-                "Montant": total,
-                "DateEnvoi": datetime.now().strftime("%d/%m/%Y"),
-                "Payée": False
-            }
-            df_arch = pd.concat([df_arch, pd.DataFrame([nouvelle_archive])], ignore_index=True)
-            sauvegarder_data(df_arch, "archives_factures.json")
-            st.success("Facture enregistrée dans l'historique !")
-            st.rerun()
-    else:
-        st.info("Aucune prestation CMN à facturer pour cette période.")
+        if deja_archive:
+            st.warning(f"⚠️ La facture de {current_month_label} est déjà présente dans tes archives.")
+            if st.button("📥 RÉ-ARCHIVER QUAND MÊME (DOUBLON)", use_container_width=True):
+                # Cette option reste au cas où tu aurais vraiment besoin de corriger
+                pass 
+        else:
+            if st.button("🗄️ ARCHIVER & MARQUER COMME ENVOYÉE", use_container_width=True):
+                nouvelle_archive = {
+                    "Mois": current_month_label,
+                    "Montant": total,
+                    "DateEnvoi": datetime.now().strftime("%d/%m/%Y"),
+                    "Payée": False
+                }
+                df_arch = pd.concat([df_arch, pd.DataFrame([nouvelle_archive])], ignore_index=True)
+                sauvegarder_data(df_arch, "archives_factures.json")
+                st.success(f"Facture de {current_month_label} archivée !")
+                st.rerun()
 
     # --- 2. AFFICHAGE DE L'HISTORIQUE & POIΝTAGE ---
     if not df_arch.empty:
@@ -386,6 +397,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
