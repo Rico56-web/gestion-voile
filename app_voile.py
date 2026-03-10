@@ -100,20 +100,25 @@ if st.session_state.page == "LISTE":
             soc = str(r.get('Société','')).upper()
             statut = str(r.get('Statut','🟡 Attente'))
             tel = str(r.get('Téléphone', r.get('Tel', ''))).strip()
-            mail = str(r.get('Mail', '')).strip()
+            mail = str(r.get('Mail', r.get('Email', ''))).strip() # Cherche les deux variantes
             tel_link = tel.replace(" ", "").replace(".", "").replace("-", "")
             if tel_link.startswith("0"): tel_link = "33" + tel_link[1:]
             badge_color = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
 
             st.markdown(f"""<div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
+            <div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
                 <div class="status-badge" style="color:{badge_color}; border-color:{badge_color}; background:{badge_color}15;">{statut}</div>
                 <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
                 🏢 <b>{soc}</b> | 📅 {r.get('DateNav')} ({r.get('NbJours','1')}j)<br>
-                📞 {tel} | ✉️ {mail}<br><br>
-                <a href="tel:{tel_link}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
-                <a href="https://wa.me/{tel_link}" target="_blank" class="btn-contact" style="background:#25d366;">💬 WhatsApp</a>
-                <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
-            </div>""", unsafe_allow_html=True)
+                📞 {tel} <br>
+                ✉️ {mail}<br><br>
+                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                    <a href="tel:{tel_link}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
+                    <a href="https://wa.me/{tel_link}" target="_blank" class="btn-contact" style="background:#25d366;">💬 WhatsApp</a>
+                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Email</a>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)   
             ce, cd = st.columns([1, 4])
             if ce.button("✏️ Modifier", key=f"ed_l_{i}"): st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
             if cd.checkbox("🗑️", key=f"del_l_{i}"):
@@ -193,23 +198,27 @@ elif st.session_state.page in ["SECU", "FRAIS", "NOTES"]:
 elif st.session_state.page == "FORM":
     idx = st.session_state.edit_idx
     init = df.loc[idx].to_dict() if (idx != "NEW" and not df.empty) else {}
-    with st.form("f_form"):
-        st_v = st.selectbox("Statut", ["🟢 OK", "🟡 Attente", "🔴 Annulé"], index=1)
-        c1, c2 = st.columns(2)
-        p, n = c1.text_input("Prénom", init.get("Prénom","")), c2.text_input("Nom", init.get("Nom",""))
-        s = st.text_input("Société", init.get("Société",""))
-        c3, c4 = st.columns(2)
-        d, j = c3.text_input("Date (JJ/MM/AAAA)", init.get("DateNav","")), c4.text_input("Jours", str(init.get("NbJours","1")))
-        t = st.text_input("Tél", init.get("Téléphone", init.get("Tel", "")))
-        ml = st.text_input("Mail", init.get("Mail", ""))
-        pr = st.text_input("Prix", str(init.get("PrixJour","0")))
-        if st.form_submit_button("SAUVEGARDER"):
-            row = {"Prénom":p, "Nom":n, "Société":s, "Téléphone":t, "Mail":ml, "DateNav":d, "NbJours":j, "PrixJour":pr, "Statut":st_v}
-            if idx=="NEW": df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-            else: 
-                for k,v in row.items(): df.at[idx,k]=v
-            sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
-    st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+   if st.form_submit_button("SAUVEGARDER"):
+    row = {
+        "Prénom": p, 
+        "Nom": n, 
+        "Société": s, 
+        "Téléphone": t, 
+        "Mail": ml,  # <--- CETTE LIGNE DOIT ÊTRE PRÉSENTE
+        "DateNav": d, 
+        "NbJours": j, 
+        "PrixJour": pr, 
+        "Statut": st_v
+    }
+    if idx == "NEW":
+        df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+    else:
+        for k, v in row.items():
+            df.at[idx, k] = v
+    sauvegarder_data(df, "contacts.json")
+    st.session_state.page = "LISTE"
+    st.rerun()
+
 
 
 
