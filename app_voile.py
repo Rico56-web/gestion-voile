@@ -426,7 +426,74 @@ elif st.session_state.page == "FACTURE":
                 for _, r in df_paye.sort_values('dt', ascending=False).iterrows():
                     st.caption(f"• {r['DateNav']} : {r.get('Nom','')} ({fmt_p(r['PrixJour'])})")
             else: st.write("Aucun archivé")
+
+elif st.session_state.page == "NOTES":
+    st.markdown('<div class="page-title">📝 MES NOTES & MÉMOS</div>', unsafe_allow_html=True)
+    
+    # 1. Chargement des données des notes
+    df_n = charger_data("notes.json")
+    
+    # Gestion de l'index d'édition pour les notes
+    if "edit_n_idx" not in st.session_state: st.session_state.edit_n_idx = None
+
+    # --- FORMULAIRE D'ÉDITION ---
+    if st.session_state.edit_n_idx is not None:
+        idx = st.session_state.edit_n_idx
+        init = df_n.loc[idx].to_dict() if (idx != "NEW" and not df_n.empty) else {}
         
+        with st.form("f_note_edit"):
+            st.subheader("📝 " + ("MODIFIER LA NOTE" if idx != "NEW" else "NOUVELLE NOTE"))
+            titre_n = st.text_input("Titre", init.get("Titre", ""))
+            contenu_n = st.text_area("Contenu", init.get("Contenu", ""), height=200)
+            
+            c1, c2 = st.columns(2)
+            if c1.form_submit_button("✅ ENREGISTRER"):
+                row = {
+                    "Titre": titre_n, 
+                    "Contenu": contenu_n, 
+                    "Date": datetime.now().strftime("%d/%m/%Y")
+                }
+                if idx == "NEW":
+                    df_n = pd.concat([df_n, pd.DataFrame([row])], ignore_index=True)
+                else:
+                    for k, v in row.items(): df_n.at[idx, k] = v
+                
+                sauvegarder_data(df_n, "notes.json")
+                st.session_state.edit_n_idx = None
+                st.rerun()
+            
+            if c2.form_submit_button("❌ ANNULER"):
+                st.session_state.edit_n_idx = None
+                st.rerun()
+    else:
+        # --- AFFICHAGE DES NOTES ---
+        st.button("➕ AJOUTER UNE NOTE", on_click=lambda: st.session_state.update({"edit_n_idx":"NEW"}), use_container_width=True)
+        
+        if not df_n.empty:
+            # On affiche les notes (de la plus récente à la plus ancienne)
+            for i in reversed(df_n.index):
+                r = df_n.loc[i]
+                st.markdown(f"""
+                <div class="client-card" style="border-left: 5px solid #f39c12; background: white;">
+                    <div style="display:flex; justify-content:space-between; color:#7f8c8d; font-size:0.8rem; margin-bottom:5px;">
+                        <span>📅 {r.get('Date', '')}</span>
+                    </div>
+                    <b style="font-size:1.1rem; color:#2c3e50;">{r.get('Titre', 'Sans titre')}</b><br>
+                    <div style="white-space: pre-wrap; color:#34495e; margin-top:10px; font-size:0.95rem;">{r.get('Contenu', '')}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                c1, c2 = st.columns([1, 4])
+                if c1.button("✏️", key=f"ed_n_{i}"): 
+                    st.session_state.edit_n_idx = i
+                    st.rerun()
+                if c2.button("🗑️ Supprimer la note", key=f"del_n_{i}"): 
+                    df_n = df_n.drop(i)
+                    sauvegarder_data(df_n, "notes.json")
+                    st.rerun()
+        else:
+            st.info("Aucune note enregistrée. Idéal pour noter les codes de pontons, rappels techniques, etc.")
+
 elif st.session_state.page == "SECU":
     st.markdown('<div class="page-title">🛡️ SÉCURITÉ & ARMEMENT</div>', unsafe_allow_html=True)
     
@@ -513,6 +580,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
