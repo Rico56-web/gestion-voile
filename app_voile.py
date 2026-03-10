@@ -88,9 +88,12 @@ for i, (l, p) in enumerate(menu):
         st.session_state.page = p; st.rerun()
 
 # --- 4. PAGES ---
-
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
+    
+    # --- BARRE DE RECHERCHE ---
+    search_query = st.text_input("🔍 Rechercher un prénom ou un nom...", "").lower()
+    
     c1, c2 = st.columns(2)
     if c1.button("🚀 FUTURES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): 
         st.session_state.view_mode="FUTURES"; st.rerun()
@@ -102,26 +105,38 @@ if st.session_state.page == "LISTE":
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
         today = datetime.now().replace(hour=0, minute=0, second=0)
+        
+        # Filtre Temporel (Futur/Passé)
         data = df[df['dt'] >= today] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < today]
-        for i, r in data.sort_values('dt').iterrows():
-            soc = str(r.get('Société','')).upper()
-            statut = str(r.get('Statut','🟡 Attente'))
-            nb_j = str(r.get('NbJours','1'))
-            badge_color = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
-            tel = "".join(filter(str.isdigit, str(r.get('Téléphone',''))))
-            
-            st.markdown(f"""<div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
-                <div class="status-badge" style="color:{badge_color}; border-color:{badge_color}; background:{badge_color}15;">{statut}</div>
-                <b>{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
-                🏢 <b>{soc}</b> | 📅 {r.get('DateNav')} <b>({nb_j}j)</b><br>
-                📧 <a href="mailto:{r.get('Email','')}">{r.get('Email','')}</a><br>
-                📞 <a href="tel:{tel}">{r.get('Téléphone','')}</a>
-            </div>""", unsafe_allow_html=True)
-            ce, cd = st.columns([1, 2])
-            if ce.button("✏️", key=f"ed_l_{i}"): st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
-            if cd.checkbox("🗑️", key=f"del_l_{i}"):
-                if st.button("Confirmer", key=f"conf_l_{i}"): 
-                    df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
+        
+        # --- LOGIQUE DE FILTRE DE RECHERCHE ---
+        if search_query:
+            data = data[
+                data['Prénom'].str.lower().str.contains(search_query, na=False) | 
+                data['Nom'].str.lower().str.contains(search_query, na=False)
+            ]
+        
+        if data.empty:
+            st.info("Aucun résultat pour cette recherche.")
+        else:
+            for i, r in data.sort_values('dt').iterrows():
+                soc = str(r.get('Société','')).upper()
+                statut = str(r.get('Statut','🟡 Attente'))
+                badge_color = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
+                
+                st.markdown(f"""<div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
+                    <div class="status-badge" style="color:{badge_color}; border-color:{badge_color}; background:{badge_color}15;">{statut}</div>
+                    <b>{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
+                    🏢 <b>{soc}</b> | 📅 {r.get('DateNav')} <b>({r.get('NbJours','1')}j)</b><br>
+                    📞 <a href="tel:{r.get('Téléphone','')}">{r.get('Téléphone','')}</a>
+                </div>""", unsafe_allow_html=True)
+                ce, cd = st.columns([1, 2])
+                if ce.button("✏️", key=f"ed_l_{i}"): st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
+                if cd.checkbox("🗑️", key=f"del_l_{i}"):
+                    if st.button("Confirmer suppression", key=f"conf_l_{i}"): 
+                        df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
+
+  
 
 elif st.session_state.page == "LOGBOOK":
     st.markdown('<div class="page-title">📖 JOURNAL DE BORD</div>', unsafe_allow_html=True)
@@ -346,6 +361,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
