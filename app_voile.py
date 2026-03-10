@@ -100,7 +100,7 @@ if st.session_state.page == "LISTE":
     if c1.button("📂 PASSÉES", use_container_width=True, type="primary" if st.session_state.view_mode=="PASSÉES" else "secondary"): 
         st.session_state.view_mode="PASSÉES"; st.rerun()
     # Archives (Futures) à droite
-    if c2.button("🚀 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): 
+    if c2.button("🚀 FUTURES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): 
         st.session_state.view_mode="FUTURES"; st.rerun()
     
     st.button("➕ NOUVELLE FICHE", on_click=lambda: st.session_state.update({"edit_idx":"NEW", "page":"FORM"}), use_container_width=True)
@@ -366,6 +366,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
