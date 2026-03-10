@@ -1,3 +1,5 @@
+import requests
+import base64
 import streamlit as st
 import pandas as pd
 import json
@@ -492,6 +494,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
