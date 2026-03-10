@@ -319,6 +319,7 @@ elif st.session_state.page == "STATS":
             st.error(f"🔧 **Total Frais :** {t_frais} | ⚓ **Bénéfice Net :** {t_enc - t_frais}")
         else:
             st.info(f"Aucune activité enregistrée pour {an_sel}")
+            
 elif st.session_state.page == "FACTURES":
         st.markdown('<div class="page-title">🧾 GÉNÉRATION DE FACTURE</div>', unsafe_allow_html=True)
         
@@ -515,6 +516,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
