@@ -178,75 +178,60 @@ elif st.session_state.page in ["SECU", "FRAIS", "NOTES"]:
     if c_idx is not None:
         init = c_df.loc[c_idx].to_dict() if (c_idx != "NEW" and not c_df.empty) else {}
         with st.form("edit_c"):
-            if st.session_state.page == "SECU": row = {"Item": st.text_input("Point", init.get("Item", ""))}
-            elif st.session_state.page == "FRAIS": row = {"Date": st.text_input("Date", init.get("Date", "")), "Montant": st.text_input("Montant", init.get("Montant", "0")), "Note": st.text_area("Note", init.get("Note", ""))}
-            else: row = {"Titre": st.text_input("Titre", init.get("Titre", "")), "Contenu": st.text_area("Contenu", init.get("Contenu", "")), "Date": datetime.now().strftime("%d/%m/%Y")}
-            if st.form_submit_button("✅"):
-                if c_idx == "NEW": c_df = pd.concat([c_df, pd.DataFrame([row])], ignore_index=True)
+            if st.session_state.page == "SECU": 
+                row = {"Item": st.text_input("Point", init.get("Item", ""))}
+            elif st.session_state.page == "FRAIS": 
+                row = {"Date": st.text_input("Date", init.get("Date", "")), "Montant": st.text_input("Montant", init.get("Montant", "0")), "Note": st.text_area("Note", init.get("Note", ""))}
+            else: 
+                row = {"Titre": st.text_input("Titre", init.get("Titre", "")), "Contenu": st.text_area("Contenu", init.get("Contenu", "")), "Date": datetime.now().strftime("%d/%m/%Y")}
+            
+            if st.form_submit_button("✅ SAUVEGARDER"):
+                if c_idx == "NEW": 
+                    c_df = pd.concat([c_df, pd.DataFrame([row])], ignore_index=True)
                 else: 
                     for k,v in row.items(): c_df.at[c_idx, k] = v
                 sauvegarder_data(c_df, c_file)
-                st.session_state.update({"edit_s_idx":None, "edit_f_idx":None, "edit_n_idx":None}); st.rerun()
+                st.session_state.update({"edit_s_idx":None, "edit_f_idx":None, "edit_n_idx":None})
+                st.rerun()
     else:
         st.button("➕ AJOUTER", on_click=lambda: st.session_state.update({f"edit_{st.session_state.page[0].lower()}_idx":"NEW"}), use_container_width=True)
         for i, r in c_df.iterrows():
             st.markdown(f'<div class="client-card">{r.values[0]}</div>', unsafe_allow_html=True)
             c1, c2 = st.columns(2)
-            if c1.button("✏️ Modifier", key=f"ed_{st.session_state.page}_{i}"): st.session_state.update({f"edit_{st.session_state.page[0].lower()}_idx":i}); st.rerun()
-            if c2.button("🗑️", key=f"del_{st.session_state.page}_{i}"): c_df = c_df.drop(i); sauvegarder_data(c_df, c_file); st.rerun()
-
-rerun()
+            if c1.button("✏️ Modifier", key=f"ed_{st.session_state.page}_{i}"): 
+                st.session_state.update({f"edit_{st.session_state.page[0].lower()}_idx":i})
+                st.rerun()
+            if c2.button("🗑️", key=f"del_{st.session_state.page}_{i}"): 
+                c_df = c_df.drop(i)
+                sauvegarder_data(c_df, c_file)
+                st.rerun()
 
 elif st.session_state.page == "FORM":
     st.markdown('<div class="page-title">📝 FICHE NAVIGATION</div>', unsafe_allow_html=True)
     idx = st.session_state.edit_idx
-    
-    # Récupération des données existantes
     init = df.loc[idx].to_dict() if (idx != "NEW" and not df.empty) else {}
     
     with st.form("f_form"):
         st_v = st.selectbox("Statut", ["🟢 OK", "🟡 Attente", "🔴 Annulé"], index=1)
         c1, c2 = st.columns(2)
-        p = c1.text_input("Prénom", init.get("Prénom",""))
-        n = c2.text_input("Nom", init.get("Nom",""))
+        p, n = c1.text_input("Prénom", init.get("Prénom","")), c2.text_input("Nom", init.get("Nom",""))
         s = st.text_input("Société", init.get("Société",""))
-        
         c3, c4 = st.columns(2)
-        d = c3.text_input("Date (JJ/MM/AAAA)", init.get("DateNav",""))
-        j = c4.text_input("Jours", str(init.get("NbJours","1")))
-        
-        # On utilise 'Téléphone' pour être raccord avec la LISTE
+        d, j = c3.text_input("Date (JJ/MM/AAAA)", init.get("DateNav","")), c4.text_input("Jours", str(init.get("NbJours","1")))
         t = st.text_input("Tél", init.get("Téléphone", init.get("Tel", "")))
         ml = st.text_input("Mail", init.get("Mail", ""))
         pr = st.text_input("Prix", str(init.get("PrixJour","0")))
         
-        # LE BOUTON DOIT ÊTRE ALIGNÉ ICI (DANS LE WITH)
-        submit = st.form_submit_button("SAUVEGARDER", use_container_width=True)
-        
-        if submit:
-            row = {
-                "Prénom": p, 
-                "Nom": n, 
-                "Société": s, 
-                "Téléphone": t, 
-                "Mail": ml, 
-                "DateNav": d, 
-                "NbJours": j, 
-                "PrixJour": pr, 
-                "Statut": st_v
-            }
-            
-            if idx == "NEW":
+        if st.form_submit_button("SAUVEGARDER"):
+            row = {"Prénom":p, "Nom":n, "Société":s, "Téléphone":t, "Mail":ml, "DateNav":d, "NbJours":j, "PrixJour":pr, "Statut":st_v}
+            if idx=="NEW": 
                 df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-            else:
-                for k, v in row.items():
-                    df.at[idx, k] = v
-            
+            else: 
+                for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json")
-            st.session_state.page = "LISTE"
+            st.session_state.page="LISTE"
             st.rerun()
-
-    # Le bouton Annuler est HORS du formulaire
+            
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
