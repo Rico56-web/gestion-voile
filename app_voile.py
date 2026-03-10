@@ -212,42 +212,61 @@ elif st.session_state.page == "BUDGET":
     st.table(pd.DataFrame(res).set_index('M'))
     st.markdown(f'<div style="background:#1a2a6c;color:white;padding:15px;border-radius:10px;text-align:center;font-weight:bold;">TOTAL NET : {fmt_p(t_net)}</div>', unsafe_allow_html=True)
 
-elif st.session_state.page in ["SECU", "FRAIS", "NOTES"]:
-    st.markdown(f'<div class="page-title">{st.session_state.page}</div>', unsafe_allow_html=True)
-    c_df = df_s if st.session_state.page == "SECU" else (df_f if st.session_state.page == "FRAIS" else df_n)
-    c_idx = st.session_state.edit_s_idx if st.session_state.page == "SECU" else (st.session_state.edit_f_idx if st.session_state.page == "FRAIS" else st.session_state.edit_n_idx)
-    c_file = "secu.json" if st.session_state.page == "SECU" else ("frais.json" if st.session_state.page == "FRAIS" else "notes.json")
+elif st.session_state.page == "FRAIS":
+    st.markdown('<div class="page-title">💰 GESTION DES FRAIS</div>', unsafe_allow_html=True)
+    c_df = df_f
+    c_idx = st.session_state.edit_f_idx
+    c_file = "frais.json"
     
     if c_idx is not None:
         init = c_df.loc[c_idx].to_dict() if (c_idx != "NEW" and not c_df.empty) else {}
-        with st.form("edit_c"):
-            if st.session_state.page == "SECU": 
-                row = {"Item": st.text_input("Point", init.get("Item", ""))}
-            elif st.session_state.page == "FRAIS": 
-                row = {"Date": st.text_input("Date", init.get("Date", "")), "Montant": st.text_input("Montant", init.get("Montant", "0")), "Note": st.text_area("Note", init.get("Note", ""))}
-            else: 
-                row = {"Titre": st.text_input("Titre", init.get("Titre", "")), "Contenu": st.text_area("Contenu", init.get("Contenu", "")), "Date": datetime.now().strftime("%d/%m/%Y")}
+        with st.form("edit_frais"):
+            st.subheader("📝 " + ("MODIFIER LE FRAIS" if c_idx != "NEW" else "NOUVEAU FRAIS"))
+            d_f = st.text_input("Date", init.get("Date", datetime.now().strftime("%d/%m/%Y")))
+            m_f = st.text_input("Montant (€)", str(init.get("Montant", "0")))
+            n_f = st.text_area("Libellé / Note", init.get("Note", ""))
             
             if st.form_submit_button("✅ SAUVEGARDER"):
+                row = {"Date": d_f, "Montant": m_f, "Note": n_f}
                 if c_idx == "NEW": 
                     c_df = pd.concat([c_df, pd.DataFrame([row])], ignore_index=True)
                 else: 
                     for k,v in row.items(): c_df.at[c_idx, k] = v
                 sauvegarder_data(c_df, c_file)
-                st.session_state.update({"edit_s_idx":None, "edit_f_idx":None, "edit_n_idx":None})
+                st.session_state.edit_f_idx = None
+                st.rerun()
+            
+            if st.form_submit_button("❌ ANNULER"):
+                st.session_state.edit_f_idx = None
                 st.rerun()
     else:
-        st.button("➕ AJOUTER", on_click=lambda: st.session_state.update({f"edit_{st.session_state.page[0].lower()}_idx":"NEW"}), use_container_width=True)
-        for i, r in c_df.iterrows():
-            st.markdown(f'<div class="client-card">{r.values[0]}</div>', unsafe_allow_html=True)
-            c1, c2 = st.columns(2)
-            if c1.button("✏️ Modifier", key=f"ed_{st.session_state.page}_{i}"): 
-                st.session_state.update({f"edit_{st.session_state.page[0].lower()}_idx":i})
-                st.rerun()
-            if c2.button("🗑️", key=f"del_{st.session_state.page}_{i}"): 
-                c_df = c_df.drop(i)
-                sauvegarder_data(c_df, c_file)
-                st.rerun()
+        st.button("➕ AJOUTER UN FRAIS", on_click=lambda: st.session_state.update({"edit_f_idx":"NEW"}), use_container_width=True)
+        
+        if not c_df.empty:
+            # Affichage des frais avec détails
+            for i, r in c_df.iterrows():
+                st.markdown(f"""
+                <div class="client-card" style="border-left: 5px solid #e74c3c; background: white;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <b style="font-size:1.1rem;">{r.get('Date')}</b>
+                        <span style="color:#e74c3c; font-weight:bold; font-size:1.2rem;">{r.get('Montant')} €</span>
+                    </div>
+                    <div style="color:#555; margin-top:5px; font-style:italic;">
+                        📌 {r.get('Note', 'Sans libellé')}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                c1, c2 = st.columns([1, 4])
+                if c1.button("✏️", key=f"ed_f_{i}"): 
+                    st.session_state.edit_f_idx = i
+                    st.rerun()
+                if c2.button("🗑️ Supprimer", key=f"del_f_{i}"): 
+                    c_df = c_df.drop(i)
+                    sauvegarder_data(c_df, c_file)
+                    st.rerun()
+        else:
+            st.info("Aucun frais enregistré.")
                 
 elif st.session_state.page == "LOGBOOK":
     st.markdown('<div class="page-title">📖 JOURNAL DE BORD</div>', unsafe_allow_html=True)
@@ -415,6 +434,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
