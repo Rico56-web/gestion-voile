@@ -140,14 +140,27 @@ if st.session_state.page == "LISTE":
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING & CROISIÈRES</div>', unsafe_allow_html=True)
     
-    y_col, m_col = st.columns(2)
-    p_y = y_col.selectbox("An", [2025, 2026, 2027], index=1)
-    p_m = m_col.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
+    # --- INTERFACE DE CONTRÔLE EN HAUT ---
+    col_date, col_opt = st.columns([2, 1])
+    
+    with col_date:
+        y_col, m_col = st.columns(2)
+        p_y = y_col.selectbox("An", [2025, 2026, 2027], index=1)
+        p_m = m_col.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
+    
+    with col_opt:
+        st.write("") # Petit décalage pour l'alignement
+        # Voici la case à cocher bien en évidence
+        opt_groupe = st.checkbox("💬 Option Groupe WA", value=False, help="Afficher le bouton de création de groupe WhatsApp pour les sorties à plusieurs.")
+
+    # ... (Ensuite ton code de calendrier reste le même) ...
     
     occu = {}
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
         df_mois = df[(df['dt'].dt.year == p_y) & (df['dt'].dt.month == p_m)].sort_values('dt')
+        
+        # (Reste du code pour remplir 'occu' et afficher le calendrier...)
         
         for _, r in df.iterrows():
             statut_str = str(r.get('Statut','')).upper()
@@ -650,6 +663,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
