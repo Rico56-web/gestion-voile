@@ -248,14 +248,15 @@ elif st.session_state.page in ["SECU", "FRAIS", "NOTES"]:
                 c_df = c_df.drop(i)
                 sauvegarder_data(c_df, c_file)
                 st.rerun()
+                
 elif st.session_state.page == "LOGBOOK":
     st.markdown('<div class="page-title">📖 JOURNAL DE BORD</div>', unsafe_allow_html=True)
     
     # 1. Chargement des données du Logbook
     df_log = charger_data("logbook.json")
     
-    # 2. Formulaire de saisie
-    with st.expander("➕ ENREGISTRER UNE NOUVELLE ÉTAPE", expanded=False):
+    # 2. Formulaire de saisie (Calcul automatique du bilan à la validation)
+    with st.expander("➕ NOUVELLE ÉTAPE", expanded=False):
         with st.form("f_log_complet"):
             st.subheader("🚩 DÉPART")
             c1, c2 = st.columns(2)
@@ -263,55 +264,68 @@ elif st.session_state.page == "LOGBOOK":
             d_met = c2.selectbox("Météo", ["☀️ Beau", "☁️ Couvert", "🌧️ Pluie", "🌬️ Vent fort"])
             
             c3, c4 = st.columns(2)
-            d_h = c3.number_input("Heures Moteur (Départ)", step=0.1)
-            d_mi = c4.number_input("Loch / Milles (Départ)", step=0.1)
+            d_h = c3.number_input("Heures Moteur (Départ)", step=0.1, format="%.1f")
+            d_mi = c4.number_input("Loch / Milles (Départ)", step=0.1, format="%.1f")
             
             st.markdown("--- ⛵ **EN COURS** ---")
-            obs = st.text_area("Observations (Virements, technique...)", height=100)
+            obs = st.text_area("Observations (Virements, technique...)", height=80)
             
             st.markdown("--- 🏁 **ARRIVÉE** ---")
             c5, c6 = st.columns(2)
             a_lieu = c5.text_input("Port / Mouillage (Arrivée)")
-            a_mi = c6.number_input("Loch / Milles (Arrivée)", step=0.1)
+            a_h = st.number_input("Heures Moteur (Arrivée)", step=0.1, format="%.1f")
+            a_mi = st.number_input("Loch / Milles (Arrivée)", step=0.1, format="%.1f")
 
             if st.form_submit_button("⚓ ENREGISTRER L'ÉTAPE", use_container_width=True):
-                dist = a_mi - d_mi
-                nouvelle_etape = {
+                # Calcul du bilan de l'étape
+                bilan_milles = round(a_mi - d_mi, 1)
+                bilan_heures = round(a_h - d_h, 1)
+                
+                nueva_row = {
                     "Date": datetime.now().strftime("%d/%m/%Y"),
-                    "Depart": d_lieu,
-                    "Arrivee": a_lieu,
-                    "Meteo": d_met,
-                    "Milles": dist,
-                    "Observations": obs
+                    "Depart": d_lieu, "Arrivee": a_lieu,
+                    "H_Dep": d_h, "H_Arr": a_h, "H_Bilan": bilan_heures,
+                    "M_Dep": d_mi, "M_Arr": a_mi, "M_Bilan": bilan_milles,
+                    "Meteo": d_met, "Observations": obs
                 }
-                # Mise à jour et sauvegarde
-                df_log = pd.concat([df_log, pd.DataFrame([nouvelle_etape])], ignore_index=True)
+                
+                df_log = pd.concat([df_log, pd.DataFrame([nueva_row])], ignore_index=True)
                 sauvegarder_data(df_log, "logbook.json")
-                st.success(f"Étape enregistrée : {dist:.1f} milles nautiques.")
+                st.success(f"✅ Étape validée : {bilan_milles} mn | {bilan_heures} h moteur")
                 st.rerun()
 
-    # 3. Affichage de l'Historique (L'ancien Logbook)
+    # 3. Affichage de l'Historique avec Bilan
     st.markdown("---")
-    st.subheader("📜 Historique des étapes")
-    
     if not df_log.empty:
-        # On affiche du plus récent au plus ancien
         for i in reversed(df_log.index):
             r = df_log.loc[i]
+            # On récupère les bilans ou on les calcule à la volée si anciens logs
+            b_m = r.get('M_Bilan', round(to_f(r.get('M_Arr',0)) - to_f(r.get('M_Dep',0)), 1))
+            b_h = r.get('H_Bilan', round(to_f(r.get('H_Arr',0)) - to_f(r.get('H_Dep',0)), 1))
+            
             st.markdown(f"""
-            <div class="client-card" style="border-left: 5px solid #1a2a6c;">
-                <b>📅 {r.get('Date', 'N/A')}</b> | 🚩 {r.get('Depart')} ➡️ 🏁 {r.get('Arrivee')}<br>
-                ⛵ <b>Distance : {r.get('Milles', 0)} mn</b> | ☀️ {r.get('Meteo')}<br>
-                <p style="font-size:0.9rem; color:#555; margin-top:5px;">📝 {r.get('Observations', '')}</p>
+            <div class="client-card" style="border-left: 8px solid #1a2a6c; background:#f8f9fa;">
+                <div style="display:flex; justify-content:space-between;">
+                    <b>📅 {r.get('Date')}</b>
+                    <span style="color:#1a2a6c; font-weight:bold;">{r.get('Meteo')}</span>
+                </div>
+                <div style="margin: 10px 0;">
+                    🚩 {r.get('Depart')} ➡️ 🏁 {r.get('Arrivee')}
+                </div>
+                <div style="background:#eef2f3; padding:8px; border-radius:5px; display:flex; gap:15px; font-weight:bold; color:#1a2a6c;">
+                    🚢 Distance : {b_m} mn<br>
+                    ⚙️ Moteur : {b_h} h
+                </div>
+                <p style="font-size:0.85rem; color:#666; margin-top:8px; font-style:italic;">📝 {r.get('Observations','')}</p>
             </div>
             """, unsafe_allow_html=True)
             
-            if st.button("🗑️ Supprimer l'étape", key=f"del_log_{i}"):
+            if st.button("🗑️", key=f"del_log_{i}"):
                 df_log = df_log.drop(i)
                 sauvegarder_data(df_log, "logbook.json")
                 st.rerun()
     else:
-        st.info("Le journal de bord est vide pour le moment.")
+        st.info("Aucun logbook enregistré.")
 
 elif st.session_state.page == "FORM":
     st.markdown('<div class="page-title">📝 FICHE NAVIGATION</div>', unsafe_allow_html=True)
@@ -342,6 +356,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
