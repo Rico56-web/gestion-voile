@@ -319,48 +319,48 @@ elif st.session_state.page == "STATS":
             st.error(f"🔧 **Total Frais :** {t_frais} | ⚓ **Bénéfice Net :** {t_enc - t_frais}")
         else:
             st.info(f"Aucune activité enregistrée pour {an_sel}")
-            
-elif st.session_state.page == "FACTURES":
+  elif st.session_state.page == "FACTURES":
         st.markdown('<div class="page-title">🧾 GÉNÉRATION DE FACTURE</div>', unsafe_allow_html=True)
         
-        # 1. Préparation des données
+        # --- TEST DE SÉCURITÉ ---
         if df.empty:
-            st.warning("⚠️ Aucune donnée disponible pour la facturation.")
+            st.warning("⚠️ Aucune donnée n'est chargée. Retournez dans 'LISTE' pour rafraîchir.")
         else:
-            # Filtre par société
+            # 1. Sélection de la société
+            # On s'assure que 'Société' existe, sinon on met 'Inconnu'
+            if 'Société' not in df.columns:
+                df['Société'] = "Inconnu"
+            
             soc_list = sorted(df['Société'].unique().astype(str).tolist())
             soc_sel = st.selectbox("Sélectionner un Client / Société", ["Toutes"] + soc_list)
             
-            df_fact = df.copy()
+            df_f = df.copy()
             if soc_sel != "Toutes":
-                df_fact = df_fact[df_fact['Société'] == soc_sel]
+                df_f = df_f[df_f['Société'] == soc_sel]
 
-            if df_fact.empty:
-                st.info(f"Aucune ligne trouvée pour {soc_sel}")
+            # 2. Affichage des résultats
+            if df_f.empty:
+                st.info(f"Aucune navigation trouvée pour {soc_sel}")
             else:
-                # Affichage du tableau
-                st.dataframe(df_fact[['DateNav', 'Nom', 'PrixJour', 'Statut']], use_container_width=True)
+                st.dataframe(df_f[['DateNav', 'Nom', 'PrixJour', 'Statut']], use_container_width=True)
                 
-                # Calcul du total avec sécurité to_f
-                total_facture = sum(df_fact['PrixJour'].apply(to_f))
-                st.metric(f"Total pour {soc_sel}", f"{int(total_facture)} €")
+                # Calcul total
+                total_f = sum(df_f['PrixJour'].apply(to_f))
+                st.metric(f"Total {soc_sel}", f"{int(total_f)} €")
 
-                # 2. Construction du texte (Le bloc qui posait problème)
-                corps = f"Bonjour,\n\nVoici le récapitulatif des prestations pour {soc_sel} :\n\n"
+                # 3. Préparation du texte (Construction propre)
+                corps = f"Bonjour,\n\nVoici le récapitulatif pour {soc_sel} :\n\n"
                 
-                for _, r in df_fact.iterrows():
-                    p_ligne = to_f(r.get('PrixJour', 0))
-                    date_l = r.get('DateNav', '--')
-                    nom_l = r.get('Nom', '')
-                    corps += f"- Le {date_l} ({nom_l}) : {int(p_ligne)} €\n"
+                for _, r in df_f.iterrows():
+                    # Sécurité sur chaque ligne
+                    p_l = to_f(r.get('PrixJour', 0))
+                    d_l = r.get('DateNav', '--')
+                    n_l = r.get('Nom', '')
+                    corps += f"- Le {d_l} ({n_l}) : {int(p_l)} €\n"
                 
-                corps += f"\nTotal Général : {int(total_facture)} €\n\nMerci de votre confiance.\nCordialement,\nVesta Skipper 2026"
+                corps += f"\nTotal Général : {int(total_f)} €\n\nMerci."
 
-                # 3. Affichage final
-                st.text_area("📋 Message prêt à copier :", corps, height=200)
-                
-                if st.button("Confirmer la facturation"):
-                    st.success("Facture validée dans le système.")       
+                st.text_area("📋 Message à copier :", corps, height=200)  
 
 
 elif st.session_state.page == "NOTES":
@@ -516,6 +516,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
