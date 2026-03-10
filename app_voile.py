@@ -240,30 +240,42 @@ elif st.session_state.page == "PLANNING":
             st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
     else:
         st.info("Aucune navigation ce mois-ci.")
+        
 elif st.session_state.page == "STATS":
-    st.markdown('<div class="page-title">📊 TABLEAU DE BORD COMPACT</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">📊 TABLEAU DE BORD SÉCURISÉ</div>', unsafe_allow_html=True)
     
     if df.empty:
         st.warning("⚠️ Aucune donnée trouvée.")
     else:
-        # 1. Filtre par Année
+        # 1. Préparation & Filtre Année
         df['dt'] = df['DateNav'].apply(parse_d)
-        list_ans = [2026, 2027, 2028]
-        an_sel = st.selectbox("Choisir l'année", list_ans, index=0)
-        
-        # Filtrage du DataFrame principal pour l'année choisie
+        an_sel = st.selectbox("Choisir l'année", [2026, 2027, 2028], index=0)
         df_an = df[df['dt'].dt.year == an_sel].copy()
         
-        # 2. Préparation des données financières
-        def est_paye(r):
-            txt = (str(r.get('Statut','')) + " " + str(r.get('Paye',''))).lower()
-            return any(m in txt for m in ["payé", "paye", "ok", "✅", "🟢"])
+        # 2. Logique de tri ultra-précise
+        def classifier_ligne(r):
+            statut = str(r.get('Statut','')).lower()
+            paye_col = str(r.get('Paye','')).lower()
+            combinaison = statut + " " + paye_col
+            
+            # A. On élimine les annulations direct
+            if any(m in combinaison for m in ["annulé", "annule", "🔴"]):
+                return "IGNORE"
+            
+            # B. On cherche si c'est payé (mots clés positifs)
+            est_regle = any(m in combinaison for m in ["payé", "paye", "ok", "✅", "🟢"])
+            
+            if est_regle:
+                return "ENCAISSE"
+            else:
+                return "PREVISIONNEL"
 
-        df_an['is_paye'] = df_an.apply(est_paye, axis=1)
+        # Application de la logique
+        df_an['Type'] = df_an.apply(classifier_ligne, axis=1)
         df_an['Mnt'] = df_an['PrixJour'].apply(to_f)
         df_an['Mois_Num'] = df_an['dt'].dt.month
 
-        # 3. Chargement et filtrage des frais pour l'année
+        # 3. Chargement des frais
         df_f = charger_data("frais.json")
         if not df_f.empty:
             df_f['dt_f'] = df_f['Date'].apply(parse_d)
@@ -271,39 +283,42 @@ elif st.session_state.page == "STATS":
             df_f_an['Mnt_F'] = df_f_an['Montant'].apply(to_f)
             df_f_an['Mois_F'] = df_f_an['dt_f'].dt.month
         else:
-            df_f_an = pd.DataFrame(columns=['Mnt_F', 'Mois_F'])
+            df_f_an = pd.DataFrame()
 
-        # 4. Construction du tableau compact (1 à 12)
+        # 4. Construction du tableau compact
         recap = []
         for m in range(1, 13):
-            # Data de navigation pour ce mois
             d_m = df_an[df_an['Mois_Num'] == m]
-            encaise = int(d_m[d_m['is_paye']]['Mnt'].sum()) # Arrondi inférieur via int()
-            prev = int(d_m[~d_m['is_paye']]['Mnt'].sum())
             
-            # Frais pour ce mois
-            frais_m = int(df_f_an[df_f_an['Mois_F'] == m]['Mnt_F'].sum()) if not df_f_an.empty else 0
+            val_enc = int(d_m[d_m['Type'] == "ENCAISSE"]['Mnt'].sum())
+            val_prev = int(d_m[d_m['Type'] == "PREVISIONNEL"]['Mnt'].sum())
             
-            # On n'ajoute au tableau que si il y a une activité (CA ou Frais)
-            if (encaise + prev + frais_m) > 0:
+            # Calcul des frais pour ce mois
+            f_m = 0
+            if not df_f_an.empty:
+                f_m = int(df_f_an[df_f_an['Mois_F'] == m]['Mnt_F'].sum())
+            
+            if (val_enc + val_prev + f_m) > 0:
                 recap.append({
                     "M": m,
-                    "Encaissé": encaise,
-                    "Prév.": prev,
-                    "Frais": frais_m,
-                    "Net": encaise - frais_m
+                    "Encaissé": val_enc,
+                    "Prév.": val_prev,
+                    "Frais": f_m,
+                    "Net": val_enc - f_m
                 })
 
         if recap:
-            # Affichage du tableau compact
             st.table(pd.DataFrame(recap))
             
-            # Totaux annuels en bas (arrondis)
-            t_enc = sum(item['Encaissé'] for item in recap)
-            t_frais = sum(item['Frais'] for item in recap)
-            st.info(f"**Total Année {an_sel}** | Recettes : {t_enc} | Frais : {t_frais} | Net : {t_enc - t_frais}")
+            # Totaux
+            t_enc = sum(i['Encaissé'] for i in recap)
+            t_prev = sum(i['Prév.'] for i in recap)
+            t_frais = sum(i['Frais'] for i in recap)
+            
+            st.success(f"💰 **Encaissé Réel :** {t_enc} | ⏳ **Total en attente :** {t_prev}")
+            st.error(f"🔧 **Total Frais :** {t_frais} | ⚓ **Bénéfice Net :** {t_enc - t_frais}")
         else:
-            st.info(f"Aucune donnée pour l'année {an_sel}")
+            st.info(f"Aucune activité enregistrée pour {an_sel}")
         
 elif st.session_state.page == "FACTURE":
     st.markdown('<div class="page-title">📄 FACTURATION & ARCHIVES</div>', unsafe_allow_html=True)
@@ -529,6 +544,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
