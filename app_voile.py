@@ -324,7 +324,7 @@ elif st.session_state.page == "FACTURE":
     st.markdown('<div class="page-title">📄 FACTURATION & ARCHIVES</div>', unsafe_allow_html=True)
     
     c1, c2 = st.columns(2)
-    f_y = c1.selectbox("Année", [2025, 2026, 2027], index=1)
+    f_y = c1.selectbox("Année", [2025, 2026, 2027,2028], index=1)
     f_m = c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
     
     if not df.empty:
@@ -342,11 +342,14 @@ elif st.session_state.page == "FACTURE":
         st.subheader("💰 À FACTURER CE MOIS")
         if not df_a_envoyer.empty:
             total = sum(df_a_envoyer['PrixJour'].apply(to_f))
-            
+            # --- LA CORRECTION ---
+       for i, r in df_fact.iterrows():
+       # On ajoute to_f() ici pour "nettoyer" le prix avant l'affichage
+         prix_nettoye = to_f(r.get('PrixJour', 0))
+         corps += f"- Le {r['DateNav']} ({r.get('Nom','')}) : {fmt_p(prix_nettoye)}\n"
             # Construction du corps du mail
             corps = f"Bonjour Jean-Michel,\n\nCi-après le détail de la facturation des sorties CMN du mois de {calendar.month_name[f_m]} {f_y} :\n\n"
-            for _, r in df_a_envoyer.sort_values('dt').iterrows():
-                corps += f"- Le {r['DateNav']} ({r.get('Nom','')}) : {fmt_p(r['PrixJour'])}\n"
+            
             corps += f"\nTOTAL À RÉGLER : {fmt_p(total)}\n\nBonne réception,\nEric CLAVREUL"
             
             st.info(f"Montant détecté : {fmt_p(total)}")
@@ -544,6 +547,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
