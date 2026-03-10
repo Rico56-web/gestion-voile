@@ -320,87 +320,43 @@ elif st.session_state.page == "STATS":
         else:
             st.info(f"Aucune activité enregistrée pour {an_sel}")
         
-elif st.session_state.page == "FACTURE":
-    st.markdown('<div class="page-title">📄 FACTURATION & ARCHIVES</div>', unsafe_allow_html=True)
-    
-    c1, c2 = st.columns(2)
-    f_y = c1.selectbox("Année", [2025, 2026, 2027,2028], index=1)
-    f_m = c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
-    
-    if not df.empty:
-        df['dt'] = df['DateNav'].apply(parse_d)
-        mask_base = (df['dt'].dt.year == f_y) & (df['dt'].dt.month == f_m) & (df['Société'].str.upper() == "CMN")
-        df_mois = df[mask_base].copy()
+elif st.session_state.page == "FACTURES":
+        st.markdown('<div class="page-title">🧾 GÉNÉRATION DE FACTURE</div>', unsafe_allow_html=True)
         
-        # --- 1. LES SORTIES À FACTURER (Statut OK / 🟢) ---
-        df_a_envoyer = df_mois[df_mois['Statut'].str.contains("OK|🟢", na=False)]
+        # Filtre par société pour la facture
+        soc_list = sorted(df['Société'].unique().tolist()) if not df.empty else []
+        soc_sel = st.selectbox("Choisir la société", ["Toutes"] + soc_list)
         
-        # --- 2. LES ARCHIVES ---
-        df_attente = df_mois[df_mois['Statut'].str.contains("Attente|🟡|Facturé", na=False)]
-        df_paye = df_mois[df_mois['Statut'].str.contains("Payé|✅|Paye", na=False, case=False)]
+        df_fact = df.copy()
+        if soc_sel != "Toutes":
+            df_fact = df_fact[df_fact['Société'] == soc_sel]
 
-        st.subheader("💰 À FACTURER CE MOIS")
-        if not df_a_envoyer.empty:
-            total = sum(df_a_envoyer['PrixJour'].apply(to_f))
-            # --- LA CORRECTION ---
-       for i, r in df_fact.iterrows():
-       # On ajoute to_f() ici pour "nettoyer" le prix avant l'affichage
-         prix_nettoye = to_f(r.get('PrixJour', 0))
-         corps += f"- Le {r['DateNav']} ({r.get('Nom','')}) : {fmt_p(prix_nettoye)}\n"
-            # Construction du corps du mail
-           # --- BLOC RECALIBRÉ ---
-        corps = f"Bonjour,\n\nVoici le récapitulatif de vos sorties :\n"
-
-        for i, r in df_fact.iterrows():
-            # On nettoie le prix pour éviter le plantage
-            p_net = to_f(r.get('PrixJour', 0))
-            corps += f"- Le {r['DateNav']} ({r.get('Nom','')}) : {fmt_p(p_net)}\n"
-
-        # On calcule le total proprement
-        total_facture = sum(df_fact['PrixJour'].apply(to_f))
-        corps += f"\nTotal à régler : {fmt_p(total_facture)}\n\nMerci !"
-        # --- FIN DU BLOC ---
-            st.info(f"Montant détecté : {fmt_p(total)}")
-            txt = st.text_area("Aperçu du message", corps, height=200)
-            
-            dest, cc, sujet = "tresorier@cmn-asso.fr", "eric.clavreul@gmail.com", f"Facturation Skipper - {calendar.month_name[f_m]} {f_y}"
-            
-            # --- BOUTON IPHONE (Mail natif) ---
-            params = urllib.parse.urlencode({'cc': cc, 'subject': sujet, 'body': txt})
-            st.markdown(f'''
-                <a href="mailto:{dest}?{params}" style="background-color:#1a2a6c; color:white; padding:15px; display:block; text-align:center; text-decoration:none; border-radius:10px; font-weight:bold; margin-bottom:10px;">
-                    📱 ENVOYER VIA IPHONE (Mail)
-                </a>
-            ''', unsafe_allow_html=True)
-            
-            # --- BOUTON PC (Gmail) ---
-            gmail_url = f"https://mail.google.com/mail/?view=cm&fs=1&to={dest}&cc={cc}&sujet={urllib.parse.quote(sujet)}&body={urllib.parse.quote(txt)}"
-            st.markdown(f'''
-                <a href="{gmail_url}" target="_blank" style="background-color:#db4437; color:white; padding:15px; display:block; text-align:center; text-decoration:none; border-radius:10px; font-weight:bold;">
-                    💻 ENVOYER VIA GMAIL (PC)
-                </a>
-            ''', unsafe_allow_html=True)
+        if df_fact.empty:
+            st.info("Sélectionnez une société pour éditer la facture.")
         else:
-            st.info("Aucune nouvelle sortie '🟢 OK' à facturer pour ce mois.")
+            # Affichage du tableau de prévisualisation
+            st.dataframe(df_fact[['DateNav', 'Nom', 'PrixJour', 'Statut']])
+            
+            # Calcul du total sécurisé
+            total_facture = sum(df_fact['PrixJour'].apply(to_f))
+            st.metric("Total à facturer", fmt_p(total_facture))
 
-        # --- SECTION ARCHIVES ---
-        st.markdown("---")
-        st.subheader("📂 ÉTAT DES PAIEMENTS")
-        c_att, c_ok = st.columns(2)
-        
-        with c_att:
-            st.markdown("<b style='color:#f39c12;'>⏳ EN ATTENTE / ENVOYÉ</b>", unsafe_allow_html=True)
-            if not df_attente.empty:
-                for _, r in df_attente.sort_values('dt', ascending=False).iterrows():
-                    st.caption(f"• {r['DateNav']} : {r.get('Nom','')} ({fmt_p(r['PrixJour'])})")
-            else: st.write("Rien en attente")
+            # --- PRÉPARATION DU CORPS DU MAIL (BLOC CORRIGÉ) ---
+            corps = f"Bonjour,\n\nVoici le récapitulatif de vos sorties pour {soc_sel} :\n\n"
 
-        with c_ok:
-            st.markdown("<b style='color:#27ae60;'>✅ PAYÉ / ARCHIVÉ</b>", unsafe_allow_html=True)
-            if not df_paye.empty:
-                for _, r in df_paye.sort_values('dt', ascending=False).iterrows():
-                    st.caption(f"• {r['DateNav']} : {r.get('Nom','')} ({fmt_p(r['PrixJour'])})")
-            else: st.write("Aucun archivé")
+            for i, r in df_fact.iterrows():
+                # On utilise to_f pour nettoyer le prix de chaque ligne
+                p_l = to_f(r.get('PrixJour', 0))
+                corps += f"- Le {r.get('DateNav','--')} ({r.get('Nom','')}) : {fmt_p(p_l)}\n"
+
+            corps += f"\nTotal général : {fmt_p(total_facture)}\n\nMerci de votre confiance.\nCordialement,\nL'équipe Vesta Skipper"
+            
+            # Zone de texte pour copier le message
+            st.text_area("Message à copier :", corps, height=250)
+            
+            # Bouton de validation/envoi (si configuré)
+            if st.button("Valider la facturation"):
+                st.success("Facture prête à être envoyée !")
 
 elif st.session_state.page == "NOTES":
     st.markdown('<div class="page-title">📝 MES NOTES & MÉMOS</div>', unsafe_allow_html=True)
@@ -555,6 +511,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
