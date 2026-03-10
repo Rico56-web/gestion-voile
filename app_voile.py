@@ -234,59 +234,79 @@ elif st.session_state.page == "BUDGET":
 elif st.session_state.page == "FACTURE":
     st.markdown('<div class="page-title">📄 FACTURATION CMN</div>', unsafe_allow_html=True)
     
-    # Initialisation de sécurité
-    df_c = pd.DataFrame() 
+    # 1. Chargement de l'historique des archives
+    df_arch = charger_data("archives_factures.json")
     
     c1, c2 = st.columns(2)
-    f_y = c1.selectbox("Année", [2025, 2026, 2027], index=1, key="f_y")
-    f_m = c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x], key="f_m")
+    f_y = c1.selectbox("Année", [2025, 2026, 2027], index=1)
+    f_m = c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
     
+    df_c = pd.DataFrame()
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
-        mask_cmn = (df['dt'].dt.year == f_y) & (df['dt'].dt.month == f_m) & \
-                   (df['Société'].str.upper() == "CMN") & (df['Statut'].str.contains("OK|🟢", na=False))
-        df_c = df[mask_cmn]
+        df_c = df[(df['dt'].dt.year == f_y) & (df['dt'].dt.month == f_m) & 
+                  (df['Société'].str.upper() == "CMN") & (df['Statut'].str.contains("OK|🟢", na=False))]
     
     if not df_c.empty:
         total = sum(df_c['PrixJour'].apply(to_f))
-        
-        # --- CORPS DU MAIL ---
         corps = f"Bonjour Jean-Michel,\n\nCi-après le détail de la facturation des sorties CMN de ce mois ({calendar.month_name[f_m]} {f_y}) :\n\n"
         for _, r in df_c.iterrows():
             corps += f"- Le {r['DateNav']} : {fmt_p(r['PrixJour'])}\n"
-        corps += f"\nTOTAL À RÉGLER : {fmt_p(total)}\n\nBonne continuation.\n\nEric CLAVREUL"
+        corps += f"\nTOTAL : {fmt_p(total)}\n\nBonne continuation.\n\nEric CLAVREUL"
         
-        txt = st.text_area("Aperçu du message", corps, height=250)
+        st.text_area("Aperçu du message", corps, height=150)
         
-        # --- PARAMÈTRES ---
-        dest = "tresorier@cmn-asso.fr"
-        cc = "eric.clavreul@gmail.com"
-        sujet = f"Facturation Skipper - {calendar.month_name[f_m]} {f_y}"
+        # Options d'envoi
+        dest, cc, sujet = "tresorier@cmn-asso.fr", "eric.clavreul@gmail.com", f"Facturation Skipper {calendar.month_name[f_m]} {f_y}"
+        params = urllib.parse.urlencode({'cc': cc, 'subject': sujet, 'body': corps})
         
-        # 1. LIEN CLASSIQUE (Idéal iPhone / iPad)
-        params_mailto = urllib.parse.urlencode({'cc': cc, 'subject': sujet, 'body': txt})
-        link_mailto = f"mailto:{dest}?{params_mailto}"
+        col_btn1, col_btn2 = st.columns(2)
+        col_btn1.markdown(f'<a href="mailto:{dest}?{params}" style="background-color:#1a2a6c;color:white;padding:12px;display:block;text-align:center;text-decoration:none;border-radius:8px;font-weight:bold;font-size:0.9rem;">📱 SMARTPHONE</a>', unsafe_allow_html=True)
+        gmail_url = f"https://mail.google.com/mail/?view=cm&fs=1&to={dest}&cc={cc}&sujet={urllib.parse.quote(sujet)}&body={urllib.parse.quote(corps)}"
+        col_btn2.markdown(f'<a href="{gmail_url}" target="_blank" style="background-color:#db4437;color:white;padding:12px;display:block;text-align:center;text-decoration:none;border-radius:8px;font-weight:bold;font-size:0.9rem;">💻 GMAIL PC</a>', unsafe_allow_html=True)
         
-        st.markdown(f'''
-            <a href="{link_mailto}" style="background-color:#1a2a6c; color:white; padding:15px; 
-            display:block; text-align:center; text-decoration:none; border-radius:10px; font-weight:bold; margin-bottom:10px;">
-            📱 ENVOYER VIA MON SMARTPHONE
-            </a>
-        ''', unsafe_allow_html=True)
+        # --- BOUTON ARCHIVAGE ---
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🗄️ ARCHIVER & MARQUER COMME ENVOYÉE", use_container_width=True):
+            nouvelle_archive = {
+                "Mois": f"{calendar.month_name[f_m]} {f_y}",
+                "Montant": total,
+                "DateEnvoi": datetime.now().strftime("%d/%m/%Y"),
+                "Payée": False
+            }
+            df_arch = pd.concat([df_arch, pd.DataFrame([nouvelle_archive])], ignore_index=True)
+            sauvegarder_data(df_arch, "archives_factures.json")
+            st.success("Facture enregistrée dans l'historique !")
+            st.rerun()
+    else:
+        st.info("Aucune prestation CMN à facturer pour cette période.")
 
-        # 2. LIEN GMAIL WEB (Idéal PC / Navigateur)
-        # On utilise une URL spécifique à Gmail qui force l'ouverture en ligne
-        gmail_url = f"https://mail.google.com/mail/?view=cm&fs=1&to={dest}&cc={cc}&sujet={urllib.parse.quote(sujet)}&body={urllib.parse.quote(txt)}"
-        
-        st.markdown(f'''
-            <a href="{gmail_url}" target="_blank" style="background-color:#db4437; color:white; padding:15px; 
-            display:block; text-align:center; text-decoration:none; border-radius:10px; font-weight:bold;">
-            💻 ENVOYER VIA GMAIL (ORDINATEUR)
-            </a>
-        ''', unsafe_allow_html=True)
-        
-    else: 
-        st.info(f"Aucune prestation CMN validée pour {calendar.month_name[f_m]} {f_y}.")
+    # --- 2. AFFICHAGE DE L'HISTORIQUE & POIΝTAGE ---
+    if not df_arch.empty:
+        st.markdown("---")
+        st.subheader("📜 Historique & Paiements")
+        for i in reversed(df_arch.index):
+            arch = df_arch.loc[i]
+            is_paid = arch.get("Payée", False)
+            
+            # Mise en forme selon le statut
+            label_statut = "✅ PAYÉE" if is_paid else "⏳ EN ATTENTE"
+            color_statut = "#2ecc71" if is_paid else "#e67e22"
+            
+            with st.expander(f"{arch['Mois']} — {fmt_p(arch['Montant'])} ({label_statut})"):
+                st.write(f"Envoyée le : {arch['DateEnvoi']}")
+                
+                c1, c2 = st.columns(2)
+                # Bouton pour changer le statut
+                if c1.button("Marquer comme " + ("En attente" if is_paid else "Payée"), key=f"pay_{i}"):
+                    df_arch.at[i, "Payée"] = not is_paid
+                    sauvegarder_data(df_arch, "archives_factures.json")
+                    st.rerun()
+                
+                if c2.button("🗑️ Supprimer", key=f"del_arch_{i}"):
+                    df_arch = df_arch.drop(i)
+                    sauvegarder_data(df_arch, "archives_factures.json")
+                    st.rerun()
 
 elif st.session_state.page == "SECU":
     st.markdown('<div class="page-title">🛟 SÉCURITÉ</div>', unsafe_allow_html=True)
@@ -366,6 +386,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
