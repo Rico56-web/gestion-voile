@@ -143,10 +143,8 @@ if st.session_state.page == "LISTE":
 
   elif st.session_state.page == "LOGBOOK":
     st.markdown('<div class="page-title">📖 LIVRE DE BORD</div>', unsafe_allow_html=True)
-    
     # 1. Chargement des données du livre de bord
     df_log = charger_data("livre_de_bord.json")
-    
     # --- FORMULAIRE DE SAISIE / ÉDITION ---
     idx_log = st.session_state.get("edit_log_idx", None)
     init_log = df_log.loc[idx_log].to_dict() if (idx_log is not None and not df_log.empty) else {}
@@ -435,6 +433,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
