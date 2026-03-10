@@ -131,7 +131,7 @@ elif st.session_state.page == "LOGBOOK":
     init_log = df_log.loc[idx_log].to_dict() if (idx_log is not None and not df_log.empty) else {}
     
     with st.form("f_livre_bord"):
-        st.subheader("🚩 ÉTAPE DE NAVIGATION")
+        st.subheader("🚩 NOUVELLE ÉTAPE")
         c1, c2 = st.columns(2)
         date_l = c1.text_input("Date", init_log.get("Date", datetime.now().strftime("%d/%m/%Y")))
         d_lieu = c2.text_input("Port Départ", init_log.get("LieuD", ""))
@@ -141,15 +141,15 @@ elif st.session_state.page == "LOGBOOK":
         d_h = c3.number_input("Heures Moteur (Départ)", value=float(init_log.get("HeuresD", 0.0)), step=0.1)
         d_mi = c4.number_input("Loch (Départ)", value=float(init_log.get("MillesD", 0.0)), step=0.1)
         
-        obs = st.text_area("Observations", init_log.get("Obs", ""), height=80)
+        obs = st.text_area("Observations / Météo", init_log.get("Obs", ""), height=80)
         
         st.markdown("**🏁 ARRIVÉE**")
         c5, c6 = st.columns(2)
         a_lieu = c5.text_input("Port Arrivée", init_log.get("LieuA", ""))
-        a_h = c5.number_input("Heures Moteur (Arrivée)", value=float(init_log.get("HeuresA", 0.0)), step=0.1)
-        a_mi = c6.number_input("Loch (Arrivée)", value=float(init_log.get("MillesA", 0.0)), step=0.1)
+        a_h = c6.number_input("Heures Moteur (Arrivée)", value=float(init_log.get("HeuresA", 0.0)), step=0.1)
+        a_mi = st.number_input("Loch (Arrivée)", value=float(init_log.get("MillesA", 0.0)), step=0.1)
         
-        if st.form_submit_button("⚓ ENREGISTRER L'ÉTAPE"):
+        if st.form_submit_button("⚓ ENREGISTRER L'ÉTAPE", use_container_width=True):
             dist = a_mi - d_mi
             h_mot = a_h - d_h
             row = {
@@ -157,34 +157,51 @@ elif st.session_state.page == "LOGBOOK":
                 "Obs":obs, "LieuA":a_lieu, "HeuresA":a_h, "MillesA":a_mi, 
                 "Dist":dist, "DeltaH":h_mot
             }
+            import pandas as pd
             if idx_log is None: df_log = pd.concat([df_log, pd.DataFrame([row])], ignore_index=True)
             else:
                 for k,v in row.items(): df_log.at[idx_log, k] = v
                 st.session_state.edit_log_idx = None
             sauvegarder_data(df_log, "livre_de_bord.json")
-            
-            # Affichage du bilan immédiat
-            st.success(f"✅ Étape enregistrée ! Bilan : {dist:.1f} mn parcourus | {h_mot:.1f} h moteur")
             st.rerun()
 
-    if idx_log is not None and st.button("Annuler modification"): 
+    if idx_log is not None and st.button("❌ Annuler modification"): 
         st.session_state.edit_log_idx = None; st.rerun()
 
     if not df_log.empty:
         st.markdown("---")
-        st.subheader("📜 Historique")
+        st.subheader("📜 Historique des navigations")
         for i in reversed(df_log.index):
             l = df_log.loc[i]
-            # Affichage détaillé dans l'historique
-            with st.expander(f"📅 {l['Date']} : {l['LieuD']} ➔ {l['LieuA']}"):
-                col1, col2 = st.columns(2)
-                col1.metric("Distance", f"{l.get('Dist', 0):.1f} mn")
-                col2.metric("Moteur", f"{l.get('DeltaH', 0):.1f} h")
+            dist_val = l.get('Dist', 0)
+            mot_val = l.get('DeltaH', 0)
+            
+            # Affichage permanent du bilan dans l'entête de l'expander
+            with st.expander(f"📅 {l['Date']} | {l['LieuD']} ➔ {l['LieuA']} ({dist_val:.1f} mn)"):
+                # LE BANDEAU DE BILAN VISUEL
+                st.markdown(f"""
+                <div style="display: flex; justify-content: space-around; background: #f0f2f6; padding: 10px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #ddd;">
+                    <div style="text-align: center;">
+                        <span style="font-size: 0.8rem; color: #666;">DISTANCE</span><br>
+                        <span style="font-size: 1.2rem; font-weight: bold; color: #1a2a6c;">{dist_val:.1f} MN</span>
+                    </div>
+                    <div style="text-align: center; border-left: 1px solid #ccc; border-right: 1px solid #ccc; padding: 0 20px;">
+                        <span style="font-size: 0.8rem; color: #666;">MOTEUR</span><br>
+                        <span style="font-size: 1.2rem; font-weight: bold; color: #e67e22;">{mot_val:.1f} H</span>
+                    </div>
+                    <div style="text-align: center;">
+                        <span style="font-size: 0.8rem; color: #666;">LOCH FIN</span><br>
+                        <span style="font-size: 1.2rem; font-weight: bold; color: #2ecc71;">{l.get('MillesA', 0):.0f}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
                 st.write(f"**Notes :** {l['Obs']}")
                 
-                cl1, cl2 = st.columns(2)
-                if cl1.button("✏️ Modifier", key=f"ed_log_{i}"): st.session_state.edit_log_idx = i; st.rerun()
-                if cl2.button("🗑️ Supprimer", key=f"del_log_{i}"):
+                c_edit, c_del = st.columns(2)
+                if c_edit.button("✏️ Modifier", key=f"ed_log_{i}"): 
+                    st.session_state.edit_log_idx = i; st.rerun()
+                if c_del.button("🗑️ Supprimer", key=f"del_log_{i}"):
                     df_log = df_log.drop(i); sauvegarder_data(df_log, "livre_de_bord.json"); st.rerun()
 
 elif st.session_state.page == "PLANNING":
@@ -346,6 +363,7 @@ elif st.session_state.page == "FORM":
             else: 
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
+
 
 
 
