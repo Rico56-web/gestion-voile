@@ -140,41 +140,66 @@ if st.session_state.page == "LISTE":
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING & CROISIÈRES</div>', unsafe_allow_html=True)
     
-    # 1. Barre de contrôle en haut
+    # 1. Barre de contrôle (Mois / Année / Option)
     c_date, c_check = st.columns([2, 1])
     p_y = c_date.selectbox("An", [2025, 2026, 2027], index=1)
     p_m = c_date.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
-    
-    # La fameuse case à cocher
     opt_wa = c_check.checkbox("💬 Option Groupe", value=False)
 
-    # ... (Code du calendrier inchangé ici) ...
-    # [On saute la partie calcul 'occu' et l'affichage de la table pour aller aux détails]
+    occu = {}
+    df_mois = pd.DataFrame() # Initialisation pour éviter l'erreur
 
+    if not df.empty:
+        # On prépare les dates
+        df['dt'] = df['DateNav'].apply(parse_d)
+        # On crée la variable df_mois pour le mois sélectionné
+        df_mois = df[(df['dt'].dt.year == p_y) & (df['dt'].dt.month == p_m)].sort_values('dt')
+        
+        # Remplissage du calendrier visuel
+        for _, r in df.iterrows():
+            statut_str = str(r.get('Statut','')).upper()
+            if "🔴" not in statut_str and "ANNULÉ" not in statut_str:
+                d_s, nb_j = r['dt'], int(to_f(r.get('NbJours', 1)))
+                for j in range(nb_j):
+                    curr = d_s + timedelta(days=j)
+                    if curr.year == p_y and curr.month == p_m:
+                        soc = str(r.get('Société','')).upper()
+                        occu[curr.day] = "day-cmn" if soc == "CMN" else "day-ok"
+
+    # --- AFFICHAGE DU CALENDRIER ---
+    cal = calendar.monthcalendar(p_y, p_m)
+    h = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
+    for wk in cal:
+        h += '<tr>'
+        for d in wk:
+            style = f'class="{occu[d]}"' if d in occu else ''
+            h += f'<td {style}>{d if d != 0 else ""}</td>'
+        h += '</tr>'
+    st.markdown(h + '</table>', unsafe_allow_html=True)
+
+    # --- DÉTAILS ET BOUTONS ---
     st.markdown("---")
     st.subheader(f"👥 Détails {calendar.month_name[p_m]}")
     
-    if not df.empty and not df_mois.empty:
+    if not df_mois.empty:
         groupes = df_mois.groupby('DateNav')
         
         for date_nav, gp in groupes:
-            tels = []
-            noms = []
+            tels, noms = [], []
             st.markdown(f"**📅 {date_nav}**")
             
             for _, r in gp.iterrows():
                 n_c = f"{r.get('Prénom','')} {r.get('Nom','').upper()}"
                 st.markdown(f"• {n_c} ({r.get('Société','')})")
                 
-                # On prépare les numéros au cas où
-                t = str(r.get('Téléphone','')).strip().replace(" ","")
-                if t: 
+                # Récupération propre du téléphone
+                t = str(r.get('Téléphone','')).strip().replace(" ","").replace(".","")
+                if t and t != "nan": 
                     if t.startswith("0"): t = "33" + t[1:]
                     tels.append(t)
                     noms.append(n_c)
 
-            # --- LA CONDITION DE VERROUILLAGE ---
-            # Le bouton ne s'affiche QUE SI opt_wa est VRAI (coché)
+            # --- LE VERROU : Affichage conditionnel du bouton ---
             if opt_wa and len(gp) > 1 and tels:
                 msg = urllib.parse.quote(f"Bonjour à tous ({', '.join(noms)}), navigation du {date_nav}...")
                 url_wa = f"https://wa.me/{tels[0]}?text={msg}"
@@ -185,81 +210,8 @@ elif st.session_state.page == "PLANNING":
                 """, unsafe_allow_html=True)
             
             st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
-
-elif st.session_state.page == "BUDGET":
-    st.markdown('<div class="page-title">💰 STATS & BILAN</div>', unsafe_allow_html=True)
-    s_y = st.selectbox("Année", [2025, 2026, 2027], index=1)
-    obj = st.number_input("Cible annuelle (€)", value=float(st.session_state.cible_annuelle), step=1000.0)
-    st.session_state.cible_annuelle = obj
-    if not df.empty: df['dt'] = df['DateNav'].apply(parse_d)
-    if not df_f.empty: df_f['dt'] = df_f['Date'].apply(parse_d)
-    res, t_rev, t_fra, t_net, t_pre = [], 0, 0, 0, 0
-    for i in range(1, 13):
-        rev = sum(df[(df['dt'].dt.year == s_y) & (df['dt'].dt.month == i) & (df['Statut'].str.contains("OK|🟢", na=False))]['PrixJour'].apply(to_f)) if not df.empty else 0
-        fr = sum(df_f[(df_f['dt'].dt.year == s_y) & (df_f['dt'].dt.month == i)]['Montant'].apply(to_f)) if not df_f.empty else 0
-        prev = sum(df[(df['dt'].dt.year == s_y) & (df['dt'].dt.month == i) & (df['Statut'].str.contains("OK|🟢|🟡", na=False))]['PrixJour'].apply(to_f)) if not df.empty else 0
-        t_rev += rev; t_fra += fr; t_net += (rev-fr); t_pre += prev
-        res.append({"M": i, "Rev": int(rev), "Frais": int(fr), "Net": int(rev-fr), "Prév": int(prev)})
-    st.write(f"📈 **Réalisé (OK) : {int(t_rev)} / {int(obj)}**")
-    st.progress(min(t_rev/obj, 1.0) if obj > 0 else 0.0)
-    st.table(pd.DataFrame(res).set_index('M'))
-    st.markdown(f'<div style="background:#1a2a6c;color:white;padding:15px;border-radius:10px;text-align:center;font-weight:bold;">TOTAL NET : {fmt_p(t_net)}</div>', unsafe_allow_html=True)
-
-elif st.session_state.page == "FRAIS":
-    st.markdown('<div class="page-title">💰 GESTION DES FRAIS</div>', unsafe_allow_html=True)
-    c_df = df_f
-    c_idx = st.session_state.edit_f_idx
-    c_file = "frais.json"
-    
-    if c_idx is not None:
-        init = c_df.loc[c_idx].to_dict() if (c_idx != "NEW" and not c_df.empty) else {}
-        with st.form("edit_frais"):
-            st.subheader("📝 " + ("MODIFIER LE FRAIS" if c_idx != "NEW" else "NOUVEAU FRAIS"))
-            d_f = st.text_input("Date", init.get("Date", datetime.now().strftime("%d/%m/%Y")))
-            m_f = st.text_input("Montant (€)", str(init.get("Montant", "0")))
-            n_f = st.text_area("Libellé / Note", init.get("Note", ""))
-            
-            if st.form_submit_button("✅ SAUVEGARDER"):
-                row = {"Date": d_f, "Montant": m_f, "Note": n_f}
-                if c_idx == "NEW": 
-                    c_df = pd.concat([c_df, pd.DataFrame([row])], ignore_index=True)
-                else: 
-                    for k,v in row.items(): c_df.at[c_idx, k] = v
-                sauvegarder_data(c_df, c_file)
-                st.session_state.edit_f_idx = None
-                st.rerun()
-            
-            if st.form_submit_button("❌ ANNULER"):
-                st.session_state.edit_f_idx = None
-                st.rerun()
     else:
-        st.button("➕ AJOUTER UN FRAIS", on_click=lambda: st.session_state.update({"edit_f_idx":"NEW"}), use_container_width=True)
-        
-        if not c_df.empty:
-            # Affichage des frais avec détails
-            for i, r in c_df.iterrows():
-                st.markdown(f"""
-                <div class="client-card" style="border-left: 5px solid #e74c3c; background: white;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <b style="font-size:1.1rem;">{r.get('Date')}</b>
-                        <span style="color:#e74c3c; font-weight:bold; font-size:1.2rem;">{r.get('Montant')} €</span>
-                    </div>
-                    <div style="color:#555; margin-top:5px; font-style:italic;">
-                        📌 {r.get('Note', 'Sans libellé')}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                c1, c2 = st.columns([1, 4])
-                if c1.button("✏️", key=f"ed_f_{i}"): 
-                    st.session_state.edit_f_idx = i
-                    st.rerun()
-                if c2.button("🗑️ Supprimer", key=f"del_f_{i}"): 
-                    c_df = c_df.drop(i)
-                    sauvegarder_data(c_df, c_file)
-                    st.rerun()
-        else:
-            st.info("Aucun frais enregistré.")
+        st.info("Aucune navigation ce mois-ci.")
                 
 elif st.session_state.page == "LOGBOOK":
     st.markdown('<div class="page-title">📖 JOURNAL DE BORD</div>', unsafe_allow_html=True)
@@ -573,6 +525,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
