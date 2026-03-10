@@ -242,44 +242,49 @@ elif st.session_state.page == "PLANNING":
         st.info("Aucune navigation ce mois-ci.")
 
 
-elif st.session_state.page == "STATS":
+ elif st.session_state.page == "STATS":
     st.markdown('<div class="page-title">📊 BILAN DES ENCAISSEMENTS</div>', unsafe_allow_html=True)
-    st.write("Nombre de lignes chargées :", len(df))
-if not df.empty:
-    st.write("Colonnes disponibles :", df.columns.tolist())
-    # On recharge les données pour être à jour
+    
     if df.empty:
         st.warning("⚠️ Aucune donnée de navigation trouvée.")
     else:
-        # Nettoyage du texte pour le filtre
-        df['Statut_Clean'] = df['Statut'].fillna("").astype(str).str.lower().str.strip()
-        
-        # Filtre : On prend OK, Payé, ou l'émoji vert
-        mask_paye = df['Statut_Clean'].str.contains("payé|paye|✅|ok|🟢", na=False)
-        df_paye = df[mask_paye].copy()
+        # On crée un filtre qui regarde 'Statut' ET 'Paye'
+        def est_paye(r):
+            # On combine le texte des deux colonnes pour chercher le mot clé
+            texte_complet = (str(r.get('Statut', '')) + " " + str(r.get('Paye', ''))).lower()
+            return any(mot in texte_complet for mot in ["payé", "paye", "ok", "✅", "🟢"])
 
+        # Application du filtre
+        df_paye = df[df.apply(est_paye, axis=1)].copy()
+        
         # Calculs
         ca_total = sum(df_paye['PrixJour'].apply(to_f))
         
-        # Chargement des frais (Maint)
+        # Récupération des frais (MAINT)
         df_f = charger_data("frais.json")
         total_frais = sum(df_f['Montant'].apply(to_f)) if not df_f.empty else 0.0
-
+        
         # Affichage des indicateurs
-        c1, c2 = st.columns(2)
+        c1, c2, c3 = st.columns(3)
         c1.metric("Encaissé (Net)", fmt_p(ca_total))
         c2.metric("Dépenses (Frais)", fmt_p(total_frais))
+        c3.metric("Bénéfice Réel", fmt_p(ca_total - total_frais))
         
         st.markdown("---")
         
         if not df_paye.empty:
-            st.subheader("🏢 Répartition par client")
+            st.subheader("🏢 Répartition par client (Payé)")
+            # On groupe par Société
             recap_soc = df_paye.groupby('Société')['PrixJour'].apply(lambda x: sum(x.apply(to_f)))
             st.bar_chart(recap_soc)
-            st.table(recap_soc.apply(fmt_p))
+            
+            # Petit tableau propre
+            for soc, montant in recap_soc.items():
+                col_n, col_m = st.columns([2, 1])
+                col_n.write(f"**{soc}**")
+                col_m.write(f"{fmt_p(montant)}")
         else:
-            st.info("💡 Aucune navigation n'est encore marquée comme 'Payée' ou 'OK'.")
-# --- FIN DU BLOC ---      
+            st.info("💡 Aucune ligne n'est marquée comme payée. Vérifiez vos colonnes 'Statut' ou 'Paye'.")
         
 elif st.session_state.page == "FACTURE":
     st.markdown('<div class="page-title">📄 FACTURATION & ARCHIVES</div>', unsafe_allow_html=True)
@@ -505,6 +510,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
