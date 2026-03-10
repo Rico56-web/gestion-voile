@@ -217,6 +217,51 @@ elif st.session_state.page == "PLANNING":
                 st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
     else:
         st.write("Aucune navigation ce mois-ci.")
+    # --- DÉTAILS ET GROUPES WHATSAPP ---
+    st.markdown("---")
+    col_titre, col_opt = st.columns([2, 1])
+    col_titre.subheader(f"👥 Navigations de {calendar.month_name[p_m]}")
+    
+    # Case à cocher pour décider si on veut voir l'option groupe ou pas
+    opt_groupe = col_opt.checkbox("🛠️ Option Groupe", value=False)
+    
+    if not df.empty and not df_mois.empty:
+        groupes = df_mois.groupby('DateNav')
+        
+        for date_nav, gp in groupes:
+            tels_groupe = []
+            noms_groupe = []
+            
+            st.markdown(f"**📅 {date_nav}**")
+            
+            for _, r in gp.iterrows():
+                nom_c = f"{r.get('Prénom','')} {r.get('Nom','').upper()}"
+                soc = str(r.get('Société','')).upper()
+                tel = str(r.get('Téléphone', r.get('Tel', ''))).strip().replace(" ", "").replace(".", "").replace("-", "")
+                if tel.startswith("0"): tel = "33" + tel[1:]
+                
+                if tel: tels_groupe.append(tel)
+                noms_groupe.append(nom_c)
+                
+                st.markdown(f"""
+                <div style="padding:5px 10px; border-left:4px solid {"#3498db" if soc=="CMN" else "#2ecc71"}; background:white; margin-bottom:2px; border:1px solid #eee; font-size:0.9rem;">
+                    {nom_c} ({soc}) | 📞 {r.get('Téléphone','')}
+                </div>
+                """, unsafe_allow_html=True)
+
+            # Le bouton n'apparaît QUE SI tu as coché la case "Option Groupe" en haut
+            if opt_groupe and len(gp) > 1 and tels_groupe:
+                noms_txt = ", ".join(noms_groupe)
+                msg = urllib.parse.quote(f"Bonjour à tous ({noms_txt}), je prépare notre navigation du {date_nav}. Bienvenue à bord !")
+                wa_url = f"https://wa.me/{tels_groupe[0]}?text={msg}"
+                
+                st.markdown(f"""
+                    <a href="{wa_url}" target="_blank" style="background-color:#25d366; color:white; padding:8px 12px; display:inline-block; text-decoration:none; border-radius:15px; font-size:0.8rem; font-weight:bold; margin: 5px 0 15px 0;">
+                        💬 PROPOSER GROUPE WHATSAPP ({len(gp)} pers.)
+                    </a>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)    
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS & BILAN</div>', unsafe_allow_html=True)
@@ -605,6 +650,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
