@@ -330,7 +330,7 @@ elif st.session_state.page == "LOGBOOK":
                 if c1.button("✏️", key=f"edit_log_btn_{i}"):
                     st.session_state.edit_log_idx = i
                     st.rerun()
-                if c2.button("🗑️ Supprimer le doublon", key=f"del_log_{i}"):
+                if c2.button("🗑️ Supprimer ", key=f"del_log_{i}"):
                     df_log = df_log.drop(i)
                     sauvegarder_data(df_log, "logbook.json")
                     st.rerun()
@@ -366,6 +366,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
