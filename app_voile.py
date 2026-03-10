@@ -323,45 +323,36 @@ elif st.session_state.page == "STATS":
 elif st.session_state.page == "FACTURES":
         st.markdown('<div class="page-title">🧾 GÉNÉRATION DE FACTURE</div>', unsafe_allow_html=True)
         
-        # --- TEST DE SÉCURITÉ ---
         if df.empty:
-            st.warning("⚠️ Aucune donnée n'est chargée. Retournez dans 'LISTE' pour rafraîchir.")
+            st.warning("⚠️ Aucune donnée de navigation à facturer.")
         else:
-            # 1. Sélection de la société
-            # On s'assure que 'Société' existe, sinon on met 'Inconnu'
-            if 'Société' not in df.columns:
-                df['Société'] = "Inconnu"
-            
-            soc_list = sorted(df['Société'].unique().astype(str).tolist())
-            soc_sel = st.selectbox("Sélectionner un Client / Société", ["Toutes"] + soc_list)
+            # 1. Sélection du Client
+            col_list = df['Société'].unique().astype(str).tolist()
+            soc_sel = st.selectbox("Client à facturer", ["Tous"] + sorted(col_list))
             
             df_f = df.copy()
-            if soc_sel != "Toutes":
+            if soc_sel != "Tous":
                 df_f = df_f[df_f['Société'] == soc_sel]
 
-            # 2. Affichage des résultats
             if df_f.empty:
-                st.info(f"Aucune navigation trouvée pour {soc_sel}")
+                st.info(f"Aucune ligne pour {soc_sel}")
             else:
+                # 2. Tableau de prévisualisation
                 st.dataframe(df_f[['DateNav', 'Nom', 'PrixJour', 'Statut']], use_container_width=True)
                 
-                # Calcul total
+                # 3. Calcul et Construction du texte
                 total_f = sum(df_f['PrixJour'].apply(to_f))
-                st.metric(f"Total {soc_sel}", f"{int(total_f)} €")
-
-                # 3. Préparation du texte (Construction propre)
+                
                 corps = f"Bonjour,\n\nVoici le récapitulatif pour {soc_sel} :\n\n"
-                
                 for _, r in df_f.iterrows():
-                    # Sécurité sur chaque ligne
-                    p_l = to_f(r.get('PrixJour', 0))
-                    d_l = r.get('DateNav', '--')
-                    n_l = r.get('Nom', '')
-                    corps += f"- Le {d_l} ({n_l}) : {int(p_l)} €\n"
+                    p_l = int(to_f(r.get('PrixJour', 0)))
+                    corps += f"- Le {r.get('DateNav','--')} ({r.get('Nom','')}) : {p_l} €\n"
                 
-                corps += f"\nTotal Général : {int(total_f)} €\n\nMerci."
+                corps += f"\nTotal Général : {int(total_f)} €\n\nMerci de votre confiance.\nVesta Skipper 2026"
 
-                st.text_area("📋 Message à copier :", corps, height=200)  
+                # 4. Affichage
+                st.metric(f"Total {soc_sel}", f"{int(total_f)} €")
+                st.text_area("📋 Message à copier :", corps, height=200)
 
 
 elif st.session_state.page == "NOTES":
@@ -517,6 +508,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
