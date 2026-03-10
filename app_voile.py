@@ -231,7 +231,9 @@ elif st.session_state.page == "PLANNING":
 
 elif st.session_state.page == "STATS":
     st.markdown('<div class="page-title">📊 BILAN DES ENCAISSEMENTS</div>', unsafe_allow_html=True)
-    
+    st.write("Nombre de lignes chargées :", len(df))
+if not df.empty:
+    st.write("Colonnes disponibles :", df.columns.tolist())
     # On recharge les données pour être à jour
     if df.empty:
         st.warning("⚠️ Aucune donnée de navigation trouvée.")
@@ -490,6 +492,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
