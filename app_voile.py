@@ -319,44 +319,48 @@ elif st.session_state.page == "STATS":
             st.error(f"🔧 **Total Frais :** {t_frais} | ⚓ **Bénéfice Net :** {t_enc - t_frais}")
         else:
             st.info(f"Aucune activité enregistrée pour {an_sel}")
-        
 elif st.session_state.page == "FACTURES":
         st.markdown('<div class="page-title">🧾 GÉNÉRATION DE FACTURE</div>', unsafe_allow_html=True)
         
-        # Filtre par société pour la facture
-        soc_list = sorted(df['Société'].unique().tolist()) if not df.empty else []
-        soc_sel = st.selectbox("Choisir la société", ["Toutes"] + soc_list)
-        
-        df_fact = df.copy()
-        if soc_sel != "Toutes":
-            df_fact = df_fact[df_fact['Société'] == soc_sel]
-
-        if df_fact.empty:
-            st.info("Sélectionnez une société pour éditer la facture.")
+        # 1. Préparation des données
+        if df.empty:
+            st.warning("⚠️ Aucune donnée disponible pour la facturation.")
         else:
-            # Affichage du tableau de prévisualisation
-            st.dataframe(df_fact[['DateNav', 'Nom', 'PrixJour', 'Statut']])
+            # Filtre par société
+            soc_list = sorted(df['Société'].unique().astype(str).tolist())
+            soc_sel = st.selectbox("Sélectionner un Client / Société", ["Toutes"] + soc_list)
             
-            # Calcul du total sécurisé
-            total_facture = sum(df_fact['PrixJour'].apply(to_f))
-            st.metric("Total à facturer", fmt_p(total_facture))
+            df_fact = df.copy()
+            if soc_sel != "Toutes":
+                df_fact = df_fact[df_fact['Société'] == soc_sel]
 
-            # --- PRÉPARATION DU CORPS DU MAIL (BLOC CORRIGÉ) ---
-            corps = f"Bonjour,\n\nVoici le récapitulatif de vos sorties pour {soc_sel} :\n\n"
+            if df_fact.empty:
+                st.info(f"Aucune ligne trouvée pour {soc_sel}")
+            else:
+                # Affichage du tableau
+                st.dataframe(df_fact[['DateNav', 'Nom', 'PrixJour', 'Statut']], use_container_width=True)
+                
+                # Calcul du total avec sécurité to_f
+                total_facture = sum(df_fact['PrixJour'].apply(to_f))
+                st.metric(f"Total pour {soc_sel}", f"{int(total_facture)} €")
 
-            for i, r in df_fact.iterrows():
-                # On utilise to_f pour nettoyer le prix de chaque ligne
-                p_l = to_f(r.get('PrixJour', 0))
-                corps += f"- Le {r.get('DateNav','--')} ({r.get('Nom','')}) : {fmt_p(p_l)}\n"
+                # 2. Construction du texte (Le bloc qui posait problème)
+                corps = f"Bonjour,\n\nVoici le récapitulatif des prestations pour {soc_sel} :\n\n"
+                
+                for _, r in df_fact.iterrows():
+                    p_ligne = to_f(r.get('PrixJour', 0))
+                    date_l = r.get('DateNav', '--')
+                    nom_l = r.get('Nom', '')
+                    corps += f"- Le {date_l} ({nom_l}) : {int(p_ligne)} €\n"
+                
+                corps += f"\nTotal Général : {int(total_facture)} €\n\nMerci de votre confiance.\nCordialement,\nVesta Skipper 2026"
 
-            corps += f"\nTotal général : {fmt_p(total_facture)}\n\nMerci de votre confiance.\nCordialement,\nL'équipe Vesta Skipper"
-            
-            # Zone de texte pour copier le message
-            st.text_area("Message à copier :", corps, height=250)
-            
-            # Bouton de validation/envoi (si configuré)
-            if st.button("Valider la facturation"):
-                st.success("Facture prête à être envoyée !")
+                # 3. Affichage final
+                st.text_area("📋 Message prêt à copier :", corps, height=200)
+                
+                if st.button("Confirmer la facturation"):
+                    st.success("Facture validée dans le système.")       
+
 
 elif st.session_state.page == "NOTES":
     st.markdown('<div class="page-title">📝 MES NOTES & MÉMOS</div>', unsafe_allow_html=True)
@@ -511,6 +515,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
