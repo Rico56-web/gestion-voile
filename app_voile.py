@@ -357,55 +357,68 @@ elif st.session_state.page == "LOGBOOK":
             st.info("Aucun logbook enregistré.")
             
 elif st.session_state.page == "FACTURE":
-    st.markdown('<div class="page-title">📄 FACTURATION CMN</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">📄 FACTURATION & ARCHIVES</div>', unsafe_allow_html=True)
     
     c1, c2 = st.columns(2)
     f_y = c1.selectbox("Année", [2025, 2026, 2027], index=1)
     f_m = c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
     
-    df_c = pd.DataFrame()
     if not df.empty:
-        # 1. Préparation des dates
         df['dt'] = df['DateNav'].apply(parse_d)
+        # Filtre de base : CMN + Mois/Année
+        mask_base = (df['dt'].dt.year == f_y) & (df['dt'].dt.month == f_m) & (df['Société'].str.upper() == "CMN")
+        df_mois = df[mask_base].copy()
         
-        # 2. Filtre : Uniquement CMN + Mois/Année + Statut OK (Vert)
-        mask = (
-            (df['dt'].dt.year == f_y) & 
-            (df['dt'].dt.month == f_m) & 
-            (df['Société'].str.upper() == "CMN") & 
-            (df['Statut'].str.contains("OK|🟢", na=False))
-        )
-        df_c = df[mask].copy()
+        # --- 1. LES SORTIES À FACTURER (Statut OK / 🟢) ---
+        df_a_envoyer = df_mois[df_mois['Statut'].str.contains("OK|🟢", na=False)]
         
-        # 3. ANTI-DOUBLONS : On supprime les lignes identiques (même date, même nom)
-        df_c = df_c.drop_duplicates(subset=['DateNav', 'Nom', 'Prénom'])
+        # --- 2. LES ARCHIVES (Attente, Facturé, Payé) ---
+        df_attente = df_mois[df_mois['Statut'].str.contains("Attente|🟡|Facturé", na=False)]
+        df_paye = df_mois[df_mois['Statut'].str.contains("Payé|✅", na=False)]
 
-    if not df_c.empty:
-        # Calcul du total
-        total = sum(df_c['PrixJour'].apply(to_f))
+        # --- AFFICHAGE SECTION ENVOI ---
+        st.subheader("💰 À FACTURER CE MOIS")
+        if not df_a_envoyer.empty:
+            total = sum(df_a_envoyer['PrixJour'].apply(to_f))
+            st.success(f"Montant à réclamer : {fmt_p(total)}")
+            
+            # (Le bloc de préparation d'email reste le même que tout à l'heure...)
+            corps = f"Bonjour Jean-Michel,\n\nSorties CMN {calendar.month_name[f_m]} {f_y} :\n"
+            for _, r in df_a_envoyer.iterrows():
+                corps += f"- Le {r['DateNav']} ({r.get('Nom','')}) : {fmt_p(r['PrixJour'])}\n"
+            corps += f"\nTOTAL : {fmt_p(total)}"
+            
+            txt = st.text_area("Message", corps, height=150)
+            # Boutons Mailto (Smartphone / PC)...
+            dest, cc = "tresorier@cmn-asso.fr", "eric.clavreul@gmail.com"
+            params = urllib.parse.urlencode({'cc': cc, 'subject': f"Facture {calendar.month_name[f_m]}", 'body': txt})
+            st.markdown(f'<a href="mailto:{dest}?{params}" class="btn-contact" style="background:#1a2a6c; display:block; text-align:center; padding:10px; color:white; text-decoration:none; border-radius:5px;">📱 ENVOYER LA FACTURE</a>', unsafe_allow_html=True)
+        else:
+            st.info("Aucune nouvelle sortie '🟢 OK' à facturer.")
+
+        # --- AFFICHAGE SECTION ARCHIVES ---
+        st.markdown("---")
+        st.subheader("📂 ÉTAT DES PAIEMENTS")
         
-        # Construction du message
-        corps = f"Bonjour Jean-Michel,\n\nCi-après le détail de la facturation des sorties CMN de ce mois ({calendar.month_name[f_m]} {f_y}) :\n\n"
-        for _, r in df_c.sort_values('dt').iterrows():
-            corps += f"- Le {r['DateNav']} ({r.get('Prénom','')} {r.get('Nom','').upper()}) : {fmt_p(r['PrixJour'])}\n"
+        col_att, col_ok = st.columns(2)
         
-        corps += f"\nTOTAL À RÉGLER : {fmt_p(total)}\n\nBonne continuation.\n\nEric CLAVREUL"
-        
-        # Affichage
-        st.info(f"💰 Total détecté : {fmt_p(total)} ({len(df_c)} sorties)")
-        txt = st.text_area("Aperçu du message à envoyer", corps, height=250)
-        
-        dest, cc, sujet = "tresorier@cmn-asso.fr", "eric.clavreul@gmail.com", f"Facturation Skipper - {calendar.month_name[f_m]} {f_y}"
-        
-        # Boutons d'envoi
-        params = urllib.parse.urlencode({'cc': cc, 'subject': sujet, 'body': txt})
-        st.markdown(f'<a href="mailto:{dest}?{params}" style="background-color:#1a2a6c;color:white;padding:15px;display:block;text-align:center;text-decoration:none;border-radius:10px;font-weight:bold;margin-bottom:10px;">📱 ENVOYER VIA SMARTPHONE</a>', unsafe_allow_html=True)
-        
-        gmail_url = f"https://mail.google.com/mail/?view=cm&fs=1&to={dest}&cc={cc}&sujet={urllib.parse.quote(sujet)}&body={urllib.parse.quote(txt)}"
-        st.markdown(f'<a href="{gmail_url}" target="_blank" style="background-color:#db4437;color:white;padding:15px;display:block;text-align:center;text-decoration:none;border-radius:10px;font-weight:bold;">💻 ENVOYER VIA GMAIL (PC)</a>', unsafe_allow_html=True)
+        with col_att:
+            st.markdown("<b style='color:#f39c12;'>⏳ EN ATTENTE / ENVOYÉ</b>", unsafe_allow_html=True)
+            if not df_attente.empty:
+                for _, r in df_attente.iterrows():
+                    st.write(f"• {r['DateNav']} : {r.get('Nom','')} ({fmt_p(r['PrixJour'])})")
+            else: st.caption("Rien en attente")
+
+        with col_ok:
+            st.markdown("<b style='color:#27ae60;'>✅ PAYÉ / ARCHIVÉ</b>", unsafe_allow_html=True)
+            if not df_paye.empty:
+                for _, r in df_paye.iterrows():
+                    st.write(f"• {r['DateNav']} : {r.get('Nom','')} ({fmt_p(r['PrixJour'])})")
+            else: st.caption("Aucun paiement reçu")
+
     else:
-        st.warning(f"Aucune prestation CMN validée (statut 🟢 OK) trouvée pour {calendar.month_name[f_m]} {f_y}.")
-        st.write("Vérifiez que vos fiches dans LISTE sont bien sur 'Société: CMN' et 'Statut: 🟢 OK'.")
+        st.write("Aucune donnée disponible.")
+        
 elif st.session_state.page == "SECU":
     st.markdown('<div class="page-title">🛡️ SÉCURITÉ & ARMEMENT</div>', unsafe_allow_html=True)
     
@@ -492,6 +505,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
