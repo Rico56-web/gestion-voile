@@ -241,8 +241,7 @@ elif st.session_state.page == "PLANNING":
     else:
         st.info("Aucune navigation ce mois-ci.")
 
-
- elif st.session_state.page == "STATS":
+elif st.session_state.page == "STATS":
     st.markdown('<div class="page-title">📊 BILAN DES ENCAISSEMENTS</div>', unsafe_allow_html=True)
     
     if df.empty:
@@ -510,6 +509,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
