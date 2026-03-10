@@ -248,22 +248,63 @@ elif st.session_state.page in ["SECU", "FRAIS", "NOTES"]:
                     cur_df = cur_df.drop(i); sauvegarder_data(cur_df, cur_file); st.rerun()
 
 elif st.session_state.page == "FORM":
+    st.markdown('<div class="page-title">📝 FICHE NAVIGATION</div>', unsafe_allow_html=True)
     idx = st.session_state.edit_idx
+    
+    # Récupération sécurisée des données existantes
     init = df.loc[idx].to_dict() if (idx != "NEW" and not df.empty) else {}
-    with st.form("f_form"):
-        st.subheader("📝 FICHE NAVIGATION")
-        st_v = st.selectbox("Statut", ["🟢 OK", "🟡 Attente", "🔴 Annulé"], index=0)
-        c1, c2 = st.columns(2); p = c1.text_input("Prénom", init.get("Prénom","")); n = c2.text_input("Nom", init.get("Nom",""))
-        c3, c4 = st.columns(2); d = c3.text_input("Date (DD/MM/YYYY)", init.get("DateNav","")); j = c4.text_input("Nb Jours", init.get("NbJours","1"))
-        s = st.text_input("Société", init.get("Société",""))
-        c5, c6 = st.columns(2); tel = c5.text_input("Tél", init.get("Tel","")); mail = c6.text_input("Mail", init.get("Mail",""))
-        pr = st.text_input("Prix Total (€)", init.get("PrixJour","0"))
-        if st.form_submit_button("💾 ENREGISTRER"):
-            row = {"Prénom":p, "Nom":n, "Société":s, "DateNav":d, "NbJours":j, "PrixJour":pr, "Statut":st_v, "Tel":tel, "Mail":mail}
-            if idx=="NEW": df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-            else: 
-                for k,v in row.items(): df.at[idx,k]=v
-            sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
+    
+    with st.form("f_saisie_client"):
+        st.subheader("👤 Informations Client")
+        st_v = st.selectbox("Statut", ["🟢 OK", "🟡 Attente", "🔴 Annulé"], 
+                            index=["🟢 OK", "🟡 Attente", "🔴 Annulé"].index(init.get("Statut", "🟡 Attente")))
+        
+        c1, c2 = st.columns(2)
+        p = c1.text_input("Prénom", init.get("Prénom", ""))
+        n = c2.text_input("Nom", init.get("Nom", ""))
+        
+        s = st.text_input("Société / Organisme", init.get("Société", ""))
+        
+        st.markdown("---")
+        st.subheader("📞 Coordonnées (Indispensable)")
+        c3, c4 = st.columns(2)
+        # On cherche 'Tel' ou 'Tél' pour ne pas perdre tes anciennes saisies
+        tel = c3.text_input("Téléphone", init.get("Tel", init.get("Tél", "")))
+        mail = c4.text_input("Email", init.get("Mail", init.get("Email", "")))
+        
+        st.markdown("---")
+        st.subheader("⛵ Détails de la sortie")
+        c5, c6 = st.columns(2)
+        d = c5.text_input("Date (JJ/MM/AAAA)", init.get("DateNav", datetime.now().strftime("%d/%m/%Y")))
+        j = c6.text_input("Nombre de jours", str(init.get("NbJours", "1")))
+        
+        pr = st.text_input("Prix Total (€)", str(init.get("PrixJour", "0")))
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        btn_save = st.form_submit_button("💾 ENREGISTRER LA FICHE", use_container_width=True)
+        
+        if btn_save:
+            # On crée un dictionnaire propre avec les clés EXACTES attendues par la LISTE
+            row = {
+                "Prénom": p, "Nom": n, "Société": s, 
+                "DateNav": d, "NbJours": j, "PrixJour": pr, 
+                "Statut": st_v, "Tel": tel, "Mail": mail
+            }
+            
+            if idx == "NEW":
+                df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+            else:
+                for k, v in row.items():
+                    df.at[idx, k] = v
+            
+            sauvegarder_data(df, "contacts.json")
+            st.success("Fiche enregistrée ! Retour à la liste...")
+            st.session_state.page = "LISTE"
+            st.rerun()
+
+    if st.button("⬅️ Annuler et retour", use_container_width=True):
+        st.session_state.page = "LISTE"
+        st.rerun()
 
 
 
