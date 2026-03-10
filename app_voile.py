@@ -138,13 +138,18 @@ if st.session_state.page == "LISTE":
                     if st.button("Confirmer suppression", key=f"conf_l_{i}"): df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
 
 elif st.session_state.page == "PLANNING":
-    st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">🗓️ PLANNING & DÉTAILS</div>', unsafe_allow_html=True)
+    
     y_col, m_col = st.columns(2)
     p_y = y_col.selectbox("An", [2025, 2026, 2027], index=1)
-    p_m = m_col.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
+    p_m = m_col.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
+    
     occu = {}
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
+        # On filtre les données du mois sélectionné pour la liste du dessous
+        df_mois = df[(df['dt'].dt.year == p_y) & (df['dt'].dt.month == p_m)].sort_values('dt')
+        
         for _, r in df.iterrows():
             if "🔴" not in str(r.get('Statut','')):
                 d_s, nb_j = r['dt'], int(to_f(r.get('NbJours', 1)))
@@ -153,6 +158,8 @@ elif st.session_state.page == "PLANNING":
                     if curr.year == p_y and curr.month == p_m:
                         soc = str(r.get('Société','')).upper()
                         occu[curr.day] = ("day-cmn" if soc == "CMN" else "day-ok", f"{r.get('Prénom','')} {r.get('Nom','')[:1]}.")
+
+    # --- AFFICHAGE DU CALENDRIER ---
     cal = calendar.monthcalendar(p_y, p_m)
     h = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
     for wk in cal:
@@ -162,6 +169,26 @@ elif st.session_state.page == "PLANNING":
             h += f'<td class="{style}">{d if d != 0 else ""}{txt}</td>'
         h += '</tr>'
     st.markdown(h + '</table>', unsafe_allow_html=True)
+
+    # --- LISTE DES NOMS DU MOIS (SOUS LE PLANNING) ---
+    st.markdown("---")
+    st.subheader(f"👥 Détails de {calendar.month_name[p_m]}")
+    
+    if not df.empty and not df_mois.empty:
+        for i, r in df_mois.iterrows():
+            statut = str(r.get('Statut','🟡'))
+            soc = str(r.get('Société','')).upper()
+            tel = str(r.get('Téléphone', r.get('Tel', ''))).strip()
+            
+            # Petite ligne compacte pour le planning
+            st.markdown(f"""
+            <div style="background:white; padding:10px; border-radius:5px; border-left:5px solid {"#3498db" if soc=="CMN" else "#2ecc71"}; margin-bottom:5px; border:1px solid #eee;">
+                <b>{r.get('DateNav')}</b> : {r.get('Prénom','')} {r.get('Nom','').upper()} 
+                ({r.get('NbJours','1')}j) - <i>{soc}</i> | 📞 {tel}
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.write("Aucune navigation prévue ce mois-ci.")
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS & BILAN</div>', unsafe_allow_html=True)
@@ -248,6 +275,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
