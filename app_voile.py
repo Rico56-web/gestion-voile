@@ -234,7 +234,6 @@ elif st.session_state.page == "PLANNING":
             st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
     else:
         st.info("Aucune navigation ce mois-ci.")
-
 elif st.session_state.page == "STATS":
         st.markdown('<div class="page-title">📊 BILAN DES ENCAISSEMENTS</div>', unsafe_allow_html=True)
         
@@ -269,7 +268,8 @@ elif st.session_state.page == "STATS":
             recap_soc = df_paye.groupby('Société')['PrixJour'].apply(lambda x: sum(x.apply(to_f)))
             st.bar_chart(recap_soc)
         else:
-            st.info("Aucune donnée pour les statistiques.")       
+            st.info("Aucune donnée pour les statistiques.")
+    
 elif st.session_state.page == "LOGBOOK":
     st.markdown('<div class="page-title">📖 JOURNAL DE BORD</div>', unsafe_allow_html=True)
     
@@ -582,6 +582,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
