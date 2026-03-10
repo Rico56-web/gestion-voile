@@ -195,30 +195,61 @@ elif st.session_state.page in ["SECU", "FRAIS", "NOTES"]:
             if c1.button("✏️ Modifier", key=f"ed_{st.session_state.page}_{i}"): st.session_state.update({f"edit_{st.session_state.page[0].lower()}_idx":i}); st.rerun()
             if c2.button("🗑️", key=f"del_{st.session_state.page}_{i}"): c_df = c_df.drop(i); sauvegarder_data(c_df, c_file); st.rerun()
 
-elif st.session_state.page == "FORM":
-    idx = st.session_state.edit_idx
-    init = df.loc[idx].to_dict() if (idx != "NEW" and not df.empty) else {}
-   if st.form_submit_button("SAUVEGARDER"):
-    row = {
-        "Prénom": p, 
-        "Nom": n, 
-        "Société": s, 
-        "Téléphone": t, 
-        "Mail": ml,  # <--- CETTE LIGNE DOIT ÊTRE PRÉSENTE
-        "DateNav": d, 
-        "NbJours": j, 
-        "PrixJour": pr, 
-        "Statut": st_v
-    }
-    if idx == "NEW":
-        df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-    else:
-        for k, v in row.items():
-            df.at[idx, k] = v
-    sauvegarder_data(df, "contacts.json")
-    st.session_state.page = "LISTE"
-    st.rerun()
+rerun()
 
+elif st.session_state.page == "FORM":
+    st.markdown('<div class="page-title">📝 FICHE NAVIGATION</div>', unsafe_allow_html=True)
+    idx = st.session_state.edit_idx
+    
+    # Récupération des données existantes
+    init = df.loc[idx].to_dict() if (idx != "NEW" and not df.empty) else {}
+    
+    with st.form("f_form"):
+        st_v = st.selectbox("Statut", ["🟢 OK", "🟡 Attente", "🔴 Annulé"], index=1)
+        c1, c2 = st.columns(2)
+        p = c1.text_input("Prénom", init.get("Prénom",""))
+        n = c2.text_input("Nom", init.get("Nom",""))
+        s = st.text_input("Société", init.get("Société",""))
+        
+        c3, c4 = st.columns(2)
+        d = c3.text_input("Date (JJ/MM/AAAA)", init.get("DateNav",""))
+        j = c4.text_input("Jours", str(init.get("NbJours","1")))
+        
+        # On utilise 'Téléphone' pour être raccord avec la LISTE
+        t = st.text_input("Tél", init.get("Téléphone", init.get("Tel", "")))
+        ml = st.text_input("Mail", init.get("Mail", ""))
+        pr = st.text_input("Prix", str(init.get("PrixJour","0")))
+        
+        # LE BOUTON DOIT ÊTRE ALIGNÉ ICI (DANS LE WITH)
+        submit = st.form_submit_button("SAUVEGARDER", use_container_width=True)
+        
+        if submit:
+            row = {
+                "Prénom": p, 
+                "Nom": n, 
+                "Société": s, 
+                "Téléphone": t, 
+                "Mail": ml, 
+                "DateNav": d, 
+                "NbJours": j, 
+                "PrixJour": pr, 
+                "Statut": st_v
+            }
+            
+            if idx == "NEW":
+                df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+            else:
+                for k, v in row.items():
+                    df.at[idx, k] = v
+            
+            sauvegarder_data(df, "contacts.json")
+            st.session_state.page = "LISTE"
+            st.rerun()
+
+    # Le bouton Annuler est HORS du formulaire
+    if st.button("Annuler"):
+        st.session_state.page = "LISTE"
+        st.rerun()
 
 
 
