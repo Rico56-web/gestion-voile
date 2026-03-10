@@ -94,11 +94,14 @@ if st.session_state.page == "LISTE":
     # --- BARRE DE RECHERCHE ---
     search_query = st.text_input("🔍 Rechercher un prénom ou un nom...", "").lower()
     
+    # --- BOUTONS INVERSÉS ---
     c1, c2 = st.columns(2)
-    if c1.button("🚀 FUTURES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): 
-        st.session_state.view_mode="FUTURES"; st.rerun()
-    if c2.button("📂 PASSÉES", use_container_width=True, type="primary" if st.session_state.view_mode=="PASSÉES" else "secondary"): 
+    # Passées à gauche
+    if c1.button("📂 PASSÉES", use_container_width=True, type="primary" if st.session_state.view_mode=="PASSÉES" else "secondary"): 
         st.session_state.view_mode="PASSÉES"; st.rerun()
+    # Archives (Futures) à droite
+    if c2.button("🚀 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): 
+        st.session_state.view_mode="FUTURES"; st.rerun()
     
     st.button("➕ NOUVELLE FICHE", on_click=lambda: st.session_state.update({"edit_idx":"NEW", "page":"FORM"}), use_container_width=True)
     
@@ -106,10 +109,10 @@ if st.session_state.page == "LISTE":
         df['dt'] = df['DateNav'].apply(parse_d)
         today = datetime.now().replace(hour=0, minute=0, second=0)
         
-        # Filtre Temporel (Futur/Passé)
-        data = df[df['dt'] >= today] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < today]
+        # Logique de filtrage temporel
+        data = df[df['dt'] < today] if st.session_state.view_mode=="PASSÉES" else df[df['dt'] >= today]
         
-        # --- LOGIQUE DE FILTRE DE RECHERCHE ---
+        # Filtre de recherche
         if search_query:
             data = data[
                 data['Prénom'].str.lower().str.contains(search_query, na=False) | 
@@ -117,9 +120,11 @@ if st.session_state.page == "LISTE":
             ]
         
         if data.empty:
-            st.info("Aucun résultat pour cette recherche.")
+            st.info("Aucune navigation trouvée.")
         else:
-            for i, r in data.sort_values('dt').iterrows():
+            # Tri : Chronologique pour les archives, Inverse pour le passé
+            sort_order = True if st.session_state.view_mode=="FUTURES" else False
+            for i, r in data.sort_values('dt', ascending=sort_order).iterrows():
                 soc = str(r.get('Société','')).upper()
                 statut = str(r.get('Statut','🟡 Attente'))
                 badge_color = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
@@ -133,7 +138,7 @@ if st.session_state.page == "LISTE":
                 ce, cd = st.columns([1, 2])
                 if ce.button("✏️", key=f"ed_l_{i}"): st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
                 if cd.checkbox("🗑️", key=f"del_l_{i}"):
-                    if st.button("Confirmer suppression", key=f"conf_l_{i}"): 
+                    if st.button("Confirmer", key=f"conf_l_{i}"): 
                         df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
 
   
@@ -361,6 +366,7 @@ elif st.session_state.page == "FORM":
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
     st.button("Annuler", on_click=lambda: st.session_state.update({"page":"LISTE"}))
+
 
 
 
