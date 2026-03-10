@@ -355,6 +355,7 @@ elif st.session_state.page == "LOGBOOK":
                     st.rerun()
         else:
             st.info("Aucun logbook enregistré.")
+            
 elif st.session_state.page == "FACTURE":
     st.markdown('<div class="page-title">📄 FACTURATION CMN</div>', unsafe_allow_html=True)
     
@@ -405,6 +406,63 @@ elif st.session_state.page == "FACTURE":
     else:
         st.warning(f"Aucune prestation CMN validée (statut 🟢 OK) trouvée pour {calendar.month_name[f_m]} {f_y}.")
         st.write("Vérifiez que vos fiches dans LISTE sont bien sur 'Société: CMN' et 'Statut: 🟢 OK'.")
+elif st.session_state.page == "SECU":
+    st.markdown('<div class="page-title">🛡️ SÉCURITÉ & ARMEMENT</div>', unsafe_allow_html=True)
+    
+    # 1. Chargement des données spécifiques à la sécurité
+    df_s = charger_data("secu.json")
+    
+    # Gestion de l'index d'édition
+    if "edit_s_idx" not in st.session_state: st.session_state.edit_s_idx = None
+
+    # --- FORMULAIRE D'AJOUT / MODIF ---
+    if st.session_state.edit_s_idx is not None:
+        idx = st.session_state.edit_s_idx
+        init = df_s.loc[idx].to_dict() if (idx != "NEW" and not df_s.empty) else {}
+        
+        with st.form("f_secu_edit"):
+            st.subheader("🚩 " + ("MODIFIER LE POINT" if idx != "NEW" else "NOUVEAU POINT DE CONTRÔLE"))
+            item = st.text_input("Matériel ou Point de contrôle", init.get("Item", ""))
+            obs_s = st.text_area("État / Emplacement / Date limite", init.get("Note", ""))
+            
+            c1, c2 = st.columns(2)
+            if c1.form_submit_button("✅ ENREGISTRER"):
+                row = {"Item": item, "Note": obs_s}
+                if idx == "NEW":
+                    df_s = pd.concat([df_s, pd.DataFrame([row])], ignore_index=True)
+                else:
+                    for k, v in row.items(): df_s.at[idx, k] = v
+                sauvegarder_data(df_s, "secu.json")
+                st.session_state.edit_s_idx = None
+                st.rerun()
+            
+            if c2.form_submit_button("❌ ANNULER"):
+                st.session_state.edit_s_idx = None
+                st.rerun()
+    else:
+        # --- AFFICHAGE DE LA LISTE DE SÉCURITÉ ---
+        st.button("➕ AJOUTER UN ÉLÉMENT", on_click=lambda: st.session_state.update({"edit_s_idx":"NEW"}), use_container_width=True)
+        
+        if not df_s.empty:
+            for i, r in df_s.iterrows():
+                st.markdown(f"""
+                <div class="client-card" style="border-left: 5px solid #27ae60; background: white;">
+                    <b style="font-size:1.1rem; color:#2c3e50;">⚓ {r.get('Item')}</b><br>
+                    <span style="color:#7f8c8d; font-size:0.9rem;">{r.get('Note', '')}</span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                c1, c2 = st.columns([1, 4])
+                if c1.button("✏️", key=f"ed_s_{i}"): 
+                    st.session_state.edit_s_idx = i
+                    st.rerun()
+                if c2.button("🗑️ Supprimer", key=f"del_s_{i}"): 
+                    df_s = df_s.drop(i)
+                    sauvegarder_data(df_s, "secu.json")
+                    st.rerun()
+        else:
+            st.info("Aucun élément de sécurité enregistré. Commencez par en ajouter un (ex: Gilets, Fusées, Radeau...).")
+
 elif st.session_state.page == "FORM":
     st.markdown('<div class="page-title">📝 FICHE NAVIGATION</div>', unsafe_allow_html=True)
     idx = st.session_state.edit_idx
@@ -434,6 +492,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
