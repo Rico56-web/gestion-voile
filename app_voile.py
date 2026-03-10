@@ -81,15 +81,8 @@ def sauvegarder_data(df, file):
     requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": f"Update {file}", "content": content, "sha": sha})
     st.cache_data.clear()
 
-def to_f(v): 
-    try: return float(str(v).replace("€","").replace(",",".").replace(" ",""))
-    except: return 0.0
-
 def fmt_p(v): return f"{to_f(v):,.2f} €".replace(",", " ").replace(".", ",")
 
-def parse_d(d):
-    try: return datetime.strptime(str(d).strip().replace("-","/"), '%d/%m/%Y')
-    except: return datetime(2000, 1, 1)
 
 # Chargement
 df = charger_data("contacts.json")
@@ -281,94 +274,42 @@ elif st.session_state.page == "STATS":
                 st.info("💡 Aucune ligne n'est marquée comme 'Payé' ou 'OK' dans ton planning.")
                 st.write("Vérifie bien l'orthographe dans ta liste de contacts.")
     
-elif st.session_state.page == "LOGBOOK":
-    st.markdown('<div class="page-title">📖 JOURNAL DE BORD</div>', unsafe_allow_html=True)
+
+ elif st.session_state.page == "STATS":
+    st.markdown('<div class="page-title">📊 BILAN DES ENCAISSEMENTS</div>', unsafe_allow_html=True)
     
-    df_log = charger_data("logbook.json")
-    
-    # Gestion de l'index d'édition pour le Logbook
-    if "edit_log_idx" not in st.session_state: st.session_state.edit_log_idx = None
-
-    # --- FORMULAIRE D'ÉDITION (Affiché si on clique sur Modifier ou Nouvelle Étape) ---
-    if st.session_state.edit_log_idx is not None:
-        idx = st.session_state.edit_log_idx
-        # Pré-remplissage si modification
-        init = df_log.loc[idx].to_dict() if (idx != "NEW" and not df_log.empty) else {}
-        
-        with st.form("f_log_edit"):
-            st.subheader("📝 " + ("MODIFIER L'ÉTAPE" if idx != "NEW" else "NOUVELLE ÉTAPE"))
-            c1, c2 = st.columns(2)
-            d_lieu = c1.text_input("Port (Départ)", init.get("Depart", ""))
-            d_met = c2.selectbox("Météo", ["☀️ Beau", "☁️ Couvert", "🌧️ Pluie", "🌬️ Vent fort"], 
-                                 index=["☀️ Beau", "☁️ Couvert", "🌧️ Pluie", "🌬️ Vent fort"].index(init.get("Meteo", "☀️ Beau")))
-            
-            c3, c4 = st.columns(2)
-            d_h = c3.number_input("Heures Moteur (Départ)", value=float(init.get("H_Dep", 0.0)), step=0.1)
-            d_mi = c4.number_input("Loch / Milles (Départ)", value=float(init.get("M_Dep", 0.0)), step=0.1)
-            
-            obs = st.text_area("Observations", init.get("Observations", ""), height=80)
-            
-            st.markdown("---")
-            c5, c6 = st.columns(2)
-            a_lieu = c5.text_input("Port (Arrivée)", init.get("Arrivee", ""))
-            a_h = st.number_input("Heures Moteur (Arrivée)", value=float(init.get("H_Arr", 0.0)), step=0.1)
-            a_mi = st.number_input("Loch / Milles (Arrivée)", value=float(init.get("M_Arr", 0.0)), step=0.1)
-
-            col_b1, col_b2 = st.columns(2)
-            if col_b1.form_submit_button("✅ ENREGISTRER"):
-                bilan_milles = round(a_mi - d_mi, 1)
-                bilan_heures = round(a_h - d_h, 1)
-                nueva_row = {
-                    "Date": init.get("Date", datetime.now().strftime("%d/%m/%Y")),
-                    "Depart": d_lieu, "Arrivee": a_lieu,
-                    "H_Dep": d_h, "H_Arr": a_h, "H_Bilan": bilan_heures,
-                    "M_Dep": d_mi, "M_Arr": a_mi, "M_Bilan": bilan_milles,
-                    "Meteo": d_met, "Observations": obs
-                }
-                
-                if idx == "NEW":
-                    df_log = pd.concat([df_log, pd.DataFrame([nueva_row])], ignore_index=True)
-                else:
-                    for k, v in nueva_row.items(): df_log.at[idx, k] = v
-                
-                sauvegarder_data(df_log, "logbook.json")
-                st.session_state.edit_log_idx = None
-                st.rerun()
-            
-            if col_b2.form_submit_button("❌ ANNULER"):
-                st.session_state.edit_log_idx = None
-                st.rerun()
-
+    # On s'assure que le fichier contacts est bien chargé pour les calculs
+    if df.empty:
+        st.warning("⚠️ Aucune donnée de navigation (contacts.json) trouvée.")
     else:
-        # --- AFFICHAGE DE L'HISTORIQUE ---
-        st.button("➕ NOUVELLE ÉTAPE", on_click=lambda: st.session_state.update({"edit_log_idx":"NEW"}), use_container_width=True)
+        # Nettoyage pour le filtre
+        df['Statut_Clean'] = df['Statut'].fillna("").astype(str).str.lower().str.strip()
         
-        if not df_log.empty:
-            for i in reversed(df_log.index):
-                r = df_log.loc[i]
-                b_m = r.get('M_Bilan', 0)
-                b_h = r.get('H_Bilan', 0)
-                
-                st.markdown(f"""
-                <div class="client-card" style="border-left: 8px solid #1a2a6c; background:#f8f9fa; margin-bottom:5px;">
-                    <b>📅 {r.get('Date')}</b> | {r.get('Depart')} ➡️ {r.get('Arrivee')} <br>
-                    <div style="background:#eef2f3; padding:5px; border-radius:5px; margin:5px 0; font-weight:bold; color:#1a2a6c; font-size:0.9rem;">
-                        🚢 {b_m} mn | ⚙️ {b_h} h moteur | {r.get('Meteo')}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                c1, c2 = st.columns([1, 4])
-                if c1.button("✏️", key=f"edit_log_btn_{i}"):
-                    st.session_state.edit_log_idx = i
-                    st.rerun()
-                if c2.button("🗑️ Supprimer ", key=f"del_log_{i}"):
-                    df_log = df_log.drop(i)
-                    sauvegarder_data(df_log, "logbook.json")
-                    st.rerun()
+        # Filtre : Payé, OK, ou l'émoji ✅
+        mask_paye = df['Statut_Clean'].str.contains("payé|paye|✅|ok|🟢", na=False)
+        df_paye = df[mask_paye].copy()
+
+        # Calculs
+        ca_total = sum(df_paye['PrixJour'].apply(to_f))
+        
+        # Chargement des frais (Maint)
+        df_f = charger_data("frais.json")
+        total_frais = sum(df_f['Montant'].apply(to_f)) if not df_f.empty else 0.0
+
+        # Affichage des indicateurs
+        c1, c2 = st.columns(2)
+        c1.metric("Encaissé (Net)", fmt_p(ca_total))
+        c2.metric("Dépenses (Frais)", fmt_p(total_frais))
+        
+        st.markdown("---")
+        
+        if not df_paye.empty:
+            st.subheader("🏢 Répartition par client")
+            recap_soc = df_paye.groupby('Société')['PrixJour'].apply(lambda x: sum(x.apply(to_f)))
+            st.bar_chart(recap_soc)
+            st.table(recap_soc.apply(fmt_p))
         else:
-            st.info("Aucun logbook enregistré.")
-            
+            st.info("💡 Aucune navigation n'est encore marquée comme 'Payée' ou 'OK'.")           
 elif st.session_state.page == "FACTURE":
     st.markdown('<div class="page-title">📄 FACTURATION & ARCHIVES</div>', unsafe_allow_html=True)
     
@@ -593,6 +534,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
