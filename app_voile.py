@@ -234,41 +234,52 @@ elif st.session_state.page == "PLANNING":
             st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
     else:
         st.info("Aucune navigation ce mois-ci.")
+        
 elif st.session_state.page == "STATS":
         st.markdown('<div class="page-title">📊 BILAN DES ENCAISSEMENTS</div>', unsafe_allow_html=True)
         
-        # On recharge les données au cas où
-        df_f = charger_data("frais.json")
-        
-        if not df.empty:
-            # FILTRAGE : Uniquement ce qui est payé (Statut contient Payé ou ✅)
-            mask_paye = df['Statut'].str.contains("Payé|Paye|✅", na=False, case=False)
-            df_paye = df[mask_paye].copy()
-            
-            # Calculs avec notre fonction de sécurité to_f
-            ca_total = sum(df_paye['PrixJour'].apply(to_f))
-            total_frais = sum(df_f['Montant'].apply(to_f)) if not df_f.empty else 0.0
-            
-            # Affichage des indicateurs
-            c1, c2 = st.columns(2)
-            c1.metric("Encaissé (Net)", fmt_p(ca_total))
-            c2.metric("Dépenses (Frais)", fmt_p(total_frais))
-            
-            st.markdown("---")
-            
-            # Bénéfice Réel
-            benefice = ca_total - total_frais
-            if benefice >= 0:
-                st.success(f"📈 Bénéfice Net : {fmt_p(benefice)}")
-            else:
-                st.error(f"📉 Déficit : {fmt_p(benefice)}")
-                
-            # Détail par Société
-            st.subheader("🏢 Détail par client (Payé)")
-            recap_soc = df_paye.groupby('Société')['PrixJour'].apply(lambda x: sum(x.apply(to_f)))
-            st.bar_chart(recap_soc)
+        # 1. Vérification forcée des données
+        if df.empty:
+            st.warning("⚠️ Le fichier planning (data.json) semble vide.")
         else:
-            st.info("Aucune donnée pour les statistiques.")
+            # Nettoyage automatique du texte pour le filtre
+            # On passe tout en minuscule et on enlève les espaces pour ne rien rater
+            df['Statut_Clean'] = df['Statut'].fillna("").astype(str).str.lower().str.strip()
+            
+            # On cherche tout ce qui ressemble à "payé", "paye", "ok" ou l'émoji
+            mask_paye = df['Statut_Clean'].str.contains("payé|paye|✅|ok", na=False)
+            df_paye = df[mask_paye].copy()
+
+            # --- AFFICHAGE DE DÉBOGAGE (À enlever plus tard) ---
+            nb_total = len(df)
+            nb_paye = len(df_paye)
+            st.write(f"🔍 Analyse : {nb_total} lignes au total dont **{nb_paye} marquées comme payées**.")
+
+            if nb_paye > 0:
+                # Calculs
+                ca_total = sum(df_paye['PrixJour'].apply(to_f))
+                
+                # Chargement des frais
+                df_f = charger_data("frais.json")
+                total_frais = sum(df_f['Montant'].apply(to_f)) if not df_f.empty else 0.0
+                
+                # Affichage des Metrics
+                c1, c2 = st.columns(2)
+                c1.metric("Encaissé (Net)", fmt_p(ca_total))
+                c2.metric("Dépenses (Frais)", fmt_p(total_frais))
+                
+                st.markdown("---")
+                
+                # Graphique par Société
+                st.subheader("🏢 Répartition par client")
+                recap_soc = df_paye.groupby('Société')['PrixJour'].apply(lambda x: sum(x.apply(to_f)))
+                st.bar_chart(recap_soc)
+                
+                # Tableau récapitulatif
+                st.table(recap_soc.apply(fmt_p))
+            else:
+                st.info("💡 Aucune ligne n'est marquée comme 'Payé' ou 'OK' dans ton planning.")
+                st.write("Vérifie bien l'orthographe dans ta liste de contacts.")
     
 elif st.session_state.page == "LOGBOOK":
     st.markdown('<div class="page-title">📖 JOURNAL DE BORD</div>', unsafe_allow_html=True)
@@ -582,6 +593,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
