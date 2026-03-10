@@ -157,7 +157,88 @@ if not df_log.empty:
                     df_log = df_log.drop(i)
                     sauvegarder_data(df_log, "livre_de_bord.json")
                     st.rerun()
+elif st.session_state.page == "LOGBOOK":
+    st.markdown('<div class="page-title">📖 LIVRE DE BORD</div>', unsafe_allow_html=True)
+    
+    # 1. Chargement sécurisé
+    df_log = charger_data("livre_de_bord.json")
+    if df_log.empty:
+        # Création d'une structure vide si le fichier n'existe pas encore
+        df_log = pd.DataFrame(columns=["Date", "LieuD", "HeuresD", "MillesD", "Obs", "LieuA", "HeuresA", "MillesA", "Dist", "DeltaH"])
+    
+    idx_log = st.session_state.edit_log_idx
+    init_log = df_log.loc[idx_log].to_dict() if (idx_log is not None and not df_log.empty) else {}
+    
+    # --- FORMULAIRE ---
+    with st.form("f_livre_bord"):
+        st.subheader("🚩 NOUVELLE ÉTAPE")
+        c1, c2 = st.columns(2)
+        date_l = c1.text_input("Date", init_log.get("Date", datetime.now().strftime("%d/%m/%Y")))
+        d_lieu = c2.text_input("Port Départ", init_log.get("LieuD", ""))
+        
+        st.markdown("**🚀 DÉPART**")
+        c3, c4 = st.columns(2)
+        d_h = c3.number_input("Heures Moteur (Départ)", value=float(init_log.get("HeuresD", 0.0)), step=0.1)
+        d_mi = c4.number_input("Loch (Départ)", value=float(init_log.get("MillesD", 0.0)), step=0.1)
+        
+        obs = st.text_area("Observations / Météo", init_log.get("Obs", ""), height=80)
+        
+        st.markdown("**🏁 ARRIVÉE**")
+        c5, c6 = st.columns(2)
+        a_lieu = c5.text_input("Port Arrivée", init_log.get("LieuA", ""))
+        a_h = c6.number_input("Heures Moteur (Arrivée)", value=float(init_log.get("HeuresA", 0.0)), step=0.1)
+        a_mi = st.number_input("Loch (Arrivée)", value=float(init_log.get("MillesA", 0.0)), step=0.1)
+        
+        if st.form_submit_button("⚓ ENREGISTRER L'ÉTAPE", use_container_width=True):
+            dist = a_mi - d_mi
+            h_mot = a_h - d_h
+            row = {
+                "Date":date_l, "LieuD":d_lieu, "HeuresD":d_h, "MillesD":d_mi, 
+                "Obs":obs, "LieuA":a_lieu, "HeuresA":a_h, "MillesA":a_mi, 
+                "Dist":dist, "DeltaH":h_mot
+            }
+            if idx_log is None: 
+                df_log = pd.concat([df_log, pd.DataFrame([row])], ignore_index=True)
+            else:
+                for k,v in row.items(): df_log.at[idx_log, k] = v
+                st.session_state.edit_log_idx = None
+            
+            sauvegarder_data(df_log, "livre_de_bord.json")
+            st.rerun()
 
+    if idx_log is not None and st.button("❌ Annuler modification"): 
+        st.session_state.edit_log_idx = None; st.rerun()
+
+    # --- AFFICHAGE DU BILAN & HISTORIQUE ---
+    if not df_log.empty:
+        st.markdown("---")
+        st.subheader("📜 Historique des navigations")
+        for i in reversed(df_log.index):
+            l = df_log.loc[i]
+            
+            # Calculs avec sécurité pour l'affichage
+            d_v = float(l.get('Dist', 0))
+            m_v = float(l.get('DeltaH', 0))
+            l_f = float(l.get('MillesA', 0))
+            
+            with st.expander(f"📅 {l['Date']} | {l['LieuD']} ➔ {l['LieuA']} ({d_v:.1f} mn)"):
+                # BILAN VISUEL NATIF
+                b1, b2, b3 = st.columns(3)
+                b1.metric("DISTANCE", f"{d_v:.1f} MN")
+                b2.metric("MOTEUR", f"{m_v:.1f} H")
+                b3.metric("LOCH FIN", f"{l_f:.0f}")
+                
+                st.markdown("---")
+                if l.get('Obs'):
+                    st.info(f"📝 {l['Obs']}")
+                
+                ce, cd = st.columns(2)
+                if ce.button("✏️ Modifier", key=f"ed_log_{i}"): 
+                    st.session_state.edit_log_idx = i; st.rerun()
+                if cd.button("🗑️ Supprimer", key=f"del_log_{i}"):
+                    df_log = df_log.drop(i); sauvegarder_data(df_log, "livre_de_bord.json"); st.rerun()
+    else:
+        st.info("ℹ️ Le livre de bord est vide. Enregistrez votre première étape ci-dessus.")
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
     y_col, m_col = st.columns(2)
@@ -317,6 +398,7 @@ elif st.session_state.page == "FORM":
             else: 
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
+
 
 
 
