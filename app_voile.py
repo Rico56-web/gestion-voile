@@ -138,18 +138,15 @@ if st.session_state.page == "LISTE":
                     if st.button("Confirmer suppression", key=f"conf_l_{i}"): df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
 
 elif st.session_state.page == "PLANNING":
-    st.markdown('<div class="page-title">🗓️ PLANNING & DÉTAILS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">🗓️ PLANNING & CROISIÈRES</div>', unsafe_allow_html=True)
     
     y_col, m_col = st.columns(2)
     p_y = y_col.selectbox("An", [2025, 2026, 2027], index=1)
     p_m = m_col.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
     
     occu = {}
-    df_mois = pd.DataFrame()
-    
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
-        # Isoler les données du mois pour la liste sous le calendrier
         df_mois = df[(df['dt'].dt.year == p_y) & (df['dt'].dt.month == p_m)].sort_values('dt')
         
         for _, r in df.iterrows():
@@ -160,38 +157,66 @@ elif st.session_state.page == "PLANNING":
                     curr = d_s + timedelta(days=j)
                     if curr.year == p_y and curr.month == p_m:
                         soc = str(r.get('Société','')).upper()
-                        # On ne garde que la classe de couleur, plus de texte
                         occu[curr.day] = "day-cmn" if soc == "CMN" else "day-ok"
 
-    # --- AFFICHAGE DU CALENDRIER ÉPURÉ ---
+    # --- CALENDRIER VISUEL ---
     cal = calendar.monthcalendar(p_y, p_m)
     h = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
     for wk in cal:
         h += '<tr>'
         for d in wk:
             style = f'class="{occu[d]}"' if d in occu else ''
-            # On affiche uniquement le chiffre du jour
             h += f'<td {style}>{d if d != 0 else ""}</td>'
         h += '</tr>'
     st.markdown(h + '</table>', unsafe_allow_html=True)
 
-    # --- LISTE DES NOMS DU MOIS (SOUS LE PLANNING) ---
+    # --- DÉTAILS ET GROUPES WHATSAPP ---
     st.markdown("---")
-    st.subheader(f"👥 Détails de {calendar.month_name[p_m]} {p_y}")
+    st.subheader(f"👥 Navigations de {calendar.month_name[p_m]}")
     
-    if not df_mois.empty:
-        for i, r in df_mois.iterrows():
-            soc = str(r.get('Société','')).upper()
-            tel = str(r.get('Téléphone', r.get('Tel', ''))).strip()
+    if not df.empty and not df_mois.empty:
+        # On regroupe par date pour détecter les croisières à plusieurs
+        groupes = df_mois.groupby('DateNav')
+        
+        for date_nav, gp in groupes:
+            tels_groupe = []
+            noms_groupe = []
             
-            st.markdown(f"""
-            <div style="background:white; padding:12px; border-radius:8px; border-left:8px solid {"#3498db" if soc=="CMN" else "#2ecc71"}; margin-bottom:8px; border:1px solid #ddd; box-shadow: 2px 2px 5px rgba(0,0,0,0.05);">
-                <b style="color:#1a2a6c;">{r.get('DateNav')}</b> : <b>{r.get('Prénom','')} {r.get('Nom','').upper()}</b> <br>
-                🏢 {soc} ({r.get('NbJours','1')}j) | 📞 {tel}
-            </div>
-            """, unsafe_allow_html=True)
+            # Encadré pour la journée
+            st.markdown(f"**📅 {date_nav}**")
+            
+            for _, r in gp.iterrows():
+                nom_c = f"{r.get('Prénom','')} {r.get('Nom','').upper()}"
+                soc = str(r.get('Société','')).upper()
+                tel = str(r.get('Téléphone', r.get('Tel', ''))).strip().replace(" ", "").replace(".", "").replace("-", "")
+                if tel.startswith("0"): tel = "33" + tel[1:]
+                
+                if tel: tels_groupe.append(tel)
+                noms_groupe.append(nom_c)
+                
+                # Petite ligne par personne
+                st.markdown(f"""
+                <div style="padding:5px 10px; border-left:4px solid {"#3498db" if soc=="CMN" else "#2ecc71"}; background:white; margin-bottom:2px; border:1px solid #eee; font-size:0.9rem;">
+                    {nom_c} ({soc}) | 📞 {r.get('Téléphone','')}
+                </div>
+                """, unsafe_allow_html=True)
+
+            # Si plus d'un contact, bouton groupe WhatsApp
+            if len(gp) > 1 and tels_groupe:
+                noms_txt = ", ".join(noms_groupe)
+                msg = urllib.parse.quote(f"Bonjour à tous ({noms_txt}), je prépare notre navigation du {date_nav}. Bienvenue à bord !")
+                # On lance la discussion avec le premier, le message contient tous les noms
+                wa_url = f"https://wa.me/{tels_groupe[0]}?text={msg}"
+                
+                st.markdown(f"""
+                    <a href="{wa_url}" target="_blank" style="background-color:#25d366; color:white; padding:8px 12px; display:inline-block; text-decoration:none; border-radius:15px; font-size:0.8rem; font-weight:bold; margin: 5px 0 15px 0;">
+                        💬 CRÉER GROUPE WHATSAPP ({len(gp)} pers.)
+                    </a>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
     else:
-        st.info(f"Aucune navigation enregistrée pour {calendar.month_name[p_m]}.")
+        st.write("Aucune navigation ce mois-ci.")
 
 elif st.session_state.page == "BUDGET":
     st.markdown('<div class="page-title">💰 STATS & BILAN</div>', unsafe_allow_html=True)
@@ -580,6 +605,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
