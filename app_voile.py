@@ -235,54 +235,41 @@ elif st.session_state.page == "PLANNING":
     else:
         st.info("Aucune navigation ce mois-ci.")
 
-    elif st.session_state.page == "STATS":
-    st.markdown('<div class="page-title">📊 BILAN DES ENCAISSEMENTS</div>', unsafe_allow_html=True)
-    
-    if not df.empty:
-        # --- FILTRAGE : Uniquement ce qui est payé ---
-        # On cherche "Payé", "Paye" ou l'émoji ✅ dans la colonne Statut
-        mask_paye = df['Statut'].str.contains("Payé|Paye|✅", na=False, case=False)
-        df_paye = df[mask_paye].copy()
+ elif st.session_state.page == "STATS":
+        st.markdown('<div class="page-title">📊 BILAN DES ENCAISSEMENTS</div>', unsafe_allow_html=True)
         
-        # Calcul du CA encaissé
-        ca_total = sum(df_paye['PrixJour'].apply(to_f))
-        nb_sorties_payees = len(df_paye)
+        # On recharge les données au cas où
+        df_f = charger_data("frais.json")
         
-        # Affichage des indicateurs clés
-        c1, c2 = st.columns(2)
-        c1.metric("Total Encaissé", fmt_p(ca_total))
-        c2.metric("Sorties Réglées", f"{nb_sorties_payees}")
-        
-        st.markdown("---")
-        
-        # --- RÉPARTITION PAR SOCIÉTÉ (PAYÉ UNIQUEMENT) ---
-        st.subheader("🏢 Répartition du CA encaissé")
-        if not df_paye.empty:
-            # Groupement par société pour voir qui rapporte quoi
+        if not df.empty:
+            # FILTRAGE : Uniquement ce qui est payé (Statut contient Payé ou ✅)
+            mask_paye = df['Statut'].str.contains("Payé|Paye|✅", na=False, case=False)
+            df_paye = df[mask_paye].copy()
+            
+            # Calculs avec notre fonction de sécurité to_f
+            ca_total = sum(df_paye['PrixJour'].apply(to_f))
+            total_frais = sum(df_f['Montant'].apply(to_f)) if not df_f.empty else 0.0
+            
+            # Affichage des indicateurs
+            c1, c2 = st.columns(2)
+            c1.metric("Encaissé (Net)", fmt_p(ca_total))
+            c2.metric("Dépenses (Frais)", fmt_p(total_frais))
+            
+            st.markdown("---")
+            
+            # Bénéfice Réel
+            benefice = ca_total - total_frais
+            if benefice >= 0:
+                st.success(f"📈 Bénéfice Net : {fmt_p(benefice)}")
+            else:
+                st.error(f"📉 Déficit : {fmt_p(benefice)}")
+                
+            # Détail par Société
+            st.subheader("🏢 Détail par client (Payé)")
             recap_soc = df_paye.groupby('Société')['PrixJour'].apply(lambda x: sum(x.apply(to_f)))
-            
-            # Affichage sous forme de petit tableau propre
-            for soc, montant in recap_soc.items():
-                col_n, col_m = st.columns([2, 1])
-                col_n.write(f"**{soc}**")
-                col_m.write(f"{fmt_p(montant)}")
-            
-            # Petit graphique pour le visuel
             st.bar_chart(recap_soc)
         else:
-            st.warning("Aucun encaissement enregistré pour le moment.")
-            
-        # --- RAPPEL DES FRAIS ---
-        st.markdown("---")
-        st.subheader("📉 Rappel des Frais (Dépenses)")
-        df_f = charger_data("frais.json")
-        if not df_f.empty:
-            total_frais = sum(df_f['Montant'].apply(to_f))
-            st.error(f"Total Dépenses : {fmt_p(total_frais)}")
-            st.info(f"Bénéfice Net estimé : {fmt_p(ca_total - total_frais)}")
-    else:
-        st.info("Aucune donnée disponible pour établir les statistiques.")
-        
+            st.info("Aucune donnée pour les statistiques.")       
 elif st.session_state.page == "LOGBOOK":
     st.markdown('<div class="page-title">📖 JOURNAL DE BORD</div>', unsafe_allow_html=True)
     
@@ -595,6 +582,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
