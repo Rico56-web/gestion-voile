@@ -125,35 +125,63 @@ if st.session_state.page == "LISTE":
 
 elif st.session_state.page == "LOGBOOK":
     st.markdown('<div class="page-title">📖 LIVRE DE BORD</div>', unsafe_allow_html=True)
+    
+    df_log = charger_data("livre_de_bord.json")
     idx_log = st.session_state.edit_log_idx
     init_log = df_log.loc[idx_log].to_dict() if (idx_log is not None and not df_log.empty) else {}
+    
     with st.form("f_livre_bord"):
         st.subheader("🚩 ÉTAPE DE NAVIGATION")
         c1, c2 = st.columns(2)
         date_l = c1.text_input("Date", init_log.get("Date", datetime.now().strftime("%d/%m/%Y")))
         d_lieu = c2.text_input("Port Départ", init_log.get("LieuD", ""))
+        
+        st.markdown("**🚀 DÉPART**")
         c3, c4 = st.columns(2)
         d_h = c3.number_input("Heures Moteur (Départ)", value=float(init_log.get("HeuresD", 0.0)), step=0.1)
         d_mi = c4.number_input("Loch (Départ)", value=float(init_log.get("MillesD", 0.0)), step=0.1)
-        obs = st.text_area("Observations", init_log.get("Obs", ""), height=100)
-        st.markdown("---")
-        a_lieu = st.text_input("Port Arrivée", init_log.get("LieuA", ""))
-        a_mi = st.number_input("Loch (Arrivée)", value=float(init_log.get("MillesA", 0.0)), step=0.1)
-        if st.form_submit_button("⚓ ENREGISTRER"):
+        
+        obs = st.text_area("Observations", init_log.get("Obs", ""), height=80)
+        
+        st.markdown("**🏁 ARRIVÉE**")
+        c5, c6 = st.columns(2)
+        a_lieu = c5.text_input("Port Arrivée", init_log.get("LieuA", ""))
+        a_h = c5.number_input("Heures Moteur (Arrivée)", value=float(init_log.get("HeuresA", 0.0)), step=0.1)
+        a_mi = c6.number_input("Loch (Arrivée)", value=float(init_log.get("MillesA", 0.0)), step=0.1)
+        
+        if st.form_submit_button("⚓ ENREGISTRER L'ÉTAPE"):
             dist = a_mi - d_mi
-            row = {"Date":date_l, "LieuD":d_lieu, "HeuresD":d_h, "MillesD":d_mi, "Obs":obs, "LieuA":a_lieu, "MillesA":a_mi, "Dist":dist}
+            h_mot = a_h - d_h
+            row = {
+                "Date":date_l, "LieuD":d_lieu, "HeuresD":d_h, "MillesD":d_mi, 
+                "Obs":obs, "LieuA":a_lieu, "HeuresA":a_h, "MillesA":a_mi, 
+                "Dist":dist, "DeltaH":h_mot
+            }
             if idx_log is None: df_log = pd.concat([df_log, pd.DataFrame([row])], ignore_index=True)
             else:
                 for k,v in row.items(): df_log.at[idx_log, k] = v
                 st.session_state.edit_log_idx = None
-            sauvegarder_data(df_log, "livre_de_bord.json"); st.success(f"Enregistré ! ({dist:.1f} mn)"); st.rerun()
+            sauvegarder_data(df_log, "livre_de_bord.json")
+            
+            # Affichage du bilan immédiat
+            st.success(f"✅ Étape enregistrée ! Bilan : {dist:.1f} mn parcourus | {h_mot:.1f} h moteur")
+            st.rerun()
+
     if idx_log is not None and st.button("Annuler modification"): 
         st.session_state.edit_log_idx = None; st.rerun()
+
     if not df_log.empty:
         st.markdown("---")
+        st.subheader("📜 Historique")
         for i in reversed(df_log.index):
             l = df_log.loc[i]
-            with st.expander(f"📅 {l['Date']} : {l['LieuD']} ➔ {l['LieuA']} ({l.get('Dist', 0):.1f} mn)"):
+            # Affichage détaillé dans l'historique
+            with st.expander(f"📅 {l['Date']} : {l['LieuD']} ➔ {l['LieuA']}"):
+                col1, col2 = st.columns(2)
+                col1.metric("Distance", f"{l.get('Dist', 0):.1f} mn")
+                col2.metric("Moteur", f"{l.get('DeltaH', 0):.1f} h")
+                st.write(f"**Notes :** {l['Obs']}")
+                
                 cl1, cl2 = st.columns(2)
                 if cl1.button("✏️ Modifier", key=f"ed_log_{i}"): st.session_state.edit_log_idx = i; st.rerun()
                 if cl2.button("🗑️ Supprimer", key=f"del_log_{i}"):
@@ -318,6 +346,7 @@ elif st.session_state.page == "FORM":
             else: 
                 for k,v in row.items(): df.at[idx,k]=v
             sauvegarder_data(df, "contacts.json"); st.session_state.page="LISTE"; st.rerun()
+
 
 
 
