@@ -63,27 +63,38 @@ st.markdown("""<style>
     .btn-contact { display: inline-block; padding: 8px 12px; border-radius: 5px; text-decoration: none; color: white !important; font-weight: bold; margin-right: 5px; font-size: 0.8rem; }
 </style>""", unsafe_allow_html=True)
 
-# --- 2. FONCTIONS DE DONNÉES ---
+# --- 2. FONCTIONS DE DONNÉES (VERSION NETTOYÉE) ---
 @st.cache_data(ttl=1)
 def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-        res = requests.get(f"https://api.github.com/repos/{repo}/contents/{file}", headers={"Authorization": f"token {token}"})
-        if res.status_code == 200: 
-            return pd.DataFrame(json.loads(base64.b64decode(res.json()['content']).decode('utf-8')))
-    except: pass
-    return pd.DataFrame()
+        url = f"https://api.github.com/repos/{repo}/contents/{file}"
+        res = requests.get(url, headers={"Authorization": f"token {token}"})
+        if res.status_code == 200:
+            content = res.json()['content']
+            decoded = base64.b64decode(content).decode('utf-8')
+            return pd.DataFrame(json.loads(decoded))
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Erreur technique sur {file} : {e}")
+        return pd.DataFrame()
 
 def sauvegarder_data(df, file):
-    repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-    url = f"https://api.github.com/repos/{repo}/contents/{file}"
-    res = requests.get(url, headers={"Authorization": f"token {token}"})
-    sha = res.json().get('sha') if res.status_code == 200 else None
-    content = base64.b64encode(df.to_json(orient="records", indent=4, force_ascii=False).encode('utf-8')).decode('utf-8')
-    requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": f"Update {file}", "content": content, "sha": sha})
-    st.cache_data.clear()
-
-def fmt_p(v): return f"{to_f(v):,.2f} €".replace(",", " ").replace(".", ",")
+    try:
+        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
+        url = f"https://api.github.com/repos/{repo}/contents/{file}"
+        res = requests.get(url, headers={"Authorization": f"token {token}"})
+        sha = res.json().get('sha') if res.status_code == 200 else None
+        
+        # Encodage sécurisé en JSON UTF-8
+        json_data = df.to_json(orient="records", indent=4, force_ascii=False)
+        content = base64.b64encode(json_data.encode('utf-8')).decode('utf-8')
+        
+        requests.put(url, headers={"Authorization": f"token {token}"}, 
+                     json={"message": f"Update {file}", "content": content, "sha": sha})
+        st.cache_data.clear()
+    except Exception as e:
+        st.error(f"Erreur de sauvegarde : {e}")
 
 
 # Chargement
@@ -494,6 +505,7 @@ elif st.session_state.page == "FORM":
     if st.button("Annuler"):
         st.session_state.page = "LISTE"
         st.rerun()
+
 
 
 
