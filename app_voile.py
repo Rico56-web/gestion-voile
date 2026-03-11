@@ -110,76 +110,46 @@ for i, (l, p) in enumerate(menu):
                 <a href="https://wa.me/{tel.replace(' ','')}" target="_blank" class="btn-contact" style="background:#25d366;">💬 WhatsApp</a>
                 <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
             </div>""", unsafe_allow_html=True)
-
-# --- REMPLACEMENT DU BLOC LISTE ET PLANNING ---
-if st.session_state.page == "LISTE":
+        if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
     
-    # 1. Barre de recherche et Filtres
     search_term = st.text_input("🔍 Rechercher par Nom ou Prénom", "").strip().lower()
-    
     c1, c2 = st.columns(2)
     if c1.button("🚀 FUTURES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): 
         st.session_state.view_mode="FUTURES"; st.rerun()
     if c2.button("📂 PASSÉES", use_container_width=True, type="primary" if st.session_state.view_mode=="PASSÉES" else "secondary"): 
         st.session_state.view_mode="PASSÉES"; st.rerun()
     
-    # Bouton de création
-    st.button("➕ NOUVELLE FICHE", on_click=lambda: st.session_state.update({"edit_idx":"NEW", "page":"FORM"}), use_container_width=True)
-    
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
         today = datetime.now().replace(hour=0, minute=0, second=0)
-        
-        # Filtre Passées / Futures
         data = df[df['dt'] >= today] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < today]
         
-        # Logique de recherche
         if search_term:
-            data = data[
-                (data['Nom'].str.lower().str.contains(search_term, na=False)) | 
-                (data['Prénom'].str.lower().str.contains(search_term, na=False))
-            ]
+            data = data[(data['Nom'].str.lower().str.contains(search_term, na=False)) | 
+                        (data['Prénom'].str.lower().str.contains(search_term, na=False))]
         
-        if data.empty:
-            st.info("Aucun résultat pour cette recherche.")
-        else:
-            # Affichage des fiches
-            for i, r in data.sort_values('dt', ascending=(st.session_state.view_mode=="FUTURES")).iterrows():
-                # --- ZONE CRITIQUE D'ALIGNEMENT ---
-                soc = str(r.get('Société','')).upper()
-                statut = str(r.get('Statut','🟡 Attente'))
-                tel = str(r.get('Téléphone', '')).strip()
-                mail = str(r.get('Mail', '')).strip()
-                nb_j = int(to_f(r.get('NbJours', 1)))
-                
-                # Couleur du badge selon le statut
-                b_col = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
-
-                st.markdown(f"""
-                <div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
-                    <div class="status-badge" style="color:{b_col}; border-color:{b_col}; background:{b_col}15;">{statut}</div>
-                    <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
-                    🏢 <b>{soc}</b> | 📅 {r.get('DateNav')} <b>({nb_j} j)</b><br>
-                    📞 {tel} | ✉️ {mail}<br><br>
-                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
-                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
-                </div>""", unsafe_allow_html=True)
-                
-                # Boutons d'édition
-                ce, cd = st.columns([1, 4])
-                if ce.button("✏️", key=f"ed_l_{i}"): 
-                    st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
-                if cd.checkbox("🗑️", key=f"del_l_{i}"):
-                    if st.button("Confirmer", key=f"conf_l_{i}"): 
-                        df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
-
-
-
+        for i, r in data.sort_values('dt').iterrows():
+            soc = str(r.get('Société','')).upper()
+            statut = str(r.get('Statut','🟡 Attente'))
+            tel = str(r.get('Téléphone', '')).strip()
+            mail = str(r.get('Mail', '')).strip()
+            nb_j = int(to_f(r.get('NbJours', 1)))
+            
+            b_col = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
+            
+            st.markdown(f"""
+            <div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
+                <div class="status-badge" style="color:{b_col}; border-color:{b_col}; background:{b_col}15;">{statut}</div>
+                <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
+                🏢 <b>{soc}</b> | 📅 {r.get('DateNav')} <b>({nb_j} j)</b><br>
+                📞 {tel} | ✉️ {mail}<br><br>
+                <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
+                <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
+            </div>""", unsafe_allow_html=True)
 
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING & CROISIÈRES</div>', unsafe_allow_html=True)
-    
     c1, c2 = st.columns(2)
     p_y = c1.selectbox("Année", [2025, 2026, 2027], index=1)
     p_m = c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
@@ -187,25 +157,18 @@ elif st.session_state.page == "PLANNING":
     st.markdown("""<style>.cal-table td { height: 40px !important; font-size: 0.9rem !important; padding: 2px !important; }</style>""", unsafe_allow_html=True)
 
     occu = {}
-    df_mois = pd.DataFrame()
-
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
-        df_mois = df[(df['dt'].dt.year == p_y) & (df['dt'].dt.month == p_m)].sort_values('dt')
-        
-        # --- LOGIQUE DE COLORATION MULTI-JOURS ---
         for _, r in df.iterrows():
             if "🔴" not in str(r.get('Statut','')):
-                date_debut = r['dt']
-                nb_jours = int(to_f(r.get('NbJours', 1)))
-                soc = str(r.get('Société','')).upper()
-                
-                for j in range(nb_jours):
-                    jour_courant = date_debut + timedelta(days=j)
-                    if jour_courant.year == p_y and jour_courant.month == p_m:
-                        occu[jour_courant.day] = "day-cmn" if soc == "CMN" else "day-ok"
+                d_debut = r['dt']
+                n_jours = int(to_f(r.get('NbJours', 1)))
+                s_name = str(r.get('Société','')).upper()
+                for j in range(n_jours):
+                    curr = d_debut + timedelta(days=j)
+                    if curr.year == p_y and curr.month == p_m:
+                        occu[curr.day] = "day-cmn" if s_name == "CMN" else "day-ok"
 
-    # Affichage Calendrier
     cal = calendar.monthcalendar(p_y, p_m)
     h = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
     for wk in cal:
@@ -215,25 +178,14 @@ elif st.session_state.page == "PLANNING":
             h += f'<td {style}>{d if d != 0 else ""}</td>'
         h += '</tr>'
     st.markdown(h + '</table>', unsafe_allow_html=True)
-
-    # Liste Contacts avec Durée
+    
+    # Liste des contacts en dessous
     st.markdown("---")
-    st.subheader(f"👥 Détails {calendar.month_name[p_m]}")
-    if not df_mois.empty:
-        for _, r in df_mois.iterrows():
-            nom_c = f"{r.get('Prénom','')} {r.get('Nom','').upper()}"
-            soc = str(r.get('Société','')).upper()
-            nb_j = int(to_f(r.get('NbJours', 1)))
-            
-            col_n, col_w = st.columns([3, 1])
-            col_n.markdown(f"**{r.get('DateNav')}** : {nom_c} (_{soc}_) - **{nb_j} j**")
-            
-            tel = str(r.get('Téléphone','')).strip().replace(" ","")
-            if tel and tel != "nan":
-                if tel.startswith("0"): tel = "33" + tel[1:]
-                col_w.markdown(f'<a href="https://wa.me/{tel}" target="_blank" style="background:#25d366; color:white; padding:2px 8px; border-radius:10px; text-decoration:none; font-size:0.7rem;">💬 WA</a>', unsafe_allow_html=True)
-    else:
-        st.info("Aucune navigation ce mois-ci.")
+    df_m = df[(df['dt'].dt.year == p_y) & (df['dt'].dt.month == p_m)].sort_values('dt')
+    if not df_m.empty:
+        for _, r in df_m.iterrows():
+            st.write(f"📅 **{r['DateNav']}** : {r['Prénom']} {r['Nom'].upper()} ({int(to_f(r['NbJours']))} j)")
+
 
 elif st.session_state.page == "STATS":
     st.markdown('<div class="page-title">💰 STATISTIQUES ANNUELLES</div>', unsafe_allow_html=True)
@@ -280,6 +232,7 @@ elif st.session_state.page == "LOGBOOK":
 elif st.session_state.page == "NOTES":
     st.markdown('<div class="page-title">📝 NOTES PERSONNELLES</div>', unsafe_allow_html=True)
     st.text_area("Bloc-notes :", placeholder="Écrivez vos rappels ici...")
+
 
 
 
