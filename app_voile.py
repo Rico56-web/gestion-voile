@@ -5,7 +5,6 @@ import pandas as pd
 import json
 from datetime import datetime, timedelta
 import calendar
-import urllib.parse
 
 # --- 🛠️ FONCTIONS DE SÉCURITÉ ---
 def to_f(val):
@@ -36,6 +35,7 @@ if not st.session_state.authenticated:
 
 if "page" not in st.session_state: st.session_state.page = "LISTE"
 if "view_mode" not in st.session_state: st.session_state.view_mode = "FUTURES"
+if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
 
 st.markdown("""<style>
     .main-title { color: #1a2a6c; font-size: 1.6rem; font-weight: bold; text-align: center; margin-bottom: 5px; }
@@ -45,7 +45,7 @@ st.markdown("""<style>
     .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: white; }
     .cal-table td { height: 45px; text-align: center; border: 1px solid #ddd; font-weight: bold; vertical-align: top; padding: 2px; font-size: 0.9rem; }
     .day-ok { background-color: #2ecc71 !important; color: white !important; }
-    .day-cmn { background-color: #3498db !important; color: white !important; } /* CMN en Bleu */
+    .day-cmn { background-color: #3498db !important; color: white !important; }
     .btn-contact { display: inline-block; padding: 8px 12px; border-radius: 5px; text-decoration: none; color: white !important; font-weight: bold; margin-right: 5px; font-size: 0.8rem; }
 </style>""", unsafe_allow_html=True)
 
@@ -73,6 +73,7 @@ def sauvegarder_data(df, file):
         content = base64.b64encode(json_data.encode('utf-8')).decode('utf-8')
         requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": f"Update {file}", "content": content, "sha": sha})
         st.cache_data.clear()
+        st.success("Données enregistrées !")
     except: st.error("Erreur de sauvegarde")
 
 df = charger_data("contacts.json")
@@ -89,6 +90,12 @@ for i, (l, p) in enumerate(menu):
 
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
+    
+    if st.button("➕ NOUVELLE NAVIGATION", use_container_width=True):
+        st.session_state.edit_idx = "NEW"
+        st.session_state.page = "FORM"
+        st.rerun()
+
     search_term = st.text_input("🔍 Rechercher...", "").strip().lower()
     c1, c2 = st.columns(2)
     if c1.button("🚀 FUTURES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): 
@@ -116,9 +123,55 @@ if st.session_state.page == "LISTE":
                 <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
                 Société : <b>{soc}</b> | Date : {r.get('DateNav')} <b>({nb_j} j)</b><br>
                 Tel : {tel}<br><br>
-                <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appel</a>
+                <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
                 <a href="https://wa.me/{tel.replace(' ','')}" target="_blank" class="btn-contact" style="background:#25d366;">WhatsApp</a>
             </div>""", unsafe_allow_html=True)
+            
+            # Boutons Action (✏️ et 🗑️)
+            c_edit, c_del, c_space = st.columns([1, 1, 5])
+            if c_edit.button("✏️", key=f"ed_{i}"):
+                st.session_state.edit_idx = i
+                st.session_state.page = "FORM"
+                st.rerun()
+            if c_del.button("🗑️", key=f"del_{i}"):
+                df = df.drop(i)
+                sauvegarder_data(df, "contacts.json")
+                st.rerun()
+
+elif st.session_state.page == "FORM":
+    st.markdown('<div class="page-title">📝 SAISIE NAVIGATION</div>', unsafe_allow_html=True)
+    idx = st.session_state.edit_idx
+    row = df.iloc[idx] if idx != "NEW" and idx is not None else {}
+    
+    with st.form("form_nav"):
+        f_nom = st.text_input("Nom", value=row.get('Nom', ''))
+        f_pre = st.text_input("Prénom", value=row.get('Prénom', ''))
+        f_soc = st.selectbox("Société", ["CMN", "Particulier", "Autre"], index=0 if row.get('Société')=="CMN" else 1)
+        f_dat = st.text_input("Date (JJ/MM/AAAA)", value=row.get('DateNav', datetime.now().strftime("%d/%m/%Y")))
+        f_jou = st.number_input("Nombre de jours", min_value=1, value=int(to_f(row.get('NbJours', 1))))
+        f_pri = st.text_input("Prix total (€)", value=str(row.get('PrixJour', '0')))
+        f_sta = st.selectbox("Statut", ["🟡 Attente", "🟢 OK", "🔴 Annulé"], index=1 if "OK" in str(row.get('Statut')) else 0)
+        f_pay = st.selectbox("Paiement", ["Unpaid", "Paid"], index=1 if row.get('Paiement')=="Paid" else 0)
+        f_tel = st.text_input("Téléphone", value=row.get('Téléphone', ''))
+        
+        if st.form_submit_button("ENREGISTRER"):
+            new_data = {
+                "Nom": f_nom, "Prénom": f_pre, "Société": f_soc, 
+                "DateNav": f_dat, "NbJours": f_jou, "PrixJour": f_pri, 
+                "Statut": f_sta, "Paiement": f_pay, "Téléphone": f_tel
+            }
+            if idx == "NEW":
+                df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
+            else:
+                for k, v in new_data.items(): df.at[idx, k] = v
+            
+            sauvegarder_data(df, "contacts.json")
+            st.session_state.page = "LISTE"
+            st.rerun()
+    
+    if st.button("ANNULER"):
+        st.session_state.page = "LISTE"
+        st.rerun()
 
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING & CROISIÈRES</div>', unsafe_allow_html=True)
@@ -149,33 +202,6 @@ elif st.session_state.page == "PLANNING":
         h += '</tr>'
     st.markdown(h + '</table>', unsafe_allow_html=True)
 
-elif st.session_state.page == "STATS":
-    st.markdown('<div class="page-title">💰 TABLEAU DE BORD (MÉMORISÉ)</div>', unsafe_allow_html=True)
-    if not df.empty:
-        df['dt'] = df['DateNav'].apply(parse_d)
-        res = []
-        for y in [2025, 2026, 2027]:
-            sub = df[df['dt'].dt.year == y]
-            ca = sub['PrixJour'].apply(to_f).sum()
-            res.append({"Année": y, "Navigations": len(sub), "CA Estimé (€)": f"{int(ca)} €"})
-        st.table(pd.DataFrame(res))
-
-elif st.session_state.page == "LOGS":
-    st.markdown('<div class="page-title">📂 ARCHIVES & PAIEMENTS</div>', unsafe_allow_html=True)
-    if not df.empty:
-        # Ajout du statut de paiement fictif ou réel si présent dans le JSON
-        df_display = df[['DateNav', 'Nom', 'Société', 'Statut']].copy()
-        # On peut simuler la colonne Paid/Unpaid demandée hier
-        st.write("Suivi des encaissements :")
-        st.dataframe(df_display, use_container_width=True)
-
-elif st.session_state.page == "FACTURES":
-    st.markdown('<div class="page-title">🧾 FACTURATION</div>', unsafe_allow_html=True)
-    st.info("Sélectionnez un client dans la liste pour générer le récapitulatif.")
-
-elif st.session_state.page == "MAINT":
-    st.markdown('<div class="page-title">🔧 MAINTENANCE</div>', unsafe_allow_html=True)
-    st.write("Carnet d'entretien du Vesta.")
 
 
 
