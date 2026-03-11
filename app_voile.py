@@ -92,30 +92,73 @@ for i, (l, p) in enumerate(menu):
 
 # --- 4. LOGIQUE DES PAGES ---
 
+# --- REMPLACEMENT DU BLOC LISTE ET PLANNING (Lignes 115 à 210 environ) ---
+
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
-    search_term = st.text_input("🔍 Rechercher", "").strip().lower()
+    
+    # Recherche et filtres
+    search_term = st.text_input("🔍 Rechercher par Nom ou Prénom", "").strip().lower()
     c1, c2 = st.columns(2)
-    if c1.button("🚀 FUTURES", use_container_width=True): st.session_state.view_mode="FUTURES"; st.rerun()
-    if c2.button("📂 PASSÉES", use_container_width=True): st.session_state.view_mode="PASSÉES"; st.rerun()
+    if c1.button("🚀 FUTURES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): 
+        st.session_state.view_mode="FUTURES"; st.rerun()
+    if c2.button("📂 PASSÉES", use_container_width=True, type="primary" if st.session_state.view_mode=="PASSÉES" else "secondary"): 
+        st.session_state.view_mode="PASSÉES"; st.rerun()
     
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
         today = datetime.now().replace(hour=0, minute=0, second=0)
         data = df[df['dt'] >= today] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < today]
+        
         if search_term:
-            data = data[data['Nom'].str.lower().str.contains(search_term, na=False)]
+            data = data[(data['Nom'].str.lower().str.contains(search_term, na=False)) | 
+                        (data['Prénom'].str.lower().str.contains(search_term, na=False))]
         
         for i, r in data.sort_values('dt').iterrows():
             soc = str(r.get('Société','')).upper()
-            st.markdown(f'<div class="client-card"><b>{r.get("Prénom","")} {r.get("Nom","").upper()}</b><br>📅 {r.get("DateNav")} | 🏢 {soc}</div>', unsafe_allow_html=True)
+            statut = str(r.get('Statut','🟡 Attente'))
+            tel = str(r.get('Téléphone', '')).strip()
+            mail = str(r.get('Mail', '')).strip()
+            
+            # Calcul de la couleur du badge
+            b_col = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
+            
+            # Affichage de la fiche
+            st.markdown(f"""
+            <div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
+                <div class="status-badge" style="color:{b_col}; border-color:{b_col}; background:{b_col}15;">{statut}</div>
+                <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
+                🏢 <b>{soc}</b> | 📅 {r.get('DateNav')}<br>
+                📞 {tel} | ✉️ {mail}<br><br>
+                <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
+                <a href="https://wa.me/{tel.replace(' ','')}" target="_blank" class="btn-contact" style="background:#25d366;">💬 WhatsApp</a>
+                <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
+            </div>""", unsafe_allow_html=True)
 
 elif st.session_state.page == "PLANNING":
-    st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
-    p_y = st.selectbox("Année", [2026, 2027], index=0)
-    p_m = st.selectbox("Mois", range(1, 13), index=datetime.now().month-1)
-    st.write(f"Calendrier de {calendar.month_name[p_m]} {p_y}")
-    # (Le code calendrier que tu avais est conservé ici)
+    st.markdown('<div class="page-title">🗓️ PLANNING & CROISIÈRES</div>', unsafe_allow_html=True)
+    p_y = st.selectbox("Année", [2025, 2026, 2027], index=1)
+    p_m = st.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
+    
+    occu = {}
+    if not df.empty:
+        df['dt'] = df['DateNav'].apply(parse_d)
+        for _, r in df.iterrows():
+            if "🔴" not in str(r.get('Statut','')):
+                d_s = r['dt']
+                if d_s.year == p_y and d_s.month == p_m:
+                    soc = str(r.get('Société','')).upper()
+                    occu[d_s.day] = "day-cmn" if soc == "CMN" else "day-ok"
+
+    cal = calendar.monthcalendar(p_y, p_m)
+    h = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
+    for wk in cal:
+        h += '<tr>'
+        for d in wk:
+            style = f'class="{occu[d]}"' if d in occu else ''
+            h += f'<td {style}>{d if d != 0 else ""}</td>'
+        h += '</tr>'
+    st.markdown(h + '</table>', unsafe_allow_html=True)
 
 elif st.session_state.page == "STATS":
     st.markdown('<div class="page-title">💰 STATISTIQUES ANNUELLES</div>', unsafe_allow_html=True)
@@ -162,6 +205,7 @@ elif st.session_state.page == "LOGBOOK":
 elif st.session_state.page == "NOTES":
     st.markdown('<div class="page-title">📝 NOTES PERSONNELLES</div>', unsafe_allow_html=True)
     st.text_area("Bloc-notes :", placeholder="Écrivez vos rappels ici...")
+
 
 
 
