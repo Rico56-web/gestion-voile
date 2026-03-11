@@ -131,11 +131,15 @@ if st.session_state.page == "LISTE":
         if search_term:
             data = data[(data['Nom'].str.lower().str.contains(search_term, na=False)) | 
                         (data['Prénom'].str.lower().str.contains(search_term, na=False))]
-        
-        for i, r in data.sort_values('dt').iterrows():
+      for i, r in data.sort_values('dt').iterrows():
             soc = str(r.get('Société','')).upper()
             statut = str(r.get('Statut','🟡 Attente'))
-            nb_j = int(to_f(r.get('NbJours', 1))) # Récupération du nombre de jours
+            # --- CES LIGNES DOIVENT ÊTRE ALIGNÉES VERTICALEMENT ---
+            tel = str(r.get('Téléphone', '')).strip()
+            mail = str(r.get('Mail', '')).strip()
+            nb_j = int(to_f(r.get('NbJours', 1))) 
+            
+            # Calcul de la couleur du badge
             b_col = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
             
             st.markdown(f"""
@@ -143,10 +147,11 @@ if st.session_state.page == "LISTE":
                 <div class="status-badge" style="color:{b_col}; border-color:{b_col}; background:{b_col}15;">{statut}</div>
                 <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
                 🏢 <b>{soc}</b> | 📅 {r.get('DateNav')} <b>({nb_j} j)</b><br>
-                📞 {r.get('Téléphone','')} | ✉️ {r.get('Mail','')}<br><br>
-                <a href="tel:{r.get('Téléphone','')}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
-                <a href="mailto:{r.get('Mail','')}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
-            </div>""", unsafe_allow_html=True)
+                📞 {tel} | ✉️ {mail}<br><br>
+                <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
+                <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
+            </div>""", unsafe_allow_html=True)  
+
 
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING & CROISIÈRES</div>', unsafe_allow_html=True)
@@ -251,6 +256,7 @@ elif st.session_state.page == "LOGBOOK":
 elif st.session_state.page == "NOTES":
     st.markdown('<div class="page-title">📝 NOTES PERSONNELLES</div>', unsafe_allow_html=True)
     st.text_area("Bloc-notes :", placeholder="Écrivez vos rappels ici...")
+
 
 
 
