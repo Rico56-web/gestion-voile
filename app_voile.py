@@ -242,29 +242,23 @@ elif st.session_state.page == "PLANNING":
         st.info("Aucune navigation ce mois-ci.")
         
 elif st.session_state.page == "STATS":
-        st.markdown('<div class="page-title">📊 STATISTIQUES COMPACTES</div>', unsafe_allow_html=True)
-        # 1. Filtre année (2026-2028)
-        an_sel = st.selectbox("Année", [2026, 2027, 2028])
-        # On affiche un texte simple pour vérifier que la page charge
-        st.write(f"Affichage des stats pour {an_sel}")
-        # (Ton code de tableau compact viendra ici une fois l'alignement OK)
+        st.markdown('<div class="page-title">📊 STATISTIQUES</div>', unsafe_allow_html=True)
+        st.write("Page Statistiques active")
+        # Le code du tableau compact sera réinséré ici une fois le bug résolu
 
     elif st.session_state.page == "FACTURES":
-        st.markdown('<div class="page-title">🧾 FACTURATION</div>', unsafe_allow_html=True)
-        if df.empty:
-            st.info("Aucune donnée.")
-        else:
-            st.write("Sélectionnez une société pour générer le récapitulatif.")
+        st.markdown('<div class="page-title">🧾 FACTURES</div>', unsafe_allow_html=True)
+        st.write("Page Facturation active")
 
     elif st.session_state.page == "MAINT":
         st.markdown('<div class="page-title">🔧 MAINTENANCE</div>', unsafe_allow_html=True)
-        st.info("Gestion des frais et de l'entretien.")
+        st.write("Page Maintenance active")
 
     elif st.session_state.page == "LOGS":
         st.markdown('<div class="page-title">📂 ARCHIVES</div>', unsafe_allow_html=True)
         if not df.empty:
-            # On affiche les colonnes essentielles pour le suivi
-            st.dataframe(df[['DateNav', 'Nom', 'Société', 'Statut']], use_container_width=True)
+            st.dataframe(df[['DateNav', 'Nom', 'Société', 'Statut']])
+
 
 
 
