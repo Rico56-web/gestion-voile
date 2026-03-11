@@ -69,7 +69,128 @@ if st.session_state.page == "CONTACTS":
     if c_f.button("🚀 MISSIONS FUTURES", use_container_width=True, type="primary" if not st.session_state.view_archive else "secondary"):
         st.session_state.view_archive = False; st.rerun()
     if c_p.button("📁 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_archive else "secondary"):
-        st.session_state.view_
+        st.session_state.view_archive = True; st.rerun()
+
+    if st.session_state.edit_idx is not None:
+        idx = st.session_state.edit_idx
+        r = df.loc[idx]
+        with st.form("edit_form"):
+            st.subheader(f"Modifier : {r.get('Prénom','')} {r.get('Nom','')}")
+            
+            # --- ORDRE DES CHAMPS DEMANDÉ ---
+            c1, c2, c3 = st.columns(3)
+            u_date_nav = c1.text_input("Date Nav", r.get('Date Nav',''))
+            u_nb_jours = c2.text_input("Nb jours", r.get('Nb jours',''))
+            s_list = ["En attente", "OK", "Terminé", "Refusé"]
+            u_statut = c3.selectbox("Statut", s_list, index=safe_get_index(s_list, r.get('Statut')))
+
+            c4, c5, c6 = st.columns(3)
+            u_nom = c4.text_input("Nom", r.get('Nom',''))
+            u_pre = c5.text_input("Prénom", r.get('Prénom',''))
+            u_tel = c6.text_input("Téléphone", r.get('Téléphone',''))
+
+            c7, c8, c9 = st.columns(3)
+            u_mail = c7.text_input("Mail", r.get('Mail',''))
+            p_list = ["Pas payé", "Payé"]
+            u_paye = c8.selectbox("Paiement", p_list, index=safe_get_index(p_list, r.get('Paiement')))
+            u_prix = c9.text_input("Prix total (€)", str(r.get('Prix','0')))
+
+            st.divider() # Séparation pour les infos complémentaires
+            c10, c11, c12 = st.columns(3)
+            u_pass = c10.text_input("Passager", r.get('Passager',''))
+            u_hist = c11.text_input("Historique", r.get('Historique',''))
+            u_soc = c12.text_input("Société", r.get('Société',''))
+
+            c13, c14, c15 = st.columns(3)
+            u_milles = c13.text_input("Milles", r.get('Milles',''))
+            u_hres = c14.text_input("Heures moteur", r.get('Heures moteur',''))
+            u_dt_obj = c15.text_input("dt obj", r.get('dt obj',''))
+
+            c16, c17, c18 = st.columns(3)
+            u_dt_sort = c16.text_input("dt sort", r.get('dt sort',''))
+            u_dt = c17.text_input("dt", r.get('dt',''))
+            u_notes = c18.text_area("Notes", r.get('Notes',''))
+
+            if st.form_submit_button("💾 ENREGISTRER"):
+                data_upd = {
+                    'Date Nav': u_date_nav, 'Nb jours': u_nb_jours, 'Statut': u_statut,
+                    'Nom': u_nom, 'Prénom': u_pre, 'Téléphone': u_tel, 'Mail': u_mail,
+                    'Paiement': u_paye, 'Prix': to_f(u_prix), 'Passager': u_pass,
+                    'Historique': u_hist, 'Société': u_soc, 'Milles': u_milles,
+                    'Heures moteur': u_hres, 'dt obj': u_dt_obj, 'dt sort': u_dt_sort,
+                    'dt': u_dt, 'Notes': u_notes
+                }
+                for k, v in data_upd.items(): df.at[idx, k] = v
+                sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
+            if st.form_submit_button("❌ ANNULER"): st.session_state.edit_idx = None; st.rerun()
+    
+    else:
+        # LOGIQUE DE FILTRAGE
+        if st.session_state.view_archive:
+            df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])]
+        else:
+            df_disp = df[~df['Statut'].isin(["Terminé", "Refusé"])]
+
+        for i, r in df_disp.iterrows():
+            tel = str(r.get('Téléphone','')).strip()
+            mail = str(r.get('Mail','')).strip()
+            
+            # Couleurs Statut
+            s_val = str(r.get('Statut','')).upper()
+            col_s = "#3498db" if "TERM" in s_val else "#2ecc71" if "OK" in s_val else "#e74c3c" if "REFUS" in s_val else "#f1c40f"
+            
+            # Couleurs Paiement
+            p_val = str(r.get('Paiement','')).upper()
+            txt_p = "Payé" if "PAY" in p_val and "PAS" not in p_val and "UN" not in p_val else "Pas payé"
+            col_p = "#2ecc71" if txt_p == "Payé" else "#e74c3c"
+
+            st.markdown(f"""
+            <div class="fiche-globale">
+                <div class="section-haute">
+                    <div style="float:right; text-align:right;">
+                        <span class="statut-badge" style="background:{col_s};">{r.get('Statut','En attente')}</span><br>
+                        <span class="statut-badge" style="background:{col_p};">{txt_p}</span>
+                    </div>
+                    <div class="prenom-style">{r.get('Prénom','')} {str(r.get('Nom','')).upper()}</div>
+                    <div style="color:#e67e22; font-weight:bold;">📞 {tel} | ✉️ {mail}</div>
+                    <p style="margin-top:10px;">
+                        📅 <b>{r.get('Date Nav','--')}</b> ({r.get('Nb jours','?')} j.) | 🏢 <b>{r.get('Société','')}</b> | 💰 <b>{r.get('Prix',0)} €</b>
+                    </p>
+                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
+                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
+                    <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
+                </div>
+                <div class="section-basse">
+            """, unsafe_allow_html=True)
+            
+            c_notes, c_edit, c_del = st.columns([0.5, 0.25, 0.25])
+            c_notes.write(f"**Notes :** {r.get('Notes','')}")
+            
+            if c_edit.button("✏️ MODIFIER", key=f"ed_{i}", use_container_width=True):
+                st.session_state.edit_idx = i; st.rerun()
+            
+            if c_del.button("🗑️ SUPPRIMER", key=f"btn_del_{i}", use_container_width=True):
+                st.session_state[f"ask_del_{i}"] = True
+            
+            if st.session_state.get(f"ask_del_{i}"):
+                st.warning("Confirmer ?")
+                cd1, cd2 = st.columns(2)
+                if cd1.button("✅ OUI", key=f"y_{i}", type="primary", use_container_width=True):
+                    df = df.drop(i); sauvegarder_data(df, "contacts.json")
+                    st.session_state[f"ask_del_{i}"] = False; st.rerun()
+                if cd2.button("❌ NON", key=f"n_{i}", use_container_width=True):
+                    st.session_state[f"ask_del_{i}"] = False; st.rerun()
+            
+            st.markdown('</div></div>', unsafe_allow_html=True)
+
+# --- PAGES STATS & MAINT (STUBS) ---
+elif st.session_state.page == "STATS":
+    st.title("💰 Statistiques")
+    st.info("Le calcul des statistiques se base sur les prix enregistrés.")
+elif st.session_state.page == "MAINT":
+    st.title("🔧 Maintenance")
+    st.write("Suivi basé sur les Heures moteur et Milles saisis dans les fiches.")
+
 
 
 
