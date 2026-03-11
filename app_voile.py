@@ -5,30 +5,45 @@ import pandas as pd
 import json
 import time
 
-# --- 1. STYLE CSS GÉNÉRAL ---
+# --- 1. STYLE CSS (ESPACEMENT ET OMBRES) ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 st.markdown("""<style>
-    .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 20px; border-bottom: 3px solid #1a2a6c; }
-    .page-title { background: #1a2a6c; color: white; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
+    .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; }
     
-    /* STYLE DES FICHES (Contacts & Maintenance) */
-    .fiche-complete { border: 2px solid #1a2a6c; border-radius: 12px; overflow: hidden; margin-bottom: 25px; background-color: white; }
-    .zone-infos { padding: 18px; background: white; }
-    .zone-actions { padding: 15px; background: #f1f3f6; border-top: 1px solid #1a2a6c; }
+    /* FICHE AVEC OMBRE ET MARGE BASSE */
+    .fiche-complete { 
+        border: 1px solid #d1d8e0; 
+        border-radius: 12px; 
+        overflow: hidden; 
+        margin-bottom: 40px; /* Espace important entre les fiches */
+        background-color: white;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1); /* Ombre pour décoller la fiche du fond */
+    }
+    
+    .zone-infos { padding: 20px; background: white; }
+    
+    /* ZONE GRISE PLUS DISTINCTE */
+    .zone-actions { 
+        padding: 15px; 
+        background: #f8f9fa; 
+        border-top: 1px solid #1a2a6c;
+        border-bottom: 4px solid #1a2a6c; /* Petite barre de fin de fiche */
+    }
     
     .prenom-style { font-size: 1.8rem; font-weight: bold; color: #1a2a6c; }
     .nom-style { font-size: 1.2rem; text-transform: uppercase; color: #555; }
     .contact-verif { font-family: monospace; color: #e67e22; font-weight: bold; font-size: 1.1rem; margin: 5px 0; }
-    .statut-badge { padding: 4px 10px; border-radius: 15px; font-size: 0.85rem; font-weight: bold; color: white; margin-left: 5px; display: inline-block; }
+    .statut-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; margin-left: 5px; }
     
     .btn-contact { 
-        display: inline-block; padding: 8px 15px; border-radius: 5px; 
+        display: inline-block; padding: 10px 18px; border-radius: 6px; 
         text-decoration: none; color: white !important; font-size: 0.9rem; 
-        font-weight: bold; margin-right: 10px; margin-top: 12px;
+        font-weight: bold; margin-right: 10px; margin-top: 15px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
 </style>""", unsafe_allow_html=True)
 
-# --- 2. FONCTIONS TECHNIQUES ---
+# --- 2. FONCTIONS ---
 def to_f(val):
     try:
         if pd.isna(val) or str(val).strip() == "": return 0.0
@@ -72,7 +87,6 @@ for i, (label, p) in enumerate(pages):
 # --- 4. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
     if st.session_state.edit_idx is not None:
-        # (Logique du formulaire de modification identique à la version précédente)
         idx = st.session_state.edit_idx
         r = df.loc[idx]
         with st.form("edit_contact"):
@@ -88,48 +102,62 @@ if st.session_state.page == "CONTACTS":
             u_statut = f1.selectbox("Statut Mission", ["En attente", "OK", "Refusé"], index=["En attente", "OK", "Refusé"].index(r.get('Statut', 'En attente')))
             u_paiement = f2.selectbox("Paiement", ["Pas payé", "Payé"], index=["Pas payé", "Payé"].index(r.get('Paiement', 'Pas payé')))
             u_notes = st.text_area("Notes", value=r.get('Notes',''))
-            if st.form_submit_button("💾 ENREGISTRER"):
+            b1, b2 = st.columns(2)
+            if b1.form_submit_button("💾 ENREGISTRER"):
                 df.at[idx, 'Prénom'], df.at[idx, 'Nom'], df.at[idx, 'Prix'] = u_pre, u_nom, to_f(u_prix)
                 df.at[idx, 'Téléphone'], df.at[idx, 'Mail'], df.at[idx, 'Statut'] = u_tel, u_mail, u_statut
                 df.at[idx, 'Paiement'], df.at[idx, 'Notes'], df.at[idx, 'Société'] = u_paiement, u_notes, u_soc
                 sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
-            if st.form_submit_button("❌ ANNULER"): st.session_state.edit_idx = None; st.rerun()
+            if b2.form_submit_button("❌ ANNULER"): st.session_state.edit_idx = None; st.rerun()
     else:
         for i, r in df.iterrows():
             tel, mail = str(r.get('Téléphone','')).strip(), str(r.get('Mail','')).strip()
             col_s = {"OK": "#2ecc71", "En attente": "#f1c40f", "Refusé": "#e74c3c"}.get(r.get('Statut'), "#95a5a6")
             col_p = "#2ecc71" if r.get('Paiement') == "Payé" else "#e74c3c"
-            st.markdown(f"""<div class="fiche-complete"><div class="zone-infos">
-                    <div style="float:right;"><span class="statut-badge" style="background:{col_s};">{r.get('Statut','')}</span>
-                    <span class="statut-badge" style="background:{col_p};">{r.get('Paiement','')}</span></div>
+            
+            st.markdown(f"""
+            <div class="fiche-complete">
+                <div class="zone-infos">
+                    <div style="float:right;">
+                        <span class="statut-badge" style="background:{col_s};">{r.get('Statut','')}</span>
+                        <span class="statut-badge" style="background:{col_p};">{r.get('Paiement','')}</span>
+                    </div>
                     <div class="prenom-style">{r.get('Prénom','')} {str(r.get('Nom','')).upper()}</div>
                     <div class="contact-verif">📞 {tel} | ✉️ {mail}</div>
                     <p>🏢 <b>{r.get('Société','')}</b> | 💰 <b>{r.get('Prix',0)} €</b></p>
-                    <div style="margin-top:10px;"><a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appeler</a>
-                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Email</a>
-                    <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">💬 WhatsApp</a></div>
-                </div><div class="zone-actions">""", unsafe_allow_html=True)
+                    <div style="margin-top:10px;">
+                        <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appeler</a>
+                        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Email</a>
+                        <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">💬 WhatsApp</a>
+                    </div>
+                </div>
+                <div class="zone-actions">
+            """, unsafe_allow_html=True)
+            
             cn, cb = st.columns([0.65, 0.35])
             cn.write(f"**Notes :** {r.get('Notes','')}")
             with cb:
-                if st.button("✏️ MODIFIER", key=f"btn_{i}", use_container_width=True): st.session_state.edit_idx = i; st.rerun()
-                if st.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True): st.session_state[f"conf_{i}"] = True
+                if st.button("✏️ MODIFIER", key=f"btn_{i}", use_container_width=True):
+                    st.session_state.edit_idx = i; st.rerun()
+                
+                # Système de suppression compact
+                if st.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
+                    st.session_state[f"conf_{i}"] = True
+                
                 if st.session_state.get(f"conf_{i}"):
-                    if st.checkbox("⚠️ Confirmer ?", key=f"chk_{i}"):
+                    if st.checkbox("Confirmer ?", key=f"chk_{i}"):
                         if st.button("Valider", key=f"fdel_{i}", type="primary", use_container_width=True):
                             df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
             st.markdown('</div></div>', unsafe_allow_html=True)
 
-# --- 5. PAGE MAINTENANCE (Harmonisée) ---
+# --- 5. PAGE MAINTENANCE (Même Style) ---
 elif st.session_state.page == "MAINT":
     st.markdown('<div class="page-title">🔧 REGISTRE DE MAINTENANCE</div>', unsafe_allow_html=True)
-    with st.expander("➕ Ajouter un frais de maintenance"):
-        with st.form("add_maint"):
-            m_objet = st.text_input("Objet du frais")
-            m_montant = st.text_input("Montant (€)")
-            m_date = st.date_input("Date")
-            if st.form_submit_button("Ajouter"):
-                new_m = pd.DataFrame([{"Objet": m_objet, "Montant": to_f(m_montant), "Date": str(m_date)}])
+    with st.expander("➕ Ajouter un frais"):
+        with st.form("add_m"):
+            o, m, d = st.text_input("Objet"), st.text_input("Montant"), st.date_input("Date")
+            if st.form_submit_button("Valider"):
+                new_m = pd.DataFrame([{"Objet": o, "Montant": to_f(m), "Date": str(d)}])
                 df_maint = pd.concat([df_maint, new_m], ignore_index=True)
                 sauvegarder_data(df_maint, "maintenance.json"); st.rerun()
 
@@ -140,10 +168,9 @@ elif st.session_state.page == "MAINT":
                 <p>💰 Montant : <b>{r.get('Montant',0)} €</b></p>
             </div><div class="zone-actions">""", unsafe_allow_html=True)
         cn, cb = st.columns([0.65, 0.35])
-        cn.write("Détails : Frais enregistré dans le registre de maintenance.")
-        with cb:
-            if st.button("🗑️ SUPPRIMER", key=f"del_m_{i}", use_container_width=True):
-                df_maint = df_maint.drop(i); sauvegarder_data(df_maint, "maintenance.json"); st.rerun()
+        cn.write("Enregistré dans la maintenance annuelle.")
+        if cb.button("🗑️ SUPPRIMER", key=f"del_m_{i}", use_container_width=True):
+            df_maint = df_maint.drop(i); sauvegarder_data(df_maint, "maintenance.json"); st.rerun()
         st.markdown('</div></div>', unsafe_allow_html=True)
 
 # --- 6. PAGE STATS ---
@@ -158,6 +185,7 @@ elif st.session_state.page == "STATS":
     c3.metric("🔧 FRAIS", f"{maint} €")
     st.divider()
     st.header(f"Bénéfice estimé : {acquis + prev - maint} €")
+
 
 
 
