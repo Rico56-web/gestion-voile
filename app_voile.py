@@ -113,9 +113,7 @@ else:
                 with col_de:
                     st.button("🗑️", key=f"de_{i}")
                 st.divider()
-
-
-
+                
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
     
@@ -214,6 +212,7 @@ elif st.session_state.page == "STATS":
     c1.metric("Revenus (OK/Paid)", f"{ca} €")
     c2.metric("Frais (Maint)", f"{frais} €")
     c3.metric("NET FINAL", f"{ca - frais} €")
+
 
 
 
