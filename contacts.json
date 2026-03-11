@@ -1,7 +1,7 @@
 [
     {
         "DateNav":"01\/03\/2026",
-        "NbJours":"4",
+        "NbJours":4,
         "Statut":"🟢 OK",
         "Nom":"PHILIPPE",
         "Prénom":"Elisabeth",
@@ -18,7 +18,7 @@
         "dt_sort":1772323200000.0,
         "dt":1772323200000,
         "Mail":null,
-        "Paiement":null,
+        "Paiement":"Paid",
         "Notes":null
     },
     {
