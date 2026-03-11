@@ -68,34 +68,43 @@ if tabs[2].button("🔧 MAINT"): st.session_state.page = "MAINT"
 if tabs[3].button("📊 STATS"): st.session_state.page = "STATS"
 
 # --- 4. PAGES ---
-
+# --- PAGE : LISTE (Correction de l'ordre d'affichage) ---
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📇 FICHES CONTACTS</div>', unsafe_allow_html=True)
     
-    # Recherche Nom OU Prénom
-    search = st.text_input("🔍 Rechercher un contact (Nom ou Prénom)").lower()
+    search = st.text_input("🔍 Rechercher un Nom ou un Prénom").lower()
     
     if not df.empty:
-        filtered = df[df['Nom'].str.lower().contains(search, na=False) | df['Prénom'].str.lower().contains(search, na=False)]
-        
-        for i, r in filtered.iterrows():
+        # Filtre dynamique Nom ou Prénom
+        mask = df['Nom'].str.lower().contains(search, na=False) | df['Prénom'].str.lower().contains(search, na=False)
+        data_filtered = df[mask]
+
+        for i, r in data_filtered.iterrows():
             with st.container():
-                st.markdown(f"""<div class="client-card">
-                    <div class="prenom-style">{r['Prénom']}</div>
-                    <div class="nom-style">{str(r['Nom']).upper()}</div>
-                    <div class="info-line">📞 {r.get('Téléphone','')} | ✉️ {r.get('Mail','')}</div>
-                    <div class="info-line">📅 {r.get('DateNav','')} | ⏳ {r.get('NbJours','1')} Jours</div>
-                    <div class="info-line">🏢 {r.get('Société','')} | 💰 {r.get('Prix','0')} €</div>
-                </div>""", unsafe_allow_html=True)
+                # --- AFFICHAGE STRICT ---
+                # 1. Prénom (Gros)
+                st.markdown(f'<div class="prenom-style">{r["Prénom"]}</div>', unsafe_allow_html=True)
+                # 2. Nom (Majuscules) juste en dessous
+                st.markdown(f'<div class="nom-style">{str(r["Nom"]).upper()}</div>', unsafe_allow_html=True)
                 
-                # Zone Notes + Boutons alignés
-                c_txt, c_btn1, c_btn2 = st.columns([0.8, 0.1, 0.1])
-                c_txt.text_input("Notes", value=r.get('Notes',''), key=f"note_{i}", label_visibility="collapsed")
-                c_btn1.button("✏️", key=f"edit_{i}")
-                if c_btn2.button("🗑️", key=f"del_{i}"):
-                    # Logique de suppression ici
-                    pass
-                st.markdown("---")
+                # 3. Tel | Mail
+                st.write(f"📞 {r.get('Téléphone','')} | ✉️ {r.get('Mail','')}")
+                # 4. Date Nav | Nb Jours
+                st.write(f"📅 {r.get('DateNav','')} | ⏳ {r.get('NbJours','1')} Jours")
+                # 5. Société | Prix
+                st.write(f"🏢 {r.get('Société','')} | 💰 {r.get('Prix','0')} €")
+                
+                # Zone Notes + Boutons (✏️ et 🗑️ sur la même ligne)
+                col_n, col_ed, col_de = st.columns([0.8, 0.1, 0.1])
+                with col_n:
+                    st.text_input("Notes", value=r.get('Notes',''), key=f"note_{i}", label_visibility="collapsed")
+                with col_ed:
+                    st.button("✏️", key=f"ed_{i}")
+                with col_de:
+                    st.button("🗑️", key=f"de_{i}")
+                st.divider()
+
+
 
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
@@ -129,18 +138,58 @@ elif st.session_state.page == "PLANNING":
     for _, r in month_data.sort_values('DateNav').iterrows():
         dot = "🔵" if str(r['Société']).upper() == "CMN" else "🟢"
         st.write(f"{dot} **{r['DateNav']}** : {r['Prénom']} {str(r['Nom']).upper()} ({r['Société']})")
-
+        # --- PAGE : MAINT (Gestion des frais) ---
 elif st.session_state.page == "MAINT":
-    st.markdown('<div class="page-title">🔧 MAINTENANCE</div>', unsafe_allow_html=True)
-    with st.form("form_maint"):
-        d_m = st.date_input("Date")
-        obj_m = st.text_input("Objet")
-        prix_m = st.number_input("Montant (€)", min_value=0.0)
-        if st.form_submit_button("Enregistrer Frais"):
-            new_f = pd.DataFrame([{"Date": d_m.strftime("%d/%m/%Y"), "Objet": obj_m, "Montant": prix_m}])
-            sauvegarder_data(pd.concat([df_maint, new_f]), "maintenance.json")
+    st.markdown('<div class="page-title">🔧 MAINTENANCE & FRAIS</div>', unsafe_allow_html=True)
+    
+    # Formulaire d'ajout
+    with st.form("new_maint"):
+        c1, c2, c3 = st.columns([2, 3, 2])
+        m_date = c1.date_input("Date")
+        m_obj = c2.text_input("Objet du frais")
+        m_prix = c3.number_input("Montant (€)", min_value=0.0)
+        
+        if st.form_submit_button("🔨 AJOUTER LE FRAIS"):
+            new_entry = {
+                "Date": m_date.strftime("%d/%m/%Y"),
+                "Objet": m_obj,
+                "Montant": m_prix
+            }
+            # On ajoute à l'existant et on sauvegarde sur GitHub
+            updated_maint = pd.concat([df_maint, pd.DataFrame([new_entry])], ignore_index=True)
+            sauvegarder_data(updated_maint, "maintenance.json")
+            st.success("Frais enregistré !")
             st.rerun()
-    st.table(df_maint)
+
+    # Affichage de l'historique
+    if not df_maint.empty:
+        st.table(df_maint)
+    else:
+        st.info("Aucun frais enregistré dans maintenance.json")
+
+# --- PAGE : STATS (Calcul du NET) ---
+elif st.session_state.page == "STATS":
+    st.markdown('<div class="page-title">📊 RÉSULTAT NET</div>', unsafe_allow_html=True)
+    
+    # Calcul CA : Prix total si statut=OK et paiement=Paid
+    # Note: Assurez-vous que vos colonnes s'appellent bien 'Statut' et 'Paiement'
+    ca_total = df[(df['Statut'].str.contains("OK", na=False)) & (df['Paiement'] == "Paid")]['Prix'].apply(to_f).sum()
+    
+    # Calcul Frais : Somme de la colonne Montant dans maintenance.json
+    frais_total = df_maint['Montant'].apply(to_f).sum()
+    
+    net = ca_total - frais_total
+    
+    col1, col2 = st.columns(2)
+    col1.metric("Recettes encaissées", f"{ca_total} €")
+    col2.metric("Total Frais Maintenance", f"-{frais_total} €", delta_color="inverse")
+    
+    st.markdown(f"""
+    <div style="text-align:center; padding:20px; background:#f0f2f6; border-radius:10px;">
+        <h2 style="margin:0;">BÉNÉFICE NET : {net} €</h2>
+    </div>
+    """, unsafe_allow_html=True)
+
 
 elif st.session_state.page == "STATS":
     st.markdown('<div class="page-title">📊 STATS & NET</div>', unsafe_allow_html=True)
@@ -153,6 +202,7 @@ elif st.session_state.page == "STATS":
     c1.metric("Revenus (OK/Paid)", f"{ca} €")
     c2.metric("Frais (Maint)", f"{frais} €")
     c3.metric("NET FINAL", f"{ca - frais} €")
+
 
 
 
