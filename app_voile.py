@@ -96,7 +96,6 @@ if st.session_state.page == "CONTACTS":
 
     st.divider()
 
-    # Liste des statuts incluant "Terminé"
     s_list = ["En attente", "OK", "Terminé", "Refusé"]
     p_list = ["Pas payé", "Payé"]
 
@@ -104,6 +103,7 @@ if st.session_state.page == "CONTACTS":
         idx = st.session_state.edit_idx
         r = df.loc[idx]
         with st.form("edit_form"):
+            # Titre du formulaire mis à jour : Prénom Nom
             st.subheader(f"Modifier : {r.get('Prénom','')} {r.get('Nom','')}")
             c1, c2, c3 = st.columns(3)
             u_pre, u_nom, u_soc = c1.text_input("Prénom", r.get('Prénom','')), c2.text_input("Nom", r.get('Nom','')), c3.text_input("Société", r.get('Société',''))
@@ -123,7 +123,6 @@ if st.session_state.page == "CONTACTS":
             if st.form_submit_button("❌ ANNULER"): st.session_state.edit_idx = None; st.rerun()
     
     else:
-        # LOGIQUE DE FILTRAGE : Terminé et Refusé vont en archive
         if st.session_state.view_archive:
             df_display = df[df['Statut'].isin(["Terminé", "Refusé"])]
         else:
@@ -133,13 +132,11 @@ if st.session_state.page == "CONTACTS":
             tel = str(r.get('Téléphone','')).strip()
             s_val, p_val = str(r.get('Statut','')).upper().strip(), str(r.get('Paiement','')).upper().strip()
             
-            # Couleurs des badges
             if s_val == "OK": col_s = "#2ecc71"
-            elif s_val == "TERMINÉ": col_s = "#3498db" # Bleu pour terminé
+            elif s_val == "TERMINÉ": col_s = "#3498db"
             elif s_val == "REFUSÉ": col_s = "#e74c3c"
-            else: col_s = "#f1c40f" # Jaune
+            else: col_s = "#f1c40f"
 
-            # Correction Unpaid et couleur Paiement
             if ("PAY" in p_val) and ("PAS" not in p_val) and ("UN" not in p_val):
                 col_p, txt_p = "#2ecc71", "Payé"
             else:
@@ -178,6 +175,7 @@ if st.session_state.page == "CONTACTS":
                         if st.button("Valider", key=f"fdel_{i}", type="primary", use_container_width=True):
                             df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
             st.markdown('</div></div>', unsafe_allow_html=True)
+
 
 
 
