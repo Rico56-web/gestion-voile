@@ -20,7 +20,9 @@
         "Mail":null,
         "Paiement":"Pay\u00e9",
         "Notes":"Sympa et cool  . Elle est venue avec sa fille de 15ans",
-        "Prix":476.0
+        "Prix":476.0,
+        "Date":"25\/02\/2026",
+        "Jours":"4"
     },
     {
         "DateNav":"14\/03\/2026",
@@ -43,7 +45,9 @@
         "Mail":null,
         "Paiement":"Unpaid",
         "Notes":"",
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"14\/03\/2026",
@@ -66,7 +70,9 @@
         "Mail":null,
         "Paiement":"Pas pay\u00e9",
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"21\/03\/2026",
@@ -89,7 +95,9 @@
         "Mail":null,
         "Paiement":"Pas pay\u00e9",
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"28\/03\/2026",
@@ -112,7 +120,9 @@
         "Mail":null,
         "Paiement":"Pas pay\u00e9",
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"04\/04\/2026",
@@ -135,7 +145,9 @@
         "Mail":null,
         "Paiement":null,
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"12\/04\/2026",
@@ -158,7 +170,9 @@
         "Mail":null,
         "Paiement":null,
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"18\/04\/2026",
@@ -181,7 +195,9 @@
         "Mail":null,
         "Paiement":null,
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"1\/05\/2026",
@@ -204,7 +220,9 @@
         "Mail":null,
         "Paiement":null,
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"4\/05\/2026",
@@ -227,7 +245,9 @@
         "Mail":null,
         "Paiement":"Pas pay\u00e9",
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"14\/05\/2026",
@@ -250,7 +270,9 @@
         "Mail":null,
         "Paiement":null,
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"31\/05\/2026",
@@ -273,7 +295,9 @@
         "Mail":null,
         "Paiement":"Pas pay\u00e9",
         "Notes":null,
-        "Prix":900.0
+        "Prix":900.0,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"31\/05\/2026",
@@ -296,7 +320,9 @@
         "Mail":null,
         "Paiement":null,
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"31\/05\/2026",
@@ -319,7 +345,9 @@
         "Mail":null,
         "Paiement":null,
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"31\/05\/2026",
@@ -342,7 +370,9 @@
         "Mail":null,
         "Paiement":null,
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"01\/08\/2026",
@@ -365,7 +395,9 @@
         "Mail":null,
         "Paiement":null,
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"28\/04\/2026",
@@ -388,7 +420,9 @@
         "Mail":null,
         "Paiement":null,
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"07\/03\/2026",
@@ -411,7 +445,9 @@
         "Mail":null,
         "Paiement":null,
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     },
     {
         "DateNav":"14\/03\/2026",
@@ -434,6 +470,8 @@
         "Mail":"",
         "Paiement":null,
         "Notes":null,
-        "Prix":null
+        "Prix":null,
+        "Date":null,
+        "Jours":null
     }
 ]
