@@ -17,11 +17,13 @@
         "dt_obj":1772323200000.0,
         "dt_sort":1772323200000.0,
         "dt":1772323200000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"14\/03\/2026",
-        "NbJours":"2",
+        "NbJours":2,
         "Statut":"🟢 OK",
         "Nom":"COURONNE",
         "Prénom":"Benoit",
@@ -37,7 +39,9 @@
         "dt_obj":null,
         "dt_sort":null,
         "dt":1773446400000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":"Unpaid",
+        "Notes":""
     },
     {
         "DateNav":"14\/03\/2026",
@@ -57,7 +61,9 @@
         "dt_obj":null,
         "dt_sort":null,
         "dt":1773446400000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"21\/03\/2026",
@@ -77,7 +83,9 @@
         "dt_obj":1774051200000.0,
         "dt_sort":1774051200000.0,
         "dt":1774051200000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"28\/03\/2026",
@@ -97,7 +105,9 @@
         "dt_obj":1774656000000.0,
         "dt_sort":1774656000000.0,
         "dt":1774656000000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"04\/04\/2026",
@@ -117,7 +127,9 @@
         "dt_obj":1775260800000.0,
         "dt_sort":1775260800000.0,
         "dt":1775260800000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"12\/04\/2026",
@@ -137,7 +149,9 @@
         "dt_obj":1775952000000.0,
         "dt_sort":1775952000000.0,
         "dt":1775952000000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"18\/04\/2026",
@@ -157,7 +171,9 @@
         "dt_obj":1776470400000.0,
         "dt_sort":1776470400000.0,
         "dt":1776470400000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"1\/05\/2026",
@@ -177,7 +193,9 @@
         "dt_obj":1777593600000.0,
         "dt_sort":1777593600000.0,
         "dt":1777593600000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"4\/05\/2026",
@@ -197,7 +215,9 @@
         "dt_obj":1777852800000.0,
         "dt_sort":1777852800000.0,
         "dt":1777852800000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"14\/05\/2026",
@@ -217,7 +237,9 @@
         "dt_obj":1778716800000.0,
         "dt_sort":1778716800000.0,
         "dt":1778716800000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"31\/05\/2026",
@@ -237,7 +259,9 @@
         "dt_obj":1780185600000.0,
         "dt_sort":1780185600000.0,
         "dt":1780185600000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"31\/05\/2026",
@@ -257,7 +281,9 @@
         "dt_obj":1780185600000.0,
         "dt_sort":1780185600000.0,
         "dt":1780185600000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"31\/05\/2026",
@@ -277,7 +303,9 @@
         "dt_obj":1780185600000.0,
         "dt_sort":1780185600000.0,
         "dt":1780185600000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"31\/05\/2026",
@@ -297,7 +325,9 @@
         "dt_obj":1780185600000.0,
         "dt_sort":1780185600000.0,
         "dt":1780185600000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"01\/08\/2026",
@@ -317,7 +347,9 @@
         "dt_obj":null,
         "dt_sort":1785542400000.0,
         "dt":1785542400000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"28\/04\/2026",
@@ -337,7 +369,9 @@
         "dt_obj":1777334400000.0,
         "dt_sort":1777334400000.0,
         "dt":1777334400000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"07\/03\/2026",
@@ -357,7 +391,9 @@
         "dt_obj":null,
         "dt_sort":null,
         "dt":1772841600000,
-        "Mail":null
+        "Mail":null,
+        "Paiement":null,
+        "Notes":null
     },
     {
         "DateNav":"14\/03\/2026",
@@ -377,6 +413,8 @@
         "dt_obj":null,
         "dt_sort":null,
         "dt":1773446400000,
-        "Mail":""
+        "Mail":"",
+        "Paiement":null,
+        "Notes":null
     }
 ]
