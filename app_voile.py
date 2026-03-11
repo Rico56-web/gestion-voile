@@ -93,7 +93,6 @@ for i, (label, p) in enumerate(p_config):
 # --- 4. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
     
-    # Sélecteur Passé / Futur
     c_f, c_p = st.columns(2)
     if c_f.button("🚀 MISSIONS FUTURES", use_container_width=True, type="primary" if not st.session_state.view_archive else "secondary"):
         st.session_state.view_archive = False; st.rerun()
@@ -103,83 +102,89 @@ if st.session_state.page == "CONTACTS":
     st.divider()
 
     if st.session_state.edit_idx is not None:
-        # --- FORMULAIRE D'EDITION (Identique au précédent) ---
         idx = st.session_state.edit_idx
         r = df.loc[idx]
         with st.form("edit_form"):
             st.subheader(f"Modifier : {r.get('Prénom','')} {r.get('Nom','')}")
             c1, c2, c3 = st.columns(3)
-            u_pre, u_nom, u_prix = c1.text_input("Prénom", r.get('Prénom','')), c2.text_input("Nom", r.get('Nom','')), c3.text_input("Prix", str(r.get('Prix','0')))
-            u_tel, u_mail, u_soc = c1.text_input("Tél", r.get('Téléphone','')), c2.text_input("Email", r.get('Mail','')), c3.text_input("Société", r.get('Société',''))
+            u_pre = c1.text_input("Prénom", value=r.get('Prénom',''))
+            u_nom = c2.text_input("Nom", value=r.get('Nom',''))
+            u_soc = c3.text_input("Société", value=r.get('Société',''))
+            
+            u_date = c1.text_input("Date (ex: 12/05)", value=r.get('Date',''))
+            u_jours = c2.text_input("Nombre de jours", value=str(r.get('Jours','')))
+            u_prix = c3.text_input("Prix total (€)", value=str(r.get('Prix','0')))
+            
+            u_tel = c1.text_input("Téléphone", value=r.get('Téléphone',''))
+            u_mail = c2.text_input("Email", value=r.get('Mail',''))
+            
             s_list, p_list = ["En attente", "OK", "Refusé"], ["Pas payé", "Payé"]
-            u_statut = st.selectbox("Statut", s_list, index=safe_get_index(s_list, r.get('Statut')))
+            u_statut = st.selectbox("Statut Mission", s_list, index=safe_get_index(s_list, r.get('Statut')))
             u_paye = st.selectbox("Paiement", p_list, index=safe_get_index(p_list, r.get('Paiement')))
             u_notes = st.text_area("Notes", value=r.get('Notes',''))
-            if st.form_submit_button("💾 SAUVEGARDER"):
-                df.at[idx, 'Prénom'], df.at[idx, 'Nom'], df.at[idx, 'Prix'] = u_pre, u_nom, to_f(u_prix)
-                df.at[idx, 'Téléphone'], df.at[idx, 'Mail'], df.at[idx, 'Statut'] = u_tel, u_mail, u_statut
-                df.at[idx, 'Paiement'], df.at[idx, 'Notes'], df.at[idx, 'Société'] = u_paye, u_notes, u_soc
+            
+            if st.form_submit_button("💾 ENREGISTRER"):
+                # Mise à jour de toutes les colonnes
+                df.at[idx, 'Prénom'], df.at[idx, 'Nom'] = u_pre, u_nom
+                df.at[idx, 'Société'], df.at[idx, 'Date'], df.at[idx, 'Jours'] = u_soc, u_date, u_jours
+                df.at[idx, 'Prix'], df.at[idx, 'Téléphone'], df.at[idx, 'Mail'] = to_f(u_prix), u_tel, u_mail
+                df.at[idx, 'Statut'], df.at[idx, 'Paiement'], df.at[idx, 'Notes'] = u_statut, u_paye, u_notes
                 sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
             if st.form_submit_button("❌ ANNULER"): st.session_state.edit_idx = None; st.rerun()
+    
     else:
-        # --- FILTRAGE DES DONNÉES ---
+        # Filtrage
         if st.session_state.view_archive:
-            # Archives : Tout ce qui est Refusé
             df_display = df[df['Statut'].str.contains("Refusé", case=False, na=False)]
         else:
-            # Futures : En attente ou OK
             df_display = df[~df['Statut'].str.contains("Refusé", case=False, na=False)]
 
-        if df_display.empty:
-            st.info("Aucune fiche dans cette catégorie.")
-        else:
-            for i, r in df_display.iterrows():
-                tel, mail = str(r.get('Téléphone','')).strip(), str(r.get('Mail','')).strip()
-                s_val, p_val = str(r.get('Statut','')).upper().strip(), str(r.get('Paiement','')).upper().strip()
-                col_s = "#2ecc71" if "OK" in s_val else "#e74c3c" if "REFUS" in s_val else "#f1c40f"
-                
-                # Correction Unpaid -> Pas payé
-                if ("PAY" in p_val) and ("PAS" not in p_val) and ("UN" not in p_val):
-                    col_p, txt_p = "#2ecc71", "Payé"
-                else:
-                    col_p, txt_p = "#e74c3c", "Pas payé"
+        for i, r in df_display.iterrows():
+            tel, mail = str(r.get('Téléphone','')).strip(), str(r.get('Mail','')).strip()
+            s_val, p_val = str(r.get('Statut','')).upper().strip(), str(r.get('Paiement','')).upper().strip()
+            col_s = "#2ecc71" if "OK" in s_val else "#e74c3c" if "REFUS" in s_val else "#f1c40f"
+            
+            if ("PAY" in p_val) and ("PAS" not in p_val) and ("UN" not in p_val):
+                col_p, txt_p = "#2ecc71", "Payé"
+            else:
+                col_p, txt_p = "#e74c3c", "Pas payé"
 
-                st.markdown(f"""
-                <div class="fiche-globale">
-                    <div class="section-haute">
-                        <div style="float:right; text-align:right;">
-                            <span class="statut-badge" style="background:{col_s};">{r.get('Statut','En attente')}</span><br>
-                            <span class="statut-badge" style="background:{col_p};">{txt_p}</span>
-                        </div>
-                        <div class="prenom-style">{r.get('Prénom','')} {str(r.get('Nom','')).upper()}</div>
-                        <div class="contact-verif">📞 {tel} | ✉️ {mail}</div>
-                        <p style="margin-top:10px;">🏢 <b>{r.get('Société','')}</b> | 💰 <b>{r.get('Prix',0)} €</b></p>
-                        <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
-                        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
+            st.markdown(f"""
+            <div class="fiche-globale">
+                <div class="section-haute">
+                    <div style="float:right; text-align:right;">
+                        <span class="statut-badge" style="background:{col_s};">{r.get('Statut','En attente')}</span><br>
+                        <span class="statut-badge" style="background:{col_p};">{txt_p}</span>
                     </div>
-                    <div class="section-basse">
-                """, unsafe_allow_html=True)
-                
-                c_notes, c_btns = st.columns([0.65, 0.35])
-                c_notes.write(f"**Notes :** {r.get('Notes','')}")
-                with c_btns:
-                    if st.button("✏️ MODIFIER", key=f"ed_{i}", use_container_width=True):
-                        st.session_state.edit_idx = i; st.rerun()
-                    if st.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
-                        st.session_state[f"ask_del_{i}"] = True
-                    if st.session_state.get(f"ask_del_{i}"):
-                        if st.checkbox("Confirmer ?", key=f"chk_{i}"):
-                            if st.button("Valider", key=f"fdel_{i}", type="primary", use_container_width=True):
-                                df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
-                st.markdown('</div></div>', unsafe_allow_html=True)
+                    <div class="prenom-style">{r.get('Prénom','')} {str(r.get('Nom','')).upper()}</div>
+                    <div class="contact-verif">📞 {tel} | ✉️ {mail}</div>
+                    <p style="margin-top:10px; font-size:1.1rem;">
+                        📅 <b>{r.get('Date','--')}</b> ({r.get('Jours','?')} jours) | 
+                        🏢 <b>{r.get('Société','')}</b> | 
+                        💰 <b>{r.get('Prix',0)} €</b>
+                    </p>
+                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appeler</a>
+                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Email</a>
+                </div>
+                <div class="section-basse">
+            """, unsafe_allow_html=True)
+            
+            c_notes, c_btns = st.columns([0.65, 0.35])
+            c_notes.write(f"**Notes :** {r.get('Notes','')}")
+            with c_btns:
+                if st.button("✏️ MODIFIER", key=f"ed_{i}", use_container_width=True):
+                    st.session_state.edit_idx = i; st.rerun()
+                if st.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
+                    st.session_state[f"ask_del_{i}"] = True
+                if st.session_state.get(f"ask_del_{i}"):
+                    if st.checkbox("Confirmer ?", key=f"chk_{i}"):
+                        if st.button("Valider", key=f"fdel_{i}", type="primary", use_container_width=True):
+                            df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
+            st.markdown('</div></div>', unsafe_allow_html=True)
 
-# --- PAGES MAINT & STATS (Identiques...) ---
-elif st.session_state.page == "MAINT":
-    st.markdown('<div class="page-title">🔧 REGISTRE DE MAINTENANCE</div>', unsafe_allow_html=True)
-    # ... (code maintenance précédent)
-elif st.session_state.page == "STATS":
-    st.markdown('<div class="page-title">📊 BILAN FINANCIER 2026</div>', unsafe_allow_html=True)
-    # ... (code stats précédent)
+# --- PAGES MAINT & STATS ---
+# (Gardez le code précédent pour ces pages)
+
 
 
 
