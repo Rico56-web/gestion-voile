@@ -20,7 +20,7 @@
         "Mail":null,
         "Paiement":"Paid",
         "Notes":"Sympa",
-        "Prix":"476"
+        "Prix":476.0
     },
     {
         "DateNav":"14\/03\/2026",
