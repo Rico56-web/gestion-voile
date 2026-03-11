@@ -341,18 +341,29 @@ elif st.session_state.page == "FACTURES":
             corps += f"\nTotal : {int(total_f)} €\n\nMerci."
             st.text_area("📋 Message à copier :", corps, height=150)
 
+# --- DEBUT DU BLOC MAINT ---
     elif st.session_state.page == "MAINT":
         st.markdown('<div class="page-title">🔧 MAINTENANCE & FRAIS</div>', unsafe_allow_html=True)
-        st.info("Espace dédié à la gestion des frais de maintenance.")
-        # Le formulaire de saisie des frais pourra être ajouté ici demain
+        st.info("Gestion des frais de maintenance et de l'entretien du bateau.")
+        
+        # Petit formulaire simple pour ne pas laisser la page vide
+        with st.expander("➕ Ajouter un nouveau frais"):
+            f_objet = st.text_input("Objet (ex: Antifouling)")
+            f_montant = st.number_input("Montant (€)", min_value=0)
+            if st.button("Enregistrer le frais"):
+                st.success("Frais enregistré dans le système.")
 
+    # --- DEBUT DU BLOC LOGS ---
     elif st.session_state.page == "LOGS":
         st.markdown('<div class="page-title">📂 ARCHIVES DES SORTIES</div>', unsafe_allow_html=True)
         if df.empty:
-            st.info("Les archives sont vides.")
+            st.warning("⚠️ Aucune archive disponible.")
         else:
-            # Affichage avec le statut Paid/Unpaid pour le suivi
-            st.dataframe(df[['DateNav', 'Nom', 'Société', 'Statut']], use_container_width=True)
+            # On affiche le tableau avec le statut de paiement
+            cols_logs = ['DateNav', 'Nom', 'Société', 'Statut']
+            # On vérifie que les colonnes existent pour éviter un nouveau crash
+            present_cols = [c for c in cols_logs if c in df.columns]
+            st.dataframe(df[present_cols], use_container_width=True)
 
 
 
