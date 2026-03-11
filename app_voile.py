@@ -240,24 +240,40 @@ elif st.session_state.page == "PLANNING":
             st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
     else:
         st.info("Aucune navigation ce mois-ci.")
-        
-elif st.session_state.page == "STATS":
-        st.markdown('<div class="page-title">📊 STATISTIQUES</div>', unsafe_allow_html=True)
-        st.write("Page Statistiques active")
-        # Le code du tableau compact sera réinséré ici une fois le bug résolu
 
-    elif st.session_state.page == "FACTURES":
-        st.markdown('<div class="page-title">🧾 FACTURES</div>', unsafe_allow_html=True)
-        st.write("Page Facturation active")
+elif st.session_state.page == "FACTURES":
+        st.markdown('<div class="page-title">🧾 GÉNÉRATION DE FACTURE</div>', unsafe_allow_html=True)
+        if df.empty:
+            st.warning("⚠️ Aucune donnée.")
+        else:
+            soc_list = sorted(df['Société'].unique().astype(str).tolist())
+            soc_sel = st.selectbox("Client", ["Tous"] + soc_list)
+            df_f = df.copy()
+            if soc_sel != "Tous":
+                df_f = df_f[df_f['Société'] == soc_sel]
+            
+            total_f = sum(df_f['PrixJour'].apply(to_f))
+            st.metric(f"Total {soc_sel}", f"{int(total_f)} €")
+            
+            corps = f"Bonjour,\n\nVoici le récapitulatif pour {soc_sel} :\n\n"
+            for _, r in df_f.iterrows():
+                p_l = int(to_f(r.get('PrixJour', 0)))
+                corps += f"- Le {r.get('DateNav','--')} ({r.get('Nom','')}) : {p_l} €\n"
+            corps += f"\nTotal : {int(total_f)} €\n\nMerci."
+            st.text_area("📋 Message à copier :", corps, height=150)
 
     elif st.session_state.page == "MAINT":
-        st.markdown('<div class="page-title">🔧 MAINTENANCE</div>', unsafe_allow_html=True)
-        st.write("Page Maintenance active")
+        st.markdown('<div class="page-title">🔧 MAINTENANCE & FRAIS</div>', unsafe_allow_html=True)
+        st.info("Espace dédié à la gestion des frais de maintenance.")
+        # Le formulaire de saisie des frais pourra être ajouté ici demain
 
     elif st.session_state.page == "LOGS":
-        st.markdown('<div class="page-title">📂 ARCHIVES</div>', unsafe_allow_html=True)
-        if not df.empty:
-            st.dataframe(df[['DateNav', 'Nom', 'Société', 'Statut']])
+        st.markdown('<div class="page-title">📂 ARCHIVES DES SORTIES</div>', unsafe_allow_html=True)
+        if df.empty:
+            st.info("Les archives sont vides.")
+        else:
+            # Affichage avec le statut Paid/Unpaid pour le suivi
+            st.dataframe(df[['DateNav', 'Nom', 'Société', 'Statut']], use_container_width=True)
 
 
 
