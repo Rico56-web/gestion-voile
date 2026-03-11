@@ -92,12 +92,30 @@ for i, (l, p) in enumerate(menu):
 
 # --- 4. LOGIQUE DES PAGES ---
 
-# --- REMPLACEMENT DU BLOC LISTE ET PLANNING (Lignes 115 à 210 environ) ---
+
+            tel = str(r.get('Téléphone', '')).strip()
+            mail = str(r.get('Mail', '')).strip()
+            
+            # Calcul de la couleur du badge
+            b_col = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
+            
+            # Affichage de la fiche
+            st.markdown(f"""
+            <div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
+                <div class="status-badge" style="color:{b_col}; border-color:{b_col}; background:{b_col}15;">{statut}</div>
+                <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
+                🏢 <b>{soc}</b> | 📅 {r.get('DateNav')}<br>
+                📞 {tel} | ✉️ {mail}<br><br>
+                <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
+                <a href="https://wa.me/{tel.replace(' ','')}" target="_blank" class="btn-contact" style="background:#25d366;">💬 WhatsApp</a>
+                <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
+            </div>""", unsafe_allow_html=True)
+
+# --- REMPLACEMENT DU BLOC LISTE ET PLANNING ---
 
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
     
-    # Recherche et filtres
     search_term = st.text_input("🔍 Rechercher par Nom ou Prénom", "").strip().lower()
     c1, c2 = st.columns(2)
     if c1.button("🚀 FUTURES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): 
@@ -117,36 +135,27 @@ if st.session_state.page == "LISTE":
         for i, r in data.sort_values('dt').iterrows():
             soc = str(r.get('Société','')).upper()
             statut = str(r.get('Statut','🟡 Attente'))
-            tel = str(r.get('Téléphone', '')).strip()
-            mail = str(r.get('Mail', '')).strip()
-            
-            # Calcul de la couleur du badge
+            nb_j = int(to_f(r.get('NbJours', 1))) # Récupération du nombre de jours
             b_col = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
             
-            # Affichage de la fiche
             st.markdown(f"""
             <div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
                 <div class="status-badge" style="color:{b_col}; border-color:{b_col}; background:{b_col}15;">{statut}</div>
                 <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
-                🏢 <b>{soc}</b> | 📅 {r.get('DateNav')}<br>
-                📞 {tel} | ✉️ {mail}<br><br>
-                <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
-                <a href="https://wa.me/{tel.replace(' ','')}" target="_blank" class="btn-contact" style="background:#25d366;">💬 WhatsApp</a>
-                <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
+                🏢 <b>{soc}</b> | 📅 {r.get('DateNav')} <b>({nb_j} j)</b><br>
+                📞 {r.get('Téléphone','')} | ✉️ {r.get('Mail','')}<br><br>
+                <a href="tel:{r.get('Téléphone','')}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
+                <a href="mailto:{r.get('Mail','')}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
             </div>""", unsafe_allow_html=True)
 
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING & CROISIÈRES</div>', unsafe_allow_html=True)
     
-    # 1. Contrôles plus compacts
     c1, c2 = st.columns(2)
     p_y = c1.selectbox("Année", [2025, 2026, 2027], index=1)
     p_m = c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
     
-    # Style pour réduire la taille du calendrier
-    st.markdown("""<style>
-        .cal-table td { height: 40px !important; font-size: 0.9rem !important; padding: 2px !important; }
-    </style>""", unsafe_allow_html=True)
+    st.markdown("""<style>.cal-table td { height: 40px !important; font-size: 0.9rem !important; padding: 2px !important; }</style>""", unsafe_allow_html=True)
 
     occu = {}
     df_mois = pd.DataFrame()
@@ -155,14 +164,19 @@ elif st.session_state.page == "PLANNING":
         df['dt'] = df['DateNav'].apply(parse_d)
         df_mois = df[(df['dt'].dt.year == p_y) & (df['dt'].dt.month == p_m)].sort_values('dt')
         
+        # --- LOGIQUE DE COLORATION MULTI-JOURS ---
         for _, r in df.iterrows():
             if "🔴" not in str(r.get('Statut','')):
-                d_s = r['dt']
-                if d_s.year == p_y and d_s.month == p_m:
-                    soc = str(r.get('Société','')).upper()
-                    occu[d_s.day] = "day-cmn" if soc == "CMN" else "day-ok"
+                date_debut = r['dt']
+                nb_jours = int(to_f(r.get('NbJours', 1)))
+                soc = str(r.get('Société','')).upper()
+                
+                for j in range(nb_jours):
+                    jour_courant = date_debut + timedelta(days=j)
+                    if jour_courant.year == p_y and jour_courant.month == p_m:
+                        occu[jour_courant.day] = "day-cmn" if soc == "CMN" else "day-ok"
 
-    # 2. Affichage Calendrier Compact
+    # Affichage Calendrier
     cal = calendar.monthcalendar(p_y, p_m)
     h = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
     for wk in cal:
@@ -173,31 +187,24 @@ elif st.session_state.page == "PLANNING":
         h += '</tr>'
     st.markdown(h + '</table>', unsafe_allow_html=True)
 
-    # 3. Liste détaillée des contacts en dessous
+    # Liste Contacts avec Durée
     st.markdown("---")
-    st.subheader(f"👥 Contacts de {calendar.month_name[p_m]}")
-    
+    st.subheader(f"👥 Détails {calendar.month_name[p_m]}")
     if not df_mois.empty:
-        # On regroupe par date pour voir qui navigue ensemble
-        groupes = df_mois.groupby('DateNav')
-        for date_nav, gp in groupes:
-            st.markdown(f"**📅 {date_nav}**")
-            for _, r in gp.iterrows():
-                nom_c = f"{r.get('Prénom','')} {r.get('Nom','').upper()}"
-                soc = str(r.get('Société','')).upper()
-                tel = str(r.get('Téléphone','')).strip().replace(" ","")
-                
-                col_n, col_w = st.columns([3, 1])
-                col_n.markdown(f"• {nom_c} (_{soc}_)")
-                
-                # Bouton WhatsApp rapide pour chaque contact
-                if tel and tel != "nan":
-                    if tel.startswith("0"): tel = "33" + tel[1:]
-                    link_wa = f"https://wa.me/{tel}"
-                    col_w.markdown(f'<a href="{link_wa}" target="_blank" style="background:#25d366; color:white; padding:2px 8px; border-radius:10px; text-decoration:none; font-size:0.7rem;">💬 WA</a>', unsafe_allow_html=True)
-            st.markdown("---")
+        for _, r in df_mois.iterrows():
+            nom_c = f"{r.get('Prénom','')} {r.get('Nom','').upper()}"
+            soc = str(r.get('Société','')).upper()
+            nb_j = int(to_f(r.get('NbJours', 1)))
+            
+            col_n, col_w = st.columns([3, 1])
+            col_n.markdown(f"**{r.get('DateNav')}** : {nom_c} (_{soc}_) - **{nb_j} j**")
+            
+            tel = str(r.get('Téléphone','')).strip().replace(" ","")
+            if tel and tel != "nan":
+                if tel.startswith("0"): tel = "33" + tel[1:]
+                col_w.markdown(f'<a href="https://wa.me/{tel}" target="_blank" style="background:#25d366; color:white; padding:2px 8px; border-radius:10px; text-decoration:none; font-size:0.7rem;">💬 WA</a>', unsafe_allow_html=True)
     else:
-        st.info("Aucune navigation enregistrée pour ce mois.")
+        st.info("Aucune navigation ce mois-ci.")
 
 elif st.session_state.page == "STATS":
     st.markdown('<div class="page-title">💰 STATISTIQUES ANNUELLES</div>', unsafe_allow_html=True)
@@ -244,6 +251,7 @@ elif st.session_state.page == "LOGBOOK":
 elif st.session_state.page == "NOTES":
     st.markdown('<div class="page-title">📝 NOTES PERSONNELLES</div>', unsafe_allow_html=True)
     st.text_area("Bloc-notes :", placeholder="Écrivez vos rappels ici...")
+
 
 
 
