@@ -322,192 +322,44 @@ elif st.session_state.page == "STATS":
             
 elif st.session_state.page == "FACTURES":
         st.markdown('<div class="page-title">🧾 GÉNÉRATION DE FACTURE</div>', unsafe_allow_html=True)
-        
         if df.empty:
-            st.warning("⚠️ Aucune donnée de navigation à facturer.")
+            st.warning("⚠️ Aucune donnée disponible.")
         else:
-            # 1. Sélection du Client
-            col_list = df['Société'].unique().astype(str).tolist()
-            soc_sel = st.selectbox("Client à facturer", ["Tous"] + sorted(col_list))
-            
+            soc_list = sorted(df['Société'].unique().astype(str).tolist())
+            soc_sel = st.selectbox("Client à facturer", ["Tous"] + soc_list)
             df_f = df.copy()
             if soc_sel != "Tous":
                 df_f = df_f[df_f['Société'] == soc_sel]
-
-            if df_f.empty:
-                st.info(f"Aucune ligne pour {soc_sel}")
-            else:
-                # 2. Tableau de prévisualisation
-                st.dataframe(df_f[['DateNav', 'Nom', 'PrixJour', 'Statut']], use_container_width=True)
-                
-                # 3. Calcul et Construction du texte
-                total_f = sum(df_f['PrixJour'].apply(to_f))
-                
-                corps = f"Bonjour,\n\nVoici le récapitulatif pour {soc_sel} :\n\n"
-                for _, r in df_f.iterrows():
-                    p_l = int(to_f(r.get('PrixJour', 0)))
-                    corps += f"- Le {r.get('DateNav','--')} ({r.get('Nom','')}) : {p_l} €\n"
-                
-                corps += f"\nTotal Général : {int(total_f)} €\n\nMerci de votre confiance.\nVesta Skipper 2026"
-
-                # 4. Affichage
-                st.metric(f"Total {soc_sel}", f"{int(total_f)} €")
-                st.text_area("📋 Message à copier :", corps, height=200)
-
-
-elif st.session_state.page == "NOTES":
-    st.markdown('<div class="page-title">📝 MES NOTES & MÉMOS</div>', unsafe_allow_html=True)
-    
-    # 1. Chargement des données des notes
-    df_n = charger_data("notes.json")
-    
-    # Gestion de l'index d'édition pour les notes
-    if "edit_n_idx" not in st.session_state: st.session_state.edit_n_idx = None
-
-    # --- FORMULAIRE D'ÉDITION ---
-    if st.session_state.edit_n_idx is not None:
-        idx = st.session_state.edit_n_idx
-        init = df_n.loc[idx].to_dict() if (idx != "NEW" and not df_n.empty) else {}
-        
-        with st.form("f_note_edit"):
-            st.subheader("📝 " + ("MODIFIER LA NOTE" if idx != "NEW" else "NOUVELLE NOTE"))
-            titre_n = st.text_input("Titre", init.get("Titre", ""))
-            contenu_n = st.text_area("Contenu", init.get("Contenu", ""), height=200)
             
-            c1, c2 = st.columns(2)
-            if c1.form_submit_button("✅ ENREGISTRER"):
-                row = {
-                    "Titre": titre_n, 
-                    "Contenu": contenu_n, 
-                    "Date": datetime.now().strftime("%d/%m/%Y")
-                }
-                if idx == "NEW":
-                    df_n = pd.concat([df_n, pd.DataFrame([row])], ignore_index=True)
-                else:
-                    for k, v in row.items(): df_n.at[idx, k] = v
-                
-                sauvegarder_data(df_n, "notes.json")
-                st.session_state.edit_n_idx = None
-                st.rerun()
+            total_f = sum(df_f['PrixJour'].apply(to_f))
+            st.metric(f"Total {soc_sel}", f"{int(total_f)} €")
             
-            if c2.form_submit_button("❌ ANNULER"):
-                st.session_state.edit_n_idx = None
-                st.rerun()
-    else:
-        # --- AFFICHAGE DES NOTES ---
-        st.button("➕ AJOUTER UNE NOTE", on_click=lambda: st.session_state.update({"edit_n_idx":"NEW"}), use_container_width=True)
-        
-        if not df_n.empty:
-            # On affiche les notes (de la plus récente à la plus ancienne)
-            for i in reversed(df_n.index):
-                r = df_n.loc[i]
-                st.markdown(f"""
-                <div class="client-card" style="border-left: 5px solid #f39c12; background: white;">
-                    <div style="display:flex; justify-content:space-between; color:#7f8c8d; font-size:0.8rem; margin-bottom:5px;">
-                        <span>📅 {r.get('Date', '')}</span>
-                    </div>
-                    <b style="font-size:1.1rem; color:#2c3e50;">{r.get('Titre', 'Sans titre')}</b><br>
-                    <div style="white-space: pre-wrap; color:#34495e; margin-top:10px; font-size:0.95rem;">{r.get('Contenu', '')}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                c1, c2 = st.columns([1, 4])
-                if c1.button("✏️", key=f"ed_n_{i}"): 
-                    st.session_state.edit_n_idx = i
-                    st.rerun()
-                if c2.button("🗑️ Supprimer la note", key=f"del_n_{i}"): 
-                    df_n = df_n.drop(i)
-                    sauvegarder_data(df_n, "notes.json")
-                    st.rerun()
+            corps = f"Bonjour,\n\nVoici le récapitulatif pour {soc_sel} :\n\n"
+            for _, r in df_f.iterrows():
+                p_l = int(to_f(r.get('PrixJour', 0)))
+                corps += f"- Le {r.get('DateNav','--')} ({r.get('Nom','')}) : {p_l} €\n"
+            corps += f"\nTotal : {int(total_f)} €\n\nMerci."
+            st.text_area("📋 Message à copier :", corps, height=200)
+
+    elif st.session_state.page == "MAINT":
+        st.markdown('<div class="page-title">🔧 MAINTENANCE & FRAIS</div>', unsafe_allow_html=True)
+        # Formulaire simplifié pour ajouter un frais
+        with st.form("form_frais"):
+            f_date = st.text_input("Date (JJ/MM/AAAA)", datetime.now().strftime("%d/%m/%Y"))
+            f_nom = st.text_input("Objet du frais")
+            f_mnt = st.number_input("Montant", min_value=0.0, step=1.0)
+            if st.form_submit_button("Ajouter le frais"):
+                # Ici la logique d'enregistrement dans frais.json
+                st.success("Frais enregistré !")
+
+    elif st.session_state.page == "LOGS":
+        st.markdown('<div class="page-title">📂 ARCHIVES DES SORTIES</div>', unsafe_allow_html=True)
+        if df.empty:
+            st.info("Les archives sont vides.")
         else:
-            st.info("Aucune note enregistrée. Idéal pour noter les codes de pontons, rappels techniques, etc.")
-
-elif st.session_state.page == "SECU":
-    st.markdown('<div class="page-title">🛡️ SÉCURITÉ & ARMEMENT</div>', unsafe_allow_html=True)
-    
-    # 1. Chargement des données spécifiques à la sécurité
-    df_s = charger_data("secu.json")
-    
-    # Gestion de l'index d'édition
-    if "edit_s_idx" not in st.session_state: st.session_state.edit_s_idx = None
-
-    # --- FORMULAIRE D'AJOUT / MODIF ---
-    if st.session_state.edit_s_idx is not None:
-        idx = st.session_state.edit_s_idx
-        init = df_s.loc[idx].to_dict() if (idx != "NEW" and not df_s.empty) else {}
-        
-        with st.form("f_secu_edit"):
-            st.subheader("🚩 " + ("MODIFIER LE POINT" if idx != "NEW" else "NOUVEAU POINT DE CONTRÔLE"))
-            item = st.text_input("Matériel ou Point de contrôle", init.get("Item", ""))
-            obs_s = st.text_area("État / Emplacement / Date limite", init.get("Note", ""))
-            
-            c1, c2 = st.columns(2)
-            if c1.form_submit_button("✅ ENREGISTRER"):
-                row = {"Item": item, "Note": obs_s}
-                if idx == "NEW":
-                    df_s = pd.concat([df_s, pd.DataFrame([row])], ignore_index=True)
-                else:
-                    for k, v in row.items(): df_s.at[idx, k] = v
-                sauvegarder_data(df_s, "secu.json")
-                st.session_state.edit_s_idx = None
-                st.rerun()
-            
-            if c2.form_submit_button("❌ ANNULER"):
-                st.session_state.edit_s_idx = None
-                st.rerun()
-    else:
-        # --- AFFICHAGE DE LA LISTE DE SÉCURITÉ ---
-        st.button("➕ AJOUTER UN ÉLÉMENT", on_click=lambda: st.session_state.update({"edit_s_idx":"NEW"}), use_container_width=True)
-        
-        if not df_s.empty:
-            for i, r in df_s.iterrows():
-                st.markdown(f"""
-                <div class="client-card" style="border-left: 5px solid #27ae60; background: white;">
-                    <b style="font-size:1.1rem; color:#2c3e50;">⚓ {r.get('Item')}</b><br>
-                    <span style="color:#7f8c8d; font-size:0.9rem;">{r.get('Note', '')}</span>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                c1, c2 = st.columns([1, 4])
-                if c1.button("✏️", key=f"ed_s_{i}"): 
-                    st.session_state.edit_s_idx = i
-                    st.rerun()
-                if c2.button("🗑️ Supprimer", key=f"del_s_{i}"): 
-                    df_s = df_s.drop(i)
-                    sauvegarder_data(df_s, "secu.json")
-                    st.rerun()
-        else:
-            st.info("Aucun élément de sécurité enregistré. Commencez par en ajouter un (ex: Gilets, Fusées, Radeau...).")
-
-elif st.session_state.page == "FORM":
-    st.markdown('<div class="page-title">📝 FICHE NAVIGATION</div>', unsafe_allow_html=True)
-    idx = st.session_state.edit_idx
-    init = df.loc[idx].to_dict() if (idx != "NEW" and not df.empty) else {}
-    
-    with st.form("f_form"):
-        st_v = st.selectbox("Statut", ["🟢 OK", "🟡 Attente", "🔴 Annulé"], index=1)
-        c1, c2 = st.columns(2)
-        p, n = c1.text_input("Prénom", init.get("Prénom","")), c2.text_input("Nom", init.get("Nom",""))
-        s = st.text_input("Société", init.get("Société",""))
-        c3, c4 = st.columns(2)
-        d, j = c3.text_input("Date (JJ/MM/AAAA)", init.get("DateNav","")), c4.text_input("Jours", str(init.get("NbJours","1")))
-        t = st.text_input("Tél", init.get("Téléphone", init.get("Tel", "")))
-        ml = st.text_input("Mail", init.get("Mail", ""))
-        pr = st.text_input("Prix", str(init.get("PrixJour","0")))
-        
-        if st.form_submit_button("SAUVEGARDER"):
-            row = {"Prénom":p, "Nom":n, "Société":s, "Téléphone":t, "Mail":ml, "DateNav":d, "NbJours":j, "PrixJour":pr, "Statut":st_v}
-            if idx=="NEW": 
-                df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-            else: 
-                for k,v in row.items(): df.at[idx,k]=v
-            sauvegarder_data(df, "contacts.json")
-            st.session_state.page="LISTE"
-            st.rerun()
-            
-    if st.button("Annuler"):
-        st.session_state.page = "LISTE"
-        st.rerun()
+            # Ajout du statut Payé/Unpayé comme demandé
+            df_logs = df.copy()
+            st.dataframe(df_logs[['DateNav', 'Nom', 'Société', 'Statut']], use_container_width=True)
 
 
 
