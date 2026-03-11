@@ -120,30 +120,40 @@ elif st.session_state.page == "PLANNING":
 elif st.session_state.page == "STATS":
     st.markdown('<div class="page-title">📊 STATISTIQUES & RÉSULTATS</div>', unsafe_allow_html=True)
     
-    # Calcul du NET
-    ca = df[(df.get('Statut','')=="OK") & (df.get('Paiement','')=="Paid")]['Prix'].apply(to_f).sum()
-    frais = df_maint['Montant'].apply(to_f).sum()
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Encaissé (Paid)", f"{ca} €")
-    col2.metric("Maintenance", f"{frais} €")
-    col3.metric("NET", f"{ca - frais} €")
-
-    st.markdown("---")
-    # Tableau Stats Mensuel sans colonne index (commence par Mois)
     if not df.empty:
-        df['Mois'] = df['DateNav'].apply(lambda x: parse_d(x).month)
-        st_m = df.groupby('Mois')['Prix'].sum().reset_index()
-        st.table(st_m.set_index('Mois')) # Supprime la colonne 0,1,2...
+        # Nettoyage de sécurité : enlève les espaces dans les noms de colonnes
+        df.columns = [c.strip() for c in df.columns]
+        
+        # Vérification de la colonne Prix (ou prix)
+        col_prix = 'Prix' if 'Prix' in df.columns else ('prix' if 'prix' in df.columns else None)
+        
+        if col_prix:
+            # Calcul du NET sécurisé
+            ca = df[(df.get('Statut','')=="OK") & (df.get('Paiement','')=="Paid")][col_prix].apply(to_f).sum()
+            frais = df_maint['Montant'].apply(to_f).sum() if not df_maint.empty else 0.0
+            
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Encaissé (Paid)", f"{ca} €")
+            c2.metric("Maintenance", f"{frais} €")
+            c3.metric("NET", f"{ca - frais} €")
 
-    # Boutons Modifier / Effacer avec Verrouillage
+            st.markdown("---")
+            # Tableau par mois (commence par le mois)
+            if 'DateNav' in df.columns:
+                df['Mois'] = df['DateNav'].apply(lambda x: parse_d(x).month)
+                st_m = df.groupby('Mois')[col_prix].sum().reset_index()
+                st.table(st_m.set_index('Mois'))
+        else:
+            st.error("La colonne 'Prix' est introuvable dans le fichier contacts.json")
+
+    # Boutons de gestion
     c_m1, c_m2 = st.columns(2)
     if c_m1.button("✏️ MODIFIER LES STATS"):
-        st.warning("Mode modification activé. Attention aux doublons.")
+        st.info("Mode modification : les champs sont déverrouillés.")
     
     if c_m2.button("🗑️ EFFACER LES DONNÉES"):
-        if st.checkbox("Confirmer la suppression totale ?"):
-            st.error("Action irréversible.")
+        if st.checkbox("Confirmer la suppression ?"):
+            st.warning("Action en attente de validation finale.")
 
 # --- LOGS (Livre de bord) ---
 elif st.session_state.page == "LOGS":
@@ -154,11 +164,25 @@ elif st.session_state.page == "LOGS":
 # --- FACTURES ---
 elif st.session_state.page == "FACTURES":
     st.markdown('<div class="page-title">📄 FACTURES</div>', unsafe_allow_html=True)
+    
     if not df.empty:
-        soc = st.selectbox("Client", df['Société'].unique())
-        total = df[df['Société'] == soc]['Prix'].apply(to_f).sum()
-        st.write(f"Récapitulatif pour **{soc}**")
-        st.metric("Total à facturer", f"{total} €")
+        df.columns = [c.strip() for c in df.columns]
+        col_soc = 'Société' if 'Société' in df.columns else 'societe'
+        col_prix = 'Prix' if 'Prix' in df.columns else 'prix'
+        
+        if col_soc in df.columns and col_prix in df.columns:
+            soc_list = df[col_soc].unique()
+            soc_sel = st.selectbox("Choisir un Client / Bureau", soc_list)
+            
+            total = df[df[col_soc] == soc_sel][col_prix].apply(to_f).sum()
+            
+            st.write(f"Récapitulatif pour : **{soc_sel}**")
+            st.metric(f"Total à facturer", f"{total} €")
+            
+            if st.button("Générer l'aperçu"):
+                st.text_area("Libellé facture", f"Prestation de skipper - {soc_sel}\nMontant total : {total} €")
+        else:
+            st.error("Colonnes 'Société' ou 'Prix' manquantes.")
 
 # --- SÉCURITÉ ---
 elif st.session_state.page == "SECU":
@@ -182,6 +206,7 @@ elif st.session_state.page == "NOTES":
     note_libre = st.text_area("Bloc-notes général", height=400)
     if st.button("Enregistrer les notes"):
         st.success("Notes sauvegardées (Simulation)")
+
 
 
 
