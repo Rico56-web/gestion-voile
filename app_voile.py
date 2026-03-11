@@ -137,12 +137,24 @@ if st.session_state.page == "LISTE":
 
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING & CROISIÈRES</div>', unsafe_allow_html=True)
-    p_y = st.selectbox("Année", [2025, 2026, 2027], index=1)
-    p_m = st.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
     
+    # 1. Contrôles plus compacts
+    c1, c2 = st.columns(2)
+    p_y = c1.selectbox("Année", [2025, 2026, 2027], index=1)
+    p_m = c2.selectbox("Mois", range(1, 13), index=datetime.now().month-1, format_func=lambda x: calendar.month_name[x])
+    
+    # Style pour réduire la taille du calendrier
+    st.markdown("""<style>
+        .cal-table td { height: 40px !important; font-size: 0.9rem !important; padding: 2px !important; }
+    </style>""", unsafe_allow_html=True)
+
     occu = {}
+    df_mois = pd.DataFrame()
+
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
+        df_mois = df[(df['dt'].dt.year == p_y) & (df['dt'].dt.month == p_m)].sort_values('dt')
+        
         for _, r in df.iterrows():
             if "🔴" not in str(r.get('Statut','')):
                 d_s = r['dt']
@@ -150,6 +162,7 @@ elif st.session_state.page == "PLANNING":
                     soc = str(r.get('Société','')).upper()
                     occu[d_s.day] = "day-cmn" if soc == "CMN" else "day-ok"
 
+    # 2. Affichage Calendrier Compact
     cal = calendar.monthcalendar(p_y, p_m)
     h = '<table class="cal-table"><tr><th>LU</th><th>MA</th><th>ME</th><th>JE</th><th>VE</th><th>SA</th><th>DI</th></tr>'
     for wk in cal:
@@ -159,6 +172,32 @@ elif st.session_state.page == "PLANNING":
             h += f'<td {style}>{d if d != 0 else ""}</td>'
         h += '</tr>'
     st.markdown(h + '</table>', unsafe_allow_html=True)
+
+    # 3. Liste détaillée des contacts en dessous
+    st.markdown("---")
+    st.subheader(f"👥 Contacts de {calendar.month_name[p_m]}")
+    
+    if not df_mois.empty:
+        # On regroupe par date pour voir qui navigue ensemble
+        groupes = df_mois.groupby('DateNav')
+        for date_nav, gp in groupes:
+            st.markdown(f"**📅 {date_nav}**")
+            for _, r in gp.iterrows():
+                nom_c = f"{r.get('Prénom','')} {r.get('Nom','').upper()}"
+                soc = str(r.get('Société','')).upper()
+                tel = str(r.get('Téléphone','')).strip().replace(" ","")
+                
+                col_n, col_w = st.columns([3, 1])
+                col_n.markdown(f"• {nom_c} (_{soc}_)")
+                
+                # Bouton WhatsApp rapide pour chaque contact
+                if tel and tel != "nan":
+                    if tel.startswith("0"): tel = "33" + tel[1:]
+                    link_wa = f"https://wa.me/{tel}"
+                    col_w.markdown(f'<a href="{link_wa}" target="_blank" style="background:#25d366; color:white; padding:2px 8px; border-radius:10px; text-decoration:none; font-size:0.7rem;">💬 WA</a>', unsafe_allow_html=True)
+            st.markdown("---")
+    else:
+        st.info("Aucune navigation enregistrée pour ce mois.")
 
 elif st.session_state.page == "STATS":
     st.markdown('<div class="page-title">💰 STATISTIQUES ANNUELLES</div>', unsafe_allow_html=True)
@@ -205,6 +244,7 @@ elif st.session_state.page == "LOGBOOK":
 elif st.session_state.page == "NOTES":
     st.markdown('<div class="page-title">📝 NOTES PERSONNELLES</div>', unsafe_allow_html=True)
     st.text_area("Bloc-notes :", placeholder="Écrivez vos rappels ici...")
+
 
 
 
