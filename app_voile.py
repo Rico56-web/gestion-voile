@@ -36,7 +36,20 @@ def charger_data(file):
         res = requests.get(url, headers={"Authorization": f"token {token}"})
         if res.status_code == 200:
             content = res.json()['content']
-            return pd.DataFrame(json.loads(base64.b64decode(content).decode('utf-8')))
+            df_raw = pd.DataFrame(json.loads(base64.b64decode(content).decode('utf-8')))
+            
+            # NETTOYAGE AUTOMATIQUE DES COLONNES
+            # 1. Enlever les espaces avant/après
+            df_raw.columns = [c.strip() for c in df_raw.columns]
+            # 2. Harmoniser les noms critiques pour le code
+            mapping = {
+                'prix': 'Prix', 'PRIX': 'Prix', 'Montant': 'Prix',
+                'société': 'Société', 'societe': 'Société', 'SOCIETE': 'Société',
+                'prénom': 'Prénom', 'prenom': 'Prénom',
+                'nom': 'Nom', 'NOM': 'Nom'
+            }
+            df_raw = df_raw.rename(columns=mapping)
+            return df_raw
         return pd.DataFrame()
     except: return pd.DataFrame()
 
@@ -206,6 +219,7 @@ elif st.session_state.page == "NOTES":
     note_libre = st.text_area("Bloc-notes général", height=400)
     if st.button("Enregistrer les notes"):
         st.success("Notes sauvegardées (Simulation)")
+
 
 
 
