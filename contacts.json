@@ -48,7 +48,7 @@
     {
         "DateNav":"14\/03\/2026",
         "NbJours":"2",
-        "Statut":"\ud83d\udfe1 Attente",
+        "Statut":"OK",
         "Nom":"BANDIM FAUSTINO",
         "Pr\u00e9nom":"Pedro",
         "T\u00e9l\u00e9phone":"+41762218767",
@@ -64,7 +64,7 @@
         "dt_sort":null,
         "dt":1773446400000,
         "Mail":null,
-        "Paiement":null,
+        "Paiement":"Pas pay\u00e9",
         "Notes":null,
         "Prix":null
     },
