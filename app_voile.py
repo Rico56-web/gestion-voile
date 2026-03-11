@@ -91,9 +91,7 @@ for i, (l, p) in enumerate(menu):
         st.session_state.page = p; st.rerun()
 
 # --- 4. LOGIQUE DES PAGES ---
-
-
-            tel = str(r.get('Téléphone', '')).strip()
+        tel = str(r.get('Téléphone', '')).strip()
             mail = str(r.get('Mail', '')).strip()
             
             # Calcul de la couleur du badge
@@ -232,6 +230,7 @@ elif st.session_state.page == "LOGBOOK":
 elif st.session_state.page == "NOTES":
     st.markdown('<div class="page-title">📝 NOTES PERSONNELLES</div>', unsafe_allow_html=True)
     st.text_area("Bloc-notes :", placeholder="Écrivez vos rappels ici...")
+
 
 
 
