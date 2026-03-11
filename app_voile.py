@@ -112,7 +112,6 @@ for i, (l, p) in enumerate(menu):
             </div>""", unsafe_allow_html=True)
 
 # --- REMPLACEMENT DU BLOC LISTE ET PLANNING ---
-
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
     
@@ -147,6 +146,7 @@ if st.session_state.page == "LISTE":
         else:
             # Affichage des fiches
             for i, r in data.sort_values('dt', ascending=(st.session_state.view_mode=="FUTURES")).iterrows():
+                # --- ZONE CRITIQUE D'ALIGNEMENT ---
                 soc = str(r.get('Société','')).upper()
                 statut = str(r.get('Statut','🟡 Attente'))
                 tel = str(r.get('Téléphone', '')).strip()
@@ -173,6 +173,8 @@ if st.session_state.page == "LISTE":
                 if cd.checkbox("🗑️", key=f"del_l_{i}"):
                     if st.button("Confirmer", key=f"conf_l_{i}"): 
                         df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
+
+
 
 
 elif st.session_state.page == "PLANNING":
@@ -278,6 +280,7 @@ elif st.session_state.page == "LOGBOOK":
 elif st.session_state.page == "NOTES":
     st.markdown('<div class="page-title">📝 NOTES PERSONNELLES</div>', unsafe_allow_html=True)
     st.text_area("Bloc-notes :", placeholder="Écrivez vos rappels ici...")
+
 
 
 
