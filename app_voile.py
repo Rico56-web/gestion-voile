@@ -5,12 +5,13 @@ import pandas as pd
 import json
 import time
 
-# --- 1. STYLE CSS (BOÎTE UNIQUE) ---
+# --- 1. STYLE CSS (BOÎTE UNIQUE & OMBRES) ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 st.markdown("""<style>
     .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; }
+    .page-title { background: #1a2a6c; color: white; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
     
-    /* LA FICHE ENTIÈRE */
+    /* LA FICHE ENTIÈRE - STRUCTURE CORRIGÉE */
     .fiche-globale { 
         border: 2px solid #1a2a6c; 
         border-radius: 12px; 
@@ -20,13 +21,12 @@ st.markdown("""<style>
         overflow: hidden;
     }
     
-    .section-haute { padding: 20px; border-bottom: 1px solid #eee; }
+    .section-haute { padding: 20px; border-bottom: 1px solid #eee; background: white; }
     .section-basse { padding: 15px; background-color: #f8f9fc; } /* Zone notes et boutons */
     
     .prenom-style { font-size: 1.8rem; font-weight: bold; color: #1a2a6c; margin: 0; }
-    .nom-style { font-size: 1.2rem; text-transform: uppercase; color: #555; }
     .contact-verif { font-family: monospace; color: #e67e22; font-weight: bold; font-size: 1.1rem; }
-    .statut-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; color: white; margin-left: 5px; }
+    .statut-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; color: white; margin-left: 5px; display: inline-block; }
     
     .btn-contact { 
         display: inline-block; padding: 8px 14px; border-radius: 6px; 
@@ -35,12 +35,21 @@ st.markdown("""<style>
     }
 </style>""", unsafe_allow_html=True)
 
-# --- 2. FONCTIONS ---
+# --- 2. FONCTIONS DE SÉCURITÉ ---
 def to_f(val):
     try:
         if pd.isna(val) or str(val).strip() == "": return 0.0
         return float(str(val).replace(',', '.').replace('€', '').replace(' ', '').strip())
     except: return 0.0
+
+def safe_get_index(liste, valeur, par_defaut=0):
+    """Évite l'erreur ValueError si le statut est mal écrit dans le JSON"""
+    try:
+        val_clean = str(valeur).strip().lower()
+        for i, item in enumerate(liste):
+            if item.lower() == val_clean: return i
+        return par_defaut
+    except: return par_defaut
 
 def charger_data(file):
     try:
@@ -60,7 +69,7 @@ def sauvegarder_data(df, file):
     res = requests.get(url, headers={"Authorization": f"token {token}"})
     sha = res.json().get('sha') if res.status_code == 200 else None
     content = base64.b64encode(df.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
-    requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": "Update", "content": content, "sha": sha})
+    requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": "Update Vesta", "content": content, "sha": sha})
 
 # --- 3. NAVIGATION ---
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
@@ -69,15 +78,16 @@ if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
 df = charger_data("contacts.json")
 df_maint = charger_data("maintenance.json")
 
-st.markdown('<div class="main-header">⚓ SKIPPER VESTA 2026</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
 m = st.columns(6)
-pages = [("📋 CONTACTS","CONTACTS"), ("💰 STATS","STATS"), ("🔧 MAINT","MAINT")]
-for i, (label, p) in enumerate(pages):
+p_config = [("📋 CONTACTS","CONTACTS"), ("💰 STATS","STATS"), ("🔧 MAINT","MAINT")]
+for i, (label, p) in enumerate(p_config):
     if m[i].button(label, use_container_width=True, type="primary" if st.session_state.page==p else "secondary"):
         st.session_state.page = p; st.session_state.edit_idx = None; st.rerun()
 
 # --- 4. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
+    
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         r = df.loc[idx]
@@ -90,22 +100,30 @@ if st.session_state.page == "CONTACTS":
             u_tel = c1.text_input("Téléphone", value=r.get('Téléphone',''))
             u_mail = c2.text_input("Email", value=r.get('Mail',''))
             u_soc = c3.text_input("Société", value=r.get('Société',''))
-            u_statut = st.selectbox("Statut", ["En attente", "OK", "Refusé"], index=["En attente", "OK", "Refusé"].index(r.get('Statut', 'En attente')))
-            u_paye = st.selectbox("Paiement", ["Pas payé", "Payé"], index=["Pas payé", "Payé"].index(r.get('Paiement', 'Pas payé')))
+            
+            s_list = ["En attente", "OK", "Refusé"]
+            p_list = ["Pas payé", "Payé"]
+            u_statut = st.selectbox("Statut Mission", s_list, index=safe_get_index(s_list, r.get('Statut')))
+            u_paye = st.selectbox("Paiement", p_list, index=safe_get_index(p_list, r.get('Paiement')))
             u_notes = st.text_area("Notes", value=r.get('Notes',''))
-            if st.form_submit_button("SAUVEGARDER"):
+            
+            if st.form_submit_button("💾 ENREGISTRER"):
                 df.at[idx, 'Prénom'], df.at[idx, 'Nom'], df.at[idx, 'Prix'] = u_pre, u_nom, to_f(u_prix)
                 df.at[idx, 'Téléphone'], df.at[idx, 'Mail'], df.at[idx, 'Société'] = u_tel, u_mail, u_soc
                 df.at[idx, 'Statut'], df.at[idx, 'Paiement'], df.at[idx, 'Notes'] = u_statut, u_paye, u_notes
                 sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
-            if st.form_submit_button("ANNULER"): st.session_state.edit_idx = None; st.rerun()
+            if st.form_submit_button("❌ ANNULER"): st.session_state.edit_idx = None; st.rerun()
+    
     else:
         for i, r in df.iterrows():
             tel, mail = str(r.get('Téléphone','')).strip(), str(r.get('Mail','')).strip()
-            col_s = {"OK": "#2ecc71", "En attente": "#f1c40f", "Refusé": "#e74c3c"}.get(r.get('Statut'), "#95a5a6")
-            col_p = "#2ecc71" if r.get('Paiement') == "Payé" else "#e74c3c"
             
-            # --- OUVERTURE DE LA FICHE ---
+            # Gestion robuste des couleurs
+            s_val = str(r.get('Statut','')).upper()
+            p_val = str(r.get('Paiement','')).upper()
+            col_s = "#2ecc71" if "OK" in s_val else "#e74c3c" if "REFUS" in s_val else "#f1c40f"
+            col_p = "#2ecc71" if "PAYÉ" in p_val and "PAS" not in p_val else "#e74c3c"
+
             st.markdown(f"""
             <div class="fiche-globale">
                 <div class="section-haute">
@@ -116,57 +134,64 @@ if st.session_state.page == "CONTACTS":
                     <div class="prenom-style">{r.get('Prénom','')} {str(r.get('Nom','')).upper()}</div>
                     <div class="contact-verif">📞 {tel} | ✉️ {mail}</div>
                     <p style="margin-top:10px;">🏢 <b>{r.get('Société','')}</b> | 💰 <b>{r.get('Prix',0)} €</b></p>
-                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appeler</a>
-                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Email</a>
-                    <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">💬 WhatsApp</a>
+                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
+                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
+                    <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                 </div>
                 <div class="section-basse">
             """, unsafe_allow_html=True)
             
-            # --- CONTENU STREAMLIT (DANS LA SECTION BASSE) ---
-            cn, cb = st.columns([0.65, 0.35])
-            cn.write(f"**Notes :** {r.get('Notes','')}")
-            with cb:
+            c_notes, c_btns = st.columns([0.65, 0.35])
+            c_notes.write(f"**Notes :** {r.get('Notes','')}")
+            with c_btns:
                 if st.button("✏️ MODIFIER", key=f"ed_{i}", use_container_width=True):
                     st.session_state.edit_idx = i; st.rerun()
-                if st.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
-                    st.session_state[f"conf_{i}"] = True
                 
-                if st.session_state.get(f"conf_{i}"):
+                if st.button("🗑️ SUPPRIMER", key=f"pre_del_{i}", use_container_width=True):
+                    st.session_state[f"ask_del_{i}"] = True
+                
+                if st.session_state.get(f"ask_del_{i}"):
                     if st.checkbox("Confirmer ?", key=f"chk_{i}"):
-                        if st.button("Valider", key=f"fdel_{i}", type="primary", use_container_width=True):
+                        if st.button("Valider", key=f"real_del_{i}", type="primary", use_container_width=True):
                             df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
             
-            # --- FERMETURE DE LA FICHE ---
             st.markdown('</div></div>', unsafe_allow_html=True)
 
-# --- 5. PAGE MAINTENANCE (Même Structure) ---
+# --- 5. PAGE MAINTENANCE ---
 elif st.session_state.page == "MAINT":
     st.markdown('<div class="page-title">🔧 REGISTRE DE MAINTENANCE</div>', unsafe_allow_html=True)
-    # (Formulaire d'ajout identique...)
+    # Formulaire d'ajout simplifié pour l'exemple
+    with st.expander("➕ Ajouter un frais"):
+        with st.form("new_m"):
+            obj, mt = st.text_input("Objet"), st.text_input("Montant")
+            if st.form_submit_button("Ajouter"):
+                df_maint = pd.concat([df_maint, pd.DataFrame([{"Objet": obj, "Montant": to_f(mt), "Date": "2026"}])], ignore_index=True)
+                sauvegarder_data(df_maint, "maintenance.json"); st.rerun()
+
     for i, r in df_maint.iterrows():
         st.markdown(f"""<div class="fiche-globale"><div class="section-haute">
                 <div class="prenom-style">{r.get('Objet','')}</div>
-                <div class="contact-verif">📅 {r.get('Date','')} | 💰 {r.get('Montant',0)} €</div>
+                <div class="contact-verif">💰 {r.get('Montant',0)} €</div>
             </div><div class="section-basse">""", unsafe_allow_html=True)
-        cn, cb = st.columns([0.65, 0.35])
-        cn.write("Dépense liée à l'entretien du Vesta.")
-        if cb.button("🗑️ SUPPRIMER", key=f"dm_{i}", use_container_width=True):
+        if st.button("🗑️ SUPPRIMER", key=f"dm_{i}", use_container_width=True):
             df_maint = df_maint.drop(i); sauvegarder_data(df_maint, "maintenance.json"); st.rerun()
         st.markdown('</div></div>', unsafe_allow_html=True)
 
 # --- 6. PAGE STATS ---
 elif st.session_state.page == "STATS":
     st.markdown('<div class="page-title">📊 BILAN FINANCIER 2026</div>', unsafe_allow_html=True)
-    acquis = df[(df['Statut']=="OK") & (df['Paiement']=="Payé")]['Prix'].apply(to_f).sum()
-    prev = df[(df['Statut']=="En attente") | ((df['Statut']=="OK") & (df['Paiement']=="Pas payé"))]['Prix'].apply(to_f).sum()
-    maint = df_maint['Montant'].apply(to_f).sum() if not df_maint.empty else 0.0
-    c1, c2, c3 = st.columns(3)
-    c1.metric("💰 ACQUIS", f"{acquis} €")
-    c2.metric("⏳ PRÉVISIONNEL", f"{prev} €")
-    c3.metric("🔧 FRAIS", f"{maint} €")
-    st.divider()
-    st.header(f"Bénéfice estimé : {acquis + prev - maint} €")
+    if not df.empty:
+        acquis = df[(df['Statut']=="OK") & (df['Paiement']=="Payé")]['Prix'].apply(to_f).sum()
+        prev = df[(df['Statut']=="En attente") | ((df['Statut']=="OK") & (df['Paiement']=="Pas payé"))]['Prix'].apply(to_f).sum()
+        frais = df_maint['Montant'].apply(to_f).sum() if not df_maint.empty else 0.0
+        
+        c1, c2, c3 = st.columns(3)
+        c1.metric("💰 ACQUIS", f"{acquis} €")
+        c2.metric("⏳ PRÉVISIONNEL", f"{prev} €")
+        c3.metric("🔧 FRAIS", f"{frais} €")
+        st.divider()
+        st.header(f"Bénéfice estimé : {acquis + prev - frais} €")
+
 
 
 
