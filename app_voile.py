@@ -5,13 +5,12 @@ import pandas as pd
 import json
 import time
 
-# --- 1. STYLE CSS (BOÎTE UNIQUE & TEXTE SANS COUPURE) ---
+# --- 1. STYLE CSS (BOÎTE UNIQUE & TEXTE COMPLET) ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 st.markdown("""<style>
     .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; }
     .page-title { background: #1a2a6c; color: white; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
     
-    /* LA FICHE ENTIÈRE */
     .fiche-globale { 
         border: 2px solid #1a2a6c; 
         border-radius: 12px; 
@@ -24,19 +23,19 @@ st.markdown("""<style>
     .section-haute { padding: 20px; border-bottom: 1px solid #eee; background: white; }
     .section-basse { padding: 15px; background-color: #f8f9fc; } 
     
-    /* FIX : Empêcher la coupure du prénom/nom */
+    /* FIX : Affichage complet du prénom et nom */
     .prenom-style { 
-        font-size: 1.6rem; /* Taille légèrement réduite pour plus de confort */
+        font-size: 1.7rem; 
         font-weight: bold; 
         color: #1a2a6c; 
         margin: 0;
-        white-space: nowrap; /* Empêche le retour à la ligne */
-        overflow: hidden; 
-        text-overflow: ellipsis; /* Ajoute "..." si c'est vraiment trop long au lieu de couper moche */
+        line-height: 1.2;
+        word-wrap: break-word; /* Permet de passer à la ligne si trop long */
+        overflow: visible;     /* S'assure que rien n'est caché */
     }
     
-    .contact-verif { font-family: monospace; color: #e67e22; font-weight: bold; font-size: 1.1rem; }
-    .statut-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; color: white; margin-left: 5px; display: inline-block; }
+    .contact-verif { font-family: monospace; color: #e67e22; font-weight: bold; font-size: 1.1rem; margin: 5px 0; }
+    .statut-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; color: white; margin-left: 5px; display: inline-block; margin-bottom: 5px; }
     
     .btn-contact { 
         display: inline-block; padding: 8px 14px; border-radius: 6px; 
@@ -91,12 +90,11 @@ st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allo
 m = st.columns(6)
 p_config = [("📋 CONTACTS","CONTACTS"), ("💰 STATS","STATS"), ("🔧 MAINT","MAINT")]
 for i, (label, p) in enumerate(p_config):
-    if m[i].button(label, use_container_width=True, type="primary" if st.session_state.page==p else "secondary"):
+    if m[i].button(label, key=f"nav_{p}", use_container_width=True, type="primary" if st.session_state.page==p else "secondary"):
         st.session_state.page = p; st.session_state.edit_idx = None; st.rerun()
 
 # --- 4. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
-    
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         r = df.loc[idx]
@@ -109,20 +107,16 @@ if st.session_state.page == "CONTACTS":
             u_tel = c1.text_input("Téléphone", value=r.get('Téléphone',''))
             u_mail = c2.text_input("Email", value=r.get('Mail',''))
             u_soc = c3.text_input("Société", value=r.get('Société',''))
-            
-            s_list = ["En attente", "OK", "Refusé"]
-            p_list = ["Pas payé", "Payé"]
+            s_list, p_list = ["En attente", "OK", "Refusé"], ["Pas payé", "Payé"]
             u_statut = st.selectbox("Statut Mission", s_list, index=safe_get_index(s_list, r.get('Statut')))
             u_paye = st.selectbox("Paiement", p_list, index=safe_get_index(p_list, r.get('Paiement')))
             u_notes = st.text_area("Notes", value=r.get('Notes',''))
-            
             if st.form_submit_button("💾 ENREGISTRER"):
                 df.at[idx, 'Prénom'], df.at[idx, 'Nom'], df.at[idx, 'Prix'] = u_pre, u_nom, to_f(u_prix)
                 df.at[idx, 'Téléphone'], df.at[idx, 'Mail'], df.at[idx, 'Société'] = u_tel, u_mail, u_soc
                 df.at[idx, 'Statut'], df.at[idx, 'Paiement'], df.at[idx, 'Notes'] = u_statut, u_paye, u_notes
                 sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
             if st.form_submit_button("❌ ANNULER"): st.session_state.edit_idx = None; st.rerun()
-    
     else:
         for i, r in df.iterrows():
             tel, mail = str(r.get('Téléphone','')).strip(), str(r.get('Mail','')).strip()
@@ -133,8 +127,8 @@ if st.session_state.page == "CONTACTS":
             st.markdown(f"""
             <div class="fiche-globale">
                 <div class="section-haute">
-                    <div style="float:right;">
-                        <span class="statut-badge" style="background:{col_s};">{r.get('Statut','En attente')}</span>
+                    <div style="float:right; text-align:right;">
+                        <span class="statut-badge" style="background:{col_s};">{r.get('Statut','En attente')}</span><br>
                         <span class="statut-badge" style="background:{col_p};">{r.get('Paiement','Pas payé')}</span>
                     </div>
                     <div class="prenom-style">{r.get('Prénom','')} {str(r.get('Nom','')).upper()}</div>
@@ -160,7 +154,7 @@ if st.session_state.page == "CONTACTS":
                             df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
             st.markdown('</div></div>', unsafe_allow_html=True)
 
-# --- 5. PAGE MAINTENANCE (Même Style) ---
+# --- 5. PAGE MAINTENANCE ---
 elif st.session_state.page == "MAINT":
     st.markdown('<div class="page-title">🔧 REGISTRE DE MAINTENANCE</div>', unsafe_allow_html=True)
     with st.expander("➕ Ajouter un frais"):
@@ -193,6 +187,7 @@ elif st.session_state.page == "STATS":
         c3.metric("🔧 FRAIS", f"{frais} €")
         st.divider()
         st.header(f"Bénéfice estimé : {acquis + prev - frais} €")
+
 
 
 
