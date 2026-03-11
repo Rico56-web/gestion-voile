@@ -116,40 +116,64 @@ for i, (l, p) in enumerate(menu):
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
     
+    # 1. Barre de recherche et Filtres
     search_term = st.text_input("🔍 Rechercher par Nom ou Prénom", "").strip().lower()
+    
     c1, c2 = st.columns(2)
     if c1.button("🚀 FUTURES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): 
         st.session_state.view_mode="FUTURES"; st.rerun()
     if c2.button("📂 PASSÉES", use_container_width=True, type="primary" if st.session_state.view_mode=="PASSÉES" else "secondary"): 
         st.session_state.view_mode="PASSÉES"; st.rerun()
     
+    # Bouton de création
+    st.button("➕ NOUVELLE FICHE", on_click=lambda: st.session_state.update({"edit_idx":"NEW", "page":"FORM"}), use_container_width=True)
+    
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
         today = datetime.now().replace(hour=0, minute=0, second=0)
+        
+        # Filtre Passées / Futures
         data = df[df['dt'] >= today] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < today]
         
+        # Logique de recherche
         if search_term:
-            data = data[(data['Nom'].str.lower().str.contains(search_term, na=False)) | 
-                        (data['Prénom'].str.lower().str.contains(search_term, na=False))]
-for i, r in data.sort_values('dt').iterrows():
-            soc = str(r.get('Société','')).upper()
-            statut = str(r.get('Statut','🟡 Attente'))
-            tel = str(r.get('Téléphone', '')).strip()
-            mail = str(r.get('Mail', '')).strip()
-            nb_j = int(to_f(r.get('NbJours', 1))) 
-            
-            # Calcul de la couleur du badge
-            b_col = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
-            
-            st.markdown(f"""
-            <div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
-                <div class="status-badge" style="color:{b_col}; border-color:{b_col}; background:{b_col}15;">{statut}</div>
-                <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
-                🏢 <b>{soc}</b> | 📅 {r.get('DateNav')} <b>({nb_j} j)</b><br>
-                📞 {tel} | ✉️ {mail}<br><br>
-                <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
-                <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
-            </div>""", unsafe_allow_html=True)
+            data = data[
+                (data['Nom'].str.lower().str.contains(search_term, na=False)) | 
+                (data['Prénom'].str.lower().str.contains(search_term, na=False))
+            ]
+        
+        if data.empty:
+            st.info("Aucun résultat pour cette recherche.")
+        else:
+            # Affichage des fiches
+            for i, r in data.sort_values('dt', ascending=(st.session_state.view_mode=="FUTURES")).iterrows():
+                soc = str(r.get('Société','')).upper()
+                statut = str(r.get('Statut','🟡 Attente'))
+                tel = str(r.get('Téléphone', '')).strip()
+                mail = str(r.get('Mail', '')).strip()
+                nb_j = int(to_f(r.get('NbJours', 1)))
+                
+                # Couleur du badge selon le statut
+                b_col = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
+
+                st.markdown(f"""
+                <div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
+                    <div class="status-badge" style="color:{b_col}; border-color:{b_col}; background:{b_col}15;">{statut}</div>
+                    <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
+                    🏢 <b>{soc}</b> | 📅 {r.get('DateNav')} <b>({nb_j} j)</b><br>
+                    📞 {tel} | ✉️ {mail}<br><br>
+                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
+                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
+                </div>""", unsafe_allow_html=True)
+                
+                # Boutons d'édition
+                ce, cd = st.columns([1, 4])
+                if ce.button("✏️", key=f"ed_l_{i}"): 
+                    st.session_state.edit_idx = i; st.session_state.page = "FORM"; st.rerun()
+                if cd.checkbox("🗑️", key=f"del_l_{i}"):
+                    if st.button("Confirmer", key=f"conf_l_{i}"): 
+                        df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
+
 
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING & CROISIÈRES</div>', unsafe_allow_html=True)
@@ -254,6 +278,7 @@ elif st.session_state.page == "LOGBOOK":
 elif st.session_state.page == "NOTES":
     st.markdown('<div class="page-title">📝 NOTES PERSONNELLES</div>', unsafe_allow_html=True)
     st.text_area("Bloc-notes :", placeholder="Écrivez vos rappels ici...")
+
 
 
 
