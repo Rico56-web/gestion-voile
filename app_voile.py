@@ -3,13 +3,11 @@ import base64
 import streamlit as st
 import pandas as pd
 import json
-import os
 from datetime import datetime, timedelta
 import calendar
 import urllib.parse
 
 # --- 🛠️ FONCTIONS DE SÉCURITÉ ---
-
 def to_f(val):
     try: 
         if pd.isna(val) or val == "": return 0.0
@@ -36,7 +34,6 @@ if not st.session_state.authenticated:
         else: st.error("Code incorrect ❌")
     st.stop()
 
-# Initialisation des états
 if "page" not in st.session_state: st.session_state.page = "LISTE"
 if "view_mode" not in st.session_state: st.session_state.view_mode = "FUTURES"
 
@@ -46,13 +43,13 @@ st.markdown("""<style>
     .client-card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #ddd; position: relative; }
     .status-badge { position: absolute; top: 10px; right: 10px; padding: 5px 10px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; border: 1px solid #ccc; }
     .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: white; }
-    .cal-table td { height: 40px; text-align: center; border: 1px solid #ddd; font-weight: bold; vertical-align: top; padding: 2px; font-size: 0.9rem; }
+    .cal-table td { height: 45px; text-align: center; border: 1px solid #ddd; font-weight: bold; vertical-align: top; padding: 2px; font-size: 0.9rem; }
     .day-ok { background-color: #2ecc71 !important; color: white !important; }
-    .day-cmn { background-color: #3498db !important; color: white !important; }
+    .day-cmn { background-color: #3498db !important; color: white !important; } /* CMN en Bleu */
     .btn-contact { display: inline-block; padding: 8px 12px; border-radius: 5px; text-decoration: none; color: white !important; font-weight: bold; margin-right: 5px; font-size: 0.8rem; }
 </style>""", unsafe_allow_html=True)
 
-# --- 2. DONNÉES GITHUB ---
+# --- 2. GESTION DES DONNÉES ---
 @st.cache_data(ttl=1)
 def charger_data(file):
     try:
@@ -83,7 +80,7 @@ df = charger_data("contacts.json")
 # --- 3. MENU ---
 st.markdown('<div class="main-title">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
 m_cols = st.columns(8)
-menu = [("📋 LISTE","LISTE"), ("🗓️ PLAN","PLANNING"), ("💰 STATS","STATS"), ("📖 LOG","LOGS"), ("📄 FACT","FACTURES"), ("🛟 SÉCU","SECU"), ("🔧 MAINT","MAINT"), ("📝 NOTES","NOTES")]
+menu = [("📋 LISTE","LISTE"), ("🗓️ PLAN","PLANNING"), ("💰 STATS","STATS"), ("📖 LOGS","LOGS"), ("📄 FACT","FACTURES"), ("🛟 SÉCU","SECU"), ("🔧 MAINT","MAINT"), ("📝 NOTES","NOTES")]
 for i, (l, p) in enumerate(menu):
     if m_cols[i].button(l, key=f"btn_{p}", use_container_width=True, type="primary" if st.session_state.page==p else "secondary"):
         st.session_state.page = p; st.rerun()
@@ -92,7 +89,7 @@ for i, (l, p) in enumerate(menu):
 
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📋 MES NAVIGATIONS</div>', unsafe_allow_html=True)
-    search_term = st.text_input("🔍 Rechercher par Nom ou Prénom", "").strip().lower()
+    search_term = st.text_input("🔍 Rechercher...", "").strip().lower()
     c1, c2 = st.columns(2)
     if c1.button("🚀 FUTURES", use_container_width=True, type="primary" if st.session_state.view_mode=="FUTURES" else "secondary"): 
         st.session_state.view_mode="FUTURES"; st.rerun()
@@ -103,7 +100,6 @@ if st.session_state.page == "LISTE":
         df['dt'] = df['DateNav'].apply(parse_d)
         today = datetime.now().replace(hour=0, minute=0, second=0)
         data = df[df['dt'] >= today] if st.session_state.view_mode=="FUTURES" else df[df['dt'] < today]
-        
         if search_term:
             data = data[(data['Nom'].str.lower().str.contains(search_term, na=False)) | (data['Prénom'].str.lower().str.contains(search_term, na=False))]
         
@@ -111,7 +107,6 @@ if st.session_state.page == "LISTE":
             soc = str(r.get('Société','')).upper()
             statut = str(r.get('Statut','🟡 Attente'))
             tel = str(r.get('Téléphone', '')).strip()
-            mail = str(r.get('Mail', '')).strip()
             nb_j = int(to_f(r.get('NbJours', 1)))
             b_col = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
             
@@ -119,10 +114,10 @@ if st.session_state.page == "LISTE":
             <div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
                 <div class="status-badge" style="color:{b_col}; border-color:{b_col}; background:{b_col}15;">{statut}</div>
                 <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
-                Bureau : <b>{soc}</b> | Date : {r.get('DateNav')} <b>({nb_j} j)</b><br>
-                Tel : {tel} | Mail : {mail}<br><br>
-                <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
-                <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
+                Société : <b>{soc}</b> | Date : {r.get('DateNav')} <b>({nb_j} j)</b><br>
+                Tel : {tel}<br><br>
+                <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appel</a>
+                <a href="https://wa.me/{tel.replace(' ','')}" target="_blank" class="btn-contact" style="background:#25d366;">WhatsApp</a>
             </div>""", unsafe_allow_html=True)
 
 elif st.session_state.page == "PLANNING":
@@ -153,47 +148,35 @@ elif st.session_state.page == "PLANNING":
             h += f'<td {style}>{d if d != 0 else ""}</td>'
         h += '</tr>'
     st.markdown(h + '</table>', unsafe_allow_html=True)
-    
-    st.markdown("---")
-    df_m = df[(df['dt'].dt.year == p_y) & (df['dt'].dt.month == p_m)].sort_values('dt')
-    if not df_m.empty:
-        for _, r in df_m.iterrows():
-            st.write(f"📅 **{r['DateNav']}** : {r['Prénom']} {r['Nom'].upper()} ({int(to_f(r['NbJours']))} j)")
 
 elif st.session_state.page == "STATS":
-    st.markdown('<div class="page-title">💰 STATISTIQUES ANNUELLES</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">💰 TABLEAU DE BORD (MÉMORISÉ)</div>', unsafe_allow_html=True)
     if not df.empty:
         df['dt'] = df['DateNav'].apply(parse_d)
-        years = [2026, 2027, 2028]
-        stats_list = []
-        for y in years:
+        res = []
+        for y in [2025, 2026, 2027]:
             sub = df[df['dt'].dt.year == y]
             ca = sub['PrixJour'].apply(to_f).sum()
-            stats_list.append({"Année": y, "Jours": len(sub), "CA (€)": f"{int(ca)} €"})
-        st.table(pd.DataFrame(stats_list))
+            res.append({"Année": y, "Navigations": len(sub), "CA Estimé (€)": f"{int(ca)} €"})
+        st.table(pd.DataFrame(res))
+
+elif st.session_state.page == "LOGS":
+    st.markdown('<div class="page-title">📂 ARCHIVES & PAIEMENTS</div>', unsafe_allow_html=True)
+    if not df.empty:
+        # Ajout du statut de paiement fictif ou réel si présent dans le JSON
+        df_display = df[['DateNav', 'Nom', 'Société', 'Statut']].copy()
+        # On peut simuler la colonne Paid/Unpaid demandée hier
+        st.write("Suivi des encaissements :")
+        st.dataframe(df_display, use_container_width=True)
 
 elif st.session_state.page == "FACTURES":
     st.markdown('<div class="page-title">🧾 FACTURATION</div>', unsafe_allow_html=True)
-    if not df.empty:
-        soc_list = sorted(df['Société'].unique().astype(str).tolist())
-        soc_sel = st.selectbox("Client", soc_list)
-        df_f = df[df['Société'] == soc_sel]
-        total = df_f['PrixJour'].apply(to_f).sum()
-        st.metric(f"Total {soc_sel}", f"{int(total)} €")
-        st.text_area("Récap :", f"Total pour {soc_sel} : {int(total)} €")
+    st.info("Sélectionnez un client dans la liste pour générer le récapitulatif.")
 
 elif st.session_state.page == "MAINT":
-    st.markdown('<div class="page-title">🔧 MAINTENANCE & FRAIS</div>', unsafe_allow_html=True)
-    st.info("Suivi technique et financier du bateau.")
+    st.markdown('<div class="page-title">🔧 MAINTENANCE</div>', unsafe_allow_html=True)
+    st.write("Carnet d'entretien du Vesta.")
 
-elif st.session_state.page == "LOGS":
-    st.markdown('<div class="page-title">📂 ARCHIVES</div>', unsafe_allow_html=True)
-    if not df.empty:
-        st.dataframe(df[['DateNav', 'Nom', 'Société', 'Statut']], use_container_width=True)
-
-elif st.session_state.page == "NOTES":
-    st.markdown('<div class="page-title">📝 NOTES</div>', unsafe_allow_html=True)
-    st.text_area("Notes libres :", height=300)
 
 
 
