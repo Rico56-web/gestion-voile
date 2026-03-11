@@ -2,7 +2,7 @@
     {
         "DateNav":"01\/03\/2026",
         "NbJours":4,
-        "Statut":"\ud83d\udfe2 OK",
+        "Statut":"En attente",
         "Nom":"PHILIPPE",
         "Pr\u00e9nom":"Elisabeth",
         "T\u00e9l\u00e9phone":"0602468634",
@@ -18,7 +18,7 @@
         "dt_sort":1772323200000.0,
         "dt":1772323200000,
         "Mail":null,
-        "Paiement":"Paid",
+        "Paiement":"Pas pay\u00e9",
         "Notes":"Sympa et cool  . Elle est venue avec sa fille de 15ans",
         "Prix":476.0
     },
