@@ -166,8 +166,8 @@ elif st.session_state.page == "MAINT":
         st.table(df_maint)
     else:
         st.info("Aucun frais enregistré dans maintenance.json")
-
-# --- PAGE : STATS (Calcul du NET) ---
+        
+     # --- PAGE : STATS (Calcul du NET) ---
 elif st.session_state.page == "STATS":
     st.markdown('<div class="page-title">📊 RÉSULTAT NET</div>', unsafe_allow_html=True)
     
@@ -191,6 +191,8 @@ elif st.session_state.page == "STATS":
     """, unsafe_allow_html=True)
 
 
+
+
 elif st.session_state.page == "STATS":
     st.markdown('<div class="page-title">📊 STATS & NET</div>', unsafe_allow_html=True)
     
@@ -202,6 +204,7 @@ elif st.session_state.page == "STATS":
     c1.metric("Revenus (OK/Paid)", f"{ca} €")
     c2.metric("Frais (Maint)", f"{frais} €")
     c3.metric("NET FINAL", f"{ca - frais} €")
+
 
 
 
