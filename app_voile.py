@@ -12,7 +12,7 @@ st.markdown("""<style>
     .fiche-complete { border: 2px solid #1a2a6c; border-radius: 12px; overflow: hidden; margin-bottom: 25px; background-color: white; }
     .zone-infos { padding: 18px; background: white; }
     .zone-actions { padding: 15px; background: #f1f3f6; border-top: 1px solid #1a2a6c; }
-    .statut-badge { padding: 4px 10px; border-radius: 15px; font-size: 0.85rem; font-weight: bold; color: white; }
+    .statut-badge { padding: 4px 10px; border-radius: 15px; font-size: 0.85rem; font-weight: bold; color: white; margin-left: 5px; }
 </style>""", unsafe_allow_html=True)
 
 # --- 2. FONCTIONS TECHNIQUES ---
@@ -59,78 +59,93 @@ for i, (label, p) in enumerate(pages):
 # --- 4. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
     
+    # --- FORMULAIRE DE MODIFICATION ---
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         r = df.loc[idx]
-        with st.form("edit_form"):
-            st.subheader(f"Détails : {r['Prénom']} {r['Nom']}")
+        
+        # Sécurité pour les index des selectbox
+        list_statut = ["En attente", "OK", "Refusé"]
+        idx_statut = list_statut.index(r.get('Statut')) if r.get('Statut') in list_statut else 0
+        
+        list_paye = ["Pas payé", "Payé"]
+        idx_paye = list_paye.index(r.get('Paiement')) if r.get('Paiement') in list_paye else 0
+
+        with st.form("form_edit_contact"):
+            st.subheader(f"Détails : {r.get('Prénom','')} {r.get('Nom','')}")
             c1, c2, c3 = st.columns(3)
             u_pre = c1.text_input("Prénom", value=r.get('Prénom',''))
             u_nom = c2.text_input("Nom", value=r.get('Nom',''))
             u_prix = c3.text_input("Prix (€)", value=str(r.get('Prix','0')))
             
-            # --- NOUVEAUX STATUTS ---
             s1, s2 = st.columns(2)
-            u_statut = s1.selectbox("Statut Mission", ["En attente", "OK", "Refusé"], index=["En attente", "OK", "Refusé"].index(r.get('Statut', 'En attente')))
-            u_paiement = s2.selectbox("Paiement", ["Pas payé", "Payé"], index=["Pas payé", "Payé"].index(r.get('Paiement', 'Pas payé')))
+            u_statut = s1.selectbox("Statut Mission", list_statut, index=idx_statut)
+            u_paiement = s2.selectbox("Paiement", list_paye, index=idx_paye)
             
             u_notes = st.text_area("Notes", value=r.get('Notes',''))
             
-            if st.form_submit_button("💾 SAUVEGARDER"):
-                df.at[idx, 'Prénom'], df.at[idx, 'Nom'], df.at[idx, 'Prix'] = u_pre, u_nom, to_f(u_prix)
-                df.at[idx, 'Statut'], df.at[idx, 'Paiement'], df.at[idx, 'Notes'] = u_statut, u_paiement, u_notes
+            # BOUTONS DU FORMULAIRE (Indispensables ici)
+            col_b1, col_b2 = st.columns(2)
+            if col_b1.form_submit_button("💾 ENREGISTRER"):
+                df.at[idx, 'Prénom'] = u_pre
+                df.at[idx, 'Nom'] = u_nom
+                df.at[idx, 'Prix'] = to_f(u_prix)
+                df.at[idx, 'Statut'] = u_statut
+                df.at[idx, 'Paiement'] = u_paiement
+                df.at[idx, 'Notes'] = u_notes
                 sauvegarder_data(df, "contacts.json")
-                st.session_state.edit_idx = None; st.rerun()
+                st.session_state.edit_idx = None
+                st.rerun()
+                
+            if col_b2.form_submit_button("❌ ANNULER"):
+                st.session_state.edit_idx = None
+                st.rerun()
+
+    # --- LISTE DES CONTACTS ---
     else:
         for i, r in df.iterrows():
-            # Couleurs de badge
-            color_s = {"OK": "#2ecc71", "En attente": "#f1c40f", "Refusé": "#e74c3c"}.get(r.get('Statut'), "#95a5a6")
-            color_p = "#2ecc71" if r.get('Paiement') == "Payé" else "#e74c3c"
+            col_s = {"OK": "#2ecc71", "En attente": "#f1c40f", "Refusé": "#e74c3c"}.get(r.get('Statut'), "#95a5a6")
+            col_p = "#2ecc71" if r.get('Paiement') == "Payé" else "#e74c3c"
             
             st.markdown(f"""
             <div class="fiche-complete">
                 <div class="zone-infos">
                     <div style="float:right;">
-                        <span class="statut-badge" style="background:{color_s};">{r.get('Statut', 'En attente')}</span>
-                        <span class="statut-badge" style="background:{color_p};">{r.get('Paiement', 'Pas payé')}</span>
+                        <span class="statut-badge" style="background:{col_s};">{r.get('Statut', 'En attente')}</span>
+                        <span class="statut-badge" style="background:{col_p};">{r.get('Paiement', 'Pas payé')}</span>
                     </div>
-                    <div class="prenom-style">{r['Prénom']} {str(r['Nom']).upper()}</div>
+                    <div class="prenom-style">{r.get('Prénom','')} {str(r.get('Nom','')).upper()}</div>
                     <p>💰 <b>{r.get('Prix', 0)} €</b> | 🏢 {r.get('Société','')}</p>
                 </div>
                 <div class="zone-actions">
             """, unsafe_allow_html=True)
-            c_n, c_b = st.columns([0.7, 0.3])
-            c_n.write(f"**Notes :** {r.get('Notes','')}")
-            if c_b.button("✏️ DÉTAILS / STATUT", key=f"ed_{i}", use_container_width=True):
-                st.session_state.edit_idx = i; st.rerun()
+            
+            cn, cb = st.columns([0.7, 0.3])
+            cn.write(f"**Notes :** {r.get('Notes','')}")
+            if cb.button("✏️ DÉTAILS / STATUT", key=f"btn_{i}", use_container_width=True):
+                st.session_state.edit_idx = i
+                st.rerun()
             st.markdown('</div></div>', unsafe_allow_html=True)
 
-# --- 5. PAGE STATS (LOGIQUE FINANCIÈRE) ---
+# --- 5. PAGE STATS (Logique Financière) ---
 elif st.session_state.page == "STATS":
     st.markdown('<div class="page-title">📊 BILAN FINANCIER 2026</div>', unsafe_allow_html=True)
-    
     if not df.empty:
-        # 1. ACQUIS : Statut OK ET Payé
-        mask_acquis = (df['Statut'] == "OK") & (df['Paiement'] == "Payé")
-        acquis = df[mask_acquis]['Prix'].apply(to_f).sum()
-        
-        # 2. PRÉVISIONNEL : (En attente) OU (OK mais Pas payé)
-        # On exclut les "Refusé"
-        mask_prev = ((df['Statut'] == "En attente") | ((df['Statut'] == "OK") & (df['Paiement'] == "Pas payé")))
-        previsionnel = df[mask_prev]['Prix'].apply(to_f).sum()
-        
-        # 3. MAINTENANCE
+        # ACQUIS : OK + Payé
+        acquis = df[(df['Statut']=="OK") & (df['Paiement']=="Payé")]['Prix'].apply(to_f).sum()
+        # PRÉVISIONNEL : En attente OU (OK + Pas payé)
+        prev = df[(df['Statut']=="En attente") | ((df['Statut']=="OK") & (df['Paiement']=="Pas payé"))]['Prix'].apply(to_f).sum()
+        # FRAIS
         maint = df_maint['Montant'].apply(to_f).sum() if not df_maint.empty else 0.0
         
-        # AFFICHAGE
         c1, c2, c3 = st.columns(3)
-        c1.metric("💰 ACQUIS (Net encaissé)", f"{acquis} €")
-        c2.metric("⏳ PRÉVISIONNEL", f"{previsionnel} €")
-        c3.metric("🔧 FRAIS (Maint.)", f"{maint} €")
-        
+        c1.metric("💰 ACQUIS", f"{acquis} €")
+        c2.metric("⏳ PRÉVISIONNEL", f"{prev} €")
+        c3.metric("🔧 FRAIS", f"{maint} €")
         st.divider()
-        st.subheader("Total Estimé (Acquis + Prév.)")
-        st.header(f"{acquis + previsionnel - maint} €")
+        st.subheader("Bénéfice estimé (Acquis + Prév. - Frais)")
+        st.header(f"{acquis + prev - maint} €")
+
 
 
 
