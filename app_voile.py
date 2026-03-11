@@ -13,12 +13,8 @@ st.markdown("""<style>
     .page-title { background: #1a2a6c; color: white; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
     
     .fiche-globale { 
-        border: 2px solid #1a2a6c; 
-        border-radius: 12px; 
-        background-color: white;
-        margin-bottom: 35px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        overflow: hidden;
+        border: 2px solid #1a2a6c; border-radius: 12px; background-color: white;
+        margin-bottom: 35px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); overflow: hidden;
     }
     
     .section-haute { padding: 20px; border-bottom: 1px solid #eee; background: white; }
@@ -51,7 +47,6 @@ def safe_get_index(liste, valeur, par_defaut=0):
         val_clean = str(valeur).strip().lower()
         for i, item in enumerate(liste):
             if item.lower() == val_clean: return i
-        if val_clean == "unpaid": return 0 
         return par_defaut
     except: return par_defaut
 
@@ -101,56 +96,55 @@ if st.session_state.page == "CONTACTS":
 
     st.divider()
 
+    # Liste des statuts incluant "Terminé"
+    s_list = ["En attente", "OK", "Terminé", "Refusé"]
+    p_list = ["Pas payé", "Payé"]
+
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         r = df.loc[idx]
         with st.form("edit_form"):
             st.subheader(f"Modifier : {r.get('Prénom','')} {r.get('Nom','')}")
             c1, c2, c3 = st.columns(3)
-            u_pre = c1.text_input("Prénom", value=r.get('Prénom',''))
-            u_nom = c2.text_input("Nom", value=r.get('Nom',''))
-            u_soc = c3.text_input("Société", value=r.get('Société',''))
+            u_pre, u_nom, u_soc = c1.text_input("Prénom", r.get('Prénom','')), c2.text_input("Nom", r.get('Nom','')), c3.text_input("Société", r.get('Société',''))
+            u_date, u_jours, u_prix = c1.text_input("Date", r.get('Date','')), c2.text_input("Jours", str(r.get('Jours',''))), c3.text_input("Prix total", str(r.get('Prix','0')))
+            u_tel, u_mail = c1.text_input("Tél", r.get('Téléphone','')), c2.text_input("Email", r.get('Mail',''))
             
-            u_date = c1.text_input("Date (ex: 12/05)", value=r.get('Date',''))
-            u_jours = c2.text_input("Nombre de jours", value=str(r.get('Jours','')))
-            u_prix = c3.text_input("Prix total (€)", value=str(r.get('Prix','0')))
-            
-            u_tel = c1.text_input("Téléphone", value=r.get('Téléphone',''))
-            u_mail = c2.text_input("Email", value=r.get('Mail',''))
-            
-            s_list, p_list = ["En attente", "OK", "Refusé"], ["Pas payé", "Payé"]
             u_statut = st.selectbox("Statut Mission", s_list, index=safe_get_index(s_list, r.get('Statut')))
             u_paye = st.selectbox("Paiement", p_list, index=safe_get_index(p_list, r.get('Paiement')))
             u_notes = st.text_area("Notes", value=r.get('Notes',''))
             
             if st.form_submit_button("💾 ENREGISTRER"):
-                df.at[idx, 'Prénom'], df.at[idx, 'Nom'] = u_pre, u_nom
-                df.at[idx, 'Société'], df.at[idx, 'Date'], df.at[idx, 'Jours'] = u_soc, u_date, u_jours
-                df.at[idx, 'Prix'], df.at[idx, 'Téléphone'], df.at[idx, 'Mail'] = to_f(u_prix), u_tel, u_mail
-                df.at[idx, 'Statut'], df.at[idx, 'Paiement'], df.at[idx, 'Notes'] = u_statut, u_paye, u_notes
+                df.at[idx, 'Prénom'], df.at[idx, 'Nom'], df.at[idx, 'Société'] = u_pre, u_nom, u_soc
+                df.at[idx, 'Date'], df.at[idx, 'Jours'], df.at[idx, 'Prix'] = u_date, u_jours, to_f(u_prix)
+                df.at[idx, 'Téléphone'], df.at[idx, 'Mail'], df.at[idx, 'Statut'] = u_tel, u_mail, u_statut
+                df.at[idx, 'Paiement'], df.at[idx, 'Notes'] = u_paye, u_notes
                 sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
             if st.form_submit_button("❌ ANNULER"): st.session_state.edit_idx = None; st.rerun()
     
     else:
-        # Filtrage
+        # LOGIQUE DE FILTRAGE : Terminé et Refusé vont en archive
         if st.session_state.view_archive:
-            df_display = df[df['Statut'].str.contains("Refusé", case=False, na=False)]
+            df_display = df[df['Statut'].isin(["Terminé", "Refusé"])]
         else:
-            df_display = df[~df['Statut'].str.contains("Refusé", case=False, na=False)]
+            df_display = df[~df['Statut'].isin(["Terminé", "Refusé"])]
 
         for i, r in df_display.iterrows():
             tel = str(r.get('Téléphone','')).strip()
-            mail = str(r.get('Mail','')).strip()
-            
             s_val, p_val = str(r.get('Statut','')).upper().strip(), str(r.get('Paiement','')).upper().strip()
-            col_s = "#2ecc71" if "OK" in s_val else "#e74c3c" if "REFUS" in s_val else "#f1c40f"
             
+            # Couleurs des badges
+            if s_val == "OK": col_s = "#2ecc71"
+            elif s_val == "TERMINÉ": col_s = "#3498db" # Bleu pour terminé
+            elif s_val == "REFUSÉ": col_s = "#e74c3c"
+            else: col_s = "#f1c40f" # Jaune
+
+            # Correction Unpaid et couleur Paiement
             if ("PAY" in p_val) and ("PAS" not in p_val) and ("UN" not in p_val):
                 col_p, txt_p = "#2ecc71", "Payé"
             else:
                 col_p, txt_p = "#e74c3c", "Pas payé"
 
-            # Nettoyage numéro pour WhatsApp
             tel_clean = tel.replace(' ', '').replace('-', '').replace('+', '')
 
             st.markdown(f"""
@@ -161,14 +155,12 @@ if st.session_state.page == "CONTACTS":
                         <span class="statut-badge" style="background:{col_p};">{txt_p}</span>
                     </div>
                     <div class="prenom-style">{r.get('Prénom','')} {str(r.get('Nom','')).upper()}</div>
-                    <div class="contact-verif">📞 {tel} | ✉️ {mail}</div>
+                    <div class="contact-verif">📞 {tel} | ✉️ {str(r.get('Mail',''))}</div>
                     <p style="margin-top:10px; font-size:1.1rem;">
-                        📅 <b>{r.get('Date','--')}</b> ({r.get('Jours','?')} jours) | 
-                        🏢 <b>{r.get('Société','')}</b> | 
-                        💰 <b>{r.get('Prix',0)} €</b>
+                        📅 <b>{r.get('Date','--')}</b> ({r.get('Jours','?')} j.) | 🏢 <b>{r.get('Société','')}</b> | 💰 <b>{r.get('Prix',0)} €</b>
                     </p>
                     <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appeler</a>
-                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Email</a>
+                    <a href="mailto:{r.get('Mail','')}" class="btn-contact" style="background:#e67e22;">✉️ Email</a>
                     <a href="https://wa.me/{tel_clean}" class="btn-contact" style="background:#25D366;">💬 WhatsApp</a>
                 </div>
                 <div class="section-basse">
@@ -187,8 +179,6 @@ if st.session_state.page == "CONTACTS":
                             df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
             st.markdown('</div></div>', unsafe_allow_html=True)
 
-# --- PAGES MAINT & STATS ---
-# (Reprendre le code précédent pour ces sections si nécessaire)
 
 
 
