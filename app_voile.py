@@ -242,128 +242,29 @@ elif st.session_state.page == "PLANNING":
         st.info("Aucune navigation ce mois-ci.")
         
 elif st.session_state.page == "STATS":
-    st.markdown('<div class="page-title">📊 TABLEAU DE BORD SÉCURISÉ</div>', unsafe_allow_html=True)
-    
-    if df.empty:
-        st.warning("⚠️ Aucune donnée trouvée.")
-    else:
-        # 1. Préparation & Filtre Année
-        df['dt'] = df['DateNav'].apply(parse_d)
-        an_sel = st.selectbox("Choisir l'année", [2026, 2027, 2028], index=0)
-        df_an = df[df['dt'].dt.year == an_sel].copy()
-        
-        # 2. Logique de tri ultra-précise
-        def classifier_ligne(r):
-            statut = str(r.get('Statut','')).lower()
-            paye_col = str(r.get('Paye','')).lower()
-            combinaison = statut + " " + paye_col
-            
-            # A. On élimine les annulations direct
-            if any(m in combinaison for m in ["annulé", "annule", "🔴"]):
-                return "IGNORE"
-            
-            # B. On cherche si c'est payé (mots clés positifs)
-            est_regle = any(m in combinaison for m in ["payé", "paye", "ok", "✅", "🟢"])
-            
-            if est_regle:
-                return "ENCAISSE"
-            else:
-                return "PREVISIONNEL"
+        st.markdown('<div class="page-title">📊 STATISTIQUES COMPACTES</div>', unsafe_allow_html=True)
+        # 1. Filtre année (2026-2028)
+        an_sel = st.selectbox("Année", [2026, 2027, 2028])
+        # On affiche un texte simple pour vérifier que la page charge
+        st.write(f"Affichage des stats pour {an_sel}")
+        # (Ton code de tableau compact viendra ici une fois l'alignement OK)
 
-        # Application de la logique
-        df_an['Type'] = df_an.apply(classifier_ligne, axis=1)
-        df_an['Mnt'] = df_an['PrixJour'].apply(to_f)
-        df_an['Mois_Num'] = df_an['dt'].dt.month
-
-        # 3. Chargement des frais
-        df_f = charger_data("frais.json")
-        if not df_f.empty:
-            df_f['dt_f'] = df_f['Date'].apply(parse_d)
-            df_f_an = df_f[df_f['dt_f'].dt.year == an_sel].copy()
-            df_f_an['Mnt_F'] = df_f_an['Montant'].apply(to_f)
-            df_f_an['Mois_F'] = df_f_an['dt_f'].dt.month
-        else:
-            df_f_an = pd.DataFrame()
-
-        # 4. Construction du tableau compact
-        recap = []
-        for m in range(1, 13):
-            d_m = df_an[df_an['Mois_Num'] == m]
-            
-            val_enc = int(d_m[d_m['Type'] == "ENCAISSE"]['Mnt'].sum())
-            val_prev = int(d_m[d_m['Type'] == "PREVISIONNEL"]['Mnt'].sum())
-            
-            # Calcul des frais pour ce mois
-            f_m = 0
-            if not df_f_an.empty:
-                f_m = int(df_f_an[df_f_an['Mois_F'] == m]['Mnt_F'].sum())
-            
-            if (val_enc + val_prev + f_m) > 0:
-                recap.append({
-                    "M": m,
-                    "Encaissé": val_enc,
-                    "Prév.": val_prev,
-                    "Frais": f_m,
-                    "Net": val_enc - f_m
-                })
-
-        if recap:
-            st.table(pd.DataFrame(recap))
-            
-            # Totaux
-            t_enc = sum(i['Encaissé'] for i in recap)
-            t_prev = sum(i['Prév.'] for i in recap)
-            t_frais = sum(i['Frais'] for i in recap)
-            
-            st.success(f"💰 **Encaissé Réel :** {t_enc} | ⏳ **Total en attente :** {t_prev}")
-            st.error(f"🔧 **Total Frais :** {t_frais} | ⚓ **Bénéfice Net :** {t_enc - t_frais}")
-        else:
-            st.info(f"Aucune activité enregistrée pour {an_sel}")
-            
-elif st.session_state.page == "FACTURES":
-        st.markdown('<div class="page-title">🧾 GÉNÉRATION DE FACTURE</div>', unsafe_allow_html=True)
+    elif st.session_state.page == "FACTURES":
+        st.markdown('<div class="page-title">🧾 FACTURATION</div>', unsafe_allow_html=True)
         if df.empty:
-            st.warning("⚠️ Aucune donnée.")
+            st.info("Aucune donnée.")
         else:
-            soc_list = sorted(df['Société'].unique().astype(str).tolist())
-            soc_sel = st.selectbox("Client", ["Tous"] + soc_list)
-            df_f = df.copy()
-            if soc_sel != "Tous":
-                df_f = df_f[df_f['Société'] == soc_sel]
-            
-            total_f = sum(df_f['PrixJour'].apply(to_f))
-            st.metric(f"Total {soc_sel}", f"{int(total_f)} €")
-            
-            corps = f"Bonjour,\n\nVoici le récapitulatif pour {soc_sel} :\n\n"
-            for _, r in df_f.iterrows():
-                p_l = int(to_f(r.get('PrixJour', 0)))
-                corps += f"- Le {r.get('DateNav','--')} ({r.get('Nom','')}) : {p_l} €\n"
-            corps += f"\nTotal : {int(total_f)} €\n\nMerci."
-            st.text_area("📋 Message à copier :", corps, height=150)
+            st.write("Sélectionnez une société pour générer le récapitulatif.")
 
-# --- DEBUT DU BLOC MAINT ---
     elif st.session_state.page == "MAINT":
-        st.markdown('<div class="page-title">🔧 MAINTENANCE & FRAIS</div>', unsafe_allow_html=True)
-        st.info("Gestion des frais de maintenance et de l'entretien du bateau.")
-        
-        # Petit formulaire simple pour ne pas laisser la page vide
-        with st.expander("➕ Ajouter un nouveau frais"):
-            f_objet = st.text_input("Objet (ex: Antifouling)")
-            f_montant = st.number_input("Montant (€)", min_value=0)
-            if st.button("Enregistrer le frais"):
-                st.success("Frais enregistré dans le système.")
+        st.markdown('<div class="page-title">🔧 MAINTENANCE</div>', unsafe_allow_html=True)
+        st.info("Gestion des frais et de l'entretien.")
 
-    # --- DEBUT DU BLOC LOGS ---
     elif st.session_state.page == "LOGS":
-        st.markdown('<div class="page-title">📂 ARCHIVES DES SORTIES</div>', unsafe_allow_html=True)
-        if df.empty:
-            st.warning("⚠️ Aucune archive disponible.")
-        else:
-            # On affiche le tableau avec le statut de paiement
-            cols_logs = ['DateNav', 'Nom', 'Société', 'Statut']
-            # On vérifie que les colonnes existent pour éviter un nouveau crash
-            present_cols = [c for c in cols_logs if c in df.columns]
-            st.dataframe(df[present_cols], use_container_width=True)
+        st.markdown('<div class="page-title">📂 ARCHIVES</div>', unsafe_allow_html=True)
+        if not df.empty:
+            # On affiche les colonnes essentielles pour le suivi
+            st.dataframe(df[['DateNav', 'Nom', 'Société', 'Statut']], use_container_width=True)
 
 
 
