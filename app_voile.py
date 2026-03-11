@@ -68,6 +68,61 @@ if tabs[2].button("🔧 MAINT"): st.session_state.page = "MAINT"
 if tabs[3].button("📊 STATS"): st.session_state.page = "STATS"
 
 # --- 4. PAGES ---
+# --- 4. LOGIQUE DES PAGES ---
+
+if st.session_state.page == "LISTE":
+    st.markdown('<div class="page-title">📇 FICHES CONTACTS</div>', unsafe_allow_html=True)
+    
+    search = st.text_input("🔍 Rechercher un Nom ou un Prénom").lower()
+    
+    if not df.empty:
+        # Nettoyage et Sécurité des colonnes
+        df.columns = [c.strip() for c in df.columns]
+        
+        # Filtrage (On vérifie que les colonnes existent)
+        if 'Nom' in df.columns and 'Prénom' in df.columns:
+            mask = (df['Nom'].astype(str).str.lower().str.contains(search, na=False)) | \
+                   (df['Prénom'].astype(str).str.lower().str.contains(search, na=False))
+            data_filtered = df[mask]
+        else:
+            data_filtered = df
+
+        for i, r in data_filtered.iterrows():
+            with st.container():
+                # 1. PRÉNOM (Gros)
+                st.markdown(f'<div class="prenom-style">{r.get("Prénom", "")}</div>', unsafe_allow_html=True)
+                # 2. NOM (MAJUSCULE)
+                st.markdown(f'<div class="nom-style">{str(r.get("Nom", "")).upper()}</div>', unsafe_allow_html=True)
+                
+                # Coordonnées et Infos
+                st.write(f"📞 {r.get('Téléphone','')} | ✉️ {r.get('Mail','')}")
+                st.write(f"📅 {r.get('DateNav','')} | ⏳ {r.get('NbJours','1')} j")
+                st.write(f"🏢 {r.get('Société','')} | 💰 {r.get('Prix','0')} €")
+                
+                # Zone Notes + Boutons (✏️ et 🗑️ sur la même ligne)
+                c_n, c_ed, c_de = st.columns([0.8, 0.1, 0.1])
+                with c_n:
+                    st.text_input("Notes", value=r.get('Notes',''), key=f"note_{i}", label_visibility="collapsed")
+                with c_ed:
+                    st.button("✏️", key=f"ed_{i}")
+                with c_de:
+                    st.button("🗑️", key=f"de_{i}")
+                st.divider()
+    else:
+        st.info("Aucun contact trouvé.")
+
+# --- LIGNE 117 : L'alignement doit être identique au "if" ci-dessus ---
+elif st.session_state.page == "PLANNING":
+    st.markdown('<div class="page-title">🗓️ PLANNING</div>', unsafe_allow_html=True)
+    # ... (Reste du code Planning)
+
+elif st.session_state.page == "MAINT":
+    st.markdown('<div class="page-title">🔧 MAINTENANCE & FRAIS</div>', unsafe_allow_html=True)
+    # ... (Reste du code Maint)
+
+elif st.session_state.page == "STATS":
+    st.markdown('<div class="page-title">📊 RÉSULTAT NET</div>', unsafe_allow_html=True)
+    # ... (Reste du code Stats)
 # --- PAGE : LISTE (Correction de l'ordre d'affichage) ---
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📇 FICHES CONTACTS</div>', unsafe_allow_html=True)
@@ -212,6 +267,7 @@ elif st.session_state.page == "STATS":
     c1.metric("Revenus (OK/Paid)", f"{ca} €")
     c2.metric("Frais (Maint)", f"{frais} €")
     c3.metric("NET FINAL", f"{ca - frais} €")
+
 
 
 
