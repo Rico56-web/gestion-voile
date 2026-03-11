@@ -131,10 +131,9 @@ if st.session_state.page == "LISTE":
         if search_term:
             data = data[(data['Nom'].str.lower().str.contains(search_term, na=False)) | 
                         (data['Prénom'].str.lower().str.contains(search_term, na=False))]
-      for i, r in data.sort_values('dt').iterrows():
+for i, r in data.sort_values('dt').iterrows():
             soc = str(r.get('Société','')).upper()
             statut = str(r.get('Statut','🟡 Attente'))
-            # --- CES LIGNES DOIVENT ÊTRE ALIGNÉES VERTICALEMENT ---
             tel = str(r.get('Téléphone', '')).strip()
             mail = str(r.get('Mail', '')).strip()
             nb_j = int(to_f(r.get('NbJours', 1))) 
@@ -150,8 +149,7 @@ if st.session_state.page == "LISTE":
                 📞 {tel} | ✉️ {mail}<br><br>
                 <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
                 <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
-            </div>""", unsafe_allow_html=True)  
-
+            </div>""", unsafe_allow_html=True)
 
 elif st.session_state.page == "PLANNING":
     st.markdown('<div class="page-title">🗓️ PLANNING & CROISIÈRES</div>', unsafe_allow_html=True)
@@ -256,6 +254,7 @@ elif st.session_state.page == "LOGBOOK":
 elif st.session_state.page == "NOTES":
     st.markdown('<div class="page-title">📝 NOTES PERSONNELLES</div>', unsafe_allow_html=True)
     st.text_area("Bloc-notes :", placeholder="Écrivez vos rappels ici...")
+
 
 
 
