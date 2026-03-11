@@ -9,7 +9,6 @@ import time
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 st.markdown("""<style>
     .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 20px; border-bottom: 3px solid #1a2a6c; }
-    .page-title { background: #1a2a6c; color: white; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
     .fiche-complete { border: 2px solid #1a2a6c; border-radius: 12px; overflow: hidden; margin-bottom: 25px; background-color: white; }
     .zone-infos { padding: 18px; background: white; }
     .zone-actions { padding: 15px; background: #f1f3f6; border-top: 1px solid #1a2a6c; }
@@ -133,23 +132,32 @@ if st.session_state.page == "CONTACTS":
                 <div class="zone-actions">
             """, unsafe_allow_html=True)
             
-            # BLOC GRIS : Notes et Boutons d'action
             cn, cb = st.columns([0.65, 0.35])
             with cn:
                 st.write(f"**Notes :** {r.get('Notes','')}")
             with cb:
+                # Bouton Modifier habituel
                 if st.button("✏️ MODIFIER", key=f"btn_{i}", use_container_width=True):
                     st.session_state.edit_idx = i; st.rerun()
                 
-                # Système de suppression avec confirmation
-                confirm = st.checkbox("Confirmer suppression", key=f"chk_{i}")
+                st.write("---") # Petite séparation
+                
+                # Zone de suppression compacte
                 if st.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True, type="secondary"):
-                    if confirm:
-                        df = df.drop(i)
-                        sauvegarder_data(df, "contacts.json")
-                        st.rerun()
-                    else:
-                        st.error("Cochez la case pour supprimer")
+                    st.session_state[f"confirm_del_{i}"] = True
+                
+                # Si on a cliqué sur supprimer, la case apparaît juste en dessous
+                if st.session_state.get(f"confirm_del_{i}", False):
+                    confirm = st.checkbox("⚠️ Confirmer ?", key=f"chk_{i}")
+                    if st.button("Valider la suppression", key=f"final_del_{i}", type="primary", use_container_width=True):
+                        if confirm:
+                            df = df.drop(i)
+                            sauvegarder_data(df, "contacts.json")
+                            del st.session_state[f"confirm_del_{i}"]
+                            st.rerun()
+                        else:
+                            st.warning("Cochez la case !")
+            
             st.markdown('</div></div>', unsafe_allow_html=True)
 
 # --- 5. PAGE STATS ---
@@ -167,6 +175,7 @@ elif st.session_state.page == "STATS":
         st.divider()
         st.subheader("Bénéfice estimé (Acquis + Prév. - Frais)")
         st.header(f"{acquis + prev - maint} €")
+
 
 
 
