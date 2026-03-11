@@ -9,13 +9,22 @@ import time
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 st.markdown("""<style>
     .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 20px; border-bottom: 3px solid #1a2a6c; }
+    .page-title { background: #1a2a6c; color: white; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
     .fiche-complete { border: 2px solid #1a2a6c; border-radius: 12px; overflow: hidden; margin-bottom: 25px; background-color: white; }
     .zone-infos { padding: 18px; background: white; }
     .zone-actions { padding: 15px; background: #f1f3f6; border-top: 1px solid #1a2a6c; }
-    .statut-badge { padding: 4px 10px; border-radius: 15px; font-size: 0.85rem; font-weight: bold; color: white; margin-left: 5px; }
+    .prenom-style { font-size: 1.8rem; font-weight: bold; color: #1a2a6c; }
+    .nom-style { font-size: 1.2rem; text-transform: uppercase; color: #555; }
+    .contact-verif { font-family: monospace; color: #e67e22; font-weight: bold; font-size: 1.1rem; margin: 5px 0; }
+    .statut-badge { padding: 4px 10px; border-radius: 15px; font-size: 0.85rem; font-weight: bold; color: white; margin-left: 5px; display: inline-block; }
+    .btn-contact { 
+        display: inline-block; padding: 8px 15px; border-radius: 5px; 
+        text-decoration: none; color: white !important; font-size: 0.9rem; 
+        font-weight: bold; margin-right: 10px; margin-top: 12px;
+    }
 </style>""", unsafe_allow_html=True)
 
-# --- 2. FONCTIONS TECHNIQUES ---
+# --- 2. FONCTIONS ---
 def to_f(val):
     try:
         if pd.isna(val) or str(val).strip() == "": return 0.0
@@ -40,7 +49,7 @@ def sauvegarder_data(df, file):
     res = requests.get(url, headers={"Authorization": f"token {token}"})
     sha = res.json().get('sha') if res.status_code == 200 else None
     content = base64.b64encode(df.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
-    requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": "Update Statuts", "content": content, "sha": sha})
+    requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": "Update", "content": content, "sha": sha})
 
 # --- 3. NAVIGATION ---
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
@@ -59,51 +68,52 @@ for i, (label, p) in enumerate(pages):
 # --- 4. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
     
-    # --- FORMULAIRE DE MODIFICATION ---
+    # --- MODE ÉDITION ---
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         r = df.loc[idx]
-        
-        # Sécurité pour les index des selectbox
         list_statut = ["En attente", "OK", "Refusé"]
-        idx_statut = list_statut.index(r.get('Statut')) if r.get('Statut') in list_statut else 0
-        
+        idx_s = list_statut.index(r.get('Statut')) if r.get('Statut') in list_statut else 0
         list_paye = ["Pas payé", "Payé"]
-        idx_paye = list_paye.index(r.get('Paiement')) if r.get('Paiement') in list_paye else 0
+        idx_p = list_paye.index(r.get('Paiement')) if r.get('Paiement') in list_paye else 0
 
-        with st.form("form_edit_contact"):
+        with st.form("edit_full"):
             st.subheader(f"Détails : {r.get('Prénom','')} {r.get('Nom','')}")
             c1, c2, c3 = st.columns(3)
             u_pre = c1.text_input("Prénom", value=r.get('Prénom',''))
             u_nom = c2.text_input("Nom", value=r.get('Nom',''))
             u_prix = c3.text_input("Prix (€)", value=str(r.get('Prix','0')))
             
-            s1, s2 = st.columns(2)
-            u_statut = s1.selectbox("Statut Mission", list_statut, index=idx_statut)
-            u_paiement = s2.selectbox("Paiement", list_paye, index=idx_paye)
-            
-            u_notes = st.text_area("Notes", value=r.get('Notes',''))
-            
-            # BOUTONS DU FORMULAIRE (Indispensables ici)
-            col_b1, col_b2 = st.columns(2)
-            if col_b1.form_submit_button("💾 ENREGISTRER"):
-                df.at[idx, 'Prénom'] = u_pre
-                df.at[idx, 'Nom'] = u_nom
-                df.at[idx, 'Prix'] = to_f(u_prix)
-                df.at[idx, 'Statut'] = u_statut
-                df.at[idx, 'Paiement'] = u_paiement
-                df.at[idx, 'Notes'] = u_notes
-                sauvegarder_data(df, "contacts.json")
-                st.session_state.edit_idx = None
-                st.rerun()
-                
-            if col_b2.form_submit_button("❌ ANNULER"):
-                st.session_state.edit_idx = None
-                st.rerun()
+            s1, s2, s3 = st.columns(3)
+            u_tel = s1.text_input("Téléphone", value=r.get('Téléphone',''))
+            u_mail = s2.text_input("Email", value=r.get('Mail',''))
+            u_soc = s3.text_input("Société", value=r.get('Société',''))
 
-    # --- LISTE DES CONTACTS ---
+            st.divider()
+            f1, f2 = st.columns(2)
+            u_statut = f1.selectbox("Statut Mission", list_statut, index=idx_s)
+            u_paiement = f2.selectbox("Paiement", list_paye, index=idx_p)
+            u_notes = st.text_area("Notes", value=r.get('Notes',''), height=150)
+            
+            b1, b2 = st.columns(2)
+            if b1.form_submit_button("💾 ENREGISTRER"):
+                df.at[idx, 'Prénom'], df.at[idx, 'Nom'], df.at[idx, 'Prix'] = u_pre, u_nom, to_f(u_prix)
+                df.at[idx, 'Téléphone'], df.at[idx, 'Mail'], df.at[idx, 'Société'] = u_tel, u_mail, u_soc
+                df.at[idx, 'Statut'], df.at[idx, 'Paiement'], df.at[idx, 'Notes'] = u_statut, u_paiement, u_notes
+                sauvegarder_data(df, "contacts.json")
+                st.session_state.edit_idx = None; st.rerun()
+            if b2.form_submit_button("❌ ANNULER"):
+                st.session_state.edit_idx = None; st.rerun()
+
+    # --- MODE LISTE ---
     else:
-        for i, r in df.iterrows():
+        search = st.text_input("🔍 Rechercher...").lower()
+        mask = df['Nom'].astype(str).str.lower().str.contains(search, na=False) | \
+               df['Prénom'].astype(str).str.lower().str.contains(search, na=False)
+
+        for i, r in df[mask].iterrows():
+            tel = str(r.get('Téléphone', '')).strip()
+            mail = str(r.get('Mail', '')).strip()
             col_s = {"OK": "#2ecc71", "En attente": "#f1c40f", "Refusé": "#e74c3c"}.get(r.get('Statut'), "#95a5a6")
             col_p = "#2ecc71" if r.get('Paiement') == "Payé" else "#e74c3c"
             
@@ -115,7 +125,13 @@ if st.session_state.page == "CONTACTS":
                         <span class="statut-badge" style="background:{col_p};">{r.get('Paiement', 'Pas payé')}</span>
                     </div>
                     <div class="prenom-style">{r.get('Prénom','')} {str(r.get('Nom','')).upper()}</div>
-                    <p>💰 <b>{r.get('Prix', 0)} €</b> | 🏢 {r.get('Société','')}</p>
+                    <div class="contact-verif">📞 {tel} | ✉️ {mail}</div>
+                    <p>🏢 <b>{r.get('Société','')}</b> | 💰 <b>{r.get('Prix', 0)} €</b></p>
+                    <div style="margin-top:10px;">
+                        <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
+                        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
+                        <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
+                    </div>
                 </div>
                 <div class="zone-actions">
             """, unsafe_allow_html=True)
@@ -123,19 +139,15 @@ if st.session_state.page == "CONTACTS":
             cn, cb = st.columns([0.7, 0.3])
             cn.write(f"**Notes :** {r.get('Notes','')}")
             if cb.button("✏️ DÉTAILS / STATUT", key=f"btn_{i}", use_container_width=True):
-                st.session_state.edit_idx = i
-                st.rerun()
+                st.session_state.edit_idx = i; st.rerun()
             st.markdown('</div></div>', unsafe_allow_html=True)
 
-# --- 5. PAGE STATS (Logique Financière) ---
+# --- 5. PAGE STATS ---
 elif st.session_state.page == "STATS":
     st.markdown('<div class="page-title">📊 BILAN FINANCIER 2026</div>', unsafe_allow_html=True)
     if not df.empty:
-        # ACQUIS : OK + Payé
         acquis = df[(df['Statut']=="OK") & (df['Paiement']=="Payé")]['Prix'].apply(to_f).sum()
-        # PRÉVISIONNEL : En attente OU (OK + Pas payé)
         prev = df[(df['Statut']=="En attente") | ((df['Statut']=="OK") & (df['Paiement']=="Pas payé"))]['Prix'].apply(to_f).sum()
-        # FRAIS
         maint = df_maint['Montant'].apply(to_f).sum() if not df_maint.empty else 0.0
         
         c1, c2, c3 = st.columns(3)
@@ -145,6 +157,7 @@ elif st.session_state.page == "STATS":
         st.divider()
         st.subheader("Bénéfice estimé (Acquis + Prév. - Frais)")
         st.header(f"{acquis + prev - maint} €")
+
 
 
 
