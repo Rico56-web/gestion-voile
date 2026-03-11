@@ -71,7 +71,7 @@
     {
         "DateNav":"21\/03\/2026",
         "NbJours":"2",
-        "Statut":"\ud83d\udfe1 Attente",
+        "Statut":"OK",
         "Nom":"GUILLOUX ",
         "Pr\u00e9nom":"Stephanie",
         "T\u00e9l\u00e9phone":"0000000000",
@@ -87,7 +87,7 @@
         "dt_sort":1774051200000.0,
         "dt":1774051200000,
         "Mail":null,
-        "Paiement":null,
+        "Paiement":"Pas pay\u00e9",
         "Notes":null,
         "Prix":null
     },
