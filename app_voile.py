@@ -72,16 +72,17 @@ if tabs[3].button("📊 STATS"): st.session_state.page = "STATS"
 if st.session_state.page == "LISTE":
     st.markdown('<div class="page-title">📇 FICHES CONTACTS</div>', unsafe_allow_html=True)
     search = st.text_input("🔍 Rechercher un Nom ou un Prénom").lower()
-    if not df.empty:
+if not df.empty:
     # Nettoyage des noms de colonnes (enlève les espaces invisibles)
     df.columns = [c.strip() for c in df.columns]
+    
     # Vérification de sécurité pour éviter l'AttributeError
-    if 'Nom' in df.columns and 'Prénom' in df.columns:
+if 'Nom' in df.columns and 'Prénom' in df.columns:
         # Filtrage sécurisé
         mask = (df['Nom'].astype(str).str.lower().str.contains(search, na=False)) | \
                (df['Prénom'].astype(str).str.lower().str.contains(search, na=False))
         data_filtered = df[mask]
-    else:
+else:
         st.error(f"Colonnes manquantes. Trouvées : {list(df.columns)}")
         data_filtered = df
     
@@ -213,6 +214,7 @@ elif st.session_state.page == "STATS":
     c1.metric("Revenus (OK/Paid)", f"{ca} €")
     c2.metric("Frais (Maint)", f"{frais} €")
     c3.metric("NET FINAL", f"{ca - frais} €")
+
 
 
 
