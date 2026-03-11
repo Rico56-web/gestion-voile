@@ -124,7 +124,6 @@ if st.session_state.page == "CONTACTS":
             u_notes = st.text_area("Notes", value=r.get('Notes',''))
             
             if st.form_submit_button("💾 ENREGISTRER"):
-                # Mise à jour de toutes les colonnes
                 df.at[idx, 'Prénom'], df.at[idx, 'Nom'] = u_pre, u_nom
                 df.at[idx, 'Société'], df.at[idx, 'Date'], df.at[idx, 'Jours'] = u_soc, u_date, u_jours
                 df.at[idx, 'Prix'], df.at[idx, 'Téléphone'], df.at[idx, 'Mail'] = to_f(u_prix), u_tel, u_mail
@@ -140,7 +139,9 @@ if st.session_state.page == "CONTACTS":
             df_display = df[~df['Statut'].str.contains("Refusé", case=False, na=False)]
 
         for i, r in df_display.iterrows():
-            tel, mail = str(r.get('Téléphone','')).strip(), str(r.get('Mail','')).strip()
+            tel = str(r.get('Téléphone','')).strip()
+            mail = str(r.get('Mail','')).strip()
+            
             s_val, p_val = str(r.get('Statut','')).upper().strip(), str(r.get('Paiement','')).upper().strip()
             col_s = "#2ecc71" if "OK" in s_val else "#e74c3c" if "REFUS" in s_val else "#f1c40f"
             
@@ -148,6 +149,9 @@ if st.session_state.page == "CONTACTS":
                 col_p, txt_p = "#2ecc71", "Payé"
             else:
                 col_p, txt_p = "#e74c3c", "Pas payé"
+
+            # Nettoyage numéro pour WhatsApp
+            tel_clean = tel.replace(' ', '').replace('-', '').replace('+', '')
 
             st.markdown(f"""
             <div class="fiche-globale">
@@ -165,6 +169,7 @@ if st.session_state.page == "CONTACTS":
                     </p>
                     <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appeler</a>
                     <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Email</a>
+                    <a href="https://wa.me/{tel_clean}" class="btn-contact" style="background:#25D366;">💬 WhatsApp</a>
                 </div>
                 <div class="section-basse">
             """, unsafe_allow_html=True)
@@ -183,7 +188,8 @@ if st.session_state.page == "CONTACTS":
             st.markdown('</div></div>', unsafe_allow_html=True)
 
 # --- PAGES MAINT & STATS ---
-# (Gardez le code précédent pour ces pages)
+# (Reprendre le code précédent pour ces sections si nécessaire)
+
 
 
 
