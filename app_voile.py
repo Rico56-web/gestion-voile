@@ -96,9 +96,28 @@ for i, (l, p) in enumerate(menu):
         # Calcul de la couleur du badge
         b_col = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
             # Affichage de la fiche
+        st.markdown(f"""
+        <div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
+        <div class="status-badge" style="color:{b_col}; border-color:{b_col}; background:{b_col}15;">{statut}</div>
+        <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
+        🏢 <b>{soc}</b> | 📅 {r.get('DateNav')}<br
+        📞 {tel} | ✉️ {mail}<br><br>
+        <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
+        <a href="https://wa.me/{tel.replace(' ','')}" target="_blank" class="btn-contact" style="background:#25d366;">💬 WhatsApp</a>
+        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
+        </div>""", unsafe_allow_html=True)     b_col = "#2ecc71" if "OK" in statut.upper() or "🟢" in statut else ("#e74c3c" if "🔴" in statut else "#f1c40f")
+            
+            # Affichage de la fiche
             st.markdown(f"""
             <div class="client-card" style="border-left: 10px solid {"#3498db" if soc=="CMN" else "#ccc"};">
                 <div class="status-badge" style="color:{b_col}; border-color:{b_col}; background:{b_col}15;">{statut}</div>
+                <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
+                🏢 <b>{soc}</b> | 📅 {r.get('DateNav')}<br>
+                📞 {tel} | ✉️ {mail}<br><br>
+                <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appel</a>
+                <a href="https://wa.me/{tel.replace(' ','')}" target="_blank" class="btn-contact" style="background:#25d366;">💬 WhatsApp</a>
+                <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Mail</a>
+            </div>""", unsafe_allow_html=True       <div class="status-badge" style="color:{b_col}; border-color:{b_col}; background:{b_col}15;">{statut}</div>
                 <b style="font-size:1.1rem;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
                 🏢 <b>{soc}</b> | 📅 {r.get('DateNav')}<br>
                 📞 {tel} | ✉️ {mail}<br><br>
@@ -240,6 +259,7 @@ elif st.session_state.page == "LOGBOOK":
 elif st.session_state.page == "NOTES":
     st.markdown('<div class="page-title">📝 NOTES PERSONNELLES</div>', unsafe_allow_html=True)
     st.text_area("Bloc-notes :", placeholder="Écrivez vos rappels ici...")
+
 
 
 
