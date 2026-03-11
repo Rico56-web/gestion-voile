@@ -68,7 +68,6 @@ for i, (label, p) in enumerate(pages):
 # --- 4. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
     
-    # --- MODE ÉDITION ---
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         r = df.loc[idx]
@@ -104,8 +103,6 @@ if st.session_state.page == "CONTACTS":
                 st.session_state.edit_idx = None; st.rerun()
             if b2.form_submit_button("❌ ANNULER"):
                 st.session_state.edit_idx = None; st.rerun()
-
-    # --- MODE LISTE ---
     else:
         search = st.text_input("🔍 Rechercher...").lower()
         mask = df['Nom'].astype(str).str.lower().str.contains(search, na=False) | \
@@ -128,18 +125,31 @@ if st.session_state.page == "CONTACTS":
                     <div class="contact-verif">📞 {tel} | ✉️ {mail}</div>
                     <p>🏢 <b>{r.get('Société','')}</b> | 💰 <b>{r.get('Prix', 0)} €</b></p>
                     <div style="margin-top:10px;">
-                        <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
-                        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
-                        <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
+                        <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appeler</a>
+                        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Email</a>
+                        <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">💬 WhatsApp</a>
                     </div>
                 </div>
                 <div class="zone-actions">
             """, unsafe_allow_html=True)
             
-            cn, cb = st.columns([0.7, 0.3])
-            cn.write(f"**Notes :** {r.get('Notes','')}")
-            if cb.button("✏️ DÉTAILS / STATUT", key=f"btn_{i}", use_container_width=True):
-                st.session_state.edit_idx = i; st.rerun()
+            # BLOC GRIS : Notes et Boutons d'action
+            cn, cb = st.columns([0.65, 0.35])
+            with cn:
+                st.write(f"**Notes :** {r.get('Notes','')}")
+            with cb:
+                if st.button("✏️ MODIFIER", key=f"btn_{i}", use_container_width=True):
+                    st.session_state.edit_idx = i; st.rerun()
+                
+                # Système de suppression avec confirmation
+                confirm = st.checkbox("Confirmer suppression", key=f"chk_{i}")
+                if st.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True, type="secondary"):
+                    if confirm:
+                        df = df.drop(i)
+                        sauvegarder_data(df, "contacts.json")
+                        st.rerun()
+                    else:
+                        st.error("Cochez la case pour supprimer")
             st.markdown('</div></div>', unsafe_allow_html=True)
 
 # --- 5. PAGE STATS ---
