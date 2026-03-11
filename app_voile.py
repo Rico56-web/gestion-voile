@@ -5,120 +5,127 @@ import pandas as pd
 import json
 import time
 
-# --- 1. CONFIGURATION ---
+# --- 1. CONFIGURATION & STYLE ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
-# --- 2. FONCTIONS DE SAUVEGARDE RÉELLE ---
+st.markdown("""<style>
+    .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 20px; border-bottom: 3px solid #1a2a6c; }
+    .fiche-complete { 
+        border: 2px solid #1a2a6c; border-radius: 12px; 
+        overflow: hidden; margin-bottom: 25px; background-color: white;
+    }
+    .zone-infos { padding: 18px; background: white; }
+    .zone-actions { padding: 15px; background: #f1f3f6; border-top: 1px solid #1a2a6c; }
+    .prenom-style { font-size: 1.8rem; font-weight: bold; color: #1a2a6c; }
+    .nom-style { font-size: 1.2rem; text-transform: uppercase; color: #555; }
+    .contact-verif { font-family: monospace; color: #e67e22; font-weight: bold; font-size: 1.1rem; margin: 5px 0; }
+    .btn-contact { 
+        display: inline-block; padding: 8px 15px; border-radius: 5px; 
+        text-decoration: none; color: white !important; font-size: 0.9rem; 
+        font-weight: bold; margin-right: 10px; margin-top: 10px;
+    }
+</style>""", unsafe_allow_html=True)
+
+# --- 2. FONCTIONS GITHUB ---
 def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
-        res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"nocache": time.time()})
+        res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
         if res.status_code == 200:
-            content = res.json()['content']
-            return pd.DataFrame(json.loads(base64.b64decode(content).decode('utf-8')))
+            return pd.DataFrame(json.loads(base64.b64decode(res.json()['content']).decode('utf-8')))
         return pd.DataFrame()
     except: return pd.DataFrame()
 
-def sauvegarder_sur_github(df, file):
-    """ Envoie les données modifiées sur GitHub pour qu'elles persistent """
+def sauvegarder_data(df, file):
     repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
     url = f"https://api.github.com/repos/{repo}/contents/{file}"
-    
-    # 1. Récupérer le SHA (obligatoire pour modifier un fichier existant)
     res = requests.get(url, headers={"Authorization": f"token {token}"})
     sha = res.json().get('sha') if res.status_code == 200 else None
-    
-    # 2. Encoder le nouveau contenu
-    new_content = base64.b64encode(df.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
-    
-    # 3. Envoyer la mise à jour
-    payload = {"message": f"Mise à jour {file}", "content": new_content, "sha": sha}
-    put_res = requests.put(url, headers={"Authorization": f"token {token}"}, json=payload)
-    return put_res.status_code in [200, 201]
+    content = base64.b64encode(df.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
+    requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": "Update", "content": content, "sha": sha})
 
-# --- 3. GESTION DES ÉTATS ---
-if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
-
-# On charge les données une seule fois par exécution
-df = charger_data("contacts.json")
-
-# --- 4. NAVIGATION & ENTÊTE ---
-st.markdown('<h1 style="text-align:center; color:#1a2a6c;">⚓ SKIPPER VESTA 2026</h1>', unsafe_allow_html=True)
+# --- 3. NAVIGATION ---
+st.markdown('<div class="main-header">⚓ SKIPPER VESTA 2026</div>', unsafe_allow_html=True)
 
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
-cols = st.columns(6)
-menu = [("📋 CONTACTS","CONTACTS"), ("💰 STATS","STATS"), ("🔧 MAINT","MAINT")]
-for i, (l, p) in enumerate(menu):
-    if cols[i].button(l, use_container_width=True): 
-        st.session_state.page = p
-        st.session_state.edit_idx = None
-        st.rerun()
+if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
 
-# --- 5. LOGIQUE CONTACTS ---
+df = charger_data("contacts.json")
+
+m = st.columns(6)
+pages = [("📋 CONTACTS","CONTACTS"), ("💰 STATS","STATS"), ("🔧 MAINT","MAINT")]
+for i, (label, p) in enumerate(pages):
+    if m[i].button(label, use_container_width=True, type="primary" if st.session_state.page==p else "secondary"):
+        st.session_state.page = p; st.session_state.edit_idx = None; st.rerun()
+
+# --- 4. LOGIQUE CONTACTS ---
 if st.session_state.page == "CONTACTS":
 
-    # --- MODE DÉTAIL / MODIFICATION ---
+    # --- MODE ÉDITION (DÉTAILS) ---
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
-        r = df.iloc[idx] # Utilisation de iloc pour l'indexation physique
-        
-        st.info(f"📍 Édition de la fiche : {r['Prénom']} {r['Nom']}")
-        
-        with st.form("edit_contact"):
+        r = df.loc[idx]
+        st.subheader(f"📝 Modification : {r['Prénom']} {r['Nom']}")
+        with st.form("edit_form"):
             c1, c2 = st.columns(2)
-            u_pre = c1.text_input("Prénom", value=r.get('Prénom', ''))
-            u_nom = c2.text_input("Nom", value=r.get('Nom', ''))
-            u_tel = c1.text_input("Téléphone", value=r.get('Téléphone', ''))
-            u_mail = c2.text_input("Email", value=r.get('Mail', ''))
-            u_prix = st.text_input("Prix (€)", value=str(r.get('Prix', '0')))
-            u_notes = st.text_area("Notes / Livre de bord", value=r.get('Notes', ''), height=200)
-            
-            b1, b2 = st.columns(2)
-            if b1.form_submit_button("💾 ENREGISTRER DÉFINITIVEMENT"):
-                # Mise à jour du DataFrame local
-                df.at[idx, 'Prénom'] = u_pre
-                df.at[idx, 'Nom'] = u_nom
-                df.at[idx, 'Téléphone'] = u_tel
-                df.at[idx, 'Mail'] = u_mail
-                df.at[idx, 'Prix'] = u_prix
-                df.at[idx, 'Notes'] = u_notes
-                
-                # Sauvegarde sur GitHub
-                if sauvegarder_sur_github(df, "contacts.json"):
-                    st.success("✅ Données sauvegardées sur GitHub !")
-                    time.sleep(1) # Petit délai pour laisser GitHub respirer
-                    st.session_state.edit_idx = None
-                    st.rerun()
-                else:
-                    st.error("❌ Erreur lors de la sauvegarde.")
+            u_pre = c1.text_input("Prénom", value=r.get('Prénom',''))
+            u_nom = c2.text_input("Nom", value=r.get('Nom',''))
+            u_tel = c1.text_input("Téléphone", value=r.get('Téléphone',''))
+            u_mail = c2.text_input("Email", value=r.get('Mail',''))
+            u_prix = st.text_input("Prix (€)", value=str(r.get('Prix','0')))
+            u_notes = st.text_area("Notes", value=r.get('Notes',''), height=150)
+            if st.form_submit_button("💾 SAUVEGARDER"):
+                df.at[idx, 'Prénom'], df.at[idx, 'Nom'], df.at[idx, 'Notes'] = u_pre, u_nom, u_notes
+                df.at[idx, 'Téléphone'], df.at[idx, 'Mail'], df.at[idx, 'Prix'] = u_tel, u_mail, u_prix
+                sauvegarder_data(df, "contacts.json")
+                st.session_state.edit_idx = None; st.success("Enregistré !"); st.rerun()
+            if st.form_submit_button("❌ ANNULER"):
+                st.session_state.edit_idx = None; st.rerun()
 
-            if b2.form_submit_button("❌ ANNULER"):
-                st.session_state.edit_idx = None
-                st.rerun()
-
-    # --- MODE AFFICHAGE LISTE ---
+    # --- MODE AFFICHAGE ---
     else:
-        for i, r in df.iterrows():
-            with st.container():
-                # On utilise ici l'encadré global
-                st.markdown(f"""
-                <div style="border:2px solid #1a2a6c; border-radius:10px; margin-bottom:20px; background:white; overflow:hidden;">
-                    <div style="padding:15px;">
-                        <span style="font-size:1.5rem; font-weight:bold; color:#1a2a6c;">{r['Prénom']} {r['Nom'].upper()}</span><br>
-                        <b>💰 Prix: {r.get('Prix','0')} €</b><br>
-                        📞 {r.get('Téléphone','')} | ✉️ {r.get('Mail','')}
-                    </div>
-                    <div style="padding:15px; background:#f1f3f6; border-top:1px solid #1a2a6c;">
-                        <b>Notes :</b><br>
-                        <p style="font-style:italic; color:#444;">{r.get('Notes','(Aucune note)')}</p>
-                    </div>
+        search = st.text_input("🔍 Rechercher...").lower()
+        mask = df['Nom'].astype(str).str.lower().str.contains(search, na=False) | \
+               df['Prénom'].astype(str).str.lower().str.contains(search, na=False)
+
+        for i, r in df[mask].iterrows():
+            tel = str(r.get('Téléphone', '')).strip()
+            mail = str(r.get('Mail', '')).strip()
+            
+            # --- DÉBUT ENCADRÉ GLOBAL ---
+            st.markdown(f"""
+            <div class="fiche-complete">
+                <div class="zone-infos">
+                    <div class="prenom-style">{r['Prénom']}</div>
+                    <div class="nom-style">{str(r['Nom']).upper()}</div>
+                    <div class="contact-verif">📞 {tel} | ✉️ {mail}</div>
+                    <p>🏢 <b>{r.get('Société','')}</b> | 💰 <b>{r.get('Prix','0')} €</b></p>
+                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 Appeler</a>
+                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ Email</a>
+                    <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">💬 WhatsApp</a>
                 </div>
-                """, unsafe_allow_html=True)
-                
-                if st.button(f"✏️ MODIFIER DÉTAILS - {r['Prénom']}", key=f"btn_{i}"):
-                    st.session_state.edit_idx = i
-                    st.rerun()
+                <div class="zone-actions">
+            """, unsafe_allow_html=True)
+            
+            # --- ZONE BASSE (Notes & Boutons) ---
+            col_notes, col_btns = st.columns([0.7, 0.3])
+            with col_notes:
+                st.write("**Notes :**")
+                st.write(r.get('Notes', ''))
+            with col_btns:
+                if st.button("✏️ MODIFIER", key=f"ed_{i}", use_container_width=True):
+                    st.session_state.edit_idx = i; st.rerun()
+                if st.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
+                    # Confirmation simple
+                    if st.checkbox("Confirmer ?", key=f"chk_{i}"):
+                        df = df.drop(i)
+                        sauvegarder_data(df, "contacts.json")
+                        st.rerun()
+            
+            st.markdown('</div></div>', unsafe_allow_html=True)
+            # --- FIN ENCADRÉ GLOBAL ---
+
 
 
 
