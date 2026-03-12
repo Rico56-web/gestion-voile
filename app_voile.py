@@ -127,16 +127,25 @@ if st.session_state.page == "CONTACTS":
                 
                 info_tel = f'<div style="color:#e67e22; font-weight:bold; font-size:0.95rem;">📞 {tel}</div>' if tel else ""
                 info_mail = f'<div style="color:#7f8c8d; font-size:0.85rem;">✉️ {mail}</div>' if mail else ""
+                # Construction de la fiche sécurisée
+                notes_texte = safe_get(r, 'Notes') or "."
                 
-                # Construction de la fiche en une seule chaîne propre pour éviter les bugs d'affichage
-                html_final = f"""<div class="fiche-globale {classe_bordure}">"""
-                html_final += f"""<span class="statut-badge" style="background:{c_p};">{p_val if p_val else "Pas payé"}</span>"""
-                html_final += f"""<span class="statut-badge" style="background:{c_s};">{s_val}</span>"""
-                html_final += f"""<div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>"""
-                html_final += f"""<div class="prenom-style">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</div>"""
-                html_final += f"""{info_tel} {info_mail}"""
-                html_final += f"""<p style="margin:8px 0; font-size:1.05rem;">📅 <b>{safe_get(r, 'DateNav')}</b> <span>({jours} jrs)</span> | 💰 <b>{safe_get(r, 'Prix')} €</b></p>"""
-                html_final += f"""<div class="notes-box">📝 {safe
+                html_final = f"""<div class="fiche-globale {classe_bordure}">
+                    <span class="statut-badge" style="background:{c_p};">{p_val}</span>
+                    <span class="statut-badge" style="background:{c_s};">{s_val}</span>
+                    <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
+                    <div class="prenom-style">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</div>
+                    {info_tel} {info_mail}
+                    <p style="margin:8px 0; font-size:1.05rem;">📅 <b>{safe_get(r, 'DateNav')}</b> <span>({jours} jrs)</span> | 💰 <b>{safe_get(r, 'Prix')} €</b></p>
+                    <div class="notes-box">📝 {notes_texte}</div>
+                    <div class="container-boutons">
+                        <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
+                        <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
+                        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
+                    </div>
+                </div>"""
+                
+                st.markdown(html_final, unsafe_allow_html=True)
 
 
 
