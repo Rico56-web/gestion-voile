@@ -23,13 +23,11 @@ st.markdown("""<style>
         margin-bottom: 15px; 
         box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
         padding: 15px; 
+        overflow: hidden;
     }
-    .prenom-style { 
-        font-size: 1.4rem; font-weight: bold; color: #1a2a6c; 
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .statut-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; display: inline-block; float: right; margin-left: 5px; }
-    .btn-contact { display: inline-block; padding: 8px 12px; border-radius: 6px; text-decoration: none; color: white !important; font-size: 0.9rem; font-weight: bold; margin-right: 8px; margin-top: 10px; }
+    .prenom-style { font-size: 1.4rem; font-weight: bold; color: #1a2a6c; white-space: nowrap; }
+    .statut-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; float: right; margin-left: 5px; }
+    .btn-contact { display: inline-block; padding: 8px 12px; border-radius: 6px; text-decoration: none !important; color: white !important; font-size: 0.9rem; font-weight: bold; margin-right: 8px; margin-top: 10px; }
     .societe-style { color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
     .notes-box { background-color: #f9f9f9; border: 1px dashed #d3d6db; padding: 8px; border-radius: 5px; margin: 10px 0; font-size: 0.9rem; color: #2c3e50; }
 </style>""", unsafe_allow_html=True)
@@ -51,7 +49,7 @@ def sauvegarder_data(df, file):
     res = requests.get(url, headers={"Authorization": f"token {token}"})
     sha = res.json().get('sha') if res.status_code == 200 else None
     content = base64.b64encode(df.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
-    requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": "Update Vesta", "content": content, "sha": sha})
+    requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": "Update", "content": content, "sha": sha})
 
 def safe_get(r, key, default=""):
     val = r.get(key)
@@ -65,14 +63,13 @@ if "view_archive" not in st.session_state: st.session_state.view_archive = False
 if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
 if "confirm_del" not in st.session_state: st.session_state.confirm_del = None
 
-st.markdown(f'<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
 
-m = st.columns(6)
-menu_list = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
-for i, name in enumerate(menu_list):
-    active = (st.session_state.page == name)
-    if m[i].button(name, use_container_width=True, key=f"nav_v12_{name}", type="primary" if active else "secondary"):
-        st.session_state.page = name; st.session_state.edit_idx = None; st.rerun()
+cols_menu = st.columns(6)
+menu_items = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
+for i, item in enumerate(menu_items):
+    if cols_menu[i].button(item, use_container_width=True, type="primary" if st.session_state.page == item else "secondary"):
+        st.session_state.page = item; st.session_state.edit_idx = None; st.rerun()
 
 df = charger_data("contacts.json")
 
@@ -89,10 +86,10 @@ if st.session_state.page == "CONTACTS":
         idx = st.session_state.edit_idx
         r = df.loc[idx]
         with st.form("edit_form"):
-            st.subheader(f"Modifier : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}")
+            st.subheader("Modifier Contact")
             col1, col2, col3, col4 = st.columns(4)
             u_date = col1.text_input("Date Nav", value=safe_get(r, 'DateNav'))
-            u_statut = col2.selectbox("Statut Mission", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut', 'En attente')))
+            u_statut = col2.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut', 'En attente')))
             u_prix = col3.text_input("Prix (€)", value=safe_get(r, 'Prix', '0'))
             u_paye = col4.selectbox("Paiement", ["Pas payé", "Payé"], index=1 if safe_get(r, 'Paiement') == "Payé" else 0)
             u_soc = st.text_input("Société", value=safe_get(r, 'Société'))
@@ -102,10 +99,8 @@ if st.session_state.page == "CONTACTS":
             u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
             u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
             if st.form_submit_button("💾 ENREGISTRER"):
-                df.at[idx, 'DateNav'], df.at[idx, 'Statut'], df.at[idx, 'Paiement'] = u_date, u_statut, u_paye
-                df.at[idx, 'Prix'], df.at[idx, 'Notes'] = u_prix, u_notes
-                df.at[idx, 'Société'], df.at[idx, 'Prénom'], df.at[idx, 'Nom'] = u_soc, u_pre, u_nom
-                df.at[idx, 'Téléphone'], df.at[idx, 'Email'] = u_tel, u_mail
+                for k, v in zip(['DateNav','Statut','Paiement','Prix','Notes','Société','Prénom','Nom','Téléphone','Email'], [u_date,u_statut,u_paye,u_prix,u_notes,u_soc,u_pre,u_nom,u_tel,u_mail]):
+                    df.at[idx, k] = v
                 sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
             if st.form_submit_button("Annuler"): st.session_state.edit_idx = None; st.rerun()
     else:
@@ -117,43 +112,51 @@ if st.session_state.page == "CONTACTS":
                 c_s = "#3498db" if "TERM" in s_val else "#2ecc71" if "OK" in s_val else "#e74c3c" if "REFUS" in s_val else "#f1c40f"
                 c_p = "#2ecc71" if "PAYÉ" == p_val else "#e74c3c"
                 
-                # Construction propre du HTML pour éviter l'affichage de texte brut
-                html_fiche = f"""
-                <div class="fiche-globale">
+                note_html = f'<div class="notes-box">📝 {note}</div>' if note else ''
+                
+                st.markdown(f"""<div class="fiche-globale">
                     <span class="statut-badge" style="background:{c_p};">{safe_get(r, 'Paiement', 'Pas payé')}</span>
                     <span class="statut-badge" style="background:{c_s};">{safe_get(r, 'Statut')}</span>
                     <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
                     <div class="prenom-style">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</div>
                     <div style="color:#e67e22; font-weight:bold; margin-top:5px;">📞 {tel}</div>
                     <p style="margin: 5px 0;">📅 <b>{safe_get(r, 'DateNav')}</b> | 💰 <b>{safe_get(r, 'Prix', '0')} €</b></p>
-                    {f'<div class="notes-box">📝 {note}</div>' if note else ''}
-                    <div style="margin-top:10px;">
+                    {note_html}
+                    <div>
                         <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
                         <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                         <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
                     </div>
-                </div>
-                """
-                st.markdown(html_fiche, unsafe_allow_html=True)
+                </div>""", unsafe_allow_html=True)
                 
                 c_edit, c_del = st.columns([1, 3])
                 if c_edit.button("✏️ Modifier", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
                 if st.session_state.confirm_del == i:
                     if st.button("✅ CONFIRMER SUPPRESSION", key=f"conf_{i}"):
                         df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.session_state.confirm_del = None; st.rerun()
-                    if st.button("❌ ANNULER", key=f"ann_{i}"): st.session_state.confirm_del = None; st.rerun()
+                    st.button("❌ ANNULER", key=f"ann_{i}")
                 else:
                     if c_del.button("🗑️ Supprimer", key=f"del_{i}"): st.session_state.confirm_del = i; st.rerun()
 
 # --- 5. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning des Navigations")
+    
+    if st.button("➕ NOUVELLE MISSION", type="primary"):
+        new_data = {"DateNav": "01/01/2026", "Statut": "En attente", "Paiement": "Pas payé", "Société": "", "Prénom": "Nouveau", "Nom": "Client", "Téléphone": "", "Email": "", "Prix": "0", "Notes": ""}
+        df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
+        sauvegarder_data(df, "contacts.json"); st.rerun()
+
     if not df.empty:
         df_plan = df[~df['Statut'].isin(["Terminé", "Refusé"])].copy()
         for i, r in df_plan.sort_values('DateNav').iterrows():
             with st.expander(f"📅 {safe_get(r, 'DateNav')} | {safe_get(r, 'Société', 'CLIENT')} | {safe_get(r, 'Prénom')}"):
-                st.write(f"**Statut :** {safe_get(r, 'Statut')} | **Prix :** {safe_get(r, 'Prix')} €")
-                if safe_get(r, 'Notes'): st.info(f"Note : {safe_get(r, 'Notes')}")
+                st.write(f"**Client :** {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}")
+                st.write(f"**Notes :** {safe_get(r, 'Notes')}")
+                if st.button("✏️ Modifier cette mission", key=f"plan_ed_{i}"):
+                    st.session_state.page = "CONTACTS"
+                    st.session_state.edit_idx = i; st.rerun()
+
 
 
 
