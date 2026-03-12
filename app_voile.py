@@ -1,4 +1,3 @@
-
 import requests
 import base64
 import streamlit as st
@@ -60,7 +59,6 @@ def safe_get(r, key):
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
 if "view_archive" not in st.session_state: st.session_state.view_archive = False
 if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
-if "confirm_del" not in st.session_state: st.session_state.confirm_del = None
 
 st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
 
@@ -74,7 +72,6 @@ df = charger_data("contacts.json")
 
 # --- 4. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
-    # Bouton Nouveau blanc/bleu
     if st.button("➕ NOUVEAU CONTACT", type="secondary", use_container_width=True):
         new_row = {"DateNav": "01/01/2026", "Statut": "En attente", "Paiement": "Pas payé", "Société": "", "Prénom": "Nouveau", "Nom": "Contact", "Téléphone": "", "Email": "", "Prix": "0", "Notes": ""}
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
@@ -106,6 +103,7 @@ if st.session_state.page == "CONTACTS":
                 d = {'DateNav':u_date,'Statut':u_statut,'Paiement':u_paye,'Prix':u_prix,'Société':u_soc,'Prénom':u_pre,'Nom':u_nom,'Téléphone':u_tel,'Email':u_mail,'Notes':u_notes}
                 for k,v in d.items(): df.at[idx, k] = v
                 sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
+            if st.form_submit_button("Annuler"): st.session_state.edit_idx = None; st.rerun()
 
     else:
         if not df.empty:
@@ -116,27 +114,27 @@ if st.session_state.page == "CONTACTS":
                 c_s = "#3498db" if "TERM" in s_val else "#2ecc71" if "OK" in s_val else "#e74c3c" if "REFUS" in s_val else "#f1c40f"
                 c_p = "#2ecc71" if "PAYÉ" == p_val else "#e74c3c"
                 
-                # NETTOYAGE STRICT DES NOTES
-                html_notes = ""
-                if len(note) > 0:
-                    html_notes = f'<div class="notes-box"><b>Notes :</b> {note}</div>'
-
-                st.markdown(f"""
-                <div class="fiche-globale">
+                # 1. HAUT DE LA FICHE
+                st.markdown(f"""<div class="fiche-globale">
                     <span class="statut-badge" style="background:{c_p};">{safe_get(r, 'Paiement') or 'Pas payé'}</span>
                     <span class="statut-badge" style="background:{c_s};">{safe_get(r, 'Statut')}</span>
                     <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
                     <div class="prenom-style">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</div>
                     <div style="color:#e67e22; font-weight:bold; margin-top:5px;">📞 {tel}</div>
                     <p style="margin: 5px 0;">📅 <b>{safe_get(r, 'DateNav')}</b> | 💰 <b>{safe_get(r, 'Prix')} €</b></p>
-                    {html_notes}
-                    <div style="margin-top:10px;">
+                """, unsafe_allow_html=True)
+                
+                # 2. BLOC NOTES (uniquement si rempli)
+                if note:
+                    st.markdown(f'<div class="notes-box"><b>Notes :</b> {note}</div>', unsafe_allow_html=True)
+                
+                # 3. BAS DE LA FICHE (Boutons)
+                st.markdown(f"""<div style="margin-top:10px;">
                         <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
                         <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                         <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
+                </div>""", unsafe_allow_html=True)
                 
                 c_ed, c_de = st.columns([1, 4])
                 if c_ed.button("✏️ Modifier", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
@@ -152,6 +150,8 @@ elif st.session_state.page == "PLANNING":
             with st.expander(f"📅 {safe_get(r, 'DateNav')} | {safe_get(r, 'Société') or 'CLIENT'}"):
                 st.write(f"**Contact :** {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}")
                 if safe_get(r, 'Notes'): st.info(f"Note : {safe_get(r, 'Notes')}")
+
+
 
 
 
