@@ -257,7 +257,7 @@
     },
     {
         "DateNav":"4\/05\/2026",
-        "NbreJours":"1",
+        "NbreJours":"2",
         "Statut":"En attente",
         "Paiement":"Pas pay\u00e9",
         "Soci\u00e9t\u00e9":"PERSO",
@@ -265,7 +265,7 @@
         "Nom":"LEBAS",
         "T\u00e9l\u00e9phone":"0683202156",
         "Email":"",
-        "Prix":"140.0",
+        "Prix":"140.00",
         "Notes":"Ras",
         "NbJours":"2",
         "Paye":null,
