@@ -15,7 +15,7 @@ st.markdown("""<style>
     
     .fiche-globale { border-radius: 12px; background: white; margin-bottom: 15px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
     .border-normal { border: 2px solid #1a2a6c; }
-    .border-cmn { border: 3px solid #0056b3; background-color: #f0f7ff; }
+    .border-cmn { border: 4px solid #0056b3 !important; background-color: #f0f7ff !important; }
     
     .prenom-style { font-size: 1.5rem; font-weight: bold; color: #1a2a6c; }
     .societe-style { color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
@@ -32,7 +32,8 @@ def charger_data(file):
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
         res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
         if res.status_code == 200:
-            df = pd.DataFrame(json.loads(base64.b64decode(res.json()['content']).decode('utf-8')))
+            data = json.loads(base64.b64decode(res.json()['content']).decode('utf-8'))
+            df = pd.DataFrame(data)
             if 'NbreJours' not in df.columns: df['NbreJours'] = "1"
             return df
         return pd.DataFrame()
@@ -48,8 +49,7 @@ def sauvegarder_data(df, file):
 
 def safe_get(r, key):
     val = r.get(key)
-    if pd.isna(val) or val is None: return ""
-    return str(val).strip()
+    return str(val).strip() if pd.notna(val) and val is not None else ""
 
 # --- 3. NAVIGATION ---
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
@@ -93,10 +93,12 @@ if st.session_state.page == "CONTACTS":
         u_date = st.text_input("Date début", value=safe_get(r, 'DateNav'))
         u_jours = st.text_input("Nombre de jours", value=safe_get(r, 'NbreJours'))
         u_prix = st.text_input("Prix total (€)", value=safe_get(r, 'Prix'))
+        
         statuts = ["En attente", "OK", "Terminé", "Refusé"]
         s_val = safe_get(r, 'Statut')
         s_idx = statuts.index(s_val) if s_val in statuts else 0
         u_statut = st.selectbox("Statut", statuts, index=s_idx)
+        
         paiements = ["Pas payé", "Payé"]
         p_val = safe_get(r, 'Paiement')
         p_idx = paiements.index(p_val) if p_val in paiements else 0
@@ -112,44 +114,37 @@ if st.session_state.page == "CONTACTS":
             sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
         if st.button("Annuler", use_container_width=True):
             st.session_state.edit_idx = None; st.rerun()
-        else:
-            if not df.empty:
-                df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
-                for i, r in df_disp.iterrows():
-                    tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
-                    p_val, s_val, jours = safe_get(r, 'Paiement'), safe_get(r, 'Statut'), safe_get(r, 'NbreJours') or "1"
+
+    else:
+        if not df.empty:
+            df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
+            for i, r in df_disp.iterrows():
+                tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
+                p_val, s_val, jours = safe_get(r, 'Paiement'), safe_get(r, 'Statut'), safe_get(r, 'NbreJours') or "1"
                 
-                # Styles et Couleurs
                 c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
                 c_p = "#2ecc71" if "PAYÉ" in p_val.upper() else "#e74c3c"
                 classe_bordure = "border-cmn" if "CMN" in soc.upper() else "border-normal"
                 
-                # Construction propre du contenu
                 info_tel = f'<div style="color:#e67e22; font-weight:bold; font-size:0.95rem;">📞 {tel}</div>' if tel else ""
                 info_mail = f'<div style="color:#7f8c8d; font-size:0.85rem;">✉️ {mail}</div>' if mail else ""
                 
-                # LE BLOC HTML (Injecté via une seule commande propre)
                 fiche_html = f"""<div class="fiche-globale {classe_bordure}">
                     <span class="statut-badge" style="background:{c_p};">{p_val if p_val else "Pas payé"}</span>
                     <span class="statut-badge" style="background:{c_s};">{s_val}</span>
                     <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
                     <div class="prenom-style">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</div>
-                    {info_tel}
-                    {info_mail}
-                    <p style="margin: 8px 0; font-size:1.05rem;">
-                        📅 <b>{safe_get(r, 'DateNav')}</b> <span>({jours} jrs)</span> | 💰 <b>{safe_get(r, 'Prix')} €</b>
-                    </p>
+                    {info_tel} {info_mail}
+                    <p style="margin: 8px 0; font-size:1.05rem;">📅 <b>{safe_get(r, 'DateNav')}</b> <span>({jours} jrs)</span> | 💰 <b>{safe_get(r, 'Prix')} €</b></p>
                     <div class="notes-box">📝 {safe_get(r, 'Notes') or "."}</div>
                     <div class="container-boutons">
                         <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
                         <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                         <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
-                    </div>
-                </div>"""
+                    </div></div>"""
                 
                 st.markdown(fiche_html, unsafe_allow_html=True)
                 
-                # Boutons de gestion (en dehors du bloc HTML)
                 if st.session_state.confirm_del == i:
                     col1, col2 = st.columns(2)
                     if col1.button("⚠️ CONFIRMER", key=f"conf_{i}", type="primary", use_container_width=True):
@@ -158,10 +153,10 @@ if st.session_state.page == "CONTACTS":
                         st.session_state.confirm_del = None; st.rerun()
                 else:
                     c1, c2 = st.columns([1, 4])
-                    if c1.button("✏️", key=f"ed_{i}"): 
-                        st.session_state.edit_idx = i; st.session_state.confirm_del = None; st.rerun()
+                    if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.session_state.confirm_del = None; st.rerun()
                     if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
                         st.session_state.confirm_del = i; st.rerun()
+
 
 
 
