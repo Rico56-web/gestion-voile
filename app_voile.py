@@ -162,11 +162,13 @@ elif st.session_state.page == "PLANNING":
                 st.markdown(f"📅 **{safe_get(r, 'DateNav')}** ({safe_get(r, 'NbreJours')}j) : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} - <span style='color:{c}; font-weight:bold;'>{s}</span>", unsafe_allow_html=True)
         except: continue
     if not found: st.info("Aucune mission ce mois-ci.")
-
-# --- 6. PAGE STATS ---
+        # --- 6. PAGE STATS ---
 elif st.session_state.page == "STATS":
     st.subheader("📊 Historique Financier 2026")
     stats_data = []
+    # Noms des mois raccourcis en français
+    m_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+    
     for m_idx in range(1, 13):
         rec, prev, frs = 0.0, 0.0, 0.0
         if not df_c.empty:
@@ -184,13 +186,33 @@ elif st.session_state.page == "STATS":
                     rm = int(safe_get(r, 'Date').split('/')[1])
                     if rm == m_idx: frs += float(safe_get(r, 'Prix') or 0)
                 except: continue
-        stats_data.append({"Mois": m_noms[m_idx-1] if 'm_noms' in locals() else calendar.month_name[m_idx], "Recettes (€)": f"{rec:.2f}", "Prévisions (€)": f"{prev:.2f}", "Frais (€)": f"{frs:.2f}", "Total (€)": f"{(rec - frs):.2f}"})
+        
+        stats_data.append({
+            "Mois": m_courts[m_idx-1],
+            "Recettes (€)": f"{rec:.2f}",
+            "Prévisions (€)": f"{prev:.2f}",
+            "Frais (€)": f"{frs:.2f}",
+            "Total (€)": f"{(rec - frs):.2f}"
+        })
+    
     st_df = pd.DataFrame(stats_data)
+    
+    # Calcul des totaux pour la ligne finale
     t_rec = sum(float(x) for x in st_df["Recettes (€)"])
     t_pre = sum(float(x) for x in st_df["Prévisions (€)"])
     t_frs = sum(float(x) for x in st_df["Frais (€)"])
-    tot_row = pd.DataFrame([{"Mois": "TOTAL", "Recettes (€)": f"{t_rec:.2f}", "Prévisions (€)": f"{t_pre:.2f}", "Frais (€)": f"{t_frs:.2f}", "Total (€)": f"{(t_rec - t_frs):.2f}"}])
-    st.table(pd.concat([st_df, tot_row], ignore_index=True))
+    
+    tot_row = pd.DataFrame([{
+        "Mois": "TOTAL", 
+        "Recettes (€)": f"{t_rec:.2f}", 
+        "Prévisions (€)": f"{t_pre:.2f}", 
+        "Frais (€)": f"{t_frs:.2f}", 
+        "Total (€)": f"{(t_rec - t_frs):.2f}"
+    }])
+    
+    # Affichage du tableau sans la colonne d'index (la première colonne de chiffres 0, 1, 2...)
+    final_df = pd.concat([st_df, tot_row], ignore_index=True)
+    st.table(final_df.set_index("Mois"))
 
 # --- 7. PAGE MAINTENANCE ---
 elif st.session_state.page == "MAINT":
@@ -217,6 +239,7 @@ elif st.session_state.page == "MAINT":
             if c1.button("✏️", key=f"em_{i}"): st.session_state.m_edit_idx = i; st.rerun()
             if c2.button("🗑️ SUPPRIMER", key=f"dm_{i}", use_container_width=True):
                 df_m = df_m.drop(i); sauvegarder_data(df_m, "maint.json"); st.rerun()
+
 
 
 
