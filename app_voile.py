@@ -14,9 +14,7 @@ st.markdown("""<style>
     button[data-testid="baseButton-secondary"] { background-color: #ffffff !important; color: #1a2a6c !important; border: 1px solid #1a2a6c !important; }
     
     .fiche-globale { border-radius: 12px; background: white; margin-bottom: 15px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-    /* Style par défaut (bleu marine Vesta) */
     .border-normal { border: 2px solid #1a2a6c; }
-    /* Style spécial CMN (bleu royal) */
     .border-cmn { border: 3px solid #0056b3; background-color: #f0f7ff; }
     
     .prenom-style { font-size: 1.5rem; font-weight: bold; color: #1a2a6c; }
@@ -64,7 +62,7 @@ st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allo
 m = st.columns(6)
 menu_names = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
 for i, name in enumerate(menu_names):
-    if m[i].button(name, use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
+    if m[i].button(name, key=f"nav_{name}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name; st.session_state.edit_idx = None; st.session_state.confirm_del = None; st.rerun()
 
 df = charger_data("contacts.json")
@@ -87,7 +85,6 @@ if st.session_state.page == "CONTACTS":
         idx = st.session_state.edit_idx
         r = df.loc[idx]
         st.subheader("📝 Modifier")
-        
         u_pre = st.text_input("Prénom", value=safe_get(r, 'Prénom'))
         u_nom = st.text_input("Nom", value=safe_get(r, 'Nom'))
         u_soc = st.text_input("Société", value=safe_get(r, 'Société'))
@@ -96,17 +93,14 @@ if st.session_state.page == "CONTACTS":
         u_date = st.text_input("Date début", value=safe_get(r, 'DateNav'))
         u_jours = st.text_input("Nombre de jours", value=safe_get(r, 'NbreJours'))
         u_prix = st.text_input("Prix total (€)", value=safe_get(r, 'Prix'))
-        
         statuts = ["En attente", "OK", "Terminé", "Refusé"]
         s_val = safe_get(r, 'Statut')
         s_idx = statuts.index(s_val) if s_val in statuts else 0
         u_statut = st.selectbox("Statut", statuts, index=s_idx)
-        
         paiements = ["Pas payé", "Payé"]
         p_val = safe_get(r, 'Paiement')
         p_idx = paiements.index(p_val) if p_val in paiements else 0
         u_paye = st.selectbox("Paiement", paiements, index=p_idx)
-        
         u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
         
         if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
@@ -124,40 +118,27 @@ if st.session_state.page == "CONTACTS":
             df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
             for i, r in df_disp.iterrows():
                 tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
-                p_val, s_val = safe_get(r, 'Paiement'), safe_get(r, 'Statut')
-                jours = safe_get(r, 'NbreJours') or "1"
-                
-                # Couleurs badges
+                p_val, s_val, jours = safe_get(r, 'Paiement'), safe_get(r, 'Statut'), safe_get(r, 'NbreJours') or "1"
                 c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
                 c_p = "#2ecc71" if "PAYÉ" in p_val.upper() else "#e74c3c"
-                
-                # Détection CMN pour la bordure
                 classe_bordure = "border-cmn" if "CMN" in soc.upper() else "border-normal"
-                
                 info_tel = f'<div style="color:#e67e22; font-weight:bold; font-size:0.95rem;">📞 {tel}</div>' if tel else ""
                 info_mail = f'<div style="color:#7f8c8d; font-size:0.85rem;">✉️ {mail}</div>' if mail else ""
                 
-                # GÉNÉRATION DE LA FICHE (L'ordre des paramètres est important)
-                st.markdown(f"""
-                <div class="fiche-globale {classe_bordure}">
+                st.markdown(f"""<div class="fiche-globale {classe_bordure}">
                     <span class="statut-badge" style="background:{c_p};">{p_val if p_val else "Pas payé"}</span>
                     <span class="statut-badge" style="background:{c_s};">{s_val}</span>
                     <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
                     <div class="prenom-style">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</div>
-                    {info_tel}
-                    {info_mail}
-                    <p style="margin: 8px 0; font-size:1.05rem;">
-                        📅 <b>{safe_get(r, 'DateNav')}</b> <span style="color:#7f8c8d; font-size:0.9rem;">({jours} jrs)</span> | 💰 <b>{safe_get(r, 'Prix')} €</b>
-                    </p>
+                    {info_tel} {info_mail}
+                    <p style="margin: 8px 0; font-size:1.05rem;">📅 <b>{safe_get(r, 'DateNav')}</b> <span>({jours} jrs)</span> | 💰 <b>{safe_get(r, 'Prix')} €</b></p>
                     <div class="notes-box">📝 {safe_get(r, 'Notes') or "."}</div>
                     <div class="container-boutons">
                         <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
                         <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                         <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
-                    </div>
-                </div>""", unsafe_allow_html=True)
+                    </div></div>""", unsafe_allow_html=True)
                 
-                # Boutons de gestion
                 if st.session_state.confirm_del == i:
                     col1, col2 = st.columns(2)
                     if col1.button("⚠️ CONFIRMER", key=f"conf_{i}", type="primary", use_container_width=True):
@@ -167,7 +148,9 @@ if st.session_state.page == "CONTACTS":
                 else:
                     c1, c2 = st.columns([1, 4])
                     if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.session_state.confirm_del = None; st.rerun()
-                    if c2.button("🗑️ SUPPRIMER", key=f"del_{i}",
+                    if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
+                        st.session_state.confirm_del = i; st.rerun()
+
 
 
 
