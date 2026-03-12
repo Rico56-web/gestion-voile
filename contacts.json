@@ -28,7 +28,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     },
     {
         "DateNav":"21\/03\/2026",
@@ -59,7 +60,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"2"
     },
     {
         "DateNav":"28\/03\/2026",
@@ -90,7 +92,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     },
     {
         "DateNav":"04\/04\/2026",
@@ -121,7 +124,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     },
     {
         "DateNav":"12\/04\/2026",
@@ -152,7 +156,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     },
     {
         "DateNav":"18\/04\/2026",
@@ -183,7 +188,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     },
     {
         "DateNav":"4\/05\/2026",
@@ -214,7 +220,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     },
     {
         "DateNav":"14\/05\/2026",
@@ -245,7 +252,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     },
     {
         "DateNav":"31\/05\/2026",
@@ -276,7 +284,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     },
     {
         "DateNav":"31\/05\/2026",
@@ -307,7 +316,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     },
     {
         "DateNav":"31\/05\/2026",
@@ -338,7 +348,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     },
     {
         "DateNav":"31\/05\/2026",
@@ -369,7 +380,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     },
     {
         "DateNav":"01\/08\/2026",
@@ -400,7 +412,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     },
     {
         "DateNav":"28\/04\/2026",
@@ -431,7 +444,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     },
     {
         "DateNav":"07\/03\/2026",
@@ -462,7 +476,8 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     },
     {
         "DateNav":"14\/03\/2026",
@@ -493,6 +508,7 @@
         "Heures moteur":null,
         "Passager":null,
         "dt obj":null,
-        "dt sort":null
+        "dt sort":null,
+        "NbreJours":"1"
     }
 ]
