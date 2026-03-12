@@ -26,7 +26,6 @@ st.markdown("""<style>
     .societe-style { color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
     .statut-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; float: right; margin-left: 5px; }
     
-    /* BOUTONS CONTACTS ALIGNÉS */
     .container-boutons { display: flex; gap: 8px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 12px; flex-wrap: nowrap; }
     .btn-contact { flex: 1; text-align: center; padding: 10px 5px; border-radius: 8px; text-decoration: none !important; color: white !important; font-size: 0.85rem; font-weight: bold; }
     
@@ -90,33 +89,44 @@ if st.session_state.page == "CONTACTS":
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         r = df.loc[idx]
-        with st.form("edit_form"):
-            st.subheader("📝 Modifier")
-            u_pre = st.text_input("Prénom", value=safe_get(r, 'Prénom'))
-            u_nom = st.text_input("Nom", value=safe_get(r, 'Nom'))
-            u_soc = st.text_input("Société / Bateau", value=safe_get(r, 'Société'))
-            u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
-            u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
-            u_date = st.text_input("Date", value=safe_get(r, 'DateNav'))
-            u_prix = st.text_input("Prix", value=safe_get(r, 'Prix'))
-            u_statut = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut') or "En attente"))
-            u_paye = st.selectbox("Paiement", ["Pas payé", "Payé"], index=1 if safe_get(r, 'Paiement') == "Payé" else 0)
-            u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
-            if st.form_submit_button("💾 ENREGISTRER"):
-                d = {'DateNav':u_date,'Statut':u_statut,'Paiement':u_paye,'Prix':u_prix,'Société':u_soc,'Prénom':u_pre,'Nom':u_nom,'Téléphone':u_tel,'Email':u_mail,'Notes':u_notes}
-                for k,v in d.items(): df.at[idx, k] = v
-                sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
-            if st.form_submit_button("Annuler"): st.session_state.edit_idx = None; st.rerun()
+        st.subheader("📝 Modifier le contact")
+        
+        # Champs directs sans st.form
+        u_pre = st.text_input("Prénom", value=safe_get(r, 'Prénom'))
+        u_nom = st.text_input("Nom", value=safe_get(r, 'Nom'))
+        u_soc = st.text_input("Société / Bateau", value=safe_get(r, 'Société'))
+        u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
+        u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
+        u_date = st.text_input("Date (JJ/MM/AAAA)", value=safe_get(r, 'DateNav'))
+        u_prix = st.text_input("Prix (€)", value=safe_get(r, 'Prix'))
+        
+        statuts = ["En attente", "OK", "Terminé", "Refusé"]
+        u_statut = st.selectbox("Statut", statuts, index=statuts.index(safe_get(r, 'Statut') or "En attente"))
+        
+        paiements = ["Pas payé", "Payé"]
+        u_paye = st.selectbox("Paiement", paiements, index=paiements.index(safe_get(r, 'Paiement') or "Pas payé"))
+        
+        u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
+        
+        col_s1, col_s2 = st.columns(2)
+        if col_s1.button("💾 ENREGISTRER", type="primary", use_container_width=True):
+            d = {'DateNav':u_date,'Statut':u_statut,'Paiement':u_paye,'Prix':u_prix,'Société':u_soc,'Prénom':u_pre,'Nom':u_nom,'Téléphone':u_tel,'Email':u_mail,'Notes':u_notes}
+            for k,v in d.items(): df.at[idx, k] = v
+            sauvegarder_data(df, "contacts.json")
+            st.session_state.edit_idx = None
+            st.rerun()
+        if col_s2.button("Annuler", use_container_width=True):
+            st.session_state.edit_idx = None
+            st.rerun()
 
     else:
         if not df.empty:
             df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
             for i, r in df_disp.iterrows():
                 tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
-                note = safe_get(r, 'Notes')
-                if not note: note = "." 
-                
+                note = safe_get(r, 'Notes') or "."
                 p_val, s_val = safe_get(r, 'Paiement'), safe_get(r, 'Statut')
+                
                 c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
                 c_p = "#2ecc71" if "PAYÉ" in p_val.upper() else "#e74c3c"
                 
@@ -156,6 +166,7 @@ elif st.session_state.page == "PLANNING":
                 st.write(f"**Skipper :** {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}")
                 if st.button("Ouvrir la fiche", key=f"p_{i}"):
                     st.session_state.page = "CONTACTS"; st.session_state.edit_idx = i; st.rerun()
+
 
 
 
