@@ -213,32 +213,71 @@ elif st.session_state.page == "STATS":
     # Affichage du tableau sans la colonne d'index (la première colonne de chiffres 0, 1, 2...)
     final_df = pd.concat([st_df, tot_row], ignore_index=True)
     st.table(final_df.set_index("Mois"))
-
-# --- 7. PAGE MAINTENANCE ---
+    # --- 7. PAGE MAINTENANCE ---
 elif st.session_state.page == "MAINT":
     st.subheader("🔧 Maintenance & Frais")
+    
+    # Initialisation de l'état de confirmation si non existant
+    if "maint_confirm_del" not in st.session_state:
+        st.session_state.maint_confirm_del = None
+
     if st.button("➕ NOUVEAU FRAIS", use_container_width=True):
         new_m = {"Date": datetime.now().strftime("%d/%m/2026"), "Cause": "Description", "Prix": "0.00"}
         df_m = pd.concat([pd.DataFrame([new_m]), df_m], ignore_index=True)
-        sauvegarder_data(df_m, "maint.json"); st.rerun()
+        sauvegarder_data(df_m, "maint.json")
+        st.rerun()
 
     if st.session_state.m_edit_idx is not None:
         idx = st.session_state.m_edit_idx
         r = df_m.loc[idx]
+        st.subheader("📝 Modifier le frais")
         u_d = st.text_input("Date", value=safe_get(r, 'Date'))
         u_c = st.text_input("Cause", value=safe_get(r, 'Cause'))
         u_p = st.text_input("Prix (€)", value=safe_get(r, 'Prix'))
-        if st.button("💾 ENREGISTRER"):
+        
+        col_btn1, col_btn2 = st.columns(2)
+        if col_btn1.button("💾 ENREGISTRER", type="primary", use_container_width=True):
             df_m.at[idx, 'Date'], df_m.at[idx, 'Cause'] = u_d, u_c
             df_m.at[idx, 'Prix'] = f"{float(u_p or 0):.2f}"
-            sauvegarder_data(df_m, "maint.json"); st.session_state.m_edit_idx = None; st.rerun()
+            sauvegarder_data(df_m, "maint.json")
+            st.session_state.m_edit_idx = None
+            st.rerun()
+        if col_btn2.button("Annuler", use_container_width=True):
+            st.session_state.m_edit_idx = None
+            st.rerun()
+            
     else:
         for i, r in df_m.iterrows():
-            st.markdown(f'<div class="fiche-globale">📅 {safe_get(r, "Date")} | 🏷️ {safe_get(r, "Cause")} | 💰 <b>{float(safe_get(r, "Prix") or 0):.2f} €</b></div>', unsafe_allow_html=True)
-            c1, c2 = st.columns([1, 4])
-            if c1.button("✏️", key=f"em_{i}"): st.session_state.m_edit_idx = i; st.rerun()
-            if c2.button("🗑️ SUPPRIMER", key=f"dm_{i}", use_container_width=True):
-                df_m = df_m.drop(i); sauvegarder_data(df_m, "maint.json"); st.rerun()
+            # Affichage de la fiche de frais
+            p_frais = f"{float(safe_get(r, 'Prix') or 0):.2f}"
+            st.markdown(f"""
+                <div class="fiche-globale">
+                    📅 <b>{safe_get(r, "Date")}</b> | 🏷️ {safe_get(r, "Cause")} | 💰 <b>{p_frais} €</b>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Logique de suppression avec confirmation
+            if st.session_state.maint_confirm_del == i:
+                st.warning(f"Supprimer ce frais de {p_frais} € ?")
+                c1, c2 = st.columns(2)
+                if c1.button("✅ OUI, SUPPRIMER", key=f"conf_m_{i}", type="primary", use_container_width=True):
+                    df_m = df_m.drop(i)
+                    sauvegarder_data(df_m, "maint.json")
+                    st.session_state.maint_confirm_del = None
+                    st.rerun()
+                if c2.button("NON, ANNULER", key=f"ann_m_{i}", use_container_width=True):
+                    st.session_state.maint_confirm_del = None
+                    st.rerun()
+            else:
+                c1, c2 = st.columns([1, 4])
+                if c1.button("✏️", key=f"em_{i}"):
+                    st.session_state.m_edit_idx = i
+                    st.rerun()
+                if c2.button("🗑️ SUPPRIMER", key=f"dm_{i}", use_container_width=True):
+                    st.session_state.maint_confirm_del = i
+                    st.rerun()
+
+
 
 
 
