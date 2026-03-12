@@ -282,48 +282,108 @@ elif st.session_state.page == "MAINT":
 elif st.session_state.page == "FACTURES":
     st.subheader("📄 Facturation Mensuelle (CMN)")
 
-    # Calcul du mois précédent (Février si nous sommes en Mars)
+    # 1. Calcul du mois précédent
     now = datetime.now()
     prev_m_idx = now.month - 1 if now.month > 1 else 12
     prev_y = now.year if now.month > 1 else now.year - 1
-    
     m_noms_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     nom_mois_prev = m_noms_fr[prev_m_idx - 1]
 
-    # Extraction des missions
-    missions_cmn = []
-    total_facture = 0.0
-    
+    st.info(f"Analyse des missions de : **{nom_mois_prev} {prev_y}**")
+
+    # 2. Filtrage des missions CMN
+    missions_potentielles = []
     if not df_c.empty:
-        for _, r in df_c.iterrows():
+        for idx, r in df_c.iterrows():
             try:
-                # Nettoyage de la date et de la société
                 date_str = safe_get(r, 'DateNav').replace(" ", "")
                 dp = date_str.split('/')
-                m = int(dp[1])
-                y = int(dp[2])
-                if y < 100: y += 2000 # Gère le format '26' -> '2026'
+                m, y = int(dp[1]), int(dp[2])
+                if y < 100: y += 2000
                 
                 soc = safe_get(r, 'Société').upper().strip()
-                
-                # Condition : Mois précédent + Année + contient "CMN"
-                if m == prev_m_idx and y == prev_y and "CMN" in soc:
-                    missions_cmn.append(r)
-                    total_facture += float(safe_get(r, 'Prix') or 0)
-            except:
-                continue
+                # On prend les missions CMN du mois précédent qui ne sont pas encore marquées "Payé"
+                if m == prev_m_idx and y == prev_y and "CMN" in soc and safe_get(r, 'Paiement') != "Payé":
+                    missions_potentielles.append({
+                        "id": idx,
+                        "Date": safe_get(r, 'DateNav'),
+                        "Client": f"{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}",
+                        "Prix": float(safe_get(r, 'Prix') or 0)
+                    })
+            except: continue
 
-    # AFFICHAGE
-    if not missions_cmn:
-        st.warning(f"Aucune mission détectée pour **{nom_mois_prev} {prev_y}** avec la mention **CMN**.")
-        st.info("💡 Vérifie que tu as bien écrit 'CMN' dans la case 'Société' de tes fiches de février.")
+    if not missions_potentielles:
+        st.warning(f"Aucune mission CMN en attente de paiement trouvée pour {nom_mois_prev}.")
     else:
-        st.success(f"✅ {len(missions_cmn)} mission(s) trouvée(s) pour la CMN en {nom_mois_prev}.")
+        st.write("### 1. Sélectionnez les missions à facturer")
         
-        # Le reste du code (Email + Confirmation) reste identique
-        st.write(f"**Montant total à facturer : {total_facture:.2f} €**")
+        # Tableau de sélection avec cases à cocher
+        selection = {}
+        total_selection = 0.0
         
-        # ... (Garder la partie Email du code précédent)
+        # En-tête du tableau
+        col_h1, col_h2, col_h3 = st.columns([1, 3, 2])
+        col_h1.write("**Inclure**")
+        col_h2.write("**Mission**")
+        col_h3.write("**Montant**")
+        
+        for m in missions_potentielles:
+            c1, c2, c3 = st.columns([1, 3, 2])
+            is_selected = c1.checkbox("", value=True, key=f"sel_{m['id']}")
+            c2.write(f"{m['Date']} - {m['Client']}")
+            c3.write(f"{m['Prix']:.2f} €")
+            
+            if is_selected:
+                selection[m['id']] = m
+                total_selection += m['Prix']
+
+        st.markdown(f"---")
+        st.markdown(f"### 2. Récapitulatif : **{total_selection:.2f} €**")
+
+        if total_selection > 0:
+            # 3. Préparation de l'Email
+            destinataire = "tresorier@cmn-asso.fr"
+            objet_mail = f"Facture Skipper Vesta - {nom_mois_prev} {prev_y}"
+            
+            corps_detail = ""
+            for m_id, m_data in selection.items():
+                corps_detail += f"- Le {m_data['Date']} : {m_data['Client']} | {m_data['Prix']:.2f} €\n"
+
+            corps_mail = st.text_area("Modifier le message :", value=f"""Bonjour,
+
+Veuillez trouver ci-dessous le détail de mes prestations de skipper pour le mois de {nom_mois_prev} {prev_y} :
+
+{corps_detail}
+TOTAL : {total_selection:.2f} €
+
+Merci de procéder au virement.
+Bien cordialement,
+Vesta Skipper""", height=200)
+
+            # 4. Bouton d'envoi et validation
+            if st.button(f"📧 CONFIRMER L'ENVOI ({total_selection:.2f} €)", type="primary", use_container_width=True):
+                # Mise à jour des fiches dans le DataFrame original
+                for m_id in selection.keys():
+                    df_c.at[m_id, 'Paiement'] = "Payé"
+                    df_c.at[m_id, 'Statut'] = "Terminé"
+                
+                sauvegarder_data(df_c, "contacts.json")
+                
+                # Génération du lien Mailto
+                import urllib.parse
+                mailto_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet_mail)}&body={urllib.parse.quote(corps_mail)}"
+                
+                st.success("✅ Données mises à jour dans les Stats !")
+                st.markdown(f'''
+                    <a href="{mailto_link}" target="_blank" 
+                       style="display: block; text-align: center; background-color: #2ecc71; color: white; 
+                       padding: 15px; text-decoration: none; border-radius: 10px; font-weight: bold; margin-top: 10px;">
+                       🚀 CLIQUER ICI POUR ENVOYER LE MAIL
+                    </a>
+                ''', unsafe_allow_html=True)
+        else:
+            st.info("Cochez au moins une mission pour préparer l'envoi.")
+
 
 
 
