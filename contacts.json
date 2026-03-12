@@ -34,7 +34,7 @@
     {
         "DateNav":"08\/05\/2026",
         "NbreJours":"2",
-        "Statut":"En attente",
+        "Statut":"OK",
         "Paiement":"Pas pay\u00e9",
         "Soci\u00e9t\u00e9":"Vog",
         "Pr\u00e9nom":"Sonia",
@@ -42,7 +42,7 @@
         "T\u00e9l\u00e9phone":"0626725877",
         "Email":"",
         "Prix":"70.00",
-        "Notes":"M\u00e9decin \u00e0 Nantes ",
+        "Notes":"M\u00e9decin \u00e0 Nantes",
         "NbJours":null,
         "Paye":null,
         "PrixJour":null,
