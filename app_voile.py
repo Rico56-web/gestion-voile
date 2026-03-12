@@ -10,25 +10,14 @@ st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
 st.markdown("""<style>
     .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; }
-    
     button[data-testid="baseButton-primary"] { background-color: #ff4b4b !important; color: white !important; border: none !important; }
     button[data-testid="baseButton-secondary"] { background-color: #ffffff !important; color: #1a2a6c !important; border: 1px solid #1a2a6c !important; }
-
-    .fiche-globale { 
-        border: 2px solid #1a2a6c; 
-        border-radius: 12px; 
-        background: white; 
-        margin-bottom: 15px; 
-        padding: 18px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    }
+    .fiche-globale { border: 2px solid #1a2a6c; border-radius: 12px; background: white; margin-bottom: 15px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
     .prenom-style { font-size: 1.5rem; font-weight: bold; color: #1a2a6c; }
     .societe-style { color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
     .statut-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; float: right; margin-left: 5px; }
-    
     .container-boutons { display: flex; gap: 8px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 12px; flex-wrap: nowrap; }
     .btn-contact { flex: 1; text-align: center; padding: 10px 5px; border-radius: 8px; text-decoration: none !important; color: white !important; font-size: 0.85rem; font-weight: bold; }
-    
     .notes-box { background-color: #f8f9fa; border-left: 5px solid #1a2a6c; padding: 12px; border-radius: 4px; margin: 12px 0; font-size: 0.95rem; color: #2c3e50; }
 </style>""", unsafe_allow_html=True)
 
@@ -54,7 +43,7 @@ def sauvegarder_data(df, file):
 def safe_get(r, key):
     val = r.get(key)
     if pd.isna(val) or val is None: return ""
-    return str(val).replace('"', '&quot;').replace("'", "&apos;").strip()
+    return str(val).strip()
 
 # --- 3. NAVIGATION ---
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
@@ -65,8 +54,8 @@ if "confirm_del" not in st.session_state: st.session_state.confirm_del = None
 st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
 
 m = st.columns(6)
-menu_list = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
-for i, name in enumerate(menu_list):
+menu_names = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
+for i, name in enumerate(menu_names):
     if m[i].button(name, use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name; st.session_state.edit_idx = None; st.session_state.confirm_del = None; st.rerun()
 
@@ -89,41 +78,53 @@ if st.session_state.page == "CONTACTS":
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         r = df.loc[idx]
-        st.subheader("📝 Modifier le contact")
+        st.subheader("📝 Modifier")
         
-        # Champs directs sans st.form
         u_pre = st.text_input("Prénom", value=safe_get(r, 'Prénom'))
         u_nom = st.text_input("Nom", value=safe_get(r, 'Nom'))
-        u_soc = st.text_input("Société / Bateau", value=safe_get(r, 'Société'))
+        u_soc = st.text_input("Société", value=safe_get(r, 'Société'))
         u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
         u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
-        u_date = st.text_input("Date (JJ/MM/AAAA)", value=safe_get(r, 'DateNav'))
-        u_prix = st.text_input("Prix (€)", value=safe_get(r, 'Prix'))
+        u_date = st.text_input("Date", value=safe_get(r, 'DateNav'))
+        u_prix = st.text_input("Prix", value=safe_get(r, 'Prix'))
         
+        # --- SÉCURITÉ ANTI-CRASH LIGNE 104 ---
         statuts = ["En attente", "OK", "Terminé", "Refusé"]
-        u_statut = st.selectbox("Statut", statuts, index=statuts.index(safe_get(r, 'Statut') or "En attente"))
+        s_val = safe_get(r, 'Statut')
+        # Si s_val n'est pas exactement dans la liste, on met 0 (En attente) par défaut
+        s_idx = statuts.index(s_val) if s_val in statuts else 0
+        u_statut = st.selectbox("Statut", statuts, index=s_idx)
         
         paiements = ["Pas payé", "Payé"]
-        u_paye = st.selectbox("Paiement", paiements, index=paiements.index(safe_get(r, 'Paiement') or "Pas payé"))
+        p_val = safe_get(r, 'Paiement')
+        p_idx = paiements.index(p_val) if p_val in paiements else 0
+        u_paye = st.selectbox("Paiement", paiements, index=p_idx)
+        # ---------------------------------------
         
         u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
         
-        col_s1, col_s2 = st.columns(2)
-        if col_s1.button("💾 ENREGISTRER", type="primary", use_container_width=True):
-            d = {'DateNav':u_date,'Statut':u_statut,'Paiement':u_paye,'Prix':u_prix,'Société':u_soc,'Prénom':u_pre,'Nom':u_nom,'Téléphone':u_tel,'Email':u_mail,'Notes':u_notes}
-            for k,v in d.items(): df.at[idx, k] = v
-            sauvegarder_data(df, "contacts.json")
-            st.session_state.edit_idx = None
-            st.rerun()
-        if col_s2.button("Annuler", use_container_width=True):
-            st.session_state.edit_idx = None
-            st.rerun()
+        if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
+            df.at[idx, 'Prénom'] = u_pre
+            df.at[idx, 'Nom'] = u_nom
+            df.at[idx, 'Société'] = u_soc
+            df.at[idx, 'Téléphone'] = u_tel
+            df.at[idx, 'Email'] = u_mail
+            df.at[idx, 'DateNav'] = u_date
+            df.at[idx, 'Prix'] = u_prix
+            df.at[idx, 'Statut'] = u_statut
+            df.at[idx, 'Paiement'] = u_paye
+            df.at[idx, 'Notes'] = u_notes
+            sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
+        if st.button("Annuler", use_container_width=True):
+            st.session_state.edit_idx = None; st.rerun()
 
     else:
         if not df.empty:
             df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
             for i, r in df_disp.iterrows():
-                tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
+                tel = safe_get(r, 'Téléphone')
+                mail = safe_get(r, 'Email')
+                soc = safe_get(r, 'Société')
                 note = safe_get(r, 'Notes') or "."
                 p_val, s_val = safe_get(r, 'Paiement'), safe_get(r, 'Statut')
                 
@@ -149,23 +150,11 @@ if st.session_state.page == "CONTACTS":
                 c1, c2 = st.columns([1, 4])
                 if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
                 if st.session_state.confirm_del == i:
-                    if st.button("⚠️ CONFIRMER", key=f"conf_{i}", type="primary"):
+                    if st.button("⚠️ CONFIRMER", key=f"conf_{i}", type="primary", use_container_width=True):
                         df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.session_state.confirm_del = None; st.rerun()
-                    if st.button("❌ Annuler", key=f"ann_{i}"): st.session_state.confirm_del = None; st.rerun()
                 else:
-                    if c2.button("🗑️", key=f"del_{i}"):
-                        st.session_state.confirm_del = i; st.rerun()
+                    if c2.button("🗑️", key=f"del_{i}"): st.session_state.confirm_del = i; st.rerun()
 
-# --- 5. PAGE PLANNING ---
-elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Planning")
-    if not df.empty:
-        df_plan = df[~df['Statut'].isin(["Terminé", "Refusé"])].copy()
-        for i, r in df_plan.sort_values('DateNav').iterrows():
-            with st.expander(f"📅 {safe_get(r, 'DateNav')} | {safe_get(r, 'Société') or 'CLIENT'}"):
-                st.write(f"**Skipper :** {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}")
-                if st.button("Ouvrir la fiche", key=f"p_{i}"):
-                    st.session_state.page = "CONTACTS"; st.session_state.edit_idx = i; st.rerun()
 
 
 
