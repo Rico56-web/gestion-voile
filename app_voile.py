@@ -16,15 +16,15 @@ st.markdown("""<style>
     .statut-badge { padding: 4px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; display: inline-block; }
     .btn-contact { display: inline-block; padding: 6px 10px; border-radius: 6px; text-decoration: none; color: white !important; font-size: 0.8rem; font-weight: bold; margin-right: 5px; margin-top: 5px; }
     
-    /* Style pour le bouton actif en VERT */
+    /* STYLE DU BOUTON DE NAVIGATION ACTIF UNIQUEMENT */
     div.stButton > button:first-child[data-testid="baseButton-secondary"] {
-        background-color: #2ecc71;
-        color: white;
-        border: none;
+        background-color: #2ecc71 !important;
+        color: white !important;
+        border: 2px solid #27ae60 !important;
     }
 </style>""", unsafe_allow_html=True)
 
-# --- 2. FONCTIONS ---
+# --- 2. FONCTIONS TECHNIQUES ---
 def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
@@ -56,8 +56,8 @@ st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allo
 m = st.columns(6)
 menu_list = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
 for i, name in enumerate(menu_list):
-    # Si la page est active, on utilise un type spécial (secondary détourné par le CSS)
     is_active = st.session_state.page == name
+    # On utilise 'secondary' pour le bouton vert (actif) et 'primary' pour le style par défaut
     if m[i].button(name, use_container_width=True, type="secondary" if is_active else "primary"):
         st.session_state.page = name
         st.session_state.edit_idx = None
@@ -65,7 +65,8 @@ for i, name in enumerate(menu_list):
 
 df = charger_data("contacts.json")
 
-# --- 4. PAGE CONTACTS ---
+# --- 4. LOGIQUE DES PAGES ---
+
 if st.session_state.page == "CONTACTS":
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
@@ -106,7 +107,7 @@ if st.session_state.page == "CONTACTS":
                 sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
             if st.form_submit_button("❌ ANNULER"): st.session_state.edit_idx = None; st.rerun()
     else:
-        # Tri et Affichage
+        # Tri chronologique automatique
         if not df.empty and 'DateNav' in df.columns:
             df['dt_tri'] = pd.to_datetime(df['DateNav'], format='%d/%m/%Y', errors='coerce')
             df = df.sort_values(by='dt_tri', ascending=True)
@@ -147,6 +148,7 @@ elif st.session_state.page == "STATS": st.header("💰 Statistiques")
 elif st.session_state.page == "MAINT": st.header("🔧 Maintenance")
 elif st.session_state.page == "FACTURES": st.header("🧾 Factures")
 elif st.session_state.page == "NOTES": st.header("📝 Notes")
+
 
 
 
