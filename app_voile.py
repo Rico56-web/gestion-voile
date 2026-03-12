@@ -15,7 +15,7 @@ st.markdown("""<style>
     button[data-testid="baseButton-primary"] { background-color: #ff4b4b !important; color: white !important; border: none !important; }
     button[data-testid="baseButton-secondary"] { background-color: #f0f2f6 !important; color: #31333f !important; border: 1px solid #d3d6db !important; }
 
-    /* DESIGN DES FICHES - ENCADREMENT COMPLET */
+    /* DESIGN DES FICHES */
     .fiche-globale { 
         border: 2px solid #1a2a6c; 
         border-radius: 12px; 
@@ -25,12 +25,8 @@ st.markdown("""<style>
         padding: 15px; 
     }
     .prenom-style { 
-        font-size: 1.4rem; 
-        font-weight: bold; 
-        color: #1a2a6c; 
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        font-size: 1.4rem; font-weight: bold; color: #1a2a6c; 
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .statut-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; display: inline-block; float: right; margin-left: 5px; }
     .btn-contact { display: inline-block; padding: 8px 12px; border-radius: 6px; text-decoration: none; color: white !important; font-size: 0.9rem; font-weight: bold; margin-right: 8px; margin-top: 10px; }
@@ -59,7 +55,8 @@ def sauvegarder_data(df, file):
 
 def safe_get(r, key, default=""):
     val = r.get(key)
-    return default if pd.isna(val) or val is None else val
+    if pd.isna(val) or val is None or str(val).strip() == "": return default
+    return str(val).strip()
 
 # --- 3. NAVIGATION ---
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
@@ -73,7 +70,7 @@ m = st.columns(6)
 menu_list = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
 for i, name in enumerate(menu_list):
     active = (st.session_state.page == name)
-    if m[i].button(name, use_container_width=True, key=f"nav_v9_{name}", type="primary" if active else "secondary"):
+    if m[i].button(name, use_container_width=True, key=f"nav_v10_{name}", type="primary" if active else "secondary"):
         st.session_state.page = name
         st.session_state.edit_idx = None
         st.rerun()
@@ -94,22 +91,17 @@ if st.session_state.page == "CONTACTS":
         r = df.loc[idx]
         with st.form("edit_form"):
             st.subheader(f"Modifier : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}")
-            
             col1, col2, col3, col4 = st.columns(4)
             u_date = col1.text_input("Date Nav", value=safe_get(r, 'DateNav'))
             u_statut = col2.selectbox("Statut Mission", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut', 'En attente')))
-            u_prix = col3.text_input("Prix (€)", value=str(safe_get(r, 'Prix', '0')))
+            u_prix = col3.text_input("Prix (€)", value=safe_get(r, 'Prix', '0'))
             u_paye = col4.selectbox("Paiement", ["Pas payé", "Payé"], index=1 if safe_get(r, 'Paiement') == "Payé" else 0)
             
             u_soc = st.text_input("Société", value=safe_get(r, 'Société'))
-            c_p, c_n = st.columns(2)
-            u_pre = c_p.text_input("Prénom", value=safe_get(r, 'Prénom'))
-            u_nom = c_n.text_input("Nom", value=safe_get(r, 'Nom'))
-            
-            c_t, c_m = st.columns(2)
-            u_tel = c_t.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
-            u_mail = c_m.text_input("Email", value=safe_get(r, 'Email'))
-            
+            u_pre = st.text_input("Prénom", value=safe_get(r, 'Prénom'))
+            u_nom = st.text_input("Nom", value=safe_get(r, 'Nom'))
+            u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
+            u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
             u_notes = st.text_area("Notes particulières", value=safe_get(r, 'Notes'))
             
             if st.form_submit_button("💾 ENREGISTRER"):
@@ -145,22 +137,26 @@ if st.session_state.page == "CONTACTS":
                 
                 c_edit, c_del = st.columns([1, 3])
                 if c_edit.button("✏️ Modifier", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
-                
                 if st.session_state.confirm_del == i:
-                    st.warning("⚠️ Supprimer ?")
-                    col_c1, col_c2 = st.columns(2)
-                    if col_c1.button("✅ OUI", key=f"yes_{i}"):
-                        df = df.drop(i); sauvegarder_data(df, "contacts.json")
-                        st.session_state.confirm_del = None; st.rerun()
-                    if col_c2.button("❌ NON", key=f"no_{i}"):
-                        st.session_state.confirm_del = None; st.rerun()
+                    if st.button("✅ CONFIRMER SUPPRESSION", key=f"yes_{i}"):
+                        df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.session_state.confirm_del = None; st.rerun()
+                    if st.button("❌ ANNULER", key=f"no_{i}"): st.session_state.confirm_del = None; st.rerun()
                 else:
                     if c_del.button("🗑️ Supprimer", key=f"del_{i}"): st.session_state.confirm_del = i; st.rerun()
 
-# --- 5. PAGE PLANNING (DÉBUT) ---
+# --- 5. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
-    st.header("🗓️ Planning des Navigations")
-    st.info("La section Contacts est terminée. On commence la mise en place du planning ici.")
+    st.subheader("🗓️ Vue Chronologique des Navigations")
+    if not df.empty:
+        # On trie par date si possible
+        df_plan = df.copy()
+        # On affiche juste une liste simple pour commencer
+        for i, r in df_plan.sort_values('DateNav').iterrows():
+            with st.expander(f"📅 {safe_get(r, 'DateNav')} - {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}"):
+                st.write(f"**Bateau / Société :** {safe_get(r, 'Société')}")
+                st.write(f"**Statut :** {safe_get(r, 'Statut')}")
+                st.write(f"**Notes :** {safe_get(r, 'Notes')}")
+
 
 
 
