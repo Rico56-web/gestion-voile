@@ -6,26 +6,48 @@ from datetime import datetime
 # --- 1. CONFIGURATION & STYLE ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
-st.markdown("""<style>
-    .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; }
-    button[data-testid="baseButton-primary"] { background-color: #ff4b4b !important; color: white !important; }
-    button[data-testid="baseButton-secondary"] { background-color: white !important; color: #1a2a6c !important; border: 1px solid #1a2a6c !important; }
-    .fiche-globale { border-radius: 12px; background: white; margin-bottom: 15px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #ddd; }
-    .border-cmn { border: 4px solid #0056b3 !important; background-color: #f0f7ff !important; }
-    .prenom-style { font-size: 1.5rem; font-weight: bold; color: #1a2a6c; }
-    .societe-style { color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #eee; }
-    .statut-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; float: right; margin-left: 5px; }
-    .container-boutons { display: flex; gap: 8px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 12px; }
-    .btn-contact { flex: 1; text-align: center; padding: 10px 5px; border-radius: 8px; text-decoration: none !important; color: white !important; font-size: 0.85rem; font-weight: bold; }
-    .notes-box { background-color: #f8f9fa; border-left: 5px solid #1a2a6c; padding: 10px; border-radius: 4px; margin: 10px 0; font-size: 0.95rem; }
-    .calendar-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 20px; }
-    .calendar-table th { background-color: #1a2a6c; color: white; padding: 10px; border: 1px solid #ddd; }
-    .calendar-table td { height: 50px; border: 1px solid #ddd; text-align: center; font-weight: bold; }
-    .day-ok { background-color: #2ecc71 !important; color: white; }
-    .day-attente { background-color: #f1c40f !important; color: black; }
+# Date du jour en français
+jours_fr = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+mois_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+now = datetime.now()
+date_bandeau = f"📅 {jours_fr[now.weekday()]} {now.day} {mois_fr[now.month-1]} {now.year}"
+
+st.markdown(f"""<style>
+    .main-header {{ font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 5px; }}
+    .date-header {{ text-align: center; color: #7f8c8d; font-weight: bold; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; padding-bottom: 10px; }}
+    button[data-testid="baseButton-primary"] {{ background-color: #ff4b4b !important; color: white !important; }}
+    button[data-testid="baseButton-secondary"] {{ background-color: white !important; color: #1a2a6c !important; border: 1px solid #1a2a6c !important; }}
+    .fiche-globale {{ border-radius: 12px; background: white; margin-bottom: 15px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #ddd; }}
+    .border-cmn {{ border: 4px solid #0056b3 !important; background-color: #f0f7ff !important; }}
+    .prenom-style {{ font-size: 1.5rem; font-weight: bold; color: #1a2a6c; }}
+    .societe-style {{ color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #eee; }}
+    .statut-badge {{ padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; float: right; margin-left: 5px; }}
+    .container-boutons {{ display: flex; gap: 8px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 12px; }}
+    .btn-contact {{ flex: 1; text-align: center; padding: 10px 5px; border-radius: 8px; text-decoration: none !important; color: white !important; font-size: 0.85rem; font-weight: bold; }}
+    .notes-box {{ background-color: #f8f9fa; border-left: 5px solid #1a2a6c; padding: 10px; border-radius: 4px; margin: 10px 0; font-size: 0.95rem; }}
+    .calendar-table {{ width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 20px; }}
+    .calendar-table th {{ background-color: #1a2a6c; color: white; padding: 10px; border: 1px solid #ddd; }}
+    .calendar-table td {{ height: 50px; border: 1px solid #ddd; text-align: center; font-weight: bold; }}
+    .day-ok {{ background-color: #2ecc71 !important; color: white; }}
+    .day-attente {{ background-color: #f1c40f !important; color: black; }}
 </style>""", unsafe_allow_html=True)
 
-# --- 2. FONCTIONS ---
+# --- 2. SÉCURITÉ ACCÈS ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
+    password = st.text_input("Entrez le code d'accès :", type="password")
+    if st.button("ACCÉDER"):
+        if password == "SKIPPER2026":
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("Code incorrect.")
+    st.stop()
+
+# --- 3. FONCTIONS DONNÉES ---
 def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
@@ -48,34 +70,36 @@ def safe_get(r, key):
     val = r.get(key)
     return str(val).strip() if pd.notna(val) and val is not None else ""
 
-# --- 3. NAVIGATION ---
+# --- 4. NAVIGATION & ENTÊTE ---
+st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=True)
+
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
 if "view_archive" not in st.session_state: st.session_state.view_archive = False
 if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
 if "m_edit_idx" not in st.session_state: st.session_state.m_edit_idx = None
+if "maint_confirm_del" not in st.session_state: st.session_state.maint_confirm_del = None
 
-st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
 m = st.columns(6)
 menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
 for i, name in enumerate(menu):
-    if m[i].button(name, key=f"n_{name}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
+    if m[i].button(name, key=f"nav_{name}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name; st.session_state.edit_idx = None; st.session_state.m_edit_idx = None; st.rerun()
 
 df_c = charger_data("contacts.json")
 df_m = charger_data("maint.json")
 
-# --- 4. PAGE CONTACTS ---
+# --- 5. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
     if st.button("➕ NOUVEAU CONTACT", type="secondary", use_container_width=True):
-        new = {"DateNav": "01/01/2026", "NbreJours": "1", "Statut": "En attente", "Paiement": "Pas payé", "Société": "", "Prénom": "Nouveau", "Nom": "Contact", "Téléphone": "", "Email": "", "Prix": "0.00", "Notes": ""}
+        new = {"DateNav": datetime.now().strftime("%d/%m/2026"), "NbreJours": "1", "Statut": "En attente", "Paiement": "Pas payé", "Société": "", "Prénom": "Nouveau", "Nom": "Contact", "Téléphone": "", "Email": "", "Prix": "0.00", "Notes": ""}
         df_c = pd.concat([pd.DataFrame([new]), df_c], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json"); st.rerun()
 
     c1, c2 = st.columns(2)
-    v_arc = st.session_state.view_archive
-    if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, type="primary" if not v_arc else "secondary"):
+    if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, type="primary" if not st.session_state.view_archive else "secondary"):
         st.session_state.view_archive = False; st.rerun()
-    if c2.button("📁 ARCHIVES", use_container_width=True, type="primary" if v_arc else "secondary"):
+    if c2.button("📁 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_archive else "secondary"):
         st.session_state.view_archive = True; st.rerun()
 
     if st.session_state.edit_idx is not None:
@@ -88,7 +112,7 @@ if st.session_state.page == "CONTACTS":
         u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
         u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
         u_date = st.text_input("Date (JJ/MM/AAAA)", value=safe_get(r, 'DateNav'))
-        u_jours = st.text_input("Nbre Jours", value=safe_get(r, 'NbreJours'))
+        u_jours = st.text_input("Nombre de Jours", value=safe_get(r, 'NbreJours'))
         u_prix = st.text_input("Prix Total (€)", value=safe_get(r, 'Prix'))
         u_stat = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut')) if safe_get(r, 'Statut') in ["En attente", "OK", "Terminé", "Refusé"] else 0)
         u_paye = st.selectbox("Paiement", ["Pas payé", "Payé"], index=["Pas payé", "Payé"].index(safe_get(r, 'Paiement')) if safe_get(r, 'Paiement') in ["Pas payé", "Payé"] else 0)
@@ -104,35 +128,49 @@ if st.session_state.page == "CONTACTS":
         if st.button("Annuler", use_container_width=True):
             st.session_state.edit_idx = None; st.rerun()
     else:
-        df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
+        df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.view_archive else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
         for i, r in df_disp.iterrows():
             tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
             p_val, s_val, jours = f"{float(safe_get(r, 'Prix') or 0):.2f}", safe_get(r, 'Statut'), safe_get(r, 'NbreJours') or "1"
             c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
             c_p = "#2ecc71" if "PAYÉ" in safe_get(r, 'Paiement').upper() else "#e74c3c"
             cl_b = "border-cmn" if "CMN" in soc.upper() else ""
-            i_tel = f'<div style="color:#e67e22;font-weight:bold;">📞 {tel}</div>' if tel else ""
-            i_mail = f'<div style="color:#7f8c8d;font-size:0.85rem;">✉️ {mail}</div>' if mail else ""
             
-            h = f'<div class="fiche-globale {cl_b}"><span class="statut-badge" style="background:{c_p};">{safe_get(r, "Paiement")}</span><span class="statut-badge" style="background:{c_s};">{s_val}</span><div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div><div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>{i_tel}{i_mail}<p style="margin:8px 0;">📅 <b>{safe_get(r, "DateNav")}</b> ({jours} jrs) | 💰 <b>{p_val} €</b></p><div class="notes-box">📝 {safe_get(r, "Notes") or "."}</div><div class="container-boutons"><a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a><a href="https://wa.me/{tel.replace(" ","")}" class="btn-contact" style="background:#25D366;">WhatsApp</a><a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a></div></div>'
+            h = f'''<div class="fiche-globale {cl_b}">
+                <span class="statut-badge" style="background:{c_p};">{safe_get(r, "Paiement")}</span>
+                <span class="statut-badge" style="background:{c_s};">{s_val}</span>
+                <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
+                <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
+                📅 <b>{safe_get(r, "DateNav")}</b> ({jours} jrs) | 💰 <b>{p_val} €</b><br>
+                📞 {tel} | ✉️ {mail}
+                <div class="notes-box">📝 {safe_get(r, "Notes") or "."}</div>
+                <div class="container-boutons">
+                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
+                    <a href="https://wa.me/{tel.replace(" ","")}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
+                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
+                </div>
+            </div>'''
             st.markdown(h, unsafe_allow_html=True)
             c1, c2 = st.columns([1, 4])
             if c1.button("✏️", key=f"ec_{i}"): st.session_state.edit_idx = i; st.rerun()
             if c2.button("🗑️ SUPPRIMER", key=f"dc_{i}", use_container_width=True):
                 df_c = df_c.drop(i); sauvegarder_data(df_c, "contacts.json"); st.rerun()
 
-# --- 5. PAGE PLANNING ---
+# --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Mensuel 2026")
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-    sel_m_nom = st.selectbox("Mois", m_noms, index=datetime.now().month - 1)
+    sel_m_nom = st.selectbox("Mois", m_noms, index=now.month - 1)
     sel_m = m_noms.index(sel_m_nom) + 1
     
     jours_occ = {}
     for _, r in df_c.iterrows():
         try:
-            dp = safe_get(r, 'DateNav').split('/')
-            if int(dp[1]) == sel_m:
+            date_str = safe_get(r, 'DateNav').replace(" ", "")
+            dp = date_str.split('/')
+            m_val, y_val = int(dp[1]), int(dp[2])
+            if y_val == 26: y_val = 2026
+            if m_val == sel_m and y_val == 2026:
                 for j in range(int(dp[0]), int(dp[0]) + int(safe_get(r, 'NbreJours'))):
                     jours_occ[j] = safe_get(r, 'Statut')
         except: continue
@@ -162,13 +200,12 @@ elif st.session_state.page == "PLANNING":
                 st.markdown(f"📅 **{safe_get(r, 'DateNav')}** ({safe_get(r, 'NbreJours')}j) : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} - <span style='color:{c}; font-weight:bold;'>{s}</span>", unsafe_allow_html=True)
         except: continue
     if not found: st.info("Aucune mission ce mois-ci.")
-        # --- 6. PAGE STATS ---
+
+# --- 7. PAGE STATS ---
 elif st.session_state.page == "STATS":
     st.subheader("📊 Historique Financier 2026")
     stats_data = []
-    # Noms des mois raccourcis en français
     m_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
-    
     for m_idx in range(1, 13):
         rec, prev, frs = 0.0, 0.0, 0.0
         if not df_c.empty:
@@ -186,112 +223,51 @@ elif st.session_state.page == "STATS":
                     rm = int(safe_get(r, 'Date').split('/')[1])
                     if rm == m_idx: frs += float(safe_get(r, 'Prix') or 0)
                 except: continue
-        
-        stats_data.append({
-            "Mois": m_courts[m_idx-1],
-            "Recettes (€)": f"{rec:.2f}",
-            "Prévisions (€)": f"{prev:.2f}",
-            "Frais (€)": f"{frs:.2f}",
-            "Total (€)": f"{(rec - frs):.2f}"
-        })
-    
+        stats_data.append({"Mois": m_courts[m_idx-1], "Recettes (€)": f"{rec:.2f}", "Prévisions (€)": f"{prev:.2f}", "Frais (€)": f"{frs:.2f}", "Total (€)": f"{(rec - frs):.2f}"})
     st_df = pd.DataFrame(stats_data)
-    
-    # Calcul des totaux pour la ligne finale
     t_rec = sum(float(x) for x in st_df["Recettes (€)"])
     t_pre = sum(float(x) for x in st_df["Prévisions (€)"])
     t_frs = sum(float(x) for x in st_df["Frais (€)"])
-    
-    tot_row = pd.DataFrame([{
-        "Mois": "TOTAL", 
-        "Recettes (€)": f"{t_rec:.2f}", 
-        "Prévisions (€)": f"{t_pre:.2f}", 
-        "Frais (€)": f"{t_frs:.2f}", 
-        "Total (€)": f"{(t_rec - t_frs):.2f}"
-    }])
-    
-    # Affichage du tableau sans la colonne d'index (la première colonne de chiffres 0, 1, 2...)
-    final_df = pd.concat([st_df, tot_row], ignore_index=True)
-    st.table(final_df.set_index("Mois"))
-    # --- 7. PAGE MAINTENANCE ---
+    tot_row = pd.DataFrame([{"Mois": "TOTAL", "Recettes (€)": f"{t_rec:.2f}", "Prévisions (€)": f"{t_pre:.2f}", "Frais (€)": f"{t_frs:.2f}", "Total (€)": f"{(t_rec - t_frs):.2f}"}])
+    st.table(pd.concat([st_df, tot_row], ignore_index=True).set_index("Mois"))
+
+# --- 8. PAGE MAINTENANCE ---
 elif st.session_state.page == "MAINT":
     st.subheader("🔧 Maintenance & Frais")
-    
-    # Initialisation de l'état de confirmation si non existant
-    if "maint_confirm_del" not in st.session_state:
-        st.session_state.maint_confirm_del = None
-
     if st.button("➕ NOUVEAU FRAIS", use_container_width=True):
-        new_m = {"Date": datetime.now().strftime("%d/%m/2026"), "Cause": "Description", "Prix": "0.00"}
+        new_m = {"Date": now.strftime("%d/%m/2026"), "Cause": "Achat", "Prix": "0.00"}
         df_m = pd.concat([pd.DataFrame([new_m]), df_m], ignore_index=True)
-        sauvegarder_data(df_m, "maint.json")
-        st.rerun()
+        sauvegarder_data(df_m, "maint.json"); st.rerun()
 
     if st.session_state.m_edit_idx is not None:
         idx = st.session_state.m_edit_idx
         r = df_m.loc[idx]
-        st.subheader("📝 Modifier le frais")
-        u_d = st.text_input("Date", value=safe_get(r, 'Date'))
-        u_c = st.text_input("Cause", value=safe_get(r, 'Cause'))
-        u_p = st.text_input("Prix (€)", value=safe_get(r, 'Prix'))
-        
-        col_btn1, col_btn2 = st.columns(2)
-        if col_btn1.button("💾 ENREGISTRER", type="primary", use_container_width=True):
-            df_m.at[idx, 'Date'], df_m.at[idx, 'Cause'] = u_d, u_c
-            df_m.at[idx, 'Prix'] = f"{float(u_p or 0):.2f}"
-            sauvegarder_data(df_m, "maint.json")
-            st.session_state.m_edit_idx = None
-            st.rerun()
-        if col_btn2.button("Annuler", use_container_width=True):
-            st.session_state.m_edit_idx = None
-            st.rerun()
-            
+        u_d, u_c, u_p = st.text_input("Date", r['Date']), st.text_input("Cause", r['Cause']), st.text_input("Prix", r['Prix'])
+        if st.button("💾 ENREGISTRER"):
+            df_m.at[idx, 'Date'], df_m.at[idx, 'Cause'], df_m.at[idx, 'Prix'] = u_d, u_c, f"{float(u_p or 0):.2f}"
+            sauvegarder_data(df_m, "maint.json"); st.session_state.m_edit_idx = None; st.rerun()
     else:
         for i, r in df_m.iterrows():
-            # Affichage de la fiche de frais
-            p_frais = f"{float(safe_get(r, 'Prix') or 0):.2f}"
-            st.markdown(f"""
-                <div class="fiche-globale">
-                    📅 <b>{safe_get(r, "Date")}</b> | 🏷️ {safe_get(r, "Cause")} | 💰 <b>{p_frais} €</b>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            # Logique de suppression avec confirmation
+            st.markdown(f'<div class="fiche-globale">📅 {r["Date"]} | 🏷️ {r["Cause"]} | 💰 <b>{float(r["Prix"] or 0):.2f} €</b></div>', unsafe_allow_html=True)
             if st.session_state.maint_confirm_del == i:
-                st.warning(f"Supprimer ce frais de {p_frais} € ?")
+                st.warning("Confirmer la suppression ?")
                 c1, c2 = st.columns(2)
-                if c1.button("✅ OUI, SUPPRIMER", key=f"conf_m_{i}", type="primary", use_container_width=True):
-                    df_m = df_m.drop(i)
-                    sauvegarder_data(df_m, "maint.json")
-                    st.session_state.maint_confirm_del = None
-                    st.rerun()
-                if c2.button("NON, ANNULER", key=f"ann_m_{i}", use_container_width=True):
-                    st.session_state.maint_confirm_del = None
-                    st.rerun()
+                if c1.button("✅ OUI", key=f"ym_{i}"): df_m = df_m.drop(i); sauvegarder_data(df_m, "maint.json"); st.session_state.maint_confirm_del = None; st.rerun()
+                if c2.button("NON", key=f"nm_{i}"): st.session_state.maint_confirm_del = None; st.rerun()
             else:
                 c1, c2 = st.columns([1, 4])
-                if c1.button("✏️", key=f"em_{i}"):
-                    st.session_state.m_edit_idx = i
-                    st.rerun()
-                if c2.button("🗑️ SUPPRIMER", key=f"dm_{i}", use_container_width=True):
-                    st.session_state.maint_confirm_del = i
-                    st.rerun()
-                    # --- 8. PAGE FACTURES ---
+                if c1.button("✏️", key=f"em_{i}"): st.session_state.m_edit_idx = i; st.rerun()
+                if c2.button("🗑️", key=f"dm_{i}"): st.session_state.maint_confirm_del = i; st.rerun()
 
-# --- 8. PAGE FACTURES ---
+# --- 9. PAGE FACTURES ---
 elif st.session_state.page == "FACTURES":
     st.subheader("📄 Facturation Mensuelle (CMN)")
-
-    # 1. Calcul du mois précédent
-    now = datetime.now()
     prev_m_idx = now.month - 1 if now.month > 1 else 12
     prev_y = now.year if now.month > 1 else now.year - 1
     m_noms_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     nom_mois_prev = m_noms_fr[prev_m_idx - 1]
-
-    st.info(f"Analyse des missions de : **{nom_mois_prev} {prev_y}**")
-
-    # 2. Filtrage des missions CMN
+    
+    st.info(f"Missions CMN de {nom_mois_prev} {prev_y}")
     missions_potentielles = []
     if not df_c.empty:
         for idx, r in df_c.iterrows():
@@ -300,89 +276,37 @@ elif st.session_state.page == "FACTURES":
                 dp = date_str.split('/')
                 m, y = int(dp[1]), int(dp[2])
                 if y < 100: y += 2000
-                
-                soc = safe_get(r, 'Société').upper().strip()
-                # On prend les missions CMN du mois précédent qui ne sont pas encore marquées "Payé"
-                if m == prev_m_idx and y == prev_y and "CMN" in soc and safe_get(r, 'Paiement') != "Payé":
-                    missions_potentielles.append({
-                        "id": idx,
-                        "Date": safe_get(r, 'DateNav'),
-                        "Client": f"{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}",
-                        "Prix": float(safe_get(r, 'Prix') or 0)
-                    })
+                if m == prev_m_idx and y == prev_y and "CMN" in safe_get(r, 'Société').upper() and safe_get(r, 'Paiement') != "Payé":
+                    missions_potentielles.append({"id": idx, "Date": safe_get(r, 'DateNav'), "Client": f"{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}", "Prix": float(safe_get(r, 'Prix') or 0)})
             except: continue
 
-    if not missions_potentielles:
-        st.warning(f"Aucune mission CMN en attente de paiement trouvée pour {nom_mois_prev}.")
+    if not missions_potentielles: st.warning("Aucune mission CMN à facturer.")
     else:
-        st.write("### 1. Sélectionnez les missions à facturer")
-        
-        # Tableau de sélection avec cases à cocher
-        selection = {}
-        total_selection = 0.0
-        
-        # En-tête du tableau
-        col_h1, col_h2, col_h3 = st.columns([1, 3, 2])
-        col_h1.write("**Inclure**")
-        col_h2.write("**Mission**")
-        col_h3.write("**Montant**")
-        
+        selection = {}; total_sel = 0.0
         for m in missions_potentielles:
             c1, c2, c3 = st.columns([1, 3, 2])
-            is_selected = c1.checkbox("", value=True, key=f"sel_{m['id']}")
-            c2.write(f"{m['Date']} - {m['Client']}")
-            c3.write(f"{m['Prix']:.2f} €")
-            
-            if is_selected:
-                selection[m['id']] = m
-                total_selection += m['Prix']
-
-        st.markdown(f"---")
-        st.markdown(f"### 2. Récapitulatif : **{total_selection:.2f} €**")
-
-        if total_selection > 0:
-            # 3. Préparation de l'Email
-            destinataire = "tresorier@cmn-asso.fr"
-            objet_mail = f"Facture Skipper Vesta - {nom_mois_prev} {prev_y}"
-            
-            corps_detail = ""
-            for m_id, m_data in selection.items():
-                corps_detail += f"- Le {m_data['Date']} : {m_data['Client']} | {m_data['Prix']:.2f} €\n"
-
-            corps_mail = st.text_area("Modifier le message :", value=f"""Bonjour,
-
-Veuillez trouver ci-dessous le détail de mes prestations de skipper pour le mois de {nom_mois_prev} {prev_y} :
-
-{corps_detail}
-TOTAL : {total_selection:.2f} €
-
-Merci de procéder au virement.
-Bien cordialement,
-Vesta Skipper""", height=200)
-
-            # 4. Bouton d'envoi et validation
-            if st.button(f"📧 CONFIRMER L'ENVOI ({total_selection:.2f} €)", type="primary", use_container_width=True):
-                # Mise à jour des fiches dans le DataFrame original
-                for m_id in selection.keys():
-                    df_c.at[m_id, 'Paiement'] = "Payé"
-                    df_c.at[m_id, 'Statut'] = "Terminé"
-                
+            if c1.checkbox("", value=True, key=f"s_{m['id']}"):
+                selection[m['id']] = m; total_sel += m['Prix']
+            c2.write(f"{m['Date']} - {m['Client']}"); c3.write(f"{m['Prix']:.2f} €")
+        
+        if total_sel > 0:
+            corps = st.text_area("Message :", f"Bonjour,\n\nPrestations {nom_mois_prev} :\n" + "".join([f"- {m['Date']} : {m['Client']} | {m['Prix']:.2f}€\n" for m in selection.values()]) + f"\nTOTAL : {total_sel:.2f}€\n\nMerci.")
+            if st.button(f"📧 CONFIRMER ({total_sel:.2f} €)"):
+                for m_id in selection.keys(): df_c.at[m_id, 'Paiement'] = "Payé"; df_c.at[m_id, 'Statut'] = "Terminé"
                 sauvegarder_data(df_c, "contacts.json")
-                
-                # Génération du lien Mailto
                 import urllib.parse
-                mailto_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet_mail)}&body={urllib.parse.quote(corps_mail)}"
-                
-                st.success("✅ Données mises à jour dans les Stats !")
-                st.markdown(f'''
-                    <a href="{mailto_link}" target="_blank" 
-                       style="display: block; text-align: center; background-color: #2ecc71; color: white; 
-                       padding: 15px; text-decoration: none; border-radius: 10px; font-weight: bold; margin-top: 10px;">
-                       🚀 CLIQUER ICI POUR ENVOYER LE MAIL
-                    </a>
-                ''', unsafe_allow_html=True)
-        else:
-            st.info("Cochez au moins une mission pour préparer l'envoi.")
+                mailto = f"mailto:tresorier@cmn-asso.fr?subject=Facture {nom_mois_prev}&body={urllib.parse.quote(corps)}"
+                st.markdown(f'<a href="{mailto}" target="_blank" style="display:block;text-align:center;background:#2ecc71;color:white;padding:15px;text-decoration:none;border-radius:10px;font-weight:bold;">🚀 ENVOYER LE MAIL</a>', unsafe_allow_html=True)
+
+# --- 10. PAGE NOTES ---
+elif st.session_state.page == "NOTES":
+    st.subheader("📝 Bloc-notes")
+    df_n = charger_data("notes.json")
+    memo = df_n.iloc[0]['contenu'] if not df_n.empty else ""
+    nouveau = st.text_area("Saisir ici :", value=memo, height=400)
+    if st.button("💾 ENREGISTRER"):
+        sauvegarder_data(pd.DataFrame([{"contenu": nouveau}]), "notes.json"); st.success("Sauvegardé !")
+
 
 
 
