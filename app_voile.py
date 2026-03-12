@@ -1,6 +1,7 @@
-import requests, base64, json, time
+import requests, base64, json, time, calendar
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 
 # --- 1. CONFIGURATION & STYLE ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
@@ -18,6 +19,7 @@ st.markdown("""<style>
     .container-boutons { display: flex; gap: 8px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 12px; }
     .btn-contact { flex: 1; text-align: center; padding: 10px 5px; border-radius: 8px; text-decoration: none !important; color: white !important; font-size: 0.85rem; font-weight: bold; }
     .notes-box { background-color: #f8f9fa; border-left: 5px solid #1a2a6c; padding: 10px; border-radius: 4px; margin: 10px 0; font-size: 0.95rem; }
+    .cal-case { border-radius: 8px; padding: 15px 5px; text-align: center; font-weight: bold; border: 1px solid #eee; margin: 2px; font-size: 1.1rem; }
 </style>""", unsafe_allow_html=True)
 
 # --- 2. FONCTIONS ---
@@ -28,7 +30,6 @@ def charger_data(file):
         res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
         if res.status_code == 200:
             df = pd.DataFrame(json.loads(base64.b64decode(res.json()['content']).decode('utf-8')))
-            if 'NbreJours' not in df.columns: df['NbreJours'] = "1"
             return df
         return pd.DataFrame()
     except: return pd.DataFrame()
@@ -53,9 +54,10 @@ if "confirm_del" not in st.session_state: st.session_state.confirm_del = None
 
 st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
 m = st.columns(6)
-for i, name in enumerate(["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]):
+menu_names = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
+for i, name in enumerate(menu_names):
     if m[i].button(name, key=f"nav_{name}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
-        st.session_state.page = name; st.session_state.edit_idx = None; st.session_state.confirm_del = None; st.rerun()
+        st.session_state.page = name; st.rerun()
 
 df = charger_data("contacts.json")
 
@@ -82,7 +84,7 @@ if st.session_state.page == "CONTACTS":
         u_soc = st.text_input("Société", value=safe_get(r, 'Société'))
         u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
         u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
-        u_date = st.text_input("Date début", value=safe_get(r, 'DateNav'))
+        u_date = st.text_input("Date début (JJ/MM/AAAA)", value=safe_get(r, 'DateNav'))
         u_jours = st.text_input("Nombre de jours", value=safe_get(r, 'NbreJours'))
         u_prix = st.text_input("Prix total (€)", value=safe_get(r, 'Prix'))
         u_statut = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut')) if safe_get(r, 'Statut') in ["En attente", "OK", "Terminé", "Refusé"] else 0)
@@ -110,130 +112,72 @@ if st.session_state.page == "CONTACTS":
                 cl_b = "border-cmn" if "CMN" in soc.upper() else "border-normal"
                 i_tel = f'<div style="color:#e67e22;font-weight:bold;">📞 {tel}</div>' if tel else ""
                 i_mail = f'<div style="color:#7f8c8d;font-size:0.85rem;">✉️ {mail}</div>' if mail else ""
-                notes = safe_get(r, 'Notes') or "."
-
-                # --- BLOC HTML COMPACT (EVITE LE TEXTE BRUT) ---
-                h = f'<div class="fiche-globale {cl_b}">'
-                h += f'<span class="statut-badge" style="background:{c_p};">{p_val}</span>'
-                h += f'<span class="statut-badge" style="background:{c_s};">{s_val}</span>'
-                h += f'<div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>'
-                h += f'<div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>'
-                h += f'{i_tel}{i_mail}'
-                h += f'<p style="margin:8px 0;">📅 <b>{safe_get(r, "DateNav")}</b> ({jours} jrs) | 💰 <b>{safe_get(r, "Prix")} €</b></p>'
-                h += f'<div class="notes-box">📝 {notes}</div>'
-                h += f'<div class="container-boutons">'
-                h += f'<a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>'
-                h += f'<a href="https://wa.me/{tel.replace(" ","")}" class="btn-contact" style="background:#25D366;">WhatsApp</a>'
-                h += f'<a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>'
-                h += f'</div></div>'
                 
+                h = f'<div class="fiche-globale {cl_b}"><span class="statut-badge" style="background:{c_p};">{p_val}</span><span class="statut-badge" style="background:{c_s};">{s_val}</span><div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div><div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>{i_tel}{i_mail}<p style="margin:8px 0;">📅 <b>{safe_get(r, "DateNav")}</b> ({jours} jrs) | 💰 <b>{safe_get(r, "Prix")} €</b></p><div class="notes-box">📝 {safe_get(r, "Notes") or "."}</div><div class="container-boutons"><a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a><a href="https://wa.me/{tel.replace(" ","")}" class="btn-contact" style="background:#25D366;">WhatsApp</a><a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a></div></div>'
                 st.markdown(h, unsafe_allow_html=True)
                 
-                if st.session_state.confirm_del == i:
-                    if st.button("⚠️ CONFIRMER SUPPRESSION", key=f"conf_{i}", type="primary", use_container_width=True):
-                        df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.session_state.confirm_del = None; st.rerun()
-                    if st.button("Annuler", key=f"ann_{i}", use_container_width=True):
-                        st.session_state.confirm_del = None; st.rerun()
-                else:
-                    col1, col2 = st.columns([1, 4])
-                    if col1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
-                    if col2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True): st.session_state.confirm_del = i; st.rerun()
+                c1, c2 = st.columns([1, 4])
+                if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
+                if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
+                    df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
 
-# --- À insérer dans la section PAGE PLANNING ---
+# --- 5. PAGE PLANNING (CALENDRIER) ---
 elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Calendrier des Missions 2026")
+    st.subheader("🗓️ Calendrier des Missions")
     
-    if not df.empty:
-        # 1. Sélection du mois
-        mois_liste = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", 
-                      "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-        current_month_idx = 2  # Par défaut Mars (mois actuel en 2026)
-        
-        sel_mois = st.selectbox("Choisir le mois", mois_liste, index=current_month_idx)
-        mois_num = mois_liste.index(sel_mois) + 1
-        
-        # 2. Préparation des données du calendrier
-        # On crée un dictionnaire des jours occupés : {jour: statut}
-        jours_occupes = {}
-        
-        for _, r in df.iterrows():
-            try:
-                date_str = safe_get(r, 'DateNav')
-                # On attend le format JJ/MM/AAAA
-                d, m, y = map(int, date_str.split('/'))
-                
-                if m == mois_num and y == 2026:
-                    nb_j = int(safe_get(r, 'NbreJours') or 1)
-                    statut = safe_get(r, 'Statut')
-                    
-                    # Remplir chaque jour de la mission
-                    for j in range(d, d + nb_j):
-                        # Priorité au statut "OK" sur "En attente" si chevauchement
-                        if j not in jours_occupes or statut == "OK":
-                            jours_occupes[j] = statut
-            except:
-                continue
+    mois_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+    sel_mois_nom = st.selectbox("Choisir le mois", mois_noms, index=datetime.now().month - 1)
+    sel_m = mois_noms.index(sel_mois_nom) + 1
 
-        # 3. Affichage du Calendrier (Grille HTML)
-        import calendar
-        cal = calendar.monthcalendar(2026, mois_num)
-        jours_semaine = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
-        
+    # Dictionnaire des jours occupés {jour: statut}
+    jours_occ = {}
+    for _, r in df.iterrows():
+        try:
+            d_part = safe_get(r, 'DateNav').split('/')
+            d, m, y = int(d_part[0]), int(d_part[1]), int(d_part[2])
+            if m == sel_m and y == 2026:
+                nb = int(safe_get(r, 'NbreJours') or 1)
+                stut = safe_get(r, 'Statut')
+                for j in range(d, d + nb):
+                    if j not in jours_occ or stut == "OK": jours_occ[j] = stut
+        except: continue
+
+    # Affichage Calendrier
+    cal_mat = calendar.monthcalendar(2026, sel_m)
+    cols_h = st.columns(7)
+    for i, j_nom in enumerate(["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]):
+        cols_h[i].markdown(f"<center><b>{j_nom}</b></center>", unsafe_allow_html=True)
+
+    for semaine in cal_mat:
         cols = st.columns(7)
-        for i, jour_nom in enumerate(jours_semaine):
-            cols[i].markdown(f"<center><b>{jour_nom}</b></center>", unsafe_allow_html=True)
-            
-        for semaine in cal:
-            cols = st.columns(7)
-            for i, jour in enumerate(semaine):
-                if jour == 0:
-                    cols[i].write("")
-                else:
-                    bg_color = "white"
-                    text_color = "#333"
-                    border = "1px solid #ddd"
-                    
-                    if jour in jours_occupes:
-                        statut = jours_occupes[jour]
-                        if statut == "OK":
-                            bg_color = "#2ecc71" # Vert
-                            text_color = "white"
-                        elif statut == "En attente":
-                            bg_color = "#f1c40f" # Jaune
-                            text_color = "black"
-                    
-                    cols[i].markdown(f"""
-                        <div style="background-color:{bg_color}; color:{text_color}; 
-                        border:{border}; border-radius:5px; padding:10px; text-align:center; 
-                        font-weight:bold; margin-bottom:5px;">
-                        {jour}
-                        </div>""", unsafe_allow_html=True)
+        for i, jour in enumerate(semaine):
+            if jour == 0: cols[i].write("")
+            else:
+                bg = "white"
+                txt = "#333"
+                if jour in jours_occ:
+                    if jours_occ[jour] == "OK": bg, txt = "#2ecc71", "white"
+                    elif jours_occ[jour] == "En attente": bg, txt = "#f1c40f", "black"
+                cols[i].markdown(f'<div class="cal-case" style="background:{bg}; color:{txt};">{jour}</div>', unsafe_allow_html=True)
 
-        st.divider()
-        
-        # 4. Rappel Liste sous le calendrier
-        st.subheader("📋 Détails du mois")
-        df_mois = []
-        for _, r in df.iterrows():
-            try:
-                _, m, y = map(int, safe_get(r, 'DateNav').split('/'))
-                if m == mois_num and y == 2026:
-                    df_mois.append(r)
-            except: continue
-            
-        if df_mois:
-            for r in df_mois:
+    st.divider()
+    st.subheader("📋 Récapitulatif du mois")
+    found = False
+    for _, r in df.iterrows():
+        try:
+            m = int(safe_get(r, 'DateNav').split('/')[1])
+            if m == sel_m:
+                found = True
                 s = safe_get(r, 'Statut')
-                color = "green" if s == "OK" else "orange"
-                st.markdown(f"""
-                **{safe_get(r, 'DateNav')}** ({safe_get(r, 'NbreJours')}j) : 
-                {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} 
-                - <span style="color:{color}; font-weight:bold;">{s}</span>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("Aucune mission prévue pour ce mois.")
-    else:
-        st.warning("Aucune donnée disponible. Créez un contact d'abord.")
+                c = "green" if s == "OK" else "orange"
+                st.markdown(f"**{safe_get(r, 'DateNav')}** ({safe_get(r, 'NbreJours')}j) : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} - <span style='color:{c}; font-weight:bold;'>{s}</span>", unsafe_allow_html=True)
+        except: continue
+    if not found: st.info("Rien de prévu ce mois-ci.")
+
+# --- PAGES SUIVANTES (À REMPLIR) ---
+else:
+    st.info(f"Page {st.session_state.page} en cours de développement.")
+
 
 
 
