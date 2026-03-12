@@ -55,8 +55,10 @@ def sauvegarder_data(df, file):
 
 def safe_get(r, key, default=""):
     val = r.get(key)
-    if pd.isna(val) or val is None or str(val).strip() == "": return default
-    return str(val).strip()
+    if pd.isna(val) or val is None: return default
+    # Nettoyage des espaces pour vérifier si c'est vraiment vide
+    string_val = str(val).strip()
+    return string_val if len(string_val) > 0 else default
 
 # --- 3. NAVIGATION ---
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
@@ -70,7 +72,7 @@ m = st.columns(6)
 menu_list = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
 for i, name in enumerate(menu_list):
     active = (st.session_state.page == name)
-    if m[i].button(name, use_container_width=True, key=f"nav_v10_{name}", type="primary" if active else "secondary"):
+    if m[i].button(name, use_container_width=True, key=f"nav_v11_{name}", type="primary" if active else "secondary"):
         st.session_state.page = name
         st.session_state.edit_idx = None
         st.rerun()
@@ -124,11 +126,11 @@ if st.session_state.page == "CONTACTS":
                 <div class="fiche-globale">
                     <span class="statut-badge" style="background:{c_p};">{safe_get(r, 'Paiement', 'Pas payé')}</span>
                     <span class="statut-badge" style="background:{c_s};">{safe_get(r, 'Statut')}</span>
-                    <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
+                    <div class="societe-style">{soc if soc != "" else "CLIENT PARTICULIER"}</div>
                     <div class="prenom-style">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</div>
                     <div style="color:#e67e22; font-weight:bold; margin-top:5px;">📞 {tel}</div>
                     <p style="margin: 5px 0;">📅 <b>{safe_get(r, 'DateNav')}</b> | 💰 <b>{safe_get(r, 'Prix', '0')} €</b></p>
-                    {f'<div class="notes-box">📝 {note}</div>' if note else ''}
+                    {f'<div class="notes-box">📝 {note}</div>' if note != "" else ''}
                     <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
                     <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                     <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
@@ -138,24 +140,34 @@ if st.session_state.page == "CONTACTS":
                 c_edit, c_del = st.columns([1, 3])
                 if c_edit.button("✏️ Modifier", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
                 if st.session_state.confirm_del == i:
-                    if st.button("✅ CONFIRMER SUPPRESSION", key=f"yes_{i}"):
+                    st.warning("⚠️ Confirmer ?")
+                    c_y, c_n = st.columns(2)
+                    if c_y.button("OUI", key=f"y_{i}"):
                         df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.session_state.confirm_del = None; st.rerun()
-                    if st.button("❌ ANNULER", key=f"no_{i}"): st.session_state.confirm_del = None; st.rerun()
+                    if c_n.button("NON", key=f"n_{i}"): st.session_state.confirm_del = None; st.rerun()
                 else:
                     if c_del.button("🗑️ Supprimer", key=f"del_{i}"): st.session_state.confirm_del = i; st.rerun()
 
-# --- 5. PAGE PLANNING ---
+# --- 5. PAGE PLANNING (DÉVELOPPEMENT) ---
 elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Vue Chronologique des Navigations")
+    st.subheader("🗓️ Vue Chronologique")
     if not df.empty:
-        # On trie par date si possible
-        df_plan = df.copy()
-        # On affiche juste une liste simple pour commencer
-        for i, r in df_plan.sort_values('DateNav').iterrows():
-            with st.expander(f"📅 {safe_get(r, 'DateNav')} - {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}"):
-                st.write(f"**Bateau / Société :** {safe_get(r, 'Société')}")
-                st.write(f"**Statut :** {safe_get(r, 'Statut')}")
-                st.write(f"**Notes :** {safe_get(r, 'Notes')}")
+        # On ne garde que les missions futures (pas Terminées ou Refusées)
+        df_plan = df[~df['Statut'].isin(["Terminé", "Refusé"])].copy()
+        df_plan = df_plan.sort_values('DateNav')
+        
+        for i, r in df_plan.iterrows():
+            soc_name = safe_get(r, 'Société', 'PARTICULIER')
+            # Couleur selon la société (CMN en bleu comme demandé précédemment)
+            box_color = "#3498db" if "CMN" in soc_name.upper() else "#1a2a6c"
+            
+            with st.expander(f"📅 {safe_get(r, 'DateNav')} | {soc_name} | {safe_get(r, 'Prénom')}"):
+                st.markdown(f"**Client :** {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}")
+                st.markdown(f"**Statut :** {safe_get(r, 'Statut')}")
+                st.markdown(f"**Paiement :** {safe_get(r, 'Paiement')}")
+                if safe_get(r, 'Notes') != "":
+                    st.info(f"Note : {safe_get(r, 'Notes')}")
+
 
 
 
