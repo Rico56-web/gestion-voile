@@ -5,21 +5,21 @@ import pandas as pd
 import json
 import time
 
-# --- 1. CONFIGURATION & STYLE ---
+# --- 1. CONFIGURATION & STYLE (FORÇAGE TOTAL) ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
 st.markdown("""<style>
     .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; }
     
-    /* FORCE LE VERT POUR LE MENU ACTIF */
+    /* STYLE DES BOUTONS DE NAVIGATION */
+    /* On force le bouton actif en VERT */
     button[data-testid="baseButton-secondary"] {
         background-color: #2ecc71 !important;
         color: white !important;
-        border: 2px solid #27ae60 !important;
-        font-weight: bold !important;
+        border: none !important;
+        box-shadow: none !important;
     }
-
-    /* FORCE LE GRIS POUR LES MENUS INACTIFS */
+    /* On force les boutons inactifs en GRIS (Élimination du rouge) */
     button[data-testid="baseButton-primary"] {
         background-color: #f0f2f6 !important;
         color: #31333f !important;
@@ -60,6 +60,7 @@ def safe_get(r, key, default=""):
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
 if "view_archive" not in st.session_state: st.session_state.view_archive = False
 if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
+if "confirm_del" not in st.session_state: st.session_state.confirm_del = None
 
 st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
 
@@ -67,7 +68,8 @@ m = st.columns(6)
 menu_list = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
 for i, name in enumerate(menu_list):
     is_active = (st.session_state.page == name)
-    if m[i].button(name, use_container_width=True, key=f"nav_{name}", type="secondary" if is_active else "primary"):
+    # L'astuce est ici : on change la clé 'v2' pour forcer le rafraîchissement
+    if m[i].button(name, use_container_width=True, key=f"nav_v2_{name}", type="secondary" if is_active else "primary"):
         st.session_state.page = name
         st.session_state.edit_idx = None
         st.rerun()
@@ -76,11 +78,12 @@ df = charger_data("contacts.json")
 
 # --- 4. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
-    c_f, c_p = st.columns(2)
+    # Filtres
+    c1, c2 = st.columns(2)
     v_arc = st.session_state.view_archive
-    if c_f.button("🚀 MISSIONS FUTURES", use_container_width=True, type="secondary" if not v_arc else "primary"):
+    if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, key="btn_futur", type="secondary" if not v_arc else "primary"):
         st.session_state.view_archive = False; st.rerun()
-    if c_p.button("📁 ARCHIVES", use_container_width=True, type="secondary" if v_arc else "primary"):
+    if c2.button("📁 ARCHIVES", use_container_width=True, key="btn_archive", type="secondary" if v_arc else "primary"):
         st.session_state.view_archive = True; st.rerun()
 
     if st.session_state.edit_idx is not None:
@@ -89,19 +92,15 @@ if st.session_state.page == "CONTACTS":
         r = df.loc[idx]
         with st.form("edit_form"):
             st.subheader(f"Modifier : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}")
-            c1, c2, c3 = st.columns(3)
-            u_date = c1.text_input("Date Nav", value=safe_get(r, 'DateNav'))
-            u_jours = c2.text_input("Nb jours", value=str(safe_get(r, 'NbJours')))
-            u_statut = c3.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut', 'En attente')))
+            u_date = st.text_input("Date Nav", value=safe_get(r, 'DateNav'))
+            u_statut = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut', 'En attente')))
             u_pre = st.text_input("Prénom", value=safe_get(r, 'Prénom'))
             u_nom = st.text_input("Nom", value=safe_get(r, 'Nom'))
             u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
-            u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
             
             if st.form_submit_button("💾 ENREGISTRER"):
-                df.at[idx, 'DateNav'], df.at[idx, 'NbJours'], df.at[idx, 'Statut'] = u_date, u_jours, u_statut
+                df.at[idx, 'DateNav'], df.at[idx, 'Statut'] = u_date, u_statut
                 df.at[idx, 'Prénom'], df.at[idx, 'Nom'], df.at[idx, 'Téléphone'] = u_pre, u_nom, u_tel
-                df.at[idx, 'Email'] = u_mail
                 sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
             if st.form_submit_button("Annuler"): st.session_state.edit_idx = None; st.rerun()
     else:
@@ -109,7 +108,7 @@ if st.session_state.page == "CONTACTS":
         if not df.empty:
             df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
             for i, r in df_disp.iterrows():
-                tel, mail = safe_get(r, 'Téléphone'), safe_get(r, 'Email')
+                tel = safe_get(r, 'Téléphone')
                 s_val = safe_get(r, 'Statut').upper()
                 c_s = "#3498db" if "TERM" in s_val else "#2ecc71" if "OK" in s_val else "#e74c3c" if "REFUS" in s_val else "#f1c40f"
                 
@@ -117,19 +116,30 @@ if st.session_state.page == "CONTACTS":
                 <div class="fiche-globale">
                     <span class="statut-badge" style="background:{c_s};">{safe_get(r, 'Statut')}</span>
                     <div class="prenom-style">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</div>
-                    <div style="color:#e67e22; font-weight:bold;">📞 {tel} | ✉️ {mail}</div>
+                    <div style="color:#e67e22; font-weight:bold;">📞 {tel}</div>
                     <p>📅 <b>{safe_get(r, 'DateNav')}</b> | 💰 <b>{safe_get(r, 'Prix', '0')} €</b></p>
                     <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
                     <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Boutons d'action
-                b1, b2 = st.columns([1, 4])
-                if b1.button("✏️ Modifier", key=f"ed_{i}"):
+                col_btn1, col_btn2 = st.columns([1, 4])
+                
+                # Modifier
+                if col_btn1.button("✏️ Modifier", key=f"edit_{i}"):
                     st.session_state.edit_idx = i; st.rerun()
-                if b2.button("🗑️ Supprimer", key=f"del_{i}"):
-                    df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
+                
+                # Système de confirmation de suppression
+                if st.session_state.confirm_del == i:
+                    if col_btn2.button("✅ CONFIRMER SUPPRESSION", key=f"conf_{i}"):
+                        df = df.drop(i)
+                        sauvegarder_data(df, "contacts.json")
+                        st.session_state.confirm_del = None; st.rerun()
+                    if st.button("❌ Annuler", key=f"canc_{i}"):
+                        st.session_state.confirm_del = None; st.rerun()
+                else:
+                    if col_btn2.button("🗑️ Supprimer", key=f"del_{i}"):
+                        st.session_state.confirm_del = i; st.rerun()
 
 # --- AUTRES PAGES ---
 elif st.session_state.page == "PLANNING": st.header("🗓️ Planning")
