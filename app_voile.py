@@ -5,25 +5,27 @@ import pandas as pd
 import json
 import time
 
-# --- 1. CONFIGURATION & STYLE (PRIORITÉ MAXIMALE) ---
+# --- 1. CONFIGURATION & STYLE (NETTOYAGE FINAL) ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
 st.markdown("""<style>
     .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; }
     
-    /* STYLE DES BOUTONS DE NAVIGATION - FORCE LE VERT ET LE GRIS */
+    /* NAVIGATION : VERT POUR L'ACTIF, AUCUNE COULEUR POUR LES AUTRES */
+    /* Bouton Sélectionné (Type Secondary dans le code) */
     button[data-testid="baseButton-secondary"] {
-        background-color: #2ecc71 !important; /* VERT */
+        background-color: #2ecc71 !important; 
         color: white !important;
         border: none !important;
     }
+    /* Boutons Non-Sélectionnés (Type Primary dans le code) */
     button[data-testid="baseButton-primary"] {
-        background-color: #f0f2f6 !important; /* GRIS NEUTRE */
+        background-color: transparent !important; 
         color: #31333f !important;
         border: 1px solid #d3d6db !important;
     }
 
-    /* DESIGN DES FICHES SIMPLIFIÉES MAIS COMPLÈTES */
+    /* DESIGN DES FICHES */
     .fiche-globale { border-left: 5px solid #1a2a6c; border-radius: 8px; background: white; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 15px; }
     .prenom-style { font-size: 1.4rem; font-weight: bold; color: #1a2a6c; }
     .statut-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; display: inline-block; float: right; margin-left: 5px; }
@@ -64,8 +66,8 @@ st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allo
 m = st.columns(6)
 menu_list = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
 for i, name in enumerate(menu_list):
-    is_active = (st.session_state.page == name)
-    if m[i].button(name, use_container_width=True, key=f"nav_v3_{name}", type="secondary" if is_active else "primary"):
+    active = (st.session_state.page == name)
+    if m[i].button(name, use_container_width=True, key=f"nav_v4_{name}", type="secondary" if active else "primary"):
         st.session_state.page = name
         st.session_state.edit_idx = None
         st.rerun()
@@ -76,9 +78,9 @@ df = charger_data("contacts.json")
 if st.session_state.page == "CONTACTS":
     c1, c2 = st.columns(2)
     v_arc = st.session_state.view_archive
-    if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, key="f_btn", type="secondary" if not v_arc else "primary"):
+    if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, type="secondary" if not v_arc else "primary"):
         st.session_state.view_archive = False; st.rerun()
-    if c2.button("📁 ARCHIVES", use_container_width=True, key="a_btn", type="secondary" if v_arc else "primary"):
+    if c2.button("📁 ARCHIVES", use_container_width=True, type="secondary" if v_arc else "primary"):
         st.session_state.view_archive = True; st.rerun()
 
     if st.session_state.edit_idx is not None:
@@ -95,10 +97,11 @@ if st.session_state.page == "CONTACTS":
             u_pre = st.text_input("Prénom", value=safe_get(r, 'Prénom'))
             u_nom = st.text_input("Nom", value=safe_get(r, 'Nom'))
             u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
+            u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
             
             if st.form_submit_button("💾 ENREGISTRER"):
                 df.at[idx, 'DateNav'], df.at[idx, 'Statut'], df.at[idx, 'Paiement'] = u_date, u_statut, u_paye
-                df.at[idx, 'Prénom'], df.at[idx, 'Nom'], df.at[idx, 'Téléphone'] = u_pre, u_nom, u_tel
+                df.at[idx, 'Prénom'], df.at[idx, 'Nom'], df.at[idx, 'Téléphone'], df.at[idx, 'Email'] = u_pre, u_nom, u_tel, u_mail
                 sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
             if st.form_submit_button("Annuler"): st.session_state.edit_idx = None; st.rerun()
     else:
@@ -108,10 +111,10 @@ if st.session_state.page == "CONTACTS":
             
             for i, r in df_disp.iterrows():
                 tel = safe_get(r, 'Téléphone')
+                mail = safe_get(r, 'Email')
                 s_val = safe_get(r, 'Statut').upper()
                 p_val = safe_get(r, 'Paiement').upper()
                 
-                # Couleurs des badges
                 c_s = "#3498db" if "TERM" in s_val else "#2ecc71" if "OK" in s_val else "#e74c3c" if "REFUS" in s_val else "#f1c40f"
                 c_p = "#2ecc71" if "PAYÉ" == p_val else "#e74c3c"
                 
@@ -124,6 +127,7 @@ if st.session_state.page == "CONTACTS":
                     <p>📅 <b>{safe_get(r, 'DateNav')}</b> | 💰 <b>{safe_get(r, 'Prix', '0')} €</b></p>
                     <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
                     <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
+                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -132,7 +136,6 @@ if st.session_state.page == "CONTACTS":
                 if c_edit.button("✏️ Modifier", key=f"ed_{i}"):
                     st.session_state.edit_idx = i; st.rerun()
                 
-                # Double confirmation pour chaque fiche
                 if st.session_state.confirm_del == i:
                     st.warning("⚠️ Confirmer la suppression ?")
                     col_c1, col_c2 = st.columns(2)
@@ -151,6 +154,8 @@ elif st.session_state.page == "STATS": st.header("💰 Statistiques")
 elif st.session_state.page == "MAINT": st.header("🔧 Maintenance")
 elif st.session_state.page == "FACTURES": st.header("🧾 Factures")
 elif st.session_state.page == "NOTES": st.header("📝 Notes")
+
+
 
 
 
