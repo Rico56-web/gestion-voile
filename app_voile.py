@@ -15,13 +15,13 @@ st.markdown("""<style>
     button[data-testid="baseButton-primary"] { background-color: #ff4b4b !important; color: white !important; border: none !important; }
     button[data-testid="baseButton-secondary"] { background-color: #f0f2f6 !important; color: #31333f !important; border: 1px solid #d3d6db !important; }
 
-    /* DESIGN DES FICHES - EMPÊCHE LA COUPURE DES NOMS */
+    /* DESIGN DES FICHES */
     .fiche-globale { border-left: 5px solid #1a2a6c; border-radius: 8px; background: white; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 15px; }
     .prenom-style { 
         font-size: 1.4rem; 
         font-weight: bold; 
         color: #1a2a6c; 
-        white-space: nowrap; /* Empêche le retour à la ligne du nom */
+        white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
@@ -65,7 +65,7 @@ m = st.columns(6)
 menu_list = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
 for i, name in enumerate(menu_list):
     active = (st.session_state.page == name)
-    if m[i].button(name, use_container_width=True, key=f"nav_v6_{name}", type="primary" if active else "secondary"):
+    if m[i].button(name, use_container_width=True, key=f"nav_v7_{name}", type="primary" if active else "secondary"):
         st.session_state.page = name
         st.session_state.edit_idx = None
         st.rerun()
@@ -86,24 +86,34 @@ if st.session_state.page == "CONTACTS":
         r = df.loc[idx]
         with st.form("edit_form"):
             st.subheader(f"Modifier : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}")
-            col1, col2, col3 = st.columns(3)
+            
+            # Première ligne : Infos Mission
+            col1, col2, col3, col4 = st.columns(4)
             u_date = col1.text_input("Date Nav", value=safe_get(r, 'DateNav'))
             u_statut = col2.selectbox("Statut Mission", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut', 'En attente')))
-            u_paye = col3.selectbox("Paiement", ["Pas payé", "Payé"], index=1 if safe_get(r, 'Paiement') == "Payé" else 0)
+            u_prix = col3.text_input("Prix (€)", value=str(safe_get(r, 'Prix', '0')))
+            u_paye = col4.selectbox("Paiement", ["Pas payé", "Payé"], index=1 if safe_get(r, 'Paiement') == "Payé" else 0)
             
+            # Deuxième ligne : Infos Client
             u_soc = st.text_input("Société", value=safe_get(r, 'Société'))
-            u_pre = st.text_input("Prénom", value=safe_get(r, 'Prénom'))
-            u_nom = st.text_input("Nom", value=safe_get(r, 'Nom'))
-            u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
-            u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
+            c_p, c_n = st.columns(2)
+            u_pre = c_p.text_input("Prénom", value=safe_get(r, 'Prénom'))
+            u_nom = c_n.text_input("Nom", value=safe_get(r, 'Nom'))
             
-            if st.form_submit_button("💾 ENREGISTRER"):
+            # Troisième ligne : Coordonnées
+            c_t, c_m = st.columns(2)
+            u_tel = c_t.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
+            u_mail = c_m.text_input("Email", value=safe_get(r, 'Email'))
+            
+            if st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS"):
                 df.at[idx, 'DateNav'], df.at[idx, 'Statut'], df.at[idx, 'Paiement'] = u_date, u_statut, u_paye
+                df.at[idx, 'Prix'] = u_prix
                 df.at[idx, 'Société'], df.at[idx, 'Prénom'], df.at[idx, 'Nom'] = u_soc, u_pre, u_nom
                 df.at[idx, 'Téléphone'], df.at[idx, 'Email'] = u_tel, u_mail
                 sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
             if st.form_submit_button("Annuler"): st.session_state.edit_idx = None; st.rerun()
     else:
+        # Affichage (identique à ton souhait avec Société et No-Wrap)
         if not df.empty:
             df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
             for i, r in df_disp.iterrows():
@@ -146,6 +156,7 @@ elif st.session_state.page == "STATS": st.header("💰 Statistiques")
 elif st.session_state.page == "MAINT": st.header("🔧 Maintenance")
 elif st.session_state.page == "FACTURES": st.header("🧾 Factures")
 elif st.session_state.page == "NOTES": st.header("📝 Notes")
+
 
 
 
