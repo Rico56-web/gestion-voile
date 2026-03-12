@@ -31,7 +31,7 @@ st.markdown("""<style>
     .statut-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; display: inline-block; float: right; margin-left: 5px; }
     .btn-contact { display: inline-block; padding: 8px 12px; border-radius: 6px; text-decoration: none; color: white !important; font-size: 0.9rem; font-weight: bold; margin-right: 8px; margin-top: 10px; }
     .societe-style { color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-    .notes-box { background-color: #f9f9f9; border: 1px dashed #d3d6db; padding: 8px; border-radius: 5px; margin-top: 10px; font-size: 0.9rem; color: #2c3e50; }
+    .notes-box { background-color: #f9f9f9; border: 1px dashed #d3d6db; padding: 8px; border-radius: 5px; margin: 10px 0; font-size: 0.9rem; color: #2c3e50; }
 </style>""", unsafe_allow_html=True)
 
 # --- 2. FONCTIONS ---
@@ -56,9 +56,8 @@ def sauvegarder_data(df, file):
 def safe_get(r, key, default=""):
     val = r.get(key)
     if pd.isna(val) or val is None: return default
-    # Nettoyage des espaces pour vérifier si c'est vraiment vide
-    string_val = str(val).strip()
-    return string_val if len(string_val) > 0 else default
+    s = str(val).strip()
+    return s if s else default
 
 # --- 3. NAVIGATION ---
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
@@ -66,16 +65,14 @@ if "view_archive" not in st.session_state: st.session_state.view_archive = False
 if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
 if "confirm_del" not in st.session_state: st.session_state.confirm_del = None
 
-st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
 
 m = st.columns(6)
 menu_list = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
 for i, name in enumerate(menu_list):
     active = (st.session_state.page == name)
-    if m[i].button(name, use_container_width=True, key=f"nav_v11_{name}", type="primary" if active else "secondary"):
-        st.session_state.page = name
-        st.session_state.edit_idx = None
-        st.rerun()
+    if m[i].button(name, use_container_width=True, key=f"nav_v12_{name}", type="primary" if active else "secondary"):
+        st.session_state.page = name; st.session_state.edit_idx = None; st.rerun()
 
 df = charger_data("contacts.json")
 
@@ -98,14 +95,12 @@ if st.session_state.page == "CONTACTS":
             u_statut = col2.selectbox("Statut Mission", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut', 'En attente')))
             u_prix = col3.text_input("Prix (€)", value=safe_get(r, 'Prix', '0'))
             u_paye = col4.selectbox("Paiement", ["Pas payé", "Payé"], index=1 if safe_get(r, 'Paiement') == "Payé" else 0)
-            
             u_soc = st.text_input("Société", value=safe_get(r, 'Société'))
             u_pre = st.text_input("Prénom", value=safe_get(r, 'Prénom'))
             u_nom = st.text_input("Nom", value=safe_get(r, 'Nom'))
             u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
             u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
-            u_notes = st.text_area("Notes particulières", value=safe_get(r, 'Notes'))
-            
+            u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
             if st.form_submit_button("💾 ENREGISTRER"):
                 df.at[idx, 'DateNav'], df.at[idx, 'Statut'], df.at[idx, 'Paiement'] = u_date, u_statut, u_paye
                 df.at[idx, 'Prix'], df.at[idx, 'Notes'] = u_prix, u_notes
@@ -118,55 +113,47 @@ if st.session_state.page == "CONTACTS":
             df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
             for i, r in df_disp.iterrows():
                 tel, mail, soc, note = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société'), safe_get(r, 'Notes')
-                s_val, p_val = safe_get(r, 'Statut').upper(), str(safe_get(r, 'Paiement')).upper()
+                s_val, p_val = safe_get(r, 'Statut').upper(), safe_get(r, 'Paiement').upper()
                 c_s = "#3498db" if "TERM" in s_val else "#2ecc71" if "OK" in s_val else "#e74c3c" if "REFUS" in s_val else "#f1c40f"
                 c_p = "#2ecc71" if "PAYÉ" == p_val else "#e74c3c"
                 
-                st.markdown(f"""
+                # Construction propre du HTML pour éviter l'affichage de texte brut
+                html_fiche = f"""
                 <div class="fiche-globale">
                     <span class="statut-badge" style="background:{c_p};">{safe_get(r, 'Paiement', 'Pas payé')}</span>
                     <span class="statut-badge" style="background:{c_s};">{safe_get(r, 'Statut')}</span>
-                    <div class="societe-style">{soc if soc != "" else "CLIENT PARTICULIER"}</div>
+                    <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
                     <div class="prenom-style">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</div>
                     <div style="color:#e67e22; font-weight:bold; margin-top:5px;">📞 {tel}</div>
                     <p style="margin: 5px 0;">📅 <b>{safe_get(r, 'DateNav')}</b> | 💰 <b>{safe_get(r, 'Prix', '0')} €</b></p>
-                    {f'<div class="notes-box">📝 {note}</div>' if note != "" else ''}
-                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
-                    <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
-                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
+                    {f'<div class="notes-box">📝 {note}</div>' if note else ''}
+                    <div style="margin-top:10px;">
+                        <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
+                        <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
+                        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
+                    </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """
+                st.markdown(html_fiche, unsafe_allow_html=True)
                 
                 c_edit, c_del = st.columns([1, 3])
                 if c_edit.button("✏️ Modifier", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
                 if st.session_state.confirm_del == i:
-                    st.warning("⚠️ Confirmer ?")
-                    c_y, c_n = st.columns(2)
-                    if c_y.button("OUI", key=f"y_{i}"):
+                    if st.button("✅ CONFIRMER SUPPRESSION", key=f"conf_{i}"):
                         df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.session_state.confirm_del = None; st.rerun()
-                    if c_n.button("NON", key=f"n_{i}"): st.session_state.confirm_del = None; st.rerun()
+                    if st.button("❌ ANNULER", key=f"ann_{i}"): st.session_state.confirm_del = None; st.rerun()
                 else:
                     if c_del.button("🗑️ Supprimer", key=f"del_{i}"): st.session_state.confirm_del = i; st.rerun()
 
-# --- 5. PAGE PLANNING (DÉVELOPPEMENT) ---
+# --- 5. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Vue Chronologique")
+    st.subheader("🗓️ Planning des Navigations")
     if not df.empty:
-        # On ne garde que les missions futures (pas Terminées ou Refusées)
         df_plan = df[~df['Statut'].isin(["Terminé", "Refusé"])].copy()
-        df_plan = df_plan.sort_values('DateNav')
-        
-        for i, r in df_plan.iterrows():
-            soc_name = safe_get(r, 'Société', 'PARTICULIER')
-            # Couleur selon la société (CMN en bleu comme demandé précédemment)
-            box_color = "#3498db" if "CMN" in soc_name.upper() else "#1a2a6c"
-            
-            with st.expander(f"📅 {safe_get(r, 'DateNav')} | {soc_name} | {safe_get(r, 'Prénom')}"):
-                st.markdown(f"**Client :** {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}")
-                st.markdown(f"**Statut :** {safe_get(r, 'Statut')}")
-                st.markdown(f"**Paiement :** {safe_get(r, 'Paiement')}")
-                if safe_get(r, 'Notes') != "":
-                    st.info(f"Note : {safe_get(r, 'Notes')}")
+        for i, r in df_plan.sort_values('DateNav').iterrows():
+            with st.expander(f"📅 {safe_get(r, 'DateNav')} | {safe_get(r, 'Société', 'CLIENT')} | {safe_get(r, 'Prénom')}"):
+                st.write(f"**Statut :** {safe_get(r, 'Statut')} | **Prix :** {safe_get(r, 'Prix')} €")
+                if safe_get(r, 'Notes'): st.info(f"Note : {safe_get(r, 'Notes')}")
 
 
 
