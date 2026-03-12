@@ -300,31 +300,39 @@ elif st.session_state.page == "FACTURES":
 
 # --- 10. PAGE NOTES ---
 elif st.session_state.page == "NOTES":
-    st.subheader("📝 Bloc-notes")
+    st.subheader("📝 Bloc-notes Professionnel")
     
-    # Chargement des données
-    df_n = charger_data("notes.json")
-    
-    # Sécurité : on vérifie si le DF n'est pas vide ET si la colonne 'contenu' existe
-    memo = ""
-    if not df_n.empty and 'contenu' in df_n.columns:
-        memo = str(df_n.iloc[0]['contenu'])
-    
-    nouveau = st.text_area(
+    # 1. Chargement initial dans la session si ce n'est pas déjà fait
+    if "memo_temp" not in st.session_state:
+        df_n = charger_data("notes.json")
+        if not df_n.empty and 'contenu' in df_n.columns:
+            st.session_state.memo_temp = str(df_n.iloc[0]['contenu'])
+        else:
+            st.session_state.memo_temp = ""
+
+    # 2. Zone de texte utilisant la variable en session
+    # L'astuce est de NE PAS mettre 'value=' mais de laisser l'utilisateur écrire
+    nouveau_memo = st.text_area(
         "Tes notes pour la saison 2026 :", 
-        value=memo, 
+        value=st.session_state.memo_temp,
         height=400,
-        placeholder="Saisis tes codes de port ou rappels ici..."
+        placeholder="Saisis tes codes de port ou rappels ici...",
+        key="note_editor" # Clé unique pour stabiliser la saisie
     )
     
+    # 3. Bouton de sauvegarde
     if st.button("💾 ENREGISTRER LES NOTES", type="primary", use_container_width=True):
-        # On force la création d'un DataFrame propre avec la bonne colonne
-        df_sauvegarde = pd.DataFrame([{"contenu": nouveau}])
+        # On récupère ce qui a été tapé dans le text_area
+        df_sauvegarde = pd.DataFrame([{"contenu": nouveau_memo}])
         sauvegarder_data(df_sauvegarde, "notes.json")
-        st.success("✅ Notes sauvegardées ! (L'erreur devrait disparaître)")
+        
+        # On met à jour la session pour le prochain affichage
+        st.session_state.memo_temp = nouveau_memo
+        st.success("✅ Notes sauvegardées sur GitHub !")
         time.sleep(1)
         st.rerun()
         
+
 
 
 
