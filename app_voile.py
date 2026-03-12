@@ -16,15 +16,22 @@ st.markdown("""<style>
     .statut-badge { padding: 4px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; display: inline-block; }
     .btn-contact { display: inline-block; padding: 6px 10px; border-radius: 6px; text-decoration: none; color: white !important; font-size: 0.8rem; font-weight: bold; margin-right: 5px; margin-top: 5px; }
     
-    /* STYLE DU BOUTON DE NAVIGATION ACTIF UNIQUEMENT */
+    /* STYLE DES BOUTONS DE NAVIGATION */
+    /* On force le bouton actif en VERT */
     div.stButton > button:first-child[data-testid="baseButton-secondary"] {
         background-color: #2ecc71 !important;
         color: white !important;
         border: 2px solid #27ae60 !important;
     }
+    /* On force les boutons inactifs en GRIS standard (pour effacer le rouge) */
+    div.stButton > button:first-child[data-testid="baseButton-primary"] {
+        background-color: #f0f2f6 !important;
+        color: #31333f !important;
+        border: 1px solid #d3d6db !important;
+    }
 </style>""", unsafe_allow_html=True)
 
-# --- 2. FONCTIONS TECHNIQUES ---
+# --- 2. FONCTIONS ---
 def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
@@ -49,6 +56,7 @@ def safe_get(r, key, default=""):
 
 # --- 3. NAVIGATION ---
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
+if "view_archive" not in st.session_state: st.session_state.view_archive = False
 if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
 
 st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
@@ -57,7 +65,6 @@ m = st.columns(6)
 menu_list = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
 for i, name in enumerate(menu_list):
     is_active = st.session_state.page == name
-    # On utilise 'secondary' pour le bouton vert (actif) et 'primary' pour le style par défaut
     if m[i].button(name, use_container_width=True, type="secondary" if is_active else "primary"):
         st.session_state.page = name
         st.session_state.edit_idx = None
@@ -65,9 +72,16 @@ for i, name in enumerate(menu_list):
 
 df = charger_data("contacts.json")
 
-# --- 4. LOGIQUE DES PAGES ---
-
+# --- 4. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
+    
+    # Rétablissement des filtres ARCHIVES / FUTURES
+    c_f, c_p = st.columns(2)
+    if c_f.button("🚀 MISSIONS FUTURES", use_container_width=True, type="primary" if not st.session_state.view_archive else "secondary"):
+        st.session_state.view_archive = False; st.rerun()
+    if c_p.button("📁 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_archive else "secondary"):
+        st.session_state.view_archive = True; st.rerun()
+
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         r = df.loc[idx]
@@ -148,6 +162,7 @@ elif st.session_state.page == "STATS": st.header("💰 Statistiques")
 elif st.session_state.page == "MAINT": st.header("🔧 Maintenance")
 elif st.session_state.page == "FACTURES": st.header("🧾 Factures")
 elif st.session_state.page == "NOTES": st.header("📝 Notes")
+
 
 
 
