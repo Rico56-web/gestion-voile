@@ -139,6 +139,101 @@ if st.session_state.page == "CONTACTS":
                     if col1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
                     if col2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True): st.session_state.confirm_del = i; st.rerun()
 
+# --- À insérer dans la section PAGE PLANNING ---
+elif st.session_state.page == "PLANNING":
+    st.subheader("🗓️ Calendrier des Missions 2026")
+    
+    if not df.empty:
+        # 1. Sélection du mois
+        mois_liste = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", 
+                      "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+        current_month_idx = 2  # Par défaut Mars (mois actuel en 2026)
+        
+        sel_mois = st.selectbox("Choisir le mois", mois_liste, index=current_month_idx)
+        mois_num = mois_liste.index(sel_mois) + 1
+        
+        # 2. Préparation des données du calendrier
+        # On crée un dictionnaire des jours occupés : {jour: statut}
+        jours_occupes = {}
+        
+        for _, r in df.iterrows():
+            try:
+                date_str = safe_get(r, 'DateNav')
+                # On attend le format JJ/MM/AAAA
+                d, m, y = map(int, date_str.split('/'))
+                
+                if m == mois_num and y == 2026:
+                    nb_j = int(safe_get(r, 'NbreJours') or 1)
+                    statut = safe_get(r, 'Statut')
+                    
+                    # Remplir chaque jour de la mission
+                    for j in range(d, d + nb_j):
+                        # Priorité au statut "OK" sur "En attente" si chevauchement
+                        if j not in jours_occupes or statut == "OK":
+                            jours_occupes[j] = statut
+            except:
+                continue
+
+        # 3. Affichage du Calendrier (Grille HTML)
+        import calendar
+        cal = calendar.monthcalendar(2026, mois_num)
+        jours_semaine = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
+        
+        cols = st.columns(7)
+        for i, jour_nom in enumerate(jours_semaine):
+            cols[i].markdown(f"<center><b>{jour_nom}</b></center>", unsafe_allow_html=True)
+            
+        for semaine in cal:
+            cols = st.columns(7)
+            for i, jour in enumerate(semaine):
+                if jour == 0:
+                    cols[i].write("")
+                else:
+                    bg_color = "white"
+                    text_color = "#333"
+                    border = "1px solid #ddd"
+                    
+                    if jour in jours_occupes:
+                        statut = jours_occupes[jour]
+                        if statut == "OK":
+                            bg_color = "#2ecc71" # Vert
+                            text_color = "white"
+                        elif statut == "En attente":
+                            bg_color = "#f1c40f" # Jaune
+                            text_color = "black"
+                    
+                    cols[i].markdown(f"""
+                        <div style="background-color:{bg_color}; color:{text_color}; 
+                        border:{border}; border-radius:5px; padding:10px; text-align:center; 
+                        font-weight:bold; margin-bottom:5px;">
+                        {jour}
+                        </div>""", unsafe_allow_html=True)
+
+        st.divider()
+        
+        # 4. Rappel Liste sous le calendrier
+        st.subheader("📋 Détails du mois")
+        df_mois = []
+        for _, r in df.iterrows():
+            try:
+                _, m, y = map(int, safe_get(r, 'DateNav').split('/'))
+                if m == mois_num and y == 2026:
+                    df_mois.append(r)
+            except: continue
+            
+        if df_mois:
+            for r in df_mois:
+                s = safe_get(r, 'Statut')
+                color = "green" if s == "OK" else "orange"
+                st.markdown(f"""
+                **{safe_get(r, 'DateNav')}** ({safe_get(r, 'NbreJours')}j) : 
+                {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} 
+                - <span style="color:{color}; font-weight:bold;">{s}</span>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("Aucune mission prévue pour ce mois.")
+    else:
+        st.warning("Aucune donnée disponible. Créez un contact d'abord.")
 
 
 
