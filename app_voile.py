@@ -22,8 +22,7 @@ st.markdown("""<style>
         background: white; 
         margin-bottom: 15px; 
         box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
-        padding: 15px; 
-        overflow: hidden;
+        padding: 15px;
     }
     .prenom-style { font-size: 1.4rem; font-weight: bold; color: #1a2a6c; white-space: nowrap; }
     .statut-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; float: right; margin-left: 5px; }
@@ -49,7 +48,7 @@ def sauvegarder_data(df, file):
     res = requests.get(url, headers={"Authorization": f"token {token}"})
     sha = res.json().get('sha') if res.status_code == 200 else None
     content = base64.b64encode(df.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
-    requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": "Update", "content": content, "sha": sha})
+    requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": "Update Vesta", "content": content, "sha": sha})
 
 def safe_get(r, key, default=""):
     val = r.get(key)
@@ -75,6 +74,12 @@ df = charger_data("contacts.json")
 
 # --- 4. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
+    # Bouton Nouveau Contact en haut
+    if st.button("➕ NOUVEAU CONTACT", type="primary", use_container_width=True):
+        new_row = {"DateNav": "01/01/2026", "Statut": "En attente", "Paiement": "Pas payé", "Société": "", "Prénom": "Nouveau", "Nom": "Contact", "Téléphone": "", "Email": "", "Prix": "0", "Notes": ""}
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+        sauvegarder_data(df, "contacts.json"); st.rerun()
+
     c1, c2 = st.columns(2)
     v_arc = st.session_state.view_archive
     if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, type="primary" if not v_arc else "secondary"):
@@ -99,8 +104,9 @@ if st.session_state.page == "CONTACTS":
             u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
             u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
             if st.form_submit_button("💾 ENREGISTRER"):
-                for k, v in zip(['DateNav','Statut','Paiement','Prix','Notes','Société','Prénom','Nom','Téléphone','Email'], [u_date,u_statut,u_paye,u_prix,u_notes,u_soc,u_pre,u_nom,u_tel,u_mail]):
-                    df.at[idx, k] = v
+                fields = ['DateNav','Statut','Paiement','Prix','Notes','Société','Prénom','Nom','Téléphone','Email']
+                vals = [u_date,u_statut,u_paye,u_prix,u_notes,u_soc,u_pre,u_nom,u_tel,u_mail]
+                for k, v in zip(fields, vals): df.at[idx, k] = v
                 sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
             if st.form_submit_button("Annuler"): st.session_state.edit_idx = None; st.rerun()
     else:
@@ -122,7 +128,7 @@ if st.session_state.page == "CONTACTS":
                     <div style="color:#e67e22; font-weight:bold; margin-top:5px;">📞 {tel}</div>
                     <p style="margin: 5px 0;">📅 <b>{safe_get(r, 'DateNav')}</b> | 💰 <b>{safe_get(r, 'Prix', '0')} €</b></p>
                     {note_html}
-                    <div>
+                    <div style="margin-top:10px;">
                         <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
                         <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                         <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
@@ -134,28 +140,21 @@ if st.session_state.page == "CONTACTS":
                 if st.session_state.confirm_del == i:
                     if st.button("✅ CONFIRMER SUPPRESSION", key=f"conf_{i}"):
                         df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.session_state.confirm_del = None; st.rerun()
-                    st.button("❌ ANNULER", key=f"ann_{i}")
+                    if st.button("❌ ANNULER", key=f"ann_{i}"): st.session_state.confirm_del = None; st.rerun()
                 else:
                     if c_del.button("🗑️ Supprimer", key=f"del_{i}"): st.session_state.confirm_del = i; st.rerun()
 
 # --- 5. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning des Navigations")
-    
-    if st.button("➕ NOUVELLE MISSION", type="primary"):
-        new_data = {"DateNav": "01/01/2026", "Statut": "En attente", "Paiement": "Pas payé", "Société": "", "Prénom": "Nouveau", "Nom": "Client", "Téléphone": "", "Email": "", "Prix": "0", "Notes": ""}
-        df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
-        sauvegarder_data(df, "contacts.json"); st.rerun()
-
     if not df.empty:
         df_plan = df[~df['Statut'].isin(["Terminé", "Refusé"])].copy()
         for i, r in df_plan.sort_values('DateNav').iterrows():
             with st.expander(f"📅 {safe_get(r, 'DateNav')} | {safe_get(r, 'Société', 'CLIENT')} | {safe_get(r, 'Prénom')}"):
-                st.write(f"**Client :** {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}")
                 st.write(f"**Notes :** {safe_get(r, 'Notes')}")
-                if st.button("✏️ Modifier cette mission", key=f"plan_ed_{i}"):
-                    st.session_state.page = "CONTACTS"
-                    st.session_state.edit_idx = i; st.rerun()
+                if st.button("✏️ Voir la fiche", key=f"plan_ed_{i}"):
+                    st.session_state.page = "CONTACTS"; st.session_state.edit_idx = i; st.rerun()
+
 
 
 
