@@ -276,6 +276,95 @@ elif st.session_state.page == "MAINT":
                 if c2.button("🗑️ SUPPRIMER", key=f"dm_{i}", use_container_width=True):
                     st.session_state.maint_confirm_del = i
                     st.rerun()
+                    # --- 8. PAGE FACTURES ---
+elif st.session_state.page == "FACTURES":
+    st.subheader("📄 Facturation Mensuelle (CMN)")
+
+    # Calcul du mois précédent
+    now = datetime.now()
+    # Si on est en Janvier, le mois précédent est Décembre de l'année d'avant
+    prev_m_idx = now.month - 1 if now.month > 1 else 12
+    prev_y = now.year if now.month > 1 else now.year - 1
+    
+    m_noms_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+    nom_mois_prev = m_noms_fr[prev_m_idx - 1]
+
+    st.info(f"Préparation de la facture pour : **{nom_mois_prev} {prev_y}**")
+
+    # 1. Extraction des missions CMN du mois précédent
+    missions_cmn = []
+    total_facture = 0.0
+    
+    for _, r in df_c.iterrows():
+        try:
+            dp = safe_get(r, 'DateNav').split('/')
+            m, y = int(dp[1]), int(dp[2])
+            soc = safe_get(r, 'Société').upper()
+            
+            if m == prev_m_idx and y == prev_y and "CMN" in soc:
+                missions_cmn.append(r)
+                total_facture += float(safe_get(r, 'Prix') or 0)
+        except: continue
+
+    if not missions_cmn:
+        st.warning(f"Aucune mission CMN trouvée pour {nom_mois_prev}.")
+    else:
+        # Affichage du récapitulatif
+        st.write(f"**Nombre de missions :** {len(missions_cmn)}")
+        st.write(f"**Montant total à facturer :** {total_facture:.2f} €")
+        
+        # 2. Préparation de l'Email
+        destinataire = "tresorier@cmn-asso.fr"
+        objet_mail = f"Facture Skipper Vesta - {nom_mois_prev} {prev_y}"
+        
+        corps_detail = ""
+        for m in missions_cmn:
+            corps_detail += f"- Le {safe_get(m, 'DateNav')} ({safe_get(m, 'NbreJours')}j) : {safe_get(m, 'Prénom')} {safe_get(m, 'Nom')} | {safe_get(m, 'Prix')} €\n"
+
+        corps_mail = st.text_area("Modifier le corps du mail avant envoi :", value=f"""Bonjour,
+
+Veuillez trouver ci-dessous le détail de mes prestations de skipper pour le mois de {nom_mois_prev} {prev_y} :
+
+{corps_detail}
+TOTAL : {total_facture:.2f} €
+
+Merci de procéder au virement.
+Bien cordialement,
+Vesta Skipper""", height=250)
+
+        # 3. Simulation d'envoi et mise à jour Statut/Stats
+        if "facture_envoyee" not in st.session_state:
+            st.session_state.facture_envoyee = False
+
+        if not st.session_state.facture_envoyee:
+            if st.button(f"📧 ENVOYER LA FACTURE ({total_facture:.2f} €)", type="primary", use_container_width=True):
+                # ICI : Logique de mise à jour (Paiement passe à "Payé")
+                indices_a_maj = []
+                for idx, r in df_c.iterrows():
+                    try:
+                        dp = safe_get(r, 'DateNav').split('/')
+                        if int(dp[1]) == prev_m_idx and "CMN" in safe_get(r, 'Société').upper():
+                            indices_a_maj.append(idx)
+                    except: continue
+                
+                for idx in indices_a_maj:
+                    df_c.at[idx, 'Paiement'] = "Payé"
+                    df_c.at[idx, 'Statut'] = "Terminé"
+                
+                sauvegarder_data(df_c, "contacts.json")
+                st.session_state.facture_envoyee = True
+                st.success("✅ Mail envoyé virtuellement et recettes ajoutées aux STATS !")
+                
+                # Lien mailto pour ouvrir l'appli mail réelle (en plus de l'enregistrement)
+                import urllib.parse
+                mailto_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet_mail)}&body={urllib.parse.quote(corps_mail)}"
+                st.markdown(f'<a href="{mailto_link}" target="_blank" style="background:#2ecc71; color:white; padding:10px; text-decoration:none; border-radius:5px;">Ouvrir mon application de mail</a>', unsafe_allow_html=True)
+                
+        else:
+            st.success("Cette facture a déjà été traitée pour ce mois.")
+            if st.button("Réinitialiser (pour un nouvel envoi)"):
+                st.session_state.facture_envoyee = False
+                st.rerun()
 
 
 
