@@ -113,11 +113,11 @@ if st.session_state.page == "CONTACTS":
         if st.button("Annuler", use_container_width=True):
             st.session_state.edit_idx = None; st.rerun()
         else:
-        if not df.empty:
-            df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
-            for i, r in df_disp.iterrows():
-                tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
-                p_val, s_val, jours = safe_get(r, 'Paiement'), safe_get(r, 'Statut'), safe_get(r, 'NbreJours') or "1"
+            if not df.empty:
+                df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
+                for i, r in df_disp.iterrows():
+                    tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
+                    p_val, s_val, jours = safe_get(r, 'Paiement'), safe_get(r, 'Statut'), safe_get(r, 'NbreJours') or "1"
                 
                 # Styles et Couleurs
                 c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
@@ -162,6 +162,7 @@ if st.session_state.page == "CONTACTS":
                         st.session_state.edit_idx = i; st.session_state.confirm_del = None; st.rerun()
                     if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
                         st.session_state.confirm_del = i; st.rerun()
+
 
 
 
