@@ -12,7 +12,13 @@ st.markdown("""<style>
     .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; }
     button[data-testid="baseButton-primary"] { background-color: #ff4b4b !important; color: white !important; border: none !important; }
     button[data-testid="baseButton-secondary"] { background-color: #ffffff !important; color: #1a2a6c !important; border: 1px solid #1a2a6c !important; }
-    .fiche-globale { border: 2px solid #1a2a6c; border-radius: 12px; background: white; margin-bottom: 15px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    
+    .fiche-globale { border-radius: 12px; background: white; margin-bottom: 15px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    /* Style par défaut (bleu marine Vesta) */
+    .border-normal { border: 2px solid #1a2a6c; }
+    /* Style spécial CMN (bleu royal) */
+    .border-cmn { border: 3px solid #0056b3; background-color: #f0f7ff; }
+    
     .prenom-style { font-size: 1.5rem; font-weight: bold; color: #1a2a6c; }
     .societe-style { color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
     .statut-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; float: right; margin-left: 5px; }
@@ -118,22 +124,28 @@ if st.session_state.page == "CONTACTS":
             df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
             for i, r in df_disp.iterrows():
                 tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
-                jours = safe_get(r, 'NbreJours') or "1"
                 p_val, s_val = safe_get(r, 'Paiement'), safe_get(r, 'Statut')
+                jours = safe_get(r, 'NbreJours') or "1"
                 
+                # Couleurs badges
                 c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
                 c_p = "#2ecc71" if "PAYÉ" in p_val.upper() else "#e74c3c"
+                
+                # Détection CMN pour la bordure
+                classe_bordure = "border-cmn" if "CMN" in soc.upper() else "border-normal"
                 
                 info_tel = f'<div style="color:#e67e22; font-weight:bold; font-size:0.95rem;">📞 {tel}</div>' if tel else ""
                 info_mail = f'<div style="color:#7f8c8d; font-size:0.85rem;">✉️ {mail}</div>' if mail else ""
                 
+                # GÉNÉRATION DE LA FICHE (L'ordre des paramètres est important)
                 st.markdown(f"""
-                <div class="fiche-globale">
+                <div class="fiche-globale {classe_bordure}">
                     <span class="statut-badge" style="background:{c_p};">{p_val if p_val else "Pas payé"}</span>
                     <span class="statut-badge" style="background:{c_s};">{s_val}</span>
                     <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
                     <div class="prenom-style">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</div>
-                    {info_tel} {info_mail}
+                    {info_tel}
+                    {info_mail}
                     <p style="margin: 8px 0; font-size:1.05rem;">
                         📅 <b>{safe_get(r, 'DateNav')}</b> <span style="color:#7f8c8d; font-size:0.9rem;">({jours} jrs)</span> | 💰 <b>{safe_get(r, 'Prix')} €</b>
                     </p>
@@ -143,8 +155,9 @@ if st.session_state.page == "CONTACTS":
                         <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                         <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
                     </div>
-                </div>"""
+                </div>""", unsafe_allow_html=True)
                 
+                # Boutons de gestion
                 if st.session_state.confirm_del == i:
                     col1, col2 = st.columns(2)
                     if col1.button("⚠️ CONFIRMER", key=f"conf_{i}", type="primary", use_container_width=True):
@@ -154,19 +167,8 @@ if st.session_state.page == "CONTACTS":
                 else:
                     c1, c2 = st.columns([1, 4])
                     if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.session_state.confirm_del = None; st.rerun()
-                    if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True): st.session_state.confirm_del = i; st.rerun()
+                    if c2.button("🗑️ SUPPRIMER", key=f"del_{i}",
 
-# --- 5. PAGE PLANNING ---
-elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Planning des missions")
-    if not df.empty:
-        df_plan = df[~df['Statut'].isin(["Terminé", "Refusé"])].copy()
-        for i, r in df_plan.sort_values('DateNav').iterrows():
-            with st.expander(f"📅 {safe_get(r, 'DateNav')} | {safe_get(r, 'Société') or 'CLIENT'}"):
-                st.write(f"**Skipper :** {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}")
-                st.write(f"**Durée :** {safe_get(r, 'NbreJours')} jour(s)")
-                if st.button("Ouvrir la fiche", key=f"p_{i}"):
-                    st.session_state.page = "CONTACTS"; st.session_state.edit_idx = i; st.rerun()
 
 
 
