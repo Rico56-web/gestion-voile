@@ -71,9 +71,9 @@ if st.session_state.page == "CONTACTS":
     c1, c2 = st.columns(2)
     v_arc = st.session_state.view_archive
     if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, type="primary" if not v_arc else "secondary"):
-        st.session_state.view_archive = False; st.rerun()
+        st.session_state.view_archive = False; st.session_state.confirm_del = None; st.rerun()
     if c2.button("📁 ARCHIVES", use_container_width=True, type="primary" if v_arc else "secondary"):
-        st.session_state.view_archive = True; st.rerun()
+        st.session_state.view_archive = True; st.session_state.confirm_del = None; st.rerun()
 
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
@@ -88,10 +88,8 @@ if st.session_state.page == "CONTACTS":
         u_date = st.text_input("Date", value=safe_get(r, 'DateNav'))
         u_prix = st.text_input("Prix", value=safe_get(r, 'Prix'))
         
-        # --- SÉCURITÉ ANTI-CRASH LIGNE 104 ---
         statuts = ["En attente", "OK", "Terminé", "Refusé"]
         s_val = safe_get(r, 'Statut')
-        # Si s_val n'est pas exactement dans la liste, on met 0 (En attente) par défaut
         s_idx = statuts.index(s_val) if s_val in statuts else 0
         u_statut = st.selectbox("Statut", statuts, index=s_idx)
         
@@ -99,20 +97,13 @@ if st.session_state.page == "CONTACTS":
         p_val = safe_get(r, 'Paiement')
         p_idx = paiements.index(p_val) if p_val in paiements else 0
         u_paye = st.selectbox("Paiement", paiements, index=p_idx)
-        # ---------------------------------------
         
         u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
         
         if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
-            df.at[idx, 'Prénom'] = u_pre
-            df.at[idx, 'Nom'] = u_nom
-            df.at[idx, 'Société'] = u_soc
-            df.at[idx, 'Téléphone'] = u_tel
-            df.at[idx, 'Email'] = u_mail
-            df.at[idx, 'DateNav'] = u_date
-            df.at[idx, 'Prix'] = u_prix
-            df.at[idx, 'Statut'] = u_statut
-            df.at[idx, 'Paiement'] = u_paye
+            df.at[idx, 'Prénom'], df.at[idx, 'Nom'], df.at[idx, 'Société'] = u_pre, u_nom, u_soc
+            df.at[idx, 'Téléphone'], df.at[idx, 'Email'], df.at[idx, 'DateNav'] = u_tel, u_mail, u_date
+            df.at[idx, 'Prix'], df.at[idx, 'Statut'], df.at[idx, 'Paiement'] = u_prix, u_statut, u_paye
             df.at[idx, 'Notes'] = u_notes
             sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
         if st.button("Annuler", use_container_width=True):
@@ -122,9 +113,7 @@ if st.session_state.page == "CONTACTS":
         if not df.empty:
             df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
             for i, r in df_disp.iterrows():
-                tel = safe_get(r, 'Téléphone')
-                mail = safe_get(r, 'Email')
-                soc = safe_get(r, 'Société')
+                tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
                 note = safe_get(r, 'Notes') or "."
                 p_val, s_val = safe_get(r, 'Paiement'), safe_get(r, 'Statut')
                 
@@ -147,13 +136,35 @@ if st.session_state.page == "CONTACTS":
                     </div>
                 </div>""", unsafe_allow_html=True)
                 
-                c1, c2 = st.columns([1, 4])
-                if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
+                # --- GESTION SUPPRESSION / MODIFICATION ---
                 if st.session_state.confirm_del == i:
-                    if st.button("⚠️ CONFIRMER", key=f"conf_{i}", type="primary", use_container_width=True):
+                    col1, col2 = st.columns(2)
+                    if col1.button("⚠️ CONFIRMER", key=f"conf_{i}", type="primary", use_container_width=True):
                         df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.session_state.confirm_del = None; st.rerun()
+                    if col2.button("❌ ANNULER", key=f"ann_{i}", use_container_width=True):
+                        st.session_state.confirm_del = None; st.rerun()
                 else:
-                    if c2.button("🗑️", key=f"del_{i}"): st.session_state.confirm_del = i; st.rerun()
+                    c1, c2 = st.columns([1, 4])
+                    if c1.button("✏️", key=f"ed_{i}"): 
+                        st.session_state.edit_idx = i
+                        st.session_state.confirm_del = None # Reset suppression si on modifie
+                        st.rerun()
+                    if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True): 
+                        st.session_state.confirm_del = i
+                        st.rerun()
+
+# --- 5. PAGE PLANNING ---
+elif st.session_state.page == "PLANNING":
+    st.subheader("🗓️ Planning")
+    if not df.empty:
+        df_plan = df[~df['Statut'].isin(["Terminé", "Refusé"])].copy()
+        for i, r in df_plan.sort_values('DateNav').iterrows():
+            with st.expander(f"📅 {safe_get(r, 'DateNav')} | {safe_get(r, 'Société') or 'CLIENT'}"):
+                st.write(f"**Skipper :** {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}")
+                if st.button("Ouvrir la fiche", key=f"p_{i}"):
+                    st.session_state.page = "CONTACTS"; st.session_state.edit_idx = i; st.rerun()
+
+
 
 
 
