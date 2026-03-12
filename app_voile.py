@@ -25,7 +25,11 @@ st.markdown("""<style>
     .prenom-style { font-size: 1.5rem; font-weight: bold; color: #1a2a6c; }
     .societe-style { color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
     .statut-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; float: right; margin-left: 5px; }
-    .btn-contact { display: inline-block; padding: 10px 14px; border-radius: 8px; text-decoration: none !important; color: white !important; font-size: 0.9rem; font-weight: bold; margin-right: 8px; margin-top: 10px; }
+    
+    /* BOUTONS CONTACTS ALIGNÉS */
+    .container-boutons { display: flex; gap: 8px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 12px; flex-wrap: nowrap; }
+    .btn-contact { flex: 1; text-align: center; padding: 10px 5px; border-radius: 8px; text-decoration: none !important; color: white !important; font-size: 0.85rem; font-weight: bold; }
+    
     .notes-box { background-color: #f8f9fa; border-left: 5px solid #1a2a6c; padding: 12px; border-radius: 4px; margin: 12px 0; font-size: 0.95rem; color: #2c3e50; }
 </style>""", unsafe_allow_html=True)
 
@@ -106,13 +110,9 @@ if st.session_state.page == "CONTACTS":
 
     else:
         if not df.empty:
-            # DÉFINITION DE DF_DISP AVANT LA BOUCLE
             df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
-            
             for i, r in df_disp.iterrows():
                 tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
-                
-                # SÉCURITÉ NOTES : On met un point si c'est vide pour éviter le bug HTML
                 note = safe_get(r, 'Notes')
                 if not note: note = "." 
                 
@@ -129,18 +129,17 @@ if st.session_state.page == "CONTACTS":
                     <div style="color:#e67e22; font-weight:bold; margin-top:5px; font-size:1.1rem;">📞 {tel}</div>
                     <p style="margin: 8px 0;">📅 <b>{safe_get(r, 'DateNav')}</b> | 💰 <b>{safe_get(r, 'Prix')} €</b></p>
                     <div class="notes-box">📝 {note}</div>
-                    <div style="margin-top:15px; border-top: 1px solid #eee; padding-top:10px;">
+                    <div class="container-boutons">
                         <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
                         <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
-                        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
+                        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
                     </div>
                 </div>""", unsafe_allow_html=True)
                 
                 c1, c2 = st.columns([1, 4])
                 if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
-                
                 if st.session_state.confirm_del == i:
-                    if st.button("⚠️ CONFIRMER SUPPRESSION", key=f"conf_{i}", type="primary"):
+                    if st.button("⚠️ CONFIRMER", key=f"conf_{i}", type="primary"):
                         df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.session_state.confirm_del = None; st.rerun()
                     if st.button("❌ Annuler", key=f"ann_{i}"): st.session_state.confirm_del = None; st.rerun()
                 else:
@@ -157,6 +156,7 @@ elif st.session_state.page == "PLANNING":
                 st.write(f"**Skipper :** {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}")
                 if st.button("Ouvrir la fiche", key=f"p_{i}"):
                     st.session_state.page = "CONTACTS"; st.session_state.edit_idx = i; st.rerun()
+
 
 
 
