@@ -11,24 +11,25 @@ st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 st.markdown("""<style>
     .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; }
     
-    /* BOUTONS NAVIGATION */
+    /* STYLE DES BOUTONS DE NAVIGATION */
     button[data-testid="baseButton-primary"] { background-color: #ff4b4b !important; color: white !important; border: none !important; }
     button[data-testid="baseButton-secondary"] { background-color: #f0f2f6 !important; color: #31333f !important; border: 1px solid #d3d6db !important; }
 
-    /* DESIGN DES FICHES */
+    /* DESIGN DES FICHES - BLINDAGE HTML */
     .fiche-globale { 
         border: 2px solid #1a2a6c; 
         border-radius: 12px; 
-        background: white; 
-        margin-bottom: 15px; 
+        background-color: white; 
+        margin-bottom: 20px; 
         box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
         padding: 15px;
+        display: block;
     }
-    .prenom-style { font-size: 1.4rem; font-weight: bold; color: #1a2a6c; white-space: nowrap; }
+    .prenom-style { font-size: 1.4rem; font-weight: bold; color: #1a2a6c; margin-bottom: 5px; }
     .statut-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; float: right; margin-left: 5px; }
     .btn-contact { display: inline-block; padding: 8px 12px; border-radius: 6px; text-decoration: none !important; color: white !important; font-size: 0.9rem; font-weight: bold; margin-right: 8px; margin-top: 10px; }
     .societe-style { color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-    .notes-box { background-color: #f9f9f9; border: 1px dashed #d3d6db; padding: 8px; border-radius: 5px; margin: 10px 0; font-size: 0.9rem; color: #2c3e50; }
+    .notes-box { background-color: #f9f9f9; border: 1px dashed #d3d6db; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 0.9rem; color: #2c3e50; }
 </style>""", unsafe_allow_html=True)
 
 # --- 2. FONCTIONS ---
@@ -74,8 +75,8 @@ df = charger_data("contacts.json")
 
 # --- 4. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
-    # Bouton Nouveau Contact en haut
-    if st.button("➕ NOUVEAU CONTACT", type="primary", use_container_width=True):
+    # Nouveau bouton moins "agressif"
+    if st.button("➕ NOUVEAU CONTACT", type="secondary", use_container_width=True):
         new_row = {"DateNav": "01/01/2026", "Statut": "En attente", "Paiement": "Pas payé", "Société": "", "Prénom": "Nouveau", "Nom": "Contact", "Téléphone": "", "Email": "", "Prix": "0", "Notes": ""}
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
         sauvegarder_data(df, "contacts.json"); st.rerun()
@@ -118,22 +119,27 @@ if st.session_state.page == "CONTACTS":
                 c_s = "#3498db" if "TERM" in s_val else "#2ecc71" if "OK" in s_val else "#e74c3c" if "REFUS" in s_val else "#f1c40f"
                 c_p = "#2ecc71" if "PAYÉ" == p_val else "#e74c3c"
                 
-                note_html = f'<div class="notes-box">📝 {note}</div>' if note else ''
+                # Bloc Note séparé pour garantir la propreté du HTML
+                bloc_note = f'<div class="notes-box">📝 {note}</div>' if note else ""
                 
-                st.markdown(f"""<div class="fiche-globale">
+                # On utilise une seule chaîne f-string très propre
+                fiche_html = f"""
+                <div class="fiche-globale">
                     <span class="statut-badge" style="background:{c_p};">{safe_get(r, 'Paiement', 'Pas payé')}</span>
                     <span class="statut-badge" style="background:{c_s};">{safe_get(r, 'Statut')}</span>
                     <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
                     <div class="prenom-style">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</div>
                     <div style="color:#e67e22; font-weight:bold; margin-top:5px;">📞 {tel}</div>
                     <p style="margin: 5px 0;">📅 <b>{safe_get(r, 'DateNav')}</b> | 💰 <b>{safe_get(r, 'Prix', '0')} €</b></p>
-                    {note_html}
-                    <div style="margin-top:10px;">
+                    {bloc_note}
+                    <div style="display: block; margin-top: 10px;">
                         <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
                         <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                         <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
                     </div>
-                </div>""", unsafe_allow_html=True)
+                </div>"""
+                
+                st.markdown(fiche_html, unsafe_allow_html=True)
                 
                 c_edit, c_del = st.columns([1, 3])
                 if c_edit.button("✏️ Modifier", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
@@ -146,14 +152,15 @@ if st.session_state.page == "CONTACTS":
 
 # --- 5. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Planning des Navigations")
+    st.subheader("🗓️ Planning")
     if not df.empty:
         df_plan = df[~df['Statut'].isin(["Terminé", "Refusé"])].copy()
         for i, r in df_plan.sort_values('DateNav').iterrows():
             with st.expander(f"📅 {safe_get(r, 'DateNav')} | {safe_get(r, 'Société', 'CLIENT')} | {safe_get(r, 'Prénom')}"):
-                st.write(f"**Notes :** {safe_get(r, 'Notes')}")
-                if st.button("✏️ Voir la fiche", key=f"plan_ed_{i}"):
+                if safe_get(r, 'Notes'): st.info(f"Note : {safe_get(r, 'Notes')}")
+                if st.button("✏️ Voir fiche", key=f"pl_{i}"):
                     st.session_state.page = "CONTACTS"; st.session_state.edit_idx = i; st.rerun()
+
 
 
 
