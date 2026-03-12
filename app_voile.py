@@ -61,6 +61,12 @@ if st.session_state.page == "CONTACTS":
     if c_p.button("📁 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_archive else "secondary"):
         st.session_state.view_archive = True; st.rerun()
 
+    # --- LOGIQUE DE TRI ---
+    # On convertit temporairement en format date pour trier correctement
+    if not df.empty and 'DateNav' in df.columns:
+        df['dt_tri'] = pd.to_datetime(df['DateNav'], format='%d/%m/%Y', errors='coerce')
+        df = df.sort_values(by='dt_tri', ascending=True) # Les plus proches en premier
+
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         r = df.loc[idx]
@@ -143,6 +149,7 @@ if st.session_state.page == "CONTACTS":
             if cd.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
                 df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
             st.markdown('</div></div>', unsafe_allow_html=True)
+
 
 
 
