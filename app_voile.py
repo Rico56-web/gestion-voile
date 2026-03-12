@@ -18,7 +18,7 @@ st.markdown("""<style>
         border: 2px solid #1a2a6c; 
         border-radius: 12px; 
         background: white; 
-        margin-bottom: 10px; 
+        margin-bottom: 15px; 
         padding: 18px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     }
@@ -84,7 +84,6 @@ if st.session_state.page == "CONTACTS":
         st.session_state.view_archive = True; st.rerun()
 
     if st.session_state.edit_idx is not None:
-        # FORMULAIRE MODIF
         idx = st.session_state.edit_idx
         r = df.loc[idx]
         with st.form("edit_form"):
@@ -95,7 +94,7 @@ if st.session_state.page == "CONTACTS":
             u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
             u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
             u_date = st.text_input("Date", value=safe_get(r, 'DateNav'))
-            u_prix = st.text_input("Prix (€)", value=safe_get(r, 'Prix'))
+            u_prix = st.text_input("Prix", value=safe_get(r, 'Prix'))
             u_statut = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut') or "En attente"))
             u_paye = st.selectbox("Paiement", ["Pas payé", "Payé"], index=1 if safe_get(r, 'Paiement') == "Payé" else 0)
             u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
@@ -106,41 +105,42 @@ if st.session_state.page == "CONTACTS":
             if st.form_submit_button("Annuler"): st.session_state.edit_idx = None; st.rerun()
 
     else:
-        # LISTE DES FICHES
         if not df.empty:
             df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
             for i, r in df_disp.iterrows():
+                # On sécurise toutes les variables pour éviter l'AttributeError
                 tel, mail, soc, note = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société'), safe_get(r, 'Notes')
-                c_s = "#3498db" if "TERM" in r['Statut'].upper() else "#2ecc71" if "OK" in r['Statut'].upper() else "#e74c3c" if "REFUS" in r['Statut'].upper() else "#f1c40f"
-                c_p = "#2ecc71" if "PAYÉ" in r['Paiement'].upper() else "#e74c3c"
+                p_val, s_val = safe_get(r, 'Paiement'), safe_get(r, 'Statut')
+                
+                # Calcul des couleurs avec les valeurs sécurisées
+                c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
+                c_p = "#2ecc71" if "PAYÉ" in p_val.upper() else "#e74c3c"
+                
                 html_note = f'<div class="notes-box">📝 {note}</div>' if note else ""
 
                 st.markdown(f"""
                 <div class="fiche-globale">
-                    <span class="statut-badge" style="background:{c_p};">{r['Paiement']}</span>
-                    <span class="statut-badge" style="background:{c_s};">{r['Statut']}</span>
+                    <span class="statut-badge" style="background:{c_p};">{p_val if p_val else "Pas payé"}</span>
+                    <span class="statut-badge" style="background:{c_s};">{s_val}</span>
                     <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
-                    <div class="prenom-style">{r['Prénom']} {r['Nom'].upper()}</div>
+                    <div class="prenom-style">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</div>
                     <div style="color:#e67e22; font-weight:bold; margin-top:5px; font-size:1.1rem;">📞 {tel}</div>
-                    <p style="margin: 8px 0;">📅 <b>{r['DateNav']}</b> | 💰 <b>{r['Prix']} €</b></p>
+                    <p style="margin: 8px 0;">📅 <b>{safe_get(r, 'DateNav')}</b> | 💰 <b>{safe_get(r, 'Prix')} €</b></p>
                     {html_note}
                     <div style="margin-top:15px; border-top: 1px solid #eee; padding-top:10px;">
                         <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
                         <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                         <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Email</a>
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
+                </div>""", unsafe_allow_html=True)
                 
-                # GESTION DES BOUTONS AVEC CONFIRMATION
                 c1, c2 = st.columns([1, 4])
                 if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
                 
                 if st.session_state.confirm_del == i:
-                    if st.button("⚠️ CONFIRMER SUPPRESSION", key=f"conf_{i}", type="primary", use_container_width=True):
+                    if st.button("⚠️ CONFIRMER SUPPRESSION", key=f"conf_{i}", type="primary"):
                         df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.session_state.confirm_del = None; st.rerun()
-                    if st.button("❌ Annuler", key=f"ann_{i}", use_container_width=True):
-                        st.session_state.confirm_del = None; st.rerun()
+                    if st.button("❌ Annuler", key=f"ann_{i}"): st.session_state.confirm_del = None; st.rerun()
                 else:
                     if c2.button("🗑️", key=f"del_{i}"):
                         st.session_state.confirm_del = i; st.rerun()
@@ -152,9 +152,10 @@ elif st.session_state.page == "PLANNING":
         df_plan = df[~df['Statut'].isin(["Terminé", "Refusé"])].copy()
         for i, r in df_plan.sort_values('DateNav').iterrows():
             with st.expander(f"📅 {safe_get(r, 'DateNav')} | {safe_get(r, 'Société') or 'CLIENT'}"):
-                st.write(f"**Contact :** {r['Prénom']} {r['Nom']}")
+                st.write(f"**Skipper :** {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}")
                 if st.button("Ouvrir la fiche", key=f"p_{i}"):
                     st.session_state.page = "CONTACTS"; st.session_state.edit_idx = i; st.rerun()
+
 
 
 
