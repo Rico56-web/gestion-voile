@@ -143,7 +143,7 @@ if st.session_state.page == "CONTACTS":
                         <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                         <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
                     </div>
-                </div>""", unsafe_allow_html=True)
+                </div>"""
                 
                 if st.session_state.confirm_del == i:
                     col1, col2 = st.columns(2)
@@ -167,6 +167,7 @@ elif st.session_state.page == "PLANNING":
                 st.write(f"**Durée :** {safe_get(r, 'NbreJours')} jour(s)")
                 if st.button("Ouvrir la fiche", key=f"p_{i}"):
                     st.session_state.page = "CONTACTS"; st.session_state.edit_idx = i; st.rerun()
+
 
 
 
