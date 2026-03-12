@@ -5,22 +5,22 @@ import pandas as pd
 import json
 import time
 
-# --- 1. CONFIGURATION & STYLE (NETTOYAGE FINAL) ---
+# --- 1. CONFIGURATION & STYLE (L'ARME ULTIME CONTRE LE ROUGE) ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
 st.markdown("""<style>
     .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; }
     
-    /* NAVIGATION : VERT POUR L'ACTIF, AUCUNE COULEUR POUR LES AUTRES */
-    /* Bouton Sélectionné (Type Secondary dans le code) */
-    button[data-testid="baseButton-secondary"] {
+    /* 1. On transforme le type 'primary' (ton rouge actuel) en VERT */
+    button[data-testid="baseButton-primary"] {
         background-color: #2ecc71 !important; 
         color: white !important;
         border: none !important;
     }
-    /* Boutons Non-Sélectionnés (Type Primary dans le code) */
-    button[data-testid="baseButton-primary"] {
-        background-color: transparent !important; 
+
+    /* 2. On transforme le type 'secondary' en GRIS NEUTRE / BLANC */
+    button[data-testid="baseButton-secondary"] {
+        background-color: #f0f2f6 !important; 
         color: #31333f !important;
         border: 1px solid #d3d6db !important;
     }
@@ -67,7 +67,8 @@ m = st.columns(6)
 menu_list = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
 for i, name in enumerate(menu_list):
     active = (st.session_state.page == name)
-    if m[i].button(name, use_container_width=True, key=f"nav_v4_{name}", type="secondary" if active else "primary"):
+    # INVERSION DES TYPES : 'primary' devient notre Vert (Actif), 'secondary' devient notre Gris (Inactif)
+    if m[i].button(name, use_container_width=True, key=f"nav_v5_{name}", type="primary" if active else "secondary"):
         st.session_state.page = name
         st.session_state.edit_idx = None
         st.rerun()
@@ -78,9 +79,9 @@ df = charger_data("contacts.json")
 if st.session_state.page == "CONTACTS":
     c1, c2 = st.columns(2)
     v_arc = st.session_state.view_archive
-    if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, type="secondary" if not v_arc else "primary"):
+    if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, type="primary" if not v_arc else "secondary"):
         st.session_state.view_archive = False; st.rerun()
-    if c2.button("📁 ARCHIVES", use_container_width=True, type="secondary" if v_arc else "primary"):
+    if c2.button("📁 ARCHIVES", use_container_width=True, type="primary" if v_arc else "secondary"):
         st.session_state.view_archive = True; st.rerun()
 
     if st.session_state.edit_idx is not None:
@@ -113,7 +114,7 @@ if st.session_state.page == "CONTACTS":
                 tel = safe_get(r, 'Téléphone')
                 mail = safe_get(r, 'Email')
                 s_val = safe_get(r, 'Statut').upper()
-                p_val = safe_get(r, 'Paiement').upper()
+                p_val = str(safe_get(r, 'Paiement')).upper()
                 
                 c_s = "#3498db" if "TERM" in s_val else "#2ecc71" if "OK" in s_val else "#e74c3c" if "REFUS" in s_val else "#f1c40f"
                 c_p = "#2ecc71" if "PAYÉ" == p_val else "#e74c3c"
