@@ -15,7 +15,7 @@ st.markdown("""<style>
     button[data-testid="baseButton-primary"] { background-color: #ff4b4b !important; color: white !important; border: none !important; }
     button[data-testid="baseButton-secondary"] { background-color: #ffffff !important; color: #1a2a6c !important; border: 1px solid #1a2a6c !important; }
 
-    /* DESIGN DES FICHES - TOUT EN UN */
+    /* DESIGN DES FICHES */
     .fiche-globale { 
         border: 2px solid #1a2a6c; 
         border-radius: 12px; 
@@ -24,13 +24,11 @@ st.markdown("""<style>
         padding: 18px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     }
-    .prenom-style { font-size: 1.5rem; font-weight: bold; color: #1a2a6c; margin-bottom: 2px; }
+    .prenom-style { font-size: 1.5rem; font-weight: bold; color: #1a2a6c; }
     .societe-style { color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
     .statut-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; float: right; margin-left: 5px; }
-    
-    /* BOUTONS ACTIONS */
-    .btn-contact { display: inline-block; padding: 10px 14px; border-radius: 8px; text-decoration: none !important; color: white !important; font-size: 0.9rem; font-weight: bold; margin-right: 8px; margin-top: 15px; }
-    .notes-box { background-color: #f8f9fa; border-left: 5px solid #1a2a6c; padding: 12px; border-radius: 4px; margin: 12px 0; font-size: 0.95rem; color: #2c3e50; line-height: 1.4; }
+    .btn-contact { display: inline-block; padding: 10px 14px; border-radius: 8px; text-decoration: none !important; color: white !important; font-size: 0.9rem; font-weight: bold; margin-right: 8px; margin-top: 10px; }
+    .notes-box { background-color: #f8f9fa; border-left: 5px solid #1a2a6c; padding: 12px; border-radius: 4px; margin: 12px 0; font-size: 0.95rem; color: #2c3e50; }
 </style>""", unsafe_allow_html=True)
 
 # --- 2. FONCTIONS ---
@@ -90,17 +88,17 @@ if st.session_state.page == "CONTACTS":
         idx = st.session_state.edit_idx
         r = df.loc[idx]
         with st.form("edit_form"):
-            st.subheader("📝 Modifier la fiche")
-            u_date = st.text_input("Date Navigation", value=safe_get(r, 'DateNav'))
+            st.subheader("📝 Modifier")
+            u_date = st.text_input("Date", value=safe_get(r, 'DateNav'))
             u_statut = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut') or "En attente"))
-            u_prix = st.text_input("Prix (€)", value=safe_get(r, 'Prix'))
+            u_prix = st.text_input("Prix", value=safe_get(r, 'Prix'))
             u_paye = st.selectbox("Paiement", ["Pas payé", "Payé"], index=1 if safe_get(r, 'Paiement') == "Payé" else 0)
             u_soc = st.text_input("Société / Bateau", value=safe_get(r, 'Société'))
             u_pre = st.text_input("Prénom", value=safe_get(r, 'Prénom'))
             u_nom = st.text_input("Nom", value=safe_get(r, 'Nom'))
             u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
             u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
-            u_notes = st.text_area("Notes particulières", value=safe_get(r, 'Notes'))
+            u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
             if st.form_submit_button("💾 ENREGISTRER"):
                 d = {'DateNav':u_date,'Statut':u_statut,'Paiement':u_paye,'Prix':u_prix,'Société':u_soc,'Prénom':u_pre,'Nom':u_nom,'Téléphone':u_tel,'Email':u_mail,'Notes':u_notes}
                 for k,v in d.items(): df.at[idx, k] = v
@@ -116,9 +114,10 @@ if st.session_state.page == "CONTACTS":
                 c_s = "#3498db" if "TERM" in s_val else "#2ecc71" if "OK" in s_val else "#e74c3c" if "REFUS" in s_val else "#f1c40f"
                 c_p = "#2ecc71" if "PAYÉ" == p_val else "#e74c3c"
                 
-                # Construction HTML monobloc
+                # ON PRÉPARE LE BLOC NOTE EN AMONT
                 html_note = f'<div class="notes-box"><b>Notes :</b> {note}</div>' if note else ""
                 
+                # ON CONSTRUIT LA FICHE EN UNE SEULE FOIS (AUCUNE RUPTURE POSSIBLE)
                 st.markdown(f"""
                 <div class="fiche-globale">
                     <span class="statut-badge" style="background:{c_p};">{safe_get(r, 'Paiement') or 'Pas payé'}</span>
@@ -136,23 +135,23 @@ if st.session_state.page == "CONTACTS":
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Boutons de gestion alignés sous les boutons de contact mais toujours dans Streamlit
+                # BOUTONS STREAMLIT (Placés après le bloc HTML pour ne pas interférer)
                 col_btn1, col_btn2 = st.columns([1, 4])
-                if col_btn1.button("✏️ Modif", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
+                if col_btn1.button("✏️ Modif", key=f"ed_{i}"):
+                    st.session_state.edit_idx = i; st.rerun()
                 if col_btn2.button("🗑️ Suppr", key=f"del_{i}"):
                     df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
 
 # --- 5. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Planning Chronologique")
+    st.subheader("🗓️ Planning")
     if not df.empty:
         df_plan = df[~df['Statut'].isin(["Terminé", "Refusé"])].copy()
         for i, r in df_plan.sort_values('DateNav').iterrows():
             with st.expander(f"📅 {safe_get(r, 'DateNav')} | {safe_get(r, 'Société') or 'CLIENT'}"):
-                st.write(f"**Skipper :** {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}")
+                st.write(f"**Contact :** {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}")
                 if safe_get(r, 'Notes'): st.info(f"Note : {safe_get(r, 'Notes')}")
-                if st.button("Voir la fiche", key=f"p_view_{i}"):
-                    st.session_state.page = "CONTACTS"; st.session_state.edit_idx = i; st.rerun()
+
 
 
 
