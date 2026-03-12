@@ -301,11 +301,30 @@ elif st.session_state.page == "FACTURES":
 # --- 10. PAGE NOTES ---
 elif st.session_state.page == "NOTES":
     st.subheader("📝 Bloc-notes")
+    
+    # Chargement des données
     df_n = charger_data("notes.json")
-    memo = df_n.iloc[0]['contenu'] if not df_n.empty else ""
-    nouveau = st.text_area("Saisir ici :", value=memo, height=400)
-    if st.button("💾 ENREGISTRER"):
-        sauvegarder_data(pd.DataFrame([{"contenu": nouveau}]), "notes.json"); st.success("Sauvegardé !")
+    
+    # Sécurité : on vérifie si le DF n'est pas vide ET si la colonne 'contenu' existe
+    memo = ""
+    if not df_n.empty and 'contenu' in df_n.columns:
+        memo = str(df_n.iloc[0]['contenu'])
+    
+    nouveau = st.text_area(
+        "Tes notes pour la saison 2026 :", 
+        value=memo, 
+        height=400,
+        placeholder="Saisis tes codes de port ou rappels ici..."
+    )
+    
+    if st.button("💾 ENREGISTRER LES NOTES", type="primary", use_container_width=True):
+        # On force la création d'un DataFrame propre avec la bonne colonne
+        df_sauvegarde = pd.DataFrame([{"contenu": nouveau}])
+        sauvegarder_data(df_sauvegarde, "notes.json")
+        st.success("✅ Notes sauvegardées ! (L'erreur devrait disparaître)")
+        time.sleep(1)
+        st.rerun()
+        
 
 
 
