@@ -123,13 +123,15 @@ if st.session_state.page == "CONTACTS":
 
 # --- 5. PAGE PLANNING (CALENDRIER) ---
 elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Calendrier des Missions")
+    st.subheader("🗓️ Planning Mensuel 2026")
     
+    # 1. Menu déroulant pour le mois
     mois_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-    sel_mois_nom = st.selectbox("Choisir le mois", mois_noms, index=datetime.now().month - 1)
+    # On cale par défaut sur Mars (3e mois) car nous sommes en Mars 2026
+    sel_mois_nom = st.selectbox("Afficher le mois :", mois_noms, index=2)
     sel_m = mois_noms.index(sel_mois_nom) + 1
 
-    # Dictionnaire des jours occupés {jour: statut}
+    # 2. Logique de récupération des jours occupés
     jours_occ = {}
     for _, r in df.iterrows():
         try:
@@ -139,29 +141,55 @@ elif st.session_state.page == "PLANNING":
                 nb = int(safe_get(r, 'NbreJours') or 1)
                 stut = safe_get(r, 'Statut')
                 for j in range(d, d + nb):
-                    if j not in jours_occ or stut == "OK": jours_occ[j] = stut
+                    # Priorité au vert (OK) si deux missions se chevauchent visuellement
+                    if j not in jours_occ or stut == "OK": 
+                        jours_occ[j] = stut
         except: continue
 
-    # Affichage Calendrier
+    # 3. Construction du Tableau (CSS pour quadrillage)
+    st.markdown("""
+        <style>
+        .calendar-table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+        .calendar-table th { background-color: #1a2a6c; color: white; padding: 10px; border: 1px solid #ddd; text-align: center; }
+        .calendar-table td { height: 60px; border: 1px solid #ddd; text-align: center; vertical-align: middle; font-weight: bold; font-size: 1.1rem; }
+        .day-empty { background-color: #f9f9f9; }
+        .day-ok { background-color: #2ecc71 !important; color: white; }
+        .day-attente { background-color: #f1c40f !important; color: black; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Génération du calendrier avec le module calendar
     cal_mat = calendar.monthcalendar(2026, sel_m)
-    cols_h = st.columns(7)
-    for i, j_nom in enumerate(["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]):
-        cols_h[i].markdown(f"<center><b>{j_nom}</b></center>", unsafe_allow_html=True)
+    
+    html_table = '<table class="calendar-table"><thead><tr>'
+    for j_nom in ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]:
+        html_table += f'<th>{j_nom}</th>'
+    html_table += '</tr></thead><tbody>'
 
     for semaine in cal_mat:
-        cols = st.columns(7)
+        html_table += '<tr>'
         for i, jour in enumerate(semaine):
-            if jour == 0: cols[i].write("")
+            if jour == 0:
+                html_table += '<td class="day-empty"></td>'
             else:
-                bg = "white"
-                txt = "#333"
+                classe_jour = ""
                 if jour in jours_occ:
-                    if jours_occ[jour] == "OK": bg, txt = "#2ecc71", "white"
-                    elif jours_occ[jour] == "En attente": bg, txt = "#f1c40f", "black"
-                cols[i].markdown(f'<div class="cal-case" style="background:{bg}; color:{txt};">{jour}</div>', unsafe_allow_html=True)
+                    if jours_occ[jour] == "OK": classe_jour = "day-ok"
+                    elif jours_occ[jour] == "En attente": classe_jour = "day-attente"
+                
+                html_table += f'<td class="{classe_jour}">{jour}</td>'
+        html_table += '</tr>'
+    
+    html_table += '</tbody></table>'
+    st.markdown(html_table, unsafe_allow_html=True)
 
-    st.divider()
-    st.subheader("📋 Récapitulatif du mois")
+    # 4. Rappel Liste sous le tableau
+    st.markdown("---")
+    st.subheader("📝 Détails des réservations")
+    col_leg1, col_leg2 = st.columns(2)
+    col_leg1.markdown("🟢 **Vert** : Confirmé (OK)")
+    col_leg2.markdown("🟡 **Jaune** : En attente")
+    
     found = False
     for _, r in df.iterrows():
         try:
@@ -169,14 +197,11 @@ elif st.session_state.page == "PLANNING":
             if m == sel_m:
                 found = True
                 s = safe_get(r, 'Statut')
-                c = "green" if s == "OK" else "orange"
-                st.markdown(f"**{safe_get(r, 'DateNav')}** ({safe_get(r, 'NbreJours')}j) : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} - <span style='color:{c}; font-weight:bold;'>{s}</span>", unsafe_allow_html=True)
+                lbl = "✅" if s == "OK" else "⏳"
+                st.write(f"{lbl} **{safe_get(r, 'DateNav')}** : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} ({safe_get(r, 'NbreJours')}j)")
         except: continue
-    if not found: st.info("Rien de prévu ce mois-ci.")
+    if not found: st.info("Aucune mission ce mois-ci.")
 
-# --- PAGES SUIVANTES (À REMPLIR) ---
-else:
-    st.info(f"Page {st.session_state.page} en cours de développement.")
 
 
 
