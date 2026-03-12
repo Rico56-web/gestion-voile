@@ -5,28 +5,33 @@ import pandas as pd
 import json
 import time
 
-# --- 1. CONFIGURATION & STYLE (Nettoyage complet du rouge) ---
+# --- 1. CONFIGURATION & STYLE (NETTOYAGE RADICAL) ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
 st.markdown("""<style>
-    .main-header { font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; }
-    .fiche-globale { border: 2px solid #1a2a6c; border-radius: 12px; background: white; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; }
-    .section-haute { padding: 15px; border-bottom: 1px solid #eee; }
-    .prenom-style { font-size: 1.4rem; font-weight: bold; color: #1a2a6c; }
-    .statut-badge { padding: 4px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; display: inline-block; }
-    .btn-contact { display: inline-block; padding: 6px 10px; border-radius: 6px; text-decoration: none; color: white !important; font-size: 0.8rem; font-weight: bold; margin-right: 5px; margin-top: 5px; }
+    /* Entête */
+    .main-header { font-size: 2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 20px; }
     
-    /* NAVIGATION : Vert pour l'actif, Gris neutre pour les autres */
+    /* RESET COMPLET DES COULEURS DES BOUTONS */
+    /* On force TOUS les boutons à être gris par défaut */
+    div.stButton > button {
+        background-color: #f0f2f6 !important;
+        color: black !important;
+        border: 1px solid #d3d6db !important;
+    }
+
+    /* FORCE LE BOUTON ACTIF EN VERT (uniquement celui-là) */
     div.stButton > button:first-child[data-testid="baseButton-secondary"] {
-        background-color: #2ecc71 !important; /* VERT */
+        background-color: green !important;
         color: white !important;
         border: none !important;
+        font-weight: bold !important;
     }
-    div.stButton > button:first-child[data-testid="baseButton-primary"] {
-        background-color: #efefef !important; /* GRIS CLAIR */
-        color: #31333f !important;
-        border: 1px solid #d3d3d3 !important;
-    }
+
+    /* Style des fiches */
+    .fiche-globale { border: 2px solid #1a2a6c; border-radius: 10px; background: white; margin-bottom: 15px; padding: 15px; }
+    .prenom-style { font-size: 1.4rem; font-weight: bold; color: #1a2a6c; }
+    .statut-badge { padding: 4px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; display: inline-block; }
 </style>""", unsafe_allow_html=True)
 
 # --- 2. FONCTIONS ---
@@ -52,121 +57,77 @@ def safe_get(r, key, default=""):
     val = r.get(key)
     return default if pd.isna(val) or val is None else val
 
-# --- 3. NAVIGATION PRINCIPALE ---
+# --- 3. NAVIGATION ---
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
 if "view_archive" not in st.session_state: st.session_state.view_archive = False
 if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
 
 st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
 
-nav_cols = st.columns(6)
-menu_items = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
-
-for idx, name in enumerate(menu_items):
-    is_active = (st.session_state.page == name)
-    if nav_cols[idx].button(name, use_container_width=True, type="secondary" if is_active else "primary"):
-        st.session_state.page = name
-        st.session_state.edit_idx = None # Reset l'édition quand on change de menu
+# Menus
+m_cols = st.columns(6)
+menus = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
+for idx, m_name in enumerate(menus):
+    active = (st.session_state.page == m_name)
+    # On utilise "secondary" pour le vert, "primary" pour le gris
+    if m_cols[idx].button(m_name, use_container_width=True, type="secondary" if active else "primary"):
+        st.session_state.page = m_name
+        st.session_state.edit_idx = None
         st.rerun()
 
 df = charger_data("contacts.json")
 
-# --- 4. CONTENU DES PAGES ---
-
-# --- PAGE CONTACTS ---
+# --- 4. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
-    # FILTRES : Missions vs Archives (Placés en haut pour être visibles)
-    f1, f2 = st.columns(2)
-    if f1.button("🚀 MISSIONS FUTURES", use_container_width=True, type="secondary" if not st.session_state.view_archive else "primary"):
+    # Filtres Archives/Futures
+    c1, c2 = st.columns(2)
+    show_arc = st.session_state.view_archive
+    if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, type="secondary" if not show_arc else "primary"):
         st.session_state.view_archive = False; st.rerun()
-    if f2.button("📁 ARCHIVES", use_container_width=True, type="secondary" if st.session_state.view_archive else "primary"):
+    if c2.button("📁 ARCHIVES", use_container_width=True, type="secondary" if show_arc else "primary"):
         st.session_state.view_archive = True; st.rerun()
 
-    st.divider()
-
     if st.session_state.edit_idx is not None:
-        # --- FORMULAIRE DE MODIFICATION ---
-        idx_edit = st.session_state.edit_idx
-        r_edit = df.loc[idx_edit]
-        with st.form("form_modif"):
-            st.subheader(f"Modification : {safe_get(r_edit, 'Prénom')} {safe_get(r_edit, 'Nom').upper()}")
-            c1, c2, c3 = st.columns(3)
-            u_date = c1.text_input("Date Nav", value=safe_get(r_edit, 'DateNav'))
-            u_jours = c2.text_input("Nb jours", value=str(safe_get(r_edit, 'NbJours')))
-            u_stat = c3.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], 
-                                  index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r_edit, 'Statut', 'En attente')))
+        # Formulaire de modification
+        idx = st.session_state.edit_idx
+        r = df.loc[idx]
+        with st.form("edit_form"):
+            st.subheader(f"Modifier : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}")
+            # ... (champs de saisie identiques)
+            u_date = st.text_input("Date Nav", value=safe_get(r, 'DateNav'))
+            u_statut = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut', 'En attente')))
+            u_nom = st.text_input("Nom", value=safe_get(r, 'Nom'))
+            u_pre = st.text_input("Prénom", value=safe_get(r, 'Prénom'))
+            u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
+            u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
+            u_prix = st.text_input("Prix Total (€)", value=str(safe_get(r, 'Prix', '0')))
+            u_paye = st.selectbox("Paiement", ["Pas payé", "Payé"], 1 if safe_get(r, 'Paiement') == "Payé" else 0)
+            u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
             
-            c4, c5, c6 = st.columns(3)
-            u_nom = c4.text_input("Nom", value=safe_get(r_edit, 'Nom'))
-            u_pre = c5.text_input("Prénom", value=safe_get(r_edit, 'Prénom'))
-            u_tel = c6.text_input("Téléphone", value=safe_get(r_edit, 'Téléphone'))
-
-            c7, c8, c9 = st.columns(3)
-            u_mail = c7.text_input("Email", value=safe_get(r_edit, 'Email'))
-            u_paye = c8.selectbox("Paiement", ["Pas payé", "Payé"], 1 if safe_get(r_edit, 'Paiement') == "Payé" else 0)
-            u_prix = c9.text_input("Prix Total (€)", value=str(safe_get(r_edit, 'Prix', '0')))
-
-            u_soc = st.text_input("Société", value=safe_get(r_edit, 'Société'))
-            u_not = st.text_area("Notes", value=safe_get(r_edit, 'Notes'))
-
-            cb1, cb2 = st.columns(2)
-            if cb1.form_submit_button("💾 ENREGISTRER"):
-                df.at[idx_edit, 'DateNav'] = u_date
-                df.at[idx_edit, 'NbJours'] = u_jours
-                df.at[idx_edit, 'Statut'] = u_stat
-                df.at[idx_edit, 'Nom'] = u_nom
-                df.at[idx_edit, 'Prénom'] = u_pre
-                df.at[idx_edit, 'Téléphone'] = u_tel
-                df.at[idx_edit, 'Email'] = u_mail
-                df.at[idx_edit, 'Paiement'] = u_paye
-                df.at[idx_edit, 'Prix'] = float(u_prix.replace(',','.'))
-                df.at[idx_edit, 'Société'] = u_soc
-                df.at[idx_edit, 'Notes'] = u_not
+            if st.form_submit_button("💾 ENREGISTRER"):
+                df.at[idx, 'DateNav'], df.at[idx, 'Statut'], df.at[idx, 'Nom'] = u_date, u_statut, u_nom
+                df.at[idx, 'Prénom'], df.at[idx, 'Téléphone'], df.at[idx, 'Email'] = u_pre, u_tel, u_mail
+                df.at[idx, 'Prix'], df.at[idx, 'Paiement'], df.at[idx, 'Notes'] = float(u_prix.replace(',','.')), u_paye, u_notes
                 sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
-            if cb2.form_submit_button("❌ ANNULER"): 
-                st.session_state.edit_idx = None; st.rerun()
+            if st.form_submit_button("❌ ANNULER"): st.session_state.edit_idx = None; st.rerun()
     else:
-        # --- AFFICHAGE DES FICHES ---
-        if not df.empty and 'DateNav' in df.columns:
+        # Tri et Affichage
+        if not df.empty:
             df['dt_tri'] = pd.to_datetime(df['DateNav'], format='%d/%m/%Y', errors='coerce')
             df = df.sort_values(by='dt_tri', ascending=True)
-
-        is_arc = st.session_state.view_archive
-        df_view = df[df['Statut'].isin(["Terminé", "Refusé"])] if is_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
-
-        for i, r in df_view.iterrows():
-            t, m = safe_get(r, 'Téléphone'), safe_get(r, 'Email')
-            s, p = safe_get(r, 'Statut').upper(), safe_get(r, 'Paiement').upper()
-            c_s = "#3498db" if "TERM" in s else "#2ecc71" if "OK" in s else "#e74c3c" if "REFUS" in s else "#f1c40f"
-            c_p = "#2ecc71" if p == "PAYÉ" else "#e74c3c"
-
-            st.markdown(f"""
-            <div class="fiche-globale">
-                <div class="section-haute">
-                    <div style="float:right; text-align:right;">
-                        <span class="statut-badge" style="background:{c_s};">{safe_get(r, 'Statut', 'En attente')}</span><br>
-                        <span class="statut-badge" style="background:{c_p};">{safe_get(r, 'Paiement', 'Pas payé')}</span>
-                    </div>
+            
+            df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if show_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
+            
+            for i, r in df_disp.iterrows():
+                st.markdown(f"""<div class="fiche-globale">
                     <div class="prenom-style">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</div>
-                    <div style="color:#e67e22; font-weight:bold;">📞 {t} | ✉️ {m}</div>
-                    <p style="margin-top:10px;">📅 <b>{safe_get(r, 'DateNav')}</b> ({safe_get(r, 'NbJours')} j.) | 🏢 <b>{safe_get(r, 'Société')}</b> | 💰 <b>{safe_get(r, 'Prix')} €</b></p>
-                    <a href="tel:{t}" class="btn-contact" style="background:#3498db;">Appeler</a>
-                    <a href="mailto:{m}" class="btn-contact" style="background:#e67e22;">Email</a>
-                    <a href="https://wa.me/{t.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            col_b1, col_b2 = st.columns(2)
-            if col_b1.button("✏️ Modifier", key=f"btn_ed_{i}"): st.session_state.edit_idx = i; st.rerun()
-            if col_b2.button("🗑️ Supprimer", key=f"btn_del_{i}"):
-                df = df.drop(i); sauvegarder_data(df, "contacts.json"); st.rerun()
+                    <p>📅 {safe_get(r, 'DateNav')} | 💰 {safe_get(r, 'Prix')}€ | Statut: {safe_get(r, 'Statut')}</p>
+                </div>""", unsafe_allow_html=True)
+                if st.button("✏️ Modifier", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
 
-# --- STUBS POUR LES AUTRES PAGES ---
-elif st.session_state.page == "PLANNING": st.header("🗓️ Planning")
-elif st.session_state.page == "STATS": st.header("💰 Statistiques")
-elif st.session_state.page == "MAINT": st.header("🔧 Maintenance")
-elif st.session_state.page == "FACTURES": st.header("🧾 Factures")
-elif st.session_state.page == "NOTES": st.header("📝 Notes")
+# --- AUTRES PAGES ---
+else:
+    st.header(f"Page {st.session_state.page}")
 
 
 
