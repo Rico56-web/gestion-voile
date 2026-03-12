@@ -112,7 +112,7 @@ if st.session_state.page == "CONTACTS":
             sauvegarder_data(df, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
         if st.button("Annuler", use_container_width=True):
             st.session_state.edit_idx = None; st.rerun()
-            else:
+        else:
         if not df.empty:
             df_disp = df[df['Statut'].isin(["Terminé", "Refusé"])] if v_arc else df[~df['Statut'].isin(["Terminé", "Refusé"])]
             for i, r in df_disp.iterrows():
@@ -162,6 +162,7 @@ if st.session_state.page == "CONTACTS":
                         st.session_state.edit_idx = i; st.session_state.confirm_del = None; st.rerun()
                     if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
                         st.session_state.confirm_del = i; st.rerun()
+
 
 
 
