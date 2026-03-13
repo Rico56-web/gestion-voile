@@ -110,8 +110,13 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except Exception:
         pass
+        
 # --- 5. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
+    # Initialisation de la variable de confirmation si elle n'existe pas
+    if "contact_confirm_del" not in st.session_state:
+        st.session_state.contact_confirm_del = None
+
     if st.button("➕ NOUVEAU CONTACT", type="secondary", use_container_width=True):
         new = {"DateNav": datetime.now().strftime("%d/%m/2026"), "NbreJours": "1", "Statut": "En attente", "Paiement": "Pas payé", "Société": "", "Prénom": "Nouveau", "Nom": "Contact", "Téléphone": "", "Email": "", "Prix": "0.00", "Notes": ""}
         df_c = pd.concat([pd.DataFrame([new]), df_c], ignore_index=True)
@@ -155,15 +160,8 @@ if st.session_state.page == "CONTACTS":
             p_val, s_val, pay_val = f"{float(safe_get(r, 'Prix') or 0):.2f}", safe_get(r, 'Statut'), safe_get(r, 'Paiement')
             jours = safe_get(r, 'NbreJours') or "1"
             
-            # Couleur du statut (OK, Terminé, etc.)
             c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
-            
-            # --- MODIFICATION : COULEUR ROUGE VIF POUR NON PAYÉ ---
-            if "PAS PAYÉ" in pay_val.upper() or "NON PAYÉ" in pay_val.upper():
-                c_p = "#FF0000"  # Rouge vif
-            else:
-                c_p = "#2ecc71"  # Vert pour Payé
-            
+            c_p = "#FF0000" if "PAS PAYÉ" in pay_val.upper() or "NON PAYÉ" in pay_val.upper() else "#2ecc71"
             cl_b = "border-cmn" if "CMN" in soc.upper() else ""
             
             h = f'''<div class="fiche-globale {cl_b}">
@@ -174,18 +172,28 @@ if st.session_state.page == "CONTACTS":
                 📅 <b>{safe_get(r, "DateNav")}</b> ({jours} jrs) | 💰 <b>{p_val} €</b><br>
                 📞 {tel} | ✉️ {mail}
                 <div class="notes-box">📝 {safe_get(r, "Notes") or "."}</div>
-                <div class="container-boutons">
-                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
-                    <a href="https://wa.me/{tel.replace(" ","")}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
-                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
-                </div>
             </div>'''
             st.markdown(h, unsafe_allow_html=True)
-            c1, c2 = st.columns([1, 4])
-            if c1.button("✏️", key=f"ec_{i}"): st.session_state.edit_idx = i; st.rerun()
-            if c2.button("🗑️ SUPPRIMER", key=f"dc_{i}", use_container_width=True):
-                df_c = df_c.drop(i); sauvegarder_data(df_c, "contacts.json"); st.rerun()
-
+            
+            # --- LOGIQUE DE CONFIRMATION DE SUPPRESSION ---
+            if st.session_state.contact_confirm_del == i:
+                st.warning(f"Supprimer la mission de {safe_get(r, 'Prénom')} ?")
+                col_y, col_n = st.columns(2)
+                if col_y.button("✅ OUI", key=f"conf_y_{i}"):
+                    df_c = df_c.drop(i)
+                    sauvegarder_data(df_c, "contacts.json")
+                    st.session_state.contact_confirm_del = None
+                    st.rerun()
+                if col_n.button("NON", key=f"conf_n_{i}"):
+                    st.session_state.contact_confirm_del = None
+                    st.rerun()
+            else:
+                c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+                if c1.button("✏️", key=f"ec_{i}"): st.session_state.edit_idx = i; st.rerun()
+                if c2.button("🗑️", key=f"dc_{i}"): st.session_state.contact_confirm_del = i; st.rerun()
+                # Boutons de contact rapide après les actions
+                c3.markdown(f'<a href="tel:{tel}" style="text-decoration:none;">📞 Appeler</a>', unsafe_allow_html=True)
+                c4.markdown(f'<a href="https://wa.me/{tel.replace(" ","")}" style="text-decoration:none;">💬 WA</a>', unsafe_allow_html=True)
 
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
@@ -363,6 +371,7 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
+
 
 
 
