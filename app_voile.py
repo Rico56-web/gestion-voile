@@ -80,11 +80,16 @@ if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
 if "m_edit_idx" not in st.session_state: st.session_state.m_edit_idx = None
 if "maint_confirm_del" not in st.session_state: st.session_state.maint_confirm_del = None
 
-m = st.columns(7) # On passe de 6 à 7 colonnes
-menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES", "LOG"] # Ajout de LOG
+# PASSAGE À 7 COLONNES ET AJOUT DE "LOG"
+m = st.columns(7) 
+menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES", "LOG"]
+
 for i, name in enumerate(menu):
     if m[i].button(name, key=f"nav_{name}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
-        st.session_state.page = name; st.session_state.edit_idx = None; st.session_state.m_edit_idx = None; st.rerun()
+        st.session_state.page = name
+        st.session_state.edit_idx = None
+        st.session_state.m_edit_idx = None
+        st.rerun()
         
 # --- CHARGEMENT DES DONNÉES ---
 df_c = charger_data("contacts.json")
