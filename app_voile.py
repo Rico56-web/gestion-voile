@@ -90,21 +90,25 @@ for i, name in enumerate(menu):
 df_c = charger_data("contacts.json")
 df_m = charger_data("maint.json")
 
-# --- TRI CHRONOLOGIQUE SÉCURISÉ ---
+# --- TRI CHRONOLOGIQUE SÉCURISÉ (Version Robuste) ---
 if not df_c.empty and 'DateNav' in df_c.columns:
     try:
-        # Création de la colonne de tri proprement
+        # On s'assure que DateNav est bien du texte et on nettoie les espaces
+        df_c['DateNav'] = df_c['DateNav'].astype(str).str.strip()
+        
+        # Création de la colonne de tri
         df_c['temp_date'] = pd.to_datetime(
-            df_c['DateNav'].astype(str).str.strip(), 
+            df_c['DateNav'], 
             format='%d/%m/%Y', 
             errors='coerce'
         )
-        # Tri uniquement si la colonne a bien été générée
-        if 'temp_date' in df_c.columns:
-            df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
-            df_c = df_c.drop(columns=['temp_date'])
+        
+        # Tri : les dates valides d'abord, les erreurs à la fin
+        df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
+        
+        # On enlève la colonne technique
+        df_c = df_c.drop(columns=['temp_date'])
     except Exception:
-        # En cas de problème, on ignore le tri pour ne pas faire planter l'appli
         pass
 
 # --- 5. PAGE CONTACTS ---
@@ -350,6 +354,7 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
+
 
 
 
