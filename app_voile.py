@@ -80,8 +80,8 @@ if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
 if "m_edit_idx" not in st.session_state: st.session_state.m_edit_idx = None
 if "maint_confirm_del" not in st.session_state: st.session_state.maint_confirm_del = None
 
-m = st.columns(6)
-menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
+m = st.columns(7) # On passe de 6 à 7 colonnes
+menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES", "LOG"] # Ajout de LOG
 for i, name in enumerate(menu):
     if m[i].button(name, key=f"nav_{name}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name; st.session_state.edit_idx = None; st.session_state.m_edit_idx = None; st.rerun()
@@ -372,7 +372,83 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
+# --- 11. PAGE LIVRE DE BORD (LOG) ---
+elif st.session_state.page == "LOG":
+    st.subheader("📖 Livre de Bord")
+    
+    # Chargement des données du journal
+    df_log = charger_data("logbook.json")
 
+    # --- FORMULAIRE DE SAISIE ---
+    with st.expander("➕ NOUVELLE NAVIGATION", expanded=True):
+        c1, c2 = st.columns(2)
+        l_date = c1.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
+        l_meteo = c2.text_input("Météo (Vent/Mer)")
+
+        st.divider()
+        col_dep, col_arr = st.columns(2)
+        
+        with col_dep:
+            st.markdown("### 🛫 Départ")
+            l_port_dep = st.text_input("Port de départ")
+            l_mot_dep = st.number_input("Moteur Départ (h)", value=0.0, step=0.1, key="md")
+            l_mil_dep = st.number_input("Milles Départ (MN)", value=0.0, step=0.1, key="ld")
+            
+        with col_arr:
+            st.markdown("### 🛬 Arrivée")
+            l_port_arr = st.text_input("Port d'arrivée")
+            l_mot_arr = st.number_input("Moteur Arrivée (h)", value=0.0, step=0.1, key="ma")
+            l_mil_arr = st.number_input("Milles Arrivée (MN)", value=0.0, step=0.1, key="la")
+
+        st.divider()
+        
+        # Calculs automatiques
+        diff_mot = round(l_mot_arr - l_mot_dep, 1)
+        diff_mil = round(l_mil_arr - l_mil_dep, 1)
+        
+        st.markdown(f"**📊 Résumé :** {diff_mot} h moteur | {diff_mil} MN parcourus")
+        l_obs = st.text_area("Observations (équipage, escales...)")
+        
+        if st.button("💾 ENREGISTRER LA NAVIGATION", type="primary", use_container_width=True):
+            nouvelle_entree = {
+                "Date": l_date, "Meteo": l_meteo,
+                "PortDep": l_port_dep, "PortArr": l_port_arr,
+                "MotDep": l_mot_dep, "MotArr": l_mot_arr,
+                "MilDep": l_mil_dep, "MilArr": l_mil_arr,
+                "TotalMot": diff_mot, "TotalMil": diff_mil,
+                "Observations": l_obs
+            }
+            # Conversion en DataFrame pour sauvegarde
+            new_df = pd.DataFrame([nouvelle_entree])
+            df_log = pd.concat([new_df, df_log], ignore_index=True) if not df_log.empty else new_df
+            sauvegarder_data(df_log, "logbook.json")
+            st.success("Navigation enregistrée !"); time.sleep(1); st.rerun()
+
+    # --- AFFICHAGE DE L'HISTORIQUE ---
+    if not df_log.empty:
+        for i, e in df_log.iterrows():
+            st.markdown(f"""
+            <div style="background:#ffffff; padding:15px; border-radius:10px; border:1px solid #ddd; border-left:5px solid #1a2a6c; margin-bottom:15px;">
+                <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding-bottom:5px;">
+                    <span style="font-weight:bold; font-size:1.1rem; color:#1a2a6c;">📅 {safe_get(e, 'Date')}</span>
+                    <span style="color:#2ecc71; font-weight:bold;">📍 {safe_get(e, 'PortDep')} ➔ {safe_get(e, 'PortArr')}</span>
+                </div>
+                <div style="margin-top:10px; font-size:0.9rem; color:#555;">
+                    ☁️ <b>Météo :</b> {safe_get(e, 'Meteo')}<br>
+                    ⚙️ <b>Moteur :</b> {safe_get(e, 'MotDep')}h à {safe_get(e, 'MotArr')}h (<b>+{safe_get(e, 'TotalMot')}h</b>)<br>
+                    ⛵ <b>Distance :</b> {safe_get(e, 'MilDep')} à {safe_get(e, 'MilArr')} MN (<b>+{safe_get(e, 'TotalMil')} MN</b>)
+                </div>
+                <div style="margin-top:8px; font-style:italic; color:#333; background:#f9f9f9; padding:8px; border-radius:4px;">
+                    "{safe_get(e, 'Observations')}"
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button(f"🗑️ Supprimer trajet {i}", key=f"del_log_{i}"):
+                df_log = df_log.drop(i)
+                sauvegarder_data(df_log, "logbook.json")
+                st.rerun()
+    else:
+        st.info("Aucune navigation enregistrée pour le moment.")
 
 
 
