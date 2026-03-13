@@ -86,24 +86,26 @@ for i, name in enumerate(menu):
     if m[i].button(name, key=f"nav_{name}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name; st.session_state.edit_idx = None; st.session_state.m_edit_idx = None; st.rerun()
         
-        # --- CHARGEMENT DES DONNÉES ---
+# --- CHARGEMENT DES DONNÉES ---
 df_c = charger_data("contacts.json")
-df_m = charger_data("maint.json")  # GARDE BIEN CETTE LIGNE
+df_m = charger_data("maint.json")
 
-# --- TRI CHRONOLOGIQUE DES CONTACTS ---
-if not df_c.empty:
-    df_c['temp_date'] = pd.to_datetime(
-        df_c['DateNav'].str.strip(), 
-        format='%d/%m/%Y', 
-        errors='coerce'
-    )
-    df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
-    df_c = df_c.drop(columns=['temp_date'])
-
-    
-    
-    # 2. Tri par date (les dates vides 'NaT' iront à la fin)
-    df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
+# --- TRI CHRONOLOGIQUE SÉCURISÉ ---
+if not df_c.empty and 'DateNav' in df_c.columns:
+    try:
+        # Création de la colonne de tri proprement
+        df_c['temp_date'] = pd.to_datetime(
+            df_c['DateNav'].astype(str).str.strip(), 
+            format='%d/%m/%Y', 
+            errors='coerce'
+        )
+        # Tri uniquement si la colonne a bien été générée
+        if 'temp_date' in df_c.columns:
+            df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
+            df_c = df_c.drop(columns=['temp_date'])
+    except Exception:
+        # En cas de problème, on ignore le tri pour ne pas faire planter l'appli
+        pass
     
     # 3. Suppression de la colonne technique
     df_c = df_c.drop(columns=['temp_date'])
@@ -351,6 +353,7 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
+
 
 
 
