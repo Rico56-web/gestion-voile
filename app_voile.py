@@ -111,9 +111,8 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     except Exception:
         pass
         
-# --- 5. PAGE CONTACTS ---
+        # --- 5. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
-    # Initialisation de la variable de confirmation si elle n'existe pas
     if "contact_confirm_del" not in st.session_state:
         st.session_state.contact_confirm_del = None
 
@@ -129,6 +128,7 @@ if st.session_state.page == "CONTACTS":
         st.session_state.view_archive = True; st.rerun()
 
     if st.session_state.edit_idx is not None:
+        # ... (Le bloc de modification reste strictement identique à l'original)
         idx = st.session_state.edit_idx
         r = df_c.loc[idx]
         st.subheader("📝 Modifier Mission")
@@ -164,6 +164,7 @@ if st.session_state.page == "CONTACTS":
             c_p = "#FF0000" if "PAS PAYÉ" in pay_val.upper() or "NON PAYÉ" in pay_val.upper() else "#2ecc71"
             cl_b = "border-cmn" if "CMN" in soc.upper() else ""
             
+            # Ici on intègre les liens d'appel directement dans le HTML de la fiche
             h = f'''<div class="fiche-globale {cl_b}">
                 <span class="statut-badge" style="background:{c_p};">{pay_val}</span>
                 <span class="statut-badge" style="background:{c_s};">{s_val}</span>
@@ -172,28 +173,28 @@ if st.session_state.page == "CONTACTS":
                 📅 <b>{safe_get(r, "DateNav")}</b> ({jours} jrs) | 💰 <b>{p_val} €</b><br>
                 📞 {tel} | ✉️ {mail}
                 <div class="notes-box">📝 {safe_get(r, "Notes") or "."}</div>
+                <div class="container-boutons">
+                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
+                    <a href="https://wa.me/{tel.replace(" ","")}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
+                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
+                </div>
             </div>'''
             st.markdown(h, unsafe_allow_html=True)
             
-            # --- LOGIQUE DE CONFIRMATION DE SUPPRESSION ---
+            # Les boutons de gestion (Editer / Supprimer) restent en dessous pour la clarté
             if st.session_state.contact_confirm_del == i:
-                st.warning(f"Supprimer la mission de {safe_get(r, 'Prénom')} ?")
-                col_y, col_n = st.columns(2)
-                if col_y.button("✅ OUI", key=f"conf_y_{i}"):
-                    df_c = df_c.drop(i)
-                    sauvegarder_data(df_c, "contacts.json")
-                    st.session_state.contact_confirm_del = None
-                    st.rerun()
-                if col_n.button("NON", key=f"conf_n_{i}"):
-                    st.session_state.contact_confirm_del = None
-                    st.rerun()
+                st.warning("⚠️ Supprimer cette fiche ?")
+                cy, cn = st.columns(2)
+                if cy.button("✅ OUI", key=f"y_{i}"):
+                    df_c = df_c.drop(i); sauvegarder_data(df_c, "contacts.json")
+                    st.session_state.contact_confirm_del = None; st.rerun()
+                if cn.button("NON", key=f"n_{i}"):
+                    st.session_state.contact_confirm_del = None; st.rerun()
             else:
-                c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
-                if c1.button("✏️", key=f"ec_{i}"): st.session_state.edit_idx = i; st.rerun()
-                if c2.button("🗑️", key=f"dc_{i}"): st.session_state.contact_confirm_del = i; st.rerun()
-                # Boutons de contact rapide après les actions
-                c3.markdown(f'<a href="tel:{tel}" style="text-decoration:none;">📞 Appeler</a>', unsafe_allow_html=True)
-                c4.markdown(f'<a href="https://wa.me/{tel.replace(" ","")}" style="text-decoration:none;">💬 WA</a>', unsafe_allow_html=True)
+                c1, c2 = st.columns([1, 4])
+                if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
+                if c2.button("🗑️ SUPPRIMER LA FICHE", key=f"del_{i}", use_container_width=True):
+                    st.session_state.contact_confirm_del = i; st.rerun()
 
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
@@ -371,6 +372,7 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
+
 
 
 
