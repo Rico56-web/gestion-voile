@@ -195,7 +195,6 @@ if st.session_state.page == "CONTACTS":
                 if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
                 if c2.button("🗑️ SUPPRIMER LA FICHE", key=f"del_{i}", use_container_width=True):
                     st.session_state.contact_confirm_del = i; st.rerun()
-
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("📅 Planning 2026")
@@ -216,9 +215,10 @@ elif st.session_state.page == "PLANNING":
     jours_calendrier = cal.monthdatescalendar(2026, sel_mois)
     
     # Entête des jours
-    cols = st.columns(7)
-    for i, j en enumerate(["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]):
-        cols[i].write(f"**{j}**")
+    cols_h = st.columns(7)
+    jours_semaine = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
+    for i, j in enumerate(jours_semaine):
+        cols_h[i].write(f"**{j}**")
 
     # Calendrier épuré
     for semaine in jours_calendrier:
@@ -244,7 +244,7 @@ elif st.session_state.page == "PLANNING":
                         bg = "#e3f2fd"
                         bord = "1px solid #3498db"
                 
-                # Un seul bloc HTML très simple par jour
+                # Info à afficher
                 info = missions_dict[d_str][:8] if d_str in missions_dict else ""
                 
                 cols[i].markdown(f'''
@@ -387,6 +387,7 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
+
 
 
 
