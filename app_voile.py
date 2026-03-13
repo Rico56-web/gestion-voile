@@ -381,19 +381,29 @@ elif st.session_state.page == "NOTES":
 elif st.session_state.page == "LOG":
     st.subheader("📖 Livre de Bord")
     
-    # Initialisation des états pour LOG
+    # Initialisation des états
     if "log_edit_idx" not in st.session_state: st.session_state.log_edit_idx = None
     if "log_confirm_del" not in st.session_state: st.session_state.log_confirm_del = None
 
     df_log = charger_data("logbook.json")
 
+    # --- STATISTIQUES SAISON ---
+    if not df_log.empty:
+        total_milles = sum(float(x) for x in df_log['TotalMil'] if x)
+        total_moteur = sum(float(x) for x in df_log['TotalMot'] if x)
+        st.markdown(f"""
+            <div style="background:#2c3e50; color:white; padding:10px; border-radius:10px; text-align:center; margin-bottom:20px;">
+                🚢 <b>Saison 2026 :</b> {total_milles:.1f} MN parcourus | ⚙️ {total_moteur:.1f} h moteur
+            </div>
+        """, unsafe_allow_html=True)
+
     # --- MODE ÉDITION OU NOUVELLE ENTRÉE ---
     if st.session_state.log_edit_idx is not None:
         idx = st.session_state.log_edit_idx
         r = df_log.loc[idx]
-        st.info(f"📝 Modification du trajet du {safe_get(r, 'Date')}")
+        st.warning(f"📝 MODIFICATION du trajet du {safe_get(r, 'Date')}")
     else:
-        r = {} # Pour le mode "Nouvelle entrée"
+        r = {}
 
     with st.expander("➕ SAISIE NAVIGATION", expanded=(st.session_state.log_edit_idx is None)):
         c1, c2 = st.columns(2)
@@ -406,14 +416,14 @@ elif st.session_state.page == "LOG":
         with col_dep:
             st.markdown("### 🛫 Départ")
             l_port_dep = st.text_input("Port de départ", value=safe_get(r, 'PortDep'))
-            l_mot_dep = st.number_input("Moteur Départ (h)", value=float(e.get('MotDep', 0) if (e := r) else 0.0), step=0.1, key="md")
-            l_mil_dep = st.number_input("Milles Départ (MN)", value=float(e.get('MilDep', 0) if (e := r) else 0.0), step=0.1, key="ld")
+            l_mot_dep = st.number_input("Moteur Départ (h)", value=float(r.get('MotDep', 0.0)) if r else 0.0, step=0.1, key="md")
+            l_mil_dep = st.number_input("Milles Départ (MN)", value=float(r.get('MilDep', 0.0)) if r else 0.0, step=0.1, key="ld")
             
         with col_arr:
             st.markdown("### 🛬 Arrivée")
             l_port_arr = st.text_input("Port d'arrivée", value=safe_get(r, 'PortArr'))
-            l_mot_arr = st.number_input("Moteur Arrivée (h)", value=float(e.get('MotArr', 0) if (e := r) else 0.0), step=0.1, key="ma")
-            l_mil_arr = st.number_input("Milles Arrivée (MN)", value=float(e.get('MilArr', 0) if (e := r) else 0.0), step=0.1, key="la")
+            l_mot_arr = st.number_input("Moteur Arrivée (h)", value=float(r.get('MotArr', 0.0)) if r else 0.0, step=0.1, key="ma")
+            l_mil_arr = st.number_input("Milles Arrivée (MN)", value=float(r.get('MilArr', 0.0)) if r else 0.0, step=0.1, key="la")
 
         st.divider()
         diff_mot = round(l_mot_arr - l_mot_dep, 1)
@@ -422,25 +432,24 @@ elif st.session_state.page == "LOG":
         st.markdown(f"**📊 Résumé :** {diff_mot} h moteur | {diff_mil} MN parcourus")
         l_obs = st.text_area("Observations", value=safe_get(r, 'Observations'))
         
-        col_btn1, col_btn2 = st.columns(2)
-        if col_btn1.button("💾 ENREGISTRER", type="primary", use_container_width=True):
-            nouvelle_entree = {
+        c_btn1, c_btn2 = st.columns(2)
+        if c_btn1.button("💾 ENREGISTRER", type="primary", use_container_width=True):
+            entree = {
                 "Date": l_date, "Meteo": l_meteo, "PortDep": l_port_dep, "PortArr": l_port_arr,
                 "MotDep": l_mot_dep, "MotArr": l_mot_arr, "MilDep": l_mil_dep, "MilArr": l_mil_arr,
                 "TotalMot": diff_mot, "TotalMil": diff_mil, "Observations": l_obs
             }
             if st.session_state.log_edit_idx is not None:
-                for k, v in nouvelle_entree.items(): df_log.at[idx, k] = v
+                for k, v in entree.items(): df_log.at[idx, k] = v
             else:
-                new_df = pd.DataFrame([nouvelle_entree])
-                df_log = pd.concat([new_df, df_log], ignore_index=True) if not df_log.empty else new_df
+                df_log = pd.concat([pd.DataFrame([entree]), df_log], ignore_index=True)
             
             sauvegarder_data(df_log, "logbook.json")
             st.session_state.log_edit_idx = None
-            st.success("C'est enregistré !"); time.sleep(1); st.rerun()
+            st.success("Enregistré !"); time.sleep(1); st.rerun()
             
         if st.session_state.log_edit_idx is not None:
-            if col_btn2.button("Annuler", use_container_width=True):
+            if c_btn2.button("ANNULER", use_container_width=True):
                 st.session_state.log_edit_idx = None; st.rerun()
 
     # --- AFFICHAGE DE L'HISTORIQUE ---
@@ -453,28 +462,27 @@ elif st.session_state.page == "LOG":
                     <span style="color:#2ecc71; font-weight:bold;">📍 {safe_get(e, 'PortDep')} ➔ {safe_get(e, 'PortArr')}</span>
                 </div>
                 <div style="margin-top:10px; font-size:0.9rem; color:#555;">
-                    ☁️ <b>Météo :</b> {safe_get(e, 'Meteo')} | ⚙️ <b>+{safe_get(e, 'TotalMot')}h</b> | ⛵ <b>+{safe_get(e, 'TotalMil')} MN</b>
+                    ☁️ {safe_get(e, 'Meteo')} | ⚙️ <b>+{safe_get(e, 'TotalMot')}h</b> | ⛵ <b>+{safe_get(e, 'TotalMil')} MN</b>
                 </div>
+                <div style="margin-top:5px; font-size:0.85rem; color:#777; font-style:italic;">"{safe_get(e, 'Observations')}"</div>
             </div>
             """, unsafe_allow_html=True)
             
-            # Sécurité Suppression
             if st.session_state.log_confirm_del == i:
-                st.warning("Supprimer définitivement ce trajet ?")
+                st.warning("Supprimer ?")
                 cy, cn = st.columns(2)
-                if cy.button("✅ OUI", key=f"y_log_{i}"):
+                if cy.button("OUI", key=f"y_l_{i}"):
                     df_log = df_log.drop(i); sauvegarder_data(df_log, "logbook.json")
                     st.session_state.log_confirm_del = None; st.rerun()
-                if cn.button("NON", key=f"n_log_{i}"):
+                if cn.button("NON", key=f"n_l_{i}"):
                     st.session_state.log_confirm_del = None; st.rerun()
             else:
-                c1, c2 = st.columns([1, 4])
-                if c1.button("✏️", key=f"ed_log_{i}"):
+                c1, c2 = st.columns(2)
+                # ICI LE BOUTON MODIFIER EN TEXTE CLAIR
+                if c1.button("📝 MODIFIER", key=f"ed_l_{i}", use_container_width=True):
                     st.session_state.log_edit_idx = i; st.rerun()
-                if c2.button("🗑️ SUPPRIMER CE TRAJET", key=f"del_log_{i}", use_container_width=True):
+                if c2.button("🗑️ SUPPRIMER", key=f"del_l_{i}", use_container_width=True):
                     st.session_state.log_confirm_del = i; st.rerun()
-    else:
-        st.info("Livre de bord vide.")
 
 
 
