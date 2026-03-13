@@ -377,9 +377,9 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
-# --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
     st.subheader("📖 Livre de Bord")
+    df_log = charger_data("logbook.json")
     
     # Chargement des données du journal
     df_log = charger_data("logbook.json")
