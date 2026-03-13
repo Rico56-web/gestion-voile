@@ -195,6 +195,7 @@ if st.session_state.page == "CONTACTS":
                 if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
                 if c2.button("🗑️ SUPPRIMER LA FICHE", key=f"del_{i}", use_container_width=True):
                     st.session_state.contact_confirm_del = i; st.rerun()
+
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("📅 Planning de la Saison 2026")
@@ -202,25 +203,29 @@ elif st.session_state.page == "PLANNING":
     aujourdhui = datetime.now()
     aujourdhui_str = aujourdhui.strftime("%d/%m/%Y")
     
+    # Navigation
     mois_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Nov.", "Déc."]
     c1, _ = st.columns([2, 1])
     sel_mois = c1.selectbox("Choisir un mois", range(1, 13), index=aujourdhui.month - 1, format_func=lambda x: mois_noms[x-1])
     
+    # Dictionnaire des missions
     missions_dict = {}
     if not df_c.empty:
         for _, row in df_c.iterrows():
             d_str = str(safe_get(row, 'DateNav')).strip()
             if d_str:
-                missions_dict[d_str] = {"soc": safe_get(row, 'Société'), "nom": f"{safe_get(row, 'Prénom')} {safe_get(row, 'Nom')}"}
+                missions_dict[d_str] = {"soc": safe_get(row, 'Société')}
 
     import calendar
     cal = calendar.Calendar(firstweekday=0)
     jours_calendrier = cal.monthdatescalendar(2026, sel_mois)
     
+    # Entête Jours
     cols = st.columns(7)
     for i, jour in enumerate(["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]):
         cols[i].write(f"**{jour}**")
 
+    # Affichage du calendrier
     for semaine in jours_calendrier:
         cols = st.columns(7)
         for i, d in enumerate(semaine):
@@ -228,35 +233,45 @@ elif st.session_state.page == "PLANNING":
                 d_str = d.strftime("%d/%m/%Y")
                 is_today = (d_str == aujourdhui_str)
                 
-                # Style par défaut (Sobre)
+                # Réglages par défaut
                 bg_color = "#ffffff"
-                border_style = "1px solid #eee"
-                text_style = "color: #333;"
-                
-                # Marquage discret pour Aujourd'hui (Cercle orange autour du chiffre)
+                border_color = "#eeeeee"
+                border_width = "1px"
+                num_color = "#333"
+
+                # 1. Priorité Aujourd'hui (Bordure Orange vive)
                 if is_today:
-                    text_style = "color: #e67e22; font-weight: bold; border: 2px solid #e67e22; border-radius: 50%; padding: 2px 6px;"
+                    border_color = "#e67e22"
+                    border_width = "3px"
+                    num_color = "#e67e22"
 
-                # Couleur Bleue uniquement pour CMN
+                # 2. Priorité CMN (Fond Bleu)
                 if d_str in missions_dict:
-                    m = missions_dict[d_str]
-                    if "CMN" in m['soc'].upper():
+                    soc_name = missions_dict[d_str]['soc'].upper()
+                    if "CMN" in soc_name:
                         bg_color = "#e3f2fd"
-                        border_style = "2px solid #3498db"
-                    else:
-                        border_style = "1px solid #2ecc71" # Simple bordure verte pour les autres
-
+                        border_color = "#3498db"
+                        border_width = "2px"
+                
+                # Rendu final avec une seule div par case
                 cols[i].markdown(f'''
-                    <div style="background-color: {bg_color}; border: {border_style}; padding: 10px 2px; border-radius: 5px; text-align: center; min-height: 65px;">
-                        <span style="{text_style}">{d.day}</span>
-                        <div style="font-size:9px; margin-top:5px; color:#555;">
+                    <div style="
+                        background-color: {bg_color}; 
+                        border: {border_width} solid {border_color}; 
+                        padding: 10px 0px; 
+                        border-radius: 5px; 
+                        text-align: center; 
+                        min-height: 60px;
+                        line-height: 1.2;
+                    ">
+                        <b style="color: {num_color}; font-size: 1.1em;">{d.day}</b><br>
+                        <span style="font-size: 9px; color: #555;">
                             {missions_dict[d_str]['soc'][:10] if d_str in missions_dict else ""}
-                        </div>
+                        </span>
                     </div>
                 ''', unsafe_allow_html=True)
             else:
                 cols[i].write("")
-
 
 # --- 7. PAGE STATS ---
 elif st.session_state.page == "STATS":
@@ -389,6 +404,7 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
+
 
 
 
