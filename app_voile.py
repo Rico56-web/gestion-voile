@@ -106,9 +106,6 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     except Exception:
         # En cas de problème, on ignore le tri pour ne pas faire planter l'appli
         pass
-    
-    # 3. Suppression de la colonne technique
-    df_c = df_c.drop(columns=['temp_date'])
 
 # --- 5. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
@@ -353,6 +350,7 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
+
 
 
 
