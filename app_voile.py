@@ -199,62 +199,60 @@ if st.session_state.page == "CONTACTS":
 elif st.session_state.page == "PLANNING":
     st.subheader("📅 Planning 2026")
     
+    # Navigation par mois
     aujourdhui = datetime.now()
-    aujourdhui_str = aujourdhui.strftime("%d/%m/%Y")
-    
-    # Sélecteur de mois
     mois_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Nov.", "Déc."]
     c1, _ = st.columns([2, 1])
     sel_mois = c1.selectbox("Mois", range(1, 13), index=aujourdhui.month - 1, format_func=lambda x: mois_noms[x-1])
     
-    # Dictionnaire simplifié
-    missions_dict = {str(safe_get(r, 'DateNav')).strip(): safe_get(r, 'Société') for _, r in df_c.iterrows() if str(safe_get(r, 'DateNav')).strip()}
+    # Dictionnaire des missions
+    missions_dict = {}
+    if not df_c.empty:
+        for _, row in df_c.iterrows():
+            d_str = str(safe_get(row, 'DateNav')).strip()
+            if d_str:
+                missions_dict[d_str] = {"soc": safe_get(row, 'Société'), "nom": f"{safe_get(row, 'Prénom')} {safe_get(row, 'Nom')}"}
 
     import calendar
     cal = calendar.Calendar(firstweekday=0)
     jours_calendrier = cal.monthdatescalendar(2026, sel_mois)
     
-    # Entête des jours
+    # Entête des jours de la semaine
     cols_h = st.columns(7)
-    jours_semaine = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
-    for i, j in enumerate(jours_semaine):
+    for i, j in enumerate(["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]):
         cols_h[i].write(f"**{j}**")
 
-    # Calendrier épuré
+    # Affichage des semaines
     for semaine in jours_calendrier:
         cols = st.columns(7)
         for i, d in enumerate(semaine):
             if d.month == sel_mois:
                 d_str = d.strftime("%d/%m/%Y")
                 
-                # Réglages par défaut
-                bg = "#ffffff"
-                bord = "1px solid #eee"
-                txt = "#333"
-
-                # Aujourd'hui (Bordure Orange)
-                if d_str == aujourdhui_str:
-                    bord = "2px solid #e67e22"
-                    txt = "#e67e22"
-
-                # Mission CMN (Fond Bleu)
+                # Style par défaut (Sobre)
+                bg_color = "#ffffff"
+                border_style = "1px solid #eee"
+                
+                # Couleur Bleue uniquement pour la CMN
+                info_text = ""
                 if d_str in missions_dict:
-                    soc = missions_dict[d_str].upper()
-                    if "CMN" in soc:
-                        bg = "#e3f2fd"
-                        bord = "1px solid #3498db"
-                
-                # Info à afficher
-                info = missions_dict[d_str][:8] if d_str in missions_dict else ""
-                
+                    m = missions_dict[d_str]
+                    info_text = m['soc'][:10] if m['soc'] else m['nom'][:10]
+                    if "CMN" in m['soc'].upper():
+                        bg_color = "#e3f2fd"
+                        border_style = "2px solid #3498db"
+                    else:
+                        border_style = "1px solid #2ecc71" # Bordure verte discrète pour les autres
+
                 cols[i].markdown(f'''
-                    <div style="background:{bg}; border:{bord}; color:{txt}; padding:5px; border-radius:4px; text-align:center; min-height:55px; font-family:sans-serif;">
-                        <div style="font-weight:bold; font-size:14px;">{d.day}</div>
-                        <div style="font-size:9px; color:#555; margin-top:2px;">{info}</div>
+                    <div style="background-color: {bg_color}; border: {border_style}; padding: 10px 2px; border-radius: 5px; text-align: center; min-height: 65px;">
+                        <div style="font-weight: bold; color: #333;">{d.day}</div>
+                        <div style="font-size: 9px; color: #555; margin-top: 5px;">{info_text}</div>
                     </div>
                 ''', unsafe_allow_html=True)
             else:
                 cols[i].write("")
+
 
 # --- 7. PAGE STATS ---
 elif st.session_state.page == "STATS":
@@ -387,6 +385,7 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
+
 
 
 
