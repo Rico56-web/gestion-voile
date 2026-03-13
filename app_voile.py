@@ -198,48 +198,91 @@ if st.session_state.page == "CONTACTS":
 
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Planning Mensuel 2026")
-    m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-    sel_m_nom = st.selectbox("Mois", m_noms, index=now.month - 1)
-    sel_m = m_noms.index(sel_m_nom) + 1
+    st.subheader("📅 Planning de la Saison 2026")
     
-    jours_occ = {}
-    for _, r in df_c.iterrows():
-        try:
-            date_str = safe_get(r, 'DateNav').replace(" ", "")
-            dp = date_str.split('/')
-            m_val, y_val = int(dp[1]), int(dp[2])
-            if y_val == 26: y_val = 2026
-            if m_val == sel_m and y_val == 2026:
-                for j in range(int(dp[0]), int(dp[0]) + int(safe_get(r, 'NbreJours'))):
-                    jours_occ[j] = safe_get(r, 'Statut')
-        except: continue
+    # 1. Préparation des dates
+    aujourdhui = datetime.now()
+    aujourdhui_str = aujourdhui.strftime("%d/%m/%Y")
+    
+    # Sélecteur de mois pour naviguer dans la saison
+    mois_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Nov.", "Déc."]
+    c1, c2 = st.columns([2, 1])
+    sel_mois = c1.selectbox("Choisir un mois", range(1, 13), index=aujourdhui.month - 1, format_func=lambda x: mois_noms[x-1])
+    
+    # 2. Création du dictionnaire des missions pour un accès rapide
+    missions_dict = {}
+    if not df_c.empty:
+        for _, row in df_c.iterrows():
+            d_str = str(safe_get(row, 'DateNav')).strip()
+            if d_str:
+                missions_dict[d_str] = {
+                    "soc": safe_get(row, 'Société'),
+                    "nom": f"{safe_get(row, 'Prénom')} {safe_get(row, 'Nom')}",
+                    "statut": safe_get(row, 'Statut')
+                }
 
-    cal_mat = calendar.monthcalendar(2026, sel_m)
-    h_cal = '<table class="calendar-table"><thead><tr><th>Lun</th><th>Mar</th><th>Mer</th><th>Jeu</th><th>Ven</th><th>Sam</th><th>Dim</th></tr></thead><tbody>'
-    for sem in cal_mat:
-        h_cal += '<tr>'
-        for jour in sem:
-            cl = ""
-            if jour != 0 and jour in jours_occ:
-                cl = "day-ok" if jours_occ[jour] == "OK" else "day-attente"
-            h_cal += f'<td class="{cl}">{jour if jour != 0 else ""}</td>'
-        h_cal += '</tr>'
-    st.markdown(h_cal + '</tbody></table>', unsafe_allow_html=True)
+    # 3. Génération du calendrier
+    import calendar
+    cal = calendar.Calendar(firstweekday=0)
+    jours_calendrier = cal.monthdatescalendar(2026, sel_mois)
     
-    st.markdown("---")
-    st.subheader("📋 Liste détaillée du mois")
-    found = False
-    for _, r in df_c.iterrows():
-        try:
-            m = int(safe_get(r, 'DateNav').split('/')[1])
-            if m == sel_m:
-                found = True
-                s = safe_get(r, 'Statut')
-                c = "green" if s == "OK" else "orange"
-                st.markdown(f"📅 **{safe_get(r, 'DateNav')}** ({safe_get(r, 'NbreJours')}j) : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} - <span style='color:{c}; font-weight:bold;'>{s}</span>", unsafe_allow_html=True)
-        except: continue
-    if not found: st.info("Aucune mission ce mois-ci.")
+    jours_semaine = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
+    cols = st.columns(7)
+    for i, jour in enumerate(jours_semaine):
+        cols[i].write(f"**{jour}**")
+
+    for semaine in jours_calendrier:
+        cols = st.columns(7)
+        for i, d in enumerate(semaine):
+            if d.month == sel_mois:
+                d_str = d.strftime("%d/%m/%Y")
+                
+                # --- LOGIQUE DE STYLE ---
+                is_today = (d_str == aujourdhui_str)
+                bg_color = "#ffffff"
+                border_style = "1px solid #eee"
+                text_color = "#333"
+                badge_html = ""
+
+                # Priorité 1 : C'est aujourd'hui (Jaune)
+                if is_today:
+                    bg_color = "#fff9c4"
+                    border_style = "2px solid #f1c40f"
+                    text_color = "#d35400"
+
+                # Priorité 2 : Il y a une mission
+                if d_str in missions_dict:
+                    m = missions_dict[d_str]
+                    # Si c'est CMN (Bleu)
+                    if "CMN" in m['soc'].upper():
+                        bg_color = "#e3f2fd"
+                        border_style = "2px solid #3498db"
+                    # Sinon mission classique (Vert)
+                    else:
+                        bg_color = "#e8f5e9"
+                        border_style = "2px solid #2ecc71"
+                    
+                    badge_html = f'<div style="font-size:10px; margin-top:5px; font-weight:bold; overflow:hidden; white-space:nowrap;">{m["soc"][:8] if m["soc"] else m["nom"][:8]}</div>'
+
+                # Affichage de la case
+                cols[i].markdown(f'''
+                    <div style="
+                        background-color: {bg_color};
+                        border: {border_style};
+                        padding: 8px 2px;
+                        border-radius: 8px;
+                        text-align: center;
+                        min-height: 70px;
+                        box-shadow: {"2px 2px 5px rgba(0,0,0,0.1)" if d_str in missions_dict else "none"};
+                    ">
+                        <span style="color: {text_color}; font-weight: {"bold" if is_today else "normal"};">{d.day}</span>
+                        {badge_html}
+                    </div>
+                ''', unsafe_allow_html=True)
+            else:
+                cols[i].write("") # Case vide pour les jours hors mois
+
+
 
 # --- 7. PAGE STATS ---
 elif st.session_state.page == "STATS":
@@ -372,6 +415,7 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
+
 
 
 
