@@ -155,7 +155,14 @@ if st.session_state.page == "CONTACTS":
             tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
             p_val, s_val, jours = f"{float(safe_get(r, 'Prix') or 0):.2f}", safe_get(r, 'Statut'), safe_get(r, 'NbreJours') or "1"
             c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
-            c_p = "#2ecc71" if "PAYÉ" in safe_get(r, 'Paiement').upper() else "#e74c3c"
+            # --- LOGIQUE DE COULEUR DU PAIEMENT ---
+paiement_statut = safe_get(r, 'Paiement').upper()
+if "PAS PAYÉ" in paiement_statut or "NON PAYÉ" in paiement_statut:
+    c_p = "#FF0000"  # Rouge vif pour attirer l'œil
+elif "PAYÉ" in paiement_statut:
+    c_p = "#2ecc71"  # Vert si c'est réglé
+else:
+    c_p = "#7f8c8d"  # Gris par défaut
             cl_b = "border-cmn" if "CMN" in soc.upper() else ""
             
             h = f'''<div class="fiche-globale {cl_b}">
@@ -354,6 +361,7 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
+
 
 
 
