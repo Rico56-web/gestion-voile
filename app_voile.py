@@ -85,12 +85,28 @@ menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES"]
 for i, name in enumerate(menu):
     if m[i].button(name, key=f"nav_{name}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name; st.session_state.edit_idx = None; st.session_state.m_edit_idx = None; st.rerun()
-
+        
+        # --- CHARGEMENT DES DONNÉES ---
 df_c = charger_data("contacts.json")
-df_m = charger_data("maint.json")
+df_m = charger_data("maint.json")  # GARDE BIEN CETTE LIGNE
+
+# --- TRI CHRONOLOGIQUE DES CONTACTS ---
 if not df_c.empty:
-    df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
-    df_c = df_c.sort_values(by='temp_date', ascending=True).drop(columns=['temp_date'])
+    df_c['temp_date'] = pd.to_datetime(
+        df_c['DateNav'].str.strip(), 
+        format='%d/%m/%Y', 
+        errors='coerce'
+    )
+    df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
+    df_c = df_c.drop(columns=['temp_date'])
+
+    
+    
+    # 2. Tri par date (les dates vides 'NaT' iront à la fin)
+    df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
+    
+    # 3. Suppression de la colonne technique
+    df_c = df_c.drop(columns=['temp_date'])
 
 # --- 5. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
@@ -335,6 +351,7 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
+
 
 
 
