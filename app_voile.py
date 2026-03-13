@@ -110,7 +110,6 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except Exception:
         pass
-
 # --- 5. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
     if st.button("➕ NOUVEAU CONTACT", type="secondary", use_container_width=True):
@@ -153,20 +152,22 @@ if st.session_state.page == "CONTACTS":
         df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.view_archive else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
         for i, r in df_disp.iterrows():
             tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
-            p_val, s_val, jours = f"{float(safe_get(r, 'Prix') or 0):.2f}", safe_get(r, 'Statut'), safe_get(r, 'NbreJours') or "1"
+            p_val, s_val, pay_val = f"{float(safe_get(r, 'Prix') or 0):.2f}", safe_get(r, 'Statut'), safe_get(r, 'Paiement')
+            jours = safe_get(r, 'NbreJours') or "1"
+            
+            # Couleur du statut (OK, Terminé, etc.)
             c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
-            # --- LOGIQUE DE COULEUR DU PAIEMENT ---
-paiement_statut = safe_get(r, 'Paiement').upper()
-if "PAS PAYÉ" in paiement_statut or "NON PAYÉ" in paiement_statut:
-    c_p = "#FF0000"  # Rouge vif pour attirer l'œil
-elif "PAYÉ" in paiement_statut:
-    c_p = "#2ecc71"  # Vert si c'est réglé
-else:
-    c_p = "#7f8c8d"  # Gris par défaut
+            
+            # --- MODIFICATION : COULEUR ROUGE VIF POUR NON PAYÉ ---
+            if "PAS PAYÉ" in pay_val.upper() or "NON PAYÉ" in pay_val.upper():
+                c_p = "#FF0000"  # Rouge vif
+            else:
+                c_p = "#2ecc71"  # Vert pour Payé
+            
             cl_b = "border-cmn" if "CMN" in soc.upper() else ""
             
             h = f'''<div class="fiche-globale {cl_b}">
-                <span class="statut-badge" style="background:{c_p};">{safe_get(r, "Paiement")}</span>
+                <span class="statut-badge" style="background:{c_p};">{pay_val}</span>
                 <span class="statut-badge" style="background:{c_s};">{s_val}</span>
                 <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
                 <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
@@ -184,6 +185,7 @@ else:
             if c1.button("✏️", key=f"ec_{i}"): st.session_state.edit_idx = i; st.rerun()
             if c2.button("🗑️ SUPPRIMER", key=f"dc_{i}", use_container_width=True):
                 df_c = df_c.drop(i); sauvegarder_data(df_c, "contacts.json"); st.rerun()
+
 
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
@@ -361,6 +363,7 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
+
 
 
 
