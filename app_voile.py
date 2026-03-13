@@ -88,6 +88,9 @@ for i, name in enumerate(menu):
 
 df_c = charger_data("contacts.json")
 df_m = charger_data("maint.json")
+if not df_c.empty:
+    df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
+    df_c = df_c.sort_values(by='temp_date', ascending=True).drop(columns=['temp_date'])
 
 # --- 5. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
@@ -332,6 +335,7 @@ elif st.session_state.page == "NOTES":
         time.sleep(1)
         st.rerun()
         
+
 
 
 
