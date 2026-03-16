@@ -381,6 +381,7 @@ elif st.session_state.page == "NOTES":
 elif st.session_state.page == "LOG":
     st.subheader("📖 Livre de Bord")
     
+    # Initialisation des états spécifiques au Log
     if "log_edit_idx" not in st.session_state: st.session_state.log_edit_idx = None
     if "log_confirm_del" not in st.session_state: st.session_state.log_confirm_del = None
 
@@ -391,29 +392,28 @@ elif st.session_state.page == "LOG":
         total_milles = sum(pd.to_numeric(df_log['TotalMil'], errors='coerce').fillna(0))
         total_moteur = sum(pd.to_numeric(df_log['TotalMot'], errors='coerce').fillna(0))
         st.markdown(f"""
-            <div style="background:#2c3e50; color:white; padding:10px; border-radius:10px; text-align:center; margin-bottom:20px;">
-                🚢 <b>Saison 2026 :</b> {total_milles:.1f} MN parcourus | ⚙️ {total_moteur:.1f} h moteur
+            <div style="background:#1a2a6c; color:white; padding:12px; border-radius:10px; text-align:center; margin-bottom:20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                🚢 <b>SAISON 2026</b><br>
+                <span style="font-size:1.2rem;">{total_milles:.1f} MN parcourus | ⚙️ {total_moteur:.1f} h moteur</span>
             </div>
         """, unsafe_allow_html=True)
 
     # --- MODE ÉDITION OU NOUVELLE ENTRÉE ---
-   is_editing = st.session_state.log_edit_idx is not None
- # On définit le titre de la section et si elle doit être ouverte
-    titre_formulaire = "📝 MODIFICATION EN COURS" if is_editing else "➕ NOUVELLE NAVIGATION"
-    # On force l'ouverture si on édite
-    form_ouvert = True if is_editing else False 
+    is_editing = st.session_state.log_edit_idx is not None
+    if is_editing:
+        idx = st.session_state.log_edit_idx
+        # On récupère la ligne à modifier de manière sûre
+        r_data = df_log.loc[idx]
+        titre_form = "📝 MODIFIER LA NAVIGATION"
+        bouton_label = "💾 ENREGISTRER LES MODIFICATIONS"
+    else:
+        r_data = None
+        titre_form = "➕ NOUVELLE NAVIGATION"
+        bouton_label = "💾 ENREGISTRER AU LIVRE DE BORD"
 
-    with st.expander(titre_formulaire, expanded=form_ouvert):
+    # Le formulaire s'ouvre tout seul si on est en train de modifier (expanded=is_editing ou True)
+    with st.expander(titre_form, expanded=(is_editing or False)):
         c1, c2 = st.columns(2)
-        # Utilisation de r_data chargée plus haut
-        l_date = c1.text_input("Date", value=safe_get(r_data, 'Date') if is_editing else datetime.now().strftime("%d/%m/%Y"))
-        l_meteo = c2.text_input("Météo (Vent/Mer)", value=safe_get(r_data, 'Meteo') if is_editing else "")
-        
-        # ... (le reste du code des colonnes départ/arrivée reste identique)
-
-    with st.expander("➕ SAISIE NAVIGATION", expanded=(not is_editing)):
-        c1, c2 = st.columns(2)
-        # Correction de l'erreur ici : on utilise r_data et is_editing
         l_date = c1.text_input("Date", value=safe_get(r_data, 'Date') if is_editing else datetime.now().strftime("%d/%m/%Y"))
         l_meteo = c2.text_input("Météo (Vent/Mer)", value=safe_get(r_data, 'Meteo') if is_editing else "")
 
@@ -423,28 +423,36 @@ elif st.session_state.page == "LOG":
         with col_dep:
             st.markdown("### 🛫 Départ")
             l_port_dep = st.text_input("Port de départ", value=safe_get(r_data, 'PortDep') if is_editing else "")
-            l_mot_dep = st.number_input("Moteur Départ (h)", value=float(r_data['MotDep']) if is_editing and 'MotDep' in r_data else 0.0, step=0.1, key="md")
-            l_mil_dep = st.number_input("Milles Départ (MN)", value=float(r_data['MilDep']) if is_editing and 'MilDep' in r_data else 0.0, step=0.1, key="ld")
+            # On force la valeur en float pour éviter les erreurs de type
+            val_mot_dep = float(r_data['MotDep']) if is_editing and 'MotDep' in r_data else 0.0
+            val_mil_dep = float(r_data['MilDep']) if is_editing and 'MilDep' in r_data else 0.0
+            l_mot_dep = st.number_input("Compteur Moteur Départ (h)", value=val_mot_dep, step=0.1, key="md_input")
+            l_mil_dep = st.number_input("Compteur Milles Départ (MN)", value=val_mil_dep, step=0.1, key="ld_input")
             
         with col_arr:
             st.markdown("### 🛬 Arrivée")
             l_port_arr = st.text_input("Port d'arrivée", value=safe_get(r_data, 'PortArr') if is_editing else "")
-            l_mot_arr = st.number_input("Moteur Arrivée (h)", value=float(r_data['MotArr']) if is_editing and 'MotArr' in r_data else 0.0, step=0.1, key="ma")
-            l_mil_arr = st.number_input("Milles Arrivée (MN)", value=float(r_data['MilArr']) if is_editing and 'MilArr' in r_data else 0.0, step=0.1, key="la")
+            val_mot_arr = float(r_data['MotArr']) if is_editing and 'MotArr' in r_data else 0.0
+            val_mil_arr = float(r_data['MilArr']) if is_editing and 'MilArr' in r_data else 0.0
+            l_mot_arr = st.number_input("Compteur Moteur Arrivée (h)", value=val_mot_arr, step=0.1, key="ma_input")
+            l_mil_arr = st.number_input("Compteur Milles Arrivée (MN)", value=val_mil_arr, step=0.1, key="la_input")
 
         st.divider()
         diff_mot = round(l_mot_arr - l_mot_dep, 1)
         diff_mil = round(l_mil_arr - l_mil_dep, 1)
         
-        st.markdown(f"**📊 Résumé :** {diff_mot} h moteur | {diff_mil} MN parcourus")
+        st.info(f"✨ **Calcul automatique :** {diff_mot} h moteur | {diff_mil} MN parcourus")
         l_obs = st.text_area("Observations", value=safe_get(r_data, 'Observations') if is_editing else "")
         
-        c_btn1, c_btn2 = st.columns(2)
-        if c_btn1.button("💾 ENREGISTRER", type="primary", key="save_log", use_container_width=True):
+        c_save, c_annul = st.columns(2)
+        if c_save.button(bouton_label, type="primary", use_container_width=True):
             entree = {
-                "Date": l_date, "Meteo": l_meteo, "PortDep": l_port_dep, "PortArr": l_port_arr,
-                "MotDep": l_mot_dep, "MotArr": l_mot_arr, "MilDep": l_mil_dep, "MilArr": l_mil_arr,
-                "TotalMot": diff_mot, "TotalMil": diff_mil, "Observations": l_obs
+                "Date": l_date, "Meteo": l_meteo, 
+                "PortDep": l_port_dep, "PortArr": l_port_arr,
+                "MotDep": l_mot_dep, "MotArr": l_mot_arr, 
+                "MilDep": l_mil_dep, "MilArr": l_mil_arr,
+                "TotalMot": diff_mot, "TotalMil": diff_mil, 
+                "Observations": l_obs
             }
             if is_editing:
                 for k, v in entree.items(): df_log.at[idx, k] = v
@@ -453,31 +461,35 @@ elif st.session_state.page == "LOG":
             
             sauvegarder_data(df_log, "logbook.json")
             st.session_state.log_edit_idx = None
-            st.success("Enregistré !"); time.sleep(1); st.rerun()
+            st.success("C'est enregistré !"); time.sleep(1); st.rerun()
             
         if is_editing:
-            if c_btn2.button("ANNULER", use_container_width=True):
+            if c_annul.button("❌ ANNULER", use_container_width=True):
                 st.session_state.log_edit_idx = None; st.rerun()
+
+    st.markdown("---")
 
     # --- AFFICHAGE DE L'HISTORIQUE ---
     if not df_log.empty:
         for i, e in df_log.iterrows():
             st.markdown(f"""
-            <div style="background:#ffffff; padding:15px; border-radius:10px; border:1px solid #ddd; border-left:5px solid #1a2a6c; margin-bottom:5px;">
+            <div style="background:#ffffff; padding:15px; border-radius:10px; border:1px solid #ddd; border-left:5px solid #1a2a6c; margin-bottom:10px;">
                 <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding-bottom:5px;">
-                    <span style="font-weight:bold; font-size:1.1rem; color:#1a2a6c;">📅 {safe_get(e, 'Date')}</span>
-                    <span style="color:#2ecc71; font-weight:bold;">📍 {safe_get(e, 'PortDep')} ➔ {safe_get(e, 'PortArr')}</span>
+                    <span style="font-weight:bold; color:#1a2a6c;">📅 {safe_get(e, 'Date')}</span>
+                    <span style="color:#2ecc71; font-weight:bold;">📍 {safe_get(e, 'PortDep')} ➜ {safe_get(e, 'PortArr')}</span>
                 </div>
-                <div style="margin-top:10px; font-size:0.9rem; color:#555;">
+                <div style="margin-top:10px; font-size:0.9rem;">
                     ☁️ {safe_get(e, 'Meteo')} | ⚙️ <b>+{safe_get(e, 'TotalMot')}h</b> | ⛵ <b>+{safe_get(e, 'TotalMil')} MN</b>
                 </div>
+                <div style="margin-top:5px; font-size:0.85rem; color:#666; font-style:italic;">"{safe_get(e, 'Observations')}"</div>
             </div>
             """, unsafe_allow_html=True)
             
+            # Gestion Suppression
             if st.session_state.log_confirm_del == i:
-                st.warning("Supprimer ?")
+                st.error("Confirmer la suppression ?")
                 cy, cn = st.columns(2)
-                if cy.button("OUI", key=f"y_l_{i}"):
+                if cy.button("✅ OUI", key=f"y_l_{i}"):
                     df_log = df_log.drop(i); sauvegarder_data(df_log, "logbook.json")
                     st.session_state.log_confirm_del = None; st.rerun()
                 if cn.button("NON", key=f"n_l_{i}"):
@@ -485,9 +497,13 @@ elif st.session_state.page == "LOG":
             else:
                 c1, c2 = st.columns(2)
                 if c1.button("📝 MODIFIER", key=f"ed_l_{i}", use_container_width=True):
-                    st.session_state.log_edit_idx = i; st.rerun()
+                    st.session_state.log_edit_idx = i
+                    st.rerun()
                 if c2.button("🗑️ SUPPRIMER", key=f"del_l_{i}", use_container_width=True):
-                    st.session_state.log_confirm_del = i; st.rerun()
+                    st.session_state.log_confirm_del = i
+                    st.rerun()
+    else:
+        st.info("Aucun trajet dans le livre de bord.")
         
 
 
