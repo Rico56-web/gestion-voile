@@ -397,13 +397,19 @@ elif st.session_state.page == "LOG":
         """, unsafe_allow_html=True)
 
     # --- MODE ÉDITION OU NOUVELLE ENTRÉE ---
-    is_editing = st.session_state.log_edit_idx is not None
-    if is_editing:
-        idx = st.session_state.log_edit_idx
-        r_data = df_log.loc[idx]
-        st.warning(f"📝 MODIFICATION du trajet du {safe_get(r_data, 'Date')}")
-    else:
-        r_data = None
+   is_editing = st.session_state.log_edit_idx is not None
+ # On définit le titre de la section et si elle doit être ouverte
+    titre_formulaire = "📝 MODIFICATION EN COURS" if is_editing else "➕ NOUVELLE NAVIGATION"
+    # On force l'ouverture si on édite
+    form_ouvert = True if is_editing else False 
+
+    with st.expander(titre_formulaire, expanded=form_ouvert):
+        c1, c2 = st.columns(2)
+        # Utilisation de r_data chargée plus haut
+        l_date = c1.text_input("Date", value=safe_get(r_data, 'Date') if is_editing else datetime.now().strftime("%d/%m/%Y"))
+        l_meteo = c2.text_input("Météo (Vent/Mer)", value=safe_get(r_data, 'Meteo') if is_editing else "")
+        
+        # ... (le reste du code des colonnes départ/arrivée reste identique)
 
     with st.expander("➕ SAISIE NAVIGATION", expanded=(not is_editing)):
         c1, c2 = st.columns(2)
