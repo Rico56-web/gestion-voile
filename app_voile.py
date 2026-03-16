@@ -376,17 +376,8 @@ elif st.session_state.page == "NOTES":
         st.success("✅ Notes sauvegardées sur GitHub !")
         time.sleep(1)
         st.rerun()
-        
-# --- 11. PAGE LIVRE DE BORD (LOG) ---
-elif st.session_state.page == "LOG":
-    st.subheader("📖 Livre de Bord")
-    
-    # Initialisation des états
-    if "log_edit_idx" not in st.session_state: st.session_state.log_edit_idx = None
-    if "log_confirm_del" not in st.session_state: st.session_state.log_confirm_del = None
 
-    df_log = charger_data("logbook.json")
-    # --- 11. PAGE LIVRE DE BORD (LOG) ---
+# --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
     st.subheader("📖 Livre de Bord")
     
@@ -491,6 +482,7 @@ elif st.session_state.page == "LOG":
                     st.session_state.log_edit_idx = i; st.rerun()
                 if c2.button("🗑️ SUPPRIMER", key=f"del_l_{i}", use_container_width=True):
                     st.session_state.log_confirm_del = i; st.rerun()
+        
 
 
 
