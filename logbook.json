@@ -13,16 +13,16 @@
         "Observations":""
     },
     {
-        "Date":"13\/03\/2026",
+        "Date":"21\/02\/2026",
         "Meteo":"Correct",
         "PortDep":"Arzon",
-        "PortArr":"Test",
-        "MotDep":0.0,
-        "MotArr":12.0,
+        "PortArr":"arzon",
+        "MotDep":2411.1,
+        "MotArr":0.0024158,
         "MilDep":0.0,
-        "MilArr":120.0,
-        "TotalMot":12.0,
-        "TotalMil":120.0,
-        "Observations":""
+        "MilArr":2600.0,
+        "TotalMot":-2411.1,
+        "TotalMil":2600.0,
+        "Observations":"sortie CMN"
     }
 ]
