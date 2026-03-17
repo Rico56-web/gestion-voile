@@ -381,19 +381,20 @@ elif st.session_state.page == "NOTES":
 elif st.session_state.page == "LOG":
     st.subheader("📖 Livre de Bord")
     
-    # Initialisation des états
+    # Initialisation des états spécifiques au Log
     if "log_edit_idx" not in st.session_state: st.session_state.log_edit_idx = None
     if "log_confirm_del" not in st.session_state: st.session_state.log_confirm_del = None
 
+    # Chargement des données
     df_log = charger_data("logbook.json")
 
     # --- STATISTIQUES ET TOTALISATEURS (MILES ET HEURES) ---
     if not df_log.empty:
-        # Calcul du cumul de la saison 2026
+        # 1. Calcul des sommes de la saison (différences cumulées)
         total_milles_saison = sum(pd.to_numeric(df_log['TotalMil'], errors='coerce').fillna(0))
         total_moteur_saison = sum(pd.to_numeric(df_log['TotalMot'], errors='coerce').fillna(0))
         
-        # Récupération des compteurs "Arrivée" les plus récents (Totalisateurs bateau)
+        # 2. Récupération des compteurs totalisateurs (Valeur Max enregistrée)
         last_mot = pd.to_numeric(df_log['MotArr'], errors='coerce').max() or 0.0
         last_mil = pd.to_numeric(df_log['MilArr'], errors='coerce').max() or 0.0
 
@@ -429,7 +430,6 @@ elif st.session_state.page == "LOG":
 
     with st.expander(titre_form, expanded=is_editing):
         c1, c2 = st.columns(2)
-        # Sécurité : on ne lit r_data que si is_editing est vrai
         l_date = c1.text_input("Date", value=safe_get(r_data, 'Date') if is_editing else datetime.now().strftime("%d/%m/%Y"))
         l_meteo = c2.text_input("Météo (Vent/Mer)", value=safe_get(r_data, 'Meteo') if is_editing else "")
 
@@ -472,17 +472,59 @@ elif st.session_state.page == "LOG":
             if is_editing:
                 for k, v in entree.items(): df_log.at[idx, k] = v
             else:
+                # Ajout en haut de liste
                 df_log = pd.concat([pd.DataFrame([entree]), df_log], ignore_index=True)
             
             sauvegarder_data(df_log, "logbook.json")
             st.session_state.log_edit_idx = None
-            st.success("Navigation enregistrée !"); time.sleep(1); st.rerun()
+            st.success("C'est enregistré !"); time.sleep(1); st.rerun()
             
         if is_editing and c_annul.button("❌ ANNULER", use_container_width=True):
             st.session_state.log_edit_idx = None; st.rerun()
 
     st.markdown("---")
-    # (Affichage de l'historique inchangé...)
+
+    # --- AFFICHAGE DE L'HISTORIQUE ---
+    if not df_log.empty:
+        for i, e in df_log.iterrows():
+            # Détection CMN pour la couleur bleue
+            port_dep = str(safe_get(e, 'PortDep')).upper()
+            port_arr = str(safe_get(e, 'PortArr')).upper()
+            is_cmn = "CMN" in port_dep or "CMN" in port_arr
+            
+            color_border = "#0055ff" if is_cmn else "#1a2a6c"
+            bg_card = "#f0f8ff" if is_cmn else "#ffffff"
+
+            st.markdown(f"""
+            <div style="background:{bg_card}; padding:15px; border-radius:10px; border:1px solid #ddd; border-left:8px solid {color_border}; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding-bottom:5px;">
+                    <span style="font-weight:bold; color:#1a2a6c;">📅 {safe_get(e, 'Date')}</span>
+                    <span style="color:{color_border}; font-weight:bold;">📍 {safe_get(e, 'PortDep')} ➜ {safe_get(e, 'PortArr')}</span>
+                </div>
+                <div style="margin-top:10px; font-size:0.9rem;">
+                    ☁️ {safe_get(e, 'Meteo')} | ⚙️ <b>+{safe_get(e, 'TotalMot')}h</b> | ⛵ <b>+{safe_get(e, 'TotalMil')} MN</b>
+                </div>
+                <div style="margin-top:5px; font-size:0.85rem; color:#666; font-style:italic;">"{safe_get(e, 'Observations')}"</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Gestion Actions (Modifier/Supprimer)
+            if st.session_state.log_confirm_del == i:
+                st.warning("Confirmer la suppression ?")
+                cy, cn = st.columns(2)
+                if cy.button("✅ OUI", key=f"y_l_{i}"):
+                    df_log = df_log.drop(i); sauvegarder_data(df_log, "logbook.json")
+                    st.session_state.log_confirm_del = None; st.rerun()
+                if cn.button("NON", key=f"n_l_{i}"):
+                    st.session_state.log_confirm_del = None; st.rerun()
+            else:
+                c1, c2 = st.columns(2)
+                if c1.button("📝 MODIFIER", key=f"ed_l_{i}", use_container_width=True):
+                    st.session_state.log_edit_idx = i; st.rerun()
+                if c2.button("🗑️ SUPPRIMER", key=f"del_l_{i}", use_container_width=True):
+                    st.session_state.log_confirm_del = i; st.rerun()
+    else:
+        st.info("Aucun trajet dans le livre de bord.")
         
 
 
