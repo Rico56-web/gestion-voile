@@ -384,7 +384,19 @@ elif st.session_state.page == "LOG":
     # Initialisation des états spécifiques au Log
     if "log_edit_idx" not in st.session_state: st.session_state.log_edit_idx = None
     if "log_confirm_del" not in st.session_state: st.session_state.log_confirm_del = None
-
+        
+# --- NETTOYAGE DES DOUBLONS (À RETIRER APRÈS USAGE) ---
+if not df_log.empty:
+    avant = len(df_log)
+    # On considère un doublon si Date, Port de Départ et Compteur Arrivée sont identiques
+    df_log = df_log.drop_duplicates(subset=['Date', 'PortDep', 'MotArr'], keep='first')
+    apres = len(df_log)
+    
+    if avant != apres:
+        sauvegarder_data(df_log, "logbook.json")
+        st.success(f"🧹 Nettoyage terminé : {avant - apres} doublons supprimés.")
+        time.sleep(1)
+        st.rerun()
     # Chargement des données
     df_log = charger_data("logbook.json")
 
