@@ -395,30 +395,44 @@ elif st.session_state.page == "LOG":
         if len(df_log) != avant:
             sauvegarder_data(df_log, "logbook.json")
 
-    # 4. Statistiques et Totalisateurs
+# 4. Statistiques et Totalisateurs (Calculés à partir du 21/02)
     if not df_log.empty:
-        # Cumul de la saison (Somme des trajets)
-        total_milles_saison = sum(pd.to_numeric(df_log['TotalMil'], errors='coerce').fillna(0))
-        total_moteur_saison = sum(pd.to_numeric(df_log['TotalMot'], errors='coerce').fillna(0))
+        # --- CONFIGURATION INITIALE (VALEURS AU 21/02) ---
+        # Remplacez ces chiffres par les vrais relevés de vos compteurs ce jour-là
+        MILLES_INITIAUX = 0.0  
+        HEURES_INITIALES = 0.0 
+
+        # Conversion des colonnes en numérique pour éviter les erreurs
+        df_log['TotalMil'] = pd.to_numeric(df_log['TotalMil'], errors='coerce').fillna(0)
+        df_log['TotalMot'] = pd.to_numeric(df_log['TotalMot'], errors='coerce').fillna(0)
+        df_log['MotArr'] = pd.to_numeric(df_log['MotArr'], errors='coerce').fillna(0)
+        df_log['MilArr'] = pd.to_numeric(df_log['MilArr'], errors='coerce').fillna(0)
+
+        # Calcul du cumul saison (Somme de toutes les navigations enregistrées)
+        cumul_milles_saison = df_log['TotalMil'].sum()
+        cumul_heures_saison = df_log['TotalMot'].sum()
         
-        # Index compteurs réels (Valeur maximum enregistrée)
-        last_mot = pd.to_numeric(df_log['MotArr'], errors='coerce').max() or 0.0
-        last_mil = pd.to_numeric(df_log['MilArr'], errors='coerce').max() or 0.0
+        # Calcul des Totalisateurs réels (Valeur initiale + Cumul saison)
+        total_milles_bateau = MILLES_INITIAUX + cumul_milles_saison
+        total_heures_bateau = HEURES_INITIALES + cumul_heures_saison
 
         st.markdown(f"""
             <div style="background:#1a2a6c; color:white; padding:15px; border-radius:10px; margin-bottom:20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                 <div style="text-align:center; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:10px; margin-bottom:10px;">
-                    🚢 <b>VESTA SKIPPER 2026 - COMPTEURS GÉNÉRAUX</b>
+                    🚢 <b>VESTA SKIPPER 2026 - ÉTAT DES COMPTEURS</b>
                 </div>
                 <div style="display: flex; justify-content: space-around; text-align:center;">
                     <div>
-                        <small>CUMUL NAVIGATION</small><br>
-                        <span style="font-size:1.2rem;"><b>{total_milles_saison:.1f} MN</b> | <b>{total_moteur_saison:.1f} h</b></span>
+                        <small>CUMUL DEPUIS LE 21/02</small><br>
+                        <span style="font-size:1.2rem;"><b>{cumul_milles_saison:.1f} MN</b> | <b>{cumul_heures_saison:.1f} h</b></span>
                     </div>
                     <div style="border-left: 1px solid rgba(255,255,255,0.3); padding-left:20px;">
-                        <small>INDEX COMPTEURS BATEAU</small><br>
-                        <span style="font-size:1.2rem;"><b>{last_mil:.1f} MN</b> | <b>{last_mot:.1f} h</b></span>
+                        <small>TOTALISATEURS GÉNÉRAUX</small><br>
+                        <span style="font-size:1.2rem;"><b>{total_milles_bateau:.1f} MN</b> | <b>{total_heures_bateau:.1f} h</b></span>
                     </div>
+                </div>
+                <div style="text-align:center; font-size:0.7rem; margin-top:10px; opacity:0.8;">
+                    Valeurs initiales au 21/02 : {MILLES_INITIAUX} MN / {HEURES_INITIALES} h
                 </div>
             </div>
         """, unsafe_allow_html=True)
