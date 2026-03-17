@@ -381,24 +381,20 @@ elif st.session_state.page == "NOTES":
 elif st.session_state.page == "LOG":
     st.subheader("📖 Livre de Bord")
     
-    # Initialisation des états spécifiques au Log
+    # 1. Initialisation des états (Si pas déjà fait)
     if "log_edit_idx" not in st.session_state: st.session_state.log_edit_idx = None
     if "log_confirm_del" not in st.session_state: st.session_state.log_confirm_del = None
-        
-# --- NETTOYAGE DES DOUBLONS (À RETIRER APRÈS USAGE) ---
-if not df_log.empty:
-    avant = len(df_log)
-    # On considère un doublon si Date, Port de Départ et Compteur Arrivée sont identiques
-    df_log = df_log.drop_duplicates(subset=['Date', 'PortDep', 'MotArr'], keep='first')
-    apres = len(df_log)
-    
-    if avant != apres:
-        sauvegarder_data(df_log, "logbook.json")
-        st.success(f"🧹 Nettoyage terminé : {avant - apres} doublons supprimés.")
-        time.sleep(1)
-        st.rerun()
-    # Chargement des données
+
+    # 2. CHARGEMENT CRUCIAL : C'est ici que df_log est créé
     df_log = charger_data("logbook.json")
+
+    # 3. NETTOYAGE (Optionnel, à mettre ici si vous voulez supprimer les doublons)
+    if not df_log.empty:
+        df_log = df_log.drop_duplicates(subset=['Date', 'PortDep', 'MotArr'], keep='first')
+
+    # 4. AFFICHAGE DES STATS (La ligne qui posait problème)
+    if not df_log.empty:
+        # ... la suite de votre code (total_milles, etc.) ...
 
     # --- STATISTIQUES ET TOTALISATEURS (MILES ET HEURES) ---
     if not df_log.empty:
