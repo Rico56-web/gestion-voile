@@ -381,28 +381,27 @@ elif st.session_state.page == "NOTES":
 elif st.session_state.page == "LOG":
     st.subheader("📖 Livre de Bord")
     
-    # 1. Initialisation des états (Si pas déjà fait)
+    # 1. Initialisation des états
     if "log_edit_idx" not in st.session_state: st.session_state.log_edit_idx = None
     if "log_confirm_del" not in st.session_state: st.session_state.log_confirm_del = None
 
-    # 2. CHARGEMENT CRUCIAL : C'est ici que df_log est créé
+    # 2. Chargement des données
     df_log = charger_data("logbook.json")
 
-    # 3. NETTOYAGE (Optionnel, à mettre ici si vous voulez supprimer les doublons)
+    # 3. Nettoyage automatique des doublons (Sécurité)
     if not df_log.empty:
+        avant = len(df_log)
         df_log = df_log.drop_duplicates(subset=['Date', 'PortDep', 'MotArr'], keep='first')
+        if len(df_log) != avant:
+            sauvegarder_data(df_log, "logbook.json")
 
-    # 4. AFFICHAGE DES STATS (La ligne qui posait problème)
+    # 4. Statistiques et Totalisateurs
     if not df_log.empty:
-        # ... la suite de votre code (total_milles, etc.) ...
-
-    # --- STATISTIQUES ET TOTALISATEURS (MILES ET HEURES) ---
-    if not df_log.empty:
-        # 1. Calcul des sommes de la saison (différences cumulées)
+        # Cumul de la saison (Somme des trajets)
         total_milles_saison = sum(pd.to_numeric(df_log['TotalMil'], errors='coerce').fillna(0))
         total_moteur_saison = sum(pd.to_numeric(df_log['TotalMot'], errors='coerce').fillna(0))
         
-        # 2. Récupération des compteurs totalisateurs (Valeur Max enregistrée)
+        # Index compteurs réels (Valeur maximum enregistrée)
         last_mot = pd.to_numeric(df_log['MotArr'], errors='coerce').max() or 0.0
         last_mil = pd.to_numeric(df_log['MilArr'], errors='coerce').max() or 0.0
 
@@ -424,7 +423,7 @@ elif st.session_state.page == "LOG":
             </div>
         """, unsafe_allow_html=True)
 
-    # --- MODE ÉDITION OU NOUVELLE ENTRÉE ---
+    # 5. Mode Édition ou Nouvelle Entrée
     is_editing = st.session_state.log_edit_idx is not None
     if is_editing:
         idx = st.session_state.log_edit_idx
@@ -480,26 +479,22 @@ elif st.session_state.page == "LOG":
             if is_editing:
                 for k, v in entree.items(): df_log.at[idx, k] = v
             else:
-                # Ajout en haut de liste
                 df_log = pd.concat([pd.DataFrame([entree]), df_log], ignore_index=True)
             
             sauvegarder_data(df_log, "logbook.json")
             st.session_state.log_edit_idx = None
-            st.success("C'est enregistré !"); time.sleep(1); st.rerun()
+            st.success("Enregistré !"); time.sleep(0.5); st.rerun()
             
         if is_editing and c_annul.button("❌ ANNULER", use_container_width=True):
             st.session_state.log_edit_idx = None; st.rerun()
 
     st.markdown("---")
 
-    # --- AFFICHAGE DE L'HISTORIQUE ---
+    # 6. Affichage de l'Historique
     if not df_log.empty:
         for i, e in df_log.iterrows():
-            # Détection CMN pour la couleur bleue
-            port_dep = str(safe_get(e, 'PortDep')).upper()
-            port_arr = str(safe_get(e, 'PortArr')).upper()
-            is_cmn = "CMN" in port_dep or "CMN" in port_arr
-            
+            # Détection CMN pour couleur bleue
+            is_cmn = "CMN" in str(safe_get(e, 'PortDep')).upper() or "CMN" in str(safe_get(e, 'PortArr')).upper()
             color_border = "#0055ff" if is_cmn else "#1a2a6c"
             bg_card = "#f0f8ff" if is_cmn else "#ffffff"
 
@@ -516,21 +511,12 @@ elif st.session_state.page == "LOG":
             </div>
             """, unsafe_allow_html=True)
             
-            # Gestion Actions (Modifier/Supprimer)
-            if st.session_state.log_confirm_del == i:
-                st.warning("Confirmer la suppression ?")
-                cy, cn = st.columns(2)
-                if cy.button("✅ OUI", key=f"y_l_{i}"):
-                    df_log = df_log.drop(i); sauvegarder_data(df_log, "logbook.json")
-                    st.session_state.log_confirm_del = None; st.rerun()
-                if cn.button("NON", key=f"n_l_{i}"):
-                    st.session_state.log_confirm_del = None; st.rerun()
-            else:
-                c1, c2 = st.columns(2)
-                if c1.button("📝 MODIFIER", key=f"ed_l_{i}", use_container_width=True):
-                    st.session_state.log_edit_idx = i; st.rerun()
-                if c2.button("🗑️ SUPPRIMER", key=f"del_l_{i}", use_container_width=True):
-                    st.session_state.log_confirm_del = i; st.rerun()
+            # Actions
+            c1, c2 = st.columns(2)
+            if c1.button("📝 MODIFIER", key=f"ed_l_{i}", use_container_width=True):
+                st.session_state.log_edit_idx = i; st.rerun()
+            if c2.button("🗑️ SUPPRIMER", key=f"del_l_{i}", use_container_width=True):
+                df_log = df_log.drop(i); sauvegarder_data(df_log, "logbook.json"); st.rerun()
     else:
         st.info("Aucun trajet dans le livre de bord.")
         
