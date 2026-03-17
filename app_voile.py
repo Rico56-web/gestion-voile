@@ -381,37 +381,35 @@ elif st.session_state.page == "NOTES":
 elif st.session_state.page == "LOG":
     st.subheader("📖 Livre de Bord")
     
-    # Initialisation des états spécifiques au Log
+    # Initialisation des états
     if "log_edit_idx" not in st.session_state: st.session_state.log_edit_idx = None
     if "log_confirm_del" not in st.session_state: st.session_state.log_confirm_del = None
 
     df_log = charger_data("logbook.json")
 
-    # --- STATISTIQUES ET TOTALISATEURS ---
+    # --- STATISTIQUES ET TOTALISATEURS (MILES ET HEURES) ---
     if not df_log.empty:
-        # 1. Calcul des sommes de la saison (différences cumulées)
+        # Calcul du cumul de la saison 2026
         total_milles_saison = sum(pd.to_numeric(df_log['TotalMil'], errors='coerce').fillna(0))
         total_moteur_saison = sum(pd.to_numeric(df_log['TotalMot'], errors='coerce').fillna(0))
         
-        # 2. Récupération des compteurs totalisateurs (Valeurs de la navigation la plus récente)
-        # On suppose que la dernière nav saisie a les compteurs les plus hauts
+        # Récupération des compteurs "Arrivée" les plus récents (Totalisateurs bateau)
         last_mot = pd.to_numeric(df_log['MotArr'], errors='coerce').max() or 0.0
         last_mil = pd.to_numeric(df_log['MilArr'], errors='coerce').max() or 0.0
 
-        # Affichage du bandeau mis à jour
         st.markdown(f"""
             <div style="background:#1a2a6c; color:white; padding:15px; border-radius:10px; margin-bottom:20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                 <div style="text-align:center; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:10px; margin-bottom:10px;">
-                    🚢 <b>VESTA SKIPPER 2026 - TABLEAU DE BORD</b>
+                    🚢 <b>VESTA SKIPPER 2026 - COMPTEURS GÉNÉRAUX</b>
                 </div>
                 <div style="display: flex; justify-content: space-around; text-align:center;">
                     <div>
-                        <small>CUMUL SAISON</small><br>
-                        <b>{total_milles_saison:.1f} MN</b> | <b>{total_moteur_saison:.1f} h</b>
+                        <small>CUMUL NAVIGATION</small><br>
+                        <span style="font-size:1.2rem;"><b>{total_milles_saison:.1f} MN</b> | <b>{total_moteur_saison:.1f} h</b></span>
                     </div>
                     <div style="border-left: 1px solid rgba(255,255,255,0.3); padding-left:20px;">
-                        <small>TOTALISATEURS BATEAU</small><br>
-                        <b>{last_mil:.1f} MN</b> | <b>{last_mot:.1f} h</b>
+                        <small>INDEX COMPTEURS BATEAU</small><br>
+                        <span style="font-size:1.2rem;"><b>{last_mil:.1f} MN</b> | <b>{last_mot:.1f} h</b></span>
                     </div>
                 </div>
             </div>
@@ -430,12 +428,10 @@ elif st.session_state.page == "LOG":
         bouton_label = "💾 ENREGISTRER AU LIVRE DE BORD"
 
     with st.expander(titre_form, expanded=is_editing):
-        c1, c2, c3 = st.columns([2, 2, 2])
+        c1, c2 = st.columns(2)
+        # Sécurité : on ne lit r_data que si is_editing est vrai
         l_date = c1.text_input("Date", value=safe_get(r_data, 'Date') if is_editing else datetime.now().strftime("%d/%m/%Y"))
-        l_meteo = c2.text_input("Météo", value=safe_get(r_data, 'Meteo') if is_editing else "")
-        # AJOUT DU STATUT DE PAIEMENT
-        l_paye = c3.selectbox("Statut Paiement", ["Payé", "Impayé"], 
-                              index=0 if safe_get(r_data, 'Status') == "Payé" else 1)
+        l_meteo = c2.text_input("Météo (Vent/Mer)", value=safe_get(r_data, 'Meteo') if is_editing else "")
 
         st.divider()
         col_dep, col_arr = st.columns(2)
@@ -443,16 +439,16 @@ elif st.session_state.page == "LOG":
         with col_dep:
             st.markdown("### 🛫 Départ")
             l_port_dep = st.text_input("Port de départ", value=safe_get(r_data, 'PortDep') if is_editing else "")
-            val_mot_dep = float(r_data['MotDep']) if is_editing and 'MotDep' in r_data else 0.0
-            val_mil_dep = float(r_data['MilDep']) if is_editing and 'MilDep' in r_data else 0.0
+            val_mot_dep = float(r_data['MotDep']) if (is_editing and 'MotDep' in r_data) else 0.0
+            val_mil_dep = float(r_data['MilDep']) if (is_editing and 'MilDep' in r_data) else 0.0
             l_mot_dep = st.number_input("Compteur Moteur Départ (h)", value=val_mot_dep, step=0.1, key="md_input")
             l_mil_dep = st.number_input("Compteur Milles Départ (MN)", value=val_mil_dep, step=0.1, key="ld_input")
             
         with col_arr:
             st.markdown("### 🛬 Arrivée")
             l_port_arr = st.text_input("Port d'arrivée", value=safe_get(r_data, 'PortArr') if is_editing else "")
-            val_mot_arr = float(r_data['MotArr']) if is_editing and 'MotArr' in r_data else 0.0
-            val_mil_arr = float(r_data['MilArr']) if is_editing and 'MilArr' in r_data else 0.0
+            val_mot_arr = float(r_data['MotArr']) if (is_editing and 'MotArr' in r_data) else 0.0
+            val_mil_arr = float(r_data['MilArr']) if (is_editing and 'MilArr' in r_data) else 0.0
             l_mot_arr = st.number_input("Compteur Moteur Arrivée (h)", value=val_mot_arr, step=0.1, key="ma_input")
             l_mil_arr = st.number_input("Compteur Milles Arrivée (MN)", value=val_mil_arr, step=0.1, key="la_input")
 
@@ -466,7 +462,7 @@ elif st.session_state.page == "LOG":
         c_save, c_annul = st.columns(2)
         if c_save.button(bouton_label, type="primary", use_container_width=True):
             entree = {
-                "Date": l_date, "Meteo": l_meteo, "Status": l_paye,
+                "Date": l_date, "Meteo": l_meteo, 
                 "PortDep": l_port_dep, "PortArr": l_port_arr,
                 "MotDep": l_mot_dep, "MotArr": l_mot_arr, 
                 "MilDep": l_mil_dep, "MilArr": l_mil_arr,
@@ -480,10 +476,13 @@ elif st.session_state.page == "LOG":
             
             sauvegarder_data(df_log, "logbook.json")
             st.session_state.log_edit_idx = None
-            st.success("C'est enregistré !"); time.sleep(1); st.rerun()
+            st.success("Navigation enregistrée !"); time.sleep(1); st.rerun()
+            
+        if is_editing and c_annul.button("❌ ANNULER", use_container_width=True):
+            st.session_state.log_edit_idx = None; st.rerun()
 
-    # --- AFFICHAGE DE L'HISTORIQUE ---
-    # (Le reste du code pour afficher les cartes reste similaire mais avec la couleur bleue pour CMN)
+    st.markdown("---")
+    # (Affichage de l'historique inchangé...)
         
 
 
