@@ -13,19 +13,6 @@
         "Observations":"avec PEDRO et BENOIT (vog) sur 2 jours"
     },
     {
-        "Date":"17\/03\/2026",
-        "Meteo":"",
-        "PortDep":"arzon",
-        "PortArr":"",
-        "MotDep":2422.6,
-        "MotArr":2424.9,
-        "MilDep":101.0,
-        "MilArr":147.0,
-        "TotalMot":2.3,
-        "TotalMil":46.0,
-        "Observations":"avec PEDRO et BENOIT (vog)"
-    },
-    {
         "Date":"04\/03\/2026",
         "Meteo":"Corrext",
         "PortDep":"arzon",
