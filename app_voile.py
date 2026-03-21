@@ -1,13 +1,23 @@
-
-import requests, base64, json, time, calendar
+# 1. IMPORTS (Tout en haut)
+import requests, base64, json, time
 import streamlit as st
 import pandas as pd
-from datetime import datetime
-repo = st.secrets.get("GITHUB_REPO", "NON TROUVÉ")
-st.write(f"DEBUG : Je cherche dans le dépôt : `{repo}`")
 
-# Test de lecture brute
-df_test = charger_data("contacts.json")
+# 2. DÉFINITION DE LA FONCTION (Le plan de fabrication)
+def charger_data(file):
+    try:
+        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
+        # ... (tout le reste de la fonction)
+        return pd.DataFrame(data)
+    except Exception as e:
+        st.error(f"Erreur : {e}")
+        return pd.DataFrame()
+
+# 3. DIAGNOSTIC (Maintenant ça va marcher car la fonction existe !)
+repo_name = st.secrets.get("GITHUB_REPO", "NON TROUVÉ")
+st.write(f"DEBUG : Recherche dans `{repo_name}`")
+
+df_test = charger_data("contacts.json") # <-- LIGNE 10 DEVENUE VALIDE
 st.write(f"DEBUG : Nombre de lignes lues : {len(df_test)}")
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
