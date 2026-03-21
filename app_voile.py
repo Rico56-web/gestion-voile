@@ -52,6 +52,7 @@ def safe_get(row, col):
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
 
 df_c = charger_data("contacts.json")
+st.write(f"Nombre de contacts trouvés : {len(df_c)}")
 df_m = charger_data("maint.json")
 df_log = charger_data("logbook.json")
 
