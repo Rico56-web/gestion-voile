@@ -115,37 +115,38 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except Exception:
         pass
+        
  # --- 5. PAGE CONTACTS (VERSION DÉPANNAGE FORCÉ) ---
 if st.session_state.page == "CONTACTS":
     # 1. Initialisation de la sécurité suppression
     if "contact_confirm_del" not in st.session_state:
         st.session_state.contact_confirm_del = None
 
-    # 2. Bouton Nouveau Contact avec vérification de structure
+ # --- BOUTON NOUVEAU CONTACT SÉCURISÉ ---
     if st.button("➕ NOUVEAU CONTACT", type="secondary", use_container_width=True):
-        new_data = {
+        new_contact = {
             "DateNav": datetime.now().strftime("%d/%m/2026"), 
-            "NbreJours": "1", "Statut": "En attente", "Paiement": "Pas payé", 
+            "NbreJours": "1", 
+            "Statut": "En attente", 
+            "Paiement": "Pas payé", 
             "Société": "", "Prénom": "Nouveau", "Nom": "Contact", 
             "Téléphone": "", "Email": "", "Prix": "0.00", "Notes": ""
         }
         
-        # On force la création d'un DataFrame propre si df_c est cassé
-        try:
-            new_df = pd.DataFrame([new_data])
-            if df_c is None or (isinstance(df_c, pd.DataFrame) and df_c.empty):
-                df_c = new_df
-            else:
-                df_c = pd.concat([new_df, df_c], ignore_index=True)
-            
-            sauvegarder_data(df_c, "contacts.json")
-            st.success("Nouveau contact créé !")
-            time.sleep(0.5)
-            st.rerun()
-        except Exception as e:
-            st.error(f"Erreur lors de la création : {e}")
-
-    st.divider()
+        # 1. On l'ajoute au DataFrame en mémoire
+        if df_c is None or (isinstance(df_c, pd.DataFrame) and df_c.empty):
+            df_c = pd.DataFrame([new_contact])
+        else:
+            df_c = pd.concat([pd.DataFrame([new_contact]), df_c], ignore_index=True)
+        
+        # 2. On sauvegarde sur GitHub
+        sauvegarder_data(df_c, "contacts.json")
+        
+        # 3. ON FORCE L'ÉDITION IMMÉDIATE DU NOUVEAU CONTACT (Index 0)
+        st.session_state.edit_idx = 0 
+        st.success("Contact créé ! Remplissez les informations ci-dessous.")
+        time.sleep(1)
+        st.rerun()
 
     # 3. Navigation Archives / Missions
     c1, c2 = st.columns(2)
