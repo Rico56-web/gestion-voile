@@ -138,30 +138,40 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except Exception:
         pass
-  # --- 5. PAGE CONTACTS (VERSION RÉPARÉE & SÉCURISÉE) ---
-if st.session_state.page == "CONTACTS":
-    if "contact_confirm_del" not in st.session_state:
-        st.session_state.contact_confirm_del = None
-
-    # --- 1. BOUTON CRÉATION ---
-    if st.button("➕ NOUVEAU CONTACT", type="primary", use_container_width=True):
-        new_row = {
-            "DateNav": datetime.now().strftime("%d/%m/2026"), 
-            "NbreJours": "1", "Statut": "En attente", "Paiement": "Pas payé", 
-            "Société": "", "Prénom": "Nouveau", "Nom": "Contact", 
-            "Téléphone": "", "Email": "", "Prix": "0.00", "Notes": ""
-        }
-        # On force la création du DataFrame si vide
-        if df_c.empty:
-            df_c = pd.DataFrame([new_row])
-        else:
-            df_c = pd.concat([pd.DataFrame([new_row]), df_c], ignore_index=True)
         
-        sauvegarder_data(df_c, "contacts.json")
-        st.session_state.edit_idx = 0 # On ouvre le premier (le nouveau)
-        st.rerun()
+  # --- 5. PAGE CONTACTS (VERSION RÉPARÉE & SÉCURISÉE) ---
+# --- 5. PAGE CONTACTS (VERSION FORÇAGE D'AFFICHAGE) ---
+if st.session_state.page == "CONTACTS":
+    # 1. Nettoyage de sécurité immédiat
+    if not df_c.empty:
+        # On force les noms de colonnes en minuscules puis on remet les bonnes majuscules
+        # Cela répare les fichiers où "Statut" serait devenu "statut"
+        df_c.columns = [c.strip() for c in df_c.columns]
+        
+        # On s'assure que la colonne Statut existe vraiment
+        if 'Statut' not in df_c.columns:
+            df_c['Statut'] = "En attente"
+        
+        # On remplit les cases vides pour éviter les bugs de filtrage
+        df_c['Statut'] = df_c['Statut'].fillna("En attente").astype(str)
 
-    st.divider()
+    # ... (Garder tes boutons Missions / Archives ici) ...
+
+    # 2. FILTRAGE ULTRA-SÉCURISÉ
+    # On définit ce qui est considéré comme une ARCHIVE
+    liste_archive = ["Terminé", "Refusé", "Termine", "Refuse", "ARCHIVE"]
+    
+    if st.session_state.view_archive:
+        # On affiche uniquement ce qui correspond à la liste archive
+        df_disp = df_c[df_c['Statut'].str.contains('|'.join(liste_archive), case=False, na=False)]
+    else:
+        # On affiche TOUT LE RESTE (donc même si le statut est bizarre, il apparaîtra ici)
+        df_disp = df_c[~df_c['Statut'].str.contains('|'.join(liste_archive), case=False, na=False)]
+
+    # 3. AFFICHAGE DE SÉCURITÉ (Si la liste est toujours vide)
+    if df_disp.empty and not df_c.empty:
+        st.warning("⚠️ Le filtre cache vos contacts. Affichage de TOUS les contacts sans exception :")
+        df_disp = df_c # On force l'affichage de tout le fichier
 
     # --- 2. SÉCURITÉ : RÉPARATION DES COLONNES MANQUANTES ---
     # Cette boucle évite les "KeyError" si ton fichier GitHub est ancien
