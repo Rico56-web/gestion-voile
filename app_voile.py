@@ -3,7 +3,12 @@ import requests, base64, json, time, calendar
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+repo = st.secrets.get("GITHUB_REPO", "NON TROUVÉ")
+st.write(f"DEBUG : Je cherche dans le dépôt : `{repo}`")
 
+# Test de lecture brute
+df_test = charger_data("contacts.json")
+st.write(f"DEBUG : Nombre de lignes lues : {len(df_test)}")
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
