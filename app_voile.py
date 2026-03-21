@@ -52,33 +52,29 @@ def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
-        # On ajoute un paramètre aléatoire pour forcer GitHub à nous donner la version REELLE
         import random
         res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"nocache": random.randint(1,10000)})
         
         if res.status_code == 200:
-            # Décodage sécurisé
-            content = base64.b64decode(res.json()['content']).decode('utf-8')
-            
-            # NETTOYAGE CRITIQUE : on enlève les espaces vides en début/fin de fichier
-            content = content.strip()
-            
-            # Si le fichier est juste "[]" ou vide, on renvoie un DataFrame vide
+            content = base64.b64decode(res.json()['content']).decode('utf-8').strip()
             if not content or content == "[]":
                 return pd.DataFrame()
-                
-            # Chargement manuel pour éviter les bugs de pd.read_json
+            
+            # On utilise json.loads pour être plus flexible que pd.read_json
             data = json.loads(content)
             df = pd.DataFrame(data)
             
-            # On s'assure que les colonnes sont propres
-            df.columns = [str(c).strip() for c in df.columns]
+            # --- RÉPARATION DES COLONNES À LA VOLÉE ---
+            if not df.empty:
+                df.columns = [str(c).strip() for c in df.columns]
+                # Si c'est le fichier contacts, on s'assure que 'Statut' existe
+                if file == "contacts.json" and 'Statut' not in df.columns:
+                    df['Statut'] = "En attente"
+                if file == "contacts.json" and 'Paiement' not in df.columns:
+                    df['Paiement'] = "Pas payé"
             return df
-            
         return pd.DataFrame()
     except Exception as e:
-        # On affiche l'erreur en petit pour comprendre ce qui bloque
-        st.sidebar.error(f"Erreur lecture {file}: {e}")
         return pd.DataFrame()
 
 def sauvegarder_data(df, file):
