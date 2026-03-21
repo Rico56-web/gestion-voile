@@ -139,59 +139,75 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     except Exception:
         pass
         
-  # --- 5. PAGE CONTACTS (VERSION RÉPARÉE & SÉCURISÉE) ---
-# --- 5. PAGE CONTACTS (VERSION FORÇAGE D'AFFICHAGE) ---
+# --- 5. PAGE CONTACTS (VERSION FINALE SÉCURISÉE) ---
 if st.session_state.page == "CONTACTS":
-    # 1. Nettoyage de sécurité immédiat
-    if not df_c.empty:
-        # On force les noms de colonnes en minuscules puis on remet les bonnes majuscules
-        # Cela répare les fichiers où "Statut" serait devenu "statut"
-        df_c.columns = [c.strip() for c in df_c.columns]
-        
-        # On s'assure que la colonne Statut existe vraiment
-        if 'Statut' not in df_c.columns:
-            df_c['Statut'] = "En attente"
-        
-        # On remplit les cases vides pour éviter les bugs de filtrage
-        df_c['Statut'] = df_c['Statut'].fillna("En attente").astype(str)
+    # Initialisation des états de suppression
+    if "contact_confirm_del" not in st.session_state:
+        st.session_state.contact_confirm_del = None
 
-    # ... (Garder tes boutons Missions / Archives ici) ...
-
-    # 2. FILTRAGE ULTRA-SÉCURISÉ
-    # On définit ce qui est considéré comme une ARCHIVE
-    liste_archive = ["Terminé", "Refusé", "Termine", "Refuse", "ARCHIVE"]
+    # --- SÉCURITÉ : RÉPARATION DU DATAFRAME ---
+    # On s'assure que df_c n'est pas None et on nettoie les colonnes
+    if df_c is None:
+        df_c = pd.DataFrame()
     
-    if st.session_state.view_archive:
-        # On affiche uniquement ce qui correspond à la liste archive
-        df_disp = df_c[df_c['Statut'].str.contains('|'.join(liste_archive), case=False, na=False)]
-    else:
-        # On affiche TOUT LE RESTE (donc même si le statut est bizarre, il apparaîtra ici)
-        df_disp = df_c[~df_c['Statut'].str.contains('|'.join(liste_archive), case=False, na=False)]
+    if not df_c.empty:
+        # Nettoyage des noms de colonnes (enlève les espaces et force la casse)
+        df_c.columns = [str(c).strip() for c in df_c.columns]
+        
+        # Correction automatique si 'Statut' manque ou est mal écrit
+        cols_normalisees = {c.lower(): c for c in df_c.columns}
+        if 'statut' in cols_normalisees and 'Statut' not in df_c.columns:
+            df_c = df_c.rename(columns={cols_normalisees['statut']: 'Statut'})
+        
+        # Création des colonnes obligatoires si elles manquent (évite le KeyError)
+        colonnes_requises = {
+            'Statut': 'En attente',
+            'Paiement': 'Pas payé',
+            'Prénom': '',
+            'Nom': '',
+            'Société': '',
+            'DateNav': datetime.now().strftime("%d/%m/2026"),
+            'NbreJours': '1',
+            'Prix': '0.00',
+            'Notes': '',
+            'Téléphone': '',
+            'Email': ''
+        }
+        for col, def_val in colonnes_requises.items():
+            if col not in df_c.columns:
+                df_c[col] = def_val
 
-    # 3. AFFICHAGE DE SÉCURITÉ (Si la liste est toujours vide)
-    if df_disp.empty and not df_c.empty:
-        st.warning("⚠️ Le filtre cache vos contacts. Affichage de TOUS les contacts sans exception :")
-        df_disp = df_c # On force l'affichage de tout le fichier
+    # --- BOUTON NOUVEAU CONTACT ---
+    if st.button("➕ NOUVEAU CONTACT", type="primary", use_container_width=True):
+        new_row = {k: v for k, v in colonnes_requises.items()}
+        new_row["Prénom"] = "Nouveau"
+        new_row["Nom"] = "Contact"
+        
+        if df_c.empty:
+            df_c = pd.DataFrame([new_row])
+        else:
+            df_c = pd.concat([pd.DataFrame([new_row]), df_c], ignore_index=True)
+        
+        sauvegarder_data(df_c, "contacts.json")
+        st.session_state.edit_idx = 0  # Ouvre l'édition du nouveau
+        st.rerun()
 
-    # --- 2. SÉCURITÉ : RÉPARATION DES COLONNES MANQUANTES ---
-    # Cette boucle évite les "KeyError" si ton fichier GitHub est ancien
-    cols_cibles = ["Statut", "Paiement", "Prix", "DateNav", "NbreJours", "Société", "Prénom", "Nom", "Notes", "Téléphone", "Email"]
-    for col in cols_cibles:
-        if col not in df_c.columns:
-            df_c[col] = "En attente" if col == "Statut" else "Pas payé" if col == "Paiement" else ""
+    st.divider()
 
-    # --- 3. NAVIGATION MISSIONS / ARCHIVES ---
+    # --- NAVIGATION MISSIONS / ARCHIVES ---
     c1, c2 = st.columns(2)
     if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, type="primary" if not st.session_state.view_archive else "secondary"):
-        st.session_state.view_archive = False; st.rerun()
+        st.session_state.view_archive = False
+        st.rerun()
     if c2.button("📁 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_archive else "secondary"):
-        st.session_state.view_archive = True; st.rerun()
+        st.session_state.view_archive = True
+        st.rerun()
 
-    # --- 4. MODE ÉDITION ---
+    # --- MODE ÉDITION ---
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
-        if idx < len(df_c): # Sécurité index
-            r = df_c.iloc[idx]
+        try:
+            r = df_c.iloc[idx] # Utilisation de iloc pour plus de sécurité
             st.subheader(f"📝 Modifier : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}")
             
             col1, col2 = st.columns(2)
@@ -204,71 +220,82 @@ if st.session_state.page == "CONTACTS":
             u_jours = col1.text_input("Jours", value=safe_get(r, 'NbreJours'))
             u_prix = col2.text_input("Prix (€)", value=safe_get(r, 'Prix'))
             
-            s_list = ["En attente", "OK", "Terminé", "Refusé"]
-            p_list = ["Pas payé", "Payé"]
-            u_stat = st.selectbox("Statut", s_list, index=s_list.index(safe_get(r, 'Statut')) if safe_get(r, 'Statut') in s_list else 0)
-            u_paye = st.selectbox("Paiement", p_list, index=p_list.index(safe_get(r, 'Paiement')) if safe_get(r, 'Paiement') in p_list else 0)
+            opts_s = ["En attente", "OK", "Terminé", "Refusé"]
+            u_stat = st.selectbox("Statut", opts_s, index=opts_s.index(safe_get(r, 'Statut')) if safe_get(r, 'Statut') in opts_s else 0)
+            u_paye = st.selectbox("Paiement", ["Pas payé", "Payé"], index=1 if safe_get(r, 'Paiement') == "Payé" else 0)
             u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
 
             if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
-                df_c.at[idx, 'Prénom'], df_c.at[idx, 'Nom'], df_c.at[idx, 'Société'] = u_pre, u_nom, u_soc
-                df_c.at[idx, 'Téléphone'], df_c.at[idx, 'Email'], df_c.at[idx, 'DateNav'] = u_tel, u_mail, u_date
-                df_c.at[idx, 'NbreJours'], df_c.at[idx, 'Prix'] = u_jours, u_prix
-                df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'], df_c.at[idx, 'Notes'] = u_stat, u_paye, u_notes
+                df_c.at[df_c.index[idx], 'Prénom'] = u_pre
+                df_c.at[df_c.index[idx], 'Nom'] = u_nom
+                df_c.at[df_c.index[idx], 'Société'] = u_soc
+                df_c.at[df_c.index[idx], 'Téléphone'] = u_tel
+                df_c.at[df_c.index[idx], 'Email'] = u_mail
+                df_c.at[df_c.index[idx], 'DateNav'] = u_date
+                df_c.at[df_c.index[idx], 'NbreJours'] = u_jours
+                df_c.at[df_c.index[idx], 'Prix'] = u_prix
+                df_c.at[df_c.index[idx], 'Statut'] = u_stat
+                df_c.at[df_c.index[idx], 'Paiement'] = u_paye
+                df_c.at[df_c.index[idx], 'Notes'] = u_notes
                 sauvegarder_data(df_c, "contacts.json")
-                st.session_state.edit_idx = None; st.rerun()
+                st.session_state.edit_idx = None
+                st.rerun()
             
             if st.button("Annuler"):
-                st.session_state.edit_idx = None; st.rerun()
-        else:
-            st.session_state.edit_idx = None; st.rerun()
+                st.session_state.edit_idx = None
+                st.rerun()
+        except:
+            st.session_state.edit_idx = None
+            st.rerun()
 
-    # --- 5. AFFICHAGE DES FICHES ---
+    # --- LISTE DES CONTACTS ---
     else:
-        # Filtrage
-        mask_archive = df_c['Statut'].isin(["Terminé", "Refusé"])
-        df_disp = df_c[mask_archive] if st.session_state.view_archive else df_c[~mask_archive]
-        
-        if df_disp.empty:
-            st.info("Aucun contact à afficher dans cette catégorie.")
+        if df_c.empty:
+            st.info("Le carnet d'adresses est vide. Cliquez sur 'Nouveau Contact'.")
         else:
-            for i, r in df_disp.iterrows():
-                # On récupère les valeurs pour le HTML
-                s_val = safe_get(r, 'Statut')
-                p_val = safe_get(r, 'Paiement')
-                soc = safe_get(r, 'Société')
-                tel = safe_get(r, 'Téléphone')
-                mail = safe_get(r, 'Email')
-                
-                # Couleurs
-                c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
-                c_p = "#FF0000" if "PAS PAYÉ" in p_val.upper() else "#2ecc71"
-                cl_b = "border-cmn" if "CMN" in soc.upper() else ""
+            # Filtrage selon les Archives
+            archives = ["Terminé", "Refusé"]
+            mask = df_c['Statut'].isin(archives)
+            df_disp = df_c[mask] if st.session_state.view_archive else df_c[~mask]
+            
+            if df_disp.empty:
+                st.info("Aucun contact dans cette section.")
+            else:
+                for i, r in df_disp.iterrows():
+                    s_val = safe_get(r, 'Statut')
+                    p_val = safe_get(r, 'Paiement')
+                    soc = safe_get(r, 'Société')
+                    
+                    # Couleurs badges
+                    c_s = "#3498db" if s_val == "Terminé" else "#2ecc71" if s_val == "OK" else "#f1c40f"
+                    c_p = "#2ecc71" if p_val == "Payé" else "#e74c3c"
+                    cl_b = "border-cmn" if "CMN" in soc.upper() else ""
 
-                h = f'''<div class="fiche-globale {cl_b}">
-                    <span class="statut-badge" style="background:{c_p};">{p_val}</span>
-                    <span class="statut-badge" style="background:{c_s};">{s_val}</span>
-                    <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
-                    <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
-                    📅 <b>{safe_get(r, "DateNav")}</b> ({safe_get(r, "NbreJours")}j) | 💰 <b>{safe_get(r, "Prix")} €</b><br>
-                    📞 {tel} | ✉️ {mail}
-                    <div class="notes-box">📝 {safe_get(r, "Notes") or "."}</div>
-                    <div class="container-boutons">
-                        <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
-                        <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
-                        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
-                    </div>
-                </div>'''
-                st.markdown(h, unsafe_allow_html=True)
+                    st.markdown(f'''<div class="fiche-globale {cl_b}">
+                        <span class="statut-badge" style="background:{c_p};">{p_val}</span>
+                        <span class="statut-badge" style="background:{c_s};">{s_val}</span>
+                        <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
+                        <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
+                        📅 <b>{safe_get(r, "DateNav")}</b> ({safe_get(r, "NbreJours")}j) | 💰 <b>{safe_get(r, "Prix")} €</b><br>
+                        📞 {safe_get(r, "Téléphone")} | ✉️ {safe_get(r, "Email")}
+                        <div class="notes-box">📝 {safe_get(r, "Notes") or "Aucune note."}</div>
+                        <div class="container-boutons">
+                            <a href="tel:{safe_get(r, 'Téléphone')}" class="btn-contact" style="background:#3498db;">Appeler</a>
+                            <a href="mailto:{safe_get(r, 'Email')}" class="btn-contact" style="background:#e67e22;">Mail</a>
+                        </div>
+                    </div>''', unsafe_allow_html=True)
 
-                # Boutons de gestion
-                c_ed, c_del = st.columns([1, 4])
-                if c_ed.button("✏️", key=f"ed_{i}"):
-                    st.session_state.edit_idx = i; st.rerun()
-                if c_del.button("🗑️ SUPPRIMER LA FICHE", key=f"del_{i}", use_container_width=True):
-                    df_c = df_c.drop(i)
-                    sauvegarder_data(df_c, "contacts.json")
-                    st.rerun()      
+                    c_ed, c_del = st.columns([1, 4])
+                    # Trouver l'index réel pour l'édition
+                    real_idx = list(df_c.index).index(i)
+                    if c_ed.button("✏️", key=f"ed_{i}"):
+                        st.session_state.edit_idx = real_idx
+                        st.rerun()
+                    
+                    if c_del.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
+                        df_c = df_c.drop(i)
+                        sauvegarder_data(df_c, "contacts.json")
+                        st.rerun()
 
 
 # --- 6. PAGE PLANNING ---
