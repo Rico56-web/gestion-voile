@@ -46,12 +46,7 @@ if not st.session_state.authenticated:
         else:
             st.error("Code incorrect.")
     st.stop()
-
-# --- 3. FONCTIONS DONNÉES ---
-# --- CHARGEMENT DES DONNÉES ---
-df_c = charger_data("contacts.json")
-df_m = charger_data("maint.json")
-df_log = charger_data("logbook.json") # Assure-toi que cette ligne existe !
+# --- 1. FONCTIONS DONNÉES (DOIT ÊTRE EN HAUT) ---
 def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
@@ -63,35 +58,29 @@ def charger_data(file):
             content = base64.b64decode(res.json()['content']).decode('utf-8').strip()
             if not content or content == "[]":
                 return pd.DataFrame()
-            
-            # On utilise json.loads pour être plus flexible que pd.read_json
             data = json.loads(content)
             df = pd.DataFrame(data)
-            
-            # --- RÉPARATION DES COLONNES À LA VOLÉE ---
-            if not df.empty:
-                df.columns = [str(c).strip() for c in df.columns]
-                # Si c'est le fichier contacts, on s'assure que 'Statut' existe
-                if file == "contacts.json" and 'Statut' not in df.columns:
-                    df['Statut'] = "En attente"
-                if file == "contacts.json" and 'Paiement' not in df.columns:
-                    df['Paiement'] = "Pas payé"
             return df
         return pd.DataFrame()
-    except Exception as e:
+    except:
         return pd.DataFrame()
 
 def sauvegarder_data(df, file):
-    repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-    url = f"https://api.github.com/repos/{repo}/contents/{file}"
-    res = requests.get(url, headers={"Authorization": f"token {token}"})
-    sha = res.json().get('sha') if res.status_code == 200 else None
-    content = base64.b64encode(df.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
-    requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": f"Update {file}", "content": content, "sha": sha})
+    # ... (ton code de sauvegarde habituel) ...
+    pass
 
-def safe_get(r, key):
-    val = r.get(key)
-    return str(val).strip() if pd.notna(val) and val is not None else ""
+# --- 2. NAVIGATION & MENU ---
+# (C'est ici que tu définis st.session_state.page)
+
+# --- 3. CHARGEMENT DES DONNÉES (UNIQUEMENT ICI !) ---
+# On appelle la fonction seulement APRES l'avoir définie au-dessus
+df_c = charger_data("contacts.json")
+df_m = charger_data("maint.json")
+df_log = charger_data("logbook.json")
+
+# --- 4. LOGIQUE DES PAGES ---
+if st.session_state.page == "CONTACTS":
+    # (Le gros bloc CONTACTS que je t'ai donné précédemment)
 
 # --- 4. NAVIGATION & ENTÊTE ---
 st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
