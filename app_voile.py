@@ -7,10 +7,30 @@ import pandas as pd
 def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-        # ... (tout le reste de la fonction)
-        return pd.DataFrame(data)
+        url = f"https://api.github.com/repos/{repo}/contents/{file}"
+        res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
+        
+        if res.status_code == 200:
+            raw_content = base64.b64decode(res.json()['content']).decode('utf-8').strip()
+            
+            # Diagnostic du texte brut
+            if not raw_content:
+                st.warning(f"Le fichier {file} est totalement vide sur GitHub.")
+                return pd.DataFrame()
+            
+            # Tentative de transformation en données
+            try:
+                data = json.loads(raw_content)
+                return pd.DataFrame(data)
+            except Exception as json_err:
+                st.error(f"Erreur de format dans {file} : {json_err}")
+                st.code(raw_content[:100]) # Affiche les 100 premiers caractères pour voir
+                return pd.DataFrame()
+        else:
+            st.error(f"GitHub refuse l'accès (Code {res.status_code}). Vérifie ton Token.")
+            return pd.DataFrame()
     except Exception as e:
-        st.error(f"Erreur : {e}")
+        st.error(f"Erreur système : {e}")
         return pd.DataFrame()
 
 # 3. DIAGNOSTIC (Maintenant ça va marcher car la fonction existe !)
