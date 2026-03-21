@@ -48,6 +48,10 @@ if not st.session_state.authenticated:
     st.stop()
 
 # --- 3. FONCTIONS DONNÉES ---
+# --- CHARGEMENT DES DONNÉES ---
+df_c = charger_data("contacts.json")
+df_m = charger_data("maint.json")
+df_log = charger_data("logbook.json") # Assure-toi que cette ligne existe !
 def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
