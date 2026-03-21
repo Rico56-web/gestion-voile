@@ -58,7 +58,7 @@ if m4.button("📝 NOTES"): st.session_state.page = "NOTES"
 if m5.button("📊 STT"): st.session_state.page = "STATS"
 st.divider()
 
-# --- LOGIQUE DES PAGES (TES FICHES) ---
+# --- PAGE CONTACTS (Version avec Numérotation et Suppression) ---
 if st.session_state.page == "CONTACTS":
     st.subheader("👤 Mes Contacts")
     
@@ -68,21 +68,23 @@ if st.session_state.page == "CONTACTS":
         df_c = pd.concat([pd.DataFrame([new]), df_c], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json"); st.rerun()
 
-    # Affichage des fiches (Ta mise en page)
-    for i, r in df_c.iterrows():
-        soc = str(r['Société']) if pd.notnull(r['Société']) else ""
-        pay = str(r['Paiement']) if pd.notnull(r['Paiement']) else "Pas payé"
-        stat = str(r['Statut']) if pd.notnull(r['Statut']) else "En attente"
+    # Affichage des fiches
+    # On utilise enumerate pour avoir le numéro de la fiche (n+1)
+    for n, (i, r) in enumerate(df_c.iterrows()):
+        soc = str(r.get('Société', ""))
+        pay = str(r.get('Paiement', "Pas payé"))
+        stat = str(r.get('Statut', "En attente"))
         
         c_p = "#FF0000" if "PAS" in pay.upper() else "#2ecc71"
         c_s = "#3498db" if "TERM" in stat.upper() else "#f1c40f"
         cl_b = "border-cmn" if "CMN" in soc.upper() else ""
         
+        # Affichage du numéro de fiche (#1, #2...) juste avant le prénom
         st.markdown(f'''<div class="fiche-globale {cl_b}">
             <span class="statut-badge" style="background:{c_p};">{pay}</span>
             <span class="statut-badge" style="background:{c_s};">{stat}</span>
             <div class="societe-style">{soc or "CLIENT PARTICULIER"}</div>
-            <div class="prenom-style">{r["Prénom"]} {str(r["Nom"]).upper()}</div>
+            <div class="prenom-style"><span style="color:#7f8c8d;">#{n+1}</span> | {r["Prénom"]} {str(r["Nom"]).upper()}</div>
             📅 {r["DateNav"]} ({r["NbreJours"]} jrs) | 💰 {r["Prix"]} €<br>
             <div class="notes-box">📝 {r["Notes"] or "."}</div>
             <div style="margin-top:10px;">
@@ -91,8 +93,27 @@ if st.session_state.page == "CONTACTS":
             </div>
         </div>''', unsafe_allow_html=True)
         
-        if st.button(f"✏️ Modifier la fiche {i}", key=f"ed_{i}"):
-            st.session_state.edit_idx = i # Logique de modification à suivre
+        # --- LOGIQUE DE SUPPRESSION AVEC CONFIRMATION ---
+        if st.session_state.get('contact_confirm_del') == i:
+            st.warning(f"⚠️ Supprimer la fiche #{n+1} ?")
+            col_y, col_n = st.columns(2)
+            if col_y.button("✅ OUI", key=f"y_{i}", use_container_width=True):
+                df_c = df_c.drop(i)
+                sauvegarder_data(df_c, "contacts.json")
+                st.session_state.contact_confirm_del = None
+                st.rerun()
+            if col_n.button("❌ NON", key=f"n_{i}", use_container_width=True):
+                st.session_state.contact_confirm_del = None
+                st.rerun()
+        else:
+            col_edit, col_del = st.columns([1, 1])
+            if col_edit.button(f"✏️ Modifier #{n+1}", key=f"ed_{i}", use_container_width=True):
+                st.session_state.edit_idx = i
+                # Ici tu peux ajouter ton formulaire de modification si besoin
+            
+            if col_del.button(f"🗑️ Supprimer #{n+1}", key=f"del_{i}", use_container_width=True):
+                st.session_state.contact_confirm_del = i
+                st.rerun()
 
 
 
