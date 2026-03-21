@@ -115,52 +115,128 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except Exception:
         pass
-        
-# --- 5. PAGE CONTACTS (MODE RÉCUPÉRATION TOTALE) ---
+  # --- 5. PAGE CONTACTS (VERSION RÉPARÉE & SÉCURISÉE) ---
 if st.session_state.page == "CONTACTS":
     if "contact_confirm_del" not in st.session_state:
         st.session_state.contact_confirm_del = None
 
-    # BOUTON CRÉATION
-    if st.button("➕ CRÉER ET ÉDITER", type="primary", use_container_width=True):
-        new_row = {"DateNav": "01/01/2026", "NbreJours": "1", "Statut": "OK", "Paiement": "Pas payé", "Société": "TEST", "Prénom": "Nouveau", "Nom": "Contact", "Téléphone": "000", "Email": "@", "Prix": "0.00", "Notes": ""}
-        df_c = pd.concat([pd.DataFrame([new_row]), df_c], ignore_index=True)
+    # --- 1. BOUTON CRÉATION ---
+    if st.button("➕ NOUVEAU CONTACT", type="primary", use_container_width=True):
+        new_row = {
+            "DateNav": datetime.now().strftime("%d/%m/2026"), 
+            "NbreJours": "1", "Statut": "En attente", "Paiement": "Pas payé", 
+            "Société": "", "Prénom": "Nouveau", "Nom": "Contact", 
+            "Téléphone": "", "Email": "", "Prix": "0.00", "Notes": ""
+        }
+        # On force la création du DataFrame si vide
+        if df_c.empty:
+            df_c = pd.DataFrame([new_row])
+        else:
+            df_c = pd.concat([pd.DataFrame([new_row]), df_c], ignore_index=True)
+        
         sauvegarder_data(df_c, "contacts.json")
-        st.session_state.edit_idx = 0 # On force l'ouverture immédiate
+        st.session_state.edit_idx = 0 # On ouvre le premier (le nouveau)
         st.rerun()
 
     st.divider()
 
-    # SI ON EST EN TRAIN D'ÉDITER
+    # --- 2. SÉCURITÉ : RÉPARATION DES COLONNES MANQUANTES ---
+    # Cette boucle évite les "KeyError" si ton fichier GitHub est ancien
+    cols_cibles = ["Statut", "Paiement", "Prix", "DateNav", "NbreJours", "Société", "Prénom", "Nom", "Notes", "Téléphone", "Email"]
+    for col in cols_cibles:
+        if col not in df_c.columns:
+            df_c[col] = "En attente" if col == "Statut" else "Pas payé" if col == "Paiement" else ""
+
+    # --- 3. NAVIGATION MISSIONS / ARCHIVES ---
+    c1, c2 = st.columns(2)
+    if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, type="primary" if not st.session_state.view_archive else "secondary"):
+        st.session_state.view_archive = False; st.rerun()
+    if c2.button("📁 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_archive else "secondary"):
+        st.session_state.view_archive = True; st.rerun()
+
+    # --- 4. MODE ÉDITION ---
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
-        r = df_c.loc[idx]
-        st.subheader("📝 Modification rapide")
-        u_nom = st.text_input("NOM", value=safe_get(r, 'Nom'))
-        u_stat = st.selectbox("STATUT", ["En attente", "OK", "Terminé", "Refusé"], index=0)
-        
-        if st.button("💾 ENREGISTRER"):
-            df_c.at[idx, 'Nom'] = u_nom
-            df_c.at[idx, 'Statut'] = u_stat
-            sauvegarder_data(df_c, "contacts.json")
-            st.session_state.edit_idx = None
-            st.rerun()
+        if idx < len(df_c): # Sécurité index
+            r = df_c.iloc[idx]
+            st.subheader(f"📝 Modifier : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}")
+            
+            col1, col2 = st.columns(2)
+            u_pre = col1.text_input("Prénom", value=safe_get(r, 'Prénom'))
+            u_nom = col2.text_input("Nom", value=safe_get(r, 'Nom'))
+            u_soc = col1.text_input("Société", value=safe_get(r, 'Société'))
+            u_tel = col2.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
+            u_mail = col1.text_input("Email", value=safe_get(r, 'Email'))
+            u_date = col2.text_input("Date (JJ/MM/AAAA)", value=safe_get(r, 'DateNav'))
+            u_jours = col1.text_input("Jours", value=safe_get(r, 'NbreJours'))
+            u_prix = col2.text_input("Prix (€)", value=safe_get(r, 'Prix'))
+            
+            s_list = ["En attente", "OK", "Terminé", "Refusé"]
+            p_list = ["Pas payé", "Payé"]
+            u_stat = st.selectbox("Statut", s_list, index=s_list.index(safe_get(r, 'Statut')) if safe_get(r, 'Statut') in s_list else 0)
+            u_paye = st.selectbox("Paiement", p_list, index=p_list.index(safe_get(r, 'Paiement')) if safe_get(r, 'Paiement') in p_list else 0)
+            u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
 
-    # AFFICHAGE BRUT (SANS FILTRE)
-    st.write(f"DEBUG : Nombre de contacts trouvés dans le fichier : {len(df_c)}")
-    
-    if not df_c.empty:
-        for i, r in df_c.iterrows():
-            with st.container():
-                # On affiche une ligne simple pour être sûr que ça passe
-                col_a, col_b = st.columns([3, 1])
-                col_a.write(f"👤 {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')} | 🚩 {safe_get(r, 'Statut')}")
-                if col_b.button("Modifier", key=f"btn_ed_{i}"):
-                    st.session_state.edit_idx = i
-                    st.rerun()
-                st.markdown("---")
+            if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
+                df_c.at[idx, 'Prénom'], df_c.at[idx, 'Nom'], df_c.at[idx, 'Société'] = u_pre, u_nom, u_soc
+                df_c.at[idx, 'Téléphone'], df_c.at[idx, 'Email'], df_c.at[idx, 'DateNav'] = u_tel, u_mail, u_date
+                df_c.at[idx, 'NbreJours'], df_c.at[idx, 'Prix'] = u_jours, u_prix
+                df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'], df_c.at[idx, 'Notes'] = u_stat, u_paye, u_notes
+                sauvegarder_data(df_c, "contacts.json")
+                st.session_state.edit_idx = None; st.rerun()
+            
+            if st.button("Annuler"):
+                st.session_state.edit_idx = None; st.rerun()
+        else:
+            st.session_state.edit_idx = None; st.rerun()
+
+    # --- 5. AFFICHAGE DES FICHES ---
     else:
-        st.error("Le fichier lu est vide. Vérifiez votre fichier contacts.json sur GitHub.")
+        # Filtrage
+        mask_archive = df_c['Statut'].isin(["Terminé", "Refusé"])
+        df_disp = df_c[mask_archive] if st.session_state.view_archive else df_c[~mask_archive]
+        
+        if df_disp.empty:
+            st.info("Aucun contact à afficher dans cette catégorie.")
+        else:
+            for i, r in df_disp.iterrows():
+                # On récupère les valeurs pour le HTML
+                s_val = safe_get(r, 'Statut')
+                p_val = safe_get(r, 'Paiement')
+                soc = safe_get(r, 'Société')
+                tel = safe_get(r, 'Téléphone')
+                mail = safe_get(r, 'Email')
+                
+                # Couleurs
+                c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
+                c_p = "#FF0000" if "PAS PAYÉ" in p_val.upper() else "#2ecc71"
+                cl_b = "border-cmn" if "CMN" in soc.upper() else ""
+
+                h = f'''<div class="fiche-globale {cl_b}">
+                    <span class="statut-badge" style="background:{c_p};">{p_val}</span>
+                    <span class="statut-badge" style="background:{c_s};">{s_val}</span>
+                    <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
+                    <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
+                    📅 <b>{safe_get(r, "DateNav")}</b> ({safe_get(r, "NbreJours")}j) | 💰 <b>{safe_get(r, "Prix")} €</b><br>
+                    📞 {tel} | ✉️ {mail}
+                    <div class="notes-box">📝 {safe_get(r, "Notes") or "."}</div>
+                    <div class="container-boutons">
+                        <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
+                        <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
+                        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
+                    </div>
+                </div>'''
+                st.markdown(h, unsafe_allow_html=True)
+
+                # Boutons de gestion
+                c_ed, c_del = st.columns([1, 4])
+                if c_ed.button("✏️", key=f"ed_{i}"):
+                    st.session_state.edit_idx = i; st.rerun()
+                if c_del.button("🗑️ SUPPRIMER LA FICHE", key=f"del_{i}", use_container_width=True):
+                    df_c = df_c.drop(i)
+                    sauvegarder_data(df_c, "contacts.json")
+                    st.rerun()      
+
 
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
