@@ -65,32 +65,68 @@ for i, name in enumerate(menu):
 
 # --- 4. LOGIQUE DES PAGES ---
 
+# --- PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
     st.subheader("👤 Carnet de Contacts")
-    if st.button("➕ NOUVEAU CONTACT"):
-        new = pd.DataFrame([{"Prénom": "Nouveau", "Nom": "Contact", "Statut": "En attente", "DateNav": "01/01/2026"}])
-        df_c = pd.concat([new, df_c], ignore_index=True)
+    
+    # Bouton de création
+    if st.button("➕ NOUVEAU CONTACT", type="primary", use_container_width=True):
+        new_row = {"Prénom": "Nouveau", "Nom": "Contact", "Statut": "En attente", "DateNav": datetime.now().strftime("%d/%m/2026"), "Société": "", "Prix": "0.00", "Paiement": "Pas payé"}
+        df_c = pd.concat([pd.DataFrame([new_row]), df_c], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()
-    
+
     if not df_c.empty:
+        # Nettoyage et Tri
+        df_c.columns = [str(c).strip() for c in df_c.columns]
         for i, r in df_c.iterrows():
-            with st.expander(f"{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} - {safe_get(r, 'DateNav')}"):
-                st.write(f"Statut: {safe_get(r, 'Statut')}")
-                if st.button("Supprimer", key=f"del_{i}"):
+            # On utilise une carte visuelle pour chaque contact
+            with st.container():
+                st.markdown(f"""
+                <div style="border:1px solid #ddd; padding:10px; border-radius:10px; margin-bottom:10px; background:white;">
+                    <b style="color:#1a2a6c;">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</b> | 📅 {safe_get(r, 'DateNav')}<br>
+                    <small>{safe_get(r, 'Société')} | Statut: {safe_get(r, 'Statut')} | Paiement: {safe_get(r, 'Paiement')}</small>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                c1, c2 = st.columns([1, 5])
+                if c1.button("🗑️", key=f"del_{i}"):
                     df_c = df_c.drop(i)
                     sauvegarder_data(df_c, "contacts.json")
                     st.rerun()
     else:
-        st.info("Aucun contact.")
+        st.info("Aucun contact enregistré.")
 
+# --- PAGE PLANNING ---
+elif st.session_state.page == "PLANNING":
+    st.subheader("🗓️ Planning 2026")
+    if not df_c.empty:
+        # On affiche juste une liste simplifiée pour vérifier que les données sont là
+        for _, r in df_c.iterrows():
+            st.write(f"📅 {safe_get(r, 'DateNav')} : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}")
+    else:
+        st.info("Le planning est vide.")
+
+# --- PAGE MAINT ---
+elif st.session_state.page == "MAINT":
+    st.subheader("🔧 Maintenance")
+    if not df_m.empty:
+        st.table(df_m)
+    else:
+        st.info("Aucun frais de maintenance.")
+
+# --- PAGE LOG (LIVRE DE BORD) ---
 elif st.session_state.page == "LOG":
     st.subheader("📖 Livre de Bord")
-    # Ton code de log ici...
-    st.write("Contenu du livre de bord")
+    if not df_log.empty:
+        for i, r in df_log.iterrows():
+            st.info(f"⚓ {safe_get(r, 'Date')} : {safe_get(r, 'PortDep')} ➜ {safe_get(r, 'PortArr')}")
+    else:
+        st.info("Le livre de bord est vide.")
 
+# --- AUTRES PAGES ---
 else:
-    st.info(f"La page {st.session_state.page} est en cours de reconstruction.")
+    st.info(f"Le module {st.session_state.page} est en cours de reconnexion.")
 
 
 
