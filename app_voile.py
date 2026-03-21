@@ -52,11 +52,34 @@ def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
-        res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
+        # On ajoute un paramètre aléatoire pour forcer GitHub à nous donner la version REELLE
+        import random
+        res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"nocache": random.randint(1,10000)})
+        
         if res.status_code == 200:
-            return pd.DataFrame(json.loads(base64.b64decode(res.json()['content']).decode('utf-8')))
+            # Décodage sécurisé
+            content = base64.b64decode(res.json()['content']).decode('utf-8')
+            
+            # NETTOYAGE CRITIQUE : on enlève les espaces vides en début/fin de fichier
+            content = content.strip()
+            
+            # Si le fichier est juste "[]" ou vide, on renvoie un DataFrame vide
+            if not content or content == "[]":
+                return pd.DataFrame()
+                
+            # Chargement manuel pour éviter les bugs de pd.read_json
+            data = json.loads(content)
+            df = pd.DataFrame(data)
+            
+            # On s'assure que les colonnes sont propres
+            df.columns = [str(c).strip() for c in df.columns]
+            return df
+            
         return pd.DataFrame()
-    except: return pd.DataFrame()
+    except Exception as e:
+        # On affiche l'erreur en petit pour comprendre ce qui bloque
+        st.sidebar.error(f"Erreur lecture {file}: {e}")
+        return pd.DataFrame()
 
 def sauvegarder_data(df, file):
     repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
