@@ -116,111 +116,51 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     except Exception:
         pass
         
- # --- 5. PAGE CONTACTS (VERSION DÉPANNAGE FORCÉ) ---
+# --- 5. PAGE CONTACTS (MODE RÉCUPÉRATION TOTALE) ---
 if st.session_state.page == "CONTACTS":
-    # 1. Initialisation de la sécurité suppression
     if "contact_confirm_del" not in st.session_state:
         st.session_state.contact_confirm_del = None
 
- # --- BOUTON NOUVEAU CONTACT SÉCURISÉ ---
-    if st.button("➕ NOUVEAU CONTACT", type="secondary", use_container_width=True):
-        new_contact = {
-            "DateNav": datetime.now().strftime("%d/%m/2026"), 
-            "NbreJours": "1", 
-            "Statut": "En attente", 
-            "Paiement": "Pas payé", 
-            "Société": "", "Prénom": "Nouveau", "Nom": "Contact", 
-            "Téléphone": "", "Email": "", "Prix": "0.00", "Notes": ""
-        }
-        
-        # 1. On l'ajoute au DataFrame en mémoire
-        if df_c is None or (isinstance(df_c, pd.DataFrame) and df_c.empty):
-            df_c = pd.DataFrame([new_contact])
-        else:
-            df_c = pd.concat([pd.DataFrame([new_contact]), df_c], ignore_index=True)
-        
-        # 2. On sauvegarde sur GitHub
+    # BOUTON CRÉATION
+    if st.button("➕ CRÉER ET ÉDITER", type="primary", use_container_width=True):
+        new_row = {"DateNav": "01/01/2026", "NbreJours": "1", "Statut": "OK", "Paiement": "Pas payé", "Société": "TEST", "Prénom": "Nouveau", "Nom": "Contact", "Téléphone": "000", "Email": "@", "Prix": "0.00", "Notes": ""}
+        df_c = pd.concat([pd.DataFrame([new_row]), df_c], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
-        
-        # 3. ON FORCE L'ÉDITION IMMÉDIATE DU NOUVEAU CONTACT (Index 0)
-        st.session_state.edit_idx = 0 
-        st.success("Contact créé ! Remplissez les informations ci-dessous.")
-        time.sleep(1)
+        st.session_state.edit_idx = 0 # On force l'ouverture immédiate
         st.rerun()
 
-    # 3. Navigation Archives / Missions
-    c1, c2 = st.columns(2)
-    if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, type="primary" if not st.session_state.view_archive else "secondary"):
-        st.session_state.view_archive = False; st.rerun()
-    if c2.button("📁 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_archive else "secondary"):
-        st.session_state.view_archive = True; st.rerun()
+    st.divider()
 
-    # 4. Vérification du contenu (pour éviter le KeyError)
-    if df_c is None or (isinstance(df_c, pd.DataFrame) and df_c.empty):
-        st.info("Le carnet d'adresses est vide.")
-        
-    elif st.session_state.edit_idx is not None:
-        # --- BLOC ÉDITION ---
+    # SI ON EST EN TRAIN D'ÉDITER
+    if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         r = df_c.loc[idx]
-        st.subheader("📝 Modifier Mission")
+        st.subheader("📝 Modification rapide")
+        u_nom = st.text_input("NOM", value=safe_get(r, 'Nom'))
+        u_stat = st.selectbox("STATUT", ["En attente", "OK", "Terminé", "Refusé"], index=0)
         
-        # Champs de saisie
-        u_pre = st.text_input("Prénom", value=safe_get(r, 'Prénom'))
-        u_nom = st.text_input("Nom", value=safe_get(r, 'Nom'))
-        u_soc = st.text_input("Société", value=safe_get(r, 'Société'))
-        u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
-        u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
-        u_date = st.text_input("Date", value=safe_get(r, 'DateNav'))
-        u_jours = st.text_input("Jours", value=safe_get(r, 'NbreJours'))
-        u_prix = st.text_input("Prix", value=safe_get(r, 'Prix'))
-        
-        u_stat = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], 
-                              index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut')) if safe_get(r, 'Statut') in ["En attente", "OK", "Terminé", "Refusé"] else 0)
-        u_paye = st.selectbox("Paiement", ["Pas payé", "Payé"], 
-                              index=["Pas payé", "Payé"].index(safe_get(r, 'Paiement')) if safe_get(r, 'Paiement') in ["Pas payé", "Payé"] else 0)
-        u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
-        
-        if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
-            df_c.at[idx, 'Prénom'] = u_pre
+        if st.button("💾 ENREGISTRER"):
             df_c.at[idx, 'Nom'] = u_nom
-            df_c.at[idx, 'Société'] = u_soc
-            df_c.at[idx, 'Téléphone'] = u_tel
-            df_c.at[idx, 'Email'] = u_mail
-            df_c.at[idx, 'DateNav'] = u_date
-            df_c.at[idx, 'NbreJours'] = u_jours
-            df_c.at[idx, 'Prix'] = u_prix
             df_c.at[idx, 'Statut'] = u_stat
-            df_c.at[idx, 'Paiement'] = u_paye
-            df_c.at[idx, 'Notes'] = u_notes
-            
             sauvegarder_data(df_c, "contacts.json")
             st.session_state.edit_idx = None
-            st.success("Modifié !"); time.sleep(0.5); st.rerun()
-            
-        if st.button("Annuler"):
-            st.session_state.edit_idx = None; st.rerun()
+            st.rerun()
 
+    # AFFICHAGE BRUT (SANS FILTRE)
+    st.write(f"DEBUG : Nombre de contacts trouvés dans le fichier : {len(df_c)}")
+    
+    if not df_c.empty:
+        for i, r in df_c.iterrows():
+            with st.container():
+                # On affiche une ligne simple pour être sûr que ça passe
+                col_a, col_b = st.columns([3, 1])
+                col_a.write(f"👤 {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')} | 🚩 {safe_get(r, 'Statut')}")
+                if col_b.button("Modifier", key=f"btn_ed_{i}"):
+                    st.session_state.edit_idx = i
+                    st.rerun()
+                st.markdown("---")
     else:
-        # --- AFFICHAGE DE LA LISTE ---
-        # Sécurité : on s'assure que la colonne Statut existe avant de filtrer
-        if 'Statut' not in df_c.columns:
-            df_c['Statut'] = "En attente"
-            
-        mask = df_c['Statut'].isin(["Terminé", "Refusé"])
-        df_disp = df_c[mask] if st.session_state.view_archive else df_c[~mask]
-        
-        for i, r in df_disp.iterrows():
-            # (Ici tu gardes ton code HTML d'affichage des fiches tel quel)
-            # ... copier/coller ton code HTML actuel ici ...
-            st.write(f"📌 {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}") # Test simple si bug HTML
-            
-            # Boutons Editer / Supprimer
-            c_ed, c_del = st.columns([1, 4])
-            if c_ed.button("✏️", key=f"ed_{i}"):
-                st.session_state.edit_idx = i; st.rerun()
-            if c_del.button("🗑️", key=f"del_{i}"):
-                st.session_state.contact_confirm_del = i; st.rerun()
+        st.error("Le fichier lu est vide. Vérifiez votre fichier contacts.json sur GitHub.")
 
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
