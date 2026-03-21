@@ -6,11 +6,10 @@ import base64
 import time
 from datetime import datetime
 
-# --- CONFIGURATION GITHUB (Secrets Streamlit) ---
+# --- CONFIGURATION GITHUB (Indispensable pour le Cloud) ---
 REPO = st.secrets["GITHUB_REPO"]
 TOKEN = st.secrets["GITHUB_TOKEN"]
 
-# --- FONCTIONS DE CONNEXION (Adaptées pour GitHub) ---
 def charger_data(fichier):
     try:
         url = f"https://api.github.com/repos/{REPO}/contents/{fichier}"
@@ -28,7 +27,7 @@ def sauvegarder_data(df, fichier):
     sha = res.json()['sha'] if res.status_code == 200 else None
     content = json.dumps(df.to_dict(orient="records"), indent=4, ensure_ascii=False)
     data = {
-        "message": f"Maj {fichier}",
+        "message": f"Mise à jour {fichier}",
         "content": base64.b64encode(content.encode('utf-8')).decode('utf-8'),
         "sha": sha
     }
@@ -37,18 +36,50 @@ def sauvegarder_data(df, fichier):
 def safe_get(row, col):
     return str(row[col]) if col in row and pd.notnull(row[col]) else ""
 
-# --- TON STYLE ET CONFIGURATION ---
+# --- TON CODE (STYLE ET CONFIGURATION) ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
 st.markdown("""
     <style>
-    .fiche-globale { background-color: white; padding: 15px; border-radius: 10px; border: 1px solid #eee; margin-bottom: 15px; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); position: relative; }
+    .fiche-globale {
+        background-color: white;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #eee;
+        margin-bottom: 15px;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+        position: relative;
+    }
     .border-cmn { border: 3px solid #3498db !important; }
-    .statut-badge { float: right; padding: 4px 10px; border-radius: 15px; color: white; font-size: 11px; font-weight: bold; margin-left: 5px; }
+    .statut-badge {
+        float: right;
+        padding: 4px 10px;
+        border-radius: 15px;
+        color: white;
+        font-size: 11px;
+        font-weight: bold;
+        margin-left: 5px;
+    }
     .societe-style { color: #7f8c8d; font-size: 12px; font-weight: bold; }
     .prenom-style { font-size: 18px; font-weight: bold; color: #2c3e50; margin: 5px 0; }
-    .notes-box { background: #f9f9f9; padding: 8px; border-radius: 5px; font-size: 13px; margin-top: 10px; border-left: 3px solid #ddd; }
-    .btn-contact { display: inline-block; padding: 8px 15px; border-radius: 5px; color: white !important; text-decoration: none !important; font-size: 13px; margin-right: 5px; margin-top: 10px; }
+    .notes-box {
+        background: #f9f9f9;
+        padding: 8px;
+        border-radius: 5px;
+        font-size: 13px;
+        margin-top: 10px;
+        border-left: 3px solid #ddd;
+    }
+    .btn-contact {
+        display: inline-block;
+        padding: 8px 15px;
+        border-radius: 5px;
+        color: white !important;
+        text-decoration: none !important;
+        font-size: 13px;
+        margin-right: 5px;
+        margin-top: 10px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -60,6 +91,14 @@ if "page" not in st.session_state: st.session_state.page = "PLANNING"
 if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
 if "view_archive" not in st.session_state: st.session_state.view_archive = False
 if "contact_confirm_del" not in st.session_state: st.session_state.contact_confirm_del = None
+
+# --- TRI CHRONOLOGIQUE ---
+if not df_c.empty and 'DateNav' in df_c.columns:
+    try:
+        df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
+        df_c = df_c.sort_values(by='temp_date', ascending=True).drop(columns=['temp_date'])
+    except:
+        pass
 
 # --- BARRE LATÉRALE (TON MENU) ---
 with st.sidebar:
@@ -97,42 +136,57 @@ if st.session_state.page == "CONTACTS":
         u_date = st.text_input("Date (JJ/MM/AAAA)", value=safe_get(r, 'DateNav'))
         u_jours = st.text_input("Jours", value=safe_get(r, 'NbreJours'))
         u_prix = st.text_input("Prix (€)", value=safe_get(r, 'Prix'))
-        u_stat = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=0)
-        u_paye = st.selectbox("Paiement", ["Pas payé", "Payé"], index=0)
+        u_stat = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(safe_get(r, 'Statut')) if safe_get(r, 'Statut') in ["En attente", "OK", "Terminé", "Refusé"] else 0)
+        u_paye = st.selectbox("Paiement", ["Pas payé", "Payé"], index=["Pas payé", "Payé"].index(safe_get(r, 'Paiement')) if safe_get(r, 'Paiement') in ["Pas payé", "Payé"] else 0)
         u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
         
         if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
             df_c.at[idx, 'Prénom'], df_c.at[idx, 'Nom'], df_c.at[idx, 'Société'] = u_pre, u_nom, u_soc
             df_c.at[idx, 'Téléphone'], df_c.at[idx, 'Email'], df_c.at[idx, 'DateNav'] = u_tel, u_mail, u_date
-            df_c.at[idx, 'NbreJours'], df_c.at[idx, 'Prix'] = u_jours, u_prix
+            df_c.at[idx, 'NbreJours'], df_c.at[idx, 'Prix'] = u_jours, f"{float(u_prix or 0):.2f}"
             df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'], df_c.at[idx, 'Notes'] = u_stat, u_paye, u_notes
             sauvegarder_data(df_c, "contacts.json"); st.session_state.edit_idx = None; st.rerun()
-        if st.button("Annuler"): st.session_state.edit_idx = None; st.rerun()
+        if st.button("Annuler", use_container_width=True): st.session_state.edit_idx = None; st.rerun()
 
     else:
-        df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.view_archive else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
-        for i, r in df_disp.iterrows():
-            tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
-            p_val, s_val, pay_val = safe_get(r, 'Prix'), safe_get(r, 'Statut'), safe_get(r, 'Paiement')
-            c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
-            c_p = "#FF0000" if "PAS" in pay_val.upper() else "#2ecc71"
-            cl_b = "border-cmn" if "CMN" in soc.upper() else ""
-            
-            st.markdown(f'''<div class="fiche-globale {cl_b}">
-                <span class="statut-badge" style="background:{c_p};">{pay_val}</span>
-                <span class="statut-badge" style="background:{c_s};">{s_val}</span>
-                <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
-                <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
-                📅 <b>{safe_get(r, "DateNav")}</b> ({safe_get(r, "NbreJours")} jrs) | 💰 <b>{p_val} €</b><br>
-                📞 {tel} | ✉️ {mail}
-                <div class="notes-box">📝 {safe_get(r, "Notes")}</div>
-                <div class="container-boutons">
-                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
-                    <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
-                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
-                </div>
-            </div>''', unsafe_allow_html=True)
-            if st.button("✏️ Modifier", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
+        if not df_c.empty:
+            df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.view_archive else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
+            for i, r in df_disp.iterrows():
+                tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
+                p_val, s_val, pay_val = f"{float(safe_get(r, 'Prix') or 0):.2f}", safe_get(r, 'Statut'), safe_get(r, 'Paiement')
+                c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
+                c_p = "#FF0000" if "PAS" in pay_val.upper() else "#2ecc71"
+                cl_b = "border-cmn" if "CMN" in soc.upper() else ""
+                
+                h = f'''<div class="fiche-globale {cl_b}">
+                    <span class="statut-badge" style="background:{c_p};">{pay_val}</span>
+                    <span class="statut-badge" style="background:{c_s};">{s_val}</span>
+                    <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
+                    <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
+                    📅 <b>{safe_get(r, "DateNav")}</b> ({safe_get(r, "NbreJours")} jrs) | 💰 <b>{p_val} €</b><br>
+                    📞 {tel} | ✉️ {mail}
+                    <div class="notes-box">📝 {safe_get(r, "Notes") or "."}</div>
+                    <div class="container-boutons">
+                        <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
+                        <a href="https://wa.me/{tel.replace(" ","")}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
+                        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
+                    </div>
+                </div>'''
+                st.markdown(h, unsafe_allow_html=True)
+                
+                if st.session_state.contact_confirm_del == i:
+                    st.warning("⚠️ Supprimer ?")
+                    cy, cn = st.columns(2)
+                    if cy.button("✅ OUI", key=f"y_{i}"):
+                        df_c = df_c.drop(i); sauvegarder_data(df_c, "contacts.json")
+                        st.session_state.contact_confirm_del = None; st.rerun()
+                    if cn.button("NON", key=f"n_{i}"):
+                        st.session_state.contact_confirm_del = None; st.rerun()
+                else:
+                    c1, c2 = st.columns([1, 4])
+                    if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
+                    if c2.button("🗑️ SUPPRIMER LA FICHE", key=f"del_{i}", use_container_width=True):
+                        st.session_state.contact_confirm_del = i; st.rerun()
 
 # --- PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
@@ -149,17 +203,31 @@ elif st.session_state.page == "PLANNING":
         cols = st.columns(7)
         for i, d in enumerate(sem):
             if d.month == sel_mois:
-                d_str, bg, bord, info = d.strftime("%d/%m/%Y"), "#ffffff", "1px solid #eee", ""
+                d_str = d.strftime("%d/%m/%Y")
+                bg, bord, info = "#ffffff", "1px solid #eee", ""
                 if d_str in missions_dict:
                     info = missions_dict[d_str][:10]
                     bg = "#e3f2fd" if "CMN" in info.upper() else "#ffffff"
                     bord = "2px solid #3498db" if "CMN" in info.upper() else "1px solid #2ecc71"
                 cols[i].markdown(f'''<div style="background:{bg}; border:{bord}; padding:10px 2px; border-radius:5px; text-align:center; min-height:65px;"><div style="font-weight:bold;">{d.day}</div><div style="font-size:9px; color:#555;">{info}</div></div>''', unsafe_allow_html=True)
 
-# --- PAGES VIDES POUR L'INSTANT ---
-elif st.session_state.page == "MAINTENANCE": st.title("🔧 Maintenance")
-elif st.session_state.page == "NOTES": st.title("📝 Notes")
-elif st.session_state.page == "STATS": st.title("📊 Statistiques")
+# --- PAGE NOTES ---
+elif st.session_state.page == "NOTES":
+    st.title("📝 Bloc-Notes")
+    # Utilisation de GitHub pour les notes
+    url_n = f"https://api.github.com/repos/{REPO}/contents/notes.txt"
+    res_n = requests.get(url_n, headers={"Authorization": f"token {TOKEN}"})
+    current_notes = base64.b64decode(res_n.json()['content']).decode('utf-8') if res_n.status_code == 200 else ""
+    new_notes = st.text_area("Mes notes :", value=current_notes, height=400)
+    if st.button("💾 SAUVEGARDER LES NOTES", use_container_width=True, type="primary"):
+        sha_n = res_n.json()['sha'] if res_n.status_code == 200 else None
+        data_n = {"message": "Maj notes", "content": base64.b64encode(new_notes.encode('utf-8')).decode('utf-8'), "sha": sha_n}
+        requests.put(url_n, headers={"Authorization": f"token {TOKEN}"}, json=data_n)
+        st.success("Notes enregistrées !")
+
+# --- PAGES VIDES ---
+elif st.session_state.page == "MAINTENANCE": st.title("🔧 Maintenance"); st.info("Page en cours")
+elif st.session_state.page == "STATS": st.title("📊 Statistiques"); st.info("Page en cours")
 
 
 
