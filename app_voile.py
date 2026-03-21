@@ -1,168 +1,115 @@
-# 1. IMPORTS (Tout en haut)
-import requests, base64, json, time
 import streamlit as st
 import pandas as pd
+import requests
+import json
+import base64
+import time
+from datetime import datetime
 
-# 2. DÉFINITION DE LA FONCTION (Le plan de fabrication)
+# --- CONFIGURATION GITHUB ---
+GITHUB_REPO = st.secrets["GITHUB_REPO"]
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+
 def charger_data(file):
     try:
-        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-        url = f"https://api.github.com/repos/{repo}/contents/{file}"
-        res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
-        
-        if res.status_code == 200:
-            raw_content = base64.b64decode(res.json()['content']).decode('utf-8').strip()
-            
-            # Diagnostic du texte brut
-            if not raw_content:
-                st.warning(f"Le fichier {file} est totalement vide sur GitHub.")
-                return pd.DataFrame()
-            
-            # Tentative de transformation en données
-            try:
-                data = json.loads(raw_content)
-                return pd.DataFrame(data)
-            except Exception as json_err:
-                st.error(f"Erreur de format dans {file} : {json_err}")
-                st.code(raw_content[:100]) # Affiche les 100 premiers caractères pour voir
-                return pd.DataFrame()
-        else:
-            st.error(f"GitHub refuse l'accès (Code {res.status_code}). Vérifie ton Token.")
-            return pd.DataFrame()
-    except Exception as e:
-        st.error(f"Erreur système : {e}")
-        return pd.DataFrame()
-
-# 3. DIAGNOSTIC (Maintenant ça va marcher car la fonction existe !)
-repo_name = st.secrets.get("GITHUB_REPO", "NON TROUVÉ")
-st.write(f"DEBUG : Recherche dans `{repo_name}`")
-
-df_test = charger_data("contacts.json") # <-- LIGNE 10 DEVENUE VALIDE
-st.write(f"DEBUG : Nombre de lignes lues : {len(df_test)}")
-# --- 1. CONFIGURATION ---
-st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
-
-# Sécurité Accès
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-if not st.session_state.authenticated:
-    st.title("⚓ VESTA SKIPPER 2026")
-    pw = st.text_input("Code d'accès :", type="password")
-    if st.button("ACCÉDER"):
-        if pw == "SKIPPER2026":
-            st.session_state.authenticated = True
-            st.rerun()
-    st.stop()
-
-# --- 2. FONCTIONS (LE MOTEUR) ---
-def charger_data(file):
-    try:
-        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-        url = f"https://api.github.com/repos/{repo}/contents/{file}"
-        res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file}"
+        res = requests.get(url, headers={"Authorization": f"token {GITHUB_TOKEN}"}, params={"v": time.time()})
         if res.status_code == 200:
             content = base64.b64decode(res.json()['content']).decode('utf-8')
-            data = json.loads(content)
-            return pd.DataFrame(data)
-    except: pass
-    return pd.DataFrame()
+            return pd.DataFrame(json.loads(content))
+        return pd.DataFrame()
+    except:
+        return pd.DataFrame()
 
-def sauvegarder_data(df, file):
-    try:
-        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-        url = f"https://api.github.com/repos/{repo}/contents/{file}"
-        res = requests.get(url, headers={"Authorization": f"token {token}"})
-        sha = res.json()['sha'] if res.status_code == 200 else None
-        content = base64.b64encode(df.to_json(orient='records').encode('utf-8')).decode('utf-8')
-        data = {"message": f"Update {file}", "content": content}
-        if sha: data["sha"] = sha
-        requests.put(url, headers={"Authorization": f"token {token}"}, json=data)
-    except: st.error(f"Erreur de sauvegarde {file}")
-
-def safe_get(row, col):
-    return str(row[col]) if col in row and pd.notnull(row[col]) else ""
-
-# --- 3. CHARGEMENT & NAVIGATION ---
-if "page" not in st.session_state: st.session_state.page = "CONTACTS"
-
-df_c = charger_data("contacts.json")
-st.write(f"Nombre de contacts trouvés : {len(df_c)}")
-df_m = charger_data("maint.json")
-df_log = charger_data("logbook.json")
-
-st.title("⚓ VESTA SKIPPER 2026")
-m = st.columns(7)
-menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES", "LOG"]
-for i, name in enumerate(menu):
-    if m[i].button(name, use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
-        st.session_state.page = name
-        st.rerun()
-
-# --- 4. LOGIQUE DES PAGES ---
-
-# --- PAGE CONTACTS ---
-if st.session_state.page == "CONTACTS":
-    st.subheader("👤 Carnet de Contacts")
+def sauvegarder_data(file, df):
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file}"
+    res = requests.get(url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
+    sha = res.json()['sha'] if res.status_code == 200 else None
     
-    # Bouton de création
-    if st.button("➕ NOUVEAU CONTACT", type="primary", use_container_width=True):
-        new_row = {"Prénom": "Nouveau", "Nom": "Contact", "Statut": "En attente", "DateNav": datetime.now().strftime("%d/%m/2026"), "Société": "", "Prix": "0.00", "Paiement": "Pas payé"}
-        df_c = pd.concat([pd.DataFrame([new_row]), df_c], ignore_index=True)
-        sauvegarder_data(df_c, "contacts.json")
-        st.rerun()
+    content = df.to_json(orient='records', indent=4)
+    data = {
+        "message": f"Mise à jour {file}",
+        "content": base64.b64encode(content.encode('utf-8')).decode('utf-8'),
+        "sha": sha
+    }
+    requests.put(url, headers={"Authorization": f"token {GITHUB_TOKEN}"}, json=data)
+
+# --- INTERFACE ---
+st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
+st.title("⛵ Vesta Skipper 2026")
+
+menu = st.sidebar.radio("Menu", ["📅 Planning", "📇 Contacts", "📊 Stats", "📝 Livre de Bord"])
+
+# --- SECTION PLANNING ---
+if menu == "📅 Planning":
+    st.header("Planning des Sorties")
+    df_p = charger_data("planning.json")
+    
+    with st.expander("➕ Ajouter une sortie"):
+        with st.form("form_p"):
+            date = st.date_input("Date")
+            client = st.text_input("Client")
+            compagnie = st.selectbox("Compagnie", ["CMN", "Privé", "Autre"])
+            status = st.selectbox("Paiement", ["Unpaid", "Paid"])
+            if st.form_submit_button("Enregistrer"):
+                # Couleur bleue pour CMN
+                color = "#2e7bcf" if compagnie == "CMN" else "#2c3e50"
+                nouvelle_ligne = {"Date": str(date), "Client": client, "Compagnie": compagnie, "Status": status, "Color": color}
+                df_p = pd.concat([df_p, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
+                sauvegarder_data("planning.json", df_p)
+                st.success("Planning mis à jour !")
+                st.rerun()
+
+    if not df_p.empty:
+        st.table(df_p[["Date", "Client", "Compagnie", "Status"]])
+
+# --- SECTION CONTACTS ---
+elif menu == "📇 Contacts":
+    st.header("Annuaire Clients")
+    df_c = charger_data("contacts.json")
+    
+    with st.expander("➕ Nouveau Contact"):
+        with st.form("form_c"):
+            nom = st.text_input("Nom")
+            tel = st.text_input("Téléphone")
+            email = st.text_input("Email")
+            notes = st.text_area("Notes")
+            if st.form_submit_button("Ajouter"):
+                nouveau_c = {"Nom": nom, "Tel": tel, "Email": email, "Notes": notes}
+                df_c = pd.concat([df_c, pd.DataFrame([nouveau_c])], ignore_index=True)
+                sauvegarder_data("contacts.json", df_c)
+                st.success("Contact enregistré !")
+                st.rerun()
 
     if not df_c.empty:
-        # Nettoyage et Tri
-        df_c.columns = [str(c).strip() for c in df_c.columns]
-        for i, r in df_c.iterrows():
-            # On utilise une carte visuelle pour chaque contact
-            with st.container():
-                st.markdown(f"""
-                <div style="border:1px solid #ddd; padding:10px; border-radius:10px; margin-bottom:10px; background:white;">
-                    <b style="color:#1a2a6c;">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</b> | 📅 {safe_get(r, 'DateNav')}<br>
-                    <small>{safe_get(r, 'Société')} | Statut: {safe_get(r, 'Statut')} | Paiement: {safe_get(r, 'Paiement')}</small>
-                </div>
-                """, unsafe_allow_html=True)
+        for i, row in df_c.iterrows():
+            with st.expander(f"👤 {row['Nom']}"):
+                st.write(f"📞 **Tel :** {row['Tel']}")
+                st.write(f"✉️ **Email :** {row['Email']}")
+                st.info(f"📝 {row.get('Notes', '')}")
                 
-                c1, c2 = st.columns([1, 5])
-                if c1.button("🗑️", key=f"del_{i}"):
-                    df_c = df_c.drop(i)
-                    sauvegarder_data(df_c, "contacts.json")
-                    st.rerun()
-    else:
-        st.info("Aucun contact enregistré.")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown(f'<a href="tel:{row["Tel"]}" style="text-decoration:none;"><button style="width:100%; border-radius:5px; background-color:#2e7bcf; color:white; border:none; padding:10px;">📞 Appeler</button></a>', unsafe_allow_html=True)
+                with col2:
+                    st.markdown(f'<a href="mailto:{row["Email"]}" style="text-decoration:none;"><button style="width:100%; border-radius:5px; background-color:#28a745; color:white; border:none; padding:10px;">✉️ Mail</button></a>', unsafe_allow_html=True)
 
-# --- PAGE PLANNING ---
-elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Planning 2026")
-    if not df_c.empty:
-        # On affiche juste une liste simplifiée pour vérifier que les données sont là
-        for _, r in df_c.iterrows():
-            st.write(f"📅 {safe_get(r, 'DateNav')} : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom')}")
+# --- SECTION STATS ---
+elif menu == "📊 Stats":
+    st.header("Statistiques d'Activité")
+    df_p = charger_data("planning.json")
+    if not df_p.empty:
+        st.metric("Total Sorties", len(df_p))
+        st.bar_chart(df_p['Compagnie'].value_counts())
     else:
-        st.info("Le planning est vide.")
+        st.write("Aucune donnée disponible.")
 
-# --- PAGE MAINT ---
-elif st.session_state.page == "MAINT":
-    st.subheader("🔧 Maintenance")
-    if not df_m.empty:
-        st.table(df_m)
-    else:
-        st.info("Aucun frais de maintenance.")
-
-# --- PAGE LOG (LIVRE DE BORD) ---
-elif st.session_state.page == "LOG":
-    st.subheader("📖 Livre de Bord")
-    if not df_log.empty:
-        for i, r in df_log.iterrows():
-            st.info(f"⚓ {safe_get(r, 'Date')} : {safe_get(r, 'PortDep')} ➜ {safe_get(r, 'PortArr')}")
-    else:
-        st.info("Le livre de bord est vide.")
-
-# --- AUTRES PAGES ---
-else:
-    st.info(f"Le module {st.session_state.page} est en cours de reconnexion.")
+# --- SECTION LIVRE DE BORD ---
+elif menu == "📝 Livre de Bord":
+    st.header("Historique & Maintenance")
+    df_l = charger_data("logbook.json")
+    # ... Affichage simplifié du logbook
+    st.table(df_l)
 
 
 
