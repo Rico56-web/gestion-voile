@@ -44,23 +44,33 @@ def sauvegarder_data(df):
 df_c = charger_data()
 if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
 if 'delete_confirm_idx' not in st.session_state: st.session_state.delete_confirm_idx = None
+if 'voir_archives' not in st.session_state: st.session_state.voir_archives = False
 
-# --- MENU ---
+# --- MENU LATÉRAL ---
 st.sidebar.title("⚓ Vesta 2026")
 page = st.sidebar.radio("Navigation", ["CONTACTS", "PLANNING", "STATS"])
 
 if page == "CONTACTS":
     st.subheader("👤 Mes Fiches")
     
-    # Bouton Ajouter
+    # --- 1. SÉLECTION ACTIVES / ARCHIVÉES ---
+    col_t1, col_t2 = st.columns(2)
+    if col_t1.button("🚀 ACTIVES", type="primary" if not st.session_state.voir_archives else "secondary", use_container_width=True, key="btn_actives"):
+        st.session_state.voir_archives = False
+        st.rerun()
+    if col_t2.button("📁 ARCHIVÉES", type="primary" if st.session_state.voir_archives else "secondary", use_container_width=True, key="btn_archives"):
+        st.session_state.voir_archives = True
+        st.rerun()
+
+    # Bouton Nouveau
     if st.button("➕ NOUVEAU CONTACT", use_container_width=True):
         new_line = {c: "" for c in df_c.columns}
-        new_line.update({"Prénom": "Nouveau", "Nom": "Contact", "DateNav": "01/01/2026", "Statut": "En attente", "Paiement": "Pas payé"})
+        new_line.update({"Prénom": "Nouveau", "Nom": "Contact", "DateNav": datetime.now().strftime("%d/%m/2026"), "Statut": "En attente", "Paiement": "Pas payé"})
         df_c = pd.concat([pd.DataFrame([new_line]), df_c], ignore_index=True)
         sauvegarder_data(df_c)
         st.rerun()
 
-    # --- ZONE D'ÉDITION (S'affiche si on clique sur Modifier) ---
+    # --- 2. ZONE D'ÉDITION ---
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         if idx in df_c.index:
@@ -90,19 +100,25 @@ if page == "CONTACTS":
                         st.session_state.edit_idx = None
                         st.rerun()
 
-    # --- LISTE DES FICHES ---
+    # --- 3. FILTRAGE ET RECHERCHE ---
     search = st.text_input("🔍 Rechercher...", "").lower()
     
-    for idx, r in df_c.iterrows():
+    # On sépare Actives (En attente, OK) et Archivées (Terminé, Refusé)
+    if st.session_state.voir_archives:
+        df_affichage = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])]
+    else:
+        df_affichage = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
+
+    # --- 4. BOUCLE D'AFFICHAGE ---
+    for idx, r in df_affichage.iterrows():
         if search and search not in str(r['Nom']).lower() and search not in str(r['Prénom']).lower() and search not in str(r['Société']).lower():
             continue
             
         soc = str(r['Société']) if str(r['Société']) != "" else "PARTICULIER"
         color_p = "#2ecc71" if r['Paiement'] == "Payé" else "#e74c3c"
-        color_s = "#2ecc71" if r['Statut'] == "OK" else "#f1c40f"
+        color_s = "#2ecc71" if r['Statut'] == "OK" else "#f1c40f" if r['Statut'] == "En attente" else "#3498db"
         cl_b = "border-cmn" if "CMN" in soc.upper() else ""
 
-        # Affichage HTML de la fiche
         st.markdown(f"""
             <div class="fiche-globale {cl_b}">
                 <div class="prenom-style">{r['Prénom']} {str(r['Nom']).upper()}</div>
@@ -121,14 +137,11 @@ if page == "CONTACTS":
             </div>
         """, unsafe_allow_html=True)
         
-        # --- BOUTONS ACTIONS (MODIFIER & SUPPRIMER) ---
         col_ed, col_del = st.columns(2)
-        
         if col_ed.button(f"✏️ Modifier", key=f"ed_{idx}", use_container_width=True):
             st.session_state.edit_idx = idx
             st.rerun()
 
-        # Logique de suppression avec confirmation
         if st.session_state.delete_confirm_idx == idx:
             if col_del.button(f"✅ CONFIRMER ?", key=f"conf_{idx}", type="primary", use_container_width=True):
                 df_c = df_c.drop(idx).reset_index(drop=True)
@@ -144,11 +157,10 @@ if page == "CONTACTS":
                 st.rerun()
 
 elif page == "PLANNING":
-    st.write("### 📅 Planning (En construction)")
+    st.info("Le module Planning est prêt à être codé.")
 
 elif page == "STATS":
-    st.write(f"### 📊 Stats")
-    st.write(f"Nombre de fiches : {len(df_c)}")
+    st.metric("Total fiches", len(df_c))
 
 
 
