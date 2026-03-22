@@ -12,23 +12,23 @@ st.markdown("""
     <style>
     .fiche-globale {
         background: white; border-radius: 12px; padding: 15px;
-        margin-bottom: 10px; border-left: 8px solid #3498db;
+        margin-bottom: 12px; border-left: 8px solid #3498db;
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     .border-cmn { border-left: 8px solid #2980b9 !important; background: #f0f7ff; }
-    .prenom-style { font-size: 19px; font-weight: bold; color: #2c3e50; }
+    .prenom-style { font-size: 20px; font-weight: bold; color: #2c3e50; margin-bottom: 2px; }
     .statut-badge {
-        padding: 3px 8px; border-radius: 15px; color: white;
-        font-size: 10px; font-weight: bold; margin-left: 4px;
+        padding: 4px 10px; border-radius: 15px; color: white;
+        font-size: 11px; font-weight: bold; margin-left: 5px;
     }
-    .label-gris { color: #7f8c8d; font-size: 13px; }
+    .label-gris { color: #7f8c8d; font-size: 13px; font-weight: 500; }
+    .info-box { background:#f9f9f9; padding:8px; border-radius:8px; margin:8px 0; font-size:13px; border: 1px solid #eee; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- FONCTIONS DATA ---
 def charger_data():
     file = "contacts.json"
-    # Liste complète des colonnes (anciennes + nouvelles)
     cols = ['Prénom', 'Nom', 'Société', 'DateNav', 'DateResa', 'NbreJours', 'Téléphone', 'Email', 'Statut', 'Paiement', 'Prix']
     if os.path.exists(file):
         try:
@@ -87,12 +87,9 @@ if page == "CONTACTS":
                     u_soc = c1.text_input("Société", value=r['Société'])
                     u_tel = c2.text_input("Téléphone", value=r['Téléphone'])
                     u_mail = c1.text_input("Email", value=r['Email'])
-                    u_date = c2.text_input("Date Navigation (JJ/MM/2026)", value=r['DateNav'])
-                    
-                    # Nouveaux champs dans le formulaire
-                    u_resa = c1.text_input("Date de Réservation", value=r['DateResa'])
+                    u_date = c2.text_input("Date Nav (JJ/MM/2026)", value=r['DateNav'])
+                    u_resa = c1.text_input("Date Résa (JJ/MM/AAAA)", value=r['DateResa'])
                     u_jours = c2.text_input("Nombre de jours", value=r['NbreJours'])
-                    
                     u_stat = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], 
                                          index=["En attente", "OK", "Terminé", "Refusé"].index(r['Statut']) if r['Statut'] in ["En attente", "OK", "Terminé", "Refusé"] else 0)
                     u_paye = st.selectbox("Paiement", ["Pas payé", "Payé"], index=1 if r['Paiement']=="Payé" else 0)
@@ -104,7 +101,7 @@ if page == "CONTACTS":
                         df_c.at[idx, 'DateResa'], df_c.at[idx, 'NbreJours'] = u_resa, u_jours
                         df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'] = u_stat, u_paye
                         sauvegarder_data(df_c); st.session_state.edit_idx = None; st.rerun()
-                    if st.form_submit_button("Fermer"):
+                    if st.form_submit_button("Annuler / Fermer"):
                         st.session_state.edit_idx = None; st.rerun()
 
     # --- LISTE ---
@@ -119,19 +116,20 @@ if page == "CONTACTS":
         color_p = "#2ecc71" if r['Paiement'] == "Payé" else "#e74c3c"
         color_s = "#2ecc71" if r['Statut'] == "OK" else "#f1c40f" if r['Statut'] == "En attente" else "#3498db"
         cl_b = "border-cmn" if "CMN" in soc.upper() else ""
+        d_resa = r['DateResa'] if str(r['DateResa']).strip() != "" else "Non précisée"
 
-        # --- AFFICHAGE FICHE AVEC NOUVELLES INFOS ---
+        # --- AFFICHAGE FICHE ---
         st.markdown(f"""
             <div class="fiche-globale {cl_b}">
                 <div class="prenom-style">{r['Prénom']} {str(r['Nom']).upper()}</div>
-                <div style="color:gray; font-size:14px;">🏛️ {soc}</div>
+                <div style="color:gray; font-size:14px; margin-bottom:5px;">🏛️ {soc}</div>
                 <div style="margin:5px 0; font-size:14px;">
                     📞 <b>{r['Téléphone']}</b><br>
                     ✉️ {r['Email']}
                 </div>
                 
-                <div style="background:#f9f9f9; padding:5px; border-radius:5px; margin:5px 0; font-size:13px;">
-                    📝 <span class="label-gris">Réservé le :</span> {r['DateResa']}<br>
+                <div class="info-box">
+                    📝 <span class="label-gris">Réservé le :</span> {d_resa}<br>
                     ⏳ <span class="label-gris">Durée :</span> {r['NbreJours']} jour(s)
                 </div>
 
@@ -154,15 +152,14 @@ if page == "CONTACTS":
             if c_del.button(f"✅ CONFIRMER", key=f"conf_{idx}", type="primary", use_container_width=True):
                 df_c = df_c.drop(idx).reset_index(drop=True); sauvegarder_data(df_c)
                 st.session_state.delete_confirm_idx = None; st.rerun()
-            if st.button("Annuler", key=f"ann_{idx}", use_container_width=True):
+            if st.button("Annuler suppression", key=f"ann_{idx}", use_container_width=True):
                 st.session_state.delete_confirm_idx = None; st.rerun()
         else:
             if c_del.button(f"🗑️ Supprimer", key=f"del_{idx}", use_container_width=True):
                 st.session_state.delete_confirm_idx = idx; st.rerun()
 
 elif page == "PLANNING":
-    st.info("Module Planning prêt.")
-
+    st.info("Module Planning prêt pour l'intégration calendrier.")
 
 
 
