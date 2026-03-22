@@ -8,7 +8,7 @@ import time
 # --- CONFIGURATION PAGE ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
-# --- STYLE CSS (MOBILE FIRST) ---
+# --- STYLE CSS (OPTIMISÉ MOBILE) ---
 st.markdown("""
     <style>
     .fiche-globale {
@@ -18,6 +18,7 @@ st.markdown("""
     }
     .border-cmn { border-left: 8px solid #2980b9 !important; background-color: #f0f7ff; }
     .prenom-style { font-size: 20px; font-weight: bold; margin-bottom: 2px; }
+    .nom-style { text-transform: uppercase; }
     .statut-badge {
         padding: 4px 10px; border-radius: 15px; color: white;
         font-size: 11px; font-weight: bold; margin-left: 5px; display: inline-block;
@@ -30,7 +31,6 @@ st.markdown("""
 # --- FONCTIONS DATA ---
 def charger_data():
     file = "contacts.json"
-    # 'DateResa' a été retiré de la liste des colonnes
     cols = ['Prénom', 'Nom', 'Société', 'DateNav', 'NbreJours', 'Téléphone', 'Email', 'Statut', 'Paiement', 'Prix']
     if os.path.exists(file):
         try:
@@ -44,7 +44,7 @@ def charger_data():
 def sauvegarder_data(df):
     df.to_json("contacts.json", orient='records', indent=4)
 
-# --- INITIALISATION DES ETATS ---
+# --- INITIALISATION ---
 if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
 if 'del_idx' not in st.session_state: st.session_state.del_idx = None
 if 'rebook_idx' not in st.session_state: st.session_state.rebook_idx = None
@@ -57,28 +57,24 @@ df_c = charger_data()
 st.sidebar.title("⚓ Vesta Skipper")
 page = st.sidebar.radio("Navigation", ["CONTACTS", "PLANNING", "STATS"])
 
-# --- PAGE CONTACTS ---
 if page == "CONTACTS":
-    st.subheader("👤 Gestion des Navigations")
+    st.subheader("👤 Mes Contacts")
 
-    # Onglets Actives / Archives
+    # Onglets
     c_t1, c_t2 = st.columns(2)
     if c_t1.button("🚀 EN COURS", type="primary" if not st.session_state.archives else "secondary", use_container_width=True):
         st.session_state.archives = False; st.rerun()
     if c_t2.button("📁 ARCHIVES", type="primary" if st.session_state.archives else "secondary", use_container_width=True):
         st.session_state.archives = True; st.rerun()
 
-    # --- BARRE D'ACTIONS ---
+    # Barre d'actions
     col_a, col_b = st.columns([2, 1])
-    
-    # 1. Nouveau Contact
     if col_a.button("➕ NOUVEAU CONTACT", use_container_width=True):
         new_line = {c: "" for c in df_c.columns}
-        new_line.update({"Prénom": "Nouveau", "Nom": "Contact", "DateNav": datetime.now().strftime("%d/%m/2026"), "NbreJours": "1", "Statut": "En attente", "Paiement": "Pas payé"})
+        new_line.update({"Prénom": "Nouveau", "Nom": "Contact", "DateNav": "01/01/2026", "NbreJours": "1", "Statut": "En attente", "Paiement": "Pas payé"})
         df_c = pd.concat([pd.DataFrame([new_line]), df_c], ignore_index=True)
         sauvegarder_data(df_c); st.rerun()
 
-    # 2. Bouton Nettoyer Sécurisé
     if not st.session_state.archives:
         if st.session_state.confirm_clean:
             cc1, cc2 = col_b.columns(2)
@@ -92,51 +88,40 @@ if page == "CONTACTS":
                     except: pass
                     return row['Statut']
                 df_c['Statut'] = df_c.apply(check_archive, axis=1)
-                sauvegarder_data(df_c)
-                st.session_state.confirm_clean = False
-                st.toast("Ménage terminé !"); time.sleep(1); st.rerun()
+                sauvegarder_data(df_c); st.session_state.confirm_clean = False; st.rerun()
             if cc2.button("X", use_container_width=True):
                 st.session_state.confirm_clean = False; st.rerun()
         else:
             if col_b.button("🧹 NETTOYER", use_container_width=True):
                 st.session_state.confirm_clean = True; st.rerun()
 
-    # Formulaire de modification (Sans DateResa)
+    # Formulaire d'édition
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
-        if idx in df_c.index:
-            r = df_c.loc[idx]
-            with st.expander(f"📝 MODIFIER : {r['Prénom']} {r['Nom']}", expanded=True):
-                with st.form("edit_form"):
-                    c1, c2 = st.columns(2)
-                    u_pre = c1.text_input("Prénom", r['Prénom'])
-                    u_nom = c2.text_input("Nom", r['Nom'])
-                    u_soc = c1.text_input("Société", r['Société'])
-                    u_tel = c2.text_input("Téléphone", r['Téléphone'])
-                    u_nav = c1.text_input("Date Navigation", r['DateNav'])
-                    u_jou = c2.text_input("Nb Jours", r['NbreJours'])
-                    u_pri = c1.text_input("Prix (€)", r['Prix'])
-                    u_sta = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=0)
-                    u_pay = st.selectbox("Paiement", ["Pas payé", "Payé"], index=0)
-                    if st.form_submit_button("ENREGISTRER", use_container_width=True):
-                        # On s'assure de l'ordre des colonnes lors de l'enregistrement
-                        df_c.at[idx, 'Prénom'] = u_pre
-                        df_c.at[idx, 'Nom'] = u_nom
-                        df_c.at[idx, 'Société'] = u_soc
-                        df_c.at[idx, 'Téléphone'] = u_tel
-                        df_c.at[idx, 'DateNav'] = u_nav
-                        df_c.at[idx, 'NbreJours'] = u_jou
-                        df_c.at[idx, 'Statut'] = u_sta
-                        df_c.at[idx, 'Paiement'] = u_pay
-                        df_c.at[idx, 'Prix'] = u_pri
-                        sauvegarder_data(df_c); st.session_state.edit_idx = None; st.rerun()
+        r = df_c.loc[idx]
+        with st.expander(f"📝 MODIFIER : {r['Prénom']} {r['Nom']}", expanded=True):
+            with st.form("edit_form"):
+                c1, c2 = st.columns(2)
+                u_pre = c1.text_input("Prénom", r['Prénom'])
+                u_nom = c2.text_input("Nom", r['Nom'])
+                u_soc = c1.text_input("Société", r['Société'])
+                u_tel = c2.text_input("Téléphone", r['Téléphone'])
+                u_mail = c1.text_input("Email", r['Email'])
+                u_nav = c2.text_input("Date Navigation", r['DateNav'])
+                u_jou = c1.text_input("Nb Jours", r['NbreJours'])
+                u_pri = c2.text_input("Prix (€)", r['Prix'])
+                u_sta = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=0)
+                u_pay = st.selectbox("Paiement", ["Pas payé", "Payé"], index=0)
+                if st.form_submit_button("ENREGISTRER", use_container_width=True):
+                    df_c.loc[idx] = [u_pre, u_nom, u_soc, u_nav, u_jou, u_tel, u_mail, u_sta, u_pay, u_pri]
+                    sauvegarder_data(df_c); st.session_state.edit_idx = None; st.rerun()
 
-    # --- LISTE ---
+    # Liste
     search = st.text_input("🔍 Rechercher...", "").lower()
     df_f = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.archives else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
     for idx, r in df_f.iterrows():
-        if search and search not in str(r['Nom']).lower() and search not in str(r['Prénom']).lower() and search not in str(r['Société']).lower():
+        if search and not any(search in str(r[c]).lower() for c in ['Nom', 'Prénom', 'Société']):
             continue
             
         soc = str(r['Société']) if str(r['Société']).strip() != "" else "PARTICULIER"
@@ -144,18 +129,21 @@ if page == "CONTACTS":
         color_p = "#2ecc71" if r['Paiement'] == "Payé" else "#e74c3c"
         cl_b = "border-cmn" if "CMN" in soc.upper() else ""
 
-        # Affichage fiche (Sans Date de Réservation)
+        # --- AFFICHAGE FICHE DANS L'ORDRE DEMANDÉ ---
         st.markdown(f"""
             <div class="fiche-globale {cl_b}">
-                <div class="prenom-style">{r['Prénom']} {str(r['Nom']).upper()}</div>
-                <div style="color:gray; font-size:14px;">🏛️ {soc}</div>
-                <div style="margin:5px 0; font-size:14px;">📞 <b>{r['Téléphone']}</b></div>
+                <div class="prenom-style">{r['Prénom']} <span class="nom-style">{r['Nom']}</span></div>
+                <div style="color:gray; font-size:14px; margin-bottom:4px;">🏛️ {soc}</div>
+                <div style="font-size:14px; margin-bottom:2px;">📞 <b>{r['Téléphone']}</b></div>
+                <div style="font-size:14px; margin-bottom:8px;">✉️ {r['Email']}</div>
+                
                 <div class="info-box">
-                    ⏳ <span class="label-gris">Durée :</span> {r['NbreJours']} jour(s)
+                    ⏳ <span class="label-gris">Durée de la mission :</span> {r['NbreJours']} jour(s)
                 </div>
+
                 <hr style="margin:10px 0; border:0; border-top:1px solid #eee;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:14px;">📅 <b>{r['DateNav']}</b></span>
+                    <span style="font-size:15px;">📅 <b>{r['DateNav']}</b></span>
                     <div>
                         <span class="statut-badge" style="background:{color_s};">{r['Statut']}</span>
                         <span class="statut-badge" style="background:{color_p};">{r['Paiement']}</span>
@@ -164,17 +152,15 @@ if page == "CONTACTS":
             </div>
         """, unsafe_allow_html=True)
         
-        # ACTIONS
+        # Actions
         c1, c2, c3 = st.columns(3)
-        
-        # Re-book sécurisé
         if st.session_state.rebook_idx == idx:
-            if c1.button("✅ RE-BOOK", key=f"re_conf_{idx}", type="primary", use_container_width=True):
+            if c1.button("✅ RE-BOOK", key=f"re_cf_{idx}", type="primary", use_container_width=True):
                 new_nav = r.copy()
-                new_nav.update({"DateNav": datetime.now().strftime("%d/%m/2026"), "Statut": "En attente", "Paiement": "Pas payé"})
+                new_nav.update({"DateNav": "01/01/2026", "Statut": "En attente", "Paiement": "Pas payé"})
                 df_c = pd.concat([pd.DataFrame([new_nav]), df_c], ignore_index=True)
                 sauvegarder_data(df_c); st.session_state.rebook_idx = None; st.rerun()
-            if st.button("X", key=f"re_ann_{idx}", use_container_width=True):
+            if st.button("X", key=f"re_x_{idx}", use_container_width=True):
                 st.session_state.rebook_idx = None; st.rerun()
         else:
             if c1.button("🔄 RE-BOOK", key=f"re_{idx}", use_container_width=True):
@@ -191,9 +177,7 @@ if page == "CONTACTS":
             st.session_state.del_idx = idx; st.rerun()
 
 elif page == "PLANNING":
-    st.subheader("📅 Planning 2026")
-    st.info("Le calendrier est la prochaine étape !")
-
+    st.info("On s'occupe du planning ?")
 
 
 
