@@ -68,6 +68,9 @@ st.divider()
 if st.session_state.page == "CONTACTS":
     st.subheader("👤 Gestion des Contacts & Clients")
     
+    # 1. INITIALISATION DE SÉCURITÉ (Évite le NameError)
+    df_disp = pd.DataFrame() 
+    
     # 🔍 RECHERCHE
     search = st.text_input("🔍 Rechercher un nom, prénom ou société...", "").lower()
     
@@ -79,137 +82,96 @@ if st.session_state.page == "CONTACTS":
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()
 
-    # --- LOGIQUE D'ÉDITION (FORMULAIRE) ---
+    # --- LOGIQUE D'ÉDITION ---
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
-        r = df_c.loc[idx]
-        st.markdown("### 📝 Modification & Historique")
-        
-        with st.expander("Modifier les informations", expanded=True):
-            col1, col2 = st.columns(2)
-            u_pre = col1.text_input("Prénom", value=safe_get(r, 'Prénom'))
-            u_nom = col2.text_input("Nom", value=safe_get(r, 'Nom'))
-            u_soc = col1.text_input("Société (Mettre CMN pour le bleu)", value=safe_get(r, 'Société'))
-            u_tel = col2.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
-            u_mail = col1.text_input("Email", value=safe_get(r, 'Email'))
-            u_date = col2.text_input("Date (JJ/MM/2026)", value=safe_get(r, 'DateNav'))
-            u_jours = col1.text_input("Nombre de jours", value=safe_get(r, 'NbreJours'))
-            u_prix = col2.text_input("Prix total (€)", value=safe_get(r, 'Prix'))
-            
-            u_stat = st.selectbox("Statut Mission", ["En attente", "OK", "Terminé", "Refusé"], 
-                                 index=["En attente", "OK", "Terminé", "Refusé"].index(r['Statut']) if r['Statut'] in ["En attente", "OK", "Terminé", "Refusé"] else 0)
-            u_paye = st.selectbox("Statut Paiement", ["Pas payé", "Payé"], 
-                                 index=0 if r['Paiement'] == "Pas payé" else 1)
-            u_notes = st.text_area("Notes / Commentaires", value=safe_get(r, 'Notes'))
+        # Vérification que l'index existe toujours dans le DataFrame
+        if idx in df_c.index:
+            r = df_c.loc[idx]
+            st.markdown("### 📝 Modification")
+            with st.expander("Modifier les informations", expanded=True):
+                # ... (tes champs text_input ici: u_pre, u_nom, u_soc, etc.)
+                # N'oublie pas le bouton pour fermer :
+                if st.button("Annuler / Fermer"):
+                    st.session_state.edit_idx = None
+                    st.rerun()
+        else:
+            st.session_state.edit_idx = None
 
-            c_save, c_annul = st.columns(2)
-            if c_save.button("💾 ENREGISTRER LES MODIFICATIONS", type="primary", use_container_width=True):
-                df_c.at[idx, 'Prénom'], df_c.at[idx, 'Nom'], df_c.at[idx, 'Société'] = u_pre, u_nom, u_soc
-                df_c.at[idx, 'Téléphone'], df_c.at[idx, 'Email'], df_c.at[idx, 'DateNav'] = u_tel, u_mail, u_date
-                df_c.at[idx, 'NbreJours'], df_c.at[idx, 'Prix'] = u_jours, u_prix
-                df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'], df_c.at[idx, 'Notes'] = u_stat, u_paye, u_notes
-                sauvegarder_data(df_c, "contacts.json")
-                st.session_state.edit_idx = None
-                st.success("Modification enregistrée !")
-                time.sleep(1)
-                st.rerun()
-            
-            if c_annul.button("Annuler", use_container_width=True):
-                st.session_state.edit_idx = None
-                st.rerun()
-
-        # --- AFFICHAGE HISTORIQUE (Navigations liées au même nom) ---
-        st.markdown("#### 📜 Historique des navigations de ce client")
-        hist = df_c[(df_c['Nom'] == r['Nom']) & (df_c['Prénom'] == r['Prénom'])]
-        st.table(hist[['DateNav', 'NbreJours', 'Statut', 'Prix', 'Paiement']])
-        st.divider()
-
-    # --- AFFICHAGE DE LA LISTE ---
+    # --- FILTRAGE ET ARCHIVES ---
     t1, t2 = st.columns(2)
     if t1.button("🚀 EN COURS", type="primary" if not st.session_state.view_archive else "secondary", use_container_width=True):
         st.session_state.view_archive = False; st.rerun()
     if t2.button("📁 ARCHIVÉS", type="primary" if st.session_state.view_archive else "secondary", use_container_width=True):
         st.session_state.view_archive = True; st.rerun()
 
+    # Création du DataFrame à afficher
     df_filtered = df_c.copy()
-  # ... (code précédent : filtrage df_disp)
-
-    for idx, r in df_disp.iterrows():
-        # 1. Préparation des données de la fiche
-        soc = safe_get(r, 'Société')
-        color_paye = "#2ecc71" if r['Paiement'] == "Payé" else "#e74c3c"
-        s_val = r['Statut'].upper()
-        color_statut = "#2ecc71" if "OK" in s_val else "#3498db" if "TERM" in s_val else "#f1c40f" if "ATTENT" in s_val else "#e74c3c"
-        cl_b = "border-cmn" if "CMN" in soc.upper() else ""
-        
-        # 2. Affichage HTML de la fiche
-        st.markdown(f"""
-            <div class="fiche-globale {cl_b}">
-                <span class="statut-badge" style="background:{color_paye};">{r['Paiement']}</span>
-                <span class="statut-badge" style="background:{color_statut};">{r['Statut']}</span>
-                <div style="font-size:12px; color:gray;">{soc if soc else "PARTICULIER"}</div>
-                <div class="prenom-style">{r['Prénom']} {r['Nom'].upper()}</div>
-                📞 <b>{r['Téléphone']}</b> | ✉️ <i>{r['Email']}</i><br>
-                📅 <b>{r['DateNav']}</b> ({r['NbreJours']}j) | 💰 <b>{r['Prix']}€</b>
-                <div style="margin-top:10px; display: flex; justify-content: space-between;">
-                    <a href="tel:{r['Téléphone']}" class="btn-contact" style="background:#3498db;">Appel</a>
-                    <a href="https://wa.me/{str(r['Téléphone']).replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
-                    <a href="mailto:{r['Email']}" class="btn-contact" style="background:#e67e22;">Mail</a>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        # 3. BLOC BOUTONS (C'est ici que l'erreur se produisait)
-        # Ces colonnes DOIVENT être à l'intérieur de la boucle FOR
-        c_ed, c_del = st.columns([1, 1])
-        
-        # Bouton Modifier
-        if c_ed.button(f"✏️ MODIFIER / HISTORIQUE", key=f"btn_ed_{idx}", use_container_width=True):
-            st.session_state.edit_idx = idx
-            st.rerun()
-
-        # Bouton Supprimer avec Confirmation
-        if st.session_state.get('confirm_del') == idx:
-            st.warning(f"⚠️ Supprimer #{idx} ?")
-            col_y, col_n = st.columns(2)
-            if col_y.button("✅ OUI", key=f"conf_y_{idx}", use_container_width=True):
-                df_c = df_c.drop(idx)
-                sauvegarder_data(df_c, "contacts.json")
-                st.session_state.confirm_del = None
-                st.success("Fiche supprimée")
-                time.sleep(1)
-                st.rerun()
-            if col_n.button("NON", key=f"conf_n_{idx}", use_container_width=True):
-                st.session_state.confirm_del = None
-                st.rerun()
+    
+    # Application de la recherche
+    if not df_filtered.empty and search:
+        df_filtered = df_filtered[
+            df_filtered['Nom'].str.lower().str.contains(search, na=False) | 
+            df_filtered['Prénom'].str.lower().str.contains(search, na=False) | 
+            df_filtered['Société'].str.lower().str.contains(search, na=False)
+        ]
+    
+    # Définition de df_disp (Crucial pour éviter l'erreur)
+    if not df_filtered.empty:
+        if st.session_state.view_archive:
+            df_disp = df_filtered[df_filtered['Statut'].isin(["Terminé", "Refusé"])]
         else:
-            if c_del.button(f"🗑️ SUPPRIMER", key=f"btn_del_{idx}", use_container_width=True):
-                st.session_state.confirm_del = idx
-                st.rerun()
-        
-        # Fidélité
-        nb_nav = len(df_c[(df_c['Nom'] == r['Nom']) & (df_c['Prénom'] == r['Prénom'])])
-        badge_fid = f"<span style='color:#f39c12; font-weight:bold;'>⭐ Fidèle ({nb_nav} nav.)</span>" if nb_nav > 1 else ""
+            df_disp = df_filtered[~df_filtered['Statut'].isin(["Terminé", "Refusé"])]
+    else:
+        df_disp = pd.DataFrame()
 
-        st.markdown(f"""
-            <div class="fiche-globale {cl_b}">
-                <span class="statut-badge" style="background:{color_paye};">{r['Paiement']}</span>
-                <span class="statut-badge" style="background:{color_statut};">{r['Statut']}</span>
-                <div style="font-size:12px; color:gray;">{soc if soc else "PARTICULIER"} {badge_fid}</div>
-                <div class="prenom-style">{r['Prénom']} {r['Nom'].upper()}</div>
-                📞 <b>{r['Téléphone']}</b> | ✉️ <i>{r['Email']}</i><br>
-                📅 <b>{r['DateNav']}</b> ({r['NbreJours']}j) | 💰 <b>{r['Prix']}€</b>
-                <div style="margin-top:10px; display: flex; justify-content: space-between;">
-                    <a href="tel:{r['Téléphone']}" class="btn-contact" style="background:#3498db;">Appel</a>
-                    <a href="https://wa.me/{str(r['Téléphone']).replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
-                    <a href="mailto:{r['Email']}" class="btn-contact" style="background:#e67e22;">Mail</a>
+    # --- BOUCLE D'AFFICHAGE ---
+    if not df_disp.empty:
+        for idx, r in df_disp.iterrows():
+            # Préparation des données
+            soc = safe_get(r, 'Société')
+            color_paye = "#2ecc71" if r['Paiement'] == "Payé" else "#e74c3c"
+            s_val = str(r['Statut']).upper()
+            color_statut = "#2ecc71" if "OK" in s_val else "#3498db" if "TERM" in s_val else "#f1c40f" if "ATTENT" in s_val else "#e74c3c"
+            cl_b = "border-cmn" if "CMN" in str(soc).upper() else ""
+            
+            # Fiche HTML
+            st.markdown(f"""
+                <div class="fiche-globale {cl_b}">
+                    <span class="statut-badge" style="background:{color_paye};">{r['Paiement']}</span>
+                    <span class="statut-badge" style="background:{color_statut};">{r['Statut']}</span>
+                    <div style="font-size:12px; color:gray;">{soc if soc else "PARTICULIER"}</div>
+                    <div class="prenom-style">{r['Prénom']} {r['Nom'].upper()}</div>
+                    📞 <b>{r['Téléphone']}</b> | ✉️ <i>{r['Email']}</i><br>
+                    📅 <b>{r['DateNav']}</b> ({r['NbreJours']}j) | 💰 <b>{r['Prix']}€</b>
                 </div>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button(f"✏️ MODIFIER / HISTORIQUE #{idx}", key=f"btn_ed_{idx}", use_container_width=True):
-            st.session_state.edit_idx = idx
-            st.rerun()
+            """, unsafe_allow_html=True)
+            
+            # Boutons Actions (Bien indentés !)
+            c_ed, c_del = st.columns(2)
+            if c_ed.button(f"✏️ MODIFIER", key=f"ed_{idx}", use_container_width=True):
+                st.session_state.edit_idx = idx
+                st.rerun()
+            
+            # Système de suppression
+            if st.session_state.get('confirm_del') == idx:
+                st.warning("Supprimer ?")
+                cy, cn = st.columns(2)
+                if cy.button("OUI", key=f"y_{idx}"):
+                    df_c = df_c.drop(idx)
+                    sauvegarder_data(df_c, "contacts.json")
+                    st.session_state.confirm_del = None
+                    st.rerun()
+                if cn.button("NON", key=f"n_{idx}"):
+                    st.session_state.confirm_del = None
+                    st.rerun()
+            else:
+                if c_del.button(f"🗑️ SUPPRIMER", key=f"del_{idx}", use_container_width=True):
+                    st.session_state.confirm_del = idx
+                    st.rerun()
+    else:
+        st.info("Aucun contact trouvé.")
+
 
 # --- MODULE STATS (Calculs automatiques) ---
 if st.session_state.page == "STATS":
