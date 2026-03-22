@@ -101,34 +101,41 @@ if st.session_state.page == "CONTACTS":
     else:
         df_disp = df_filtered[~df_filtered['Statut'].isin(["Terminé", "Refusé"])]
 
-    # Affichage des Fiches
+# Affichage des Fiches
     for idx, r in df_disp.iterrows():
         soc = safe_get(r, 'Société')
         is_cmn = "CMN" in soc.upper()
         cl_b = "border-cmn" if is_cmn else ""
         
+        # --- LOGIQUE DE COULEUR (Extraite pour éviter l'erreur f-string) ---
+        color_paye = "#2ecc71" if r['Paiement'] == "Payé" else "#e74c3c"
+        # Couleur statut : Vert si OK, Bleu si Terminé, Jaune si Attente, Rouge si Refusé
+        s_val = r['Statut'].upper()
+        color_statut = "#2ecc71" if "OK" in s_val else "#3498db" if "TERM" in s_val else "#f1c40f" if "ATTENT" in s_val else "#e74c3c"
+
         # Calcul fidélité
         nb_nav = len(df_c[(df_c['Nom'] == r['Nom']) & (df_c['Prénom'] == r['Prénom'])])
-        badge_fid = f"⭐ Fidèle ({nb_nav})" if nb_nav > 1 else ""
+        badge_fid = f"<span style='color:#f1c40f;'>⭐ Fidèle ({nb_nav})</span>" if nb_nav > 1 else ""
 
+        # La Fiche Visuelle corrigée
         st.markdown(f"""
             <div class="fiche-globale {cl_b}">
-                <span class="statut-badge" style="background:#2ecc71 if r['Paiement']=='Payé' else '#e74c3c'}">{r['Paiement']}</span>
-                <span class="statut-badge" style="background:#3498db">{r['Statut']}</span>
+                <span class="statut-badge" style="background:{color_paye};">{r['Paiement']}</span>
+                <span class="statut-badge" style="background:{color_statut};">{r['Statut']}</span>
                 <div style="font-size:12px; color:gray;">{soc if soc else "PARTICULIER"} {badge_fid}</div>
                 <div class="prenom-style">{r['Prénom']} {r['Nom'].upper()}</div>
-                📅 {r['DateNav']} ({r['NbreJours']}j) | 💰 {r['Prix']}€<br>
-                <div style="margin-top:10px;">
+                📅 <b>{r['DateNav']}</b> ({r['NbreJours']}j) | 💰 <b>{r['Prix']}€</b><br>
+                <div style="margin-top:10px; display: flex; justify-content: space-between;">
                     <a href="tel:{r['Téléphone']}" class="btn-contact" style="background:#3498db;">Appel</a>
-                    <a href="https://wa.me/{r['Téléphone'].replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
+                    <a href="https://wa.me/{str(r['Téléphone']).replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                     <a href="mailto:{r['Email']}" class="btn-contact" style="background:#e67e22;">Mail</a>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
-        # Bouton Modifier / Historique
+        # Boutons Action
         col_ed, col_del = st.columns([1, 1])
-        if col_ed.button(f"✏️ Modifier / Historique #{idx}", key=f"ed_{idx}"):
+        if col_ed.button(f"✏️ Modifier / Historique", key=f"ed_{idx}", use_container_width=True):
             st.session_state.edit_idx = idx
             st.rerun()
 
