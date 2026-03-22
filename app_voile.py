@@ -7,13 +7,49 @@ from datetime import datetime
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
-# --- CHARGEMENT DATA ---
+# --- STYLE CSS (CORRIGÉ POUR ÉVITER LE TEXTE BRUT) ---
+st.markdown("""
+    <style>
+    /* La fiche principale */
+    .card {
+        background-color: white;
+        border-radius: 15px;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-left: 10px solid #3498db;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        color: #2c3e50;
+    }
+    /* Le titre Prénom NOM */
+    .title { font-size: 22px; font-weight: bold; color: #1a252f; margin-bottom: 2px; }
+    .nom { text-transform: uppercase; }
+    /* L'encadré gris pour la durée */
+    .duration-box {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 10px;
+        margin: 10px 0;
+        border: 1px solid #e9ecef;
+        font-size: 14px;
+    }
+    /* Les badges de statut */
+    .badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        color: white;
+        font-size: 12px;
+        font-weight: bold;
+        display: inline-block;
+        margin-left: 5px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- DATA ---
 def charger_data():
     file = "contacts.json"
     if os.path.exists(file):
-        try:
-            return pd.read_json(file)
-        except: pass
+        return pd.read_json(file)
     return pd.DataFrame(columns=['Prénom', 'Nom', 'Société', 'DateNav', 'NbreJours', 'Téléphone', 'Email', 'Statut', 'Paiement', 'Prix'])
 
 df = charger_data()
@@ -21,61 +57,51 @@ df = charger_data()
 # --- INTERFACE ---
 st.title("⚓ Vesta Skipper 2026")
 
-tab1, tab2 = st.tabs(["🚀 MISSIONS", "📅 PLANNING"])
+search = st.text_input("🔍 Rechercher un client...", "").lower()
 
-with tab1:
-    search = st.text_input("🔍 Rechercher...", "").lower()
+for idx, r in df.iterrows():
+    if search and not any(search in str(r[c]).lower() for c in ['Nom', 'Prénom', 'Société']):
+        continue
+
+    # Préparation des couleurs
+    color_statut = "#2ecc71" if r['Statut'] == "OK" else "#f1c40f" # Vert si OK, Jaune sinon
+    color_paie = "#2ecc71" if r['Paiement'] == "Payé" else "#e74c3c" # Vert si Payé, Rouge sinon
+
+    # --- CONSTRUCTION DU HTML (SANS ERREUR) ---
+    # On utilise f-string pour injecter les variables
+    fiche_html = f"""
+    <div class="card">
+        <div class="title">{r['Prénom']} <span class="nom">{r['Nom']}</span></div>
+        <div style="color: #7f8c8d; font-size: 14px;">🏛️ {r['Société'] if r['Société'] else 'PARTICULIER'}</div>
+        <div style="margin-top: 8px; font-size: 15px;">
+            📞 <b>{r['Téléphone']}</b> | ✉️ {r['Email']}
+        </div>
+        
+        <div class="duration-box">
+            ⏳ <span style="color: #95a5a6;">Durée de la mission :</span> <b>{r['NbreJours']} jour(s)</b>
+        </div>
+        
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 18px;">📅 <b>{r['DateNav']}</b></div>
+            <div>
+                <span class="badge" style="background-color: {color_statut};">{r['Statut']}</span>
+                <span class="badge" style="background-color: {color_paie};">{r['Paiement']}</span>
+            </div>
+        </div>
+    </div>
+    """
     
-    # On boucle sur les données
-    for idx, r in df.iterrows():
-        # Filtrage simple
-        if search and not any(search in str(r[c]).lower() for c in ['Nom', 'Prénom', 'Société']):
-            continue
-
-        # --- CRÉATION DE LA FICHE SANS HTML ---
-        with st.container(border=True):
-            # Ligne 1 : Nom et Prénom
-            st.subheader(f"{r['Prénom']} {str(r['Nom']).upper()}")
-            
-            # Ligne 2 : Société et Contacts
-            col1, col2 = st.columns(2)
-            col1.write(f"🏛️ **{r['Société'] if r['Société'] else 'Particulier'}**")
-            col2.write(f"📞 {r['Téléphone']}")
-            
-            st.write(f"✉️ {r['Email']}")
-            
-            # Ligne 3 : Détails Mission
-            st.info(f"⏳ **Durée de la mission :** {r['NbreJours']} jour(s)")
-            
-            st.divider() # La ligne de séparation
-            
-            # Ligne 4 : Date et Statuts
-            c_date, c_statut, c_paie = st.columns([2, 1, 1])
-            c_date.write(f"📅 **{r['DateNav']}**")
-            
-            # Affichage des statuts avec des couleurs natives
-            if r['Statut'] == "OK":
-                c_statut.success(r['Statut'])
-            else:
-                c_statut.warning(r['Statut'])
-                
-            if r['Paiement'] == "Payé":
-                c_paie.success("Payé")
-            else:
-                c_paie.error("Impayé")
-
-            # Boutons d'actions
-            ba1, ba2, ba3 = st.columns(3)
-            if ba1.button("🔄 RE-BOOK", key=f"re_{idx}"):
-                st.info("Action Re-book")
-            if ba2.button("✏️ Modifier", key=f"ed_{idx}"):
-                st.info("Action Modifier")
-            if ba3.button("🗑️ Suppr.", key=f"del_{idx}"):
-                st.error("Action Supprimer")
-
-with tab2:
-    st.write("Le planning sera ici.")
-
+    # AFFICHAGE DE LA FICHE
+    st.markdown(fiche_html, unsafe_allow_html=True)
+    
+    # BOUTONS D'ACTIONS (NATIFS POUR LA RÉACTIVITÉ)
+    c1, c2, c3 = st.columns(3)
+    c1.button("🔄 RE-BOOK", key=f"rb_{idx}", use_container_width=True)
+    c2.button("✏️ Modifier", key=f"ed_{idx}", use_container_width=True)
+    c3.button("🗑️ Suppr.", key=f"del_{idx}", use_container_width=True)
+    st.write("") # Espace entre les fiches
 
 
 
