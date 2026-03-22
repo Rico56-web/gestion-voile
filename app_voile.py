@@ -8,7 +8,7 @@ import time
 # --- CONFIGURATION PAGE ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
-# --- STYLE CSS (OPTIMISÉ MOBILE) ---
+# --- STYLE CSS (MOBILE FIRST) ---
 st.markdown("""
     <style>
     .fiche-globale {
@@ -47,6 +47,7 @@ def sauvegarder_data(df):
 if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
 if 'del_idx' not in st.session_state: st.session_state.del_idx = None
 if 'rebook_idx' not in st.session_state: st.session_state.rebook_idx = None
+if 'confirm_clean' not in st.session_state: st.session_state.confirm_clean = False
 if 'archives' not in st.session_state: st.session_state.archives = False
 
 df_c = charger_data()
@@ -66,26 +67,38 @@ if page == "CONTACTS":
     if c_t2.button("📁 ARCHIVES", type="primary" if st.session_state.archives else "secondary", use_container_width=True):
         st.session_state.archives = True; st.rerun()
 
-    # Bouton Nouveau & Archivage Auto
+    # --- BARRE D'ACTIONS ---
     col_a, col_b = st.columns([2, 1])
+    
+    # 1. Nouveau Contact
     if col_a.button("➕ NOUVEAU CONTACT", use_container_width=True):
         new_line = {c: "" for c in df_c.columns}
         new_line.update({"Prénom": "Nouveau", "Nom": "Contact", "DateNav": datetime.now().strftime("%d/%m/2026"), "DateResa": datetime.now().strftime("%d/%m/%Y"), "NbreJours": "1", "Statut": "En attente", "Paiement": "Pas payé"})
         df_c = pd.concat([pd.DataFrame([new_line]), df_c], ignore_index=True)
         sauvegarder_data(df_c); st.rerun()
 
+    # 2. Bouton Nettoyer Sécurisé
     if not st.session_state.archives:
-        if col_b.button("🧹 NETTOYER", use_container_width=True):
-            auj = datetime.now()
-            def check_archive(row):
-                try:
-                    d_nav = datetime.strptime(str(row['DateNav']), "%d/%m/%Y")
-                    if d_nav < auj and row['Paiement'] == "Payé" and row['Statut'] == "OK":
-                        return "Terminé"
-                except: pass
-                return row['Statut']
-            df_c['Statut'] = df_c.apply(check_archive, axis=1)
-            sauvegarder_data(df_c); st.toast("Ménage terminé !"); time.sleep(1); st.rerun()
+        if st.session_state.confirm_clean:
+            cc1, cc2 = col_b.columns(2)
+            if cc1.button("⚠️ OUI", type="primary", use_container_width=True):
+                auj = datetime.now()
+                def check_archive(row):
+                    try:
+                        d_nav = datetime.strptime(str(row['DateNav']), "%d/%m/%Y")
+                        if d_nav < auj and row['Paiement'] == "Payé" and row['Statut'] == "OK":
+                            return "Terminé"
+                    except: pass
+                    return row['Statut']
+                df_c['Statut'] = df_c.apply(check_archive, axis=1)
+                sauvegarder_data(df_c)
+                st.session_state.confirm_clean = False
+                st.toast("Ménage terminé !"); time.sleep(1); st.rerun()
+            if cc2.button("X", use_container_width=True):
+                st.session_state.confirm_clean = False; st.rerun()
+        else:
+            if col_b.button("🧹 NETTOYER", use_container_width=True):
+                st.session_state.confirm_clean = True; st.rerun()
 
     # Formulaire de modification
     if st.session_state.edit_idx is not None:
@@ -109,11 +122,10 @@ if page == "CONTACTS":
                         df_c.loc[idx] = [u_pre, u_nom, u_soc, u_nav, u_res, u_jou, u_tel, r['Email'], u_sta, u_pay, u_pri]
                         sauvegarder_data(df_c); st.session_state.edit_idx = None; st.rerun()
 
-    # Filtrage
+    # --- LISTE ---
     search = st.text_input("🔍 Rechercher...", "").lower()
     df_f = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.archives else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-    # Boucle d'affichage
     for idx, r in df_f.iterrows():
         if search and search not in str(r['Nom']).lower() and search not in str(r['Prénom']).lower() and search not in str(r['Société']).lower():
             continue
@@ -146,15 +158,13 @@ if page == "CONTACTS":
         # ACTIONS
         c1, c2, c3 = st.columns(3)
         
-        # --- BLOC RE-BOOK VERROUILLÉ ---
+        # Re-book sécurisé
         if st.session_state.rebook_idx == idx:
-            if c1.button("✅ CONFIRM ?", key=f"re_conf_{idx}", type="primary", use_container_width=True):
+            if c1.button("✅ RE-BOOK", key=f"re_conf_{idx}", type="primary", use_container_width=True):
                 new_nav = r.copy()
                 new_nav.update({"DateNav": datetime.now().strftime("%d/%m/2026"), "Statut": "En attente", "Paiement": "Pas payé"})
                 df_c = pd.concat([pd.DataFrame([new_nav]), df_c], ignore_index=True)
-                sauvegarder_data(df_c)
-                st.session_state.rebook_idx = None
-                st.rerun()
+                sauvegarder_data(df_c); st.session_state.rebook_idx = None; st.rerun()
             if st.button("X", key=f"re_ann_{idx}", use_container_width=True):
                 st.session_state.rebook_idx = None; st.rerun()
         else:
@@ -174,8 +184,8 @@ if page == "CONTACTS":
             st.session_state.del_idx = idx; st.rerun()
 
 elif page == "PLANNING":
-    st.subheader("📅 Calendrier 2026")
-    st.info("Module prêt pour le visuel.")
+    st.subheader("📅 Planning 2026")
+    st.write("Voulez-vous que j'ajoute maintenant le calendrier visuel ?")
 
 
 
