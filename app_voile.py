@@ -125,36 +125,53 @@ if st.session_state.page == "CONTACTS":
     else:
         df_disp = df_filtered[~df_filtered['Statut'].isin(["Terminé", "Refusé"])]
 
-    # 6. AFFICHAGE DES FICHES
+# 6. AFFICHAGE DES FICHES
     for idx, r in df_disp.iterrows():
         soc = safe_get(r, 'Société')
+        # Couleurs
         color_paye = "#2ecc71" if r['Paiement'] == "Payé" else "#e74c3c"
-        color_statut = "#2ecc71" if "OK" in str(r['Statut']).upper() else "#f1c40f" if "ATTENT" in str(r['Statut']).upper() else "#3498db"
+        s_val = str(r['Statut']).upper()
+        color_statut = "#2ecc71" if "OK" in s_val else "#f1c40f" if "ATTENT" in s_val else "#3498db"
         cl_b = "border-cmn" if "CMN" in str(soc).upper() else ""
         
+        # Structure de la fiche (Ordre demandé : Prénom, Nom, Société, Tel, Email, Date, Statut, Paiement)
         st.markdown(f"""
             <div class="fiche-globale {cl_b}">
-                <span class="statut-badge" style="background:{color_paye};">{r['Paiement']}</span>
-                <span class="statut-badge" style="background:{color_statut};">{r['Statut']}</span>
-                <div style="font-size:12px; color:gray;">{soc if soc else "PARTICULIER"}</div>
                 <div class="prenom-style">{r['Prénom']} {r['Nom'].upper()}</div>
-                📞 <b>{r['Téléphone']}</b> | ✉️ <i>{r['Email']}</i><br>
-                📅 <b>{r['DateNav']}</b> | 💰 <b>{r['Prix']}€</b>
+                <div style="color: #7f8c8d; font-weight: bold; margin-bottom: 5px;">🏛️ {soc if soc else "PARTICULIER"}</div>
+                
+                <div style="margin: 5px 0;">
+                    📞 <b>{r['Téléphone']}</b><br>
+                    ✉️ <i>{r['Email']}</i>
+                </div>
+                
+                <hr style="margin: 10px 0; border: 0; border-top: 1px solid #eee;">
+                
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>📅 <b>{r['DateNav']}</b></span>
+                    <div>
+                        <span class="statut-badge" style="background:{color_statut};">{r['Statut']}</span>
+                        <span class="statut-badge" style="background:{color_paye};">{r['Paiement']}</span>
+                    </div>
+                </div>
             </div>
         """, unsafe_allow_html=True)
         
+        # Boutons Actions
         c_ed, c_del = st.columns(2)
         if c_ed.button(f"✏️ MODIFIER", key=f"ed_{idx}", use_container_width=True):
             st.session_state.edit_idx = idx
             st.rerun()
             
         if st.session_state.get('confirm_del') == idx:
-            if st.button(f"✅ CONFIRMER SUPPRESSION #{idx}", key=f"conf_{idx}", type="primary", use_container_width=True):
+            st.warning(f"Confirmer suppression #{idx} ?")
+            cy, cn = st.columns(2)
+            if cy.button("OUI", key=f"conf_{idx}", type="primary", use_container_width=True):
                 df_c = df_c.drop(idx)
                 sauvegarder_data(df_c, "contacts.json")
                 st.session_state.confirm_del = None
                 st.rerun()
-            if st.button("ANNULER", key=f"ann_{idx}", use_container_width=True):
+            if cn.button("NON", key=f"ann_{idx}", use_container_width=True):
                 st.session_state.confirm_del = None
                 st.rerun()
         else:
