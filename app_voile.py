@@ -81,22 +81,65 @@ if st.session_state.page == "CONTACTS":
         df_c = pd.concat([pd.DataFrame([new_row]), df_c], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()
-
-    # --- LOGIQUE D'ÉDITION ---
+# --- LOGIQUE D'ÉDITION (LE FORMULAIRE COMPLET) ---
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
-        # Vérification que l'index existe toujours dans le DataFrame
         if idx in df_c.index:
             r = df_c.loc[idx]
-            st.markdown("### 📝 Modification")
-            with st.expander("Modifier les informations", expanded=True):
-                # ... (tes champs text_input ici: u_pre, u_nom, u_soc, etc.)
-                # N'oublie pas le bouton pour fermer :
-                if st.button("Annuler / Fermer"):
+            st.markdown(f"### 📝 Modification de la fiche #{idx}")
+            
+            with st.expander("Ouvrir le formulaire de modification", expanded=True):
+                col1, col2 = st.columns(2)
+                u_pre = col1.text_input("Prénom", value=safe_get(r, 'Prénom'))
+                u_nom = col2.text_input("Nom", value=safe_get(r, 'Nom'))
+                u_soc = col1.text_input("Société", value=safe_get(r, 'Société'), help="Tapez CMN pour le bleu")
+                u_tel = col2.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
+                u_mail = col1.text_input("Email", value=safe_get(r, 'Email'))
+                u_date = col2.text_input("Date (JJ/MM/2026)", value=safe_get(r, 'DateNav'))
+                u_jours = col1.text_input("Nombre de jours", value=safe_get(r, 'NbreJours'))
+                u_prix = col2.text_input("Prix total (€)", value=safe_get(r, 'Prix'))
+                
+                # Sélecteurs pour éviter les erreurs de frappe
+                list_statut = ["En attente", "OK", "Terminé", "Refusé"]
+                u_stat = st.selectbox("Statut Mission", list_statut, 
+                                     index=list_statut.index(r['Statut']) if r['Statut'] in list_statut else 0)
+                
+                list_paye = ["Pas payé", "Payé"]
+                u_paye = st.selectbox("Statut Paiement", list_paye, 
+                                     index=list_paye.index(r['Paiement']) if r['Paiement'] in list_paye else 0)
+                
+                u_notes = st.text_area("Notes / Commentaires", value=safe_get(r, 'Notes'))
+
+                c_save, c_annul = st.columns(2)
+                if c_save.button("💾 ENREGISTRER", type="primary", use_container_width=True):
+                    df_c.at[idx, 'Prénom'] = u_pre
+                    df_c.at[idx, 'Nom'] = u_nom
+                    df_c.at[idx, 'Société'] = u_soc
+                    df_c.at[idx, 'Téléphone'] = u_tel
+                    df_c.at[idx, 'Email'] = u_mail
+                    df_c.at[idx, 'DateNav'] = u_date
+                    df_c.at[idx, 'NbreJours'] = u_jours
+                    df_c.at[idx, 'Prix'] = u_prix
+                    df_c.at[idx, 'Statut'] = u_stat
+                    df_c.at[idx, 'Paiement'] = u_paye
+                    df_c.at[idx, 'Notes'] = u_notes
+                    
+                    sauvegarder_data(df_c, "contacts.json")
+                    st.session_state.edit_idx = None
+                    st.success("Modifications enregistrées !")
+                    time.sleep(1)
+                    st.rerun()
+                
+                if c_annul.button("Annuler / Fermer", use_container_width=True):
                     st.session_state.edit_idx = None
                     st.rerun()
-        else:
-            st.session_state.edit_idx = None
+
+            # --- AFFICHAGE HISTORIQUE (Navigations liées) ---
+            st.markdown("#### 📜 Historique client")
+            hist = df_c[(df_c['Nom'] == r['Nom']) & (df_c['Prénom'] == r['Prénom'])]
+            if not hist.empty:
+                st.dataframe(hist[['DateNav', 'NbreJours', 'Statut', 'Prix', 'Paiement']], use_container_width=True)
+            st.divider()
 
     # --- FILTRAGE ET ARCHIVES ---
     t1, t2 = st.columns(2)
