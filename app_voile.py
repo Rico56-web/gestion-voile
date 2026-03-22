@@ -37,7 +37,7 @@ def charger_data():
             df = pd.read_json(file)
             for c in cols: 
                 if c not in df.columns: df[c] = ""
-            return df[cols] # Force l'ordre des colonnes
+            return df[cols]
         except: pass
     return pd.DataFrame(columns=cols)
 
@@ -53,23 +53,23 @@ if 'archives' not in st.session_state: st.session_state.archives = False
 
 df_c = charger_data()
 
-# --- NAVIGATION ---
+# --- MENU LATÉRAL ---
 st.sidebar.title("⚓ Vesta Skipper")
 page = st.sidebar.radio("Navigation", ["CONTACTS", "PLANNING", "STATS"])
 
 if page == "CONTACTS":
-    st.subheader("👤 Mes Contacts")
+    st.subheader("👤 Mes Missions")
 
-    # Onglets
+    # Onglets Actives / Archives
     c_t1, c_t2 = st.columns(2)
     if c_t1.button("🚀 EN COURS", type="primary" if not st.session_state.archives else "secondary", use_container_width=True):
         st.session_state.archives = False; st.rerun()
     if c_t2.button("📁 ARCHIVES", type="primary" if st.session_state.archives else "secondary", use_container_width=True):
         st.session_state.archives = True; st.rerun()
 
-    # Barre d'actions haut de page
+    # Barre d'actions (Nouveau + Nettoyage)
     col_a, col_b = st.columns([2, 1])
-    if col_a.button("➕ NOUVEAU CONTACT", use_container_width=True):
+    if col_a.button("➕ NOUVELLE FICHE", use_container_width=True):
         new_line = {c: "" for c in df_c.columns}
         new_line.update({"Prénom": "Nouveau", "Nom": "Contact", "DateNav": "01/01/2026", "NbreJours": "1", "Statut": "En attente", "Paiement": "Pas payé"})
         df_c = pd.concat([pd.DataFrame([new_line]), df_c], ignore_index=True)
@@ -95,11 +95,11 @@ if page == "CONTACTS":
             if col_b.button("🧹 NETTOYER", use_container_width=True):
                 st.session_state.confirm_clean = True; st.rerun()
 
-    # Zone Modification
+    # Formulaire de modification
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         r = df_c.loc[idx]
-        with st.expander(f"📝 MODIFIER : {r['Prénom']} {r['Nom']}", expanded=True):
+        with st.expander(f"📝 ÉDITION : {r['Prénom']} {r['Nom']}", expanded=True):
             with st.form("edit_form"):
                 c1, c2 = st.columns(2)
                 u_pre = c1.text_input("Prénom", r['Prénom'])
@@ -107,28 +107,21 @@ if page == "CONTACTS":
                 u_soc = c1.text_input("Société", r['Société'])
                 u_tel = c2.text_input("Téléphone", r['Téléphone'])
                 u_mail = c1.text_input("Email", r['Email'])
-                u_nav = c2.text_input("Date Nav (JJ/MM/2026)", r['DateNav'])
-                u_jou = c1.text_input("Nb Jours", r['NbreJours'])
-                u_pri = c2.text_input("Prix (€)", r['Prix'])
-                u_sta = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(r['Statut']) if r['Statut'] in ["En attente", "OK", "Terminé", "Refusé"] else 0)
+                u_nav = c2.text_input("Date Nav", r['DateNav'])
+                u_jou = c1.text_input("Durée (jours)", r['NbreJours'])
+                u_pri = c2.text_input("Prix total (€)", r['Prix'])
+                u_sta = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], 
+                                    index=["En attente", "OK", "Terminé", "Refusé"].index(r['Statut']) if r['Statut'] in ["En attente", "OK", "Terminé", "Refusé"] else 0)
                 u_pay = st.selectbox("Paiement", ["Pas payé", "Payé"], index=1 if r['Paiement']=="Payé" else 0)
-                if st.form_submit_button("ENREGISTRER", use_container_width=True):
-                    df_c.at[idx, 'Prénom'] = u_pre
-                    df_c.at[idx, 'Nom'] = u_nom
-                    df_c.at[idx, 'Société'] = u_soc
-                    df_c.at[idx, 'Téléphone'] = u_tel
-                    df_c.at[idx, 'Email'] = u_mail
-                    df_c.at[idx, 'DateNav'] = u_nav
-                    df_c.at[idx, 'NbreJours'] = u_jou
-                    df_c.at[idx, 'Statut'] = u_sta
-                    df_c.at[idx, 'Paiement'] = u_pay
-                    df_c.at[idx, 'Prix'] = u_pri
+                if st.form_submit_button("SAUVEGARDER", use_container_width=True):
+                    df_c.loc[idx] = [u_pre, u_nom, u_soc, u_nav, u_jou, u_tel, u_mail, u_sta, u_pay, u_pri]
                     sauvegarder_data(df_c); st.session_state.edit_idx = None; st.rerun()
 
-    # Liste des fiches
-    search = st.text_input("🔍 Recherche rapide...", "").lower()
+    # Filtre de recherche
+    search = st.text_input("🔍 Rechercher un nom ou société...", "").lower()
     df_f = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.archives else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
+    # Affichage des fiches
     for idx, r in df_f.iterrows():
         if search and not any(search in str(r[c]).lower() for c in ['Nom', 'Prénom', 'Société']):
             continue
@@ -138,7 +131,6 @@ if page == "CONTACTS":
         color_p = "#2ecc71" if r['Paiement'] == "Payé" else "#e74c3c"
         cl_b = "border-cmn" if "CMN" in soc.upper() else ""
 
-        # Affichage HTML ordonné
         st.markdown(f"""
             <div class="fiche-globale {cl_b}">
                 <div class="prenom-style">{r['Prénom']} <span class="nom-style">{r['Nom']}</span></div>
@@ -161,10 +153,10 @@ if page == "CONTACTS":
             </div>
         """, unsafe_allow_html=True)
         
-        # Boutons d'actions
+        # Actions boutons
         c1, c2, c3 = st.columns(3)
         
-        # Action Re-book (Sécurisée)
+        # Confirmation Re-book
         if st.session_state.rebook_idx == idx:
             if c1.button("✅ RE-BOOK", key=f"re_cf_{idx}", type="primary", use_container_width=True):
                 new_nav = r.copy()
@@ -177,11 +169,10 @@ if page == "CONTACTS":
             if c1.button("🔄 RE-BOOK", key=f"re_{idx}", use_container_width=True):
                 st.session_state.rebook_idx = idx; st.rerun()
         
-        # Action Modifier
         if c2.button("✏️ Modifier", key=f"ed_{idx}", use_container_width=True):
             st.session_state.edit_idx = idx; st.rerun()
 
-        # Action Supprimer (Sécurisée)
+        # Confirmation Suppression
         if st.session_state.del_idx == idx:
             if c3.button("✅ OK ?", key=f"cf_{idx}", type="primary", use_container_width=True):
                 df_c = df_c.drop(idx).reset_index(drop=True); sauvegarder_data(df_c)
@@ -190,8 +181,10 @@ if page == "CONTACTS":
             st.session_state.del_idx = idx; st.rerun()
 
 elif page == "PLANNING":
-    st.title("📅 Planning de Navigation")
-    st.write("Voulez-vous que je génère le calendrier visuel basé sur vos fiches ?")
+    st.info("Prêt pour la configuration du calendrier visuel.")
+
+elif page == "STATS":
+    st.info("Prêt pour la configuration des statistiques de navigation.")
 
 
 
