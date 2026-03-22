@@ -30,7 +30,8 @@ st.markdown("""
 # --- FONCTIONS DATA ---
 def charger_data():
     file = "contacts.json"
-    cols = ['Prénom', 'Nom', 'Société', 'DateNav', 'DateResa', 'NbreJours', 'Téléphone', 'Email', 'Statut', 'Paiement', 'Prix']
+    # 'DateResa' a été retiré de la liste des colonnes
+    cols = ['Prénom', 'Nom', 'Société', 'DateNav', 'NbreJours', 'Téléphone', 'Email', 'Statut', 'Paiement', 'Prix']
     if os.path.exists(file):
         try:
             df = pd.read_json(file)
@@ -73,7 +74,7 @@ if page == "CONTACTS":
     # 1. Nouveau Contact
     if col_a.button("➕ NOUVEAU CONTACT", use_container_width=True):
         new_line = {c: "" for c in df_c.columns}
-        new_line.update({"Prénom": "Nouveau", "Nom": "Contact", "DateNav": datetime.now().strftime("%d/%m/2026"), "DateResa": datetime.now().strftime("%d/%m/%Y"), "NbreJours": "1", "Statut": "En attente", "Paiement": "Pas payé"})
+        new_line.update({"Prénom": "Nouveau", "Nom": "Contact", "DateNav": datetime.now().strftime("%d/%m/2026"), "NbreJours": "1", "Statut": "En attente", "Paiement": "Pas payé"})
         df_c = pd.concat([pd.DataFrame([new_line]), df_c], ignore_index=True)
         sauvegarder_data(df_c); st.rerun()
 
@@ -100,7 +101,7 @@ if page == "CONTACTS":
             if col_b.button("🧹 NETTOYER", use_container_width=True):
                 st.session_state.confirm_clean = True; st.rerun()
 
-    # Formulaire de modification
+    # Formulaire de modification (Sans DateResa)
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         if idx in df_c.index:
@@ -113,13 +114,21 @@ if page == "CONTACTS":
                     u_soc = c1.text_input("Société", r['Société'])
                     u_tel = c2.text_input("Téléphone", r['Téléphone'])
                     u_nav = c1.text_input("Date Navigation", r['DateNav'])
-                    u_res = c2.text_input("Date Réservation", r['DateResa'])
-                    u_jou = c1.text_input("Nb Jours", r['NbreJours'])
-                    u_pri = c2.text_input("Prix (€)", r['Prix'])
+                    u_jou = c2.text_input("Nb Jours", r['NbreJours'])
+                    u_pri = c1.text_input("Prix (€)", r['Prix'])
                     u_sta = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=0)
                     u_pay = st.selectbox("Paiement", ["Pas payé", "Payé"], index=0)
-                    if st.form_submit_button("ENREGISTRER LES MODIFICATIONS", use_container_width=True):
-                        df_c.loc[idx] = [u_pre, u_nom, u_soc, u_nav, u_res, u_jou, u_tel, r['Email'], u_sta, u_pay, u_pri]
+                    if st.form_submit_button("ENREGISTRER", use_container_width=True):
+                        # On s'assure de l'ordre des colonnes lors de l'enregistrement
+                        df_c.at[idx, 'Prénom'] = u_pre
+                        df_c.at[idx, 'Nom'] = u_nom
+                        df_c.at[idx, 'Société'] = u_soc
+                        df_c.at[idx, 'Téléphone'] = u_tel
+                        df_c.at[idx, 'DateNav'] = u_nav
+                        df_c.at[idx, 'NbreJours'] = u_jou
+                        df_c.at[idx, 'Statut'] = u_sta
+                        df_c.at[idx, 'Paiement'] = u_pay
+                        df_c.at[idx, 'Prix'] = u_pri
                         sauvegarder_data(df_c); st.session_state.edit_idx = None; st.rerun()
 
     # --- LISTE ---
@@ -135,13 +144,13 @@ if page == "CONTACTS":
         color_p = "#2ecc71" if r['Paiement'] == "Payé" else "#e74c3c"
         cl_b = "border-cmn" if "CMN" in soc.upper() else ""
 
+        # Affichage fiche (Sans Date de Réservation)
         st.markdown(f"""
             <div class="fiche-globale {cl_b}">
                 <div class="prenom-style">{r['Prénom']} {str(r['Nom']).upper()}</div>
                 <div style="color:gray; font-size:14px;">🏛️ {soc}</div>
                 <div style="margin:5px 0; font-size:14px;">📞 <b>{r['Téléphone']}</b></div>
                 <div class="info-box">
-                    📝 <span class="label-gris">Réservé le :</span> {r['DateResa'] if r['DateResa'] else "N/A"}<br>
                     ⏳ <span class="label-gris">Durée :</span> {r['NbreJours']} jour(s)
                 </div>
                 <hr style="margin:10px 0; border:0; border-top:1px solid #eee;">
@@ -171,11 +180,9 @@ if page == "CONTACTS":
             if c1.button("🔄 RE-BOOK", key=f"re_{idx}", use_container_width=True):
                 st.session_state.rebook_idx = idx; st.rerun()
         
-        # Modifier
         if c2.button("✏️ Modifier", key=f"ed_{idx}", use_container_width=True):
             st.session_state.edit_idx = idx; st.rerun()
 
-        # Supprimer
         if st.session_state.del_idx == idx:
             if c3.button("✅ OK ?", key=f"cf_{idx}", type="primary", use_container_width=True):
                 df_c = df_c.drop(idx).reset_index(drop=True); sauvegarder_data(df_c)
@@ -185,7 +192,7 @@ if page == "CONTACTS":
 
 elif page == "PLANNING":
     st.subheader("📅 Planning 2026")
-    st.write("Voulez-vous que j'ajoute maintenant le calendrier visuel ?")
+    st.info("Le calendrier est la prochaine étape !")
 
 
 
