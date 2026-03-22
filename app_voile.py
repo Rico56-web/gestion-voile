@@ -43,11 +43,13 @@ def charger_data():
 def sauvegarder_data(df):
     df.to_json("contacts.json", orient='records', indent=4)
 
-# --- INITIALISATION ---
-df_c = charger_data()
+# --- INITIALISATION DES ETATS ---
 if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
 if 'del_idx' not in st.session_state: st.session_state.del_idx = None
+if 'rebook_idx' not in st.session_state: st.session_state.rebook_idx = None
 if 'archives' not in st.session_state: st.session_state.archives = False
+
+df_c = charger_data()
 
 # --- BARRE LATÉRALE ---
 st.sidebar.title("⚓ Vesta Skipper")
@@ -73,7 +75,7 @@ if page == "CONTACTS":
         sauvegarder_data(df_c); st.rerun()
 
     if not st.session_state.archives:
-        if col_b.button("🧹 NETTOYER", help="Archive les dossiers payés et passés", use_container_width=True):
+        if col_b.button("🧹 NETTOYER", use_container_width=True):
             auj = datetime.now()
             def check_archive(row):
                 try:
@@ -108,7 +110,7 @@ if page == "CONTACTS":
                         sauvegarder_data(df_c); st.session_state.edit_idx = None; st.rerun()
 
     # Filtrage
-    search = st.text_input("🔍 Rechercher un nom ou une société...", "").lower()
+    search = st.text_input("🔍 Rechercher...", "").lower()
     df_f = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.archives else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
     # Boucle d'affichage
@@ -141,17 +143,29 @@ if page == "CONTACTS":
             </div>
         """, unsafe_allow_html=True)
         
-        # Actions
+        # ACTIONS
         c1, c2, c3 = st.columns(3)
-        if c1.button("🔄 RE-BOOK", key=f"re_{idx}", help="Dupliquer pour une nouvelle nav", use_container_width=True):
-            new_nav = r.copy()
-            new_nav.update({"DateNav": datetime.now().strftime("%d/%m/2026"), "Statut": "En attente", "Paiement": "Pas payé"})
-            df_c = pd.concat([pd.DataFrame([new_nav]), df_c], ignore_index=True)
-            sauvegarder_data(df_c); st.rerun()
         
+        # --- BLOC RE-BOOK VERROUILLÉ ---
+        if st.session_state.rebook_idx == idx:
+            if c1.button("✅ CONFIRM ?", key=f"re_conf_{idx}", type="primary", use_container_width=True):
+                new_nav = r.copy()
+                new_nav.update({"DateNav": datetime.now().strftime("%d/%m/2026"), "Statut": "En attente", "Paiement": "Pas payé"})
+                df_c = pd.concat([pd.DataFrame([new_nav]), df_c], ignore_index=True)
+                sauvegarder_data(df_c)
+                st.session_state.rebook_idx = None
+                st.rerun()
+            if st.button("X", key=f"re_ann_{idx}", use_container_width=True):
+                st.session_state.rebook_idx = None; st.rerun()
+        else:
+            if c1.button("🔄 RE-BOOK", key=f"re_{idx}", use_container_width=True):
+                st.session_state.rebook_idx = idx; st.rerun()
+        
+        # Modifier
         if c2.button("✏️ Modifier", key=f"ed_{idx}", use_container_width=True):
             st.session_state.edit_idx = idx; st.rerun()
 
+        # Supprimer
         if st.session_state.del_idx == idx:
             if c3.button("✅ OK ?", key=f"cf_{idx}", type="primary", use_container_width=True):
                 df_c = df_c.drop(idx).reset_index(drop=True); sauvegarder_data(df_c)
@@ -160,8 +174,8 @@ if page == "CONTACTS":
             st.session_state.del_idx = idx; st.rerun()
 
 elif page == "PLANNING":
-    st.subheader("📅 Calendrier des Navigations")
-    st.write("Module prêt. Voulez-vous que j'ajoute le calendrier visuel ici ?")
+    st.subheader("📅 Calendrier 2026")
+    st.info("Module prêt pour le visuel.")
 
 
 
