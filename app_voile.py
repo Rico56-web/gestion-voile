@@ -68,8 +68,34 @@ st.divider()
 if st.session_state.page == "CONTACTS":
     st.subheader("👤 Gestion des Contacts & Clients")
     
-    # 1. INITIALISATION DE SÉCURITÉ (Évite le NameError)
-    df_disp = pd.DataFrame() 
+     # --- FILTRAGE ET TRI (ORDRE CHRONOLOGIQUE) ---
+    df_filtered = df_c.copy()
+    
+    # Nettoyage et Tri par date
+    if not df_filtered.empty:
+        # On convertit en format date pour trier correctement (JJ/MM/2026)
+        df_filtered['date_tri'] = pd.to_datetime(df_filtered['DateNav'], format='%d/%m/%Y', errors='coerce')
+        
+        # Tri : Les plus récentes/proches en haut
+        # Si tu veux les plus lointaines en haut, change ascending=True
+        df_filtered = df_filtered.sort_values(by='date_tri', ascending=False)
+
+    # Application de la recherche
+    if not df_filtered.empty and search:
+        df_filtered = df_filtered[
+            df_filtered['Nom'].str.lower().str.contains(search, na=False) | 
+            df_filtered['Prénom'].str.lower().str.contains(search, na=False) | 
+            df_filtered['Société'].str.lower().str.contains(search, na=False)
+        ]
+    
+    # Définition de df_disp finale
+    if not df_filtered.empty:
+        if st.session_state.view_archive:
+            df_disp = df_filtered[df_filtered['Statut'].isin(["Terminé", "Refusé"])]
+        else:
+            df_disp = df_filtered[~df_filtered['Statut'].isin(["Terminé", "Refusé"])]
+    else:
+        df_disp = pd.DataFrame()
     
     # 🔍 RECHERCHE
     search = st.text_input("🔍 Rechercher un nom, prénom ou société...", "").lower()
