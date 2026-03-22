@@ -144,12 +144,32 @@ if st.session_state.page == "CONTACTS":
     else:
         df_disp = df_filtered[~df_filtered['Statut'].isin(["Terminé", "Refusé"])]
 
-    for idx, r in df_disp.iterrows():
-        soc = safe_get(r, 'Société')
-        color_paye = "#2ecc71" if r['Paiement'] == "Payé" else "#e74c3c"
-        s_val = r['Statut'].upper()
-        color_statut = "#2ecc71" if "OK" in s_val else "#3498db" if "TERM" in s_val else "#f1c40f" if "ATTENT" in s_val else "#e74c3c"
-        cl_b = "border-cmn" if "CMN" in soc.upper() else ""
+ # --- BLOC BOUTONS ACTIONS (MODIFIER & SUPPRIMER) ---
+        c_ed, c_del = st.columns([1, 1])
+        
+        # Bouton Modifier
+        if c_ed.button(f"✏️ MODIFIER / HISTORIQUE", key=f"btn_ed_{idx}", use_container_width=True):
+            st.session_state.edit_idx = idx
+            st.rerun()
+            
+        # Bouton Supprimer avec Confirmation
+        if st.session_state.get('confirm_del') == idx:
+            st.warning(f"⚠️ Supprimer définitivement #{idx} ?")
+            col_y, col_n = st.columns(2)
+            if col_y.button("✅ OUI", key=f"conf_y_{idx}", use_container_width=True):
+                df_c = df_c.drop(idx)
+                sauvegarder_data(df_c, "contacts.json")
+                st.session_state.confirm_del = None
+                st.success("Fiche supprimée")
+                time.sleep(1)
+                st.rerun()
+            if col_n.button("NON", key=f"conf_n_{idx}", use_container_width=True):
+                st.session_state.confirm_del = None
+                st.rerun()
+        else:
+            if c_del.button(f"🗑️ SUPPRIMER", key=f"btn_del_{idx}", use_container_width=True):
+                st.session_state.confirm_del = idx
+                st.rerun()
         
         # Fidélité
         nb_nav = len(df_c[(df_c['Nom'] == r['Nom']) & (df_c['Prénom'] == r['Prénom'])])
