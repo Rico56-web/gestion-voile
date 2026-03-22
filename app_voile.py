@@ -3,140 +3,152 @@ import pandas as pd
 import json
 import os
 from datetime import datetime
-import time
 
-# --- CONFIGURATION PAGE ---
+# --- CONFIGURATION ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
-# --- STYLE CSS ---
+# --- CSS POUR IPHONE ---
 st.markdown("""
     <style>
     .fiche-globale {
-        background: white; border-radius: 15px; padding: 15px;
-        margin-bottom: 20px; border-left: 8px solid #3498db;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        background: white; border-radius: 12px; padding: 15px;
+        margin-bottom: 10px; border-left: 8px solid #3498db;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     .border-cmn { border-left: 8px solid #2980b9 !important; background: #f0f7ff; }
+    .prenom-style { font-size: 19px; font-weight: bold; color: #2c3e50; }
     .statut-badge {
-        padding: 4px 10px; border-radius: 20px; color: white;
-        font-size: 11px; font-weight: bold; margin-left: 5px;
+        padding: 3px 8px; border-radius: 15px; color: white;
+        font-size: 10px; font-weight: bold; margin-left: 4px;
     }
-    .prenom-style { font-size: 20px; font-weight: bold; color: #2c3e50; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- FONCTIONS DATA ---
-def charger_data(file):
-    cols_voulues = ['Prénom', 'Nom', 'Société', 'DateNav', 'NbreJours', 'Statut', 'Paiement', 'Prix', 'Notes', 'Téléphone', 'Email']
+def charger_data():
+    file = "contacts.json"
+    cols = ['Prénom', 'Nom', 'Société', 'DateNav', 'Téléphone', 'Email', 'Statut', 'Paiement', 'Prix']
     if os.path.exists(file):
         try:
             df = pd.read_json(file)
-            # Sécurité : On ajoute les colonnes manquantes si elles n'existent pas
-            for col in cols_voulues:
-                if col not in df.columns:
-                    df[col] = ""
+            for c in cols: 
+                if c not in df.columns: df[c] = ""
             return df
-        except:
-            pass
-    return pd.DataFrame(columns=cols_voulues)
+        except: pass
+    return pd.DataFrame(columns=cols)
 
-def sauvegarder_data(df, file):
-    df.to_json(file, orient='records', indent=4)
+def sauvegarder_data(df):
+    df.to_json("contacts.json", orient='records', indent=4)
 
 # --- INITIALISATION ---
-df_c = charger_data("contacts.json")
-
-if 'page' not in st.session_state: st.session_state.page = "CONTACTS"
+df_c = charger_data()
 if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
-if 'view_archive' not in st.session_state: st.session_state.view_archive = False
-if 'confirm_del' not in st.session_state: st.session_state.confirm_del = None
+if 'delete_confirm_idx' not in st.session_state: st.session_state.delete_confirm_idx = None
 
-# --- MENU LATÉRAL ---
-with st.sidebar:
-    st.title("⚓ Vesta Skipper")
-    if st.button("👤 CONTACTS", use_container_width=True): st.session_state.page = "CONTACTS"; st.rerun()
-    if st.button("📅 PLANNING", use_container_width=True): st.session_state.page = "PLANNING"; st.rerun()
+# --- MENU ---
+st.sidebar.title("⚓ Vesta 2026")
+page = st.sidebar.radio("Navigation", ["CONTACTS", "PLANNING", "STATS"])
 
-# --- PAGE CONTACTS ---
-if st.session_state.page == "CONTACTS":
-    st.subheader("👤 Mes Contacts")
-
-    # Recherche
-    search = st.text_input("🔍 Rechercher...", "").lower()
-
-    # Bouton Ajout
-    if st.button("➕ NOUVELLE FICHE", use_container_width=True):
-        new_row = {c: "" for c in df_c.columns}
-        new_row.update({"Prénom": "Nouveau", "Nom": "Contact", "DateNav": datetime.now().strftime("%d/%m/2026"), "Statut": "En attente", "Paiement": "Pas payé"})
-        df_c = pd.concat([pd.DataFrame([new_row]), df_c], ignore_index=True)
-        sauvegarder_data(df_c, "contacts.json")
+if page == "CONTACTS":
+    st.subheader("👤 Mes Fiches")
+    
+    # Bouton Ajouter
+    if st.button("➕ NOUVEAU CONTACT", use_container_width=True):
+        new_line = {c: "" for c in df_c.columns}
+        new_line.update({"Prénom": "Nouveau", "Nom": "Contact", "DateNav": "01/01/2026", "Statut": "En attente", "Paiement": "Pas payé"})
+        df_c = pd.concat([pd.DataFrame([new_line]), df_c], ignore_index=True)
+        sauvegarder_data(df_c)
         st.rerun()
 
-    # Logique Edition (Formulaire)
+    # --- ZONE D'ÉDITION (S'affiche si on clique sur Modifier) ---
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         if idx in df_c.index:
             r = df_c.loc[idx]
-            with st.expander("📝 MODIFIER LES INFORMATIONS", expanded=True):
-                u_pre = st.text_input("Prénom", value=r['Prénom'])
-                u_nom = st.text_input("Nom", value=r['Nom'])
-                u_soc = st.text_input("Société", value=r['Société'])
-                u_tel = st.text_input("Téléphone", value=r['Téléphone'])
-                u_mail = st.text_input("Email", value=r['Email'])
-                u_date = st.text_input("Date Navigation", value=r['DateNav'])
-                u_stat = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=0)
-                u_paye = st.selectbox("Paiement", ["Pas payé", "Payé"], index=0)
-                
-                if st.button("💾 ENREGISTRER"):
-                    df_c.at[idx, 'Prénom'], df_c.at[idx, 'Nom'] = u_pre, u_nom
-                    df_c.at[idx, 'Société'], df_c.at[idx, 'Téléphone'] = u_soc, u_tel
-                    df_c.at[idx, 'Email'], df_c.at[idx, 'DateNav'] = u_mail, u_date
-                    df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'] = u_stat, u_paye
-                    sauvegarder_data(df_c, "contacts.json")
-                    st.session_state.edit_idx = None
-                    st.rerun()
+            with st.expander(f"📝 Modification : {r['Prénom']} {r['Nom']}", expanded=True):
+                with st.form("edit_form"):
+                    u_pre = st.text_input("Prénom", value=r['Prénom'])
+                    u_nom = st.text_input("Nom", value=r['Nom'])
+                    u_soc = st.text_input("Société", value=r['Société'])
+                    u_tel = st.text_input("Téléphone", value=r['Téléphone'])
+                    u_mail = st.text_input("Email", value=r['Email'])
+                    u_date = st.text_input("Date (JJ/MM/AAAA)", value=r['DateNav'])
+                    u_stat = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], 
+                                         index=["En attente", "OK", "Terminé", "Refusé"].index(r['Statut']) if r['Statut'] in ["En attente", "OK", "Terminé", "Refusé"] else 0)
+                    u_paye = st.selectbox("Paiement", ["Pas payé", "Payé"], index=1 if r['Paiement']=="Payé" else 0)
+                    
+                    c1, c2 = st.columns(2)
+                    if c1.form_submit_button("💾 ENREGISTRER"):
+                        df_c.at[idx, 'Prénom'], df_c.at[idx, 'Nom'] = u_pre, u_nom
+                        df_c.at[idx, 'Société'], df_c.at[idx, 'Téléphone'] = u_soc, u_tel
+                        df_c.at[idx, 'Email'], df_c.at[idx, 'DateNav'] = u_mail, u_date
+                        df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'] = u_stat, u_paye
+                        sauvegarder_data(df_c)
+                        st.session_state.edit_idx = None
+                        st.rerun()
+                    if c2.form_submit_button("Fermer"):
+                        st.session_state.edit_idx = None
+                        st.rerun()
 
-    # Tri et Filtrage
-    df_filtered = df_c.copy()
-    if search:
-        df_filtered = df_filtered[df_filtered['Nom'].str.lower().str.contains(search, na=False) | 
-                                 df_filtered['Prénom'].str.lower().str.contains(search, na=False)]
+    # --- LISTE DES FICHES ---
+    search = st.text_input("🔍 Rechercher...", "").lower()
+    
+    for idx, r in df_c.iterrows():
+        if search and search not in str(r['Nom']).lower() and search not in str(r['Prénom']).lower() and search not in str(r['Société']).lower():
+            continue
+            
+        soc = str(r['Société']) if str(r['Société']) != "" else "PARTICULIER"
+        color_p = "#2ecc71" if r['Paiement'] == "Payé" else "#e74c3c"
+        color_s = "#2ecc71" if r['Statut'] == "OK" else "#f1c40f"
+        cl_b = "border-cmn" if "CMN" in soc.upper() else ""
 
-    # Affichage
-    for idx, r in df_filtered.iterrows():
-        # Sécurité affichage vide
-        soc = r['Société'] if str(r['Société']).strip() != "" else "PARTICULIER"
-        tel = r['Téléphone'] if str(r['Téléphone']).strip() != "" else "Non renseigné"
-        mail = r['Email'] if str(r['Email']).strip() != "" else "Non renseigné"
-        
-        # Style
-        color_paye = "#2ecc71" if r['Paiement'] == "Payé" else "#e74c3c"
-        color_statut = "#2ecc71" if "OK" in str(r['Statut']).upper() else "#f1c40f"
-        cl_b = "border-cmn" if "CMN" in str(soc).upper() else ""
-
+        # Affichage HTML de la fiche
         st.markdown(f"""
             <div class="fiche-globale {cl_b}">
                 <div class="prenom-style">{r['Prénom']} {str(r['Nom']).upper()}</div>
-                <div style="color:gray; font-weight:bold;">🏛️ {soc}</div>
-                <div style="margin:8px 0;">
-                    📞 <b><a href="tel:{tel}" style="text-decoration:none; color:#2980b9;">{tel}</a></b><br>
-                    ✉️ <i>{mail}</i>
+                <div style="color:gray; font-size:14px;">🏛️ {soc}</div>
+                <div style="margin:5px 0; font-size:14px;">
+                    📞 <b>{r['Téléphone']}</b><br>
+                    ✉️ {r['Email']}
                 </div>
-                <hr style="margin:10px 0; border:0; border-top:1px solid #eee;">
-                <div style="display:flex; justify-content:space-between;">
-                    <span>📅 <b>{r['DateNav']}</b></span>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+                    <span style="font-size:14px;">📅 <b>{r['DateNav']}</b></span>
                     <div>
-                        <span class="statut-badge" style="background:{color_statut};">{r['Statut']}</span>
-                        <span class="statut-badge" style="background:{color_paye};">{r['Paiement']}</span>
+                        <span class="statut-badge" style="background:{color_s};">{r['Statut']}</span>
+                        <span class="statut-badge" style="background:{color_p};">{r['Paiement']}</span>
                     </div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
-        if st.button(f"✏️ MODIFIER", key=f"btn_{idx}", use_container_width=True):
+        # --- BOUTONS ACTIONS (MODIFIER & SUPPRIMER) ---
+        col_ed, col_del = st.columns(2)
+        
+        if col_ed.button(f"✏️ Modifier", key=f"ed_{idx}", use_container_width=True):
             st.session_state.edit_idx = idx
             st.rerun()
 
+        # Logique de suppression avec confirmation
+        if st.session_state.delete_confirm_idx == idx:
+            if col_del.button(f"✅ CONFIRMER ?", key=f"conf_{idx}", type="primary", use_container_width=True):
+                df_c = df_c.drop(idx).reset_index(drop=True)
+                sauvegarder_data(df_c)
+                st.session_state.delete_confirm_idx = None
+                st.rerun()
+            if st.button("Annuler suppression", key=f"ann_{idx}", use_container_width=True):
+                st.session_state.delete_confirm_idx = None
+                st.rerun()
+        else:
+            if col_del.button(f"🗑️ Supprimer", key=f"del_{idx}", use_container_width=True):
+                st.session_state.delete_confirm_idx = idx
+                st.rerun()
+
+elif page == "PLANNING":
+    st.write("### 📅 Planning (En construction)")
+
+elif page == "STATS":
+    st.write(f"### 📊 Stats")
+    st.write(f"Nombre de fiches : {len(df_c)}")
 
 
 
