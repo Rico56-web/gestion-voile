@@ -132,29 +132,45 @@ if st.session_state.page == "CONTACTS":
         st.session_state.view_archive = True; st.rerun()
 
     df_filtered = df_c.copy()
-    if search:
-        df_filtered = df_filtered[
-            df_filtered['Nom'].str.lower().str.contains(search, na=False) | 
-            df_filtered['Prénom'].str.lower().str.contains(search, na=False) | 
-            df_filtered['Société'].str.lower().str.contains(search, na=False)
-        ]
-    
-    if st.session_state.view_archive:
-        df_disp = df_filtered[df_filtered['Statut'].isin(["Terminé", "Refusé"])]
-    else:
-        df_disp = df_filtered[~df_filtered['Statut'].isin(["Terminé", "Refusé"])]
+  # ... (code précédent : filtrage df_disp)
 
- # --- BLOC BOUTONS ACTIONS (MODIFIER & SUPPRIMER) ---
+    for idx, r in df_disp.iterrows():
+        # 1. Préparation des données de la fiche
+        soc = safe_get(r, 'Société')
+        color_paye = "#2ecc71" if r['Paiement'] == "Payé" else "#e74c3c"
+        s_val = r['Statut'].upper()
+        color_statut = "#2ecc71" if "OK" in s_val else "#3498db" if "TERM" in s_val else "#f1c40f" if "ATTENT" in s_val else "#e74c3c"
+        cl_b = "border-cmn" if "CMN" in soc.upper() else ""
+        
+        # 2. Affichage HTML de la fiche
+        st.markdown(f"""
+            <div class="fiche-globale {cl_b}">
+                <span class="statut-badge" style="background:{color_paye};">{r['Paiement']}</span>
+                <span class="statut-badge" style="background:{color_statut};">{r['Statut']}</span>
+                <div style="font-size:12px; color:gray;">{soc if soc else "PARTICULIER"}</div>
+                <div class="prenom-style">{r['Prénom']} {r['Nom'].upper()}</div>
+                📞 <b>{r['Téléphone']}</b> | ✉️ <i>{r['Email']}</i><br>
+                📅 <b>{r['DateNav']}</b> ({r['NbreJours']}j) | 💰 <b>{r['Prix']}€</b>
+                <div style="margin-top:10px; display: flex; justify-content: space-between;">
+                    <a href="tel:{r['Téléphone']}" class="btn-contact" style="background:#3498db;">Appel</a>
+                    <a href="https://wa.me/{str(r['Téléphone']).replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
+                    <a href="mailto:{r['Email']}" class="btn-contact" style="background:#e67e22;">Mail</a>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # 3. BLOC BOUTONS (C'est ici que l'erreur se produisait)
+        # Ces colonnes DOIVENT être à l'intérieur de la boucle FOR
         c_ed, c_del = st.columns([1, 1])
         
         # Bouton Modifier
         if c_ed.button(f"✏️ MODIFIER / HISTORIQUE", key=f"btn_ed_{idx}", use_container_width=True):
             st.session_state.edit_idx = idx
             st.rerun()
-            
+
         # Bouton Supprimer avec Confirmation
         if st.session_state.get('confirm_del') == idx:
-            st.warning(f"⚠️ Supprimer définitivement #{idx} ?")
+            st.warning(f"⚠️ Supprimer #{idx} ?")
             col_y, col_n = st.columns(2)
             if col_y.button("✅ OUI", key=f"conf_y_{idx}", use_container_width=True):
                 df_c = df_c.drop(idx)
