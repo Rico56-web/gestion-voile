@@ -64,40 +64,10 @@ for i, m in enumerate(menu):
 
 st.divider()
 
-# --- MODULE CONTACTS ---
 if st.session_state.page == "CONTACTS":
     st.subheader("👤 Gestion des Contacts & Clients")
     
-     # --- FILTRAGE ET TRI (ORDRE CHRONOLOGIQUE) ---
-    df_filtered = df_c.copy()
-    
-    # Nettoyage et Tri par date
-    if not df_filtered.empty:
-        # On convertit en format date pour trier correctement (JJ/MM/2026)
-        df_filtered['date_tri'] = pd.to_datetime(df_filtered['DateNav'], format='%d/%m/%Y', errors='coerce')
-        
-        # Tri : Les plus récentes/proches en haut
-        # Si tu veux les plus lointaines en haut, change ascending=True
-        df_filtered = df_filtered.sort_values(by='date_tri', ascending=False)
-
-    # Application de la recherche
-    if not df_filtered.empty and search:
-        df_filtered = df_filtered[
-            df_filtered['Nom'].str.lower().str.contains(search, na=False) | 
-            df_filtered['Prénom'].str.lower().str.contains(search, na=False) | 
-            df_filtered['Société'].str.lower().str.contains(search, na=False)
-        ]
-    
-    # Définition de df_disp finale
-    if not df_filtered.empty:
-        if st.session_state.view_archive:
-            df_disp = df_filtered[df_filtered['Statut'].isin(["Terminé", "Refusé"])]
-        else:
-            df_disp = df_filtered[~df_filtered['Statut'].isin(["Terminé", "Refusé"])]
-    else:
-        df_disp = pd.DataFrame()
-    
-    # 🔍 RECHERCHE
+    # --- 1. DÉFINIR LA RECHERCHE EN PREMIER ---
     search = st.text_input("🔍 Rechercher un nom, prénom ou société...", "").lower()
     
     # Bouton Ajout
@@ -107,6 +77,49 @@ if st.session_state.page == "CONTACTS":
         df_c = pd.concat([pd.DataFrame([new_row]), df_c], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()
+
+    # --- 2. LOGIQUE D'ÉDITION (Placée ici pour être visible) ---
+    if st.session_state.edit_idx is not None:
+        # ... (Garde ton code du formulaire d'édition ici)
+        pass 
+
+    # --- 3. FILTRAGE ET TRI ---
+    df_filtered = df_c.copy()
+    
+    if not df_filtered.empty:
+        # Conversion pour le tri (format JJ/MM/AAAA)
+        df_filtered['date_tri'] = pd.to_datetime(df_filtered['DateNav'], format='%d/%m/%Y', errors='coerce')
+        
+        # TRI : Les dates les plus proches (futures) en premier
+        df_filtered = df_filtered.sort_values(by='date_tri', ascending=True)
+
+        # RECHERCHE (Maintenant 'search' est bien défini plus haut)
+        if search:
+            df_filtered = df_filtered[
+                df_filtered['Nom'].str.lower().str.contains(search, na=False) | 
+                df_filtered['Prénom'].str.lower().str.contains(search, na=False) | 
+                df_filtered['Société'].str.lower().str.contains(search, na=False)
+            ]
+    
+    # --- 4. SÉPARATION ARCHIVES / EN COURS ---
+    t1, t2 = st.columns(2)
+    if t1.button("🚀 EN COURS", type="primary" if not st.session_state.view_archive else "secondary", use_container_width=True):
+        st.session_state.view_archive = False; st.rerun()
+    if t2.button("📁 ARCHIVÉS", type="primary" if st.session_state.view_archive else "secondary", use_container_width=True):
+        st.session_state.view_archive = True; st.rerun()
+
+    if st.session_state.view_archive:
+        df_disp = df_filtered[df_filtered['Statut'].isin(["Terminé", "Refusé"])]
+    else:
+        df_disp = df_filtered[~df_filtered['Statut'].isin(["Terminé", "Refusé"])]
+
+    # --- 5. BOUCLE D'AFFICHAGE ---
+    if not df_disp.empty:
+        for idx, r in df_disp.iterrows():
+            # ... (Garde ton code d'affichage des fiches ici)
+            st.write(f"Fiche de {r['Prénom']} {r['Nom']}") # Exemple simplifié
+    else:
+        st.info("Aucune mission trouvée.")
 # --- LOGIQUE D'ÉDITION (LE FORMULAIRE COMPLET) ---
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
