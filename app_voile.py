@@ -1,28 +1,29 @@
 import streamlit as st
 import pandas as pd
-import json
 import os
-from datetime import datetime
 
-# --- 1. CONFIGURATION ET STYLE ---
+# --- 1. CONFIGURATION ET DESIGN ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
-# On injecte le design UNE SEULE FOIS pour toute la page
+# On applique un style global sur les blocs de Streamlit
 st.markdown("""
     <style>
-    /* On stylise les blocs natifs de Streamlit pour qu'ils soient beaux */
+    /* Supprime les bordures par défaut et ajoute notre style "Vesta" */
     [data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: white !important;
+        background-color: #ffffff !important;
         border-radius: 15px !important;
-        border-left: 10px solid #3498db !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
-        padding: 10px !important;
+        border-left: 10px solid #2980b9 !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+        padding: 20px !important;
+        margin-bottom: 10px !important;
     }
-    .stAlert { padding: 5px !important; } /* Pour réduire la taille des badges */
+    /* Style pour les titres */
+    h3 { color: #2c3e50; margin-bottom: 0px !important; padding-bottom: 0px !important; }
+    .stMarkdown p { font-size: 15px; margin-bottom: 5px !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. DATA ---
+# --- 2. LOGIQUE DATA ---
 def charger_data():
     if os.path.exists("contacts.json"):
         return pd.read_json("contacts.json")
@@ -30,48 +31,54 @@ def charger_data():
 
 df = charger_data()
 
-# --- 3. INTERFACE ---
-st.title("⚓ Vesta Skipper 2026")
+# --- 3. AFFICHAGE DES MISSIONS ---
+st.title("⚓ Mes Navigations")
 
-# Barre de recherche
+# Barre de recherche simple
 search = st.text_input("🔍 Rechercher...", "").lower()
 
 for idx, r in df.iterrows():
     if search and not any(search in str(r[c]).lower() for c in ['Nom', 'Prénom', 'Société']):
         continue
 
-    # --- LE CONTENEUR (C'est lui qui fait la fiche) ---
+    # --- CRÉATION DE LA FICHE ---
     with st.container(border=True):
-        # Ligne 1 : Identité
-        st.subheader(f"{r['Prénom']} {str(r['Nom']).upper()}")
+        # Ligne d'en-tête
+        st.markdown(f"### {r['Prénom']} **{str(r['Nom']).upper()}**")
+        st.write(f"🏛️ {r['Société'] if r['Société'] else 'PARTICULIER'}")
         
-        # Ligne 2 : Société et Tel
-        c_soc, c_tel = st.columns(2)
-        c_soc.write(f"🏛️ {r['Société'] if r['Société'] else 'PARTICULIER'}")
-        c_tel.write(f"📞 **{r['Téléphone']}**")
+        # Section Contacts
+        c1, c2 = st.columns(2)
+        c1.write(f"📞 **{r['Téléphone']}**")
+        c2.write(f"✉️ {r['Email']}")
         
-        # Ligne 3 : La durée (dans un bloc coloré natif)
+        # Section Détails (Bloc bleu clair natif)
         st.info(f"⏳ Durée de la mission : **{r['NbreJours']} jour(s)**")
         
-        st.divider() # La barre horizontale propre
+        st.divider() # Ligne de séparation élégante
         
-        # Ligne 4 : Date et Badges
-        c_date, c_sta, c_pay = st.columns([2, 1, 1])
-        c_date.markdown(f"### 📅 {r['DateNav']}")
+        # Pied de fiche : Date et Badges
+        col_date, col_badges = st.columns([1, 1])
         
-        # Badges de Statut (Natifs)
-        if r['Statut'] == "OK": c_sta.success(r['Statut'])
-        elif r['Statut'] == "Terminé": c_sta.info(r['Statut'])
-        else: c_sta.warning(r['Statut'])
+        with col_date:
+            st.markdown(f"#### 📅 {r['DateNav']}")
             
-        if r['Paiement'] == "Payé": c_pay.success("✔ Payé")
-        else: c_pay.error("✖ Impayé")
+        with col_badges:
+            # On utilise des colonnes imbriquées pour aligner les badges à droite
+            b_c1, b_c2 = st.columns(2)
+            # Badge Statut
+            if r['Statut'] == "OK": b_c1.success(r['Statut'])
+            elif r['Statut'] == "Terminé": b_c1.info(r['Statut'])
+            else: b_c1.warning(r['Statut'])
+            # Badge Paiement
+            if r['Paiement'] == "Payé": b_c2.success("✔ PAYÉ")
+            else: b_c2.error("✖ IMPAYÉ")
 
-        # Boutons d'actions
-        b1, b2, b3 = st.columns(3)
-        b1.button("🔄 RE-BOOK", key=f"rb_{idx}", use_container_width=True)
-        b2.button("✏️ Modifier", key=f"ed_{idx}", use_container_width=True)
-        b3.button("🗑️ Supprimer", key=f"del_{idx}", use_container_width=True)
+        # Boutons d'actions en bas de fiche
+        act1, act2, act3 = st.columns(3)
+        act1.button("🔄 RE-BOOK", key=f"rb_{idx}", use_container_width=True)
+        act2.button("✏️ Modifier", key=f"ed_{idx}", use_container_width=True)
+        act3.button("🗑️ Suppr.", key=f"del_{idx}", use_container_width=True)
 
 
 
