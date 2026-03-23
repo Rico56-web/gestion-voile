@@ -117,6 +117,8 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         pass
   # --- 5. PAGE CONTACTS ---
   if st.session_state.page == "CONTACTS":
+  if "view_archive" not in st.session_state:
+        st.session_state.view_archive = False  # Par défaut, on voit les missions futures
   if "contact_confirm_del" not in st.session_state:
         st.session_state.contact_confirm_del = None
 
