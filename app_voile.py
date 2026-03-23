@@ -184,34 +184,71 @@ if st.session_state.page == "CONTACTS":
             st.session_state.edit_idx = None
             st.rerun()
 
-    else:
-        # --- 1. FILTRAGE SÉCURISÉ ---
-        # On s'assure que df_c n'est pas vide avant de filtrer
-        if df_c.empty:
-            st.warning("📭 Votre fichier de contacts est vide. Cliquez sur 'Nouveau Contact' en haut.")
+   else:
+        # --- 1. FILTRAGE ---
+        if st.session_state.view_archive:
+            df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])]
         else:
-            # Séparation Missions Futures / Archives
-            if st.session_state.view_archive:
-                df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])]
-                titre_vue = "📁 ARCHIVES"
-            else:
-                df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
-                titre_vue = "🚀 MISSIONS FUTURES"
+            df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-            st.write(f"### {titre_vue} ({len(df_disp)} fiches)")
+        if df_disp.empty:
+            st.info("Aucune mission à afficher.")
+        
+        # --- 2. BOUCLE D'AFFICHAGE ---
+        for i, r in df_disp.iterrows():
+            # RÉCUPÉRATION (On force le nom des colonnes)
+            # On cherche 'Téléphone' ET 'Telephone' pour être sûr
+            t = str(r.get('Téléphone') or r.get('Telephone') or "Absent").strip()
+            m = str(r.get('Email') or r.get('E-mail') or "Absent").strip()
+            s = str(r.get('Société') or r.get('Societe') or "PARTICULIER").strip()
+            p = str(r.get('Prénom') or "").strip()
+            n = str(r.get('Nom') or "").strip()
+            
+            # Nettoyage pour le lien appel
+            t_link = t.replace(" ", "").replace(".", "").replace("-", "")
 
-            # --- 2. SI TOUJOURS RIEN APRÈS LE FILTRE ---
-            if df_disp.empty:
-                st.info(f"Aucune fiche dans {titre_vue}. Essayez l'autre onglet !")
+            # AFFICHAGE DE LA FICHE
+            # On met le téléphone bien en évidence dans le HTML
+            html_fiche = f'''
+            <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 10px; background-color: white;">
+                <h4 style="margin:0; color:#1a2a6c;">{s.upper()}</h4>
+                <p style="margin:5px 0;"><b>{p} {n.upper()}</b></p>
+                <hr>
+                <p style="font-size: 1.1rem; color: #2c3e50;">
+                    📞 <b>{t}</b><br>
+                    ✉️ {m}
+                </p>
+                <div style="display: flex; gap: 10px;">
+                    <a href="tel:{t_link}" style="background:#3498db; color:white; padding:8px; border-radius:5px; text-decoration:none;">Appeler</a>
+                    <a href="https://wa.me/{t_link}" style="background:#25D366; color:white; padding:8px; border-radius:5px; text-decoration:none;">WhatsApp</a>
+                </div>
+            </div>
+            '''
+            st.markdown(html_fiche, unsafe_allow_html=True)
 
-     # --- 3. LA BOUCLE D'AFFICHAGE ---
-    for i, r in df_disp.iterrows():
-            # 1. RÉCUPÉRATION DES DONNÉES
-            tel = str(r.get('Téléphone') or r.get('Telephone') or "").strip()
-            mail = str(r.get('Email') or r.get('E-mail') or "").strip()
-            soc = str(r.get('Société') or r.get('Societe') or "PARTICULIER").strip()
-            pre = str(r.get('Prénom') or r.get('Prenom') or "").strip()
-            nom = str(r.get('Nom') or "").strip()
+            # --- 3. LES BOUTONS (JUSTE SOUS LA FICHE) ---
+            # Ils DOIVENT être alignés ici pour apparaître sous chaque fiche
+            col_edit, col_del = st.columns([1, 4])
+            
+            if col_edit.button("✏️ MODIFIER", key=f"edit_{i}"):
+                st.session_state.edit_idx = i
+                st.rerun()
+                
+            if col_del.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
+                st.session_state.contact_confirm_del = i
+                st.rerun()
+
+            # Confirmation de suppression
+            if st.session_state.contact_confirm_del == i:
+                st.error("Confirmer la suppression ?")
+                if st.button("OUI, Supprimer", key=f"conf_y_{i}"):
+                    df_c = df_c.drop(i)
+                    sauvegarder_data(df_c, "contacts.json")
+                    st.session_state.contact_confirm_del = None
+                    st.rerun()
+                if st.button("Annuler", key=f"conf_n_{i}"):
+                    st.session_state.contact_confirm_del = None
+                    st.rerun()
             t_link = tel.replace(" ", "").replace(".", "").replace("-", "")
 
             # 2. AFFICHAGE DE LA FICHE (Le carré bleu/gris)
