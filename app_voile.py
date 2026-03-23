@@ -160,7 +160,7 @@ if st.session_state.page == "CONTACTS":
             st.session_state.edit_idx = None; st.rerun()
     else:
         df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.view_archive else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
- for i, r in df_disp.iterrows():
+for i, r in df_disp.iterrows():
             # 1. On prépare les données proprement
             tel = safe_get(r, 'Téléphone')
             mail = safe_get(r, 'Email')
