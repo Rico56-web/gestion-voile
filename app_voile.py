@@ -221,24 +221,24 @@ if st.session_state.page == "CONTACTS":
             ... (ton code HTML actuel) ...
         '''
             
-            # Gestion Suppression / Edition
-            if st.session_state.contact_confirm_del == i:
+        # Gestion Suppression / Edition
+        if st.session_state.contact_confirm_del == i:
                 st.warning("⚠️ Supprimer cette fiche ?")
                 cy, cn = st.columns(2)
-                if cy.button("✅ OUI", key=f"y_{i}"):
+        if cy.button("✅ OUI", key=f"y_{i}"):
                     df_c = df_c.drop(i)
                     sauvegarder_data(df_c, "contacts.json")
                     st.session_state.contact_confirm_del = None
                     st.rerun()
-                if cn.button("NON", key=f"n_{i}"):
+        if cn.button("NON", key=f"n_{i}"):
                     st.session_state.contact_confirm_del = None
                     st.rerun()
-            else:
+        else:
                 c1, c2 = st.columns([1, 4])
-                if c1.button("✏️", key=f"ed_{i}"):
+        if c1.button("✏️", key=f"ed_{i}"):
                     st.session_state.edit_idx = i
                     st.rerun()
-                if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
+        if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
                     st.session_state.contact_confirm_del = i
                     st.rerun()
                     
