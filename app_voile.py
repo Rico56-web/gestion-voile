@@ -115,33 +115,28 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except Exception:
         pass
+
 # --- 5. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
-if "view_archive" not in st.session_state:
-    st.session_state.view_archive = False  # Par défaut, on voit les missions futures
-if "contact_confirm_del" not in st.session_state:
-    st.session_state.contact_confirm_del = None
+    # 1. INITIALISATION (Bien décalé vers la droite)
+    if "view_archive" not in st.session_state:
+        st.session_state.view_archive = False
+    if "contact_confirm_del" not in st.session_state:
+        st.session_state.contact_confirm_del = None
 
-    # Bouton Nouveau Contact
+    # 2. BOUTON NOUVEAU CONTACT
     if st.button("➕ NOUVEAU CONTACT", type="secondary", use_container_width=True):
         new = {
             "DateNav": datetime.now().strftime("%d/%m/2026"), 
-            "NbreJours": "1", 
-            "Statut": "En attente", 
-            "Paiement": "Pas payé", 
-            "Société": "", 
-            "Prénom": "Nouveau", 
-            "Nom": "Contact", 
-            "Téléphone": "", 
-            "Email": "", 
-            "Prix": "0.00", 
-            "Notes": ""
+            "NbreJours": "1", "Statut": "En attente", "Paiement": "Pas payé", 
+            "Société": "", "Prénom": "Nouveau", "Nom": "Contact", 
+            "Téléphone": "", "Email": "", "Prix": "0.00", "Notes": ""
         }
         df_c = pd.concat([pd.DataFrame([new]), df_c], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()
 
-    # Navigation Archives / Missions Futures
+    # 3. NAVIGATION ARCHIVES / MISSIONS
     c1, c2 = st.columns(2)
     if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, type="primary" if not st.session_state.view_archive else "secondary"):
         st.session_state.view_archive = False
@@ -150,8 +145,9 @@ if "contact_confirm_del" not in st.session_state:
         st.session_state.view_archive = True
         st.rerun()
 
-    # --- MODE ÉDITION ---
+    # 4. FILTRE ET AFFICHAGE
     if st.session_state.edit_idx is not None:
+        # --- BLOC ÉDITION (A garder tel quel dans ton code) ---
         idx = st.session_state.edit_idx
         r = df_c.loc[idx]
         st.subheader("📝 Modifier Mission")
@@ -160,90 +156,95 @@ if "contact_confirm_del" not in st.session_state:
         u_soc = st.text_input("Société", value=safe_get(r, 'Société'))
         u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
         u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
-        u_date = st.text_input("Date (JJ/MM/AAAA)", value=safe_get(r, 'DateNav'))
-        u_jours = st.text_input("Nombre de Jours", value=safe_get(r, 'NbreJours'))
-        u_prix = st.text_input("Prix Total (€)", value=safe_get(r, 'Prix'))
+        u_date = st.text_input("Date", value=safe_get(r, 'DateNav'))
+        u_jours = st.text_input("Jours", value=safe_get(r, 'NbreJours'))
+        u_prix = st.text_input("Prix", value=safe_get(r, 'Prix'))
         
-        stats_list = ["En attente", "OK", "Terminé", "Refusé"]
-        u_stat = st.selectbox("Statut", stats_list, index=stats_list.index(safe_get(r, 'Statut')) if safe_get(r, 'Statut') in stats_list else 0)
-        
-        pays_list = ["Pas payé", "Payé"]
-        u_paye = st.selectbox("Paiement", pays_list, index=pays_list.index(safe_get(r, 'Paiement')) if safe_get(r, 'Paiement') in pays_list else 0)
-        
+        s_opts = ["En attente", "OK", "Terminé", "Refusé"]
+        u_stat = st.selectbox("Statut", s_opts, index=s_opts.index(safe_get(r, 'Statut')) if safe_get(r, 'Statut') in s_opts else 0)
+        p_opts = ["Pas payé", "Payé"]
+        u_paye = st.selectbox("Paiement", p_opts, index=p_opts.index(safe_get(r, 'Paiement')) if safe_get(r, 'Paiement') in p_opts else 0)
         u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
-        
+
         if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
             df_c.at[idx, 'Prénom'], df_c.at[idx, 'Nom'], df_c.at[idx, 'Société'] = u_pre, u_nom, u_soc
             df_c.at[idx, 'Téléphone'], df_c.at[idx, 'Email'], df_c.at[idx, 'DateNav'] = u_tel, u_mail, u_date
-            df_c.at[idx, 'NbreJours'] = u_jours
-            try:
-                df_c.at[idx, 'Prix'] = f"{float(u_prix or 0):.2f}"
-            except:
-                df_c.at[idx, 'Prix'] = "0.00"
-            df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'], df_c.at[idx, 'Notes'] = u_stat, u_paye, u_notes
+            df_c.at[idx, 'NbreJours'], df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'] = u_jours, u_stat, u_paye
+            df_c.at[idx, 'Prix'] = f"{float(u_prix or 0):.2f}"
+            df_c.at[idx, 'Notes'] = u_notes
             sauvegarder_data(df_c, "contacts.json")
             st.session_state.edit_idx = None
             st.rerun()
-            
-        if st.button("Annuler", use_container_width=True):
+        if st.button("Annuler"):
             st.session_state.edit_idx = None
             st.rerun()
 
-    # --- AFFICHAGE DE LA LISTE ---
     else:
+        # --- LISTE DES CONTACTS ---
         df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.view_archive else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
         
-    for i, r in df_disp.iterrows():
-        # --- 1. RÉCUPÉRATION ULTRA-SÉCURISÉE ---
-        # On cherche 'Téléphone' avec accent, puis sans, puis en minuscule
-        tel = safe_get(r, 'Téléphone') or safe_get(r, 'Telephone') or safe_get(r, 'tel') or ""
+        if df_disp.empty:
+            st.info("Aucune mission ici.")
         
-        # On cherche 'Email' sous toutes ses formes
-        mail = safe_get(r, 'Email') or safe_get(r, 'E-mail') or safe_get(r, 'mail') or ""
-        
-        # Le reste des variables
-        soc = safe_get(r, 'Société') or safe_get(r, 'Societe') or ""
-        s_val = safe_get(r, 'Statut') or "En attente"
-        pay_val = safe_get(r, 'Paiement') or "Pas payé"
-        date_nav = safe_get(r, 'DateNav') or "00/00/2026"
-        jours = safe_get(r, 'NbreJours') or "1"
-        
-        try:
+        for i, r in df_disp.iterrows():
+            # RÉCUPÉRATION SÉCURISÉE (Pour éviter les bulles vides)
+            tel = str(safe_get(r, 'Téléphone') or safe_get(r, 'Telephone') or "")
+            mail = str(safe_get(r, 'Email') or safe_get(r, 'E-mail') or "")
+            soc = safe_get(r, 'Société') or ""
+            s_val = safe_get(r, 'Statut') or "En attente"
+            pay_val = safe_get(r, 'Paiement') or "Pas payé"
+            date_nav = safe_get(r, 'DateNav') or "??/??/2026"
+            jours = safe_get(r, 'NbreJours') or "1"
             p_val = f"{float(safe_get(r, 'Prix') or 0):.2f}"
-        except:
-            p_val = "0.00"
 
-        # --- 2. COULEURS ---
-        c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
-        c_p = "#FF0000" if "PAS PAYÉ" in pay_val.upper() or "NON PAYÉ" in pay_val.upper() else "#2ecc71"
-        cl_b = "border-cmn" if "CMN" in soc.upper() else ""
+            # Couleurs et bordure CMN
+            c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
+            c_p = "#FF0000" if "PAS PAYÉ" in pay_val.upper() or "NON PAYÉ" in pay_val.upper() else "#2ecc71"
+            cl_b = "border-cmn" if "CMN" in soc.upper() else ""
 
-        # --- 3. TON BLOC HTML (ne change rien dedans) ---
-        h = f'''<div class="fiche-globale {cl_b}">
-            ... (ton code HTML actuel) ...
-        '''
-        # --- 4. GESTION SUPPRESSION / EDITION ---
-        if st.session_state.contact_confirm_del == i:
-                st.warning("⚠️ Supprimer cette fiche ?")
+            h = f'''<div class="fiche-globale {cl_b}">
+                <span class="statut-badge" style="background:{c_p};">{pay_val}</span>
+                <span class="statut-badge" style="background:{c_s};">{s_val}</span>
+                <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
+                <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
+                
+                <div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #1a2a6c; font-size: 1rem;">
+                    📅 <b>Date :</b> {date_nav}<br>
+                    ⛵ <b>Durée :</b> {jours} jour(s)<br>
+                    💰 <b>Montant :</b> {p_val} €
+                </div>
+
+                <div style="margin-bottom:10px; font-size: 1.1rem;">
+                    📞 <b>{tel}</b><br>
+                    ✉️ {mail}
+                </div>
+
+                <div class="notes-box">📝 {safe_get(r, "Notes") or "."}</div>
+
+                <div class="container-boutons">
+                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
+                    <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
+                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
+                </div>
+            </div>'''
+            st.markdown(h, unsafe_allow_html=True)
+
+            # Gestion Suppression / Edition
+            if st.session_state.contact_confirm_del == i:
+                st.warning("⚠️ Supprimer ?")
                 cy, cn = st.columns(2)
-                # Aligne bien les "if" sous le "cy, cn"
                 if cy.button("✅ OUI", key=f"y_{i}"):
-                    df_c = df_c.drop(i)
-                    sauvegarder_data(df_c, "contacts.json")
-                    st.session_state.contact_confirm_del = None
-                    st.rerun()
+                    df_c = df_c.drop(i); sauvegarder_data(df_c, "contacts.json")
+                    st.session_state.contact_confirm_del = None; st.rerun()
                 if cn.button("NON", key=f"n_{i}"):
-                    st.session_state.contact_confirm_del = None
-                    st.rerun()
-                else:
-                    c1, c2 = st.columns([1, 4])
-                     # Aligne bien les boutons sous le "c1, c2"
-                    if c1.button("✏️", key=f"ed_{i}"):
-                        st.session_state.edit_idx = i
-                        st.rerun()
-                    if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
-                        st.session_state.contact_confirm_del = i
-                        st.rerun() 
+                    st.session_state.contact_confirm_del = None; st.rerun()
+            else:
+                c1, c2 = st.columns([1, 4])
+                if c1.button("✏️", key=f"ed_{i}"):
+                    st.session_state.edit_idx = i; st.rerun()
+                if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
+                    st.session_state.contact_confirm_del = i; st.rerun()
+ 
                     
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
