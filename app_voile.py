@@ -160,62 +160,20 @@ if st.session_state.page == "CONTACTS":
             st.session_state.edit_idx = None; st.rerun()
     else:
         df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.view_archive else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
-        for i, r in df_disp.iterrows():
-            tel, mail, soc = safe_get(r, 'Téléphone'), safe_get(r, 'Email'), safe_get(r, 'Société')
-            p_val, s_val, pay_val = f"{float(safe_get(r, 'Prix') or 0):.2f}", safe_get(r, 'Statut'), safe_get(r, 'Paiement')
-            jours = safe_get(r, 'NbreJours') or "1"
-            
-            c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
-            c_p = "#FF0000" if "PAS PAYÉ" in pay_val.upper() or "NON PAYÉ" in pay_val.upper() else "#2ecc71"
-            cl_b = "border-cmn" if "CMN" in soc.upper() else ""
-           # --- CALCULS AVANT AFFICHAGE ---
-            p_val = f"{float(safe_get(r, 'Prix') or 0):.2f}"
-            jours = safe_get(r, 'NbreJours') or "1"
-            date_nav = safe_get(r, 'DateNav')
-            
-            # --- CONSTRUCTION DE LA FICHE ---
-            h = f'''<div class="fiche-globale {cl_b}">
-                <span class="statut-badge" style="background:{c_p};">{pay_val}</span>
-                <span class="statut-badge" style="background:{c_s};">{s_val}</span>
-                <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
-                <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
-                
-                <div style="margin: 10px 0; padding: 10px; background: #f0f4f8; border-radius: 8px; border-left: 4px solid #1a2a6c;">
-                    📅 <b>Date :</b> {date_nav}<br>
-                    ⛵ <b>Durée :</b> {jours} jour(s)<br>
-                    💰 <b>Montant :</b> {p_val} €
-                </div>
+  <div style="margin: 10px 0; padding: 10px; background: #f0f4f8; border-radius: 8px; border-left: 4px solid #1a2a6c;">
+                📅 <b>Date :</b> 07/03/2026<br>
+                ⛵ <b>Durée :</b> 2 jour(s)<br>
+                💰 <b>Montant :</b> 450.00 €
+            </div>
 
-                <div style="margin-bottom:10px;">
-                    📞 <b>{tel}</b><br>
-                    ✉️ {mail}
-                </div>
+            <div style="margin-bottom:10px;">
+                📞 <b></b><br>
+                ✉️ 
+            </div>
 
-                <div class="notes-box">📝 {safe_get(r, "Notes") or "."}</div>
+            <div class="notes-box">📝 .</div>
 
-                <div class="container-boutons">
-                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
-                    <a href="https://wa.me/{tel.replace(" ","")}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
-                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
-                </div>
-            </div>'''
-            st.markdown(h, unsafe_allow_html=True) 
-          
-            
-            # Les boutons de gestion (Editer / Supprimer) restent en dessous pour la clarté
-            if st.session_state.contact_confirm_del == i:
-                st.warning("⚠️ Supprimer cette fiche ?")
-                cy, cn = st.columns(2)
-                if cy.button("✅ OUI", key=f"y_{i}"):
-                    df_c = df_c.drop(i); sauvegarder_data(df_c, "contacts.json")
-                    st.session_state.contact_confirm_del = None; st.rerun()
-                if cn.button("NON", key=f"n_{i}"):
-                    st.session_state.contact_confirm_del = None; st.rerun()
-            else:
-                c1, c2 = st.columns([1, 4])
-                if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
-                if c2.button("🗑️ SUPPRIMER LA FICHE", key=f"del_{i}", use_container_width=True):
-                    st.session_state.contact_confirm_del = i; st.rerun()
+            <div class="container-boutons">
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Mensuel 2026")
