@@ -249,60 +249,20 @@ elif st.session_state.page == "PLANNING":
                 st.markdown(f"📅 **{safe_get(r, 'DateNav')}** ({safe_get(r, 'NbreJours')}j) : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} - <span style='color:{c}; font-weight:bold;'>{s}</span>", unsafe_allow_html=True)
         except: continue
     if not found: st.info("Aucune mission ce mois-ci.")
-
-# --- 7. PAGE STATS ---
-    elif st.session_state.page == "STATS":
-        st.subheader("📊 Historique Financier 2026")
+elif st.session_state.page == "STATS":
+        st.subheader("📊 Test de Diagnostic")
+        st.write("Si tu vois ce message, le menu fonctionne !")
         
-        # Sécurité : On vérifie si les variables existent, sinon on crée des tableaux vides
-        d_c = df_c if 'df_c' in locals() else pd.DataFrame()
-        d_m = df_m if 'df_m' in locals() else pd.DataFrame()
-
-        stats_data = []
-        m_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
-        
-        for m_idx in range(1, 13):
-            rec, prev, frs = 0.0, 0.0, 0.0
-            if not d_c.empty:
-                for _, r in d_c.iterrows():
-                    try:
-                        date_val = str(r.get('DateNav', ''))
-                        if '/' in date_val and int(date_val.split('/')[1]) == m_idx:
-                            p = float(r.get('Prix') or 0)
-                            if str(r.get('Paiement')) in ["Payé", "Paid"]: rec += p
-                            elif str(r.get('Statut')) == "OK": prev += p
-                    except: continue
-            
-            if not d_m.empty:
-                for _, r in d_m.iterrows():
-                    try:
-                        date_m = str(r.get('Date', ''))
-                        if '/' in date_m and int(date_m.split('/')[1]) == m_idx:
-                            frs += float(r.get('Prix') or 0)
-                    except: continue
-            
-            stats_data.append({"Mois": m_courts[m_idx-1], "Recettes (€)": rec, "Frais (€)": frs})
-
-        # Affichage du tableau simple
-        st_df = pd.DataFrame(stats_data)
-        st.table(st_df)
-
-        # Calcul du Total
-        t_rec = st_df["Recettes (€)"].sum()
-        
-        # --- RÉCUPÉRATION DU PRIX DANS MAINT.JSON ---
-        t_frais_json = 0.0
         try:
+            # Test 1: Les fichiers sont-ils chargés ?
+            st.write(f"Vérification Contacts: {'✅ OK' if 'df_c' in locals() else '❌ Vide'}")
+            st.write(f"Vérification Maint: {'✅ OK' if 'df_m' in locals() else '❌ Vide'}")
+            
+            # Test 2: Le JSON est-il lisible ?
             m_file = repo.get_contents("maint.json")
-            m_js = json.loads(m_file.decoded_content.decode("utf-8"))
-            t_frais_json = sum(float(item.get('prix', 0)) for item in m_js)
-        except:
-            pass
-
-        st.divider()
-        c1, c2 = st.columns(2)
-        c1.metric("RECETTES TOTALES", f"{t_rec:.2f} €")
-        c2.metric("TOTAL FRAIS (JSON)", f"{t_frais_json:.2f} €", delta_color="inverse")
+            st.write("✅ Fichier maint.json trouvé sur GitHub")
+        except Exception as e:
+            st.error(f"L'erreur est ici : {e}")
         
 # --- 8. PAGE MAINTENANCE ---
 elif st.session_state.page == "MAINT":
