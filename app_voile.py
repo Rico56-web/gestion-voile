@@ -3,7 +3,7 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 from datetime import datetime
-Import json
+import json
 
 
 # --- 1. CONFIGURATION & STYLE ---
