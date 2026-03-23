@@ -141,26 +141,27 @@ if st.session_state.page == "CONTACTS":
             wa_tel = tel.replace(" ", "").replace("+", "")
 
             # AFFICHAGE DE LA FICHE
-            st.markdown(f'''<div class="fiche-globale {cl_b}">
-                <span class="statut-badge" style="background:{c_p};">{pay_val}</span>
-                <span class="statut-badge" style="background:{c_s};">{s_val}</span>
-                <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
-                <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
-                📅 <b>{safe_get(r, "DateNav")}</b> ({jours} jours) | 💰 <b>{safe_get(r, "Prix")} €</b><br>
-                
-                <div class="notes-box">📝 <b>Notes :</b> {notes if notes else "Aucune note."}</div>
+        # 1. On prépare le texte HTML dans la variable 'h'
+h = f"""
+<div class="fiche-globale {cl_b}">
+    <span class="statut-badge" style="background:{c_p};">{pay_val}</span>
+    <span class="statut-badge" style="background:{c_s};">{s_val}</span>
+    <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
+    <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
+    📅 <b>{safe_get(r, "DateNav")}</b> ({jours} jrs) | 💰 <b>{safe_get(r, "Prix")} €</b><br>
+    
+    <div class="notes-box">📝 <b>Notes :</b> {notes if notes else "..."}</div>
 
-                <div class="container-boutons">
-                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 APPEL</a>
-                    <a href="https://wa.me/{wa_tel}" target="_blank" class="btn-contact" style="background:#25D366;">💬 WHATSAPP</a>
-                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ EMAIL</a>
-                </div>
-            </div>''', unsafe_allow_html=True)
+    <div class="container-boutons">
+        <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 APPEL</a>
+        <a href="https://wa.me/{wa_tel}" target="_blank" class="btn-contact" style="background:#25D366;">💬 WA</a>
+        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ MAIL</a>
+    </div>
+</div>
+"""
 
-            col1, col2 = st.columns([1, 4])
-            if col1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
-            if col2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
-                df_c = df_c.drop(i); sauvegarder_data(df_c, "contacts.json"); st.rerun()
+# 2. On l'affiche avec l'option magique
+st.markdown(h, unsafe_allow_html=True)
 
 # --- FIN DU CODE ---
 
