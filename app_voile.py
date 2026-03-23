@@ -276,6 +276,43 @@ elif st.session_state.page == "STATS":
     t_frs = sum(float(x) for x in st_df["Frais (€)"])
     tot_row = pd.DataFrame([{"Mois": "TOTAL", "Recettes (€)": f"{t_rec:.2f}", "Prévisions (€)": f"{t_pre:.2f}", "Frais (€)": f"{t_frs:.2f}", "Total (€)": f"{(t_rec - t_frs):.2f}"}])
     st.table(pd.concat([st_df, tot_row], ignore_index=True).set_index("Mois"))
+    # --- SECTION STATISTIQUES ---
+st.markdown("### 📊 État des Comptes 2026")
+
+# 1. Préparation des chiffres (en s'assurant que ce sont des nombres)
+df['Prix'] = pd.to_numeric(df['Prix'], errors='coerce').fillna(0)
+
+total_ca = df['Prix'].sum()
+paye = df[df['Paiement'] == 'Paid']['Prix'].sum()
+reste = total_ca - paye
+
+# 2. Affichage en colonnes "Flash"
+c1, c2, c3 = st.columns(3)
+with c1:
+    st.metric("TOTAL PRÉVU", f"{total_ca:,.0f} €")
+with c2:
+    st.metric("REÇU ✅", f"{paye:,.0f} €", delta_color="normal")
+with c3:
+    st.metric("À PERCEVOIR ⏳", f"{reste:,.0f} €", delta=f"-{reste:,.0f}", delta_color="inverse")
+
+st.markdown("---")
+
+# 3. Répartition CMN vs PERSO (Graphique)
+# On compte le nombre de sorties par type de société
+stats_soc = df['Société'].fillna('PERSO').value_counts().reset_index()
+stats_soc.columns = ['Type', 'Nombre']
+
+fig = px.pie(
+    stats_soc, 
+    values='Nombre', 
+    names='Type', 
+    title="Répartition des missions",
+    color_discrete_map={'CMN': '#2e67b2', 'PERSO': '#3498db'} # On garde ton code couleur bleu
+)
+
+# Optimisation pour l'affichage mobile
+fig.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=300)
+st.plotly_chart(fig, use_container_width=True)
 
 # --- 8. PAGE MAINTENANCE ---
 elif st.session_state.page == "MAINT":
