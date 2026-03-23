@@ -201,21 +201,20 @@ if st.session_state.page == "CONTACTS":
 
      # --- 3. LA BOUCLE D'AFFICHAGE ---
             for i, r in df_disp.iterrows():
-                # --- 1. RÉCUPÉRATION AVEC SÉCURITÉ TOTALE ---
-                # On force en texte (str) et on cherche TOUTES les variantes
-                tel_val = safe_get(r, 'Téléphone') or safe_get(r, 'Telephone') or safe_get(r, 'tel') or ""
-                tel = str(tel_val).strip()
+                # --- 1. RÉCUPÉRATION ULTRA-SÉCURISÉE ---
+                # On teste toutes les variantes de noms de colonnes possibles
+                tel = str(safe_get(r, 'Téléphone') or safe_get(r, 'Telephone') or safe_get(r, 'tel') or "").strip()
+                mail = str(safe_get(r, 'Email') or safe_get(r, 'E-mail') or safe_get(r, 'mail') or "").strip()
+                soc = str(safe_get(r, 'Société') or safe_get(r, 'Societe') or "").strip()
                 
-                mail_val = safe_get(r, 'Email') or safe_get(r, 'E-mail') or safe_get(r, 'mail') or ""
-                mail = str(mail_val).strip()
-                
-                soc = safe_get(r, 'Société') or safe_get(r, 'Societe') or "CLIENT PARTICULIER"
-                
-                # --- 2. NETTOYAGE POUR LES LIENS (WhatsApp/Appel) ---
-                # On enlève les espaces pour que le lien fonctionne
-                tel_link = tel.replace(" ", "").replace(".", "").replace("-", "")
-                
-                # --- 3. LE RESTE ---
+                # Nettoyage du numéro pour les liens (WhatsApp / Appel)
+                tel_link = tel.replace(" ", "").replace(".", "").replace("-", "").replace("+33", "0")
+                if tel_link.startswith("0"): # Format WhatsApp international pour la France
+                    tel_wa = "33" + tel_link[1:]
+                else:
+                    tel_wa = tel_link
+
+                # --- 2. AUTRES DONNÉES ---
                 s_val = safe_get(r, 'Statut') or "En attente"
                 pay_val = safe_get(r, 'Paiement') or "Pas payé"
                 date_nav = safe_get(r, 'DateNav') or "??/??/2026"
@@ -224,6 +223,30 @@ if st.session_state.page == "CONTACTS":
                     p_val = f"{float(safe_get(r, 'Prix') or 0):.2f}"
                 except:
                     p_val = "0.00"
+
+                # --- 3. MISE À JOUR DU HTML ---
+                # Vérifie bien que les variables {tel} et {mail} sont ICI
+                h = f'''<div class="fiche-globale">
+                    <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
+                    <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
+                    
+                    <div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #1a2a6c;">
+                        📅 <b>Date :</b> {date_nav}<br>
+                        💰 <b>Montant :</b> {p_val} €
+                    </div>
+
+                    <div style="margin-bottom:10px; font-size: 1.1rem;">
+                        📞 <b>{tel}</b><br>
+                        ✉️ {mail}
+                    </div>
+
+                    <div class="container-boutons">
+                        <a href="tel:{tel_link}" class="btn-contact" style="background:#3498db;">Appeler</a>
+                        <a href="https://wa.me/{tel_wa}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
+                    </div>
+                </div>'''
+                
+                st.markdown(h, unsafe_allow_html=True)
                     
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
