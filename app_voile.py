@@ -203,26 +203,33 @@ if st.session_state.page == "CONTACTS":
                 if c2.button("🗑️ SUPPRIMER LA FICHE", key=f"del_{i}", use_container_width=True):
                     st.session_state.contact_confirm_del = i; st.rerun()
                     
-elif st.session_state.page == "STATS":
+       elif st.session_state.page == "STATS":
         st.subheader("📊 Historique Financier 2026")
         
-        # --- 1. CALCUL DES DONNÉES MENSUELLES ---
         stats_data = []
         m_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
         
+        # --- CALCUL MOIS PAR MOIS ---
         for m_idx in range(1, 13):
-            rec, frs = 0.0, 0.0
-            # Extraction des recettes depuis df_c (Contacts/Planning)
+            rec, prev, frs = 0.0, 0.0, 0.0
+            
+            # 1. RECETTES ET PRÉVISIONS (Depuis df_c)
             if 'df_c' in locals() and not df_c.empty:
                 for _, r in df_c.iterrows():
                     try:
                         date_val = str(r.get('DateNav', ''))
                         if '/' in date_val and int(date_val.split('/')[1]) == m_idx:
-                            if str(r.get('Paiement')) in ["Payé", "Paid"]:
-                                rec += float(r.get('Prix') or 0)
+                            p = float(r.get('Prix') or 0)
+                            statut_p = str(r.get('Paiement', ''))
+                            statut_m = str(r.get('Statut', ''))
+                            
+                            if statut_p in ["Payé", "Paid"]:
+                                rec += p
+                            elif statut_m == "OK":
+                                prev += p
                     except: continue
             
-            # Extraction des frais depuis df_m (Maintenance)
+            # 2. FRAIS (Depuis df_m)
             if 'df_m' in locals() and not df_m.empty:
                 for _, r in df_m.iterrows():
                     try:
@@ -231,49 +238,47 @@ elif st.session_state.page == "STATS":
                             frs += float(r.get('Prix') or 0)
                     except: continue
             
-            stats_data.append({"Mois": m_courts[m_idx-1], "Recettes (€)": rec, "Frais (€)": frs})
+            stats_data.append({
+                "Mois": m_courts[m_idx-1], 
+                "Recettes (€)": rec, 
+                "Prévisions (€)": prev, 
+                "Frais (€)": frs,
+                "Total (€)": (rec - frs)
+            })
 
-        # --- 2. CRÉATION DU DATAFRAME (Indispensable pour éviter le NameError) ---
+        # --- CRÉATION ET AFFICHAGE DU TABLEAU ---
         st_df = pd.DataFrame(stats_data)
-        t_rec = st_df["Recettes (€)"].sum()
-        t_frs = st_df["Frais (€)"].sum()
-
-        # --- 3. AFFICHAGE DU BILAN HAUT DE PAGE ---
-        c1, c2, c3 = st.columns(3)
-        c1.metric("TOTAL REÇU", f"{t_rec:,.2f} €")
-        c2.metric("TOTAL FRAIS", f"{t_frs:,.2f} €", delta=f"-{t_frs:,.2f}", delta_color="inverse")
-        c3.metric("RÉSULTAT", f"{(t_rec - t_frs):,.2f} €")
-
-        st.divider()
-
-        # --- 4. AFFICHAGE DU TABLEAU ---
-        st.write("Détail mensuel :")
-        st.table(st_df.set_index("Mois")) # Ici, st_df est forcément défini !
-    
-        # --- 5. GRAPHIQUE REVENUS (Version Mobile-Friendly) ---
-        fig_barres = px.bar(
-            st_df, 
-            x='Mois', 
-            y='Recettes (€)', 
-            title="CA par Mois 2026", 
-            color_discrete_sequence=['#2ecc71'],
-            text_auto='.2s'
-        )
         
-        # On désactive le zoom et la barre d'outils pour éviter les clics accidentels
-        fig_barres.update_layout(
-            dragmode=False, # Empêche de sélectionner une zone
-            margin=dict(t=50, b=0, l=0, r=0),
-            height=300
-        )
+        # Ligne de TOTAL en bas
+        t_rec = st_df["Recettes (€)"].sum()
+        t_pre = st_df["Prévisions (€)"].sum()
+        t_frs = st_df["Frais (€)"].sum()
+        
+        tot_row = pd.DataFrame([{
+            "Mois": "TOTAL", 
+            "Recettes (€)": t_rec, 
+            "Prévisions (€)": t_pre, 
+            "Frais (€)": t_frs, 
+            "Total (€)": (t_rec - t_frs)
+        }])
+        
+        # Affichage du tableau complet
+        df_final = pd.concat([st_df, tot_row], ignore_index=True)
+        st.table(df_final.set_index("Mois").style.format("{:.2f}"))
 
-        # On affiche le graphique sans la barre d'outils Plotly
-        st.plotly_chart(
-            fig_barres, 
-            use_container_width=True, 
-            config={'displayModeBar': False, 'staticPlot': False}
-        )
-          
+        # --- SECTION BILAN ET GRAPHIQUE ---
+        st.divider()
+        c1, c2, c3 = st.columns(3)
+        c1.metric("ENCAISSÉ ✅", f"{t_rec:,.2f} €")
+        c2.metric("À VENIR ⏳", f"{t_pre:,.2f} €")
+        c3.metric("MARGE RÉELLE", f"{(t_rec - t_frs):,.2f} €")
+
+        # Graphique stable (configuré pour iPhone)
+        fig_barres = px.bar(st_df, x='Mois', y=['Recettes (€)', 'Prévisions (€)'], 
+                           title="Activité Mensuelle", barmode='group',
+                           color_discrete_map={'Recettes (€)': '#2ecc71', 'Prévisions (€)': '#3498db'})
+        
+        st.plotly_chart(fig_barres, use_container_width=True, config={'displayModeBar': False})                 
 
         
 # --- 8. PAGE MAINTENANCE ---
