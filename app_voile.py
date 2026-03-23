@@ -206,53 +206,37 @@ if st.session_state.page == "CONTACTS":
 
      # --- 3. LA BOUCLE D'AFFICHAGE ---
         for i, r in df_disp.iterrows():
-    # --- 1. RÉCUPÉRATION DES DONNÉES ---
-            # On cherche avec et sans accent pour être sûr
-            tel = str(r.get('Telephone') or r.get('Téléphone') or "").strip()
-            mail = str(r.get('Email') or r.get('E-mail') or "").strip()
-            soc = str(r.get('Societe') or r.get('Société') or "PARTICULIER").strip()
-            pre = str(r.get('Prenom') or r.get('Prénom') or "").strip()
-            nom = str(r.get('Nom') or "").strip()
+    # --- 1. RÉCUPÉRATION "FILET DE PÊCHE" ---
+            # On cherche le téléphone dans toutes ces colonnes possibles
+            tel_brut = (
+                r.get('Telephone') or r.get('Téléphone') or 
+                r.get('tel') or r.get('Tel') or 
+                r.get('Portable') or r.get('phone') or ""
+            )
+            tel = str(tel_brut).strip()
             
-            # Nettoyage pour les liens
+            # On cherche l'email dans toutes ces colonnes possibles
+            mail_brut = (
+                r.get('Email') or r.get('E-mail') or 
+                r.get('mail') or r.get('courriel') or 
+                r.get('Email_pro') or ""
+            )
+            mail = str(mail_brut).strip()
+
+            # Nettoyage pour les boutons (Appeler/WhatsApp)
             t_link = tel.replace(" ", "").replace(".", "").replace("-", "")
-            
-            # --- 2. AFFICHAGE DE LA FICHE ---
+
+            # --- 2. AFFICHAGE (Avec texte de secours si vide) ---
             h = f'''<div class="fiche-globale">
-                <div class="societe-style">{soc.upper()}</div>
-                <div class="prenom-style">{pre} {nom.upper()}</div>
                 <div style="margin: 10px 0; font-size: 1.1rem;">
-                    📞 <b>{tel if tel else "Numéro absent"}</b><br>
-                    ✉️ {mail if mail else "Email absent"}
+                    📞 <b>{tel if tel and tel != "nan" else "📞 Numéro manquant"}</b><br>
+                    ✉️ {mail if mail and mail != "nan" else "✉️ Email manquant"}
                 </div>
                 <div class="container-boutons">
                     <a href="tel:{t_link}" class="btn-contact" style="background:#3498db;">Appeler</a>
-                    <a href="https://wa.me/{t_link}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                 </div>
             </div>'''
             st.markdown(h, unsafe_allow_html=True)
-
-            # --- 3. LES BOUTONS MODIFIER / SUPPRIMER (RETOUR) ---
-            if st.session_state.contact_confirm_del == i:
-                st.warning("⚠️ Supprimer cette fiche ?")
-                cy, cn = st.columns(2)
-                if cy.button("✅ OUI", key=f"y_{i}"):
-                    df_c = df_c.drop(i)
-                    sauvegarder_data(df_c, "contacts.json")
-                    st.session_state.contact_confirm_del = None
-                    st.rerun()
-                if cn.button("NON", key=f"n_{i}"):
-                    st.session_state.contact_confirm_del = None
-                    st.rerun()
-            else:
-                # Voici tes boutons qui avaient disparu :
-                c1, c2 = st.columns([1, 4])
-                if c1.button("✏️", key=f"ed_{i}"):
-                    st.session_state.edit_idx = i
-                    st.rerun()
-                if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
-                    st.session_state.contact_confirm_del = i
-                    st.rerun()
                     
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
