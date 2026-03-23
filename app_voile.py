@@ -203,7 +203,8 @@ if st.session_state.page == "CONTACTS":
                 if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
                 if c2.button("🗑️ SUPPRIMER LA FICHE", key=f"del_{i}", use_container_width=True):
                     st.session_state.contact_confirm_del = i; st.rerun()
-   # --- 6. PAGE PLANNING ---
+                    
+# --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("📅 Planning des Navigations")
     
@@ -239,7 +240,9 @@ elif st.session_state.page == "PLANNING":
                 html += f'<cell class="{cl}"><td class="{cl}">{day}<br><small>{txt}</small></td></cell>'
         html += '</tr>'
     html += '</table>'
-    st.markdown(html, unsafe_allow_html=True)                 
+    st.markdown(html, unsafe_allow_html=True)
+    
+     # ---STATISTIQUES ---
 elif st.session_state.page == "STATS":
         st.subheader("📊 Historique Financier 2026")
         
