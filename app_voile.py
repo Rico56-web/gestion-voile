@@ -192,59 +192,34 @@ if st.session_state.page == "CONTACTS":
         df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.view_archive else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
         
         for i, r in df_disp.iterrows():
-            # --- 1. DÉFINITION AVEC TESTS D'ORTHOGRAPHE ---
-            s_val = safe_get(r, 'Statut')
-            pay_val = safe_get(r, 'Paiement')
-            soc = safe_get(r, 'Société') or safe_get(r, 'Societe')
-            
-            # Test Téléphone (avec et sans accent)
-            tel = safe_get(r, 'Téléphone')
-            if not tel: tel = safe_get(r, 'Telephone')
-            if not tel: tel = ""
-            
-            # Test Email
-            mail = safe_get(r, 'Email')
-            if not mail: mail = safe_get(r, 'E-mail')
-            if not mail: mail = ""
-            
-            date_nav = safe_get(r, 'DateNav')
-            jours = safe_get(r, 'NbreJours') or "1"
-            try:
-                p_val = f"{float(safe_get(r, 'Prix') or 0):.2f}"
-            except:
-                p_val = "0.00"        
-            # Couleurs
-            c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
-            c_p = "#FF0000" if "PAS PAYÉ" in pay_val.upper() or "NON PAYÉ" in pay_val.upper() else "#2ecc71"
-            cl_b = "border-cmn" if "CMN" in soc.upper() else ""
-            
-            # Fiche HTML
-            h = f'''<div class="fiche-globale {cl_b}">
-                <span class="statut-badge" style="background:{c_p};">{pay_val}</span>
-                <span class="statut-badge" style="background:{c_s};">{s_val}</span>
-                <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
-                <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
-                
-                <div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #1a2a6c; font-size: 1rem;">
-                    📅 <b>Date :</b> {date_nav}<br>
-                    ⛵ <b>Durée :</b> {jours} jour(s)<br>
-                    💰 <b>Montant :</b> {p_val} €
-                </div>
+        # --- 1. RÉCUPÉRATION ULTRA-SÉCURISÉE ---
+        # On cherche 'Téléphone' avec accent, puis sans, puis en minuscule
+        tel = safe_get(r, 'Téléphone') or safe_get(r, 'Telephone') or safe_get(r, 'tel') or ""
+        
+        # On cherche 'Email' sous toutes ses formes
+        mail = safe_get(r, 'Email') or safe_get(r, 'E-mail') or safe_get(r, 'mail') or ""
+        
+        # Le reste des variables
+        soc = safe_get(r, 'Société') or safe_get(r, 'Societe') or ""
+        s_val = safe_get(r, 'Statut') or "En attente"
+        pay_val = safe_get(r, 'Paiement') or "Pas payé"
+        date_nav = safe_get(r, 'DateNav') or "00/00/2026"
+        jours = safe_get(r, 'NbreJours') or "1"
+        
+        try:
+            p_val = f"{float(safe_get(r, 'Prix') or 0):.2f}"
+        except:
+            p_val = "0.00"
 
-                <div style="margin-bottom:10px; font-size: 1.1rem;">
-                    📞 <b>{tel}</b><br>
-                    ✉️ {mail}
-                </div>
+        # --- 2. COULEURS ---
+        c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
+        c_p = "#FF0000" if "PAS PAYÉ" in pay_val.upper() or "NON PAYÉ" in pay_val.upper() else "#2ecc71"
+        cl_b = "border-cmn" if "CMN" in soc.upper() else ""
 
-                <div class="notes-box">📝 {safe_get(r, "Notes") or "."}</div>
-
-                <div class="container-boutons">
-                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
-                    <a href="https://wa.me/{tel.replace(" ","")}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
-                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
-                </div>
-            </div>'''
-            st.markdown(h, unsafe_allow_html=True)
+        # --- 3. TON BLOC HTML (ne change rien dedans) ---
+        h = f'''<div class="fiche-globale {cl_b}">
+            ... (ton code HTML actuel) ...
+        '''
             
             # Gestion Suppression / Edition
             if st.session_state.contact_confirm_del == i:
