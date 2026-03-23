@@ -57,15 +57,16 @@ GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 
 def charger_data(file):
     try:
+        content = df.to_json(orient="records")
         url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file}"
         headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-        res = requests.get(url, headers=headers, params={"v": time.time()})
+        res = requests.get(url, headers=headers)
         if res.status_code == 200:
-            content = res.json()['content']
-            return pd.DataFrame(json.loads(base64.b64decode(content).decode('utf-8')))
-        return pd.DataFrame()
-    except: 
-        return pd.DataFrame()
+            sha = res.json()['sha']
+            data = {"message": f"Update {file}", "content": base64.b64encode(content.encode('utf-8')).decode('utf-8'), "sha": sha}
+            requests.put(url, headers=headers, data=json.dumps(data))
+    except:
+        pass
 
 def safe_get(r, key):
     val = r.get(key)
