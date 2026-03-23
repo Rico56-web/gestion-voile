@@ -115,12 +115,12 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except Exception:
         pass
-  # --- 5. PAGE CONTACTS ---
-  if st.session_state.page == "CONTACTS":
-  if "view_archive" not in st.session_state:
-        st.session_state.view_archive = False  # Par défaut, on voit les missions futures
-  if "contact_confirm_del" not in st.session_state:
-        st.session_state.contact_confirm_del = None
+# --- 5. PAGE CONTACTS ---
+if st.session_state.page == "CONTACTS":
+if "view_archive" not in st.session_state:
+    st.session_state.view_archive = False  # Par défaut, on voit les missions futures
+if "contact_confirm_del" not in st.session_state:
+    st.session_state.contact_confirm_del = None
 
     # Bouton Nouveau Contact
     if st.button("➕ NOUVEAU CONTACT", type="secondary", use_container_width=True):
