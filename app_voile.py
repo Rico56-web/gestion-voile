@@ -179,7 +179,7 @@ if st.session_state.page == "CONTACTS":
             st.session_state.edit_idx = None
             st.rerun()
 
-         else:
+    else:
         # --- 1. FILTRAGE SÉCURISÉ ---
         # On s'assure que df_c n'est pas vide avant de filtrer
         if df_c.empty:
