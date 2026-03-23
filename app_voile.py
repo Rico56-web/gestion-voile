@@ -203,7 +203,43 @@ if st.session_state.page == "CONTACTS":
                 if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
                 if c2.button("🗑️ SUPPRIMER LA FICHE", key=f"del_{i}", use_container_width=True):
                     st.session_state.contact_confirm_del = i; st.rerun()
-                    
+   # --- 6. PAGE PLANNING ---
+elif st.session_state.page == "PLANNING":
+    st.subheader("📅 Planning des Navigations")
+    
+    col1, col2 = st.columns([2, 1])
+    mois_sel = col1.selectbox("Mois", range(1, 13), index=now.month-1, format_func=lambda x: mois_fr[x-1])
+    annee_sel = col2.number_input("Année", value=2026)
+
+    # Création du calendrier
+    cal = calendar.monthcalendar(annee_sel, mois_sel)
+    
+    # Marquage des jours occupés
+    jours_occupes = {}
+    if not df_c.empty:
+        for _, r in df_c.iterrows():
+            try:
+                d_str = safe_get(r, 'DateNav')
+                d_obj = datetime.strptime(d_str, "%d/%m/%Y")
+                if d_obj.month == mois_sel and d_obj.year == annee_sel:
+                    status = safe_get(r, 'Statut')
+                    color = "day-ok" if status == "OK" else "day-attente"
+                    jours_occupes[d_obj.day] = (color, safe_get(r, 'Prénom'))
+            except: continue
+
+    # Affichage HTML du calendrier
+    html = '<table class="calendar-table"><tr><th>Lun</th><th>Mar</th><th>Mer</th><th>Jeu</th><th>Ven</th><th>Sam</th><th>Dim</th></tr>'
+    for week in cal:
+        html += '<tr>'
+        for day in week:
+            if day == 0:
+                html += '<td></td>'
+            else:
+                cl, txt = jours_occupes.get(day, ("", ""))
+                html += f'<cell class="{cl}"><td class="{cl}">{day}<br><small>{txt}</small></td></cell>'
+        html += '</tr>'
+    html += '</table>'
+    st.markdown(html, unsafe_allow_html=True)                 
 elif st.session_state.page == "STATS":
         st.subheader("📊 Historique Financier 2026")
         
