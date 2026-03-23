@@ -167,15 +167,20 @@ if st.session_state.page == "CONTACTS":
         u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
 
         if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
-            df_c.at[idx, 'Prénom'], df_c.at[idx, 'Nom'], df_c.at[idx, 'Société'] = u_pre, u_nom, u_soc
-            df_c.at[idx, 'Téléphone'], df_c.at[idx, 'Email'], df_c.at[idx, 'DateNav'] = u_tel, u_mail, u_date
-            df_c.at[idx, 'NbreJours'], df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'] = u_jours, u_stat, u_paye
+            # On utilise des noms simples et sans espaces/accents
+            df_c.at[idx, 'Prenom'] = u_pre
+            df_c.at[idx, 'Nom'] = u_nom
+            df_c.at[idx, 'Societe'] = u_soc
+            df_c.at[idx, 'Telephone'] = u_tel  # <-- Toujours sans accent ici
+            df_c.at[idx, 'Email'] = u_mail
+            df_c.at[idx, 'DateNav'] = u_date
+            df_c.at[idx, 'NbreJours'] = u_jours
+            df_c.at[idx, 'Statut'] = u_stat
+            df_c.at[idx, 'Paiement'] = u_paye
             df_c.at[idx, 'Prix'] = f"{float(u_prix or 0):.2f}"
             df_c.at[idx, 'Notes'] = u_notes
+            
             sauvegarder_data(df_c, "contacts.json")
-            st.session_state.edit_idx = None
-            st.rerun()
-        if st.button("Annuler"):
             st.session_state.edit_idx = None
             st.rerun()
 
