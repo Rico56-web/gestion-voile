@@ -200,7 +200,7 @@ if st.session_state.page == "CONTACTS":
                 st.info(f"Aucune fiche dans {titre_vue}. Essayez l'autre onglet !")
 
      # --- 3. LA BOUCLE D'AFFICHAGE ---
-     for i, r in df_disp.iterrows():
+            for i, r in df_disp.iterrows():
                 # --- 1. RÉCUPÉRATION AVEC SÉCURITÉ TOTALE ---
                 # On force en texte (str) et on cherche TOUTES les variantes
                 tel_val = safe_get(r, 'Téléphone') or safe_get(r, 'Telephone') or safe_get(r, 'tel') or ""
