@@ -140,28 +140,30 @@ if st.session_state.page == "CONTACTS":
             # WhatsApp link clean
             wa_tel = tel.replace(" ", "").replace("+", "")
 
-            # AFFICHAGE DE LA FICHE
-        # 1. On prépare le texte HTML dans la variable 'h'
-h = f"""
+          # Préparation du contenu de la fiche
+contenu_html = f"""
 <div class="fiche-globale {cl_b}">
     <span class="statut-badge" style="background:{c_p};">{pay_val}</span>
     <span class="statut-badge" style="background:{c_s};">{s_val}</span>
-    <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
-    <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
-    📅 <b>{safe_get(r, "DateNav")}</b> ({jours} jrs) | 💰 <b>{safe_get(r, "Prix")} €</b><br>
+    <div class="societe-style">{soc if soc else "PERSO"}</div>
+    <div class="prenom-style">{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}</div>
+    📅 <b>{safe_get(r, 'DateNav')}</b> ({jours} jrs) | 💰 <b>{p_val} €</b><br>
     
     <div class="notes-box">📝 <b>Notes :</b> {notes if notes else "..."}</div>
 
     <div class="container-boutons">
-        <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">📞 APPEL</a>
-        <a href="https://wa.me/{wa_tel}" target="_blank" class="btn-contact" style="background:#25D366;">💬 WA</a>
-        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">✉️ MAIL</a>
+        <a href="tel:{tel}" class="btn-contact" style="background:#3498db; color:white !important; text-decoration:none;">📞 APPEL</a>
+        <a href="https://wa.me/{tel.replace(' ','')}" target="_blank" class="btn-contact" style="background:#25D366; color:white !important; text-decoration:none;">💬 WA</a>
+        <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22; color:white !important; text-decoration:none;">✉️ MAIL</a>
     </div>
 </div>
 """
 
-# 2. On l'affiche avec l'option magique
-st.markdown(h, unsafe_allow_html=True)
+# AFFICHAGE (Le secret est ici)
+st.markdown(contenu_html, unsafe_allow_html=True)
+      
+
+
 
 # --- FIN DU CODE ---
 
