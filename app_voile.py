@@ -191,20 +191,28 @@ if st.session_state.page == "CONTACTS":
     else:
         df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.view_archive else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
         
-        for i, r in df_disp.iterrows():
-            # Préparation des données
+    for i, r in df_disp.iterrows():
+            # --- 1. DÉFINITION AVEC TESTS D'ORTHOGRAPHE ---
             s_val = safe_get(r, 'Statut')
             pay_val = safe_get(r, 'Paiement')
-            soc = safe_get(r, 'Société')
+            soc = safe_get(r, 'Société') or safe_get(r, 'Societe')
+            
+            # Test Téléphone (avec et sans accent)
             tel = safe_get(r, 'Téléphone')
+            if not tel: tel = safe_get(r, 'Telephone')
+            if not tel: tel = ""
+            
+            # Test Email
             mail = safe_get(r, 'Email')
+            if not mail: mail = safe_get(r, 'E-mail')
+            if not mail: mail = ""
+            
             date_nav = safe_get(r, 'DateNav')
             jours = safe_get(r, 'NbreJours') or "1"
             try:
                 p_val = f"{float(safe_get(r, 'Prix') or 0):.2f}"
             except:
-                p_val = "0.00"
-            
+                p_val = "0.00"        
             # Couleurs
             c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
             c_p = "#FF0000" if "PAS PAYÉ" in pay_val.upper() or "NON PAYÉ" in pay_val.upper() else "#2ecc71"
