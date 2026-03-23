@@ -202,6 +202,7 @@ if st.session_state.page == "CONTACTS":
                 if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
                 if c2.button("🗑️ SUPPRIMER LA FICHE", key=f"del_{i}", use_container_width=True):
                     st.session_state.contact_confirm_del = i; st.rerun()
+                    
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Mensuel 2026")
@@ -248,150 +249,88 @@ elif st.session_state.page == "PLANNING":
     if not found: st.info("Aucune mission ce mois-ci.")
 
 # --- 7. PAGE STATS ---
-elif st.session_state.page == "STATS":
-    st.subheader("📊 Historique Financier 2026")
-    stats_data = []
-    m_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
-    
-    for m_idx in range(1, 13):
-        rec, prev, frs = 0.0, 0.0, 0.0
-        if not df_c.empty:
-            for _, r in df_c.iterrows():
-                try:
-                    rm = int(safe_get(r, 'DateNav').split('/')[1])
-                    if rm == m_idx:
-                        p = float(safe_get(r, 'Prix') or 0)
-                        # ATTENTION : Vérifie si tu écris "Payé" ou "Paid" dans ton fichier
-                        statut_p = safe_get(r, 'Paiement')
-                        if statut_p in ["Payé", "Paid"]: rec += p
-                        elif safe_get(r, 'Statut') == "OK": prev += p
-                except: continue
+    elif st.session_state.page == "STATS":
+        st.subheader("📊 Historique Financier 2026")
+        stats_data = []
+        m_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
         
-        if not df_m.empty:
-            for _, r in df_m.iterrows():
-                try:
-                    rm = int(safe_get(r, 'Date').split('/')[1])
-                    if rm == m_idx: frs += float(safe_get(r, 'Prix') or 0)
-                except: continue
+        for m_idx in range(1, 13):
+            rec, prev, frs = 0.0, 0.0, 0.0
+            if not df_c.empty:
+                for _, r in df_c.iterrows():
+                    try:
+                        rm = int(safe_get(r, 'DateNav').split('/')[1])
+                        if rm == m_idx:
+                            p = float(safe_get(r, 'Prix') or 0)
+                            statut_p = safe_get(r, 'Paiement')
+                            if statut_p in ["Payé", "Paid"]: rec += p
+                            elif safe_get(r, 'Statut') == "OK": prev += p
+                    except: continue
+            
+            if not df_m.empty:
+                for _, r in df_m.iterrows():
+                    try:
+                        rm = int(safe_get(r, 'Date').split('/')[1])
+                        if rm == m_idx: frs += float(safe_get(r, 'Prix') or 0)
+                    except: continue
+            
+            stats_data.append({
+                "Mois": m_courts[m_idx-1], 
+                "Recettes (€)": f"{rec:.2f}", 
+                "Prévisions (€)": f"{prev:.2f}", 
+                "Frais (€)": f"{frs:.2f}", 
+                "Total (€)": f"{(rec - frs):.2f}"
+            })
+
+        st_df = pd.DataFrame(stats_data)
+        t_rec = sum(float(x) for x in st_df["Recettes (€)"])
         
-        stats_data.append({
-            "Mois": m_courts[m_idx-1], 
-            "Recettes (€)": f"{rec:.2f}", 
-            "Prévisions (€)": f"{prev:.2f}", 
-            "Frais (€)": f"{frs:.2f}", 
-            "Total (€)": f"{(rec - frs):.2f}"
-        })
+        # Affichage du tableau récapitulatif
+        tot_row = pd.DataFrame([{"Mois": "TOTAL", "Recettes (€)": f"{t_rec:.2f}", "Prévisions (€)": f"{sum(float(x) for x in st_df['Prévisions (€)']):.2f}", "Frais (€)": f"{sum(float(x) for x in st_df['Frais (€)']):.2f}", "Total (€)": f"{(t_rec - sum(float(x) for x in st_df['Frais (€)'])):.2f}"}])
+        st.table(pd.concat([st_df, tot_row], ignore_index=True).set_index("Mois"))
 
-    st_df = pd.DataFrame(stats_data)
-    t_rec = sum(float(x) for x in st_df["Recettes (€)"])
-    t_pre = sum(float(x) for x in st_df["Prévisions (€)"])
-    t_frs = sum(float(x) for x in st_df["Frais (€)"])
-    
-    # Affichage du tableau récapitulatif
-    tot_row = pd.DataFrame([{"Mois": "TOTAL", "Recettes (€)": f"{t_rec:.2f}", "Prévisions (€)": f"{t_pre:.2f}", "Frais (€)": f"{t_frs:.2f}", "Total (€)": f"{(t_rec - t_frs):.2f}"}])
-    st.table(pd.concat([st_df, tot_row], ignore_index=True).set_index("Mois"))
+        # --- 1. RÉCUPÉRATION DES DÉPENSES RÉELLES (JSON) ---
+        try:
+            m_file = repo.get_contents("maint.json")
+            m_data = json.loads(m_file.decoded_content.decode("utf-8"))
+            df_maint = pd.DataFrame(m_data)
+            total_frais_reel = pd.to_numeric(df_maint['prix'], errors='coerce').fillna(0).sum() if not df_maint.empty else 0.0
+        except:
+            total_frais_reel = 0.0
 
-    # --- SECTION GRAPHIQUE (DÉCALÉE À DROITE POUR ÊTRE DANS LA PAGE STATS) ---
-    st.markdown("### 📊 État des Comptes 2026")
-
-    # 1. Calculs rapides sur df_c (ton DataFrame de contacts)
-    if not df_c.empty:
-        df_c['Prix_Num'] = pd.to_numeric(df_c['Prix'], errors='coerce').fillna(0)
-        total_ca = df_c['Prix_Num'].sum()
-        # On gère les deux écritures possibles Payé/Paid
-        paye = df_c[df_c['Paiement'].isin(['Paid', 'Payé'])]['Prix_Num'].sum()
-        reste = total_ca - paye
-
-        # 2. Affichage "Flash"
+        # --- 2. AFFICHAGE DU BILAN ---
+        st.markdown("### ⚓ Bilan Financier Vesta 2026")
         c1, c2, c3 = st.columns(3)
-        c1.metric("TOTAL PRÉVU", f"{total_ca:,.0f} €")
-        c2.metric("REÇU ✅", f"{paye:,.0f} €")
-        c3.metric("À PERCEVOIR ⏳", f"{reste:,.0f} €", delta=f"-{reste:,.0f}", delta_color="inverse")
+        c1.metric("RECETTES", f"{t_rec:,.2f} €")
+        c2.metric("FRAIS (MAINT)", f"{total_frais_reel:,.2f} €", delta=f"-{total_frais_reel:,.2f}", delta_color="inverse")
+        c3.metric("BÉNÉFICE NET", f"{(t_rec - total_frais_reel):,.2f} €")
 
-        st.markdown("---")
-
-        # 3. Répartition CMN vs PERSO
-        stats_soc = df_c['Société'].fillna('PERSO').replace('', 'PERSO').value_counts().reset_index()
-        stats_soc.columns = ['Type', 'Nombre']
-
-        fig = px.pie(
-            stats_soc, 
-            values='Nombre', 
-            names='Type', 
-            title="Répartition des missions",
-            color_discrete_map={'CMN': '#2e67b2', 'PERSO': '#3498db'}
-        )
-        fig.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=300)
-        st.plotly_chart(fig, use_container_width=True)
-# --- NOUVEAU : GRAPHIQUE EN BARRES (REVENUS PAR MOIS) ---
+        # --- 3. GRAPHIQUE EN BARRES ---
         st.markdown("### 📈 Revenus Mensuels")
-        
-        # On prépare les données du tableau pour le graphique
         df_barres = st_df[st_df["Mois"] != "TOTAL"].copy()
         df_barres["Recettes (€)"] = pd.to_numeric(df_barres["Recettes (€)"])
-        
-        fig_barres = px.bar(
-            df_barres, 
-            x='Mois', 
-            y='Recettes (€)',
-            title="Chiffre d'Affaires par Mois",
-            text_auto='.2s',
-            color_discrete_sequence=['#2ecc71'] # Vert pour l'argent qui rentre
-        )
+        fig_barres = px.bar(df_barres, x='Mois', y='Recettes (€)', title="CA par Mois", color_discrete_sequence=['#2ecc71'])
         fig_barres.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0))
         st.plotly_chart(fig_barres, use_container_width=True)
-# --- 1. RÉCUPÉRATION DES DÉPENSES (Depuis maint.json) ---
-try:
-    # On récupère le contenu de maintenance
-    m_file = repo.get_contents("maint.json")
-    m_data = json.loads(m_file.decoded_content.decode("utf-8"))
-    
-    # On transforme en DataFrame pour calculer facilement
-    df_maint = pd.DataFrame(m_data)
-    
-    # On s'assure que 'prix' est bien traité comme un nombre
-    if not df_maint.empty and 'prix' in df_maint.columns:
-        total_frais = pd.to_numeric(df_maint['prix'], errors='coerce').fillna(0).sum()
-    else:
-        total_frais = 0.0
-except Exception as e:
-    st.error(f"Erreur lecture maintenance : {e}")
-    total_frais = 0.0
 
-# --- 2. CALCUL DU BÉNÉFICE NET ---
-marge_nette = t_rec - total_frais
+        # --- 4. RÉPARTITION CMN/PERSO ---
+        if not df_c.empty:
+            st.markdown("---")
+            stats_soc = df_c['Société'].fillna('PERSO').replace('', 'PERSO').value_counts().reset_index()
+            stats_soc.columns = ['Type', 'Nombre']
+            fig_pie = px.pie(stats_soc, values='Nombre', names='Type', title="Répartition des missions", color_discrete_map={'CMN': '#2e67b2', 'PERSO': '#3498db'})
+            st.plotly_chart(fig_pie, use_container_width=True)
 
-# --- 3. AFFICHAGE DES CHIFFRES CLÉS ---
-st.markdown("### ⚓ Bilan Financier Vesta 2026")
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.metric("RECETTES (BRUT)", f"{t_rec:,.2f} €")
-with col2:
-    # Le delta en rouge indique une sortie d'argent
-    st.metric("FRAIS & MAINT.", f"{total_frais:,.2f} €", delta=f"-{total_frais:,.2f}", delta_color="inverse")
-with col3:
-    # Calcul du % de marge pour le pilotage
-    pourcentage = (marge_nette / t_rec * 100) if t_rec > 0 else 0
-    st.metric("BÉNÉFICE (NET)", f"{marge_nette:,.2f} €", delta=f"{pourcentage:.1f}%")
-
-st.markdown("---")
-        # --- NOUVEAU : CALCULATEUR DE FRAIS RAPIDE ---
+        # --- 5. CALCULATEUR RAPIDE ---
         st.markdown("---")
         st.markdown("### ⛽ Calculateur de Marge Rapide")
-        
         col_f1, col_f2 = st.columns(2)
         with col_f1:
-            carburant = st.number_input("Frais Carburant (€)", min_value=0.0, step=10.0)
-            port = st.number_input("Frais de Port (€)", min_value=0.0, step=10.0)
+            carb = st.number_input("Carburant (€)", min_value=0.0, step=10.0)
         with col_f2:
-            entretien = st.number_input("Entretien/Divers (€)", min_value=0.0, step=10.0)
-            total_frais_saisis = carburant + port + entretien
-            
-        marge_nette = t_rec - total_frais_saisis
+            port = st.number_input("Port (€)", min_value=0.0, step=10.0)
         
-        # Affichage du résultat final en gros
-        st.metric("MARGE NETTE ESTIMÉE", f"{marge_nette:,.2f} €", delta=f"-{total_frais_saisis} de frais")
+        st.metric("MARGE ESTIMÉE", f"{(t_rec - carb - port):,.2f} €")
         
 # --- 8. PAGE MAINTENANCE ---
 elif st.session_state.page == "MAINT":
