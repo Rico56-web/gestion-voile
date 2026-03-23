@@ -249,10 +249,31 @@ elif st.session_state.page == "STATS":
         # --- 4. AFFICHAGE DU TABLEAU ---
         st.write("Détail mensuel :")
         st.table(st_df.set_index("Mois")) # Ici, st_df est forcément défini !
+    
+        # --- 5. GRAPHIQUE REVENUS (Version Mobile-Friendly) ---
+        fig_barres = px.bar(
+            st_df, 
+            x='Mois', 
+            y='Recettes (€)', 
+            title="CA par Mois 2026", 
+            color_discrete_sequence=['#2ecc71'],
+            text_auto='.2s'
+        )
+        
+        # On désactive le zoom et la barre d'outils pour éviter les clics accidentels
+        fig_barres.update_layout(
+            dragmode=False, # Empêche de sélectionner une zone
+            margin=dict(t=50, b=0, l=0, r=0),
+            height=300
+        )
 
-        # --- 5. GRAPHIQUE REVENUS ---
-        fig_barres = px.bar(st_df, x='Mois', y='Recettes (€)', title="CA par Mois", color_discrete_sequence=['#2ecc71'])
-        st.plotly_chart(fig_barres, use_container_width=True)          
+        # On affiche le graphique sans la barre d'outils Plotly
+        st.plotly_chart(
+            fig_barres, 
+            use_container_width=True, 
+            config={'displayModeBar': False, 'staticPlot': False}
+        )
+          
 
         
 # --- 8. PAGE MAINTENANCE ---
