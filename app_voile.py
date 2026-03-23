@@ -171,7 +171,7 @@ if st.session_state.page == "CONTACTS":
             
             # Ici on intègre les liens d'appel directement dans le HTML de la fiche
             p_val = f"{float(safe_get(r, 'Prix') or 0):.2f}"
-             h = f'''<div class="fiche-globale {cl_b}">
+            h = f'''<div class="fiche-globale {cl_b}">
                 <span class="statut-badge" style="background:{c_p};">{pay_val}</span>
                 <span class="statut-badge" style="background:{c_s};">{s_val}</span>
                 <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
