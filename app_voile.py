@@ -194,7 +194,7 @@ if st.session_state.page == "CONTACTS":
             st.info("Aucune mission à afficher.")
         
         # --- 2. BOUCLE D'AFFICHAGE ---
-  for i, r in df_disp.iterrows():
+        for i, r in df_disp.iterrows():
             # --- 1. RÉCUPÉRATION (C'est ici qu'on définit 'tel') ---
             # On cherche dans toutes les colonnes possibles pour ne rien rater
             tel = str(r.get('Téléphone') or r.get('Telephone') or r.get('tel') or "").strip()
