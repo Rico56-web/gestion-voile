@@ -202,65 +202,47 @@ if st.session_state.page == "CONTACTS":
                 if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
                 if c2.button("🗑️ SUPPRIMER LA FICHE", key=f"del_{i}", use_container_width=True):
                     st.session_state.contact_confirm_del = i; st.rerun()
-                    
-# --- 6. PAGE PLANNING ---
-elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Planning Mensuel 2026")
-    m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-    sel_m_nom = st.selectbox("Mois", m_noms, index=now.month - 1)
-    sel_m = m_noms.index(sel_m_nom) + 1
-    
-    jours_occ = {}
-    for _, r in df_c.iterrows():
-        try:
-            date_str = safe_get(r, 'DateNav').replace(" ", "")
-            dp = date_str.split('/')
-            m_val, y_val = int(dp[1]), int(dp[2])
-            if y_val == 26: y_val = 2026
-            if m_val == sel_m and y_val == 2026:
-                for j in range(int(dp[0]), int(dp[0]) + int(safe_get(r, 'NbreJours'))):
-                    jours_occ[j] = safe_get(r, 'Statut')
-        except: continue
-
-    cal_mat = calendar.monthcalendar(2026, sel_m)
-    h_cal = '<table class="calendar-table"><thead><tr><th>Lun</th><th>Mar</th><th>Mer</th><th>Jeu</th><th>Ven</th><th>Sam</th><th>Dim</th></tr></thead><tbody>'
-    for sem in cal_mat:
-        h_cal += '<tr>'
-        for jour in sem:
-            cl = ""
-            if jour != 0 and jour in jours_occ:
-                cl = "day-ok" if jours_occ[jour] == "OK" else "day-attente"
-            h_cal += f'<td class="{cl}">{jour if jour != 0 else ""}</td>'
-        h_cal += '</tr>'
-    st.markdown(h_cal + '</tbody></table>', unsafe_allow_html=True)
-    
-    st.markdown("---")
-    st.subheader("📋 Liste détaillée du mois")
-    found = False
-    for _, r in df_c.iterrows():
-        try:
-            m = int(safe_get(r, 'DateNav').split('/')[1])
-            if m == sel_m:
-                found = True
-                s = safe_get(r, 'Statut')
-                c = "green" if s == "OK" else "orange"
-                st.markdown(f"📅 **{safe_get(r, 'DateNav')}** ({safe_get(r, 'NbreJours')}j) : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} - <span style='color:{c}; font-weight:bold;'>{s}</span>", unsafe_allow_html=True)
-        except: continue
-    if not found: st.info("Aucune mission ce mois-ci.")
-elif st.session_state.page == "STATS":
-        st.subheader("📊 Test de Diagnostic")
-        st.write("Si tu vois ce message, le menu fonctionne !")
+ elif st.session_state.page == "STATS":
+        st.subheader("📊 Historique Financier 2026")
         
+        # 1. RÉCUPÉRATION DES DÉPENSES (Via ta fonction charger_data ou direct)
+        total_frais_reel = 0.0
         try:
-            # Test 1: Les fichiers sont-ils chargés ?
-            st.write(f"Vérification Contacts: {'✅ OK' if 'df_c' in locals() else '❌ Vide'}")
-            st.write(f"Vérification Maint: {'✅ OK' if 'df_m' in locals() else '❌ Vide'}")
+            # On utilise ta logique de requête pour lire maint.json
+            u_m = f"https://api.github.com/repos/{GITHUB_REPO}/contents/maint.json"
+            r_m = requests.get(u_m, headers={"Authorization": f"token {GITHUB_TOKEN}"}, params={"v": time.time()})
             
-            # Test 2: Le JSON est-il lisible ?
-            m_file = repo.get_contents("maint.json")
-            st.write("✅ Fichier maint.json trouvé sur GitHub")
+            if r_m.status_code == 200:
+                content_m = json.loads(base64.b64decode(r_m.json()['content']).decode('utf-8'))
+                # On additionne tous les 'prix' présents dans le JSON
+                total_frais_reel = sum(float(item.get('prix', 0) or 0) for item in content_m)
         except Exception as e:
-            st.error(f"L'erreur est ici : {e}")
+            st.warning(f"Note : Calcul des frais indisponible ({e})")
+
+        # 2. CALCUL DES RECETTES (Via ton tableau existant st_df)
+        # Assure-toi que st_df est bien calculé juste avant ou ici
+        t_rec = sum(float(x) for x in st_df["Recettes (€)"]) if 'st_df' in locals() else 0.0
+
+        # 3. AFFICHAGE DES MÉTRIQUES "FLASH"
+        st.markdown("### ⚓ Bilan de la Saison")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("RECETTES", f"{t_rec:,.2f} €")
+        c2.metric("FRAIS (MAINT)", f"{total_frais_reel:,.2f} €", delta=f"-{total_frais_reel:,.2f}", delta_color="inverse")
+        c3.metric("BÉNÉFICE NET", f"{(t_rec - total_frais_reel):,.2f} €")
+
+        st.markdown("---")
+
+        # 4. LE TABLEAU RÉCAPITULATIF (Ton tableau mensuel)
+        st.write("Détails par mois :")
+        st.table(st_df) # Affiche ton tableau Janvier -> Décembre
+
+        # 5. LE GRAPHIQUE (Le fameux fromage)
+        if not df_c.empty:
+            stats_soc = df_c['Société'].fillna('PERSO').replace('', 'PERSO').value_counts().reset_index()
+            stats_soc.columns = ['Type', 'Nombre']
+            fig_pie = px.pie(stats_soc, values='Nombre', names='Type', title="Répartition des missions")
+            st.plotly_chart(fig_pie, use_container_width=True)                   
+
         
 # --- 8. PAGE MAINTENANCE ---
 elif st.session_state.page == "MAINT":
