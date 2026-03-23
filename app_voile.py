@@ -258,10 +258,6 @@ if st.session_state.page == "CONTACTS":
                 if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
                     st.session_state.contact_confirm_del = i
                     st.rerun()
-
-# --- 6. PAGE PLANNING ---
-elif st.session_state.page == "PLANNING":      
-
                     
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
