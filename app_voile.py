@@ -171,13 +171,16 @@ if st.session_state.page == "CONTACTS":
             
             # Ici on intègre les liens d'appel directement dans le HTML de la fiche
             p_val = f"{float(safe_get(r, 'Prix') or 0):.2f}"
-            h = f'''<div class="fiche-globale {cl_b}">
+             h = f'''<div class="fiche-globale {cl_b}">
                 <span class="statut-badge" style="background:{c_p};">{pay_val}</span>
                 <span class="statut-badge" style="background:{c_s};">{s_val}</span>
                 <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
                 <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
                 📅 <b>{safe_get(r, "DateNav")}</b> ({jours} jrs) | 💰 <b>{p_val} €</b><br>
-                📞 {tel} | ✉️ {mail}
+                <div style="margin-top:5px; color:#444;">
+                    📞 <b>{tel}</b><br>
+                    ✉️ <i>{mail}</i>
+                </div>
                 <div class="notes-box">📝 {safe_get(r, "Notes") or "."}</div>
                 <div class="container-boutons">
                     <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
