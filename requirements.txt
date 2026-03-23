@@ -1,6 +1,6 @@
 streamlit
 pandas
-PyGihub
-Plotly
+PyGithub
+plotly
 requests
 
