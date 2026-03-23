@@ -235,11 +235,11 @@ if st.session_state.page == "CONTACTS":
                     st.rerun()
                 else:
                 c1, c2 = st.columns([1, 4])
-                # Aligne bien les boutons sous le "c1, c2"
-                if c1.button("✏️", key=f"ed_{i}"):
+         # Aligne bien les boutons sous le "c1, c2"
+            if c1.button("✏️", key=f"ed_{i}"):
                     st.session_state.edit_idx = i
                     st.rerun()
-                if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
+            if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
                     st.session_state.contact_confirm_del = i
                     st.rerun() 
                     
