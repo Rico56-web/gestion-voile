@@ -116,8 +116,8 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     except Exception:
         pass
   # --- 5. PAGE CONTACTS ---
-    if st.session_state.page == "CONTACTS":
-    if "contact_confirm_del" not in st.session_state:
+  if st.session_state.page == "CONTACTS":
+  if "contact_confirm_del" not in st.session_state:
         st.session_state.contact_confirm_del = None
 
     # Bouton Nouveau Contact
