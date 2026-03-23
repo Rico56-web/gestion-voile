@@ -179,37 +179,41 @@ if st.session_state.page == "CONTACTS":
             st.session_state.edit_idx = None
             st.rerun()
 
-    else:
-        # --- LISTE DES CONTACTS ---
-        df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.view_archive else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
-        
-        if df_disp.empty:
-            st.info("Aucune mission ici.")
-        
-        for i, r in df_disp.iterrows():
-            # --- 1. RÉCUPÉRATION AVEC SÉCURITÉ TOTALE ---
-            # On force en texte (str) et on cherche avec ou sans accent
-            tel_raw = safe_get(r, 'Téléphone') or safe_get(r, 'Telephone') or safe_get(r, 'tel') or ""
-            tel = str(tel_raw).strip()
-            
-            mail_raw = safe_get(r, 'Email') or safe_get(r, 'E-mail') or safe_get(r, 'mail') or ""
-            mail = str(mail_raw).strip()
-            
-            soc = safe_get(r, 'Société') or safe_get(r, 'Societe') or ""
-            
-            # --- 2. NETTOYAGE POUR LES BOUTONS ---
-            # WhatsApp n'aime pas les espaces ou les "+" dans le lien
-            tel_wa = tel.replace(" ", "").replace("+", "")
-            
-            # --- 3. LE RESTE ---
-            s_val = safe_get(r, 'Statut') or "En attente"
-            pay_val = safe_get(r, 'Paiement') or "Pas payé"
-            date_nav = safe_get(r, 'DateNav') or "??/??/2026"
-            jours = safe_get(r, 'NbreJours') or "1"
-            try:
-                p_val = f"{float(safe_get(r, 'Prix') or 0):.2f}"
-            except:
-                p_val = "0.00"
+ else:
+        # --- 1. FILTRAGE SÉCURISÉ ---
+        # On s'assure que df_c n'est pas vide avant de filtrer
+        if df_c.empty:
+            st.warning("📭 Votre fichier de contacts est vide. Cliquez sur 'Nouveau Contact' en haut.")
+        else:
+            # Séparation Missions Futures / Archives
+            if st.session_state.view_archive:
+                df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])]
+                titre_vue = "📁 ARCHIVES"
+            else:
+                df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
+                titre_vue = "🚀 MISSIONS FUTURES"
+
+            st.write(f"### {titre_vue} ({len(df_disp)} fiches)")
+
+            # --- 2. SI TOUJOURS RIEN APRÈS LE FILTRE ---
+            if df_disp.empty:
+                st.info(f"Aucune fiche dans {titre_vue}. Essayez l'autre onglet !")
+
+            # --- 3. LA BOUCLE D'AFFICHAGE ---
+            for i, r in df_disp.iterrows():
+                # Récupération (on force l'affichage même si c'est vide)
+                tel = str(safe_get(r, 'Téléphone') or safe_get(r, 'Telephone') or "")
+                mail = str(safe_get(r, 'Email') or safe_get(r, 'E-mail') or "")
+                soc = safe_get(r, 'Société') or ""
+                s_val = safe_get(r, 'Statut') or "En attente"
+                pay_val = safe_get(r, 'Paiement') or "Pas payé"
+                
+                # ... (Ici tu mets ton bloc HTML h = f''' ... ''') ...
+                
+                st.markdown(h, unsafe_allow_html=True)
+                
+                # --- 4. LES BOUTONS (Bien alignés sous le markdown) ---
+                # (Remets ici ton bloc IF/ELSE pour Editer et Supprimer)
                     
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
