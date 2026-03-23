@@ -128,30 +128,65 @@ if st.session_state.page == "CONTACTS":
 
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
-    st.subheader("📅 Planning 2026")
-    col1, col2 = st.columns([2, 1])
-    m_sel = col1.selectbox("Mois", range(1, 13), index=now.month-1, format_func=lambda x: mois_fr[x-1])
+    st.subheader("📅 Planning des Navigations 2026")
     
-    cal = calendar.monthcalendar(2026, m_sel)
-    jours_occ = {}
-    if not df_c.empty:
+    col1, col2 = st.columns([2, 1])
+    mois_sel = col1.selectbox("Mois", range(1, 13), index=now.month-1, format_func=lambda x: mois_fr[x-1])
+    annee_sel = 2026
+
+    # Création du calendrier matriciel
+    cal = calendar.monthcalendar(annee_sel, mois_sel)
+    
+    # Dictionnaire pour stocker les infos du jour : { jour: (classe_css, texte_prenom) }
+    jours_occupes = {}
+    
+    if isinstance(df_c, pd.DataFrame) and not df_c.empty:
         for _, r in df_c.iterrows():
             try:
-                d = datetime.strptime(safe_get(r, 'DateNav'), "%d/%m/%Y")
-                if d.month == m_sel:
-                    jours_occ[d.day] = ("day-ok" if safe_get(r, 'Statut') == "OK" else "day-attente", safe_get(r, 'Prénom'))
-            except: continue
+                d_str = safe_get(r, 'DateNav').replace(" ", "")
+                # On gère les formats JJ/MM/YY ou JJ/MM/YYYY
+                d_obj = pd.to_datetime(d_str, format='%d/%m/%Y', errors='coerce')
+                
+                if pd.notnull(d_obj) and d_obj.month == mois_sel and d_obj.year == annee_sel:
+                    status = safe_get(r, 'Statut').upper()
+                    soc = safe_get(r, 'Société').upper()
+                    prenom = safe_get(r, 'Prénom')
+                    
+                    # Détermination de la couleur
+                    # 1. Priorité au statut
+                    cl = "day-ok" if "OK" in status or "TERM" in status else "day-attente"
+                    
+                    # 2. Bordure bleue si CMN (via une petite astuce de style inline)
+                    style_sup = "border: 3px solid #0055ff !important;" if "CMN" in soc else ""
+                    
+                    jours_occupes[d_obj.day] = (cl, prenom, style_sup)
+            except: 
+                continue
 
+    # Construction du tableau HTML
     html = '<table class="calendar-table"><tr><th>Lun</th><th>Mar</th><th>Mer</th><th>Jeu</th><th>Ven</th><th>Sam</th><th>Dim</th></tr>'
     for week in cal:
         html += '<tr>'
         for day in week:
-            if day == 0: html += '<td></td>'
+            if day == 0:
+                html += '<td></td>'
             else:
-                cl, txt = jours_occ.get(day, ("", ""))
-                html += f'<td class="{cl}">{day}<br><small>{txt}</small></td>'
+                # Récupération des infos du jour
+                infos = jours_occupes.get(day)
+                if infos:
+                    cl, nom, style = infos
+                    html += f'<td class="{cl}" style="{style}">{day}<br><span style="font-size:0.7rem;">{nom}</span></td>'
+                else:
+                    html += f'<td>{day}</td>'
         html += '</tr>'
-    st.markdown(html + '</table>', unsafe_allow_html=True)
+    html += '</table>'
+    
+    st.markdown(html, unsafe_allow_html=True)
+    
+    # Légende rapide pour s'y retrouver
+    st.markdown("""
+    <small>🟢 <b>Vert</b>: Confirmé (OK) | 🟡 <b>Jaune</b>: En attente | 🔵 <b>Bordure bleue</b>: Mission CMN</small>
+    """, unsafe_allow_html=True)
 
 # --- 7. PAGE STATS ---
 elif st.session_state.page == "STATS":
