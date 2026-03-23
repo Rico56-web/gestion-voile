@@ -161,15 +161,17 @@ if st.session_state.page == "CONTACTS":
     else:
         df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.view_archive else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
     for i, r in df_disp.iterrows():
-            # On s'assure que le programme cherche les bons noms de colonnes
-            # Si tes colonnes s'appellent différemment (ex: 'Tel' au lieu de 'Téléphone'), change-les ici
-            tel = safe_get(r, 'Téléphone') 
-            mail = safe_get(r, 'Email')
+            # --- 1. IL FAUT BIEN DÉFINIR CHAQUE VARIABLE ICI ---
+            s_val = safe_get(r, 'Statut')
+            pay_val = safe_get(r, 'Paiement')
             soc = safe_get(r, 'Société')
+            tel = safe_get(r, 'Téléphone')
+            mail = safe_get(r, 'Email')
             
-            # Si ça reste vide, c'est peut-être que les noms sont sans accents :
-            if not tel: tel = safe_get(r, 'Telephone')
-            if not mail: mail = safe_get(r, 'E-mail')
+            # --- 2. ENSUITE ON PEUT UTILISER S_VAL POUR LA COULEUR ---
+            c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
+            c_p = "#FF0000" if "PAS PAYÉ" in pay_val.upper() or "NON PAYÉ" in pay_val.upper() else "#2ecc71"
+            cl_b = "border-cmn" if "CMN" in soc.upper() else ""
             
             # 2. On définit les couleurs
             c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
