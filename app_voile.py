@@ -191,7 +191,7 @@ if st.session_state.page == "CONTACTS":
     else:
         df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.view_archive else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
         
-    for i, r in df_disp.iterrows():
+        for i, r in df_disp.iterrows():
             # --- 1. DÉFINITION AVEC TESTS D'ORTHOGRAPHE ---
             s_val = safe_get(r, 'Statut')
             pay_val = safe_get(r, 'Paiement')
