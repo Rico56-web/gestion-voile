@@ -183,8 +183,7 @@ if st.session_state.page == "CONTACTS":
             sauvegarder_data(df_c, "contacts.json")
             st.session_state.edit_idx = None
             st.rerun()
-
-       else:
+    else:
         # --- 1. FILTRAGE ---
         if st.session_state.view_archive:
             df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])]
