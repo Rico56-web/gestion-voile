@@ -205,59 +205,30 @@ if st.session_state.page == "CONTACTS":
                 st.info(f"Aucune fiche dans {titre_vue}. Essayez l'autre onglet !")
 
      # --- 3. LA BOUCLE D'AFFICHAGE ---
-            for i, r in df_disp.iterrows():
-                # --- 1. RÉCUPÉRATION AVEC SÉCURITÉ MAXIMALE ---
-                # On teste toutes les variantes possibles pour le téléphone
-                tel = ""
-                for col in ['Téléphone', 'Telephone', 'tel', 'Phone', 'TELEPHONE']:
-                    if col in r and str(r[col]).strip() != "" and str(r[col]).lower() != "nan":
-                        tel = str(r[col]).strip()
-                        break
-                
-                # On teste toutes les variantes pour l'email
-                mail = ""
-                for col in ['Email', 'E-mail', 'mail', 'email', 'MAIL']:
-                    if col in r and str(r[col]).strip() != "" and str(r[col]).lower() != "nan":
-                        mail = str(r[col]).strip()
-                        break
-                
-                # Société
-                soc = ""
-                for col in ['Société', 'Societe', 'société', 'societe', 'Company']:
-                    if col in r and str(r[col]).strip() != "":
-                        soc = str(r[col]).strip()
-                        break
+        for i, r in df_disp.iterrows():
+            # On cherche d'abord la version propre, sinon on cherche la version avec accent
+            tel = str(r.get('Telephone') or r.get('Téléphone') or "").strip()
+            mail = str(r.get('Email') or r.get('E-mail') or "").strip()
+            soc = str(r.get('Societe') or r.get('Société') or "").strip()
+            pre = str(r.get('Prenom') or r.get('Prénom') or "").strip()
+            nom = str(r.get('Nom') or "").strip()
 
-                # Nettoyage du numéro pour les liens (WhatsApp / Appel)
-                tel_link = tel.replace(" ", "").replace(".", "").replace("-", "")
-                
-                # --- 2. AUTRES DONNÉES ---
-                s_val = safe_get(r, 'Statut') or "En attente"
-                pay_val = safe_get(r, 'Paiement') or "Pas payé"
-                date_nav = safe_get(r, 'DateNav') or "??/??/2026"
-                p_val = f"{float(safe_get(r, 'Prix') or 0):.2f}"
+            # Nettoyage du lien pour le bouton Appel/WhatsApp
+            tel_link = tel.replace(" ", "").replace(".", "").replace("-", "")
 
-                # --- 3. TON BLOC HTML (Vérifie bien les accolades) ---
-                h = f'''<div class="fiche-globale">
-                    <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
-                    
-                    <div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #1a2a6c;">
-                        📅 <b>Date :</b> {date_nav}<br>
-                        💰 <b>Montant :</b> {p_val} €
-                    </div>
-
-                    <div style="margin-bottom:10px; font-size: 1.1rem;">
-                        📞 <b>{tel}</b><br>
-                        ✉️ {mail}
-                    </div>
-
-                    <div class="container-boutons">
-                        <a href="tel:{tel_link}" class="btn-contact" style="background:#3498db;">Appeler</a>
-                        <a href="https://wa.me/{tel_link.replace('+','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
-                    </div>
-                </div>'''
-                
-                st.markdown(h, unsafe_allow_html=True)
+            # --- TON HTML ---
+            h = f'''<div class="fiche-globale">
+                <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
+                <div class="prenom-style">{pre} {nom.upper()}</div>
+                <div style="margin-bottom:10px; font-size: 1.1rem;">
+                    📞 <b>{tel if tel else "Numéro absent"}</b><br>
+                    ✉️ {mail if mail else "Email absent"}
+                </div>
+                <div class="container-boutons">
+                    <a href="tel:{tel_link}" class="btn-contact" style="background:#3498db;">Appeler</a>
+                </div>
+            </div>'''
+            st.markdown(h, unsafe_allow_html=True)
                     
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
