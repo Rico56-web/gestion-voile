@@ -206,43 +206,53 @@ if st.session_state.page == "CONTACTS":
 elif st.session_state.page == "STATS":
         st.subheader("📊 Historique Financier 2026")
         
-        # 1. RÉCUPÉRATION DES DÉPENSES (Via ta fonction charger_data ou direct)
-        total_frais_reel = 0.0
-        try:
-            # On utilise ta logique de requête pour lire maint.json
-            u_m = f"https://api.github.com/repos/{GITHUB_REPO}/contents/maint.json"
-            r_m = requests.get(u_m, headers={"Authorization": f"token {GITHUB_TOKEN}"}, params={"v": time.time()})
+        # --- 1. CALCUL DES DONNÉES MENSUELLES ---
+        stats_data = []
+        m_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+        
+        for m_idx in range(1, 13):
+            rec, frs = 0.0, 0.0
+            # Extraction des recettes depuis df_c (Contacts/Planning)
+            if 'df_c' in locals() and not df_c.empty:
+                for _, r in df_c.iterrows():
+                    try:
+                        date_val = str(r.get('DateNav', ''))
+                        if '/' in date_val and int(date_val.split('/')[1]) == m_idx:
+                            if str(r.get('Paiement')) in ["Payé", "Paid"]:
+                                rec += float(r.get('Prix') or 0)
+                    except: continue
             
-            if r_m.status_code == 200:
-                content_m = json.loads(base64.b64decode(r_m.json()['content']).decode('utf-8'))
-                # On additionne tous les 'prix' présents dans le JSON
-                total_frais_reel = sum(float(item.get('prix', 0) or 0) for item in content_m)
-        except Exception as e:
-            st.warning(f"Note : Calcul des frais indisponible ({e})")
+            # Extraction des frais depuis df_m (Maintenance)
+            if 'df_m' in locals() and not df_m.empty:
+                for _, r in df_m.iterrows():
+                    try:
+                        date_m = str(r.get('Date', ''))
+                        if '/' in date_m and int(date_m.split('/')[1]) == m_idx:
+                            frs += float(r.get('Prix') or 0)
+                    except: continue
+            
+            stats_data.append({"Mois": m_courts[m_idx-1], "Recettes (€)": rec, "Frais (€)": frs})
 
-        # 2. CALCUL DES RECETTES (Via ton tableau existant st_df)
-        # Assure-toi que st_df est bien calculé juste avant ou ici
-        t_rec = sum(float(x) for x in st_df["Recettes (€)"]) if 'st_df' in locals() else 0.0
+        # --- 2. CRÉATION DU DATAFRAME (Indispensable pour éviter le NameError) ---
+        st_df = pd.DataFrame(stats_data)
+        t_rec = st_df["Recettes (€)"].sum()
+        t_frs = st_df["Frais (€)"].sum()
 
-        # 3. AFFICHAGE DES MÉTRIQUES "FLASH"
-        st.markdown("### ⚓ Bilan de la Saison")
+        # --- 3. AFFICHAGE DU BILAN HAUT DE PAGE ---
         c1, c2, c3 = st.columns(3)
-        c1.metric("RECETTES", f"{t_rec:,.2f} €")
-        c2.metric("FRAIS (MAINT)", f"{total_frais_reel:,.2f} €", delta=f"-{total_frais_reel:,.2f}", delta_color="inverse")
-        c3.metric("BÉNÉFICE NET", f"{(t_rec - total_frais_reel):,.2f} €")
+        c1.metric("TOTAL REÇU", f"{t_rec:,.2f} €")
+        c2.metric("TOTAL FRAIS", f"{t_frs:,.2f} €", delta=f"-{t_frs:,.2f}", delta_color="inverse")
+        c3.metric("RÉSULTAT", f"{(t_rec - t_frs):,.2f} €")
 
-        st.markdown("---")
+        st.divider()
 
-        # 4. LE TABLEAU RÉCAPITULATIF (Ton tableau mensuel)
-        st.write("Détails par mois :")
-        st.table(st_df) # Affiche ton tableau Janvier -> Décembre
+        # --- 4. AFFICHAGE DU TABLEAU ---
+        st.write("Détail mensuel :")
+        st.table(st_df.set_index("Mois")) # Ici, st_df est forcément défini !
 
-        # 5. LE GRAPHIQUE (Le fameux fromage)
-        if not df_c.empty:
-            stats_soc = df_c['Société'].fillna('PERSO').replace('', 'PERSO').value_counts().reset_index()
-            stats_soc.columns = ['Type', 'Nombre']
-            fig_pie = px.pie(stats_soc, values='Nombre', names='Type', title="Répartition des missions")
-            st.plotly_chart(fig_pie, use_container_width=True)                   
+        # --- 5. GRAPHIQUE REVENUS ---
+        fig_barres = px.bar(st_df, x='Mois', y='Recettes (€)', title="CA par Mois", color_discrete_sequence=['#2ecc71'])
+        st.plotly_chart(fig_barres, use_container_width=True)          
 
         
 # --- 8. PAGE MAINTENANCE ---
