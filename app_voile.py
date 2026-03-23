@@ -191,7 +191,7 @@ if st.session_state.page == "CONTACTS":
     else:
         df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.view_archive else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
         
-        for i, r in df_disp.iterrows():
+    for i, r in df_disp.iterrows():
         # --- 1. RÉCUPÉRATION ULTRA-SÉCURISÉE ---
         # On cherche 'Téléphone' avec accent, puis sans, puis en minuscule
         tel = safe_get(r, 'Téléphone') or safe_get(r, 'Telephone') or safe_get(r, 'tel') or ""
