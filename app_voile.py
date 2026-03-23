@@ -220,8 +220,8 @@ if st.session_state.page == "CONTACTS":
         h = f'''<div class="fiche-globale {cl_b}">
             ... (ton code HTML actuel) ...
         '''
-     # --- 4. GESTION SUPPRESSION / EDITION ---
-            if st.session_state.contact_confirm_del == i:
+        # --- 4. GESTION SUPPRESSION / EDITION ---
+        if st.session_state.contact_confirm_del == i:
                 st.warning("⚠️ Supprimer cette fiche ?")
                 cy, cn = st.columns(2)
                 # Aligne bien les "if" sous le "cy, cn"
