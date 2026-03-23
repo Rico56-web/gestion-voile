@@ -218,7 +218,7 @@ for i, r in df_disp.iterrows():
                 if c1.button("✏️", key=f"ed_{i}"): st.session_state.edit_idx = i; st.rerun()
                 if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
                     st.session_state.contact_confirm_del = i; st.rerun()
-
+                    
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Mensuel 2026")
