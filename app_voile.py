@@ -168,27 +168,39 @@ if st.session_state.page == "CONTACTS":
             c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
             c_p = "#FF0000" if "PAS PAYÉ" in pay_val.upper() or "NON PAYÉ" in pay_val.upper() else "#2ecc71"
             cl_b = "border-cmn" if "CMN" in soc.upper() else ""
-            
-            # Ici on intègre les liens d'appel directement dans le HTML de la fiche
+           # --- CALCULS AVANT AFFICHAGE ---
             p_val = f"{float(safe_get(r, 'Prix') or 0):.2f}"
+            jours = safe_get(r, 'NbreJours') or "1"
+            date_nav = safe_get(r, 'DateNav')
+            
+            # --- CONSTRUCTION DE LA FICHE ---
             h = f'''<div class="fiche-globale {cl_b}">
                 <span class="statut-badge" style="background:{c_p};">{pay_val}</span>
                 <span class="statut-badge" style="background:{c_s};">{s_val}</span>
                 <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
                 <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
-                📅 <b>{safe_get(r, "DateNav")}</b> ({jours} jrs) | 💰 <b>{p_val} €</b><br>
-                <div style="margin-top:5px; color:#444;">
-                    📞 <b>{tel}</b><br>
-                    ✉️ <i>{mail}</i>
+                
+                <div style="margin: 10px 0; padding: 10px; background: #f0f4f8; border-radius: 8px; border-left: 4px solid #1a2a6c;">
+                    📅 <b>Date :</b> {date_nav}<br>
+                    ⛵ <b>Durée :</b> {jours} jour(s)<br>
+                    💰 <b>Montant :</b> {p_val} €
                 </div>
+
+                <div style="margin-bottom:10px;">
+                    📞 <b>{tel}</b><br>
+                    ✉️ {mail}
+                </div>
+
                 <div class="notes-box">📝 {safe_get(r, "Notes") or "."}</div>
+
                 <div class="container-boutons">
                     <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
                     <a href="https://wa.me/{tel.replace(" ","")}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
                     <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
                 </div>
             </div>'''
-            st.markdown(h, unsafe_allow_html=True)
+            st.markdown(h, unsafe_allow_html=True) 
+          
             
             # Les boutons de gestion (Editer / Supprimer) restent en dessous pour la clarté
             if st.session_state.contact_confirm_del == i:
