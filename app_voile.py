@@ -50,24 +50,22 @@ if not st.session_state.authenticated:
             st.error("Code incorrect.")
     st.stop()
 
-# --- 3. FONCTIONS DONNÉES ---
+# --- 3. CONNEXION ET FONCTIONS DONNÉES ---
+# On définit ces variables globalement pour qu'elles soient visibles partout
+GITHUB_REPO = st.secrets["GITHUB_REPO"]
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+
 def charger_data(file):
     try:
-        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-        url = f"https://api.github.com/repos/{repo}/contents/{file}"
-        res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file}"
+        headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+        res = requests.get(url, headers=headers, params={"v": time.time()})
         if res.status_code == 200:
-            return pd.DataFrame(json.loads(base64.b64decode(res.json()['content']).decode('utf-8')))
+            content = res.json()['content']
+            return pd.DataFrame(json.loads(base64.b64decode(content).decode('utf-8')))
         return pd.DataFrame()
-    except: return pd.DataFrame()
-
-def sauvegarder_data(df, file):
-    repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-    url = f"https://api.github.com/repos/{repo}/contents/{file}"
-    res = requests.get(url, headers={"Authorization": f"token {token}"})
-    sha = res.json().get('sha') if res.status_code == 200 else None
-    content = base64.b64encode(df.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
-    requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": f"Update {file}", "content": content, "sha": sha})
+    except: 
+        return pd.DataFrame()
 
 def safe_get(r, key):
     val = r.get(key)
