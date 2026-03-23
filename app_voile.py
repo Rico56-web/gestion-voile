@@ -194,19 +194,22 @@ if st.session_state.page == "CONTACTS":
             st.info("Aucune mission à afficher.")
         
         # --- 2. BOUCLE D'AFFICHAGE ---
-        for i, r in df_disp.iterrows():
-            # --- 1. RÉCUPÉRATION DE TOUTES LES DONNÉES ---
+    for i, r in df_disp.iterrows():
+            # --- RÉCUPÉRATION ULTRA-LARGE ---
+            # On cherche avec et sans accents, majuscules ou minuscules
             pre = str(r.get('Prénom') or r.get('Prenom') or "").strip()
             nom = str(r.get('Nom') or "").strip()
             soc = str(r.get('Société') or r.get('Societe') or "PARTICULIER").strip()
-            tel = str(r.get('Téléphone') or r.get('Telephone') or "").strip()
-            mail = str(r.get('Email') or r.get('E-mail') or "").strip()
-            date = str(r.get('DateNav') or "??/??/2026").strip()
-            jours = str(r.get('NbreJours') or "1").strip()
-            statut = str(r.get('Statut') or "En attente").strip()
-            prix = str(r.get('Prix') or "0.00").strip()
+            tel = str(r.get('Téléphone') or r.get('Telephone') or r.get('tel') or "").strip()
+            mail = str(r.get('Email') or r.get('E-mail') or r.get('mail') or "").strip()
             
-            # Nettoyage pour les liens
+            # Les infos de mission
+            date = str(r.get('DateNav') or "07/03/2026").strip()
+            jours = str(r.get('NbreJours') or "1").strip()
+            prix = str(r.get('Prix') or "0.00").strip()
+            statut = str(r.get('Statut') or "En attente").strip()
+
+            # Nettoyage du lien téléphone pour les boutons bleus/verts
             t_link = tel.replace(" ", "").replace(".", "").replace("-", "")
 
             # --- 2. COULEUR DU STATUT ---
