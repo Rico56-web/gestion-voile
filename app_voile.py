@@ -323,7 +323,40 @@ elif st.session_state.page == "STATS":
         )
         fig.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=300)
         st.plotly_chart(fig, use_container_width=True)
+# --- NOUVEAU : GRAPHIQUE EN BARRES (REVENUS PAR MOIS) ---
+        st.markdown("### 📈 Revenus Mensuels")
+        
+        # On prépare les données du tableau pour le graphique
+        df_barres = st_df[st_df["Mois"] != "TOTAL"].copy()
+        df_barres["Recettes (€)"] = pd.to_numeric(df_barres["Recettes (€)"])
+        
+        fig_barres = px.bar(
+            df_barres, 
+            x='Mois', 
+            y='Recettes (€)',
+            title="Chiffre d'Affaires par Mois",
+            text_auto='.2s',
+            color_discrete_sequence=['#2ecc71'] # Vert pour l'argent qui rentre
+        )
+        fig_barres.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0))
+        st.plotly_chart(fig_barres, use_container_width=True)
 
+        # --- NOUVEAU : CALCULATEUR DE FRAIS RAPIDE ---
+        st.markdown("---")
+        st.markdown("### ⛽ Calculateur de Marge Rapide")
+        
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            carburant = st.number_input("Frais Carburant (€)", min_value=0.0, step=10.0)
+            port = st.number_input("Frais de Port (€)", min_value=0.0, step=10.0)
+        with col_f2:
+            entretien = st.number_input("Entretien/Divers (€)", min_value=0.0, step=10.0)
+            total_frais_saisis = carburant + port + entretien
+            
+        marge_nette = t_rec - total_frais_saisis
+        
+        # Affichage du résultat final en gros
+        st.metric("MARGE NETTE ESTIMÉE", f"{marge_nette:,.2f} €", delta=f"-{total_frais_saisis} de frais")
 # --- 8. PAGE MAINTENANCE ---
 elif st.session_state.page == "MAINT":
     st.subheader("🔧 Maintenance & Frais")
