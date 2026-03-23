@@ -220,7 +220,7 @@ for i, r in df_disp.iterrows():
                     st.session_state.contact_confirm_del = i; st.rerun()
 
 # --- 6. PAGE PLANNING ---
-    elif st.session_state.page == "PLANNING":
+elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Mensuel 2026")
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     sel_m_nom = st.selectbox("Mois", m_noms, index=now.month - 1)
