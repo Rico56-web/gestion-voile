@@ -203,7 +203,7 @@ if st.session_state.page == "CONTACTS":
                 if c2.button("🗑️ SUPPRIMER LA FICHE", key=f"del_{i}", use_container_width=True):
                     st.session_state.contact_confirm_del = i; st.rerun()
                     
-    elif st.session_state.page == "STATS":
+elif st.session_state.page == "STATS":
         st.subheader("📊 Historique Financier 2026")
         
         stats_data = []
