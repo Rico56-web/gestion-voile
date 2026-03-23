@@ -340,7 +340,42 @@ elif st.session_state.page == "STATS":
         )
         fig_barres.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0))
         st.plotly_chart(fig_barres, use_container_width=True)
+# --- 1. RÉCUPÉRATION DES DÉPENSES (Depuis maint.json) ---
+try:
+    # On récupère le contenu de maintenance
+    m_file = repo.get_contents("maint.json")
+    m_data = json.loads(m_file.decoded_content.decode("utf-8"))
+    
+    # On transforme en DataFrame pour calculer facilement
+    df_maint = pd.DataFrame(m_data)
+    
+    # On s'assure que 'prix' est bien traité comme un nombre
+    if not df_maint.empty and 'prix' in df_maint.columns:
+        total_frais = pd.to_numeric(df_maint['prix'], errors='coerce').fillna(0).sum()
+    else:
+        total_frais = 0.0
+except Exception as e:
+    st.error(f"Erreur lecture maintenance : {e}")
+    total_frais = 0.0
 
+# --- 2. CALCUL DU BÉNÉFICE NET ---
+marge_nette = t_rec - total_frais
+
+# --- 3. AFFICHAGE DES CHIFFRES CLÉS ---
+st.markdown("### ⚓ Bilan Financier Vesta 2026")
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric("RECETTES (BRUT)", f"{t_rec:,.2f} €")
+with col2:
+    # Le delta en rouge indique une sortie d'argent
+    st.metric("FRAIS & MAINT.", f"{total_frais:,.2f} €", delta=f"-{total_frais:,.2f}", delta_color="inverse")
+with col3:
+    # Calcul du % de marge pour le pilotage
+    pourcentage = (marge_nette / t_rec * 100) if t_rec > 0 else 0
+    st.metric("BÉNÉFICE (NET)", f"{marge_nette:,.2f} €", delta=f"{pourcentage:.1f}%")
+
+st.markdown("---")
         # --- NOUVEAU : CALCULATEUR DE FRAIS RAPIDE ---
         st.markdown("---")
         st.markdown("### ⛽ Calculateur de Marge Rapide")
@@ -357,6 +392,7 @@ elif st.session_state.page == "STATS":
         
         # Affichage du résultat final en gros
         st.metric("MARGE NETTE ESTIMÉE", f"{marge_nette:,.2f} €", delta=f"-{total_frais_saisis} de frais")
+        
 # --- 8. PAGE MAINTENANCE ---
 elif st.session_state.page == "MAINT":
     st.subheader("🔧 Maintenance & Frais")
