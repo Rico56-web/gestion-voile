@@ -187,64 +187,29 @@ if st.session_state.page == "CONTACTS":
             st.info("Aucune mission ici.")
         
         for i, r in df_disp.iterrows():
-            # RÉCUPÉRATION SÉCURISÉE (Pour éviter les bulles vides)
-            tel = str(safe_get(r, 'Téléphone') or safe_get(r, 'Telephone') or "")
-            mail = str(safe_get(r, 'Email') or safe_get(r, 'E-mail') or "")
-            soc = safe_get(r, 'Société') or ""
+            # --- 1. RÉCUPÉRATION AVEC SÉCURITÉ TOTALE ---
+            # On force en texte (str) et on cherche avec ou sans accent
+            tel_raw = safe_get(r, 'Téléphone') or safe_get(r, 'Telephone') or safe_get(r, 'tel') or ""
+            tel = str(tel_raw).strip()
+            
+            mail_raw = safe_get(r, 'Email') or safe_get(r, 'E-mail') or safe_get(r, 'mail') or ""
+            mail = str(mail_raw).strip()
+            
+            soc = safe_get(r, 'Société') or safe_get(r, 'Societe') or ""
+            
+            # --- 2. NETTOYAGE POUR LES BOUTONS ---
+            # WhatsApp n'aime pas les espaces ou les "+" dans le lien
+            tel_wa = tel.replace(" ", "").replace("+", "")
+            
+            # --- 3. LE RESTE ---
             s_val = safe_get(r, 'Statut') or "En attente"
             pay_val = safe_get(r, 'Paiement') or "Pas payé"
             date_nav = safe_get(r, 'DateNav') or "??/??/2026"
             jours = safe_get(r, 'NbreJours') or "1"
-            p_val = f"{float(safe_get(r, 'Prix') or 0):.2f}"
-
-            # Couleurs et bordure CMN
-            c_s = "#3498db" if "TERM" in s_val.upper() else "#2ecc71" if "OK" in s_val.upper() else "#e74c3c" if "REFUS" in s_val.upper() else "#f1c40f"
-            c_p = "#FF0000" if "PAS PAYÉ" in pay_val.upper() or "NON PAYÉ" in pay_val.upper() else "#2ecc71"
-            cl_b = "border-cmn" if "CMN" in soc.upper() else ""
-
-            h = f'''<div class="fiche-globale {cl_b}">
-                <span class="statut-badge" style="background:{c_p};">{pay_val}</span>
-                <span class="statut-badge" style="background:{c_s};">{s_val}</span>
-                <div class="societe-style">{soc if soc else "CLIENT PARTICULIER"}</div>
-                <div class="prenom-style">{safe_get(r, "Prénom")} {safe_get(r, "Nom").upper()}</div>
-                
-                <div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #1a2a6c; font-size: 1rem;">
-                    📅 <b>Date :</b> {date_nav}<br>
-                    ⛵ <b>Durée :</b> {jours} jour(s)<br>
-                    💰 <b>Montant :</b> {p_val} €
-                </div>
-
-                <div style="margin-bottom:10px; font-size: 1.1rem;">
-                    📞 <b>{tel}</b><br>
-                    ✉️ {mail}
-                </div>
-
-                <div class="notes-box">📝 {safe_get(r, "Notes") or "."}</div>
-
-                <div class="container-boutons">
-                    <a href="tel:{tel}" class="btn-contact" style="background:#3498db;">Appeler</a>
-                    <a href="https://wa.me/{tel.replace(' ','')}" class="btn-contact" style="background:#25D366;">WhatsApp</a>
-                    <a href="mailto:{mail}" class="btn-contact" style="background:#e67e22;">Mail</a>
-                </div>
-            </div>'''
-            st.markdown(h, unsafe_allow_html=True)
-
-            # Gestion Suppression / Edition
-            if st.session_state.contact_confirm_del == i:
-                st.warning("⚠️ Supprimer ?")
-                cy, cn = st.columns(2)
-                if cy.button("✅ OUI", key=f"y_{i}"):
-                    df_c = df_c.drop(i); sauvegarder_data(df_c, "contacts.json")
-                    st.session_state.contact_confirm_del = None; st.rerun()
-                if cn.button("NON", key=f"n_{i}"):
-                    st.session_state.contact_confirm_del = None; st.rerun()
-            else:
-                c1, c2 = st.columns([1, 4])
-                if c1.button("✏️", key=f"ed_{i}"):
-                    st.session_state.edit_idx = i; st.rerun()
-                if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
-                    st.session_state.contact_confirm_del = i; st.rerun()
- 
+            try:
+                p_val = f"{float(safe_get(r, 'Prix') or 0):.2f}"
+            except:
+                p_val = "0.00"
                     
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
