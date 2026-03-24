@@ -240,7 +240,7 @@ if st.session_state.page == "CONTACTS":
                     <a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold;">✉️ Mail</a>
                 </div>
             </div>'''
-           st.markdown(h, unsafe_allow_html=True)
+            st.markdown(h, unsafe_allow_html=True)
 
             # --- 4. BOUTONS MODIFIER / SUPPRIMER ---
             c1, c2 = st.columns([1, 4])
