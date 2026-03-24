@@ -195,73 +195,51 @@ if st.session_state.page == "CONTACTS":
         
         # --- 2. BOUCLE D'AFFICHAGE ---
     for i, r in df_disp.iterrows():
-            # --- RÉCUPÉRATION ULTRA-LARGE ---
-            # On cherche avec et sans accents, majuscules ou minuscules
+            # 1. RÉCUPÉRATION DES DONNÉES (On cherche partout)
             pre = str(r.get('Prénom') or r.get('Prenom') or "").strip()
             nom = str(r.get('Nom') or "").strip()
             soc = str(r.get('Société') or r.get('Societe') or "PARTICULIER").strip()
-            tel = str(r.get('Téléphone') or r.get('Telephone') or r.get('tel') or "").strip()
-            mail = str(r.get('Email') or r.get('E-mail') or r.get('mail') or "").strip()
-            
-            # Les infos de mission
-            date = str(r.get('DateNav') or "07/03/2026").strip()
+            tel = str(r.get('Téléphone') or r.get('Telephone') or "").strip()
+            mail = str(r.get('Email') or r.get('E-mail') or "").strip()
+            date = str(r.get('DateNav') or "??/??/2026").strip()
             jours = str(r.get('NbreJours') or "1").strip()
             prix = str(r.get('Prix') or "0.00").strip()
             statut = str(r.get('Statut') or "En attente").strip()
-
-            # Nettoyage du lien téléphone pour les boutons bleus/verts
+            
+            # Nettoyage du lien téléphone
             t_link = tel.replace(" ", "").replace(".", "").replace("-", "")
 
-            # --- 2. COULEUR DU STATUT ---
-            c_s = "#3498db" if "TERM" in statut.upper() else "#2ecc71" if "OK" in statut.upper() else "#f1c40f"
-
-            # --- 3. AFFICHAGE DE LA FICHE HTML ---
-            h = f'''<div style="border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; margin-bottom: 15px; background: white; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);">
-                <div style="display: flex; justify-content: space-between;">
-                    <b style="color: #1a2a6c; font-size: 1.2rem;">{pre} {nom.upper()}</b>
-                    <span style="background: {c_s}; color: white; padding: 2px 8px; border-radius: 5px; font-size: 0.8rem;">{statut}</span>
-                </div>
-                <div style="color: #7f8c8d; font-size: 0.9rem; margin-bottom: 10px;">🏢 {soc.upper()}</div>
-                
-                <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #1a2a6c;">
+            # 2. CONSTRUCTION DU HTML (h)
+            h = f'''<div style="border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; margin-bottom: 15px; background: white;">
+                <b style="color: #1a2a6c; font-size: 1.1rem;">{pre} {nom.upper()}</b>
+                <div style="color: #7f8c8d; font-size: 0.8rem;">{soc.upper()} - {statut}</div>
+                <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #1a2a6c;">
                     📅 <b>Date :</b> {date}<br>
                     ⛵ <b>Durée :</b> {jours} jour(s)<br>
                     💰 <b>Prix :</b> {prix} €
                 </div>
-
-                <div style="margin-bottom: 15px;">
+                <div style="margin-bottom: 10px;">
                     📞 <b>{tel if tel else "Non renseigné"}</b><br>
                     ✉️ {mail if mail else "Non renseigné"}
                 </div>
-
                 <div style="display: flex; gap: 8px;">
-                    <a href="tel:{t_link}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold;">📞 Appeler</a>
-                    <a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold;">💬 WhatsApp</a>
-                    <a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold;">✉️ Mail</a>
+                    <a href="tel:{t_link}" style="flex:1; background:#3498db; color:white; padding:8px; border-radius:5px; text-decoration:none; text-align:center;">Appeler</a>
+                    <a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white; padding:8px; border-radius:5px; text-decoration:none; text-align:center;">WhatsApp</a>
                 </div>
             </div>'''
+
+            # 3. L'AFFICHAGE (La ligne qui posait problème)
+            # Elle doit être alignée exactement sous le "h = f'''"
             st.markdown(h, unsafe_allow_html=True)
 
-            # --- 4. BOUTONS MODIFIER / SUPPRIMER ---
-            c1, c2 = st.columns([1, 4])
-            if c1.button("✏️", key=f"ed_{i}"):
+            # 4. LES BOUTONS D'ACTION (Alignés aussi !)
+            col_ed, col_del = st.columns([1, 4])
+            if col_ed.button("✏️", key=f"ed_{i}"):
                 st.session_state.edit_idx = i
                 st.rerun()
-            if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
+            if col_del.button("🗑️", key=f"del_{i}", use_container_width=True):
                 st.session_state.contact_confirm_del = i
                 st.rerun()
-
-            # Confirmation de suppression
-            if st.session_state.contact_confirm_del == i:
-                st.warning("Confirmer la suppression ?")
-                if st.button("OUI, Supprimer", key=f"y_{i}"):
-                    df_c = df_c.drop(i)
-                    sauvegarder_data(df_c, "contacts.json")
-                    st.session_state.contact_confirm_del = None
-                    st.rerun()
-                if st.button("ANNULER", key=f"n_{i}"):
-                    st.session_state.contact_confirm_del = None
-                    st.rerun()
 
 
 # --- 6. PAGE PLANNING ---
