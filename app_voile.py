@@ -118,150 +118,87 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 
 # --- 5. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
-    # 1. INITIALISATION (Bien décalé vers la droite)
-    if "view_archive" not in st.session_state:
-        st.session_state.view_archive = False
-    if "contact_confirm_del" not in st.session_state:
-        st.session_state.contact_confirm_del = None
+    st.title("👥 Carnet de Bord - Contacts")
 
-    # 2. BOUTON NOUVEAU CONTACT
-    if st.button("➕ NOUVEAU CONTACT", type="secondary", use_container_width=True):
-        new = {
-            "DateNav": datetime.now().strftime("%d/%m/2026"), 
-            "NbreJours": "1", "Statut": "En attente", "Paiement": "Pas payé", 
-            "Société": "", "Prénom": "Nouveau", "Nom": "Contact", 
-            "Téléphone": "", "Email": "", "Prix": "0.00", "Notes": ""
-        }
-        df_c = pd.concat([pd.DataFrame([new]), df_c], ignore_index=True)
-        sauvegarder_data(df_c, "contacts.json")
-        st.rerun()
-
-    # 3. NAVIGATION ARCHIVES / MISSIONS
-    c1, c2 = st.columns(2)
-    if c1.button("🚀 MISSIONS FUTURES", use_container_width=True, type="primary" if not st.session_state.view_archive else "secondary"):
-        st.session_state.view_archive = False
-        st.rerun()
-    if c2.button("📁 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_archive else "secondary"):
-        st.session_state.view_archive = True
-        st.rerun()
-
-    # 4. FILTRE ET AFFICHAGE
+    # --- 1. GESTION DE L'ÉDITION (Si on clique sur ✏️) ---
     if st.session_state.edit_idx is not None:
-        # --- BLOC ÉDITION (A garder tel quel dans ton code) ---
         idx = st.session_state.edit_idx
         r = df_c.loc[idx]
-        st.subheader("📝 Modifier Mission")
-        u_pre = st.text_input("Prénom", value=safe_get(r, 'Prénom'))
-        u_nom = st.text_input("Nom", value=safe_get(r, 'Nom'))
-        u_soc = st.text_input("Société", value=safe_get(r, 'Société'))
-        u_tel = st.text_input("Téléphone", value=safe_get(r, 'Téléphone'))
-        u_mail = st.text_input("Email", value=safe_get(r, 'Email'))
-        u_date = st.text_input("Date", value=safe_get(r, 'DateNav'))
-        u_jours = st.text_input("Jours", value=safe_get(r, 'NbreJours'))
-        u_prix = st.text_input("Prix", value=safe_get(r, 'Prix'))
+        st.subheader(f"Modifier : {r.get('Prénom', '')} {r.get('Nom', '')}")
         
-        s_opts = ["En attente", "OK", "Terminé", "Refusé"]
-        u_stat = st.selectbox("Statut", s_opts, index=s_opts.index(safe_get(r, 'Statut')) if safe_get(r, 'Statut') in s_opts else 0)
-        p_opts = ["Pas payé", "Payé"]
-        u_paye = st.selectbox("Paiement", p_opts, index=p_opts.index(safe_get(r, 'Paiement')) if safe_get(r, 'Paiement') in p_opts else 0)
-        u_notes = st.text_area("Notes", value=safe_get(r, 'Notes'))
-
-        if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
-            # On utilise des noms simples et sans espaces/accents
-            df_c.at[idx, 'Prenom'] = u_pre
-            df_c.at[idx, 'Nom'] = u_nom
-            df_c.at[idx, 'Societe'] = u_soc
-            df_c.at[idx, 'Telephone'] = u_tel  # <-- Toujours sans accent ici
-            df_c.at[idx, 'Email'] = u_mail
-            df_c.at[idx, 'DateNav'] = u_date
-            df_c.at[idx, 'NbreJours'] = u_jours
-            df_c.at[idx, 'Statut'] = u_stat
-            df_c.at[idx, 'Paiement'] = u_paye
-            df_c.at[idx, 'Prix'] = f"{float(u_prix or 0):.2f}"
-            df_c.at[idx, 'Notes'] = u_notes
+        with st.form("edit_form"):
+            c1, c2 = st.columns(2)
+            u_pre = c1.text_input("Prénom", value=str(r.get('Prénom', '')))
+            u_nom = c2.text_input("Nom", value=str(r.get('Nom', '')))
+            u_tel = c1.text_input("Téléphone", value=str(r.get('Téléphone', '')))
+            u_mail = c2.text_input("Email", value=str(r.get('Email', '')))
+            u_paye = st.selectbox("Paiement", ["Unpaid", "Paid"], index=0 if r.get('Paiement') == "Unpaid" else 1)
             
-            sauvegarder_data(df_c, "contacts.json")
+            if st.form_submit_button("💾 ENREGISTRER"):
+                df_c.at[idx, 'Prénom'] = u_pre
+                df_c.at[idx, 'Nom'] = u_nom
+                df_c.at[idx, 'Téléphone'] = u_tel
+                df_c.at[idx, 'Email'] = u_mail
+                df_c.at[idx, 'Paiement'] = u_paye
+                sauvegarder_data(df_c, "contacts.json")
+                st.session_state.edit_idx = None
+                st.rerun()
+        if st.button("❌ Annuler"):
             st.session_state.edit_idx = None
             st.rerun()
-    else:
-        # --- 1. CRÉATION DE LA VARIABLE df_disp (La source de l'erreur) ---
-        if st.session_state.view_archive:
-            # On filtre pour l'archive
-            df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])]
-        else:
-            # On filtre pour le planning actif (Vesta Skipper 2026)
-            df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-        # --- 2. VÉRIFICATION SI VIDE ---
-        if df_disp.empty:
-            st.info("Aucun contact à afficher pour le moment.")
+    # --- 2. AFFICHAGE DE LA LISTE ---
+    else:
+        # Création sécurisée de df_disp
+        if st.session_state.view_archive:
+            df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])].copy()
         else:
-            # --- 3. LA BOUCLE (Ligne 197 qui plantait) ---
+            df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])].copy()
+
+        if df_disp.empty:
+            st.info("Aucune fiche trouvée.")
+        else:
             for i, r in df_disp.iterrows():
-                # Récupération des données
-                pre = str(r.get('Prénom') or r.get('Prenom') or "").strip()
-                nom = str(r.get('Nom') or "").strip()
-                tel = str(r.get('Téléphone') or r.get('Telephone') or "").strip()
-                mail = str(r.get('Email') or r.get('E-mail') or "").strip()
+                # Données
+                p = str(r.get('Prénom') or "").strip()
+                n = str(r.get('Nom') or "").strip()
+                s = str(r.get('Société') or "PARTICULIER").strip()
+                t = str(r.get('Téléphone') or "").strip()
+                m = str(r.get('Email') or "").strip()
+                paye = str(r.get('Paiement') or "Unpaid")
                 
-                # ... (Suite de votre code HTML avec h = f'''...''')
-                
-                # --- AFFICHAGE AVEC LE PARAMÈTRE MAGIQUE ---
+                # Couleur du badge Paiement
+                p_color = "#2ecc71" if paye == "Paid" else "#e74c3c"
+                t_link = t.replace(" ", "").replace(".", "").replace("-", "")
+
+                # HTML de la fiche
+                h = f'''<div style="border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; margin-bottom: 10px; background: white;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <b style="color: #1a2a6c; font-size: 1.1rem;">{p} {n.upper()}</b>
+                        <span style="background:{p_color}; color:white; padding:2px 8px; border-radius:5px; font-size:0.8rem;">{paye}</span>
+                    </div>
+                    <div style="color: #7f8c8d; font-size: 0.8rem; margin-bottom: 8px;">{s}</div>
+                    <div style="margin-bottom: 10px;">
+                        📞 <b>{t if t else "Non renseigné"}</b><br>
+                        ✉️ {m if m else "Non renseigné"}
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <a href="tel:{t_link}" style="flex:1; background:#3498db; color:white; padding:8px; border-radius:5px; text-decoration:none; text-align:center;">Appeler</a>
+                        <a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white; padding:8px; border-radius:5px; text-decoration:none; text-align:center;">WhatsApp</a>
+                    </div>
+                </div>'''
+
+                # AFFICHAGE CRUCIAL
                 st.markdown(h, unsafe_allow_html=True)
 
-                # --- BOUTONS MODIFIER / SUPPRIMER ---
-                col_ed, col_del = st.columns([1, 4])
-                if col_ed.button("✏️", key=f"ed_{i}"):
+                # BOUTONS ACTIONS
+                c1, c2 = st.columns([1, 4])
+                if c1.button("✏️", key=f"ed_{i}"):
                     st.session_state.edit_idx = i
                     st.rerun()
-        # --- 2. BOUCLE D'AFFICHAGE ---
-    for i, r in df_disp.iterrows():
-            # 1. RÉCUPÉRATION DES DONNÉES (On cherche partout)
-            pre = str(r.get('Prénom') or r.get('Prenom') or "").strip()
-            nom = str(r.get('Nom') or "").strip()
-            soc = str(r.get('Société') or r.get('Societe') or "PARTICULIER").strip()
-            tel = str(r.get('Téléphone') or r.get('Telephone') or "").strip()
-            mail = str(r.get('Email') or r.get('E-mail') or "").strip()
-            date = str(r.get('DateNav') or "??/??/2026").strip()
-            jours = str(r.get('NbreJours') or "1").strip()
-            prix = str(r.get('Prix') or "0.00").strip()
-            statut = str(r.get('Statut') or "En attente").strip()
-            
-            # Nettoyage du lien téléphone
-            t_link = tel.replace(" ", "").replace(".", "").replace("-", "")
-
-            # 2. CONSTRUCTION DU HTML (h)
-            h = f'''<div style="border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; margin-bottom: 15px; background: white;">
-                <b style="color: #1a2a6c; font-size: 1.1rem;">{pre} {nom.upper()}</b>
-                <div style="color: #7f8c8d; font-size: 0.8rem;">{soc.upper()} - {statut}</div>
-                <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #1a2a6c;">
-                    📅 <b>Date :</b> {date}<br>
-                    ⛵ <b>Durée :</b> {jours} jour(s)<br>
-                    💰 <b>Prix :</b> {prix} €
-                </div>
-                <div style="margin-bottom: 10px;">
-                    📞 <b>{tel if tel else "Non renseigné"}</b><br>
-                    ✉️ {mail if mail else "Non renseigné"}
-                </div>
-                <div style="display: flex; gap: 8px;">
-                    <a href="tel:{t_link}" style="flex:1; background:#3498db; color:white; padding:8px; border-radius:5px; text-decoration:none; text-align:center;">Appeler</a>
-                    <a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white; padding:8px; border-radius:5px; text-decoration:none; text-align:center;">WhatsApp</a>
-                </div>
-            </div>'''
-
-            # 3. L'AFFICHAGE (La ligne qui posait problème)
-            # Elle doit être alignée exactement sous le "h = f'''"
-            st.markdown(h, unsafe_allow_html=True)
-
-            # 4. LES BOUTONS D'ACTION (Alignés aussi !)
-            col_ed, col_del = st.columns([1, 4])
-            if col_ed.button("✏️", key=f"ed_{i}"):
-                st.session_state.edit_idx = i
-                st.rerun()
-            if col_del.button("🗑️", key=f"del_{i}", use_container_width=True):
-                st.session_state.contact_confirm_del = i
-                st.rerun()
-
+                if c2.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
+                    # Logique de suppression ici
+                    pass
 
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
