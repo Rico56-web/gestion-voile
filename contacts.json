@@ -218,8 +218,8 @@
         "Pr\u00e9nom":"Nouveau",
         "Nom":"Renforce",
         "T\u00e9l\u00e9phone":"",
-        "Email":"",
-        "Prix":"0.00",
+        "Email":"Eric.clavreul@gmail.Com",
+        "Prix":"2000.00",
         "Notes":"",
         "NbJours":null,
         "Paye":null,
@@ -240,9 +240,9 @@
         "Passager":null,
         "dt obj":null,
         "dt sort":null,
-        "Prenom":"Test",
-        "Societe":"",
-        "Telephone":""
+        "Prenom":"Nouveau",
+        "Societe":"Hutec",
+        "Telephone":"0612439865"
     },
     {
         "DateNav":"23\/03\/2026",
