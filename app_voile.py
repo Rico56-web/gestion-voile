@@ -183,16 +183,37 @@ if st.session_state.page == "CONTACTS":
             sauvegarder_data(df_c, "contacts.json")
             st.session_state.edit_idx = None
             st.rerun()
-    else:
-        # --- 1. FILTRAGE ---
+   else:
+        # --- 1. CRÉATION DE LA VARIABLE df_disp (La source de l'erreur) ---
         if st.session_state.view_archive:
+            # On filtre pour l'archive
             df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])]
         else:
+            # On filtre pour le planning actif (Vesta Skipper 2026)
             df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
+        # --- 2. VÉRIFICATION SI VIDE ---
         if df_disp.empty:
-            st.info("Aucune mission à afficher.")
-        
+            st.info("Aucun contact à afficher pour le moment.")
+        else:
+            # --- 3. LA BOUCLE (Ligne 197 qui plantait) ---
+            for i, r in df_disp.iterrows():
+                # Récupération des données
+                pre = str(r.get('Prénom') or r.get('Prenom') or "").strip()
+                nom = str(r.get('Nom') or "").strip()
+                tel = str(r.get('Téléphone') or r.get('Telephone') or "").strip()
+                mail = str(r.get('Email') or r.get('E-mail') or "").strip()
+                
+                # ... (Suite de votre code HTML avec h = f'''...''')
+                
+                # --- AFFICHAGE AVEC LE PARAMÈTRE MAGIQUE ---
+                st.markdown(h, unsafe_allow_html=True)
+
+                # --- BOUTONS MODIFIER / SUPPRIMER ---
+                col_ed, col_del = st.columns([1, 4])
+                if col_ed.button("✏️", key=f"ed_{i}"):
+                    st.session_state.edit_idx = i
+                    st.rerun()
         # --- 2. BOUCLE D'AFFICHAGE ---
     for i, r in df_disp.iterrows():
             # 1. RÉCUPÉRATION DES DONNÉES (On cherche partout)
