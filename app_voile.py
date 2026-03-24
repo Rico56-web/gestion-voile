@@ -183,7 +183,7 @@ if st.session_state.page == "CONTACTS":
             sauvegarder_data(df_c, "contacts.json")
             st.session_state.edit_idx = None
             st.rerun()
-   else:
+         else:
         # --- 1. CRÉATION DE LA VARIABLE df_disp (La source de l'erreur) ---
         if st.session_state.view_archive:
             # On filtre pour l'archive
