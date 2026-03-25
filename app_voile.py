@@ -296,9 +296,13 @@ elif st.session_state.page == "PLANNING":
             sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
 
         # INITIALISATION
+        # --- INITIALISATION GÉANTS ---
         jours_occ = {}
         missions_detail = []
-        aujourdhui = datetime.now().date()
+        
+        # SÉCURITÉ : On s'assure de la date du jour (25 Mars 2026)
+        maintenant = datetime.now()
+        aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
 
         for _, r in df_c.iterrows():
             try:
@@ -306,33 +310,26 @@ elif st.session_state.page == "PLANNING":
                 if '/' not in d_str: continue
                 parts = d_str.split('/')
                 dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
-                if yv < 100: yv += 2000
+                if yv < 100: yv += 2000 # Gestion des années sur 2 chiffres (26 -> 2026)
                 
                 if mv == sel_m and yv == sel_y:
-                    # Nettoyage des textes pour éviter les erreurs d'espaces
+                    # Nettoyage
                     s_clean = str(r.get('Statut', '')).strip().lower()
                     p_clean = str(r.get('Paiement', '')).strip().lower()
                     nom_complet = f"{r.get('Prénom', '')} {str(r.get('Nom', '')).upper()}"
                     
                     date_mission = date(yv, mv, dv)
                     is_paye = ("pay" in p_clean) or ("paid" in p_clean)
-                    is_passe = date_mission < aujourdhui
                     
-                   # --- LOGIQUE DE COULEUR (PRÉCISION) ---
-                    p_clean = str(r.get('Paiement', '')).strip().lower()
-                    s_clean = str(r.get('Statut', '')).strip().lower()
-                    
-                    date_mission = date(yv, mv, dv)
-                    is_paye = ("pay" in p_clean) or ("paid" in p_clean)
-                    
-                    # 1. CAS DU PASSÉ (Avant aujourd'hui)
+                    # --- LOGIQUE DE COULEUR ---
+                    # 1. SI LA DATE EST PASSÉE (Avant aujourd'hui)
                     if date_mission < aujourdhui:
                         if is_paye:
                             current_c = "#3498db" # BLEU (Réglé)
                         else:
                             current_c = "#e74c3c" # ROUGE (Alerte Impayé)
 
-                    # 2. CAS DU FUTUR OU AUJOURD'HUI
+                    # 2. SI LA DATE EST AUJOURD'HUI OU DANS LE FUTUR
                     else:
                         if "termin" in s_clean:
                             current_c = "#3498db" if is_paye else "#e74c3c"
@@ -342,20 +339,21 @@ elif st.session_state.page == "PLANNING":
                             current_c = "#f1c40f" # JAUNE
                         else:
                             current_c = "transparent"
-                    # --- GESTION DES CONFLITS (Plusieurs contacts le même jour) ---
+
+                    # --- GESTION DES CONFLITS (Indispensable) ---
                     n_j = int(r.get('NbreJours', 1))
                     for j in range(dv, dv + n_j):
                         if j in jours_occ:
-                            existing_c = jours_occ[j]["c"]
-                            # Le ROUGE écrase tout
-                            if current_c == "#e74c3c" or existing_c == "#e74c3c":
+                            old_c = jours_occ[j]["c"]
+                            # Priorités : ROUGE > VERT > BLEU > JAUNE
+                            if current_c == "#e74c3c" or old_c == "#e74c3c":
                                 jours_occ[j]["c"] = "#e74c3c"
-                            # Le VERT écrase le Bleu ou Jaune
-                            elif current_c == "#2ecc71" or existing_c == "#2ecc71":
+                            elif current_c == "#2ecc71" or old_c == "#2ecc71":
                                 jours_occ[j]["c"] = "#2ecc71"
-                            # Le BLEU s'affiche si rien d'autre n'est urgent
-                            elif current_c == "#3498db" or existing_c == "#3498db":
+                            elif current_c == "#3498db" or old_c == "#3498db":
                                 jours_occ[j]["c"] = "#3498db"
+                            else:
+                                jours_occ[j]["c"] = current_c
                         else:
                             jours_occ[j] = {"c": current_c}
                     
