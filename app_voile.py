@@ -40,7 +40,7 @@ if not st.session_state.authenticated:
     st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
     password = st.text_input("Entrez le code d'accès :", type="password")
     if st.button("ACCÉDER"):
-        if password == "SKIPPER2026":
+        if password == "Skipper2026":
             st.session_state.authenticated = True
             st.rerun()
         else:
@@ -118,7 +118,7 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 
 # --- 5. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
-    st.title("👥 Vesta Skipper 2026 - Missions")
+    st.title("👥 Vesta - Missions")
     
 # --- 1. LE FORMULAIRE DE MODIFICATION ---
     if st.session_state.get('edit_idx') is not None:
