@@ -112,9 +112,9 @@
     },
     {
         "DateNav":"14\/03\/2026",
-        "NbreJours":"2",
+        "NbreJours":2,
         "Statut":"Termin\u00e9",
-        "Paiement":"Pay\u00e9",
+        "Paiement":"Unpaid",
         "Soci\u00e9t\u00e9":"Perso",
         "Pr\u00e9nom":"Benoit",
         "Nom":"Couronne",
@@ -144,8 +144,8 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "NbrePers":null,
-        "Commentaires":null
+        "NbrePers":1.0,
+        "Commentaires":"None"
     },
     {
         "DateNav":"21\/03\/2026",
