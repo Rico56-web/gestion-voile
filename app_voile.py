@@ -285,91 +285,68 @@ if st.session_state.page == "CONTACTS":
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Mensuel 2026")
-    
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     sel_m_nom = st.selectbox("Mois", m_noms, index=now.month - 1)
     sel_m = m_noms.index(sel_m_nom) + 1
     
     jours_occ = {}
     
-    # 1. ON TRIE LE DATAFRAME POUR QUE "PAID" PASSE EN DERNIER (Priorité visuelle)
-    # Cela évite qu'une mission "Unpaid" n'écrase une mission "Paid" sur le même jour.
-    df_sorted = df_c.copy()
-
-    for _, r in df_sorted.iterrows():
+    for _, r in df_c.iterrows():
         try:
             date_str = str(r.get('DateNav', '')).replace(" ", "")
             dp = date_str.split('/')
             if len(dp) < 3: continue
             
-            day_val = int(dp[0])
-            m_val = int(dp[1])
-            y_val = int(dp[2])
+            day_val, m_val, y_val = int(dp[0]), int(dp[1]), int(dp[2])
             if y_val == 26: y_val = 2026
             
             if m_val == sel_m and y_val == 2026:
                 s = str(r.get('Statut', 'En attente')).strip()
-                p = str(r.get('Paiement', 'Unpaid')).strip().lower()
                 n_j = int(r.get('NbreJours', 1))
                 
+                # --- DÉTECTION "PAID" MULTI-COLONNES (POUR ELISABETH) ---
+                # On cherche le mot "paid" dans TOUTES les colonnes de la ligne
+                ligne_texte = str(r.values).lower()
+                is_paid = "paid" in ligne_texte and "unpaid" not in ligne_texte
+                # Si "unpaid" est là, on vérifie quand même si "paid" est sélectionné spécifiquement
+                p_val = str(r.get('Paiement', '')).lower().strip()
+                if p_val == "paid": is_paid = True
+
+                # Détermination de la couleur
+                color = "#95a5a6" # Gris par défaut
+                if s == "OK": color = "#2ecc71"
+                elif s == "En attente": color = "#f1c40f"
+                elif s == "Terminé":
+                    color = "#3498db" if is_paid else "#e74c3c"
+                
                 for j in range(day_val, day_val + n_j):
-                    # LOGIQUE DE COULEUR FIXE PAR JOUR
-                    if s == "OK":
-                        color = "#2ecc71" # Vert
-                    elif s == "En attente":
-                        color = "#f1c40f" # Jaune
-                    elif s == "Terminé":
-                        if p == "paid":
-                            color = "#3498db" # BLEU (Priorité)
-                        else:
-                            color = "#e74c3c" # ROUGE
-                    else:
-                        color = "#95a5a6" # Gris
-                    
-                    # Sécurité : Si le jour est déjà BLEU, on ne l'écrase pas par du rouge
-                    if j in jours_occ and jours_occ[j] == "#3498db" and color == "#e74c3c":
-                        continue
-                    else:
-                        jours_occ[j] = color
+                    # Priorité : le Bleu gagne toujours sur le Rouge
+                    if j in jours_occ and jours_occ[j] == "#3498db": continue
+                    jours_occ[j] = color
         except: continue
 
-    # 2. GÉNÉRATION DU CALENDRIER
+    # Génération du calendrier
     cal_mat = calendar.monthcalendar(2026, sel_m)
     h_cal = '<table class="calendar-table"><thead><tr><th>Lun</th><th>Mar</th><th>Mer</th><th>Jeu</th><th>Ven</th><th>Sam</th><th>Dim</th></tr></thead><tbody>'
-    
     for sem in cal_mat:
         h_cal += '<tr>'
         for jour in sem:
-            bg = jours_occ.get(jour, "") if jour != 0 else ""
+            bg = jours_occ.get(jour, "")
             txt = "white" if bg and bg != "#f1c40f" else "black"
-            
             style = f'style="background-color: {bg}; color: {txt}; font-weight: bold; border-radius: 4px;"' if bg else ""
             h_cal += f'<td {style}>{jour if jour != 0 else ""}</td>'
         h_cal += '</tr>'
-    
     st.markdown(h_cal + '</tbody></table>', unsafe_allow_html=True)
-    
+
     # --- LÉGENDE ---
     st.markdown("""
-    <div style="display: flex; gap: 10px; font-size: 0.8rem; margin-top: 10px;">
+    <div style="display: flex; gap: 10px; font-size: 0.8rem; margin-top: 10px; justify-content: center; background: #f0f2f6; padding: 10px; border-radius: 5px;">
         <span style="color:#2ecc71;">● OK</span>
         <span style="color:#f1c40f;">● Attente</span>
         <span style="color:#3498db;">● Terminé/Payé</span>
         <span style="color:#e74c3c;">● Terminé/Impayé</span>
     </div>
     """, unsafe_allow_html=True)
-
-    st.markdown("---")
-    # Liste détaillée (on garde la même logique de couleur)
-    for _, r in df_c.iterrows():
-        try:
-            d = str(r.get('DateNav', ''))
-            if int(d.split('/')[1]) == sel_m:
-                s = str(r.get('Statut', ''))
-                p = str(r.get('Paiement', '')).strip().lower()
-                c = "#3498db" if (s == "Terminé" and p == "paid") else "#e74c3c" if s == "Terminé" else "#2ecc71" if s == "OK" else "#f1c40f"
-                st.markdown(f"📅 **{d}** : {r.get('Prénom')} {str(r.get('Nom')).upper()} - <span style='color:{c}; font-weight:bold;'>{s} ({p})</span>", unsafe_allow_html=True)
-        except: continue
 
 
 # --- 7. PAGE STATS ---
