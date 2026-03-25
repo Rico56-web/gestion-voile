@@ -183,19 +183,33 @@ if st.session_state.page == "CONTACTS":
             st.session_state.edit_idx = None
             st.rerun()
 
-
-    # --- 2. NAVIGATION ---
+# --- 2. NAVIGATION AVEC INDICATEUR D'ÉTAT ---
     st.divider()
     n1, n2, n3 = st.columns(3)
+    
+    # On récupère l'état actuel (par défaut 'False' pour En Cours)
     view_arc = st.session_state.get('view_archive', False)
-    if n1.button("📂 En Cours", key="nav_active", use_container_width=True): st.session_state.view_archive = False; st.rerun()
-    if n2.button("🗄️ Archives", key="nav_archive", use_container_width=True): st.session_state.view_archive = True; st.rerun()
+
+    # Bouton EN COURS : Bleu si actif, Gris si inactif
+    type_encours = "primary" if not view_arc else "secondary"
+    if n1.button("📂 En Cours", key="nav_active", use_container_width=True, type=type_encours):
+        st.session_state.view_archive = False
+        st.rerun()
+
+    # Bouton ARCHIVES : Bleu si actif, Gris si inactif
+    type_archive = "primary" if view_archive else "secondary"
+    if n2.button("🗄️ Archives", key="nav_archive", use_container_width=True, type=type_archive):
+        st.session_state.view_archive = True
+        st.rerun()
+
+    # Bouton AJOUTER : Toujours en Gris (ou "secondary") car c'est une action ponctuelle
     if n3.button("➕ Ajouter", key="nav_add_new", use_container_width=True):
         new_row = {"Prénom": "Nouveau", "Nom": "Contact", "Société": "PARTICULIER", "Statut": "En attente", "Paiement": "Unpaid"}
         df_c = pd.concat([df_c, pd.DataFrame([new_row])], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.session_state.edit_idx = len(df_c) - 1
         st.rerun()
+ 
 
     # --- 3. AFFICHAGE VISUEL DES FICHES ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
