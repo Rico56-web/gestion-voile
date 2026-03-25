@@ -284,7 +284,7 @@ if st.session_state.page == "CONTACTS":
             
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Planning Mensuel 2026")
+    st.subheader("🗓️ Planning 2026")
     
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     sel_m_nom = st.selectbox("Mois", m_noms, index=now.month - 1)
@@ -307,49 +307,52 @@ elif st.session_state.page == "PLANNING":
                 nom_v = str(r.get('Nom', '')).upper()
                 n_jours = int(r.get('NbreJours', 1))
                 
-                # ON DÉFINIT L'EMOJI ET LA COULEUR
-                icon = "⚪" # Par défaut
+                # Logique de couleur simplifiée
                 bg = "#ffffff"
-                
-                if "ok" in s_raw:
-                    icon = "🟢"; bg = "#2ecc71"
-                elif "attente" in s_raw:
-                    icon = "🟡"; bg = "#f1c40f"
+                if "ok" in s_raw: bg = "#2ecc71"
+                elif "attente" in s_raw: bg = "#f1c40f"
                 elif "termin" in s_raw:
-                    if "pay" in p_raw: # Détecte "payé", "paye", "paid"
-                        icon = "🟦"; bg = "#3498db" # BLEU
-                    else:
-                        icon = "🟥"; bg = "#e74c3c" # ROUGE
+                    bg = "#3498db" if "pay" in p_raw else "#e74c3c"
                 
                 for j in range(day_v, day_v + n_jours):
-                    jours_occ[j] = {"icon": icon, "bg": bg, "nom": nom_v}
+                    if j in jours_occ and jours_occ[j]["c"] == "#3498db": continue
+                    jours_occ[j] = {"c": bg, "n": nom_v}
         except: continue
 
-    # CONSTRUCTION DU TABLEAU
-    cal_mat = calendar.monthcalendar(2026, sel_m)
-    h_cal = '<table style="width:100%; border-collapse: collapse; text-align: center;">'
-    h_cal += '<tr style="background: #f0f2f6;"><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
+    # CONSTRUCTION DU TABLEAU VERSION MOBILE (IPHONE)
+    h_cal = '<table style="width:100%; border-collapse: collapse; table-layout: fixed; font-family: sans-serif;">'
+    h_cal += '<tr style="background: #eee; font-size: 0.7rem;"><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
     
+    cal_mat = calendar.monthcalendar(2026, sel_m)
     for sem in cal_mat:
         h_cal += '<tr>'
         for jour in sem:
             if jour == 0:
-                h_cal += '<td style="border: 1px solid #ddd; height: 50px;"></td>'
+                h_cal += '<td style="border: 1px solid #ddd; height: 35px;"></td>'
             else:
-                style = "border: 1px solid #ddd; height: 50px; vertical-align: top; padding: 2px;"
-                content = f'<b>{jour}</b>'
+                bg = "#ffffff"
+                nom_txt = ""
+                txt_c = "black"
                 
                 if jour in jours_occ:
-                    info = jours_occ[jour]
-                    # On tente de forcer le fond ET on met l'emoji au cas où le fond échoue
-                    style += f'background-color: {info["bg"]} !important; color: white;'
-                    content += f'<br>{info["icon"]}<br><span style="font-size: 0.6rem;">{info["nom"]}</span>'
+                    bg = jours_occ[jour]["c"]
+                    nom_txt = jours_occ[jour]["n"][:5] # On coupe le nom à 5 lettres pour le mobile
+                    txt_c = "white" if bg not in ["#f1c40f", "#ffffff"] else "black"
                 
-                h_cal += f'<td style="{style}">{content}</td>'
+                # Style compact : police plus petite et hauteur réduite
+                style = f'border: 1px solid #ddd; height: 38px; vertical-align: top; text-align: center; background-color: {bg} !important; color: {txt_c}; padding: 1px;'
+                h_cal += f'<td style="{style}"><span style="font-size: 0.75rem; font-weight: bold;">{jour}</span><br><span style="font-size: 0.45rem;">{nom_txt}</span></td>'
         h_cal += '</tr>'
     h_cal += '</table>'
     
     st.markdown(h_cal, unsafe_allow_html=True)
+
+    # Légende ultra-compacte
+    st.markdown("""
+    <div style="font-size: 0.65rem; text-align: center; margin-top: 10px;">
+        <span style="color:#2ecc71;">●OK</span> | <span style="color:#f1c40f;">●Att.</span> | <span style="color:#3498db;">●Payé</span> | <span style="color:#e74c3c;">●Impayé</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # --- 7. PAGE STATS ---
