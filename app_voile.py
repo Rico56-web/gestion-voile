@@ -118,116 +118,104 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 
 # --- 5. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
-    st.title("👥 Gestion des Missions - Vesta Skipper")
+    st.title("👥 Gestion des Missions - Vesta Skipper 2026")
 
-    # --- 1. BARRE DE NAVIGATION INTERNE ---
-    menu_col1, menu_col2, menu_col3 = st.columns(3)
-    if menu_col1.button("📂 En Cours", use_container_width=True):
-        st.session_state.view_archive = False
-        st.rerun()
-    if menu_col2.button("🗄️ Archives", use_container_width=True):
-        st.session_state.view_archive = True
-        st.rerun()
-    if menu_col3.button("➕ Ajouter Mission", use_container_width=True):
-        st.session_state.show_add_form = True
+    # --- 1. FORMULAIRE DE MODIFICATION (S'affiche si on clique sur ✏️) ---
+    if st.session_state.get('edit_idx') is not None:
+        idx = st.session_state.edit_idx
+        # On récupère la ligne à modifier
+        r = df_c.iloc[idx]
+        
+        st.warning(f"📝 Modification de : {r.get('Prénom', '')} {r.get('Nom', '')}")
+        with st.form("form_edit"):
+            c1, c2 = st.columns(2)
+            u_pre = c1.text_input("Prénom", value=str(r.get('Prénom', '')))
+            u_nom = c2.text_input("Nom", value=str(r.get('Nom', '')))
+            u_tel = c1.text_input("Téléphone", value=str(r.get('Téléphone', '')))
+            u_mail = c2.text_input("Email", value=str(r.get('Email', '')))
+            
+            # AJOUT DU STATUT
+            liste_statuts = ["En attente", "OK", "Refusé", "Terminé"]
+            current_statut = r.get('Statut', 'En attente')
+            idx_statut = liste_statuts.index(current_statut) if current_statut in liste_statuts else 0
+            u_statut = st.selectbox("Statut de la mission", liste_statuts, index=idx_statut)
+            
+            c3, c4 = st.columns(2)
+            u_date = c3.text_input("Date Nav", value=str(r.get('DateNav', '')))
+            u_jours = c4.number_input("Jours", value=int(r.get('NbreJours', 1)))
+            
+            u_comm = st.text_area("Commentaires", value=str(r.get('Commentaires', '')))
 
-    # --- 2. FORMULAIRE D'AJOUT ---
-    if st.session_state.get('show_add_form', False):
-        with st.expander("📝 Nouvelle Mission / Contact", expanded=True):
-            with st.form("add_mission_form"):
-                c1, c2 = st.columns(2)
-                f_pre = c1.text_input("Prénom")
-                f_nom = c2.text_input("Nom")
-                f_soc = c1.text_input("Société", value="PARTICULIER")
-                f_tel = c2.text_input("Téléphone")
-                f_mail = c1.text_input("Email")
-                f_statut = c2.selectbox("Statut", ["En attente", "OK", "Refusé", "Terminé"])
+            if st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS"):
+                df_c.at[idx, 'Prénom'] = u_pre
+                df_c.at[idx, 'Nom'] = u_nom
+                df_c.at[idx, 'Téléphone'] = u_tel
+                df_c.at[idx, 'Email'] = u_mail
+                df_c.at[idx, 'Statut'] = u_statut
+                df_c.at[idx, 'DateNav'] = u_date
+                df_c.at[idx, 'NbreJours'] = u_jours
+                df_c.at[idx, 'Commentaires'] = u_comm
                 
-                c3, c4, c5 = st.columns(3)
-                f_date = c3.text_input("Date Nav (JJ/MM/AAAA)")
-                f_jours = c4.number_input("Nombre de jours", min_value=1, step=1)
-                f_pers = c5.number_input("Nombre de personnes", min_value=1, step=1)
-                
-                f_comm = st.text_area("Commentaires")
-                
-                if st.form_submit_button("💾 CRÉER LA MISSION"):
-                    nouvelle_mission = {
-                        "Prénom": f_pre, "Nom": f_nom, "Société": f_soc,
-                        "Téléphone": f_tel, "Email": f_mail, "Statut": f_statut,
-                        "DateNav": f_date, "NbreJours": f_jours, "NbrePers": f_pers,
-                        "Commentaires": f_comm, "Paiement": "Unpaid"
-                    }
-                    df_c = pd.concat([df_c, pd.DataFrame([nouvelle_mission])], ignore_index=True)
-                    sauvegarder_data(df_c, "contacts.json")
-                    st.session_state.show_add_form = False
-                    st.success("Mission ajoutée !")
-                    st.rerun()
-            if st.button("Fermer le formulaire"):
-                st.session_state.show_add_form = False
+                sauvegarder_data(df_c, "contacts.json")
+                st.session_state.edit_idx = None
+                st.success("Modification enregistrée !")
                 st.rerun()
+        
+        if st.button("❌ Annuler la modification"):
+            st.session_state.edit_idx = None
+            st.rerun()
+        st.divider()
 
-    # --- 3. LOGIQUE D'AFFICHAGE ---
-    if st.session_state.view_archive:
-        st.subheader("🗄️ Archives (Terminé / Refusé)")
+    # --- 2. BARRE DE NAVIGATION ET AJOUT ---
+    col_nav1, col_nav2, col_add = st.columns([1, 1, 2])
+    if col_nav1.button("📂 En cours", use_container_width=True):
+        st.session_state.view_archive = False
+    if col_nav2.button("🗄️ Archives", use_container_width=True):
+        st.session_state.view_archive = True
+    if col_add.button("➕ Ajouter une mission", use_container_width=True):
+        # Ici on pourrait ouvrir un formulaire vide
+        pass
+
+    # --- 3. AFFICHAGE DES FICHES ---
+    # Filtrage
+    if st.session_state.get('view_archive', False):
         df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])]
     else:
-        st.subheader("📂 Missions En Cours")
         df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
     for i, r in df_disp.iterrows():
-        # Récupération de toutes les données demandées
-        pre, nom = r.get('Prénom', ''), r.get('Nom', '')
-        tel, mail = r.get('Téléphone', ''), r.get('Email', '')
         statut = r.get('Statut', 'En attente')
-        date_nav = r.get('DateNav', 'Non fixée')
-        jours = r.get('NbreJours', '1')
-        pers = r.get('NbrePers', '1')
-        comm = r.get('Commentaires', '')
-        paye = r.get('Paiement', 'Unpaid')
-
-        # Style du statut
+        # Couleur selon statut
         s_color = "#2ecc71" if statut == "OK" else "#f1c40f" if statut == "En attente" else "#e74c3c"
         
-        # HTML de la fiche détaillée
-        h = f'''<div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: white;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <b style="font-size: 1.2rem; color: #1a2a6c;">{pre} {nom.upper()}</b>
-                <span style="background:{s_color}; color:white; padding:3px 10px; border-radius:15px; font-size:0.8rem;">{statut}</span>
+        h = f'''<div style="border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: white;">
+            <div style="display: flex; justify-content: space-between;">
+                <b>{r.get('Prénom','')} {r.get('Nom','').upper()}</b>
+                <span style="background:{s_color}; color:white; padding:2px 8px; border-radius:5px; font-size:0.8rem;">{statut}</span>
             </div>
-            <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9rem;">
-                <div>📅 <b>Date:</b> {date_nav}</div>
-                <div>⛵ <b>Durée:</b> {jours} jour(s)</div>
-                <div>👥 <b>Pers:</b> {pers}</div>
-                <div>✉️ <b>Mail:</b> {mail}</div>
+            <div style="font-size: 0.9rem; margin-top: 5px;">
+                📅 {r.get('DateNav','--')} | ⛵ {r.get('NbreJours', 1)} jour(s)<br>
+                📞 {r.get('Téléphone','')} | ✉️ {r.get('Email','')}
             </div>
-            <div style="background: #f1f2f6; padding: 8px; border-radius: 5px; margin-top: 10px; font-style: italic; font-size: 0.85rem;">
-                💬 {comm if comm else "Aucun commentaire"}
-            </div>
-            <div style="margin-top: 10px; font-weight: bold;">📞 {tel}</div>
         </div>'''
         st.markdown(h, unsafe_allow_html=True)
 
-        # --- 4. BOUTONS ACTIONS (MODIFIER / SUPPRIMER) ---
-        c_edit, c_del = st.columns([1, 4])
-        
-        if c_edit.button("✏️", key=f"ed_{i}"):
+        # Boutons d'action
+        c_ed, c_del = st.columns([1, 4])
+        if c_ed.button("✏️ Modifier", key=f"btn_ed_{i}"):
             st.session_state.edit_idx = i
             st.rerun()
+            
+        if c_del.button("🗑️ Supprimer", key=f"btn_del_{i}"):
+            st.session_state.confirm_del = i
 
-        # Système de suppression avec confirmation
-        if c_del.button("🗑️ SUPPRIMER LA MISSION", key=f"del_{i}", use_container_width=True):
-            st.session_state.confirm_delete = i
-
-        if st.session_state.get('confirm_delete') == i:
-            st.error(f"⚠️ Supprimer définitivement {pre} {nom} ?")
-            col_y, col_n = st.columns(2)
-            if col_y.button("✅ OUI, Supprimer", key=f"conf_y_{i}"):
-                df_c = df_c.drop(i)
+        # Confirmation suppression
+        if st.session_state.get('confirm_del') == i:
+            st.error("Confirmer la suppression ?")
+            if st.button("OUI ✅", key=f"y_{i}"):
+                df_c = df_c.drop(i).reset_index(drop=True)
                 sauvegarder_data(df_c, "contacts.json")
-                st.session_state.confirm_delete = None
-                st.rerun()
-            if col_n.button("❌ ANNULER", key=f"conf_n_{i}"):
-                st.session_state.confirm_delete = None
+                st.session_state.confirm_del = None
                 st.rerun()
 
 # --- 6. PAGE PLANNING ---
