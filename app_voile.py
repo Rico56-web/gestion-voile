@@ -186,55 +186,61 @@ if st.session_state.page == "CONTACTS":
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.get('view_archive') else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
     for i, r in df_disp.iterrows():
-        # --- PRÉPARATION DES DONNÉES ---
-        statut = r.get('Statut', 'En attente')
-        paye = r.get('Paiement', 'Unpaid')
-        s_col = "#2ecc71" if statut == "OK" else "#f1c40f" if statut == "En attente" else "#e74c3c"
-        p_col = "#27ae60" if paye == "Paid" else "#e67e22"
+        # --- PRÉPARATION ---
+        s, p = r.get('Statut', 'En attente'), r.get('Paiement', 'Unpaid')
+        s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
+        p_col = "#27ae60" if p == "Paid" else "#e67e22"
         
         tel = str(r.get('Téléphone','')).strip()
-        tel_link = tel.replace(" ", "").replace(".", "").replace("-", "")
+        tel_link = tel.replace(" ", "").replace(".", "")
         mail = str(r.get('Email', '')).strip()
         soc = str(r.get('Société', 'PARTICULIER')).upper()
 
-        # --- LE CODE HTML (SANS ERREUR) ---
-        fiche_html = f'''
-        <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: white;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+        # --- LE DESIGN (Simplifié pour iPhone) ---
+        html_fiche = f'''
+        <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: white; color: black;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
                 <b style="font-size: 1.1rem; color: #1a2a6c;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b>
                 <div>
-                    <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold;">{statut}</span>
-                    <span style="background:{p_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold; margin-left:5px;">{paye}</span>
+                    <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem;">{s}</span>
+                    <span style="background:{p_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; margin-left:5px;">{p}</span>
                 </div>
             </div>
-            <div style="color: #666; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px;">🏢 {soc}</div>
+            <div style="color: #666; font-size: 0.8rem; margin-bottom: 10px;">🏢 {soc}</div>
             
-            <div style="font-size: 0.9rem; color: black; line-height: 1.4;">
+            <div style="font-size: 0.9rem; color: black;">
                 📅 <b>Date :</b> {r.get('DateNav','--')}<br>
                 💰 <b>Prix :</b> {r.get('Prix','0.00')} €<br>
                 ⛵ <b>Jours :</b> {r.get('NbreJours', 1)} | 👥 <b>Pers :</b> {r.get('NbrePers', 1)}
             </div>
 
-            <div style="margin-top: 10px; padding: 10px; background-color: #f9f9f9; border-radius: 5px; color: black;">
-                <div style="font-size: 0.9rem;">📞 <b>{tel if tel else "Non renseigné"}</b></div>
-                <div style="font-size: 0.9rem;">✉️ <b>{mail if mail else "Non renseigné"}</b></div>
+            <div style="margin-top: 10px; padding: 10px; background-color: #f9f9f9; border-radius: 5px; color: black; border: 1px solid #eee;">
+                📞 <b>{tel if tel else "Non renseigné"}</b><br>
+                ✉️ <b>{mail if mail else "Non renseigné"}</b>
             </div>
 
             <div style="background: #fff8e1; padding: 8px; border-radius: 5px; margin-top: 10px; font-size: 0.8rem; font-style: italic; color: black; border-left: 3px solid #f1c40f;">
                 💬 {r.get('Commentaires', 'Pas de commentaire')}
             </div>
 
-            <div style="margin-top: 15px; display: flex; gap: 8px;">
-                <a href="tel:{tel_link}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.75rem;">APPEL</a>
-                <a href="https://wa.me/{tel_link}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.75rem;">WA</a>
-                <a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.75rem;">MAIL</a>
+            <div style="margin-top: 15px; display: flex; gap: 5px;">
+                <a href="tel:{tel_link}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">APPEL</a>
+                <a href="https://wa.me/{tel_link}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">WA</a>
+                <a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">MAIL</a>
             </div>
         </div>
         '''
         
-        # ON L'AFFICHE ICI (Vérifie bien cette ligne dans ton code !)
-        st.markdown(fiche_html, unsafe_allow_html=True)
+        # --- LA LIGNE À BIEN VÉRIFIER ---
+        st.markdown(html_fiche, unsafe_allow_html=True)
 
+        # --- BOUTONS ÉDITION ET SUPPRESSION ---
+        c_ed, c_del = st.columns([1, 4])
+        if c_ed.button("✏️", key=f"ed_{i}"):
+            st.session_state.edit_idx = i
+            st.rerun()
+        if c_del.button("🗑️ SUPPRIMER CETTE MISSION", key=f"del_{i}", use_container_width=True):
+            st.session_state.confirm_del = i
         # --- BOUTONS ÉDITION / SUPPRESSION ---
         col_ed, col_del = st.columns([1, 4])
         if col_ed.button("✏️", key=f"ed_{i}"):
