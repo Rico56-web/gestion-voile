@@ -126,7 +126,7 @@ if st.session_state.page == "CONTACTS":
         try:
             r = df_c.iloc[idx]
             with st.expander(f"📝 MODIFIER : {r.get('Prénom','')} {r.get('Nom','')}", expanded=True):
-                with st.form(key=f"form_edit_mission_{idx}"):
+                with st.form(key=f"form_mission_{idx}"):
                     c1, c2 = st.columns(2)
                     u_pre = c1.text_input("Prénom", value=str(r.get('Prénom', '')))
                     u_nom = c2.text_input("Nom", value=str(r.get('Nom', '')))
@@ -136,7 +136,7 @@ if st.session_state.page == "CONTACTS":
                     
                     c_st, c_pa = st.columns(2)
                     l_s = ["En attente", "OK", "Refusé", "Terminé"]
-                    u_statut = c_st.selectbox("Statut Mission", l_s, index=l_s.index(r.get('Statut')) if r.get('Statut') in l_s else 0)
+                    u_statut = c_st.selectbox("Statut", l_s, index=l_s.index(r.get('Statut')) if r.get('Statut') in l_s else 0)
                     u_paye = c_pa.selectbox("Paiement", ["Unpaid", "Paid"], index=0 if r.get('Paiement') == "Unpaid" else 1)
                     
                     c3, c4, c5 = st.columns(3)
@@ -163,20 +163,20 @@ if st.session_state.page == "CONTACTS":
                         sauvegarder_data(df_c, "contacts.json")
                         st.session_state.edit_idx = None
                         st.rerun()
-            if st.button("❌ Annuler la modification", key="btn_cancel_top"):
+            if st.button("❌ Annuler", key="cancel_edit"):
                 st.session_state.edit_idx = None
                 st.rerun()
-        except Exception as e:
+        except:
             st.session_state.edit_idx = None
 
     # --- 2. NAVIGATION ET AJOUT ---
     st.divider()
     n1, n2, n3 = st.columns(3)
     view_arc = st.session_state.get('view_archive', False)
-    if n1.button("📂 En Cours", key="nav_active", use_container_width=True): st.session_state.view_archive = False; st.rerun()
-    if n2.button("🗄️ Archives", key="nav_archive", use_container_width=True): st.session_state.view_archive = True; st.rerun()
-    if n3.button("➕ Ajouter", key="nav_add_new", use_container_width=True):
-        new_row = {"Prénom": "Nouveau", "Nom": "Contact", "Société": "PARTICULIER", "Statut": "En attente", "Paiement": "Unpaid", "Prix": "0.00", "NbreJours": 1}
+    if n1.button("📂 En Cours", key="nav_act", use_container_width=True): st.session_state.view_archive = False; st.rerun()
+    if n2.button("🗄️ Archives", key="nav_arc", use_container_width=True): st.session_state.view_archive = True; st.rerun()
+    if n3.button("➕ Ajouter", key="nav_add", use_container_width=True):
+        new_row = {"Prénom": "Nouveau", "Nom": "Contact", "Société": "PARTICULIER", "Statut": "En attente", "Paiement": "Unpaid"}
         df_c = pd.concat([df_c, pd.DataFrame([new_row])], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.session_state.edit_idx = len(df_c) - 1
@@ -186,61 +186,57 @@ if st.session_state.page == "CONTACTS":
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
     for i, r in df_disp.iterrows():
+        # Variables de données
         s, p = r.get('Statut', 'En attente'), r.get('Paiement', 'Unpaid')
         s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
         p_col = "#27ae60" if p == "Paid" else "#e67e22"
-        
         t_raw = str(r.get('Téléphone','')).strip()
         t_link = t_raw.replace(" ", "").replace(".", "").replace("-", "")
         mail = str(r.get('Email', '')).strip()
         soc = str(r.get('Société', 'PARTICULIER')).upper()
 
-        # HTML Visuel (Forçage des couleurs pour iPhone)
-        fiche_html = f'''<div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: white; color: black;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <b style="font-size: 1.1rem; color: #1a2a6c;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b>
-                <div>
-                    <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold;">{s}</span>
-                    <span style="background:{p_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold; margin-left:5px;">{p}</span>
-                </div>
-            </div>
-            <div style="color: #666; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px;">🏢 {soc}</div>
-            
-            <div style="font-size: 0.9rem; color: black; line-height: 1.4;">
-                📅 <b>Date :</b> {r.get('DateNav','--')}<br>
-                💰 <b>Prix :</b> {r.get('Prix','0.00')} €<br>
-                ⛵ <b>Jours :</b> {r.get('NbreJours', 1)} | 👥 <b>Pers :</b> {r.get('NbrePers', 1)}
-            </div>
-
-            <div style="margin-top: 10px; padding: 10px; background-color: #f9f9f9; border-radius: 5px; color: black; border: 1px solid #eee;">
-                <div style="font-size: 0.95rem; margin-bottom: 4px;">📞 <b>{t_raw if t_raw else "Non renseigné"}</b></div>
-                <div style="font-size: 0.95rem;">✉️ <b>{mail if mail else "Non renseigné"}</b></div>
-            </div>
-
-            <div style="background: #fff8e1; padding: 8px; border-radius: 5px; margin-top: 10px; font-size: 0.8rem; font-style: italic; color: black; border-left: 3px solid #f1c40f;">
-                💬 {r.get('Commentaires', 'Pas de commentaire')}
-            </div>
-
-            <div style="margin-top: 15px; display: flex; gap: 5px;">
-                <a href="tel:{t_link}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">APPEL</a>
-                <a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">WA</a>
-                <a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">MAIL</a>
-            </div>
-        </div>'''
+        # HTML (Une seule chaîne, sans espaces parasites au début des lignes)
+        h = f'''<div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: white; color: black;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+<b style="font-size: 1.1rem; color: #1a2a6c;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b>
+<div>
+<span style="background:{s_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold;">{s}</span>
+<span style="background:{p_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold; margin-left:5px;">{p}</span>
+</div>
+</div>
+<div style="color: #666; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px;">🏢 {soc}</div>
+<div style="font-size: 0.9rem; color: black; line-height: 1.4;">
+📅 <b>Date :</b> {r.get('DateNav','--')}<br>
+💰 <b>Prix :</b> {r.get('Prix','0.00')} €<br>
+⛵ <b>Jours :</b> {r.get('NbreJours', 1)} | 👥 <b>Pers :</b> {r.get('NbrePers', 1)}
+</div>
+<div style="margin-top: 10px; padding: 10px; background-color: #f9f9f9; border-radius: 5px; color: black; border: 1px solid #eee;">
+📞 <b>{t_raw if t_raw else "Non renseigné"}</b><br>
+✉️ <b>{mail if mail else "Non renseigné"}</b>
+</div>
+<div style="background: #fff8e1; padding: 8px; border-radius: 5px; margin-top: 10px; font-size: 0.8rem; font-style: italic; color: black; border-left: 3px solid #f1c40f;">
+💬 {r.get('Commentaires', 'Pas de commentaire')}
+</div>
+<div style="margin-top: 15px; display: flex; gap: 5px;">
+<a href="tel:{t_link}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">APPEL</a>
+<a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">WA</a>
+<a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">MAIL</a>
+</div>
+</div>'''
         
-        # AFFICHAGE FINAL
-        st.markdown(fiche_html, unsafe_allow_html=True)
+        # Commande d'affichage unique
+        st.markdown(h, unsafe_allow_html=True)
 
-        # BOUTONS ÉDITION / SUPPRESSION (Clés uniques sécurisées)
+        # Boutons de gestion
         c_ed, c_del = st.columns([1, 4])
-        suff = "arc" if view_arc else "act"
-        if c_ed.button("✏️", key=f"ed_{suff}_{i}"):
+        suffix = "arc" if view_arc else "act"
+        if c_ed.button("✏️", key=f"btn_ed_{suffix}_{i}"):
             st.session_state.edit_idx = i
             st.rerun()
-        if c_del.button("🗑️ SUPPRIMER CETTE MISSION", key=f"del_{suff}_{i}", use_container_width=True):
+        if c_del.button("🗑️ SUPPRIMER CETTE MISSION", key=f"btn_del_{suffix}_{i}", use_container_width=True):
             df_c = df_c.drop(i).reset_index(drop=True)
             sauvegarder_data(df_c, "contacts.json")
-            st.rerun()    
+            st.rerun()
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Mensuel 2026")
