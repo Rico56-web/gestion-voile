@@ -295,8 +295,8 @@ elif st.session_state.page == "PLANNING":
     with col_y:
         sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
 
-    jours_occ = {}
-    missions_detail = [] # Pour l'affichage sous le calendrier
+ jours_occ = {}
+    missions_detail = []
 
     for _, r in df_c.iterrows():
         try:
@@ -304,27 +304,44 @@ elif st.session_state.page == "PLANNING":
             if '/' not in d_str: continue
             parts = d_str.split('/')
             dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
-            if yv < 100: yv += 2000 # Gère '26' -> 2026
+            if yv < 100: yv += 2000
             
             if mv == sel_m and yv == sel_y:
                 s_raw = str(r.get('Statut', '')).lower()
                 p_raw = str(r.get('Paiement', '')).lower()
                 nom_complet = f"{r.get('Prénom', '')} {str(r.get('Nom', '')).upper()}"
                 
-                # Couleurs
-                bg = "transparent"
-                if "ok" in s_raw: bg = "#2ecc71"
-                elif "attente" in s_raw: bg = "#f1c40f"
+                # --- LOGIQUE DE COULEUR ---
+                # 1. On définit la couleur de cette mission précise
+                color_mission = "transparent"
+                if "ok" in s_raw:
+                    color_mission = "#2ecc71" # Vert
+                elif "attente" in s_raw:
+                    color_mission = "#f1c40f" # Jaune
                 elif "termin" in s_raw:
-                    bg = "#3498db" if ("pay" in p_raw or "paid" in p_raw) else "#e74c3c"
+                    # Ici, le "Terminé" dépend du paiement
+                    if "pay" in p_raw or "paid" in p_raw:
+                        color_mission = "#3498db" # Bleu
+                    else:
+                        color_mission = "#e74c3c" # Rouge
                 
-                # Remplissage du calendrier
+                # --- GESTION DU CONFLIT (2 contacts) ---
                 for j in range(dv, dv + int(r.get('NbreJours', 1))):
-                    if j in jours_occ and jours_occ[j]["c"] == "#3498db": continue
-                    jours_occ[j] = {"c": bg}
+                    if j in jours_occ:
+                        # RÈGLE DE PRIORITÉ : 
+                        # Le ROUGE (Impayé) écrase tout pour vous alerter.
+                        # Le VERT/JAUNE écrase le BLEU (car une mission en cours prime sur une finie).
+                        exist_c = jours_occ[j]["c"]
+                        if color_mission == "#e74c3c": # La nouvelle est rouge
+                            jours_occ[j]["c"] = "#e74c3c"
+                        elif exist_c == "#e74c3c": # L'ancienne était déjà rouge
+                            pass 
+                        else:
+                            jours_occ[j]["c"] = color_mission
+                    else:
+                        jours_occ[j] = {"c": color_mission}
                 
-                # Stockage pour la liste détaillée
-                missions_detail.append({"date": d_str, "nom": nom_complet, "color": bg, "statut": r.get('Statut'), "paye": r.get('Paiement')})
+                missions_detail.append({"date": d_str, "nom": nom_complet, "color": color_mission, "statut": r.get('Statut'), "paye": r.get('Paiement')})
         except: continue
 
     # --- LE CALENDRIER SVG ---
