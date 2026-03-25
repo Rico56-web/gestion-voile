@@ -302,74 +302,54 @@ elif st.session_state.page == "PLANNING":
             if year_v == 26: year_v = 2026
             
             if month_v == sel_m and year_v == 2026:
-                # --- NORMALISATION TOTALE ---
-                # On met tout en minuscules et on enlève les espaces
-                s_raw = str(r.get('Statut', '')).lower().strip()
-                p_raw = str(r.get('Paiement', '')).lower().strip()
+                s_raw = str(r.get('Statut', '')).lower()
+                p_raw = str(r.get('Paiement', '')).lower()
                 nom_v = str(r.get('Nom', '')).upper()
                 n_jours = int(r.get('NbreJours', 1))
                 
-                # Couleur par défaut : Blanc
-                color = "#ffffff" 
+                # ON DÉFINIT L'EMOJI ET LA COULEUR
+                icon = "⚪" # Par défaut
+                bg = "#ffffff"
                 
-                # 1. Test OK
                 if "ok" in s_raw:
-                    color = "#2ecc71" # VERT
-                # 2. Test ATTENTE
+                    icon = "🟢"; bg = "#2ecc71"
                 elif "attente" in s_raw:
-                    color = "#f1c40f" # JAUNE
-                # 3. Test TERMINÉ (on cherche "termin" pour ignorer l'accent)
+                    icon = "🟡"; bg = "#f1c40f"
                 elif "termin" in s_raw:
-                    # On cherche "payé" ou "paye" ou "paid"
-                    if "payé" in p_raw or "paye" in p_raw or "paid" in p_raw:
-                        color = "#3498db" # BLEU (Elisabeth Philippe)
+                    if "pay" in p_raw: # Détecte "payé", "paye", "paid"
+                        icon = "🟦"; bg = "#3498db" # BLEU
                     else:
-                        color = "#e74c3c" # ROUGE (Impayé)
+                        icon = "🟥"; bg = "#e74c3c" # ROUGE
                 
                 for j in range(day_v, day_v + n_jours):
-                    # Priorité au Bleu si chevauchement
-                    if j in jours_occ and jours_occ[j]["c"] == "#3498db": continue
-                    jours_occ[j] = {"c": color, "n": nom_v}
-        except: 
-            continue
+                    jours_occ[j] = {"icon": icon, "bg": bg, "nom": nom_v}
+        except: continue
 
-    # --- AFFICHAGE DU CALENDRIER ---
+    # CONSTRUCTION DU TABLEAU
     cal_mat = calendar.monthcalendar(2026, sel_m)
-    h_cal = '<table style="width:100%; border-collapse: collapse;"><thead><tr style="background:#eee;">'
-    for jour_nom in ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]:
-        h_cal += f'<th style="padding:5px; border:1px solid #ddd;">{jour_nom}</th>'
-    h_cal += '</tr></thead><tbody>'
+    h_cal = '<table style="width:100%; border-collapse: collapse; text-align: center;">'
+    h_cal += '<tr style="background: #f0f2f6;"><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
     
     for sem in cal_mat:
         h_cal += '<tr>'
         for jour in sem:
-            bg = "#ffffff"
-            txt = "black"
-            content = str(jour) if jour != 0 else ""
-            
-            if jour != 0 and jour in jours_occ:
-                bg = jours_occ[jour]["c"]
-                nom = jours_occ[jour]["n"]
-                # Texte blanc pour tout sauf le jaune et le blanc
-                txt = "white" if bg not in ["#f1c40f", "#ffffff"] else "black"
-                content += f'<br><b style="font-size: 0.55rem; display:block; line-height:1;">{nom}</b>'
-            
-            style = f'background-color: {bg} !important; color: {txt} !important; height: 55px; text-align: center; border: 1px solid #ddd; font-weight: bold;'
-            h_cal += f'<td style="{style}">{content}</td>'
+            if jour == 0:
+                h_cal += '<td style="border: 1px solid #ddd; height: 50px;"></td>'
+            else:
+                style = "border: 1px solid #ddd; height: 50px; vertical-align: top; padding: 2px;"
+                content = f'<b>{jour}</b>'
+                
+                if jour in jours_occ:
+                    info = jours_occ[jour]
+                    # On tente de forcer le fond ET on met l'emoji au cas où le fond échoue
+                    style += f'background-color: {info["bg"]} !important; color: white;'
+                    content += f'<br>{info["icon"]}<br><span style="font-size: 0.6rem;">{info["nom"]}</span>'
+                
+                h_cal += f'<td style="{style}">{content}</td>'
         h_cal += '</tr>'
+    h_cal += '</table>'
     
-    h_cal += '</tbody></table>'
     st.markdown(h_cal, unsafe_allow_html=True)
-    
-    # --- LÉGENDE ---
-    st.markdown("""
-    <div style="display: flex; justify-content: center; gap: 15px; margin-top: 15px; font-weight: bold; font-size: 0.8rem;">
-        <span style="color:#2ecc71;">● OK</span>
-        <span style="color:#f1c40f;">● ATTENTE</span>
-        <span style="color:#3498db;">● PAYÉ</span>
-        <span style="color:#e74c3c;">● IMPAYÉ</span>
-    </div>
-    """, unsafe_allow_html=True)
 
 
 # --- 7. PAGE STATS ---
