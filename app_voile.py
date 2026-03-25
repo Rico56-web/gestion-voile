@@ -185,7 +185,7 @@ if st.session_state.page == "CONTACTS":
     # --- 3. AFFICHAGE DES FICHES ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.get('view_archive') else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-  for i, r in df_disp.iterrows():
+    for i, r in df_disp.iterrows():
         # --- PRÉPARATION DES DONNÉES ---
         statut = r.get('Statut', 'En attente')
         paye = r.get('Paiement', 'Unpaid')
