@@ -344,16 +344,28 @@ elif st.session_state.page == "PLANNING":
                     if dv == 14:
                         st.info(f"Jour 14: Passé={is_passe}, Payé={is_paye} -> Couleur={current_c}")
 
-                    # Gestion des conflits (2 contacts)
+              # --- GESTION DES CONFLITS (Plusieurs contacts le même jour) ---
                     n_j = int(r.get('NbreJours', 1))
                     for j in range(dv, dv + n_j):
                         if j in jours_occ:
-                            # Le Rouge écrase tout
-                            if current_c == "#e74c3c" or jours_occ[j]["c"] == "#e74c3c":
+                            existing_c = jours_occ[j]["c"]
+                            
+                            # RÈGLE 1 : Le ROUGE (Impayé) écrase tout (Vert, Bleu, Jaune)
+                            if current_c == "#e74c3c" or existing_c == "#e74c3c":
                                 jours_occ[j]["c"] = "#e74c3c"
+                            
+                            # RÈGLE 2 : Le VERT (En cours) écrase le Bleu ou le Jaune
+                            elif current_c == "#2ecc71" or existing_c == "#2ecc71":
+                                jours_occ[j]["c"] = "#2ecc71"
+                                
+                            # RÈGLE 3 : Le BLEU (Payé) s'affiche si rien d'autre n'est urgent
+                            elif current_c == "#3498db" or existing_c == "#3498db":
+                                jours_occ[j]["c"] = "#3498db"
+                            
                             else:
                                 jours_occ[j]["c"] = current_c
                         else:
+                            # Si le jour est libre, on met la couleur de la mission actuelle
                             jours_occ[j] = {"c": current_c}
                     
                     missions_detail.append({
