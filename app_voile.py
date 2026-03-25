@@ -317,36 +317,31 @@ elif st.session_state.page == "PLANNING":
                     date_mission = date(yv, mv, dv)
                     is_paye = ("pay" in p_clean) or ("paid" in p_clean)
                     is_passe = date_mission < aujourdhui
-                   # --- LOGIQUE DE COULEUR (PRIORITÉ RÉALIGNÉE) ---
+                    
+                   # --- LOGIQUE DE COULEUR (PRÉCISION) ---
                     p_clean = str(r.get('Paiement', '')).strip().lower()
                     s_clean = str(r.get('Statut', '')).strip().lower()
                     
+                    date_mission = date(yv, mv, dv)
                     is_paye = ("pay" in p_clean) or ("paid" in p_clean)
-                    is_passe = date_mission < aujourdhui
-
-                    # 1. ON TESTE D'ABORD SI C'EST PASSÉ (Priorité absolue)
-                    if is_passe:
-                        if is_paye:
-                            current_c = "#3498db" # BLEU (Passé et Payé)
-                        else:
-                            current_c = "#e74c3c" # ROUGE (Passé et NON Payé)
                     
-                    # 2. SI CE N'EST PAS PASSÉ, ON REGARDE LE STATUT
-                    elif "termin" in s_clean:
+                    # 1. CAS DU PASSÉ (Avant aujourd'hui)
+                    if date_mission < aujourdhui:
                         if is_paye:
-                            current_c = "#3498db" # BLEU
+                            current_c = "#3498db" # BLEU (Réglé)
                         else:
-                            current_c = "#e74c3c" # ROUGE
-                            
-                    elif "ok" in s_clean:
-                        current_c = "#2ecc71" # VERT (Futur et validé)
-                        
-                    elif "attente" in s_clean:
-                        current_c = "#f1c40f" # JAUNE
-                        
-                    else:
-                        current_c = "transparent"                
+                            current_c = "#e74c3c" # ROUGE (Alerte Impayé)
 
+                    # 2. CAS DU FUTUR OU AUJOURD'HUI
+                    else:
+                        if "termin" in s_clean:
+                            current_c = "#3498db" if is_paye else "#e74c3c"
+                        elif "ok" in s_clean:
+                            current_c = "#2ecc71" # VERT (À venir)
+                        elif "attente" in s_clean:
+                            current_c = "#f1c40f" # JAUNE
+                        else:
+                            current_c = "transparent"
                     # --- GESTION DES CONFLITS (Plusieurs contacts le même jour) ---
                     n_j = int(r.get('NbreJours', 1))
                     for j in range(dv, dv + n_j):
