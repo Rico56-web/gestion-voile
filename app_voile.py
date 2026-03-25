@@ -184,13 +184,18 @@ if st.session_state.page == "CONTACTS":
     else:
         df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-    for i, r in df_disp.iterrows():
+for i, r in df_disp.iterrows():
+        # --- RÉCUPÉRATION DES DONNÉES ---
         statut = r.get('Statut', 'En attente')
         paye = r.get('Paiement', 'Unpaid')
+        mail_client = str(r.get('Email', '')).strip()
+        tel_client = str(r.get('Téléphone','')).replace(" ", "").replace(".", "")
+        
+        # Couleurs des badges
         s_color = "#2ecc71" if statut == "OK" else "#f1c40f" if statut == "En attente" else "#e74c3c"
         p_color = "#27ae60" if paye == "Paid" else "#e67e22"
-        t_link = str(r.get('Téléphone','')).replace(" ", "").replace(".", "")
 
+        # --- CONSTRUCTION DE LA FICHE ---
         h = f'''<div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: white;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <b style="font-size: 1.2rem; color: #1a2a6c;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b>
@@ -199,22 +204,47 @@ if st.session_state.page == "CONTACTS":
                     <span style="background:{p_color}; color:white; padding:3px 8px; border-radius:5px; font-size:0.7rem; margin-left:5px;">{paye}</span>
                 </div>
             </div>
+            
             <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 0.9rem;">
                 <div>📅 <b>Date:</b> {r.get('DateNav','--')}</div>
                 <div>💰 <b>Prix:</b> {r.get('Prix','0.00')} €</div>
                 <div>⛵ <b>Jours:</b> {r.get('NbreJours', 1)}</div>
-                <div>✉️ <b>Mail:</b> {r.get('Email', '--')}</div>
+                <div>👥 <b>Pers:</b> {r.get('NbrePers', 1)}</div>
             </div>
-            <div style="background: #f8f9fa; padding: 5px; border-radius: 5px; margin-top: 8px; font-size: 0.85rem; font-style: italic; border-left: 3px solid #ddd;">
+
+            <div style="background: #f8f9fa; padding: 8px; border-radius: 5px; margin-top: 8px; font-size: 0.85rem; font-style: italic; border-left: 3px solid #ddd;">
                 💬 {r.get('Commentaires', '')}
             </div>
-            <div style="margin-top: 10px; display: flex; gap: 10px;">
-                <a href="tel:{t_link}" style="flex:1; background:#3498db; color:white; padding:8px; border-radius:5px; text-decoration:none; text-align:center; font-weight:bold;">📞 Appeler</a>
-                <a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white; padding:8px; border-radius:5px; text-decoration:none; text-align:center; font-weight:bold;">💬 WhatsApp</a>
+
+            <div style="margin-top: 15px; display: flex; gap: 8px;">
+                <a href="tel:{tel_client}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.8rem;">📞 Appel</a>
+                <a href="https://wa.me/{tel_client}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.8rem;">💬 WhatsApp</a>
+                <a href="mailto:{mail_client}" style="flex:1; background:#e67e22; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.8rem;">✉️ Mail</a>
             </div>
         </div>'''
+        
         st.markdown(h, unsafe_allow_html=True)
 
+        # --- BOUTONS ACTIONS (MODIFIER / SUPPRIMER) ---
+        col_ed, col_del = st.columns([1, 4])
+        if col_ed.button("✏️", key=f"ed_{i}"):
+            st.session_state.edit_idx = i
+            st.rerun()
+        if col_del.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
+            st.session_state.confirm_del = i
+
+        # Logique de confirmation de suppression (Optionnelle mais recommandée)
+        if st.session_state.get('confirm_del') == i:
+            st.warning("⚠️ Supprimer cette mission ?")
+            b1, b2 = st.columns(2)
+            if b1.button("OUI ✅", key=f"y_{i}"):
+                df_c = df_c.drop(i).reset_index(drop=True)
+                sauvegarder_data(df_c, "contacts.json")
+                st.session_state.confirm_del = None
+                st.rerun()
+            if b2.button("NON ❌", key=f"n_{i}"):
+                st.session_state.confirm_del = None
+                st.rerun()
         # BOUTONS ACTIONS
         col_ed, col_del = st.columns([1, 4])
         if col_ed.button("✏️", key=f"ed_{i}"):
