@@ -285,6 +285,7 @@ if st.session_state.page == "CONTACTS":
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Mensuel 2026")
+    
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     sel_m_nom = st.selectbox("Mois", m_noms, index=now.month - 1)
     sel_m = m_noms.index(sel_m_nom) + 1
@@ -293,49 +294,61 @@ elif st.session_state.page == "PLANNING":
     
     for _, r in df_c.iterrows():
         try:
-            date_str = str(r.get('DateNav', '')).replace(" ", "")
-            dp = date_str.split('/')
-            if len(dp) < 3: continue
+            d_str = str(r.get('DateNav', '')).replace(" ", "")
+            if '/' not in d_str: continue
             
-            d_v, m_v, y_v = int(dp[0]), int(dp[1]), int(dp[2])
-            if y_val == 26: y_val = 2026
+            parts = d_str.split('/')
+            day_v = int(parts[0])
+            month_v = int(parts[1])
+            year_v = int(parts[2])
+            if year_v == 26: year_v = 2026
             
-            if m_v == sel_m and y_v == 2026:
-                s = str(r.get('Statut', 'En attente')).strip()
-                p = str(r.get('Paiement', 'Unpaid')).strip().lower()
-                nom_client = str(r.get('Nom', '???')).upper()
-                n_j = int(r.get('NbreJours', 1))
+            if month_v == sel_m and year_v == 2026:
+                statut_v = str(r.get('Statut', 'En attente')).strip()
+                # On check le paiement : on cherche 'Paid' n'importe où
+                pay_v = str(r.get('Paiement', 'Unpaid')).strip().lower()
+                nom_v = str(r.get('Nom', '')).upper()
+                n_jours = int(r.get('NbreJours', 1))
                 
-                # Couleur
-                color = "#95a5a6"
-                if s == "OK": color = "#2ecc71"
-                elif s == "En attente": color = "#f1c40f"
-                elif s == "Terminé":
-                    color = "#3498db" if p == "paid" else "#e74c3c"
+                # Choix de la couleur
+                couleur = "#95a5a6" # Gris
+                if statut_v == "OK": 
+                    couleur = "#2ecc71" # Vert
+                elif statut_v == "En attente": 
+                    couleur = "#f1c40f" # Jaune
+                elif statut_v == "Terminé":
+                    if "paid" in pay_v:
+                        couleur = "#3498db" # BLEU
+                    else:
+                        couleur = "#e74c3c" # ROUGE
                 
-                for j in range(d_v, d_v + n_j):
-                    # On stocke la couleur ET le nom pour vérifier
-                    jours_occ[j] = {"c": color, "n": nom_client}
-        except: continue
+                for j in range(day_v, day_v + n_jours):
+                    # On stocke les infos
+                    jours_occ[j] = {"c": couleur, "n": nom_v}
+        except: 
+            continue
 
-    # Calendrier avec affichage du NOM
+    # Affichage du Calendrier
     cal_mat = calendar.monthcalendar(2026, sel_m)
     h_cal = '<table class="calendar-table"><thead><tr><th>Lun</th><th>Mar</th><th>Mer</th><th>Jeu</th><th>Ven</th><th>Sam</th><th>Dim</th></tr></thead><tbody>'
     
     for sem in cal_mat:
         h_cal += '<tr>'
         for jour in sem:
-            bg = ""
-            nom_aff = ""
+            style = 'style="height: 50px; vertical-align: top;"'
+            content = str(jour) if jour != 0 else ""
+            
             if jour != 0 and jour in jours_occ:
                 bg = jours_occ[jour]["c"]
-                nom_aff = f'<br><span style="font-size:0.5rem;">{jours_occ[jour]["n"]}</span>'
+                nom = jours_occ[jour]["n"]
+                style = f'style="background-color: {bg} !important; color: white !important; height: 50px; vertical-align: top; font-weight: bold;"'
+                content += f'<br><span style="font-size: 0.6rem;">{nom}</span>'
             
-            style = f'style="background-color: {bg} !important; color: white !important; height: 60px; vertical-align: top;"' if bg else 'style="height: 60px; vertical-align: top;"'
-            h_cal += f'<td {style}>{jour if jour != 0 else ""}{nom_aff}</td>'
+            h_cal += f'<td {style}>{content}</td>'
         h_cal += '</tr>'
     
     st.markdown(h_cal + '</tbody></table>', unsafe_allow_html=True)
+    st.info("🟢 OK | 🟡 Attente | 🔵 Terminé & Payé | 🔴 Terminé & Impayé")
 
 
 # --- 7. PAGE STATS ---
