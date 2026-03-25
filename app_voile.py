@@ -283,7 +283,8 @@ if st.session_state.page == "CONTACTS":
                 st.rerun()
                 
      # --- 6. PAGE PLANNING ---
-    elif st.session_state.page == "PLANNING":
+    
+     elif st.session_state.page == "PLANNING":
         st.subheader("🗓️ Planning de Navigation")
         
         # --- MENUS DÉROULANTS (MOIS & ANNÉE) ---
