@@ -292,11 +292,6 @@ elif st.session_state.page == "PLANNING":
     
     jours_occ = {}
     
-    # --- ZONE DE DÉBOGAGE POUR COMPRENDRE ---
-    for _, r in df_c.iterrows():
-        if "PHILIPPE" in str(r.get('Nom', '')).upper():
-            st.write(f"⚙️ Lu pour Philippe : Statut='{r.get('Statut')}' | Paiement='{r.get('Paiement')}'")
-    
     for _, r in df_c.iterrows():
         try:
             d_str = str(r.get('DateNav', '')).replace(" ", "")
@@ -307,35 +302,43 @@ elif st.session_state.page == "PLANNING":
             if year_v == 26: year_v = 2026
             
             if month_v == sel_m and year_v == 2026:
-                # Nettoyage total
-                s_raw = str(r.get('Statut', '')).strip()
-                p_raw = str(r.get('Paiement', '')).strip()
+                # --- NORMALISATION TOTALE ---
+                # On met tout en minuscules et on enlève les espaces
+                s_raw = str(r.get('Statut', '')).lower().strip()
+                p_raw = str(r.get('Paiement', '')).lower().strip()
                 nom_v = str(r.get('Nom', '')).upper()
                 n_jours = int(r.get('NbreJours', 1))
                 
-                # LOGIQUE DE COULEUR PAR DÉFAUT (ROUGE SI INCONNU MAIS PRÉSENT)
-                color = "#e74c3c" 
+                # Couleur par défaut : Blanc
+                color = "#ffffff" 
                 
-                # Test de statut
-                if "OK" in s_raw.upper():
-                    color = "#2ecc71"
-                elif "ATTENTE" in s_raw.upper():
-                    color = "#f1c40f"
-                elif "TERMIN" in s_raw.upper():
-                    # Test de paiement
-                    if p_raw.upper() == "PAID":
-                        color = "#3498db" # BLEU
+                # 1. Test OK
+                if "ok" in s_raw:
+                    color = "#2ecc71" # VERT
+                # 2. Test ATTENTE
+                elif "attente" in s_raw:
+                    color = "#f1c40f" # JAUNE
+                # 3. Test TERMINÉ (on cherche "termin" pour ignorer l'accent)
+                elif "termin" in s_raw:
+                    # On cherche "payé" ou "paye" ou "paid"
+                    if "payé" in p_raw or "paye" in p_raw or "paid" in p_raw:
+                        color = "#3498db" # BLEU (Elisabeth Philippe)
                     else:
-                        color = "#e74c3c" # ROUGE
+                        color = "#e74c3c" # ROUGE (Impayé)
                 
                 for j in range(day_v, day_v + n_jours):
+                    # Priorité au Bleu si chevauchement
+                    if j in jours_occ and jours_occ[j]["c"] == "#3498db": continue
                     jours_occ[j] = {"c": color, "n": nom_v}
         except: 
             continue
 
-    # AFFICHAGE DU CALENDRIER
+    # --- AFFICHAGE DU CALENDRIER ---
     cal_mat = calendar.monthcalendar(2026, sel_m)
-    h_cal = '<table style="width:100%; border-collapse: collapse;"><thead><tr style="background:#eee;"><th>Lun</th><th>Mar</th><th>Mer</th><th>Jeu</th><th>Ven</th><th>Sam</th><th>Dim</th></tr></thead><tbody>'
+    h_cal = '<table style="width:100%; border-collapse: collapse;"><thead><tr style="background:#eee;">'
+    for jour_nom in ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]:
+        h_cal += f'<th style="padding:5px; border:1px solid #ddd;">{jour_nom}</th>'
+    h_cal += '</tr></thead><tbody>'
     
     for sem in cal_mat:
         h_cal += '<tr>'
@@ -347,14 +350,26 @@ elif st.session_state.page == "PLANNING":
             if jour != 0 and jour in jours_occ:
                 bg = jours_occ[jour]["c"]
                 nom = jours_occ[jour]["n"]
-                txt = "white" if bg != "#f1c40f" else "black"
-                content += f'<br><b style="font-size: 0.5rem;">{nom}</b>'
+                # Texte blanc pour tout sauf le jaune et le blanc
+                txt = "white" if bg not in ["#f1c40f", "#ffffff"] else "black"
+                content += f'<br><b style="font-size: 0.55rem; display:block; line-height:1;">{nom}</b>'
             
-            style = f'background-color: {bg} !important; color: {txt} !important; height: 50px; text-align: center; border: 1px solid #ddd;'
+            style = f'background-color: {bg} !important; color: {txt} !important; height: 55px; text-align: center; border: 1px solid #ddd; font-weight: bold;'
             h_cal += f'<td style="{style}">{content}</td>'
         h_cal += '</tr>'
     
-    st.markdown(h_cal + '</tbody></table>', unsafe_allow_html=True)
+    h_cal += '</tbody></table>'
+    st.markdown(h_cal, unsafe_allow_html=True)
+    
+    # --- LÉGENDE ---
+    st.markdown("""
+    <div style="display: flex; justify-content: center; gap: 15px; margin-top: 15px; font-weight: bold; font-size: 0.8rem;">
+        <span style="color:#2ecc71;">● OK</span>
+        <span style="color:#f1c40f;">● ATTENTE</span>
+        <span style="color:#3498db;">● PAYÉ</span>
+        <span style="color:#e74c3c;">● IMPAYÉ</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # --- 7. PAGE STATS ---
