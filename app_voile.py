@@ -283,7 +283,6 @@ if st.session_state.page == "CONTACTS":
                 st.rerun()
             
 # --- 6. PAGE PLANNING ---
-# --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Mensuel 2026")
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
@@ -295,18 +294,20 @@ elif st.session_state.page == "PLANNING":
         try:
             date_str = safe_get(r, 'DateNav').replace(" ", "")
             dp = date_str.split('/')
+            day_val = int(dp[0])
             m_val = int(dp[1])
             y_val = int(dp[2])
             if y_val == 26: y_val = 2026
             
             if m_val == sel_m and y_val == 2026:
-                statut = safe_get(r, 'Statut')
-                paiement = safe_get(r, 'Paiement')
+                s = safe_get(r, 'Statut')
+                p = safe_get(r, 'Paiement')
                 n_jours = int(safe_get(r, 'NbreJours'))
                 
-                # On stocke un dictionnaire pour chaque jour occupé
-                for j in range(int(dp[0]), int(dp[0]) + n_jours):
-                    jours_occ[j] = {"statut": statut, "paiement": paiement}
+                # On marque chaque jour avec son Statut ET son Paiement
+                for j in range(day_val, day_val + n_jours):
+                    # On crée une clé unique "Statut|Paiement" pour simplifier la lecture après
+                    jours_occ[j] = f"{s}|{p}"
         except: continue
 
     cal_mat = calendar.monthcalendar(2026, sel_m)
@@ -315,36 +316,36 @@ elif st.session_state.page == "PLANNING":
     for sem in cal_mat:
         h_cal += '<tr>'
         for jour in sem:
-            style_td = ""
+            bg_color = ""
+            txt_color = "black"
+            
             if jour != 0 and jour in jours_occ:
-                info = jours_occ[jour]
-                s, p = info["statut"], info["paiement"]
+                info = jours_occ[jour].split('|')
+                s, p = info[0], info[1]
                 
-                # --- LOGIQUE DES COULEURS ---
+                # --- APPLICATION DES RÈGLES DE COULEURS ---
                 if s == "OK":
-                    style_td = 'style="background-color: #2ecc71; color: white;"' # VERT
+                    bg_color = "#2ecc71" # Vert
+                    txt_color = "white"
                 elif s == "En attente":
-                    style_td = 'style="background-color: #f1c40f; color: black;"' # JAUNE
+                    bg_color = "#f1c40f" # Jaune
                 elif s == "Terminé":
                     if p == "Paid":
-                        style_td = 'style="background-color: #3498db; color: white;"' # BLEU
+                        bg_color = "#3498db" # Bleu
+                        txt_color = "white"
                     else:
-                        style_td = 'style="background-color: #e74c3c; color: white;"' # ROUGE
+                        bg_color = "#e74c3c" # Rouge
+                        txt_color = "white"
             
-            h_cal += f'<td {style_td}>{jour if jour != 0 else ""}</td>'
+            style = f'style="background-color: {bg_color}; color: {txt_color};"' if bg_color else ""
+            h_cal += f'<td {style}>{jour if jour != 0 else ""}</td>'
+            
         h_cal += '</tr>'
     
     st.markdown(h_cal + '</tbody></table>', unsafe_allow_html=True)
     
-    # --- LÉGENDE ---
-    st.markdown("""
-    <div style="display: flex; gap: 10px; font-size: 0.8rem; margin-top: 10px;">
-        <span style="color:#2ecc71;">● OK</span>
-        <span style="color:#f1c40f;">● Attente</span>
-        <span style="color:#3498db;">● Terminé/Payé</span>
-        <span style="color:#e74c3c;">● Terminé/Impayé</span>
-    </div>
-    """, unsafe_allow_html=True)
+    # --- LÉGENDE RAPIDE ---
+    st.info("🟢 OK | 🟡 Attente | 🔵 Terminé & Payé | 🔴 Terminé & Impayé")
     
     st.markdown("---")
     st.subheader("📋 Liste détaillée du mois")
@@ -357,7 +358,7 @@ elif st.session_state.page == "PLANNING":
                 s = safe_get(r, 'Statut')
                 p = safe_get(r, 'Paiement')
                 
-                # Couleur du texte pour la liste
+                # Couleur pour le texte de la liste
                 if s == "OK": c = "#2ecc71"
                 elif s == "En attente": c = "#f1c40f"
                 elif s == "Terminé": c = "#3498db" if p == "Paid" else "#e74c3c"
@@ -366,6 +367,7 @@ elif st.session_state.page == "PLANNING":
                 st.markdown(f"📅 **{safe_get(r, 'DateNav')}** ({safe_get(r, 'NbreJours')}j) : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} - <span style='color:{c}; font-weight:bold;'>{s} ({p})</span>", unsafe_allow_html=True)
         except: continue
     if not found: st.info("Aucune mission ce mois-ci.")
+
 
 
 # --- 7. PAGE STATS ---
