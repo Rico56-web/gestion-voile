@@ -282,8 +282,8 @@ if st.session_state.page == "CONTACTS":
                 st.session_state[confirm_key] = False
                 st.rerun()
             
-# --- 6. PAGE PLANNING ---
-    elif st.session_state.page == "PLANNING":
+   # --- 6. PAGE PLANNING ---
+        elif st.session_state.page == "PLANNING":
         st.subheader("🗓️ Planning de Navigation")
         
         # --- MENUS DÉROULANTS (MOIS & ANNÉE) ---
