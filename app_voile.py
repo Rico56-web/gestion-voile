@@ -118,29 +118,33 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 
 # --- 5. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
-    st.title("👥 Vesta Skipper 2026 - Contacts & Missions")
+    st.title("👥 Vesta Skipper 2026 - Missions & Finance")
 
-    # --- 1. FONCTION DE MODIFICATION (S'affiche en haut si on clique sur ✏️) ---
+    # --- 1. FORMULAIRE DE MODIFICATION (S'affiche si on clique sur ✏️) ---
     if st.session_state.get('edit_idx') is not None:
         idx = st.session_state.edit_idx
         r = df_c.iloc[idx]
         
         with st.expander(f"📝 MODIFIER : {r.get('Prénom','')} {r.get('Nom','')}", expanded=True):
-            with st.form("form_edit_global"):
-                col1, col2 = st.columns(2)
-                u_pre = col1.text_input("Prénom", value=str(r.get('Prénom', '')))
-                u_nom = col2.text_input("Nom", value=str(r.get('Nom', '')))
-                u_tel = col1.text_input("Téléphone", value=str(r.get('Téléphone', '')))
-                u_mail = col2.text_input("Email", value=str(r.get('Email', '')))
+            with st.form("form_edit_complet"):
+                c1, c2 = st.columns(2)
+                u_pre = c1.text_input("Prénom", value=str(r.get('Prénom', '')))
+                u_nom = c2.text_input("Nom", value=str(r.get('Nom', '')))
+                u_tel = c1.text_input("Téléphone", value=str(r.get('Téléphone', '')))
+                u_mail = c2.text_input("Email", value=str(r.get('Email', '')))
                 
-                # LE STATUT (AJOUTÉ)
-                u_statut = st.selectbox("Statut", ["En attente", "OK", "Refusé", "Terminé"], 
-                                        index=["En attente", "OK", "Refusé", "Terminé"].index(r.get('Statut', 'En attente')))
+                # STATUT & PAIEMENT
+                c_st, c_pa = st.columns(2)
+                u_statut = c_st.selectbox("Statut", ["En attente", "OK", "Refusé", "Terminé"], 
+                                         index=["En attente", "OK", "Refusé", "Terminé"].index(r.get('Statut', 'En attente')))
+                u_paye = c_pa.selectbox("Paiement", ["Unpaid", "Paid"], 
+                                       index=0 if r.get('Paiement') == "Unpaid" else 1)
                 
-                col3, col4, col5 = st.columns(3)
-                u_date = col3.text_input("Date Nav", value=str(r.get('DateNav', '')))
-                u_jours = col4.number_input("Jours", value=int(r.get('NbreJours', 1)))
-                u_pers = col5.number_input("Pers.", value=int(r.get('NbrePers', 1)))
+                # PRIX & INFOS NAV
+                c3, c4, c5 = st.columns(3)
+                u_date = c3.text_input("Date Nav", value=str(r.get('DateNav', '')))
+                u_jours = c4.number_input("Jours", value=int(r.get('NbreJours', 1)))
+                u_prix = c5.text_input("Prix (€)", value=str(r.get('Prix', '0.00')))
                 
                 u_comm = st.text_area("Commentaires", value=str(r.get('Commentaires', '')))
 
@@ -150,9 +154,10 @@ if st.session_state.page == "CONTACTS":
                     df_c.at[idx, 'Téléphone'] = u_tel
                     df_c.at[idx, 'Email'] = u_mail
                     df_c.at[idx, 'Statut'] = u_statut
+                    df_c.at[idx, 'Paiement'] = u_paye
+                    df_c.at[idx, 'Prix'] = u_prix
                     df_c.at[idx, 'DateNav'] = u_date
                     df_c.at[idx, 'NbreJours'] = u_jours
-                    df_c.at[idx, 'NbrePers'] = u_pers
                     df_c.at[idx, 'Commentaires'] = u_comm
                     
                     sauvegarder_data(df_c, "contacts.json")
@@ -162,62 +167,62 @@ if st.session_state.page == "CONTACTS":
                 st.session_state.edit_idx = None
                 st.rerun()
 
-    # --- 2. NAVIGATION (EN COURS / ARCHIVES / AJOUTER) ---
+    # --- 2. NAVIGATION ---
     c_nav1, c_nav2, c_nav3 = st.columns(3)
-    if c_nav1.button("📂 En Cours", use_container_width=True):
-        st.session_state.view_archive = False
-    if c_nav2.button("🗄️ Archives", use_container_width=True):
-        st.session_state.view_archive = True
+    if c_nav1.button("📂 En Cours", use_container_width=True): st.session_state.view_archive = False
+    if c_nav2.button("🗄️ Archives", use_container_width=True): st.session_state.view_archive = True
     if c_nav3.button("➕ Ajouter Mission", use_container_width=True):
-        # Ici, on pourrait créer une ligne vide et passer en mode edit
-        new_row = {"Prénom": "", "Nom": "", "Statut": "En attente", "DateNav": "", "NbreJours": 1}
+        new_row = {"Prénom": "", "Nom": "", "Statut": "En attente", "Paiement": "Unpaid", "Prix": "0.00"}
         df_c = pd.concat([df_c, pd.DataFrame([new_row])], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.session_state.edit_idx = len(df_c) - 1
         st.rerun()
 
-    # --- 3. AFFICHAGE DES FICHES (CONSERVÉ ET AMÉLIORÉ) ---
+    # --- 3. AFFICHAGE ---
     if st.session_state.get('view_archive', False):
         df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])]
     else:
         df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
     for i, r in df_disp.iterrows():
-        # Données
         statut = r.get('Statut', 'En attente')
+        paye = r.get('Paiement', 'Unpaid')
         s_color = "#2ecc71" if statut == "OK" else "#f1c40f" if statut == "En attente" else "#e74c3c"
+        p_color = "#27ae60" if paye == "Paid" else "#e67e22"
         t_link = str(r.get('Téléphone','')).replace(" ", "").replace(".", "")
 
-        # LE DESIGN QUE TU AIMES (AVEC LE STATUT AJOUTÉ)
         h = f'''<div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: white;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <b style="font-size: 1.2rem; color: #1a2a6c;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b>
-                <span style="background:{s_color}; color:white; padding:3px 10px; border-radius:15px; font-size:0.8rem;">{statut}</span>
+                <div>
+                    <span style="background:{s_color}; color:white; padding:3px 8px; border-radius:5px; font-size:0.7rem;">{statut}</span>
+                    <span style="background:{p_color}; color:white; padding:3px 8px; border-radius:5px; font-size:0.7rem; margin-left:5px;">{paye}</span>
+                </div>
             </div>
-            <div style="margin-top: 10px; font-size: 0.9rem;">
-                📅 <b>Date:</b> {r.get('DateNav','--')} | ⛵ <b>Jours:</b> {r.get('NbreJours', 1)} | 👥 <b>Pers:</b> {r.get('NbrePers', 1)}<br>
-                ✉️ {r.get('Email', 'Pas d\'email')}
+            <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 0.9rem;">
+                <div>📅 <b>Date:</b> {r.get('DateNav','--')}</div>
+                <div>💰 <b>Prix:</b> {r.get('Prix','0.00')} €</div>
+                <div>⛵ <b>Jours:</b> {r.get('NbreJours', 1)}</div>
+                <div>✉️ <b>Mail:</b> {r.get('Email', '--')}</div>
             </div>
-            <div style="background: #f8f9fa; padding: 5px; border-radius: 5px; margin-top: 8px; font-size: 0.85rem; font-style: italic;">
+            <div style="background: #f8f9fa; padding: 5px; border-radius: 5px; margin-top: 8px; font-size: 0.85rem; font-style: italic; border-left: 3px solid #ddd;">
                 💬 {r.get('Commentaires', '')}
             </div>
             <div style="margin-top: 10px; display: flex; gap: 10px;">
-                <a href="tel:{t_link}" style="flex:1; background:#3498db; color:white; padding:8px; border-radius:5px; text-decoration:none; text-align:center;">📞 Appeler</a>
-                <a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white; padding:8px; border-radius:5px; text-decoration:none; text-align:center;">💬 WhatsApp</a>
+                <a href="tel:{t_link}" style="flex:1; background:#3498db; color:white; padding:8px; border-radius:5px; text-decoration:none; text-align:center; font-weight:bold;">📞 Appeler</a>
+                <a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white; padding:8px; border-radius:5px; text-decoration:none; text-align:center; font-weight:bold;">💬 WhatsApp</a>
             </div>
         </div>'''
         st.markdown(h, unsafe_allow_html=True)
 
-        # BOUTONS ACTIONS (MODIFIER / SUPPRIMER)
+        # BOUTONS ACTIONS
         col_ed, col_del = st.columns([1, 4])
         if col_ed.button("✏️", key=f"ed_{i}"):
             st.session_state.edit_idx = i
             st.rerun()
-            
-        if col_del.button("🗑️ SUPPRIMER CETTE MISSION", key=f"del_{i}", use_container_width=True):
+        if col_del.button("🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
             st.session_state.confirm_del = i
 
-        # Confirmation de suppression
         if st.session_state.get('confirm_del') == i:
             st.error("Confirmer la suppression ?")
             b1, b2 = st.columns(2)
