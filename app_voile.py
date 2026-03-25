@@ -315,8 +315,9 @@ elif st.session_state.page == "PLANNING":
                     if j in jours_occ and jours_occ[j]["c"] == "#3498db": continue
                     jours_occ[j] = {"c": bg, "n": nom_v}
         except: continue
+# ... (gardez votre boucle jours_occ au-dessus) ...
 
-    # TABLEAU AVEC PASTILLES CIRCULAIRES
+    # TABLEAU AVEC CERCLES SVG (IMAGE INTÉGRÉE)
     h_cal = '<table style="width:100%; border-collapse: collapse; table-layout: fixed; text-align: center;">'
     h_cal += '<tr style="font-size: 0.7rem; color: gray;"><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
     
@@ -325,51 +326,36 @@ elif st.session_state.page == "PLANNING":
         h_cal += '<tr>'
         for jour in sem:
             if jour == 0:
-                h_cal += '<td style="height: 45px;"></td>'
+                h_cal += '<td style="height: 40px;"></td>'
             else:
-                bg_circle = "transparent"
+                bg = "transparent"
                 nom = ""
                 txt_c = "black"
                 
                 if jour in jours_occ:
-                    bg_circle = jours_occ[jour]["c"]
+                    bg = jours_occ[jour]["c"]
                     nom = jours_occ[jour]["n"]
-                    txt_c = "white" if bg_circle not in ["#f1c40f", "transparent"] else "black"
+                    txt_c = "white" if bg not in ["#f1c40f", "transparent"] else "black"
                 
-                # Création de la pastille (Cercle coloré)
-                circle_style = f'''
-                    display: inline-block;
-                    background-color: {bg_circle} !important;
-                    color: {txt_c} !important;
-                    width: 30px;
-                    height: 30px;
-                    line-height: 30px;
-                    border-radius: 50%;
-                    font-weight: bold;
-                    font-size: 0.9rem;
-                    margin-bottom: 2px;
-                '''
+                # Si le jour est occupé, on dessine un cercle SVG
+                if bg != "transparent":
+                    cell_content = f'''
+                    <div style="position: relative; width: 30px; height: 30px; margin: 0 auto;">
+                        <svg width="30" height="30">
+                            <circle cx="15" cy="15" r="14" fill="{bg}" />
+                            <text x="15" y="20" font-size="12" text-anchor="middle" fill="{txt_c}" font-weight="bold">{jour}</text>
+                        </svg>
+                    </div>
+                    <div style="font-size: 0.45rem; color: gray; margin-top: 1px;">{nom}</div>
+                    '''
+                else:
+                    cell_content = f'<div style="font-weight:bold; font-size: 0.9rem;">{jour}</div>'
                 
-                h_cal += f'''
-                <td style="border: 0.5px solid #eee; height: 50px; vertical-align: middle; padding: 2px;">
-                    <div style="{circle_style if bg_circle != "transparent" else "font-weight:bold;"}">{jour}</div>
-                    <div style="font-size: 0.5rem; color: gray; overflow: hidden;">{nom}</div>
-                </td>
-                '''
+                h_cal += f'<td style="border: 0.5px solid #eee; height: 45px; vertical-align: middle;">{cell_content}</td>'
         h_cal += '</tr>'
     h_cal += '</table>'
     
     st.markdown(h_cal, unsafe_allow_html=True)
-    
-    # Légende avec pastilles
-    st.markdown("""
-    <div style="font-size:0.65rem; text-align:center; margin-top:10px; display: flex; justify-content: space-around;">
-        <span><b style="color:#2ecc71;">●</b> OK</span>
-        <span><b style="color:#f1c40f;">●</b> Att.</span>
-        <span><b style="color:#3498db;">●</b> Payé</span>
-        <span><b style="color:#e74c3c;">●</b> Impayé</span>
-    </div>
-    """, unsafe_allow_html=True)
 
 
 # --- 7. PAGE STATS ---
