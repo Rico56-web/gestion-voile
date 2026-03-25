@@ -296,49 +296,60 @@ elif st.session_state.page == "PLANNING":
             sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
 
         # INITIALISATION (Attention à l'alignement ici)
-        jours_occ = {}
-        missions_detail = []
+     # ... (Début de la page PLANNING avec les selectbox) ...
 
-        for _, r in df_c.iterrows():
-            try:
-                d_str = str(r.get('DateNav', '')).replace(" ", "")
-                if '/' not in d_str: continue
-                parts = d_str.split('/')
-                dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
-                if yv < 100: yv += 2000
+    jours_occ = {}
+    missions_detail = []
+
+    for _, r in df_c.iterrows():
+        try:
+            d_str = str(r.get('DateNav', '')).replace(" ", "")
+            if '/' not in d_str: continue
+            parts = d_str.split('/')
+            dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
+            if yv < 100: yv += 2000
+            
+            if mv == sel_m and yv == sel_y:
+                s_raw = str(r.get('Statut', '')).lower()
+                p_raw = str(r.get('Paiement', '')).lower()
+                nom_complet = f"{r.get('Prénom', '')} {str(r.get('Nom', '')).upper()}"
                 
-                if mv == sel_m and yv == sel_y:
-                    s_raw = str(r.get('Statut', '')).lower()
-                    p_raw = str(r.get('Paiement', '')).lower()
-                    nom_complet = f"{r.get('Prénom', '')} {str(r.get('Nom', '')).upper()}"
-                    
-                    # LOGIQUE DE COULEUR
-                    color_mission = "transparent"
-                    if "ok" in s_raw:
-                        color_mission = "#2ecc71"
-                    elif "attente" in s_raw:
-                        color_mission = "#f1c40f"
-                    elif "termin" in s_raw:
-                        # Priorité : Bleu si payé, Rouge si impayé
-                        if "pay" in p_raw or "paid" in p_raw:
-                            color_mission = "#3498db"
+                # --- [ICI VOUS COLLEZ LES NOUVELLES LIGNES] ---
+                # 1. On définit la couleur de CETTE mission précise
+                if "termin" in s_raw and not ("pay" in p_raw or "paid" in p_raw):
+                    current_c = "#e74c3c" # ROUGE (Priorité 1)
+                elif "ok" in s_raw:
+                    current_c = "#2ecc71" # VERT (Priorité 2)
+                elif "attente" in s_raw:
+                    current_c = "#f1c40f" # JAUNE (Priorité 3)
+                elif "termin" in s_raw and ("pay" in p_raw or "paid" in p_raw):
+                    current_c = "#3498db" # BLEU (Priorité 4)
+                else:
+                    current_c = "transparent"
+
+                # 2. On remplit le calendrier en gérant les conflits (le Rouge gagne)
+                n_j = int(r.get('NbreJours', 1))
+                for j in range(dv, dv + n_j):
+                    if j in jours_occ:
+                        existing_c = jours_occ[j]["c"]
+                        # Si l'un des deux est ROUGE, la case devient ROUGE
+                        if current_c == "#e74c3c" or existing_c == "#e74c3c":
+                            jours_occ[j]["c"] = "#e74c3c"
+                        # Sinon, si l'un est VERT, la case devient VERTE
+                        elif current_c == "#2ecc71" or existing_c == "#2ecc71":
+                            jours_occ[j]["c"] = "#2ecc71"
                         else:
-                            color_mission = "#e74c3c"
-                    
-                    # GESTION DES JOURS ET CONFLITS (2 contacts)
-                    n_jours = int(r.get('NbreJours', 1))
-                    for j in range(dv, dv + n_jours):
-                        # PRIORITÉ AU ROUGE : Si un jour a une mission impayée, il reste rouge
-                        if j in jours_occ:
-                            if color_mission == "#e74c3c" or jours_occ[j]["c"] == "#e74c3c":
-                                jours_occ[j]["c"] = "#e74c3c"
-                            else:
-                                jours_occ[j]["c"] = color_mission
-                        else:
-                            jours_occ[j] = {"c": color_mission}
-                    
-                    missions_detail.append({"date": d_str, "nom": nom_complet, "color": color_mission, "statut": r.get('Statut'), "paye": r.get('Paiement')})
-            except: continue
+                            jours_occ[j]["c"] = current_c
+                    else:
+                        jours_occ[j] = {"c": current_c}
+                
+                # Garder le détail pour la liste en bas
+                missions_detail.append({"date": d_str, "nom": nom_complet, "color": current_c, "statut": r.get('Statut'), "paye": r.get('Paiement')})
+                # --- [FIN DU COLLAGE] ---
+
+        except: continue
+
+    # ... (Ensuite vient la partie h_cal = '<table...' pour le calendrier SVG) ...
 
         # --- LE CALENDRIER SVG ---
         h_cal = '<table style="width:100%; border-collapse: collapse; table-layout: fixed; text-align: center;">'
