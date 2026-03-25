@@ -282,6 +282,7 @@ if st.session_state.page == "CONTACTS":
                 st.session_state[confirm_key] = False
                 st.rerun()
             
+
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Mensuel 2026")
@@ -292,24 +293,28 @@ elif st.session_state.page == "PLANNING":
     jours_occ = {}
     for _, r in df_c.iterrows():
         try:
+            # Nettoyage de la date et extraction
             date_str = safe_get(r, 'DateNav').replace(" ", "")
             dp = date_str.split('/')
+            if len(dp) < 3: continue
+            
             day_val = int(dp[0])
             m_val = int(dp[1])
             y_val = int(dp[2])
             if y_val == 26: y_val = 2026
             
+            # Si la mission correspond au mois et à l'année affichés
             if m_val == sel_m and y_val == 2026:
-                s = safe_get(r, 'Statut')
-                p = safe_get(r, 'Paiement')
+                s = str(safe_get(r, 'Statut')).strip()
+                p = str(safe_get(r, 'Paiement')).strip()
                 n_jours = int(safe_get(r, 'NbreJours'))
                 
-                # On marque chaque jour avec son Statut ET son Paiement
+                # On enregistre l'état pour chaque jour de la mission
                 for j in range(day_val, day_val + n_jours):
-                    # On crée une clé unique "Statut|Paiement" pour simplifier la lecture après
                     jours_occ[j] = f"{s}|{p}"
         except: continue
 
+    # Génération du calendrier HTML
     cal_mat = calendar.monthcalendar(2026, sel_m)
     h_cal = '<table class="calendar-table"><thead><tr><th>Lun</th><th>Mar</th><th>Mer</th><th>Jeu</th><th>Ven</th><th>Sam</th><th>Dim</th></tr></thead><tbody>'
     
@@ -321,53 +326,67 @@ elif st.session_state.page == "PLANNING":
             
             if jour != 0 and jour in jours_occ:
                 info = jours_occ[jour].split('|')
-                s, p = info[0], info[1]
+                s_brut, p_brut = info[0], info[1]
                 
-                # --- APPLICATION DES RÈGLES DE COULEURS ---
-                if s == "OK":
+                # --- LOGIQUE DE COULEURS STRICTE ---
+                if s_brut == "OK":
                     bg_color = "#2ecc71" # Vert
                     txt_color = "white"
-                elif s == "En attente":
+                elif s_brut == "En attente":
                     bg_color = "#f1c40f" # Jaune
-                elif s == "Terminé":
-                    if p == "Paid":
-                        bg_color = "#3498db" # Bleu
+                    txt_color = "black"
+                elif s_brut == "Terminé":
+                    # Vérification insensible à la casse (Paid, paid, PAID...)
+                    if p_brut.lower() == "paid":
+                        bg_color = "#3498db" # Bleu (Elisabeth Philippe doit être ici)
                         txt_color = "white"
                     else:
-                        bg_color = "#e74c3c" # Rouge
+                        bg_color = "#e74c3c" # Rouge (Impayé)
                         txt_color = "white"
+                else:
+                    bg_color = "#95a5a6" # Gris pour les autres cas
+                    txt_color = "white"
             
-            style = f'style="background-color: {bg_color}; color: {txt_color};"' if bg_color else ""
+            style = f'style="background-color: {bg_color}; color: {txt_color}; border-radius: 4px;"' if bg_color else ""
             h_cal += f'<td {style}>{jour if jour != 0 else ""}</td>'
             
         h_cal += '</tr>'
     
     st.markdown(h_cal + '</tbody></table>', unsafe_allow_html=True)
     
-    # --- LÉGENDE RAPIDE ---
-    st.info("🟢 OK | 🟡 Attente | 🔵 Terminé & Payé | 🔴 Terminé & Impayé")
+    # --- LÉGENDE DES COULEURS ---
+    st.markdown("""
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.75rem; margin-top: 10px; font-weight: bold;">
+        <span style="color:#2ecc71;">● OK</span>
+        <span style="color:#f1c40f;">● ATTENTE</span>
+        <span style="color:#3498db;">● TERMINÉ & PAYÉ</span>
+        <span style="color:#e74c3c;">● TERMINÉ & IMPAYÉ</span>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("---")
     st.subheader("📋 Liste détaillée du mois")
     found = False
     for _, r in df_c.iterrows():
         try:
-            m = int(safe_get(r, 'DateNav').split('/')[1])
+            date_nav = safe_get(r, 'DateNav')
+            m = int(date_nav.split('/')[1])
             if m == sel_m:
                 found = True
-                s = safe_get(r, 'Statut')
-                p = safe_get(r, 'Paiement')
+                s = str(safe_get(r, 'Statut')).strip()
+                p = str(safe_get(r, 'Paiement')).strip()
                 
-                # Couleur pour le texte de la liste
-                if s == "OK": c = "#2ecc71"
-                elif s == "En attente": c = "#f1c40f"
-                elif s == "Terminé": c = "#3498db" if p == "Paid" else "#e74c3c"
-                else: c = "gray"
+                # Couleur dynamique pour le texte de la liste
+                if s == "OK": c_hex = "#2ecc71"
+                elif s == "En attente": c_hex = "#f1c40f"
+                elif s == "Terminé": c_hex = "#3498db" if p.lower() == "paid" else "#e74c3c"
+                else: c_hex = "gray"
                 
-                st.markdown(f"📅 **{safe_get(r, 'DateNav')}** ({safe_get(r, 'NbreJours')}j) : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} - <span style='color:{c}; font-weight:bold;'>{s} ({p})</span>", unsafe_allow_html=True)
+                st.markdown(f"📅 **{date_nav}** : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} - <span style='color:{c_hex}; font-weight:bold;'>{s} ({p})</span>", unsafe_allow_html=True)
         except: continue
-    if not found: st.info("Aucune mission ce mois-ci.")
-
+        
+    if not found: 
+        st.info("Aucune mission prévue pour ce mois.")
 
 
 # --- 7. PAGE STATS ---
