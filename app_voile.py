@@ -284,78 +284,102 @@ if st.session_state.page == "CONTACTS":
             
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Planning 2026")
+    st.subheader("🗓️ Planning de Navigation")
     
-    m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-    sel_m_nom = st.selectbox("Mois", m_noms, index=now.month - 1)
-    sel_m = m_noms.index(sel_m_nom) + 1
-    
+    # --- MENUS DÉROULANTS (MOIS & ANNÉE) ---
+    col_m, col_y = st.columns(2)
+    with col_m:
+        m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+        sel_m_nom = st.selectbox("Mois", m_noms, index=now.month - 1)
+        sel_m = m_noms.index(sel_m_nom) + 1
+    with col_y:
+        sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
+
     jours_occ = {}
+    missions_detail = [] # Pour l'affichage sous le calendrier
+
     for _, r in df_c.iterrows():
         try:
             d_str = str(r.get('DateNav', '')).replace(" ", "")
             if '/' not in d_str: continue
             parts = d_str.split('/')
             dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
-            if yv == 26: yv = 2026
+            if yv < 100: yv += 2000 # Gère '26' -> 2026
             
-            if mv == sel_m and yv == 2026:
+            if mv == sel_m and yv == sel_y:
                 s_raw = str(r.get('Statut', '')).lower()
                 p_raw = str(r.get('Paiement', '')).lower()
-                nom_v = str(r.get('Nom', '')).upper()[:5]
+                nom_complet = f"{r.get('Prénom', '')} {str(r.get('Nom', '')).upper()}"
                 
-                # On définit la couleur de la pastille
+                # Couleurs
                 bg = "transparent"
                 if "ok" in s_raw: bg = "#2ecc71"
                 elif "attente" in s_raw: bg = "#f1c40f"
                 elif "termin" in s_raw:
-                    bg = "#3498db" if "pay" in p_raw else "#e74c3c"
+                    bg = "#3498db" if ("pay" in p_raw or "paid" in p_raw) else "#e74c3c"
                 
+                # Remplissage du calendrier
                 for j in range(dv, dv + int(r.get('NbreJours', 1))):
                     if j in jours_occ and jours_occ[j]["c"] == "#3498db": continue
-                    jours_occ[j] = {"c": bg, "n": nom_v}
+                    jours_occ[j] = {"c": bg}
+                
+                # Stockage pour la liste détaillée
+                missions_detail.append({"date": d_str, "nom": nom_complet, "color": bg, "statut": r.get('Statut'), "paye": r.get('Paiement')})
         except: continue
-# ... (gardez votre boucle jours_occ au-dessus) ...
 
-    # TABLEAU AVEC CERCLES SVG (IMAGE INTÉGRÉE)
+    # --- LE CALENDRIER SVG ---
     h_cal = '<table style="width:100%; border-collapse: collapse; table-layout: fixed; text-align: center;">'
     h_cal += '<tr style="font-size: 0.7rem; color: gray;"><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
     
-    cal_mat = calendar.monthcalendar(2026, sel_m)
+    cal_mat = calendar.monthcalendar(sel_y, sel_m)
     for sem in cal_mat:
         h_cal += '<tr>'
         for jour in sem:
             if jour == 0:
-                h_cal += '<td style="height: 40px;"></td>'
+                h_cal += '<td style="height: 40px; border: 0.5px solid #eee;"></td>'
             else:
-                bg = "transparent"
-                nom = ""
-                txt_c = "black"
+                bg = jours_occ.get(jour, {}).get("c", "transparent")
+                txt_c = "white" if bg not in ["#f1c40f", "transparent"] else "black"
                 
-                if jour in jours_occ:
-                    bg = jours_occ[jour]["c"]
-                    nom = jours_occ[jour]["n"]
-                    txt_c = "white" if bg not in ["#f1c40f", "transparent"] else "black"
-                
-                # Si le jour est occupé, on dessine un cercle SVG
                 if bg != "transparent":
-                    cell_content = f'''
-                    <div style="position: relative; width: 30px; height: 30px; margin: 0 auto;">
-                        <svg width="30" height="30">
-                            <circle cx="15" cy="15" r="14" fill="{bg}" />
-                            <text x="15" y="20" font-size="12" text-anchor="middle" fill="{txt_c}" font-weight="bold">{jour}</text>
-                        </svg>
-                    </div>
-                    <div style="font-size: 0.45rem; color: gray; margin-top: 1px;">{nom}</div>
-                    '''
+                    content = f'''
+                    <svg width="30" height="30" style="display:block; margin:auto;">
+                        <circle cx="15" cy="15" r="13" fill="{bg}" />
+                        <text x="15" y="19" font-size="12" text-anchor="middle" fill="{txt_c}" font-weight="bold">{jour}</text>
+                    </svg>'''
                 else:
-                    cell_content = f'<div style="font-weight:bold; font-size: 0.9rem;">{jour}</div>'
+                    content = f'<div style="font-weight:bold; font-size: 0.9rem; line-height:30px;">{jour}</div>'
                 
-                h_cal += f'<td style="border: 0.5px solid #eee; height: 45px; vertical-align: middle;">{cell_content}</td>'
+                h_cal += f'<td style="border: 0.5px solid #eee; height: 42px; vertical-align: middle;">{content}</td>'
         h_cal += '</tr>'
     h_cal += '</table>'
-    
     st.markdown(h_cal, unsafe_allow_html=True)
+
+    # --- LÉGENDE COMPACTE ---
+    st.markdown(f"""
+    <div style="font-size:0.65rem; text-align:center; margin: 10px 0; padding: 5px; background:#f9f9f9; border-radius:5px; display: flex; justify-content: space-around;">
+        <span><b style="color:#2ecc71;">●</b> OK</span>
+        <span><b style="color:#f1c40f;">●</b> Attente</span>
+        <span><b style="color:#3498db;">●</b> Payé</span>
+        <span><b style="color:#e74c3c;">●</b> Impayé</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # --- DÉTAIL DES MISSIONS ---
+    st.markdown("---")
+    st.subheader("📋 Détails du mois")
+    if not missions_detail:
+        st.write("Auncune navigation prévue.")
+    else:
+        # Tri par date
+        missions_detail.sort(key=lambda x: int(x['date'].split('/')[0]))
+        for m in missions_detail:
+            st.markdown(f"""
+            <div style="border-left: 4px solid {m['color']}; padding-left: 10px; margin-bottom: 8px; font-size: 0.85rem;">
+                <b>{m['date']}</b> : {m['nom']}<br>
+                <span style="color:gray;">{m['statut']} | Paiement : {m['paye']}</span>
+            </div>
+            """, unsafe_allow_html=True)
 
 
 # --- 7. PAGE STATS ---
