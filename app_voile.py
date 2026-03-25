@@ -120,13 +120,15 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta Skipper 2026 - Missions")
 
-    # --- 1. FORMULAIRE DE MODIFICATION ---
+    # --- 1. LE FORMULAIRE DE MODIFICATION (C'est lui qui posait problème) ---
     if st.session_state.get('edit_idx') is not None:
         idx = st.session_state.edit_idx
         try:
             r = df_c.iloc[idx]
+            # On ouvre une zone d'édition
             with st.expander(f"📝 MODIFIER : {r.get('Prénom','')} {r.get('Nom','')}", expanded=True):
-                with st.form(key=f"form_mission_{idx}"):
+                # TOUT CE QUI EST DANS "with st.form" DOIT ÊTRE DÉCALÉ À DROITE
+                with st.form(key=f"edit_form_{idx}"):
                     c1, c2 = st.columns(2)
                     u_pre = c1.text_input("Prénom", value=str(r.get('Prénom', '')))
                     u_nom = c2.text_input("Nom", value=str(r.get('Nom', '')))
@@ -136,7 +138,7 @@ if st.session_state.page == "CONTACTS":
                     
                     c_st, c_pa = st.columns(2)
                     l_s = ["En attente", "OK", "Refusé", "Terminé"]
-                    u_statut = c_st.selectbox("Statut", l_s, index=l_s.index(r.get('Statut')) if r.get('Statut') in l_s else 0)
+                    u_statut = c_st.selectbox("Statut Mission", l_s, index=l_s.index(r.get('Statut')) if r.get('Statut') in l_s else 0)
                     u_paye = c_pa.selectbox("Paiement", ["Unpaid", "Paid"], index=0 if r.get('Paiement') == "Unpaid" else 1)
                     
                     c3, c4, c5 = st.columns(3)
@@ -147,7 +149,8 @@ if st.session_state.page == "CONTACTS":
                     u_pers = st.number_input("Nombre de personnes", value=int(r.get('NbrePers', 1)), min_value=1)
                     u_comm = st.text_area("Commentaires", value=str(r.get('Commentaires', '')))
 
-                    if st.form_submit_button("💾 ENREGISTRER"):
+                    # --- LE BOUTON CRUCIAL (DOIT ÊTRE ICI) ---
+                    if st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS"):
                         df_c.at[idx, 'Prénom'] = u_pre
                         df_c.at[idx, 'Nom'] = u_nom
                         df_c.at[idx, 'Société'] = u_soc
@@ -160,10 +163,12 @@ if st.session_state.page == "CONTACTS":
                         df_c.at[idx, 'NbreJours'] = u_jours
                         df_c.at[idx, 'NbrePers'] = u_pers
                         df_c.at[idx, 'Commentaires'] = u_comm
+                        
                         sauvegarder_data(df_c, "contacts.json")
                         st.session_state.edit_idx = None
                         st.rerun()
-            if st.button("❌ Annuler", key="cancel_edit"):
+
+            if st.button("❌ Annuler / Fermer", key="btn_close_edit"):
                 st.session_state.edit_idx = None
                 st.rerun()
         except:
@@ -186,7 +191,6 @@ if st.session_state.page == "CONTACTS":
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
     for i, r in df_disp.iterrows():
-        # Variables de données
         s, p = r.get('Statut', 'En attente'), r.get('Paiement', 'Unpaid')
         s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
         p_col = "#27ae60" if p == "Paid" else "#e67e22"
@@ -195,7 +199,6 @@ if st.session_state.page == "CONTACTS":
         mail = str(r.get('Email', '')).strip()
         soc = str(r.get('Société', 'PARTICULIER')).upper()
 
-        # HTML (Une seule chaîne, sans espaces parasites au début des lignes)
         h = f'''<div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: white; color: black;">
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
 <b style="font-size: 1.1rem; color: #1a2a6c;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b>
@@ -223,11 +226,8 @@ if st.session_state.page == "CONTACTS":
 <a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">MAIL</a>
 </div>
 </div>'''
-        
-        # Commande d'affichage unique
         st.markdown(h, unsafe_allow_html=True)
 
-        # Boutons de gestion
         c_ed, c_del = st.columns([1, 4])
         suffix = "arc" if view_arc else "act"
         if c_ed.button("✏️", key=f"btn_ed_{suffix}_{i}"):
@@ -237,6 +237,7 @@ if st.session_state.page == "CONTACTS":
             df_c = df_c.drop(i).reset_index(drop=True)
             sauvegarder_data(df_c, "contacts.json")
             st.rerun()
+            
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Mensuel 2026")
