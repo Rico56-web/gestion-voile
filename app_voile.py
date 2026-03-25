@@ -302,9 +302,10 @@ elif st.session_state.page == "PLANNING":
             if mv == sel_m and yv == 2026:
                 s_raw = str(r.get('Statut', '')).lower()
                 p_raw = str(r.get('Paiement', '')).lower()
-                nom_v = str(r.get('Nom', '')).upper()[:5] # 5 lettres max
+                nom_v = str(r.get('Nom', '')).upper()[:5]
                 
-                bg = "#ffffff"
+                # On définit la couleur de la pastille
+                bg = "transparent"
                 if "ok" in s_raw: bg = "#2ecc71"
                 elif "attente" in s_raw: bg = "#f1c40f"
                 elif "termin" in s_raw:
@@ -315,40 +316,60 @@ elif st.session_state.page == "PLANNING":
                     jours_occ[j] = {"c": bg, "n": nom_v}
         except: continue
 
-    # TABLEAU COMPACT IPHONE
-    h_cal = '<table style="width:100%; border-collapse: collapse; table-layout: fixed; border: 1px solid #ddd;">'
-    h_cal += '<tr style="background: #f8f9fa; font-size: 0.65rem; text-align:center;"><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
+    # TABLEAU AVEC PASTILLES CIRCULAIRES
+    h_cal = '<table style="width:100%; border-collapse: collapse; table-layout: fixed; text-align: center;">'
+    h_cal += '<tr style="font-size: 0.7rem; color: gray;"><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
     
     cal_mat = calendar.monthcalendar(2026, sel_m)
     for sem in cal_mat:
         h_cal += '<tr>'
         for jour in sem:
             if jour == 0:
-                h_cal += '<td style="border: 1px solid #eee; height: 40px;"></td>'
+                h_cal += '<td style="height: 45px;"></td>'
             else:
-                bg = "#ffffff"
+                bg_circle = "transparent"
                 nom = ""
                 txt_c = "black"
                 
                 if jour in jours_occ:
-                    bg = jours_occ[jour]["c"]
+                    bg_circle = jours_occ[jour]["c"]
                     nom = jours_occ[jour]["n"]
-                    txt_c = "white" if bg not in ["#f1c40f", "#ffffff"] else "black"
+                    txt_c = "white" if bg_circle not in ["#f1c40f", "transparent"] else "black"
                 
-                # On met le contenu dans un DIV qui prend TOUTE la place pour forcer la couleur
-                cell_content = f'''
-                <div style="background-color: {bg} !important; color: {txt_c} !important; width: 100%; height: 100%; min-height: 40px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 0.5px solid #eee;">
-                    <span style="font-size: 0.8rem; font-weight: bold;">{jour}</span>
-                    <span style="font-size: 0.45rem;">{nom}</span>
-                </div>
+                # Création de la pastille (Cercle coloré)
+                circle_style = f'''
+                    display: inline-block;
+                    background-color: {bg_circle} !important;
+                    color: {txt_c} !important;
+                    width: 30px;
+                    height: 30px;
+                    line-height: 30px;
+                    border-radius: 50%;
+                    font-weight: bold;
+                    font-size: 0.9rem;
+                    margin-bottom: 2px;
                 '''
-                h_cal += f'<td style="padding: 0; border: 0.5px solid #ddd; height: 40px;">{cell_content}</td>'
+                
+                h_cal += f'''
+                <td style="border: 0.5px solid #eee; height: 50px; vertical-align: middle; padding: 2px;">
+                    <div style="{circle_style if bg_circle != "transparent" else "font-weight:bold;"}">{jour}</div>
+                    <div style="font-size: 0.5rem; color: gray; overflow: hidden;">{nom}</div>
+                </td>
+                '''
         h_cal += '</tr>'
     h_cal += '</table>'
     
     st.markdown(h_cal, unsafe_allow_html=True)
     
-    st.markdown('<div style="font-size:0.6rem; text-align:center; margin-top:5px;">🟢OK 🟡Att 🔵Payé 🔴Impayé</div>', unsafe_allow_html=True)
+    # Légende avec pastilles
+    st.markdown("""
+    <div style="font-size:0.65rem; text-align:center; margin-top:10px; display: flex; justify-content: space-around;">
+        <span><b style="color:#2ecc71;">●</b> OK</span>
+        <span><b style="color:#f1c40f;">●</b> Att.</span>
+        <span><b style="color:#3498db;">●</b> Payé</span>
+        <span><b style="color:#e74c3c;">●</b> Impayé</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # --- 7. PAGE STATS ---
