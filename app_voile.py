@@ -119,32 +119,38 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 # --- 5. PAGE CONTACTS ---
 if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta Skipper 2026 - Missions")
-
-    # --- 1. LE FORMULAIRE DE MODIFICATION ---
+# --- 1. LE FORMULAIRE DE MODIFICATION ---
     if st.session_state.get('edit_idx') is not None:
         idx = st.session_state.edit_idx
         r = df_c.iloc[idx]
         
         with st.expander(f"📝 MODIFIER : {r.get('Prénom','')} {r.get('Nom','')}", expanded=True):
-            # Le formulaire commence ici
+            # DÉBUT DU FORMULAIRE
             with st.form(key=f"edit_form_{idx}"):
-                u_pre = st.text_input("Prénom", value=str(r.get('Prénom', '')))
-                u_nom = st.text_input("Nom", value=str(r.get('Nom', '')))
-                u_soc = st.text_input("Société", value=str(r.get('Société', 'PARTICULIER')))
-                u_tel = st.text_input("Téléphone", value=str(r.get('Téléphone', '')))
+                c1, c2 = st.columns(2)
+                u_pre = c1.text_input("Prénom", value=str(r.get('Prénom', '')))
+                u_nom = c2.text_input("Nom", value=str(r.get('Nom', '')))
+                u_soc = c1.text_input("Société", value=str(r.get('Société', 'PARTICULIER')))
+                u_tel = c2.text_input("Téléphone", value=str(r.get('Téléphone', '')))
                 u_mail = st.text_input("Email", value=str(r.get('Email', '')))
                 
+                # Statuts et Paiement
                 c_st, c_pa = st.columns(2)
                 l_s = ["En attente", "OK", "Refusé", "Terminé"]
-                u_statut = c_st.selectbox("Statut", l_s, index=l_s.index(r.get('Statut')) if r.get('Statut') in l_s else 0)
+                u_statut = c_st.selectbox("Statut Mission", l_s, index=l_s.index(r.get('Statut')) if r.get('Statut') in l_s else 0)
                 u_paye = c_pa.selectbox("Paiement", ["Unpaid", "Paid"], index=0 if r.get('Paiement') == "Unpaid" else 1)
                 
-                u_date = st.text_input("Date Nav", value=str(r.get('DateNav', '')))
-                u_prix = st.text_input("Prix (€)", value=str(r.get('Prix', '0.00')))
+                # Détails Navigation
+                c3, c4, c5 = st.columns(3)
+                u_date = c3.text_input("Date Nav", value=str(r.get('DateNav', '')))
+                u_jours = c4.number_input("Jours", value=int(r.get('NbreJours', 1)), min_value=1)
+                u_pers = c5.number_input("Pers.", value=int(r.get('NbrePers', 1)), min_value=1)
+                
+                u_prix = st.text_input("Prix total (€)", value=str(r.get('Prix', '0.00')))
                 u_comm = st.text_area("Commentaires", value=str(r.get('Commentaires', '')))
 
-                # ATTENTION : Cette ligne DOIT être décalée à droite (dans le bloc with st.form)
-                submitted = st.form_submit_button("💾 ENREGISTRER")
+                # LE BOUTON D'ENREGISTREMENT (BIEN ALIGNÉ À DROITE)
+                submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS")
 
                 if submitted:
                     df_c.at[idx, 'Prénom'] = u_pre
@@ -156,16 +162,15 @@ if st.session_state.page == "CONTACTS":
                     df_c.at[idx, 'Paiement'] = u_paye
                     df_c.at[idx, 'Prix'] = u_prix
                     df_c.at[idx, 'DateNav'] = u_date
+                    df_c.at[idx, 'NbreJours'] = u_jours
+                    df_c.at[idx, 'NbrePers'] = u_pers
                     df_c.at[idx, 'Commentaires'] = u_comm
                     
                     sauvegarder_data(df_c, "contacts.json")
                     st.session_state.edit_idx = None
                     st.rerun()
-            # Fin du formulaire
+            # FIN DU FORMULAIRE
 
-        if st.button("❌ Annuler"):
-            st.session_state.edit_idx = None
-            st.rerun()
 
     # --- 2. NAVIGATION ---
     st.divider()
