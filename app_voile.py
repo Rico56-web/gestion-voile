@@ -283,6 +283,7 @@ if st.session_state.page == "CONTACTS":
                 st.rerun()
             
 # --- 6. PAGE PLANNING ---
+# --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Mensuel 2026")
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
@@ -294,24 +295,56 @@ elif st.session_state.page == "PLANNING":
         try:
             date_str = safe_get(r, 'DateNav').replace(" ", "")
             dp = date_str.split('/')
-            m_val, y_val = int(dp[1]), int(dp[2])
+            m_val = int(dp[1])
+            y_val = int(dp[2])
             if y_val == 26: y_val = 2026
+            
             if m_val == sel_m and y_val == 2026:
-                for j in range(int(dp[0]), int(dp[0]) + int(safe_get(r, 'NbreJours'))):
-                    jours_occ[j] = safe_get(r, 'Statut')
+                statut = safe_get(r, 'Statut')
+                paiement = safe_get(r, 'Paiement')
+                n_jours = int(safe_get(r, 'NbreJours'))
+                
+                # On stocke un dictionnaire pour chaque jour occupé
+                for j in range(int(dp[0]), int(dp[0]) + n_jours):
+                    jours_occ[j] = {"statut": statut, "paiement": paiement}
         except: continue
 
     cal_mat = calendar.monthcalendar(2026, sel_m)
     h_cal = '<table class="calendar-table"><thead><tr><th>Lun</th><th>Mar</th><th>Mer</th><th>Jeu</th><th>Ven</th><th>Sam</th><th>Dim</th></tr></thead><tbody>'
+    
     for sem in cal_mat:
         h_cal += '<tr>'
         for jour in sem:
-            cl = ""
+            style_td = ""
             if jour != 0 and jour in jours_occ:
-                cl = "day-ok" if jours_occ[jour] == "OK" else "day-attente"
-            h_cal += f'<td class="{cl}">{jour if jour != 0 else ""}</td>'
+                info = jours_occ[jour]
+                s, p = info["statut"], info["paiement"]
+                
+                # --- LOGIQUE DES COULEURS ---
+                if s == "OK":
+                    style_td = 'style="background-color: #2ecc71; color: white;"' # VERT
+                elif s == "En attente":
+                    style_td = 'style="background-color: #f1c40f; color: black;"' # JAUNE
+                elif s == "Terminé":
+                    if p == "Paid":
+                        style_td = 'style="background-color: #3498db; color: white;"' # BLEU
+                    else:
+                        style_td = 'style="background-color: #e74c3c; color: white;"' # ROUGE
+            
+            h_cal += f'<td {style_td}>{jour if jour != 0 else ""}</td>'
         h_cal += '</tr>'
+    
     st.markdown(h_cal + '</tbody></table>', unsafe_allow_html=True)
+    
+    # --- LÉGENDE ---
+    st.markdown("""
+    <div style="display: flex; gap: 10px; font-size: 0.8rem; margin-top: 10px;">
+        <span style="color:#2ecc71;">● OK</span>
+        <span style="color:#f1c40f;">● Attente</span>
+        <span style="color:#3498db;">● Terminé/Payé</span>
+        <span style="color:#e74c3c;">● Terminé/Impayé</span>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("---")
     st.subheader("📋 Liste détaillée du mois")
@@ -322,8 +355,15 @@ elif st.session_state.page == "PLANNING":
             if m == sel_m:
                 found = True
                 s = safe_get(r, 'Statut')
-                c = "green" if s == "OK" else "orange"
-                st.markdown(f"📅 **{safe_get(r, 'DateNav')}** ({safe_get(r, 'NbreJours')}j) : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} - <span style='color:{c}; font-weight:bold;'>{s}</span>", unsafe_allow_html=True)
+                p = safe_get(r, 'Paiement')
+                
+                # Couleur du texte pour la liste
+                if s == "OK": c = "#2ecc71"
+                elif s == "En attente": c = "#f1c40f"
+                elif s == "Terminé": c = "#3498db" if p == "Paid" else "#e74c3c"
+                else: c = "gray"
+                
+                st.markdown(f"📅 **{safe_get(r, 'DateNav')}** ({safe_get(r, 'NbreJours')}j) : {safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()} - <span style='color:{c}; font-weight:bold;'>{s} ({p})</span>", unsafe_allow_html=True)
         except: continue
     if not found: st.info("Aucune mission ce mois-ci.")
 
