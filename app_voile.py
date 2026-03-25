@@ -304,51 +304,63 @@ elif st.session_state.page == "PLANNING":
             if year_v == 26: year_v = 2026
             
             if month_v == sel_m and year_v == 2026:
-                statut_v = str(r.get('Statut', 'En attente')).strip()
-                # On check le paiement : on cherche 'Paid' n'importe où
-                pay_v = str(r.get('Paiement', 'Unpaid')).strip().lower()
+                # NETTOYAGE RADICAL POUR ÉVITER LES ERREURS DE TEXTE
+                s_raw = str(r.get('Statut', '')).lower()
+                p_raw = str(r.get('Paiement', '')).lower()
                 nom_v = str(r.get('Nom', '')).upper()
                 n_jours = int(r.get('NbreJours', 1))
                 
-                # Choix de la couleur
-                couleur = "#95a5a6" # Gris
-                if statut_v == "OK": 
-                    couleur = "#2ecc71" # Vert
-                elif statut_v == "En attente": 
-                    couleur = "#f1c40f" # Jaune
-                elif statut_v == "Terminé":
-                    if "paid" in pay_v:
-                        couleur = "#3498db" # BLEU
+                # NOUVELLE LOGIQUE DE DÉTECTION SOUPLE
+                color = "#95a5a6" # Gris par défaut
+                
+                if "ok" in s_raw:
+                    color = "#2ecc71" # VERT
+                elif "attente" in s_raw:
+                    color = "#f1c40f" # JAUNE
+                elif "termin" in s_raw: # Détecte "Terminé", "Termine", "Terminé "
+                    if "paid" in p_raw and "unpaid" not in p_raw:
+                        color = "#3498db" # BLEU
                     else:
-                        couleur = "#e74c3c" # ROUGE
+                        color = "#e74c3c" # ROUGE
                 
                 for j in range(day_v, day_v + n_jours):
-                    # On stocke les infos
-                    jours_occ[j] = {"c": couleur, "n": nom_v}
+                    # Priorité au Bleu si plusieurs missions se croisent
+                    if j in jours_occ and jours_occ[j]["c"] == "#3498db": continue
+                    jours_occ[j] = {"c": color, "n": nom_v}
         except: 
             continue
 
-    # Affichage du Calendrier
+    # AFFICHAGE DU CALENDRIER
     cal_mat = calendar.monthcalendar(2026, sel_m)
     h_cal = '<table class="calendar-table"><thead><tr><th>Lun</th><th>Mar</th><th>Mer</th><th>Jeu</th><th>Ven</th><th>Sam</th><th>Dim</th></tr></thead><tbody>'
     
     for sem in cal_mat:
         h_cal += '<tr>'
         for jour in sem:
-            style = 'style="height: 50px; vertical-align: top;"'
+            bg = "#ffffff" # Blanc par défaut si vide
+            txt = "black"
             content = str(jour) if jour != 0 else ""
             
             if jour != 0 and jour in jours_occ:
                 bg = jours_occ[jour]["c"]
                 nom = jours_occ[jour]["n"]
-                style = f'style="background-color: {bg} !important; color: white !important; height: 50px; vertical-align: top; font-weight: bold;"'
-                content += f'<br><span style="font-size: 0.6rem;">{nom}</span>'
+                txt = "white" if bg != "#f1c40f" else "black"
+                content += f'<br><span style="font-size: 0.55rem; display:block; line-height:1;">{nom}</span>'
             
+            style = f'style="background-color: {bg} !important; color: {txt} !important; height: 55px; vertical-align: top; font-weight: bold; border: 1px solid #ddd;"'
             h_cal += f'<td {style}>{content}</td>'
         h_cal += '</tr>'
     
     st.markdown(h_cal + '</tbody></table>', unsafe_allow_html=True)
-    st.info("🟢 OK | 🟡 Attente | 🔵 Terminé & Payé | 🔴 Terminé & Impayé")
+    
+    st.markdown("""
+    <div style="display: flex; justify-content: center; gap: 20px; margin-top: 15px; font-weight: bold;">
+        <span style="color:#2ecc71;">● OK</span>
+        <span style="color:#f1c40f;">● ATTENTE</span>
+        <span style="color:#3498db;">● PAYÉ</span>
+        <span style="color:#e74c3c;">● IMPAYÉ</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # --- 7. PAGE STATS ---
