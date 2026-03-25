@@ -291,68 +291,64 @@ elif st.session_state.page == "PLANNING":
     sel_m = m_noms.index(sel_m_nom) + 1
     
     jours_occ = {}
-    
     for _, r in df_c.iterrows():
         try:
             d_str = str(r.get('DateNav', '')).replace(" ", "")
             if '/' not in d_str: continue
-            
             parts = d_str.split('/')
-            day_v, month_v, year_v = int(parts[0]), int(parts[1]), int(parts[2])
-            if year_v == 26: year_v = 2026
+            dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
+            if yv == 26: yv = 2026
             
-            if month_v == sel_m and year_v == 2026:
+            if mv == sel_m and yv == 2026:
                 s_raw = str(r.get('Statut', '')).lower()
                 p_raw = str(r.get('Paiement', '')).lower()
-                nom_v = str(r.get('Nom', '')).upper()
-                n_jours = int(r.get('NbreJours', 1))
+                nom_v = str(r.get('Nom', '')).upper()[:5] # 5 lettres max
                 
-                # Logique de couleur simplifiée
                 bg = "#ffffff"
                 if "ok" in s_raw: bg = "#2ecc71"
                 elif "attente" in s_raw: bg = "#f1c40f"
                 elif "termin" in s_raw:
                     bg = "#3498db" if "pay" in p_raw else "#e74c3c"
                 
-                for j in range(day_v, day_v + n_jours):
+                for j in range(dv, dv + int(r.get('NbreJours', 1))):
                     if j in jours_occ and jours_occ[j]["c"] == "#3498db": continue
                     jours_occ[j] = {"c": bg, "n": nom_v}
         except: continue
 
-    # CONSTRUCTION DU TABLEAU VERSION MOBILE (IPHONE)
-    h_cal = '<table style="width:100%; border-collapse: collapse; table-layout: fixed; font-family: sans-serif;">'
-    h_cal += '<tr style="background: #eee; font-size: 0.7rem;"><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
+    # TABLEAU COMPACT IPHONE
+    h_cal = '<table style="width:100%; border-collapse: collapse; table-layout: fixed; border: 1px solid #ddd;">'
+    h_cal += '<tr style="background: #f8f9fa; font-size: 0.65rem; text-align:center;"><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
     
     cal_mat = calendar.monthcalendar(2026, sel_m)
     for sem in cal_mat:
         h_cal += '<tr>'
         for jour in sem:
             if jour == 0:
-                h_cal += '<td style="border: 1px solid #ddd; height: 35px;"></td>'
+                h_cal += '<td style="border: 1px solid #eee; height: 40px;"></td>'
             else:
                 bg = "#ffffff"
-                nom_txt = ""
+                nom = ""
                 txt_c = "black"
                 
                 if jour in jours_occ:
                     bg = jours_occ[jour]["c"]
-                    nom_txt = jours_occ[jour]["n"][:5] # On coupe le nom à 5 lettres pour le mobile
+                    nom = jours_occ[jour]["n"]
                     txt_c = "white" if bg not in ["#f1c40f", "#ffffff"] else "black"
                 
-                # Style compact : police plus petite et hauteur réduite
-                style = f'border: 1px solid #ddd; height: 38px; vertical-align: top; text-align: center; background-color: {bg} !important; color: {txt_c}; padding: 1px;'
-                h_cal += f'<td style="{style}"><span style="font-size: 0.75rem; font-weight: bold;">{jour}</span><br><span style="font-size: 0.45rem;">{nom_txt}</span></td>'
+                # On met le contenu dans un DIV qui prend TOUTE la place pour forcer la couleur
+                cell_content = f'''
+                <div style="background-color: {bg} !important; color: {txt_c} !important; width: 100%; height: 100%; min-height: 40px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 0.5px solid #eee;">
+                    <span style="font-size: 0.8rem; font-weight: bold;">{jour}</span>
+                    <span style="font-size: 0.45rem;">{nom}</span>
+                </div>
+                '''
+                h_cal += f'<td style="padding: 0; border: 0.5px solid #ddd; height: 40px;">{cell_content}</td>'
         h_cal += '</tr>'
     h_cal += '</table>'
     
     st.markdown(h_cal, unsafe_allow_html=True)
-
-    # Légende ultra-compacte
-    st.markdown("""
-    <div style="font-size: 0.65rem; text-align: center; margin-top: 10px;">
-        <span style="color:#2ecc71;">●OK</span> | <span style="color:#f1c40f;">●Att.</span> | <span style="color:#3498db;">●Payé</span> | <span style="color:#e74c3c;">●Impayé</span>
-    </div>
-    """, unsafe_allow_html=True)
+    
+    st.markdown('<div style="font-size:0.6rem; text-align:center; margin-top:5px;">🟢OK 🟡Att 🔵Payé 🔴Impayé</div>', unsafe_allow_html=True)
 
 
 # --- 7. PAGE STATS ---
