@@ -311,18 +311,41 @@ elif st.session_state.page == "PLANNING":
                     s_raw = str(r.get('Statut', '')).lower()
                     p_raw = str(r.get('Paiement', '')).lower()
                     nom_complet = f"{r.get('Prénom', '')} {str(r.get('Nom', '')).upper()}"
+    # --- LOGIQUE DE PRIORITÉ (AVEC ALERTE RETARD) ---
+                    from datetime import datetime
                     
-                    # LOGIQUE DE PRIORITÉ DES COULEURS
-                    if "termin" in s_raw and not ("pay" in p_raw or "paid" in p_raw):
-                        current_c = "#e74c3c" # ROUGE (Impayé - Priorité 1)
+                    # On crée un objet date pour la mission
+                    date_mission = datetime(yv, mv, dv)
+                    # On compare avec aujourd'hui (sans l'heure)
+                    aujourdhui = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                    
+                    is_paye = ("pay" in p_raw or "paid" in p_raw)
+                    is_passe = date_mission < aujourdhui
+                    
+                    current_c = "transparent"
+
+                    # 1. PRIORITÉ MAX : Si la date est PASSÉE et ce n'est PAS PAYÉ -> ROUGE
+                    if is_passe and not is_paye:
+                        current_c = "#e74c3c" # ROUGE (Alerte retard)
+                    
+                    # 2. Si c'est TERMINÉ mais pas payé (pour les dates futures ou passées)
+                    elif "termin" in s_raw and not is_paye:
+                        current_c = "#e74c3c" # ROUGE (Impayé)
+                        
+                    # 3. Mission validée (OK)
                     elif "ok" in s_raw:
-                        current_c = "#2ecc71" # VERT (Priorité 2)
+                        current_c = "#2ecc71" # VERT
+                        
+                    # 4. En attente
                     elif "attente" in s_raw:
-                        current_c = "#f1c40f" # JAUNE (Priorité 3)
-                    elif "termin" in s_raw and ("pay" in p_raw or "paid" in p_raw):
-                        current_c = "#3498db" # BLEU (Priorité 4)
+                        current_c = "#f1c40f" # JAUNE
+                        
+                    # 5. Mission terminée ET payée
+                    elif "termin" in s_raw and is_paye:
+                        current_c = "#3498db" # BLEU
                     else:
-                        current_c = "transparent"
+                        current_c = "transparent"                
+
 
                     # GESTION DES JOURS ET CONFLITS
                     n_j = int(r.get('NbreJours', 1))
