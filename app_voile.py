@@ -283,7 +283,7 @@ if st.session_state.page == "CONTACTS":
                 st.rerun()
             
 # --- 6. PAGE PLANNING ---
-elif st.session_state.page == "PLANNING":
+    elif st.session_state.page == "PLANNING":
         st.subheader("🗓️ Planning de Navigation")
         
         # --- MENUS DÉROULANTS (MOIS & ANNÉE) ---
@@ -295,61 +295,54 @@ elif st.session_state.page == "PLANNING":
         with col_y:
             sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
 
-        # INITIALISATION (Attention à l'alignement ici)
-     # ... (Début de la page PLANNING avec les selectbox) ...
+        # INITIALISATION
+        jours_occ = {}
+        missions_detail = []
 
-    jours_occ = {}
-    missions_detail = []
-
-    for _, r in df_c.iterrows():
-        try:
-            d_str = str(r.get('DateNav', '')).replace(" ", "")
-            if '/' not in d_str: continue
-            parts = d_str.split('/')
-            dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
-            if yv < 100: yv += 2000
-            
-            if mv == sel_m and yv == sel_y:
-                s_raw = str(r.get('Statut', '')).lower()
-                p_raw = str(r.get('Paiement', '')).lower()
-                nom_complet = f"{r.get('Prénom', '')} {str(r.get('Nom', '')).upper()}"
+        for _, r in df_c.iterrows():
+            try:
+                d_str = str(r.get('DateNav', '')).replace(" ", "")
+                if '/' not in d_str: continue
+                parts = d_str.split('/')
+                dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
+                if yv < 100: yv += 2000
                 
-                # --- [ICI VOUS COLLEZ LES NOUVELLES LIGNES] ---
-                # 1. On définit la couleur de CETTE mission précise
-                if "termin" in s_raw and not ("pay" in p_raw or "paid" in p_raw):
-                    current_c = "#e74c3c" # ROUGE (Priorité 1)
-                elif "ok" in s_raw:
-                    current_c = "#2ecc71" # VERT (Priorité 2)
-                elif "attente" in s_raw:
-                    current_c = "#f1c40f" # JAUNE (Priorité 3)
-                elif "termin" in s_raw and ("pay" in p_raw or "paid" in p_raw):
-                    current_c = "#3498db" # BLEU (Priorité 4)
-                else:
-                    current_c = "transparent"
-
-                # 2. On remplit le calendrier en gérant les conflits (le Rouge gagne)
-                n_j = int(r.get('NbreJours', 1))
-                for j in range(dv, dv + n_j):
-                    if j in jours_occ:
-                        existing_c = jours_occ[j]["c"]
-                        # Si l'un des deux est ROUGE, la case devient ROUGE
-                        if current_c == "#e74c3c" or existing_c == "#e74c3c":
-                            jours_occ[j]["c"] = "#e74c3c"
-                        # Sinon, si l'un est VERT, la case devient VERTE
-                        elif current_c == "#2ecc71" or existing_c == "#2ecc71":
-                            jours_occ[j]["c"] = "#2ecc71"
-                        else:
-                            jours_occ[j]["c"] = current_c
+                if mv == sel_m and yv == sel_y:
+                    s_raw = str(r.get('Statut', '')).lower()
+                    p_raw = str(r.get('Paiement', '')).lower()
+                    nom_complet = f"{r.get('Prénom', '')} {str(r.get('Nom', '')).upper()}"
+                    
+                    # LOGIQUE DE PRIORITÉ DES COULEURS
+                    if "termin" in s_raw and not ("pay" in p_raw or "paid" in p_raw):
+                        current_c = "#e74c3c" # ROUGE (Impayé - Priorité 1)
+                    elif "ok" in s_raw:
+                        current_c = "#2ecc71" # VERT (Priorité 2)
+                    elif "attente" in s_raw:
+                        current_c = "#f1c40f" # JAUNE (Priorité 3)
+                    elif "termin" in s_raw and ("pay" in p_raw or "paid" in p_raw):
+                        current_c = "#3498db" # BLEU (Priorité 4)
                     else:
-                        jours_occ[j] = {"c": current_c}
-                
-                # Garder le détail pour la liste en bas
-                missions_detail.append({"date": d_str, "nom": nom_complet, "color": current_c, "statut": r.get('Statut'), "paye": r.get('Paiement')})
-                # --- [FIN DU COLLAGE] ---
+                        current_c = "transparent"
 
-        except: continue
-
-    # ... (Ensuite vient la partie h_cal = '<table...' pour le calendrier SVG) ...
+                    # GESTION DES JOURS ET CONFLITS
+                    n_j = int(r.get('NbreJours', 1))
+                    for j in range(dv, dv + n_j):
+                        if j in jours_occ:
+                            existing_c = jours_occ[j]["c"]
+                            if current_c == "#e74c3c" or existing_c == "#e74c3c":
+                                jours_occ[j]["c"] = "#e74c3c"
+                            elif current_c == "#2ecc71" or existing_c == "#2ecc71":
+                                jours_occ[j]["c"] = "#2ecc71"
+                            else:
+                                jours_occ[j]["c"] = current_c
+                        else:
+                            jours_occ[j] = {"c": current_c}
+                    
+                    missions_detail.append({
+                        "date": d_str, "jour_num": dv, "nom": nom_complet, 
+                        "color": current_c, "statut": r.get('Statut'), "paye": r.get('Paiement')
+                    })
+            except: continue
 
         # --- LE CALENDRIER SVG ---
         h_cal = '<table style="width:100%; border-collapse: collapse; table-layout: fixed; text-align: center;">'
@@ -360,7 +353,7 @@ elif st.session_state.page == "PLANNING":
             h_cal += '<tr>'
             for jour in sem:
                 if jour == 0:
-                    h_cal += '<td style="height: 40px; border: 0.5px solid #eee;"></td>'
+                    h_cal += '<td style="height: 42px; border: 0.5px solid #eee;"></td>'
                 else:
                     bg = jours_occ.get(jour, {}).get("c", "transparent")
                     txt_c = "white" if bg not in ["#f1c40f", "transparent"] else "black"
@@ -379,30 +372,21 @@ elif st.session_state.page == "PLANNING":
         h_cal += '</table>'
         st.markdown(h_cal, unsafe_allow_html=True)
 
-        # --- LÉGENDE ---
-        st.markdown(f"""
-        <div style="font-size:0.65rem; text-align:center; margin: 10px 0; padding: 5px; background:#f9f9f9; border-radius:5px; display: flex; justify-content: space-around;">
-            <span><b style="color:#2ecc71;">●</b> OK</span>
-            <span><b style="color:#f1c40f;">●</b> Attente</span>
-            <span><b style="color:#3498db;">●</b> Payé</span>
-            <span><b style="color:#e74c3c;">●</b> Impayé</span>
-        </div>
-        """, unsafe_allow_html=True)
+        # --- LÉGENDE ET DÉTAILS ---
+        st.markdown(f"""<div style="font-size:0.65rem; text-align:center; margin: 10px 0; padding: 5px; background:#f9f9f9; border-radius:5px; display: flex; justify-content: space-around;">
+            <span><b style="color:#2ecc71;">●</b> OK</span><span><b style="color:#f1c40f;">●</b> Att.</span><span><b style="color:#3498db;">●</b> Payé</span><span><b style="color:#e74c3c;">●</b> Impayé</span>
+        </div>""", unsafe_allow_html=True)
 
-        # --- DÉTAIL DES MISSIONS ---
         st.markdown("---")
         st.subheader("📋 Détails du mois")
         if not missions_detail:
             st.write("Aucune navigation prévue.")
         else:
-            missions_detail.sort(key=lambda x: int(x['date'].split('/')[0]))
+            missions_detail.sort(key=lambda x: x['jour_num'])
             for m in missions_detail:
-                st.markdown(f"""
-                <div style="border-left: 4px solid {m['color']}; padding-left: 10px; margin-bottom: 8px; font-size: 0.85rem;">
-                    <b>{m['date']}</b> : {m['nom']}<br>
-                    <span style="color:gray;">{m['statut']} | Paiement : {m['paye']}</span>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f"""<div style="border-left: 4px solid {m['color']}; padding-left: 10px; margin-bottom: 8px; font-size: 0.85rem;">
+                    <b>{m['date']}</b> : {m['nom']}<br><span style="color:gray;">{m['statut']} | Paiement : {m['paye']}</span>
+                </div>""", unsafe_allow_html=True)
 
 
 # --- 7. PAGE STATS ---
