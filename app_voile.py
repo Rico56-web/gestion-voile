@@ -317,22 +317,35 @@ elif st.session_state.page == "PLANNING":
                     date_mission = date(yv, mv, dv)
                     is_paye = ("pay" in p_clean) or ("paid" in p_clean)
                     is_passe = date_mission < aujourdhui
+                   # --- LOGIQUE DE COULEUR (PRIORITÉ RÉALIGNÉE) ---
+                    p_clean = str(r.get('Paiement', '')).strip().lower()
+                    s_clean = str(r.get('Statut', '')).strip().lower()
                     
-                    # --- LOGIQUE DE COULEUR (ORDRE DE PRIORITÉ) ---
-                    # 1. ROUGE : Passé et non payé OU Terminé et non payé
-                    if (is_passe and not is_paye) or ("termin" in s_clean and not is_paye):
-                        current_c = "#e74c3c"
-                    # 2. BLEU : Payé (et soit passé soit terminé)
-                    elif is_paye and (is_passe or "termin" in s_clean):
-                        current_c = "#3498db"
-                    # 3. VERT : En cours (OK) pour le futur
+                    is_paye = ("pay" in p_clean) or ("paid" in p_clean)
+                    is_passe = date_mission < aujourdhui
+
+                    # 1. ON TESTE D'ABORD SI C'EST PASSÉ (Priorité absolue)
+                    if is_passe:
+                        if is_paye:
+                            current_c = "#3498db" # BLEU (Passé et Payé)
+                        else:
+                            current_c = "#e74c3c" # ROUGE (Passé et NON Payé)
+                    
+                    # 2. SI CE N'EST PAS PASSÉ, ON REGARDE LE STATUT
+                    elif "termin" in s_clean:
+                        if is_paye:
+                            current_c = "#3498db" # BLEU
+                        else:
+                            current_c = "#e74c3c" # ROUGE
+                            
                     elif "ok" in s_clean:
-                        current_c = "#2ecc71"
-                    # 4. JAUNE : En attente
+                        current_c = "#2ecc71" # VERT (Futur et validé)
+                        
                     elif "attente" in s_clean:
-                        current_c = "#f1c40f"
+                        current_c = "#f1c40f" # JAUNE
+                        
                     else:
-                        current_c = "transparent"
+                        current_c = "transparent"                
 
                     # --- GESTION DES CONFLITS (Plusieurs contacts le même jour) ---
                     n_j = int(r.get('NbreJours', 1))
