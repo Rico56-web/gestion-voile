@@ -120,7 +120,7 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta Skipper 2026 - Missions")
 
-    # --- 1. FORMULAIRE DE MODIFICATION (S'affiche si on clique sur ✏️) ---
+    # --- 1. FORMULAIRE DE MODIFICATION ---
     if st.session_state.get('edit_idx') is not None:
         idx = st.session_state.edit_idx
         try:
@@ -193,7 +193,9 @@ if st.session_state.page == "CONTACTS":
         p = r.get('Paiement', 'Unpaid')
         s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
         p_col = "#27ae60" if p == "Paid" else "#e67e22"
-        t_link = str(r.get('Téléphone','')).replace(" ", "").replace(".", "")
+        
+        t_raw = str(r.get('Téléphone','')).strip()
+        t_link = t_raw.replace(" ", "").replace(".", "")
         m_client = str(r.get('Email', '')).strip()
 
         h = f'''<div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: white;">
@@ -209,6 +211,10 @@ if st.session_state.page == "CONTACTS":
                 <div>💰 <b>Prix :</b> {r.get('Prix','0.00')} €</div>
                 <div>⛵ <b>Jours :</b> {r.get('NbreJours', 1)}</div>
                 <div>👥 <b>Pers :</b> {r.get('NbrePers', 1)}</div>
+            </div>
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; font-size: 0.9rem;">
+                📞 <b>{t_raw if t_raw else "Non renseigné"}</b><br>
+                ✉️ <b>{m_client if m_client else "Non renseigné"}</b>
             </div>
             <div style="background: #f8f9fa; padding: 8px; border-radius: 5px; margin-top: 10px; font-size: 0.8rem; font-style: italic; border-left: 3px solid #1a2a6c;">
                 💬 {r.get('Commentaires', 'Pas de commentaire')}
@@ -239,7 +245,7 @@ if st.session_state.page == "CONTACTS":
             if b2.button("❌ NON", key=f"n_{i}"):
                 st.session_state.confirm_del = None
                 st.rerun()
-    st.divider() # Fin du bloc CONTACTS
+    st.divider()
 
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
