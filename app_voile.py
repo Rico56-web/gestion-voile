@@ -281,8 +281,9 @@ if st.session_state.page == "CONTACTS":
             if b2.button("❌ NON", key=f"no_{confirm_key}", use_container_width=True):
                 st.session_state[confirm_key] = False
                 st.rerun()
+                
  # --- 6. PAGE PLANNING ---
-    elif st.session_state.page == "PLANNING":
+        elif st.session_state.page == "PLANNING":
         st.subheader("🗓️ Planning de Navigation")
         
         # --- MENUS DÉROULANTS ---
