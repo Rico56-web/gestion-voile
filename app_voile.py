@@ -285,6 +285,7 @@ if st.session_state.page == "CONTACTS":
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Mensuel 2026")
+    
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     sel_m_nom = st.selectbox("Mois", m_noms, index=now.month - 1)
     sel_m = m_noms.index(sel_m_nom) + 1
@@ -302,49 +303,57 @@ elif st.session_state.page == "PLANNING":
             
             if m_val == sel_m and y_val == 2026:
                 s = str(r.get('Statut', 'En attente')).strip()
+                # On récupère le paiement avec une sécurité maximale
+                p = str(r.get('Paiement', 'Unpaid')).strip().lower()
                 n_j = int(r.get('NbreJours', 1))
                 
-                # --- DÉTECTION "PAID" MULTI-COLONNES (POUR ELISABETH) ---
-                # On cherche le mot "paid" dans TOUTES les colonnes de la ligne
-                ligne_texte = str(r.values).lower()
-                is_paid = "paid" in ligne_texte and "unpaid" not in ligne_texte
-                # Si "unpaid" est là, on vérifie quand même si "paid" est sélectionné spécifiquement
-                p_val = str(r.get('Paiement', '')).lower().strip()
-                if p_val == "paid": is_paid = True
-
-                # Détermination de la couleur
-                color = "#95a5a6" # Gris par défaut
-                if s == "OK": color = "#2ecc71"
-                elif s == "En attente": color = "#f1c40f"
+                # Détermination de la couleur avec priorité
+                color = "#95a5a6" # Gris
+                if s == "OK": 
+                    color = "#2ecc71" # Vert
+                elif s == "En attente": 
+                    color = "#f1c40f" # Jaune
                 elif s == "Terminé":
-                    color = "#3498db" if is_paid else "#e74c3c"
+                    if p == "paid":
+                        color = "#3498db" # BLEU
+                    else:
+                        color = "#e74c3c" # ROUGE
                 
                 for j in range(day_val, day_val + n_j):
-                    # Priorité : le Bleu gagne toujours sur le Rouge
-                    if j in jours_occ and jours_occ[j] == "#3498db": continue
+                    # On ne laisse pas une mission "Unpaid" écraser une mission "Paid"
+                    if j in jours_occ and jours_occ[j] == "#3498db" and color == "#e74c3c":
+                        continue
                     jours_occ[j] = color
         except: continue
 
-    # Génération du calendrier
+    # Génération du calendrier avec FORÇAGE DE STYLE
     cal_mat = calendar.monthcalendar(2026, sel_m)
     h_cal = '<table class="calendar-table"><thead><tr><th>Lun</th><th>Mar</th><th>Mer</th><th>Jeu</th><th>Ven</th><th>Sam</th><th>Dim</th></tr></thead><tbody>'
+    
     for sem in cal_mat:
         h_cal += '<tr>'
         for jour in sem:
             bg = jours_occ.get(jour, "")
             txt = "white" if bg and bg != "#f1c40f" else "black"
-            style = f'style="background-color: {bg}; color: {txt}; font-weight: bold; border-radius: 4px;"' if bg else ""
+            
+            # LE "!important" FORCE LE NAVIGATEUR À IGNORER LE CSS EXTERNE
+            if bg:
+                style = f'style="background-color: {bg} !important; color: {txt} !important; font-weight: bold !important; border: 1px solid white !important;"'
+            else:
+                style = ""
+                
             h_cal += f'<td {style}>{jour if jour != 0 else ""}</td>'
         h_cal += '</tr>'
+    
     st.markdown(h_cal + '</tbody></table>', unsafe_allow_html=True)
 
     # --- LÉGENDE ---
     st.markdown("""
-    <div style="display: flex; gap: 10px; font-size: 0.8rem; margin-top: 10px; justify-content: center; background: #f0f2f6; padding: 10px; border-radius: 5px;">
-        <span style="color:#2ecc71;">● OK</span>
-        <span style="color:#f1c40f;">● Attente</span>
-        <span style="color:#3498db;">● Terminé/Payé</span>
-        <span style="color:#e74c3c;">● Terminé/Impayé</span>
+    <div style="display: flex; justify-content: space-around; background: #f0f2f6; padding: 10px; border-radius: 8px; margin-top: 15px;">
+        <b style="color:#2ecc71;">● OK</b>
+        <b style="color:#f1c40f;">● Attente</b>
+        <b style="color:#3498db;">● Payé</b>
+        <b style="color:#e74c3c;">● Impayé</b>
     </div>
     """, unsafe_allow_html=True)
 
