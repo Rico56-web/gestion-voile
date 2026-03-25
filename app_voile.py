@@ -319,21 +319,30 @@ elif st.session_state.page == "PLANNING":
                     is_paye = ("pay" in p_raw or "paid" in p_raw)
                     is_passe = date_mission < aujourdhui
                     
-                    # --- ATTRIBUTION DE LA COULEUR (LOGIQUE STRICTE) ---
-                    # PRIORITÉ 1 : ROUGE si (Date passée ET non payé) OU (Terminé ET non payé)
-                    if (is_passe and not is_paye) or ("termin" in s_raw and not is_paye):
-                        current_c = "#e74c3c" 
-                    # PRIORITÉ 2 : VERT si OK (et pas encore passé/impayé)
-                    elif "ok" in s_raw:
-                        current_c = "#2ecc71"
-                    # PRIORITÉ 3 : JAUNE si Attente
-                    elif "attente" in s_raw:
-                        current_c = "#f1c40f"
-                    # PRIORITÉ 4 : BLEU si Terminé ET Payé
-                    elif "termin" in s_raw and is_paye:
-                        current_c = "#3498db"
+                 # --- LOGIQUE DE COULEUR (DEBUG) ---
+                    # Nettoyage strict des textes
+                    p_clean = str(r.get('Paiement', '')).strip().lower()
+                    s_clean = str(r.get('Statut', '')).strip().lower()
+                    
+                    # Détection simplifiée
+                    is_paye = ("pay" in p_clean) or ("paid" in p_clean)
+                    is_passe = date_mission < aujourdhui
+                    
+                    # FORCE LE ROUGE SI : (Passé ET pas payé) OU (Terminé ET pas payé)
+                    if (is_passe and not is_paye) or ("termin" in s_clean and not is_paye):
+                        current_c = "#e74c3c" # ROUGE
+                    elif "ok" in s_clean:
+                        current_c = "#2ecc71" # VERT
+                    elif "attente" in s_clean:
+                        current_c = "#f1c40f" # JAUNE
+                    elif ("termin" in s_clean or is_passe) and is_paye:
+                        current_c = "#3498db" # BLEU
                     else:
                         current_c = "transparent"
+
+                    # PETIT TEST VISUEL (à supprimer après)
+                    if dv == 14:
+                        st.info(f"Jour 14: Passé={is_passe}, Payé={is_paye} -> Couleur={current_c}")
 
                     # Gestion des conflits (2 contacts)
                     n_j = int(r.get('NbreJours', 1))
