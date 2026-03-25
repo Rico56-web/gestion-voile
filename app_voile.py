@@ -237,17 +237,35 @@ if st.session_state.page == "CONTACTS":
 </div>
 </div>'''
         st.markdown(h, unsafe_allow_html=True)
-
-        # Boutons Techniques
+# --- BOUTONS ACTIONS (✏️ et 🗑️) ---
         c_ed, c_del = st.columns([1, 4])
         suffix = "arc" if view_arc else "act"
+        
+        # Bouton Modifier
         if c_ed.button("✏️", key=f"btn_ed_{suffix}_{i}"):
             st.session_state.edit_idx = i
             st.rerun()
-        if c_del.button("🗑️ SUPPRIMER CETTE MISSION", key=f"btn_del_{suffix}_{i}", use_container_width=True):
-            df_c = df_c.drop(i).reset_index(drop=True)
-            sauvegarder_data(df_c, "contacts.json")
-            st.rerun()
+
+        # LOGIQUE DE CONFIRMATION DE SUPPRESSION
+        confirm_key = f"confirm_del_{suffix}_{i}"
+        
+        # Si on n'a pas encore cliqué sur supprimer
+        if not st.session_state.get(confirm_key, False):
+            if c_del.button("🗑️ SUPPRIMER CETTE MISSION", key=f"btn_del_{suffix}_{i}", use_container_width=True):
+                st.session_state[confirm_key] = True
+                st.rerun()
+        else:
+            # Si on a cliqué, on affiche les deux boutons de confirmation
+            c_del.warning("⚠️ Confirmer la suppression ?")
+            b1, b2 = c_del.columns(2)
+            if b1.button("✅ OUI", key=f"yes_{confirm_key}", use_container_width=True):
+                df_c = df_c.drop(i).reset_index(drop=True)
+                sauvegarder_data(df_c, "contacts.json")
+                st.session_state[confirm_key] = False
+                st.rerun()
+            if b2.button("❌ NON", key=f"no_{confirm_key}", use_container_width=True):
+                st.session_state[confirm_key] = False
+                st.rerun()
             
 # --- 6. PAGE PLANNING ---
 elif st.session_state.page == "PLANNING":
