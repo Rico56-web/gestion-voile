@@ -281,12 +281,11 @@ if st.session_state.page == "CONTACTS":
             if b2.button("❌ NON", key=f"no_{confirm_key}", use_container_width=True):
                 st.session_state[confirm_key] = False
                 st.rerun()
-            
-# --- 6. PAGE PLANNING ---
-elif st.session_state.page == "PLANNING":
+ # --- 6. PAGE PLANNING ---
+    elif st.session_state.page == "PLANNING":
         st.subheader("🗓️ Planning de Navigation")
         
-        # --- MENUS DÉROULANTS (MOIS & ANNÉE) ---
+        # --- MENUS DÉROULANTS ---
         col_m, col_y = st.columns(2)
         with col_m:
             m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
@@ -295,9 +294,11 @@ elif st.session_state.page == "PLANNING":
         with col_y:
             sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
 
-        # INITIALISATION
         jours_occ = {}
         missions_detail = []
+        
+        # Date du jour pour comparaison
+        aujourdhui = datetime.now().date()
 
         for _, r in df_c.iterrows():
             try:
@@ -311,51 +312,35 @@ elif st.session_state.page == "PLANNING":
                     s_raw = str(r.get('Statut', '')).lower()
                     p_raw = str(r.get('Paiement', '')).lower()
                     nom_complet = f"{r.get('Prénom', '')} {str(r.get('Nom', '')).upper()}"
-    # --- LOGIQUE DE PRIORITÉ (AVEC ALERTE RETARD) ---
-                    from datetime import datetime
                     
-                    # On crée un objet date pour la mission
-                    date_mission = datetime(yv, mv, dv)
-                    # On compare avec aujourd'hui (sans l'heure)
-                    aujourdhui = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                    
+                    # Détection Date passée et Paiement
+                    date_mission = date(yv, mv, dv)
                     is_paye = ("pay" in p_raw or "paid" in p_raw)
                     is_passe = date_mission < aujourdhui
                     
-                    current_c = "transparent"
-
-                    # 1. PRIORITÉ MAX : Si la date est PASSÉE et ce n'est PAS PAYÉ -> ROUGE
-                    if is_passe and not is_paye:
-                        current_c = "#e74c3c" # ROUGE (Alerte retard)
-                    
-                    # 2. Si c'est TERMINÉ mais pas payé (pour les dates futures ou passées)
-                    elif "termin" in s_raw and not is_paye:
-                        current_c = "#e74c3c" # ROUGE (Impayé)
-                        
-                    # 3. Mission validée (OK)
+                    # --- ATTRIBUTION DE LA COULEUR (LOGIQUE STRICTE) ---
+                    # PRIORITÉ 1 : ROUGE si (Date passée ET non payé) OU (Terminé ET non payé)
+                    if (is_passe and not is_paye) or ("termin" in s_raw and not is_paye):
+                        current_c = "#e74c3c" 
+                    # PRIORITÉ 2 : VERT si OK (et pas encore passé/impayé)
                     elif "ok" in s_raw:
-                        current_c = "#2ecc71" # VERT
-                        
-                    # 4. En attente
+                        current_c = "#2ecc71"
+                    # PRIORITÉ 3 : JAUNE si Attente
                     elif "attente" in s_raw:
-                        current_c = "#f1c40f" # JAUNE
-                        
-                    # 5. Mission terminée ET payée
+                        current_c = "#f1c40f"
+                    # PRIORITÉ 4 : BLEU si Terminé ET Payé
                     elif "termin" in s_raw and is_paye:
-                        current_c = "#3498db" # BLEU
+                        current_c = "#3498db"
                     else:
-                        current_c = "transparent"                
+                        current_c = "transparent"
 
-
-                    # GESTION DES JOURS ET CONFLITS
+                    # Gestion des conflits (2 contacts)
                     n_j = int(r.get('NbreJours', 1))
                     for j in range(dv, dv + n_j):
                         if j in jours_occ:
-                            existing_c = jours_occ[j]["c"]
-                            if current_c == "#e74c3c" or existing_c == "#e74c3c":
+                            # Le Rouge écrase tout
+                            if current_c == "#e74c3c" or jours_occ[j]["c"] == "#e74c3c":
                                 jours_occ[j]["c"] = "#e74c3c"
-                            elif current_c == "#2ecc71" or existing_c == "#2ecc71":
-                                jours_occ[j]["c"] = "#2ecc71"
                             else:
                                 jours_occ[j]["c"] = current_c
                         else:
@@ -367,10 +352,9 @@ elif st.session_state.page == "PLANNING":
                     })
             except: continue
 
-        # --- LE CALENDRIER SVG ---
+        # --- AFFICHAGE CALENDRIER SVG ---
         h_cal = '<table style="width:100%; border-collapse: collapse; table-layout: fixed; text-align: center;">'
         h_cal += '<tr style="font-size: 0.7rem; color: gray;"><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
-        
         cal_mat = calendar.monthcalendar(sel_y, sel_m)
         for sem in cal_mat:
             h_cal += '<tr>'
@@ -380,26 +364,14 @@ elif st.session_state.page == "PLANNING":
                 else:
                     bg = jours_occ.get(jour, {}).get("c", "transparent")
                     txt_c = "white" if bg not in ["#f1c40f", "transparent"] else "black"
-                    
-                    if bg != "transparent":
-                        content = f'''
-                        <svg width="30" height="30" style="display:block; margin:auto;">
-                            <circle cx="15" cy="15" r="13" fill="{bg}" />
-                            <text x="15" y="19" font-size="12" text-anchor="middle" fill="{txt_c}" font-weight="bold">{jour}</text>
-                        </svg>'''
-                    else:
-                        content = f'<div style="font-weight:bold; font-size: 0.9rem; line-height:30px;">{jour}</div>'
-                    
+                    content = f'<svg width="30" height="30" style="display:block; margin:auto;"><circle cx="15" cy="15" r="13" fill="{bg}" /><text x="15" y="19" font-size="12" text-anchor="middle" fill="{txt_c}" font-weight="bold">{jour}</text></svg>' if bg != "transparent" else f'<div style="font-weight:bold; font-size: 0.9rem; line-height:30px;">{jour}</div>'
                     h_cal += f'<td style="border: 0.5px solid #eee; height: 42px; vertical-align: middle;">{content}</td>'
             h_cal += '</tr>'
         h_cal += '</table>'
         st.markdown(h_cal, unsafe_allow_html=True)
 
         # --- LÉGENDE ET DÉTAILS ---
-        st.markdown(f"""<div style="font-size:0.65rem; text-align:center; margin: 10px 0; padding: 5px; background:#f9f9f9; border-radius:5px; display: flex; justify-content: space-around;">
-            <span><b style="color:#2ecc71;">●</b> OK</span><span><b style="color:#f1c40f;">●</b> Att.</span><span><b style="color:#3498db;">●</b> Payé</span><span><b style="color:#e74c3c;">●</b> Impayé</span>
-        </div>""", unsafe_allow_html=True)
-
+        st.markdown(f'<div style="font-size:0.65rem; text-align:center; margin: 10px 0; padding: 5px; background:#f9f9f9; border-radius:5px; display: flex; justify-content: space-around;"><span><b style="color:#2ecc71;">●</b> OK</span><span><b style="color:#f1c40f;">●</b> Att.</span><span><b style="color:#3498db;">●</b> Payé</span><span><b style="color:#e74c3c;">●</b> Impayé</span></div>', unsafe_allow_html=True)
         st.markdown("---")
         st.subheader("📋 Détails du mois")
         if not missions_detail:
@@ -407,10 +379,7 @@ elif st.session_state.page == "PLANNING":
         else:
             missions_detail.sort(key=lambda x: x['jour_num'])
             for m in missions_detail:
-                st.markdown(f"""<div style="border-left: 4px solid {m['color']}; padding-left: 10px; margin-bottom: 8px; font-size: 0.85rem;">
-                    <b>{m['date']}</b> : {m['nom']}<br><span style="color:gray;">{m['statut']} | Paiement : {m['paye']}</span>
-                </div>""", unsafe_allow_html=True)
-
+                st.markdown(f'<div style="border-left: 4px solid {m["color"]}; padding-left: 10px; margin-bottom: 8px; font-size: 0.85rem;"><b>{m["date"]}</b> : {m["nom"]}<br><span style="color:gray;">{m["statut"]} | Paiement : {m["paye"]}</span></div>', unsafe_allow_html=True)           
 
 # --- 7. PAGE STATS ---
 elif st.session_state.page == "STATS":
