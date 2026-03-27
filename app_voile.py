@@ -264,13 +264,11 @@ if st.session_state.page == "CONTACTS":
         # LOGIQUE DE CONFIRMATION DE SUPPRESSION
         confirm_key = f"confirm_del_{suffix}_{i}"
         
-        # Si on n'a pas encore cliqué sur supprimer
         if not st.session_state.get(confirm_key, False):
             if c_del.button("🗑️ SUPPRIMER CETTE MISSION", key=f"btn_del_{suffix}_{i}", use_container_width=True):
                 st.session_state[confirm_key] = True
                 st.rerun()
         else:
-            # Si on a cliqué, on affiche les deux boutons de confirmation
             c_del.warning("⚠️ Confirmer la suppression ?")
             b1, b2 = c_del.columns(2)
             if b1.button("✅ OUI", key=f"yes_{confirm_key}", use_container_width=True):
@@ -281,6 +279,87 @@ if st.session_state.page == "CONTACTS":
             if b2.button("❌ NON", key=f"no_{confirm_key}", use_container_width=True):
                 st.session_state[confirm_key] = False
                 st.rerun()
+
+# =================================================================
+# --- 6. PAGE PLANNING (BIEN ALIGNÉE SUR LE BORD GAUCHE) ---
+# =================================================================
+elif st.session_state.page == "PLANNING":
+    st.subheader("🗓️ Planning Vesta 2026")
+    
+    # 1. RÉCUPÉRATION DE LA DATE DU JOUR
+    maintenant = datetime.now()
+    aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
+    
+    # 2. SÉLECTION MOIS/ANNÉE
+    col_m, col_y = st.columns(2)
+    with col_m:
+        m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+        sel_m = m_noms.index(st.selectbox("Mois", m_noms, index=aujourdhui.month - 1)) + 1
+    with col_y:
+        sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
+
+    # 3. FILTRAGE ET LOGIQUE DES COULEURS
+    jours_occ = {}
+    for _, r in df_c.iterrows():
+        try:
+            d_str = str(r.get('DateNav', '')).strip()
+            if '/' not in d_str: continue
+            parts = d_str.split('/')
+            dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
+            if yv < 100: yv += 2000
+            
+            if mv == sel_m and yv == sel_y:
+                s_val = str(r.get('Statut', '')).strip().lower()
+                p_val = str(r.get('Paiement', '')).strip().lower()
+                
+                # --- FILTRE ANTI-FANTÔMES ---
+                if s_val in ["", "archivé", "archive", "supprimé"]:
+                    continue
+                
+                this_date = date(yv, mv, dv)
+                is_paye = "paid" in p_val or "pay" in p_val
+                
+                # --- CALCUL COULEUR ---
+                if this_date < aujourdhui:
+                    # PASSÉ : Bleu si payé, Rouge si impayé
+                    current_c = "#3498db" if is_paye else "#e74c3c"
+                elif "ok" in s_val:
+                    current_c = "#2ecc71" # Vert
+                elif "attente" in s_val:
+                    current_c = "#f1c40f" # Jaune
+                else:
+                    current_c = "transparent"
+
+                # --- GESTION DES CONFLITS ---
+                n_j = int(r.get('NbreJours', 1))
+                for j in range(dv, dv + n_j):
+                    if j in jours_occ:
+                        old_c = jours_occ[j]["c"]
+                        if "#e74c3c" in [current_c, old_c]: final_c = "#e74c3c"
+                        elif "#2ecc71" in [current_c, old_c]: final_c = "#2ecc71"
+                        else: final_c = current_c
+                        jours_occ[j] = {"c": final_c}
+                    else:
+                        jours_occ[j] = {"c": current_c}
+        except: continue
+
+    # 4. AFFICHAGE DU CALENDRIER
+    h_cal = '<table style="width:100%; border-collapse: collapse; text-align: center;">'
+    cal_mat = calendar.monthcalendar(sel_y, sel_m)
+    for sem in cal_mat:
+        h_cal += '<tr>'
+        for jour in sem:
+            if jour == 0:
+                h_cal += '<td style="height:45px; border:0.5px solid #eee;"></td>'
+            else:
+                bg = jours_occ.get(jour, {}).get("c", "transparent")
+                txt_c = "white" if bg in ["#3498db", "#e74c3c", "#2ecc71"] else "black"
+                circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:30px; height:30px; line-height:30px; margin:auto; font-weight:bold; font-size:13px;">{jour}</div>'
+                h_cal += f'<td style="border:0.5px solid #eee; height:48px;">{circle if bg != "transparent" else jour}</td>'
+        h_cal += '</tr>'
+    h_cal += '</table>'
+    st.markdown(h_cal, unsafe_allow_html=True)
+    st.write("🔴 Impayé | 🔵 Payé | 🟢 OK | 🟡 Attente")
                 
             elif st.session_state.page == "PLANNING":
         st.subheader("🗓️ Planning Vesta 2026")
