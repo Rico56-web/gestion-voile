@@ -519,47 +519,47 @@ elif st.session_state.page == "STATS":
                 else: stats_mois[m_idx]["pre"] += p
         except: continue
 
-# --- CALCULS FRAIS (VERSION AUTO-DÉTECTION DE DATE) ---
+# --- CALCULS FRAIS (FORCE MARS = 3) ---
     if not df_m_stats.empty:
         for _, f in df_m_stats.iterrows():
             try:
-                # 1. Nettoyage du Montant (on gère tout : €, virgules, espaces)
+                # 1. Montant
                 v_f = f.get('Montant', f.get('Prix', 0))
                 m_frais = float(str(v_f).replace('€','').replace(',','.').replace(' ','').strip() or 0)
                 
-                # 2. Extraction du mois (La méthode la plus sûre)
+                # 2. Date avec conversion forcée
                 raw_date = f.get('Date', None)
-                if raw_date:
-                    # pd.to_datetime comprend 2026-03-27, 27/03/2026 et les chiffres bruts
-                    dt_objet = pd.to_datetime(raw_date, dayfirst=True, errors='coerce')
+                dt_objet = pd.to_datetime(raw_date, dayfirst=True, errors='coerce')
+                
+                if pd.notnull(dt_objet):
+                    m_idx = int(dt_objet.month) # 1 pour Janvier, 3 pour Mars, etc.
                     
-                    if pd.notnull(dt_objet):
-                        m_idx = dt_objet.month # Ici, il extraira 3 pour Mars
-                        
-                        # 3. On ajoute au bon mois
-                        if 1 <= m_idx <= 12:
-                            stats_mois[m_idx]["fra"] += m_frais
+                    # 3. Sécurité d'attribution
+                    if 1 <= m_idx <= 12:
+                        stats_mois[m_idx]["fra"] += m_frais
             except: 
                 continue
 
-    # --- 2. CONSTRUCTION DU TABLEAU ---
+    # --- 2. CONSTRUCTION DU TABLEAU (Vérification des index) ---
     data_table = []
+    # On boucle de 1 à 12 pour être certain de l'ordre des mois
     for i in range(1, 13):
+        nom_mois = m_noms_courts[i-1] # Jan est à l'index 0 de la liste des noms
+        frais_du_mois = stats_mois[i]["fra"]
+        recettes_du_mois = stats_mois[i]["rec"]
+        
         data_table.append({
-            "Mois": m_noms_courts[i-1],
-            "Recettes": stats_mois[i]["rec"],
-            "Prévisionnel": stats_mois[i]["pre"],
-            "Frais": stats_mois[i]["fra"],
-            "Solde Net": stats_mois[i]["rec"] - stats_mois[i]["fra"]
+            "Mois": nom_mois,
+            "Recettes": recettes_du_mois,
+            "Frais": frais_du_mois,
+            "Solde Net": recettes_du_mois - frais_du_mois
         })
+    
     df_stats = pd.DataFrame(data_table)
 
-    # --- 3. AFFICHAGE DES RÉSULTATS ---
-    st.write("📈 **Évolution mensuelle**")
-    st.bar_chart(df_stats.set_index('Mois')[["Recettes", "Prévisionnel"]], color=["#27ae60", "#f1c40f"])
-    
+    # --- 3. AFFICHAGE ---
     st.write("📋 **Détail financier par mois**")
-    st.dataframe(df_stats, use_container_width=True, hide_index=True)
+    st.table(df_stats) # Utilisation de st.table pour figer l'affichage
 
     # --- 4. BILAN GLOBAL ---
     st.divider()
