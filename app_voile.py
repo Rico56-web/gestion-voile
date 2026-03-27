@@ -283,7 +283,7 @@ if st.session_state.page == "CONTACTS":
                 st.rerun()
 
 # --- 6. PAGE PLANNING (CORRIGÉE) ---
-    elif st.session_state.page == "PLANNING":
+        elif st.session_state.page == "PLANNING":
         st.subheader("🗓️ Planning de Navigation")
         
         # Date charnière : Aujourd'hui le 27 Mars 2026
