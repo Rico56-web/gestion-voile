@@ -543,38 +543,28 @@ elif st.session_state.page == "STATS":
                     stats_mois[m_idx]["frais"] += m_frais
             except: continue
 
-    # 3. CRÉATION DU TABLEAU DE SYNTHÈSE
+ # 3. CRÉATION DU TABLEAU DE SYNTHÈSE (Noms Simplifiés)
     data_table = []
     for i in range(1, 13):
         data_table.append({
             "Mois": m_noms_courts[i-1],
-            "Recettes (Payé)": stats_mois[i]["recettes"],
-            "Frais (Maintenance)": stats_mois[i]["frais"],
-            "Solde Net": stats_mois[i]["recettes"] - stats_mois[i]["frais"]
+            "Recettes": stats_mois[i]["recettes"],
+            "Prévisionnel": stats_mois[i]["prev"],
+            "Frais": stats_mois[i]["frais"],
+            "Solde": stats_mois[i]["recettes"] - stats_mois[i]["frais"]
         })
     df_stats = pd.DataFrame(data_table)
 
-    # 4. AFFICHAGE
-    st.write("📋 **Détail financier mensuel**")
-    st.table(df_stats) # Utilisation de st.table pour être sûr que tout s'affiche bien sur iPhone
-
-    # 5. LE GRAND BILAN (KPI)
-    st.divider()
-    t_encaissé = df_stats["Recettes (Payé)"].sum()
-    t_frais = df_stats["Frais (Maintenance)"].sum()
+    # 4. AFFICHAGE DU GRAPHIQUE (Correction KeyError)
+    st.write("📈 **Évolution mensuelle**")
     
-    col1, col2 = st.columns(2)
-    col1.metric("TOTAL ENCAISSÉ", f"{t_encaissé:,.2f} €")
-    col2.metric("TOTAL FRAIS", f"{t_frais:,.2f} €", delta=f"-{t_frais:,.2f}", delta_color="inverse")
+    # On vérifie que les colonnes existent bien avant de tracer
+    colonnes_graph = ["Recettes", "Prévisionnel"]
+    df_graph = df_stats.set_index('Mois')[colonnes_graph]
     
-    st.success(f"💰 **SOLDE NET FINAL : {(t_encaissé - t_frais):,.2f} €**")
-
-    # 3. GRAPHIQUE
-    st.write("📈 **Évolution mensuelle (Recettes vs Prévisionnel)**")
-    df_graph = df_stats.set_index('Mois')[["Recettes (Payé)", "Prévisionnel"]]
     st.bar_chart(df_graph, color=["#27ae60", "#f1c40f"])
 
-    # 4. TABLEAU RÉCAPITULATIF
+    # 5. TABLEAU RÉCAPITULATIF
     st.write("📋 **Détail financier par mois**")
     st.dataframe(df_stats, use_container_width=True, hide_index=True)
 
