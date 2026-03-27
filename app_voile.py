@@ -438,33 +438,43 @@ elif st.session_state.page == "PLANNING":
         # Tri par jour
         res_list.sort(key=lambda x: int(str(x.get('DateNav')).split('/')[0]))
         
-     # --- DANS VOTRE BOUCLE FOR RES IN RES_LIST ---
+ # --- DANS VOTRE BOUCLE FOR RES IN RES_LIST ---
         for res in res_list:
             p_v = str(res.get('Paiement', '')).lower()
             is_p = ("pay" in p_v) and not any(x in p_v for x in ["un", "non"])
             p_color = "#27ae60" if is_p else "#e67e22"
             
-            # On crée un identifiant unique pour le bouton
+            # Statut pour le petit badge
+            s_v = str(res.get('Statut', 'En attente'))
+            s_color = "#2ecc71" if s_v == "OK" else "#f1c40f" if s_v == "En attente" else "#e74c3c"
+
             nom_client = f"{res.get('Prénom')} {res.get('Nom','').upper()}"
             btn_key = f"goto_{res.get('Nom')}_{res.get('DateNav').replace('/','')}"
 
-            # Affichage de la ligne avec un bouton discret pour naviguer
-            col_info, col_btn = st.columns([4, 1])
-            
-            with col_info:
-                st.markdown(f"""
-                <div style="padding: 10px; border-left: 5px solid {p_color}; background: white; color: black; border-radius: 5px; margin-bottom: 5px;">
-                    <b>{res.get('DateNav')}</b> - {nom_client} <br>
-                    <small>{res.get('Société','-')} | ⛵ {res.get('NbreJours', 1)}j | <b>{res.get('Prix')} €</b></small>
+            # 1. LE BLOC D'INFOS (Pleine largeur)
+            st.markdown(f"""
+            <div style="padding: 12px; border-left: 5px solid {p_color}; background: white; color: black; border-radius: 8px; margin-bottom: 2px; box-shadow: 1px 1px 3px rgba(0,0,0,0.05);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <b>{res.get('DateNav')}</b>
+                    <div>
+                        <span style="background:{s_color}; color:white; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:bold;">{s_v}</span>
+                        <span style="background:{p_color}; color:white; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:bold; margin-left:3px;">{'PAYÉ' if is_p else 'À PAYER'}</span>
+                    </div>
                 </div>
-                """, unsafe_allow_html=True)
+                <div style="margin-top: 5px;">
+                    <span style="font-size: 1.1rem; font-weight: bold;">{nom_client}</span><br>
+                    <small style="color: #666;">🏢 {res.get('Société','-')} | ⛵ {res.get('NbreJours', 1)}j | 💰 <b>{res.get('Prix')} €</b></small>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
             
-            with col_btn:
-                if st.button("Voir Fiche 🔍", key=btn_key):
-                    # ACTION : On change de page et on pré-remplit une recherche
-                    st.session_state.page = "CONTACTS"
-                    st.session_state.search_contact = res.get('Nom','') 
-                    st.rerun()  
+            # 2. LE BOUTON (Juste en dessous, discret mais large)
+            if st.button(f"🔍 Ouvrir le dossier de {res.get('Nom')}", key=btn_key, use_container_width=True):
+                st.session_state.page = "CONTACTS"
+                st.session_state.search_contact = res.get('Nom','') 
+                st.rerun()
+            
+            st.write("") # Petit espace entre les clients
 
     # 6. RÉCAPITULATIF FINANCIER DU MOIS
     st.divider()
