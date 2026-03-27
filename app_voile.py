@@ -486,7 +486,7 @@ elif st.session_state.page == "PLANNING":
 # =================================================================
 # --- 7. PAGE STATS (TABLEAU DE BORD FINANCIER 2026) ---
 # =================================================================
-elif st.session_state.page == "STATS":
+ elif st.session_state.page == "STATS":
     st.subheader("📊 Bilan & Performance Vesta 2026")
 
     # 1. INITIALISATION DES DONNÉES (12 mois forcés)
