@@ -438,43 +438,45 @@ elif st.session_state.page == "PLANNING":
         # Tri par jour
         res_list.sort(key=lambda x: int(str(x.get('DateNav')).split('/')[0]))
         
- # --- DANS VOTRE BOUCLE FOR RES IN RES_LIST ---
+# --- BOUCLE DE LA LISTE DES RÉSERVATIONS (OPTIMISÉE IPHONE) ---
         for res in res_list:
             p_v = str(res.get('Paiement', '')).lower()
             is_p = ("pay" in p_v) and not any(x in p_v for x in ["un", "non"])
             p_color = "#27ae60" if is_p else "#e67e22"
             
-            # Statut pour le petit badge
             s_v = str(res.get('Statut', 'En attente'))
             s_color = "#2ecc71" if s_v == "OK" else "#f1c40f" if s_v == "En attente" else "#e74c3c"
+            
+            nom_c = f"{res.get('Prénom')} {res.get('Nom','').upper()}"
+            nom_famille = res.get('Nom','')
 
-            nom_client = f"{res.get('Prénom')} {res.get('Nom','').upper()}"
-            btn_key = f"goto_{res.get('Nom')}_{res.get('DateNav').replace('/','')}"
-
-            # 1. LE BLOC D'INFOS (Pleine largeur)
+            # AFFICHAGE UNIQUE : TOUT DANS LE HTML
             st.markdown(f"""
-            <div style="padding: 12px; border-left: 5px solid {p_color}; background: white; color: black; border-radius: 8px; margin-bottom: 2px; box-shadow: 1px 1px 3px rgba(0,0,0,0.05);">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <b>{res.get('DateNav')}</b>
-                    <div>
-                        <span style="background:{s_color}; color:white; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:bold;">{s_v}</span>
-                        <span style="background:{p_color}; color:white; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:bold; margin-left:3px;">{'PAYÉ' if is_p else 'À PAYER'}</span>
+            <div style="padding: 15px; border-left: 6px solid {p_color}; background: white; color: black; border-radius: 10px; margin-bottom: 10px; box-shadow: 0px 2px 5px rgba(0,0,0,0.1); border: 1px solid #eee;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="font-size: 1.1rem; font-weight: bold;">{nom_c}</div>
+                    <div style="text-align: right;">
+                        <span style="background:{s_color}; color:white; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:bold;">{s_v}</span><br>
+                        <span style="background:{p_color}; color:white; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:bold; margin-top:4px; display:inline-block;">{'PAYÉ' if is_p else 'À PAYER'}</span>
                     </div>
                 </div>
-                <div style="margin-top: 5px;">
-                    <span style="font-size: 1.1rem; font-weight: bold;">{nom_client}</span><br>
-                    <small style="color: #666;">🏢 {res.get('Société','-')} | ⛵ {res.get('NbreJours', 1)}j | 💰 <b>{res.get('Prix')} €</b></small>
+                <div style="margin-top: 8px; font-size: 0.9rem;">
+                    📅 <b>{res.get('DateNav')}</b> | ⛵ {res.get('NbreJours', 1)}j | 💰 <b>{res.get('Prix')} €</b><br>
+                    <small style="color: #555;">🏢 {res.get('Société','-')}</small>
+                </div>
+                <hr style="margin: 12px 0; border: 0; border-top: 1px solid #eee;">
+                <div style="text-align: center;">
+                    <p style="font-size: 0.8rem; color: #1a2a6c; font-weight: bold; margin-bottom: 5px;">Pour voir la fiche, utilise la recherche CONTACTS :</p>
+                    <code style="background: #f0f2f6; padding: 5px 10px; border-radius: 5px; color: #1a2a6c; font-size: 1rem;">{nom_famille}</code>
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # 2. LE BOUTON (Juste en dessous, discret mais large)
-            if st.button(f"🔍 Ouvrir le dossier de {res.get('Nom')}", key=btn_key, use_container_width=True):
+            # Le bouton Streamlit est placé ICI, sans colonnes, pour être bien visible sur iOS
+            if st.button(f"🔎 VOIR LA FICHE DE {nom_famille.upper()}", key=f"btn_{nom_famille}_{idx}", use_container_width=True):
+                st.session_state.search_contact = nom_famille
                 st.session_state.page = "CONTACTS"
-                st.session_state.search_contact = res.get('Nom','') 
                 st.rerun()
-            
-            st.write("") # Petit espace entre les clients
 
     # 6. RÉCAPITULATIF FINANCIER DU MOIS
     st.divider()
