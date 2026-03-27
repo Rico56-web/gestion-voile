@@ -245,15 +245,23 @@ if st.session_state.page == "CONTACTS":
         # 3. STATUT (OK / En attente / etc.)
         s = r.get('Statut', 'En attente')
         s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
-
-    # --- 3. AFFICHAGE VISUEL DES FICHES ---
+# --- 3. AFFICHAGE VISUEL DES FICHES ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
     
-    # --- COULEUR PAIEMENT (DÉTECTION LARGE) ---
-        p_str = str(p).lower()
-        # Si c'est un vrai paiement positif (contient "pay" mais pas "non/un/pas")
+    for i, r in df_disp.iterrows():
+        # On récupère les valeurs de la ligne actuelle (r)
+        s = str(r.get('Statut', 'En attente'))
+        p = str(r.get('Paiement', 'Non payé'))
+        
+        # --- LOGIQUE PAIEMENT (ALIGNEE DANS LA BOUCLE) ---
+        p_str = p.lower().strip()
         is_p_ok = ("pay" in p_str) and ("non" not in p_str) and ("un" not in p_str) and ("pas" not in p_str)
-        p_col = "#27ae60" if is_p_ok else "#e67e22" # Vert foncé si payé, Orange sinon
+        
+        p_label = "Payé" if is_p_ok else "Non payé"
+        p_col = "#27ae60" if is_p_ok else "#e67e22"
+        s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
+
+        # La suite du code (HTML, etc.) doit aussi être alignée ici...
         
         # --- INFOS CONTACT ---
         t_raw = str(r.get('Téléphone','')).strip()
