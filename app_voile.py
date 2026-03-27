@@ -223,17 +223,33 @@ if st.session_state.page == "CONTACTS":
         sauvegarder_data(df_c, "contacts.json")
         st.session_state.edit_idx = len(df_c) - 1
         st.rerun()
- 
+    for i, r in df_disp.iterrows():
+        # 1. On récupère la valeur EXACTE enregistrée
+        p_reel = str(r.get('Paiement', 'Non payé')).strip()
+        
+        # 2. LOGIQUE DE COULEUR (On ne cherche plus midi à quatorze heures)
+        # On passe tout en minuscule pour être sûr, et on cherche si c'est positif
+        p_test = p_reel.lower()
+        
+        # C'est payé SI : c'est écrit "payé" OU "paid" 
+        # ET QUE ce n'est pas "non", "un" ou "pas"
+        is_p_ok = ("pay" in p_test or "paid" in p_test) and ("non" not in p_test and "un" not in p_test and "pas" not in p_test)
+        
+        if is_p_ok:
+            p_label = "Payé"
+            p_col = "#27ae60" # Vert
+        else:
+            p_label = "Non payé"
+            p_col = "#e67e22" # Orange
+            
+        # 3. STATUT (OK / En attente / etc.)
+        s = r.get('Statut', 'En attente')
+        s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
 
     # --- 3. AFFICHAGE VISUEL DES FICHES ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-    for i, r in df_disp.iterrows():
-        s = r.get('Statut', 'En attente')
-        p = r.get('Paiement', 'Non payé')
-        
-        # --- COULEUR STATUT ---
-        s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
+    
         
         # --- COULEUR PAIEMENT (DÉTECTION LARGE) ---
         p_str = str(p).lower()
