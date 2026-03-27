@@ -367,8 +367,17 @@ elif st.session_state.page == "PLANNING":
         except:
             continue
 
-    # 4. AFFICHAGE DU CALENDRIER HTML
-    h_cal = '<table style="width:100%; border-collapse: collapse; text-align: center; background: white;">'
+# 4. AFFICHAGE DU CALENDRIER HTML (AVEC JOURS DE LA SEMAINE)
+    jours_semaine = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
+    
+    h_cal = '<table style="width:100%; border-collapse: collapse; text-align: center; background: white; color: black;">'
+    
+    # --- AJOUT DE L'EN-TÊTE DES JOURS ---
+    h_cal += '<tr style="background: #f8f9fa; font-weight: bold; border-bottom: 2px solid #eee;">'
+    for js in jours_semaine:
+        h_cal += f'<td style="padding: 10px; border: 0.5px solid #eee; font-size: 12px; color: #666;">{js}</td>'
+    h_cal += '</tr>'
+    
     cal_mat = calendar.monthcalendar(sel_y, sel_m)
     for sem in cal_mat:
         h_cal += '<tr>'
@@ -377,9 +386,16 @@ elif st.session_state.page == "PLANNING":
                 h_cal += '<td style="height:50px; border:0.5px solid #eee;"></td>'
             else:
                 bg = jours_occ.get(jour, {}).get("c", "transparent")
+                # Texte blanc si le rond est coloré, sinon noir
                 txt_c = "white" if bg != "transparent" else "black"
-                circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:32px; height:32px; line-height:32px; margin:auto; font-weight:bold;">{jour}</div>'
-                h_cal += f'<td style="border:0.5px solid #eee; height:55px;">{circle if bg != "transparent" else jour}</td>'
+                
+                # Création du rond si occupé, sinon chiffre simple
+                if bg != "transparent":
+                    circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:32px; height:32px; line-height:32px; margin:auto; font-weight:bold; font-size:13px;">{jour}</div>'
+                else:
+                    circle = f'<span style="color:black;">{jour}</span>'
+                
+                h_cal += f'<td style="border:0.5px solid #eee; height:55px;">{circle}</td>'
         h_cal += '</tr>'
     h_cal += '</table>'
     
