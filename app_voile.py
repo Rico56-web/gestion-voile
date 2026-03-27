@@ -249,34 +249,29 @@ if st.session_state.page == "CONTACTS":
         mail = str(r.get('Email', '')).strip()
 
         # HTML Premium (Forçage noir pour iPhone)
-        h = f'''<div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: white; color: black;">
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-<b style="font-size: 1.1rem; color: #1a2a6c;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b>
-<div>
-<span style="background:{s_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold;">{s}</span>
-<span style="background:{p_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold; margin-left:5px;">{p}</span>
-</div>
-</div>
-<div style="color: #666; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px;">🏢 {str(r.get('Société','PARTICULIER')).upper()}</div>
-<div style="font-size: 0.9rem; color: black; line-height: 1.4;">
-📅 <b>Date :</b> {r.get('DateNav','--')}<br>
-💰 <b>Prix :</b> {r.get('Prix','0.00')} €<br>
-⛵ <b>Jours :</b> {r.get('NbreJours', 1)} | 👥 <b>Pers :</b> {r.get('NbrePers', 1)}
-</div>
-<div style="margin-top: 10px; padding: 10px; background-color: #f9f9f9; border-radius: 5px; color: black; border: 1px solid #eee;">
-📞 <b>{t_raw if t_raw else "Non renseigné"}</b><br>
-✉️ <b>{mail if mail else "Non renseigné"}</b>
-</div>
-<div style="background: #fff8e1; padding: 8px; border-radius: 5px; margin-top: 10px; font-size: 0.8rem; font-style: italic; color: black; border-left: 3px solid #f1c40f;">
-💬 {r.get('Commentaires', 'Pas de commentaire')}
-</div>
-<div style="margin-top: 15px; display: flex; gap: 5px;">
-<a href="tel:{t_link}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">APPEL</a>
-<a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">WA</a>
-<a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">MAIL</a>
-</div>
-</div>'''
-        st.markdown(h, unsafe_allow_html=True)
+        # --- HTML DU BADGE (CORRIGÉ POUR ÉVITER LE NAMEERROR) ---
+        h = f'''
+        <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: white; color: black;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <b style="font-size: 1.1rem; color: #1a2a6c;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b>
+                <div>
+                    <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold;">{s}</span>
+                    <span style="background:{p_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold; margin-left:5px;">{p_label}</span>
+                </div>
+            </div>
+            <div style="color: #666; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px;">🏢 {str(r.get('Société','PARTICULIER')).upper()}</div>
+            <div style="font-size: 0.9rem; color: black; line-height: 1.4;">
+                📅 <b>Date :</b> {r.get('DateNav','--')}<br>
+                💰 <b>Prix :</b> {r.get('Prix','0.00')} €<br>
+                ⛵ <b>Jours :</b> {r.get('NbreJours', 1)} | 👥 <b>Pers :</b> {r.get('NbrePers', 1)}
+            </div>
+            <div style="margin-top: 15px; display: flex; gap: 5px;">
+                <a href="tel:{t_link}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">APPEL</a>
+                <a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">WA</a>
+            </div>
+        </div>
+        '''
+        st.markdown(h, unsafe_allow_html=True)  
 # --- BOUTONS ACTIONS (✏️ et 🗑️) ---
         c_ed, c_del = st.columns([1, 4])
         suffix = "arc" if view_arc else "act"
