@@ -225,19 +225,22 @@ if st.session_state.page == "CONTACTS":
 
     # --- 4. AFFICHAGE DES FICHES ---
     for i, r in df_disp.iterrows():
-        # On récupère les valeurs
-        s = str(r.get('Statut', 'En attente'))
-        p = str(r.get('Paiement', 'Non payé'))
+        # 1. On récupère la valeur brute enregistrée (ex: "Payé", "Paid", "Non payé")
+        p_brut = str(r.get('Paiement', 'Non payé')).strip()
+        p_test = p_brut.lower()
         
-        # Logique de détection "Zéro Erreur" pour Benoit et les autres
-        p_val = p.lower().strip()
-        is_p_ok = ("pay" in p_val or "paid" in p_val) and ("non" not in p_val and "un" not in p_val and "pas" not in p_val)
+        # 2. LA RÈGLE DÉFINITIVE (Celle qui commande le badge)
+        # On est "Payé" si : le mot contient 'pay' ou 'paid' 
+        # ET qu'il n'y a pas 'non', 'un' ou 'pas'
+        is_p_ok = ("pay" in p_test or "paid" in p_test) and ("non" not in p_test and "un" not in p_test and "pas" not in p_test)
         
+        # 3. ON DÉFINIT LE TEXTE ET LA COULEUR DU BADGE
         p_label = "Payé" if is_p_ok else "Non payé"
-        p_col = "#27ae60" if is_p_ok else "#e67e22"
-        s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
+        p_col = "#27ae60" if is_p_ok else "#e67e22" # Vert si OK, Orange sinon
         
-        # La suite de votre HTML ici...
+        # 4. STATUT (OK, En attente, etc.)
+        s = str(r.get('Statut', 'En attente'))
+        s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
         
         
         # --- INFOS CONTACT ---
