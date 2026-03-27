@@ -300,7 +300,8 @@ elif st.session_state.page == "PLANNING":
 
     # 3. FILTRAGE ET LOGIQUE DES COULEURS
     jours_occ = {}
-# 3. FILTRAGE ET LOGIQUE DES COULEURS
+    
+    # 3. FILTRAGE ET LOGIQUE DES COULEURS
         jours_occ = {}
         for _, r in df_c.iterrows():
             try:
