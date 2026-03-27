@@ -382,6 +382,68 @@ elif st.session_state.page == "PLANNING":
     
     st.markdown(h_cal, unsafe_allow_html=True)
     st.write("🔴 Impayé | 🔵 Payé | 🟢 OK | 🟡 Attente")
+    # =================================================================
+# --- 5. AFFICHAGE DES DÉTAILS DU MOIS (SOUS LE CALENDRIER) ---
+# =================================================================
+st.markdown(f"### 📋 Détails des réservations - {m_noms[sel_m-1]} {sel_y}")
+
+# 1. Filtrage des données pour le mois en cours
+reservations_mois = []
+for _, r in df_c.iterrows():
+    try:
+        d_str = str(r.get('DateNav', '')).strip()
+        if '/' in d_str:
+            parts = d_str.split('/')
+            d_j, d_m, d_y = int(parts[0]), int(parts[1]), int(parts[2])
+            if d_y < 100: d_y += 2000
+            
+            if d_m == sel_m and d_y == sel_y:
+                # On exclut les fiches qui ne sont pas des réservations actives
+                if str(r.get('Statut','')).lower() not in ["refusé", "archivé", "supprimé"]:
+                    reservations_mois.append(r)
+    except:
+        continue
+
+# 2. Affichage de la liste
+if not reservations_mois:
+    st.info(f"Aucune réservation active pour {m_noms[sel_m-1]}.")
+else:
+    # On trie par jour pour avoir un ordre chronologique
+    reservations_mois.sort(key=lambda x: int(str(x.get('DateNav')).split('/')[0]))
+
+    for res in reservations_mois:
+        # Détection du paiement pour le style
+        p_val = str(res.get('Paiement', '')).lower()
+        is_p = ("pay" in p_val) and not any(x in p_val for x in ["non", "pas", "un"])
+        
+        p_txt = "✅ PAYÉ" if is_p else "⏳ À PAYER"
+        p_color = "#27ae60" if is_p else "#e67e22"
+        bg_color = "#f8f9fa" if is_p else "#fff5eb" # Fond légèrement coloré si impayé
+
+        st.markdown(f"""
+        <div style="display: flex; justify-content: space-between; align-items: center; 
+                    padding: 12px; border-radius: 8px; border-left: 5px solid {p_color}; 
+                    margin-bottom: 8px; background-color: {bg_color}; color: black;
+                    box-shadow: 1px 1px 3px rgba(0,0,0,0.1);">
+            <div style="flex: 2;">
+                <span style="font-size: 1.1rem; font-weight: bold;">{res.get('DateNav', '--')}</span>
+                <br><span style="text-transform: uppercase; font-weight: 600;">{res.get('Prénom','')} {res.get('Nom','')}</span>
+                <br><small style="color: #555;">📍 {res.get('Société','PARTICULIER')}</small>
+            </div>
+            <div style="flex: 1; text-align: center; border-left: 1px solid #ddd; border-right: 1px solid #ddd;">
+                <span style="font-size: 1.2rem;">⛵</span><br>
+                <b>{res.get('NbreJours', 1)} jour(s)</b>
+            </div>
+            <div style="flex: 1; text-align: right;">
+                <span style="font-size: 1.2rem; font-weight: bold;">{res.get('Prix', '0')} €</span><br>
+                <span style="color: {p_color}; font-size: 0.8rem; font-weight: bold;">{p_txt}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# 3. Enfin, on affiche les compteurs (Missions / Encaissé / À percevoir)
+st.divider()
+# ... (Insérez ici le code des 3 colonnes c1, c2, c3 que nous avons vu précédemment) ...
 
     # --- LISTE DÉTAILLÉE ---
     st.markdown(f"### 📋 Détails des réservations - {m_noms[sel_m-1]} {sel_y}")
