@@ -651,7 +651,7 @@ elif st.session_state.page == "MAINT":
                 if c2.button("🗑️ Supprimer", key=f"del_req_{i}", use_container_width=True):
                     st.session_state.m_confirm_del = i
                     st.rerun()
-   # --- 4. TABLEAU RÉCAPITULATIF GLOBAL (EN BAS DE PAGE) ---
+  # --- 4. TABLEAU RÉCAPITULATIF GLOBAL (EN BAS DE PAGE) ---
     st.divider()
     st.write("📊 **Vue d'ensemble du carnet d'entretien**")
 
@@ -659,7 +659,16 @@ elif st.session_state.page == "MAINT":
         # On prépare une copie propre pour l'affichage
         df_tableau = df_m.copy()
         
-        # On s'assure que les colonnes sont bien nommées pour le tableau
+        # --- FIX : Conversion des dates "Timestamp" en texte lisible ---
+        try:
+            # errors='coerce' transforme les trucs bizarres en NaT (Not a Time)
+            # dt.strftime('%d/%m/%Y') force le format Jour/Mois/Année
+            df_tableau['Date'] = pd.to_datetime(df_tableau['Date'], errors='coerce').dt.strftime('%d/%m/%Y')
+            # On remplit les dates qui auraient échoué avec la valeur d'origine ou "N/A"
+            df_tableau['Date'] = df_tableau['Date'].fillna("Date inconnue")
+        except:
+            pass
+
         # On gère les anciens noms "Cause/Prix" au cas où
         if 'Cause' in df_tableau.columns and 'Travaux' not in df_tableau.columns:
             df_tableau = df_tableau.rename(columns={'Cause': 'Travaux'})
@@ -682,7 +691,7 @@ elif st.session_state.page == "MAINT":
         total_m = pd.to_numeric(df_tableau['Montant'], errors='coerce').sum()
         st.info(f"💰 **Total cumulé des frais : {total_m:,.2f} €**")
     else:
-        st.write("Aucune donnée à afficher dans le tableau.")                 
+        st.write("Aucune donnée à afficher dans le tableau.")           
 
 # --- 10. PAGE NOTES ---
 elif st.session_state.page == "NOTES":
