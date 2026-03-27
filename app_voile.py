@@ -493,58 +493,57 @@ elif st.session_state.page == "PLANNING":
 elif st.session_state.page == "STATS":
     st.subheader("📊 Bilan & Performance Vesta 2026")
 
-    # --- CHARGEMENT SÉCURISÉ DE LA MAINTENANCE ---
+    # --- CHARGEMENT SÉCURISÉ ---
     try:
-        # On force la lecture du fichier utilisé dans l'onglet MAINT
         df_m_stats = pd.read_json("maint.json")
     except:
         df_m_stats = pd.DataFrame()
 
-    # 1. INITIALISATION DES MOIS
     m_noms_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     stats_mois = {i: {"rec": 0.0, "pre": 0.0, "fra": 0.0} for i in range(1, 13)}
 
-    # --- CALCULS REVENUS (Depuis Contacts) ---
+    # --- CALCULS REVENUS (CONTACTS) ---
     for _, r in df_c.iterrows():
         try:
             statut = str(r.get('Statut', '')).lower()
             if statut in ["refusé", "archivé"]: continue
-            
-            # Nettoyage prix
-            val_p = str(r.get('Prix', '0')).replace('€','').replace(' ','').replace(',','.').strip()
-            p = float(val_p if val_p else 0)
-            
-            # Logique Paiement
+            p = float(str(r.get('Prix', '0')).replace('€','').replace(' ','').replace(',','.').strip() or 0)
             p_val = str(r.get('Paiement', '')).lower()
             is_paye = ("pay" in p_val) and not any(x in p_val for x in ["un", "non", "pas"])
             
             d_str = str(r.get('DateNav', ''))
             if '/' in d_str:
+                # Sécurité : on prend bien l'élément d'index 1 pour le mois
                 m_idx = int(d_str.split('/')[1])
                 if is_paye: stats_mois[m_idx]["rec"] += p
                 else: stats_mois[m_idx]["pre"] += p
         except: continue
 
-    # --- CALCULS FRAIS (Depuis Maintenance) ---
+    # --- CALCULS FRAIS (MAINTENANCE) - CORRECTION ICI ---
     if not df_m_stats.empty:
         for _, f in df_m_stats.iterrows():
             try:
-                # On cherche le prix dans toutes les colonnes possibles
-                v_f = f.get('Montant', f.get('Prix', f.get('cout', 0)))
-                c_f = str(v_f).replace('€','').replace(' ','').replace(',','.').strip()
-                m_frais = float(c_f if c_f and c_f != 'None' else 0)
+                # 1. Montant
+                v_f = f.get('Montant', f.get('Prix', 0))
+                m_frais = float(str(v_f).replace('€','').replace(',','.').strip() or 0)
                 
-                # Date
+                # 2. Extraction précise du mois
                 d_f = str(f.get('Date', ''))
                 m_idx = None
-                if '/' in d_f: m_idx = int(d_f.split('/')[1])
-                elif '-' in d_f: m_idx = int(d_f.split('-')[1])
+                
+                if '/' in d_f:
+                    parts = d_f.split('/')
+                    if len(parts) >= 2:
+                        # On force la lecture du DEUXIÈME nombre comme étant le mois
+                        m_idx = int(parts[1]) 
+                elif '-' in d_f:
+                    m_idx = int(d_f.split('-')[1])
 
                 if m_idx and 1 <= m_idx <= 12:
                     stats_mois[m_idx]["fra"] += m_frais
             except: continue
 
-    # 2. CONSTRUCTION DU TABLEAU (Noms de colonnes fixes)
+    # --- 2. CONSTRUCTION DU TABLEAU ---
     data_table = []
     for i in range(1, 13):
         data_table.append({
@@ -556,38 +555,22 @@ elif st.session_state.page == "STATS":
         })
     df_stats = pd.DataFrame(data_table)
 
-    # 3. AFFICHAGE DU GRAPHIQUE
+    # --- 3. AFFICHAGE DES RÉSULTATS ---
     st.write("📈 **Évolution mensuelle**")
     st.bar_chart(df_stats.set_index('Mois')[["Recettes", "Prévisionnel"]], color=["#27ae60", "#f1c40f"])
     
-    # 4. TABLEAU RÉCAPITULATIF
     st.write("📋 **Détail financier par mois**")
     st.dataframe(df_stats, use_container_width=True, hide_index=True)
 
-    # 5. BILAN GLOBAL (FINI LES KEYERROR)
+    # --- 4. BILAN GLOBAL ---
     st.divider()
-    total_recettes = df_stats["Recettes"].sum()
-    total_prev = df_stats["Prévisionnel"].sum()
-    total_frais = df_stats["Frais"].sum()
-    bilan_final = total_recettes - total_frais
-
-    st.write("### 🏁 Bilan Annuel")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total Encaissé", f"{total_recettes:,.2f} €")
-    c2.metric("Total Attendu", f"{total_prev:,.2f} €")
-    c3.metric("Total Frais", f"{total_frais:,.2f} €", delta=f"-{total_frais:,.2f}", delta_color="inverse")
-    c4.metric("SOLDE NET", f"{bilan_final:,.2f} €")
-
-    # --- ANALYSE D'ACTIVITÉ ---
-    st.divider()
-    df_v = df_c[~df_c['Statut'].isin(["Refusé", "Archivé"])]
-    serie_j = pd.to_numeric(df_v['NbreJours'], errors='coerce').fillna(0)
-    jours = serie_j.sum()
-    panier = total_recettes / len(df_v) if len(df_v) > 0 else 0
-
-    ca1, ca2 = st.columns(2)
-    ca1.metric("Jours en mer", f"{int(jours)} j")
-    ca2.metric("Panier Moyen", f"{panier:.2f} €")
+    t_rec = df_stats["Recettes"].sum()
+    t_fra = df_stats["Frais"].sum()
+    
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Encaissé", f"{t_rec:,.2f} €")
+    c2.metric("Frais", f"{t_fra:,.2f} €", delta_color="inverse")
+    c3.metric("SOLDE NET", f"{(t_rec - t_fra):,.2f} €")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
