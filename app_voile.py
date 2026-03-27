@@ -490,19 +490,24 @@ elif st.session_state.page == "PLANNING":
 # =================================================================
 # --- 7. PAGE STATS (VERSION HARMONISÉE & SYNCHRONISÉE) ---
 # ================================================================
+# =================================================================
+# --- 7. PAGE STATS (SYNCHRO SUR MAINTENANCE.JSON) ---
+# ================================================================
 elif st.session_state.page == "STATS":
     st.subheader("📊 Bilan & Performance Vesta 2026")
 
-    # --- CHARGEMENT SÉCURISÉ ---
+    # --- 1. CHARGEMENT DU BON FICHIER (MAINTENANCE.JSON) ---
     try:
-        df_m_stats = pd.read_json("maint.json")
+        # On pointe enfin sur le fichier actif de 46 min
+        df_m_stats = pd.read_json("maintenance.json") 
     except:
         df_m_stats = pd.DataFrame()
 
+    # Initialisation
     m_noms_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     stats_mois = {i: {"rec": 0.0, "pre": 0.0, "fra": 0.0} for i in range(1, 13)}
 
-    # --- CALCULS REVENUS (CONTACTS) ---
+    # --- 2. CALCULS REVENUS (Contacts) ---
     for _, r in df_c.iterrows():
         try:
             statut = str(r.get('Statut', '')).lower()
@@ -510,55 +515,32 @@ elif st.session_state.page == "STATS":
             p = float(str(r.get('Prix', '0')).replace('€','').replace(' ','').replace(',','.').strip() or 0)
             p_val = str(r.get('Paiement', '')).lower()
             is_paye = ("pay" in p_val) and not any(x in p_val for x in ["un", "non", "pas"])
-            
             d_str = str(r.get('DateNav', ''))
             if '/' in d_str:
-                # Sécurité : on prend bien l'élément d'index 1 pour le mois
                 m_idx = int(d_str.split('/')[1])
                 if is_paye: stats_mois[m_idx]["rec"] += p
                 else: stats_mois[m_idx]["pre"] += p
         except: continue
 
-# --- CALCULS FRAIS (VERSION NETTOYAGE RADICAL) ---
+    # --- 3. CALCULS FRAIS (Depuis maintenance.json) ---
     if not df_m_stats.empty:
         for _, f in df_m_stats.iterrows():
             try:
-                # 1. Montant
+                # Montant (On teste Montant puis Prix)
                 v_f = f.get('Montant', f.get('Prix', 0))
                 m_frais = float(str(v_f).replace('€','').replace(',','.').replace(' ','').strip() or 0)
                 
-                # 2. Date : On force le formatage en texte pour éviter les surprises
-                raw_date = str(f.get('Date', ''))
+                # Date (On utilise pd.to_datetime pour gérer le format ISO de 46 min)
+                raw_date = f.get('Date', '')
+                dt_obj = pd.to_datetime(raw_date, errors='coerce')
                 
-                # On essaie de deviner le mois manuellement si pd.to_datetime échoue
-                m_idx = None
-                
-                # Si la date ressemble à 2026-03-27...
-                if '-' in raw_date:
-                    parts = raw_date.split('-')
-                    # Si c'est AAAA-MM-DD, le mois est en 2ème position (index 1)
-                    if len(parts[0]) == 4: m_idx = int(parts[1])
-                    # Si c'est DD-MM-AAAA, le mois est aussi en index 1
-                    else: m_idx = int(parts[1])
-                
-                # Si la date ressemble à 27/03/2026...
-                elif '/' in raw_date:
-                    parts = raw_date.split('/')
-                    m_idx = int(parts[1])
-                
-                # Sécurité finale avec Pandas si le manuel a échoué
-                if m_idx is None:
-                    dt_objet = pd.to_datetime(raw_date, errors='coerce')
-                    if pd.notnull(dt_objet):
-                        m_idx = dt_objet.month
+                if pd.notnull(dt_obj):
+                    m_idx = dt_obj.month
+                    if 1 <= m_idx <= 12:
+                        stats_mois[m_idx]["fra"] += m_frais
+            except: continue
 
-                # 3. On range dans le bon mois (1=Jan, 3=Mar...)
-                if m_idx and 1 <= m_idx <= 12:
-                    stats_mois[m_idx]["fra"] += m_frais
-            except: 
-                continue
-
-    # --- RECONSTRUCTION DU TABLEAU (SANS DÉCALAGE) ---
+    # --- 4. CONSTRUCTION DU TABLEAU ---
     data_table = []
     for i in range(1, 13):
         data_table.append({
@@ -569,19 +551,18 @@ elif st.session_state.page == "STATS":
         })
     df_stats = pd.DataFrame(data_table)
 
-    # --- 3. AFFICHAGE ---
-    st.write("📋 **Détail financier par mois**")
-    st.table(df_stats) # Utilisation de st.table pour figer l'affichage
+    # --- 5. AFFICHAGE DES CHIFFRES ---
+    st.write("📋 **Bilan financier mensuel**")
+    st.table(df_stats) # Pour bien voir Mars vs Décembre
 
-    # --- 4. BILAN GLOBAL ---
-    st.divider()
+    # Bilan Global
     t_rec = df_stats["Recettes"].sum()
     t_fra = df_stats["Frais"].sum()
-    
+    st.divider()
     c1, c2, c3 = st.columns(3)
     c1.metric("Encaissé", f"{t_rec:,.2f} €")
     c2.metric("Frais", f"{t_fra:,.2f} €", delta_color="inverse")
-    c3.metric("SOLDE NET", f"{(t_rec - t_fra):,.2f} €")
+    c3.metric("NET", f"{(t_rec - t_fra):,.2f} €")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
