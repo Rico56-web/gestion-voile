@@ -318,10 +318,17 @@ elif st.session_state.page == "PLANNING":
                         continue
                     
                     this_date = date(yv, mv, dv)
+    # --- DÉTECTION BILINGUE (VERSION FINALE SÉCURISÉE) ---
+                    # 1. On nettoie bien le texte
+                    p_val = str(r.get('Paiement', '')).strip().lower()
                     
-                    # --- DÉTECTION BILINGUE (Paid / Non payé) ---
-                    # Est payé SI contient "pay" MAIS NE CONTIENT PAS "un" ou "non"
-                    is_paye = ("pay" in p_val) and ("un" not in p_val) and ("non" not in p_val)
+                    # 2. On définit ce qui est "NON PAYÉ" (Priorité au négatif)
+                    # Si on trouve "un" (unpaid), "non" (non payé) ou "pas" (pas payé)
+                    est_negatif = ("un" in p_val) or ("non" in p_val) or ("pas" in p_val) or (p_val == "")
+                    
+                    # 3. On définit ce qui est "PAYÉ"
+                    # Il faut qu'il y ait "pay" ET que ce ne soit pas un mot négatif
+                    is_paye = ("pay" in p_val) and not est_negatif
                     
                     # --- CALCUL COULEUR ---
                     if this_date < aujourdhui:
@@ -331,9 +338,11 @@ elif st.session_state.page == "PLANNING":
                         # FUTUR : Vert
                         current_c = "#2ecc71"
                     elif "attente" in s_val:
+                        # FUTUR : Jaune
                         current_c = "#f1c40f"
                     else:
-                        current_c = "transparent"
+                        current_c = "transparent"           
+             
 
                     # --- GESTION DES CONFLITS ---
                     n_j = int(r.get('NbreJours', 1))
