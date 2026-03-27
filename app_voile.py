@@ -493,145 +493,78 @@ elif st.session_state.page == "PLANNING":
 elif st.session_state.page == "STATS":
     st.subheader("📊 Bilan & Performance Vesta 2026")
 
-    # 1. INITIALISATION DES DONNÉES (12 mois forcés)
+    # 1. INITIALISATION
     m_noms_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     stats_mois = {i: {"recettes": 0.0, "prev": 0.0, "frais": 0.0} for i in range(1, 13)}
 
-    # --- CALCUL DES RECETTES ET PRÉVISIONNEL (Depuis CONTACTS) ---
+    # --- CALCULS DEPUIS CONTACTS ---
     for _, r in df_c.iterrows():
         try:
             statut = str(r.get('Statut', '')).lower()
             if statut in ["refusé", "archivé", "supprimé"]: continue
             
-            # Extraction du prix
             prix = float(str(r.get('Prix', '0')).replace('€','').replace(' ','').strip() or 0)
-            
-            # Logique Paiement
             p_val = str(r.get('Paiement', '')).lower()
             is_paye = ("pay" in p_val) and not any(x in p_val for x in ["un", "non", "pas"])
             
-            # Extraction du mois
             d_str = str(r.get('DateNav', ''))
             if '/' in d_str:
                 m_idx = int(d_str.split('/')[1])
-                
-                if is_paye:
-                    stats_mois[m_idx]["recettes"] += prix
-                else:
-                    # Si c'est OK mais non payé, ou En attente -> c'est du prévisionnel
-                    stats_mois[m_idx]["prev"] += prix
-        except:
-            continue
+                if is_paye: stats_mois[m_idx]["recettes"] += prix
+                else: stats_mois[m_idx]["prev"] += prix
+        except: continue
 
-    # --- CALCUL DES FRAIS (Depuis MAINTENANCE) ---
-    # On suppose que df_m est votre DataFrame de maintenance
+    # --- CALCULS DEPUIS MAINTENANCE (Harmonisé sur 'Montant') ---
     if 'df_m' in locals() or 'df_m' in globals():
         for _, f in df_m.iterrows():
             try:
-                # Extraction du montant du frais
-                montant_frais = float(str(f.get('Montant', '0')).replace('€','').strip() or 0)
+                # On check 'Montant' ou 'Prix' pour être sûr
+                m_frais = float(str(f.get('Montant', f.get('Prix', 0))).replace('€','').strip() or 0)
                 d_frais = str(f.get('Date', ''))
                 if '/' in d_frais:
-                    m_f = int(d_frais.split('/')[1])
-                    if m_f in stats_mois:
-                        stats_mois[m_f]["frais"] += montant_frais
-            except:
-                continue
+                    m_idx = int(d_frais.split('/')[1])
+                    if m_idx in stats_mois: stats_mois[m_idx]["frais"] += m_frais
+            except: continue
 
-# 2. CRÉATION DU TABLEAU DE DONNÉES CHRONOLOGIQUE
+    # 2. TABLEAU CHRONOLOGIQUE
     data_table = []
     for i in range(1, 13):
         data_table.append({
             "Mois": m_noms_courts[i-1],
             "Recettes (Payé)": stats_mois[i]["recettes"],
-            "Prévisionnel (Attente)": stats_mois[i]["prev"],
-            "Frais (Maint.)": stats_mois[i]["frais"],
+            "Prévisionnel": stats_mois[i]["prev"],
+            "Frais": stats_mois[i]["frais"],
             "Solde Réel": stats_mois[i]["recettes"] - stats_mois[i]["frais"]
         })
-
     df_stats = pd.DataFrame(data_table)
 
-    # --- FORCE L'ORDRE CHRONOLOGIQUE ---
-    df_stats['Mois'] = pd.Categorical(df_stats['Mois'], categories=m_noms_courts, ordered=True)
-    df_stats = df_stats.sort_values('Mois')
-
-    # 3. AFFICHAGE DU GRAPHIQUE CHRONOLOGIQUE (Fixé)
-    st.write("📈 **Évolution mensuelle (Janvier ➔ Décembre)**")
-    
-    # On prépare un DataFrame spécifique pour le graphique pour éviter les erreurs d'index
-    df_graph = df_stats.set_index('Mois')[["Recettes (Payé)", "Prévisionnel (Attente)"]]
+    # 3. GRAPHIQUE
+    st.write("📈 **Évolution mensuelle (Recettes vs Prévisionnel)**")
+    df_graph = df_stats.set_index('Mois')[["Recettes (Payé)", "Prévisionnel"]]
     st.bar_chart(df_graph, color=["#27ae60", "#f1c40f"])
 
-    # 4. LE TABLEAU RÉCAPITULATIF COMPLET
-    st.write("📋 **Détail financier par mois**")
-    st.dataframe(df_stats, use_container_width=True, hide_index=True)
-
-    # 3. AFFICHAGE DU GRAPHIQUE CHRONOLOGIQUE
-    st.write("📈 **Évolution mensuelle (Recettes vs Prévisionnel)**")
-    # On utilise un graphique groupé pour comparer
-    st.bar_chart(df_stats, x="Mois", y=["Recettes (Payé)", "Prévisionnel (Attente)"], color=["#27ae60", "#f1c40f"])
-
-    # 4. LE TABLEAU RÉCAPITULATIF COMPLET
-    st.write("📋 **Détail financier par mois**")
-    st.dataframe(df_stats, use_container_width=True, hide_index=True)
-
-    # 5. BILAN GLOBAL (BAS DE TABLEAU)
-    st.divider()
+    # 4. BILAN GLOBAL
     total_recettes = df_stats["Recettes (Payé)"].sum()
-    total_prev = df_stats["Prévisionnel (Attente)"].sum()
-    total_frais = df_stats["Frais (Maint.)"].sum()
+    total_prev = df_stats["Prévisionnel"].sum()
+    total_frais = df_stats["Frais"].sum()
     bilan_final = total_recettes - total_frais
 
-    st.write("### 🏁 Bilan Annuel")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total Encaissé", f"{total_recettes:,.2f} €")
-    c2.metric("Total Attendu", f"{total_prev:,.2f} €", delta=f"+{total_prev:,.2f}")
-    c3.metric("Total Frais", f"{total_frais:,.2f} €", delta=f"-{total_frais:,.2f}", delta_color="inverse")
-    
-    # Couleur du bilan final
-    color_bilan = "normal" if bilan_final >= 0 else "inverse"
-    c4.metric("SOLDE NET", f"{bilan_final:,.2f} €", delta="Résultat Réel", delta_color=color_bilan)
+    c2.metric("Attendu", f"{total_prev:,.2f} €")
+    c3.metric("Total Frais", f"{total_frais:,.2f} €", delta_color="inverse")
+    c4.metric("SOLDE NET", f"{bilan_final:,.2f} €")
 
-    if total_prev > 0:
-        st.warning(f"⚠️ Note : Si tout le prévisionnel est encaissé, votre solde montera à **{(bilan_final + total_prev):,.2f} €**.")
-# --- 8. PAGE MAINTENANCE ---
-elif st.session_state.page == "MAINT":
-    st.subheader("🔧 Maintenance & Frais")
-    if st.button("➕ NOUVEAU FRAIS", use_container_width=True):
-        new_m = {"Date": now.strftime("%d/%m/2026"), "Cause": "Achat", "Prix": "0.00"}
-        df_m = pd.concat([pd.DataFrame([new_m]), df_m], ignore_index=True)
-        sauvegarder_data(df_m, "maint.json"); st.rerun()
+    # --- ANALYSE D'ACTIVITÉ ---
+    st.divider()
+    df_v = df_c[~df_c['Statut'].isin(["Refusé", "Archivé"])]
+    jours = pd.to_numeric(df_v['NbreJours'], errors='coerce').fillna(0).sum()
+    panier = total_recettes / len(df_v) if len(df_v) > 0 else 0
 
-    if st.session_state.m_edit_idx is not None:
-        idx = st.session_state.m_edit_idx
-        r = df_m.loc[idx]
-        u_d, u_c, u_p = st.text_input("Date", r['Date']), st.text_input("Cause", r['Cause']), st.text_input("Prix", r['Prix'])
-        if st.button("💾 ENREGISTRER"):
-            df_m.at[idx, 'Date'], df_m.at[idx, 'Cause'], df_m.at[idx, 'Prix'] = u_d, u_c, f"{float(u_p or 0):.2f}"
-            sauvegarder_data(df_m, "maint.json"); st.session_state.m_edit_idx = None; st.rerun()
-    else:
-        for i, r in df_m.iterrows():
-            st.markdown(f'<div class="fiche-globale">📅 {r.get("Date", "N/A")} | 🏷️ {r.get("Travaux", "N/A")} | 💰 <b>{float(r.get("Montant", 0)):.2f} €</b></div>', unsafe_allow_html=True)
-            if st.session_state.maint_confirm_del == i:
-                st.warning("Confirmer la suppression ?")
-                c1, c2 = st.columns(2)
-                if c1.button("✅ OUI", key=f"ym_{i}"): df_m = df_m.drop(i); sauvegarder_data(df_m, "maint.json"); st.session_state.maint_confirm_del = None; st.rerun()
-                if c2.button("NON", key=f"nm_{i}"): st.session_state.maint_confirm_del = None; st.rerun()
-            else:
-                c1, c2 = st.columns([1, 4])
-                if c1.button("✏️", key=f"em_{i}"): st.session_state.m_edit_idx = i; st.rerun()
-                if c2.button("🗑️", key=f"dm_{i}"): st.session_state.maint_confirm_del = i; st.rerun()
-# --- CALCULS SUPPLÉMENTAIRES ---
-    jours_travailles = df_c[~df_c['Statut'].isin(["Refusé", "Archivé"])]['NbreJours'].sum()
-    nb_missions = len(df_c[~df_c['Statut'].isin(["Refusé", "Archivé"])])
-    panier_moyen = total_recettes / nb_missions if nb_missions > 0 else 0
-
-    st.write("💡 **Analyse de l'activité**")
     ca1, ca2 = st.columns(2)
-    
-    # Taux d'occupation annuel (basé sur 200 jours de saison par ex)
-    ca1.metric("Jours en mer", f"{int(jours_travailles)} j", help="Total des jours de navigation validés")
-    ca2.metric("Panier Moyen", f"{panier_moyen:.2f} €", help="Revenu moyen par contrat encaissé")
+    ca1.metric("Jours en mer", f"{int(jours)} j")
+    ca2.metric("Panier Moyen", f"{panier:.2f} €")
+
     
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CARNET DE SANTÉ VESTA) ---
