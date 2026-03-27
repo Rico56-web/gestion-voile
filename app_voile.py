@@ -534,7 +534,7 @@ elif st.session_state.page == "STATS":
             except:
                 continue
 
-    # 2. CRÉATION DU TABLEAU DE DONNÉES CHRONOLOGIQUE
+# 2. CRÉATION DU TABLEAU DE DONNÉES CHRONOLOGIQUE
     data_table = []
     for i in range(1, 13):
         data_table.append({
@@ -546,6 +546,21 @@ elif st.session_state.page == "STATS":
         })
 
     df_stats = pd.DataFrame(data_table)
+
+    # --- FORCE L'ORDRE CHRONOLOGIQUE ---
+    df_stats['Mois'] = pd.Categorical(df_stats['Mois'], categories=m_noms_courts, ordered=True)
+    df_stats = df_stats.sort_values('Mois')
+
+    # 3. AFFICHAGE DU GRAPHIQUE CHRONOLOGIQUE (Fixé)
+    st.write("📈 **Évolution mensuelle (Janvier ➔ Décembre)**")
+    
+    # On prépare un DataFrame spécifique pour le graphique pour éviter les erreurs d'index
+    df_graph = df_stats.set_index('Mois')[["Recettes (Payé)", "Prévisionnel (Attente)"]]
+    st.bar_chart(df_graph, color=["#27ae60", "#f1c40f"])
+
+    # 4. LE TABLEAU RÉCAPITULATIF COMPLET
+    st.write("📋 **Détail financier par mois**")
+    st.dataframe(df_stats, use_container_width=True, hide_index=True)
 
     # 3. AFFICHAGE DU GRAPHIQUE CHRONOLOGIQUE
     st.write("📈 **Évolution mensuelle (Recettes vs Prévisionnel)**")
