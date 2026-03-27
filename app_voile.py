@@ -406,6 +406,37 @@ elif st.session_state.page == "PLANNING":
         h_cal += '</table>'
         st.markdown(h_cal, unsafe_allow_html=True)
         st.write("🔴 Impayé | 🔵 Payé | 🟢 OK | 🟡 Attente")
+# --- NOUVEAU : RÉCAPITULATIF DU MOIS SÉLECTIONNÉ ---
+        st.divider()
+        
+        # Calcul des compteurs pour le mois affiché
+        missions_mois = 0
+        ca_encaisse = 0.0
+        ca_attente = 0.0
+        
+        for _, r in df_c.iterrows():
+            try:
+                d_str = str(r.get('DateNav', '')).strip()
+                if '/' in d_str:
+                    parts = d_str.split('/')
+                    if int(parts[1]) == sel_m and int(parts[2]) == sel_y:
+                        missions_mois += 1
+                        prix = float(str(r.get('Prix', '0')).replace('€','').strip() or 0)
+                        
+                        # Utilisation de notre nouvelle logique de paiement
+                        p_val = str(r.get('Paiement', '')).lower()
+                        if "pay" in p_val and "non" not in p_val and "un" not in p_val:
+                            ca_encaisse += prix
+                        else:
+                            ca_attente += prix
+            except:
+                continue
+
+        # Affichage en colonnes
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Missions ce mois", f"{missions_mois}")
+        c2.metric("Encaissé", f"{ca_encaisse:.2f} €", delta_color="normal")
+        c3.metric("À percevoir", f"{ca_attente:.2f} €", delta="- " if ca_attente > 0 else None)
 
 # --- 8. PAGE MAINTENANCE ---
 elif st.session_state.page == "MAINT":
