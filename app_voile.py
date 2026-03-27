@@ -483,7 +483,98 @@ elif st.session_state.page == "PLANNING":
     c3.metric("À percevoir", f"{ca_attente:.2f} €")
 
 # --- FIN DU BLOC PLANNING ---
+# =================================================================
+# --- 7. PAGE STATS (TABLEAU DE BORD FINANCIER 2026) ---
+# =================================================================
+elif st.session_state.page == "STATS":
+    st.subheader("📊 Bilan & Performance Vesta 2026")
 
+    # 1. INITIALISATION DES DONNÉES (12 mois forcés)
+    m_noms_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+    stats_mois = {i: {"recettes": 0.0, "prev": 0.0, "frais": 0.0} for i in range(1, 13)}
+
+    # --- CALCUL DES RECETTES ET PRÉVISIONNEL (Depuis CONTACTS) ---
+    for _, r in df_c.iterrows():
+        try:
+            statut = str(r.get('Statut', '')).lower()
+            if statut in ["refusé", "archivé", "supprimé"]: continue
+            
+            # Extraction du prix
+            prix = float(str(r.get('Prix', '0')).replace('€','').replace(' ','').strip() or 0)
+            
+            # Logique Paiement
+            p_val = str(r.get('Paiement', '')).lower()
+            is_paye = ("pay" in p_val) and not any(x in p_val for x in ["un", "non", "pas"])
+            
+            # Extraction du mois
+            d_str = str(r.get('DateNav', ''))
+            if '/' in d_str:
+                m_idx = int(d_str.split('/')[1])
+                
+                if is_paye:
+                    stats_mois[m_idx]["recettes"] += prix
+                else:
+                    # Si c'est OK mais non payé, ou En attente -> c'est du prévisionnel
+                    stats_mois[m_idx]["prev"] += prix
+        except:
+            continue
+
+    # --- CALCUL DES FRAIS (Depuis MAINTENANCE) ---
+    # On suppose que df_m est votre DataFrame de maintenance
+    if 'df_m' in locals() or 'df_m' in globals():
+        for _, f in df_m.iterrows():
+            try:
+                # Extraction du montant du frais
+                montant_frais = float(str(f.get('Montant', '0')).replace('€','').strip() or 0)
+                d_frais = str(f.get('Date', ''))
+                if '/' in d_frais:
+                    m_f = int(d_frais.split('/')[1])
+                    if m_f in stats_mois:
+                        stats_mois[m_f]["frais"] += montant_frais
+            except:
+                continue
+
+    # 2. CRÉATION DU TABLEAU DE DONNÉES CHRONOLOGIQUE
+    data_table = []
+    for i in range(1, 13):
+        data_table.append({
+            "Mois": m_noms_courts[i-1],
+            "Recettes (Payé)": stats_mois[i]["recettes"],
+            "Prévisionnel (Attente)": stats_mois[i]["prev"],
+            "Frais (Maint.)": stats_mois[i]["frais"],
+            "Solde Réel": stats_mois[i]["recettes"] - stats_mois[i]["frais"]
+        })
+
+    df_stats = pd.DataFrame(data_table)
+
+    # 3. AFFICHAGE DU GRAPHIQUE CHRONOLOGIQUE
+    st.write("📈 **Évolution mensuelle (Recettes vs Prévisionnel)**")
+    # On utilise un graphique groupé pour comparer
+    st.bar_chart(df_stats, x="Mois", y=["Recettes (Payé)", "Prévisionnel (Attente)"], color=["#27ae60", "#f1c40f"])
+
+    # 4. LE TABLEAU RÉCAPITULATIF COMPLET
+    st.write("📋 **Détail financier par mois**")
+    st.dataframe(df_stats, use_container_width=True, hide_index=True)
+
+    # 5. BILAN GLOBAL (BAS DE TABLEAU)
+    st.divider()
+    total_recettes = df_stats["Recettes (Payé)"].sum()
+    total_prev = df_stats["Prévisionnel (Attente)"].sum()
+    total_frais = df_stats["Frais (Maint.)"].sum()
+    bilan_final = total_recettes - total_frais
+
+    st.write("### 🏁 Bilan Annuel")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total Encaissé", f"{total_recettes:,.2f} €")
+    c2.metric("Total Attendu", f"{total_prev:,.2f} €", delta=f"+{total_prev:,.2f}")
+    c3.metric("Total Frais", f"{total_frais:,.2f} €", delta=f"-{total_frais:,.2f}", delta_color="inverse")
+    
+    # Couleur du bilan final
+    color_bilan = "normal" if bilan_final >= 0 else "inverse"
+    c4.metric("SOLDE NET", f"{bilan_final:,.2f} €", delta="Résultat Réel", delta_color=color_bilan)
+
+    if total_prev > 0:
+        st.warning(f"⚠️ Note : Si tout le prévisionnel est encaissé, votre solde montera à **{(bilan_final + total_prev):,.2f} €**.")
 # --- 8. PAGE MAINTENANCE ---
 elif st.session_state.page == "MAINT":
     st.subheader("🔧 Maintenance & Frais")
@@ -742,100 +833,7 @@ elif st.session_state.page == "LOG":
     else:
         st.info("Aucun trajet dans le livre de bord.")
         
-# =================================================================
-# --- 7. PAGE STATS (TABLEAU DE BORD VESTA 2026) ---
-# =================================================================
-elif st.session_state.page == "STATS":
-    st.subheader("📊 Tableau de Bord & Performance")
 
-    # 1. PRÉPARATION DES DONNÉES FINANCIÈRES
-    total_ca_prevu = 0.0
-    total_ca_encaisse = 0.0
-    total_missions = 0
-    
-    # Dictionnaires pour les graphiques
-    ca_par_mois = {m: 0.0 for m in range(1, 13)}
-    repartition_client = {"SOCIÉTÉ": 0, "PARTICULIER": 0}
-    
-    for _, r in df_c.iterrows():
-        try:
-            # On ignore les dossiers refusés ou archivés (selon ton choix)
-            statut_brut = str(r.get('Statut', '')).lower()
-            if statut_brut in ["refusé", "archivé", "supprimé"]:
-                continue
-                
-            # Extraction du prix
-            prix = float(str(r.get('Prix', '0')).replace('€','').strip() or 0)
-            total_ca_prevu += prix
-            total_missions += 1
-            
-            # Vérification du paiement (notre règle d'or)
-            p_val = str(r.get('Paiement', '')).lower()
-            is_paye = ("pay" in p_val) and not any(x in p_val for x in ["un", "non", "pas"])
-            if is_paye:
-                total_ca_encaisse += prix
-            
-            # Stats par mois
-            d_str = str(r.get('DateNav', ''))
-            if '/' in d_str:
-                m_idx = int(d_str.split('/')[1])
-                ca_par_mois[m_idx] += prix
-                
-            # Type de client
-            soc = str(r.get('Société', 'PARTICULIER')).upper()
-            if "PARTICULIER" in soc or soc == "" or soc == "-":
-                repartition_client["PARTICULIER"] += 1
-            else:
-                repartition_client["SOCIÉTÉ"] += 1
-        except:
-            continue
-
-    # 2. AFFICHAGE DES INDICATEURS CLÉS (KPI)
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Missions Validées", f"{total_missions}")
-    c2.metric("CA Encaissé", f"{total_ca_encaisse:,.2f} €")
-    
-    reste_a_percevoir = total_ca_prevu - total_ca_encaisse
-    c3.metric("Reste à percevoir", f"{reste_a_percevoir:,.2f} €", 
-              delta=f"-{reste_a_percevoir:,.2f}" if reste_a_percevoir > 0 else None, 
-              delta_color="inverse")
-
-    st.divider()
-
-    # 3. GRAPHIQUE DU CA MENSUEL (Bar Chart)
-    st.write("📈 **Évolution du Chiffre d'Affaires (Prévisionnel)**")
-    m_noms_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
-    data_ca = pd.DataFrame({
-        'Mois': m_noms_courts,
-        'CA (€)': [ca_par_mois[i] for i in range(1, 13)]
-    })
-    st.bar_chart(data=data_ca, x='Mois', y='CA (€)', color="#1a2a6c")
-
-    # 4. RÉPARTITION CLIENTS & TAUX D'ENCAISSEMENT
-    col_left, col_right = st.columns(2)
-    
-    with col_left:
-        st.write("👥 **Type de Clientèle**")
-        df_clients = pd.DataFrame({
-            'Type': list(repartition_client.keys()),
-            'Nombre': list(repartition_client.values())
-        })
-        # Petit tableau propre faute de Pie Chart natif simple
-        st.dataframe(df_clients, use_container_width=True, hide_index=True)
-
-    with col_right:
-        st.write("💰 **Santé Financière**")
-        if total_ca_prevu > 0:
-            taux = (total_ca_encaisse / total_ca_prevu) * 100
-            st.progress(taux / 100)
-            st.write(f"Taux d'encaissement : **{taux:.1f}%**")
-        else:
-            st.info("Aucune donnée financière.")
-
-    # 5. PETIT RÉCAPITULATIF POUR LE COMPTABLE (Optionnel)
-    with st.expander("📝 Voir le détail par mois pour ma comptabilité"):
-        df_compta = data_ca[data_ca['CA (€)'] > 0]
-        st.table(df_compta)
 
 
 
