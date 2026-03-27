@@ -637,6 +637,38 @@ elif st.session_state.page == "MAINT":
                 if c2.button("🗑️ Supprimer", key=f"del_req_{i}", use_container_width=True):
                     st.session_state.m_confirm_del = i
                     st.rerun()
+   # --- 4. TABLEAU RÉCAPITULATIF GLOBAL (EN BAS DE PAGE) ---
+    st.divider()
+    st.write("📊 **Vue d'ensemble du carnet d'entretien**")
+
+    if not df_m.empty:
+        # On prépare une copie propre pour l'affichage
+        df_tableau = df_m.copy()
+        
+        # On s'assure que les colonnes sont bien nommées pour le tableau
+        # On gère les anciens noms "Cause/Prix" au cas où
+        if 'Cause' in df_tableau.columns and 'Travaux' not in df_tableau.columns:
+            df_tableau = df_tableau.rename(columns={'Cause': 'Travaux'})
+        if 'Prix' in df_tableau.columns and 'Montant' not in df_tableau.columns:
+            df_tableau = df_tableau.rename(columns={'Prix': 'Montant'})
+
+        # Affichage du tableau interactif
+        st.dataframe(
+            df_tableau[['Date', 'Travaux', 'Montant']], 
+            column_config={
+                "Date": st.column_config.TextColumn("Date"),
+                "Travaux": st.column_config.TextColumn("Nature des travaux"),
+                "Montant": st.column_config.NumberColumn("Coût (€)", format="%.2f €"),
+            },
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # Petit rappel du total en pied de tableau
+        total_m = pd.to_numeric(df_tableau['Montant'], errors='coerce').sum()
+        st.info(f"💰 **Total cumulé des frais : {total_m:,.2f} €**")
+    else:
+        st.write("Aucune donnée à afficher dans le tableau.")                 
 
 # --- 10. PAGE NOTES ---
 elif st.session_state.page == "NOTES":
