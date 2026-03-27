@@ -196,72 +196,49 @@ if st.session_state.page == "CONTACTS":
             st.session_state.edit_idx = None
             st.rerun()
 
-# --- 2. NAVIGATION AVEC INDICATEUR D'ÉTAT ---
+ # --- 2. NAVIGATION AVEC INDICATEUR D'ÉTAT ---
     st.divider()
     n1, n2, n3 = st.columns(3)
     
-    # On récupère l'état actuel (view_arc)
     view_arc = st.session_state.get('view_archive', False)
 
-    # Bouton EN COURS : Bleu si actif (non-archive), Gris si inactif
-    type_encours = "primary" if not view_arc else "secondary"
-    if n1.button("📂 En Cours", key="nav_active", use_container_width=True, type=type_encours):
+    if n1.button("📂 En Cours", key="nav_active", use_container_width=True, type="primary" if not view_arc else "secondary"):
         st.session_state.view_archive = False
         st.rerun()
 
-    # Bouton ARCHIVES : Bleu si actif, Gris si inactif
-    # CORRECTION ICI : on utilise bien 'view_arc'
-    type_archive = "primary" if view_arc else "secondary"
-    if n2.button("🗄️ Archives", key="nav_archive", use_container_width=True, type=type_archive):
+    if n2.button("🗄️ Archives", key="nav_archive", use_container_width=True, type="primary" if view_arc else "secondary"):
         st.session_state.view_archive = True
         st.rerun()
 
-    # Bouton AJOUTER : Neutre
     if n3.button("➕ Ajouter", key="nav_add_new", use_container_width=True):
-        new_row = {"Prénom": "Nouveau", "Nom": "Contact", "Société": "PARTICULIER", "Statut": "En attente", "Paiement": "Unpaid"}
+        new_row = {"Prénom": "Nouveau", "Nom": "Contact", "Société": "PARTICULIER", "Statut": "En attente", "Paiement": "Non payé"}
         df_c = pd.concat([df_c, pd.DataFrame([new_row])], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.session_state.edit_idx = len(df_c) - 1
         st.rerun()
+
+    # --- 3. CRÉATION DE DF_DISP (Indispensable avant la boucle) ---
+    if view_arc:
+        df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])]
+    else:
+        df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
+
+    # --- 4. AFFICHAGE DES FICHES ---
     for i, r in df_disp.iterrows():
-        # 1. On récupère la valeur EXACTE enregistrée
-        p_reel = str(r.get('Paiement', 'Non payé')).strip()
-        
-        # 2. LOGIQUE DE COULEUR (On ne cherche plus midi à quatorze heures)
-        # On passe tout en minuscule pour être sûr, et on cherche si c'est positif
-        p_test = p_reel.lower()
-        
-        # C'est payé SI : c'est écrit "payé" OU "paid" 
-        # ET QUE ce n'est pas "non", "un" ou "pas"
-        is_p_ok = ("pay" in p_test or "paid" in p_test) and ("non" not in p_test and "un" not in p_test and "pas" not in p_test)
-        
-        if is_p_ok:
-            p_label = "Payé"
-            p_col = "#27ae60" # Vert
-        else:
-            p_label = "Non payé"
-            p_col = "#e67e22" # Orange
-            
-        # 3. STATUT (OK / En attente / etc.)
-        s = r.get('Statut', 'En attente')
-        s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
-# --- 3. AFFICHAGE VISUEL DES FICHES ---
-    df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
-    
-    for i, r in df_disp.iterrows():
-        # On récupère les valeurs de la ligne actuelle (r)
+        # On récupère les valeurs
         s = str(r.get('Statut', 'En attente'))
         p = str(r.get('Paiement', 'Non payé'))
         
-        # --- LOGIQUE PAIEMENT (ALIGNEE DANS LA BOUCLE) ---
-        p_str = p.lower().strip()
-        is_p_ok = ("pay" in p_str) and ("non" not in p_str) and ("un" not in p_str) and ("pas" not in p_str)
+        # Logique de détection "Zéro Erreur" pour Benoit et les autres
+        p_val = p.lower().strip()
+        is_p_ok = ("pay" in p_val or "paid" in p_val) and ("non" not in p_val and "un" not in p_val and "pas" not in p_val)
         
         p_label = "Payé" if is_p_ok else "Non payé"
         p_col = "#27ae60" if is_p_ok else "#e67e22"
         s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
-
-        # La suite du code (HTML, etc.) doit aussi être alignée ici...
+        
+        # La suite de votre HTML ici...
+        
         
         # --- INFOS CONTACT ---
         t_raw = str(r.get('Téléphone','')).strip()
