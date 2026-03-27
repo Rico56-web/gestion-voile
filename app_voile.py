@@ -519,27 +519,26 @@ elif st.session_state.page == "STATS":
                 else: stats_mois[m_idx]["pre"] += p
         except: continue
 
-# --- CALCULS FRAIS (UNIVERSEL : SLASH, TIRETS OU OBJET DATE) ---
+# --- CALCULS FRAIS (VERSION AUTO-DÉTECTION DE DATE) ---
     if not df_m_stats.empty:
         for _, f in df_m_stats.iterrows():
             try:
-                # 1. Montant
+                # 1. Nettoyage du Montant (on gère tout : €, virgules, espaces)
                 v_f = f.get('Montant', f.get('Prix', 0))
-                m_frais = float(str(v_f).replace('€','').replace(',','.').strip() or 0)
+                m_frais = float(str(v_f).replace('€','').replace(',','.').replace(' ','').strip() or 0)
                 
-                # 2. Extraction du mois intelligente
-                raw_date = f.get('Date', '')
-                m_idx = None
-                
-                # On utilise Pandas pour convertir n'importe quel format (ISO, Slash, etc.)
-                date_clean = pd.to_datetime(raw_date, errors='coerce')
-                
-                if pd.notnull(date_clean):
-                    m_idx = date_clean.month
-                
-                # 3. Attribution au mois dans le dictionnaire stats_mois
-                if m_idx and 1 <= m_idx <= 12:
-                    stats_mois[m_idx]["fra"] += m_frais
+                # 2. Extraction du mois (La méthode la plus sûre)
+                raw_date = f.get('Date', None)
+                if raw_date:
+                    # pd.to_datetime comprend 2026-03-27, 27/03/2026 et les chiffres bruts
+                    dt_objet = pd.to_datetime(raw_date, dayfirst=True, errors='coerce')
+                    
+                    if pd.notnull(dt_objet):
+                        m_idx = dt_objet.month # Ici, il extraira 3 pour Mars
+                        
+                        # 3. On ajoute au bon mois
+                        if 1 <= m_idx <= 12:
+                            stats_mois[m_idx]["fra"] += m_frais
             except: 
                 continue
 
