@@ -742,7 +742,100 @@ elif st.session_state.page == "LOG":
     else:
         st.info("Aucun trajet dans le livre de bord.")
         
+# =================================================================
+# --- 7. PAGE STATS (TABLEAU DE BORD VESTA 2026) ---
+# =================================================================
+elif st.session_state.page == "STATS":
+    st.subheader("📊 Tableau de Bord & Performance")
 
+    # 1. PRÉPARATION DES DONNÉES FINANCIÈRES
+    total_ca_prevu = 0.0
+    total_ca_encaisse = 0.0
+    total_missions = 0
+    
+    # Dictionnaires pour les graphiques
+    ca_par_mois = {m: 0.0 for m in range(1, 13)}
+    repartition_client = {"SOCIÉTÉ": 0, "PARTICULIER": 0}
+    
+    for _, r in df_c.iterrows():
+        try:
+            # On ignore les dossiers refusés ou archivés (selon ton choix)
+            statut_brut = str(r.get('Statut', '')).lower()
+            if statut_brut in ["refusé", "archivé", "supprimé"]:
+                continue
+                
+            # Extraction du prix
+            prix = float(str(r.get('Prix', '0')).replace('€','').strip() or 0)
+            total_ca_prevu += prix
+            total_missions += 1
+            
+            # Vérification du paiement (notre règle d'or)
+            p_val = str(r.get('Paiement', '')).lower()
+            is_paye = ("pay" in p_val) and not any(x in p_val for x in ["un", "non", "pas"])
+            if is_paye:
+                total_ca_encaisse += prix
+            
+            # Stats par mois
+            d_str = str(r.get('DateNav', ''))
+            if '/' in d_str:
+                m_idx = int(d_str.split('/')[1])
+                ca_par_mois[m_idx] += prix
+                
+            # Type de client
+            soc = str(r.get('Société', 'PARTICULIER')).upper()
+            if "PARTICULIER" in soc or soc == "" or soc == "-":
+                repartition_client["PARTICULIER"] += 1
+            else:
+                repartition_client["SOCIÉTÉ"] += 1
+        except:
+            continue
+
+    # 2. AFFICHAGE DES INDICATEURS CLÉS (KPI)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Missions Validées", f"{total_missions}")
+    c2.metric("CA Encaissé", f"{total_ca_encaisse:,.2f} €")
+    
+    reste_a_percevoir = total_ca_prevu - total_ca_encaisse
+    c3.metric("Reste à percevoir", f"{reste_a_percevoir:,.2f} €", 
+              delta=f"-{reste_a_percevoir:,.2f}" if reste_a_percevoir > 0 else None, 
+              delta_color="inverse")
+
+    st.divider()
+
+    # 3. GRAPHIQUE DU CA MENSUEL (Bar Chart)
+    st.write("📈 **Évolution du Chiffre d'Affaires (Prévisionnel)**")
+    m_noms_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+    data_ca = pd.DataFrame({
+        'Mois': m_noms_courts,
+        'CA (€)': [ca_par_mois[i] for i in range(1, 13)]
+    })
+    st.bar_chart(data=data_ca, x='Mois', y='CA (€)', color="#1a2a6c")
+
+    # 4. RÉPARTITION CLIENTS & TAUX D'ENCAISSEMENT
+    col_left, col_right = st.columns(2)
+    
+    with col_left:
+        st.write("👥 **Type de Clientèle**")
+        df_clients = pd.DataFrame({
+            'Type': list(repartition_client.keys()),
+            'Nombre': list(repartition_client.values())
+        })
+        # Petit tableau propre faute de Pie Chart natif simple
+        st.dataframe(df_clients, use_container_width=True, hide_index=True)
+
+    with col_right:
+        st.write("💰 **Santé Financière**")
+        if total_ca_prevu > 0:
+            taux = (total_ca_encaisse / total_ca_prevu) * 100
+            st.progress(taux / 100)
+            st.write(f"Taux d'encaissement : **{taux:.1f}%**")
+        else:
+            st.info("Aucune donnée financière.")
+
+    # 5. PETIT RÉCAPITULATIF POUR LE COMPTABLE (Optionnel)
+    with st.expander("📝 Voir le détail par mois pour ma comptabilité"):
+        df_compta = data_ca[data_ca['CA (€)'] > 0]
+        st.table(df_compta)
 
 
 
