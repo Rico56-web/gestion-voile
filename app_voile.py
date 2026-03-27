@@ -151,13 +151,13 @@ if st.session_state.page == "CONTACTS":
                 l_s = ["En attente", "OK", "Refusé", "Terminé"]
                 u_statut = c_st.selectbox("Statut Mission", l_s, index=l_s.index(r.get('Statut')) if r.get('Statut') in l_s else 0)
                 # --- REMPLACEZ LA LIGNE 134 PAR CE BLOC ---
-options_p = ["Non payé", "Payé"]
-val_actuelle = str(r.get('Paiement', '')).lower()
+                options_p = ["Non payé", "Payé"]
+                val_actuelle = str(r.get('Paiement', '')).lower()
 
-# On définit l'index : 1 (Payé) si on trouve "pay" ou "paid", sinon 0
-idx_p = 1 if ("pay" in val_actuelle and "non" not in val_actuelle and "un" not in val_actuelle) else 0
+                # On définit l'index : 1 (Payé) si on trouve "pay" ou "paid", sinon 0
+                idx_p = 1 if ("pay" in val_actuelle and "non" not in val_actuelle and "un" not in val_actuelle) else 0
 
-u_paye = c_pa.selectbox("Paiement", options_p, index=idx_p)
+                u_paye = c_pa.selectbox("Paiement", options_p, index=idx_p)
                 
                 c3, c4, c5 = st.columns(3)
                 u_date = c3.text_input("Date Nav", value=str(r.get('DateNav', '')))
