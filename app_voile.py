@@ -309,15 +309,17 @@ if st.session_state.page == "CONTACTS":
                 dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
                 if yv < 100: yv += 2000
                 
-                if mv == sel_m and yv == sel_y:
-                    s_clean = str(r.get('Statut', '')).strip().lower()
-                    p_clean = str(r.get('Paiement', '')).strip().lower()
+           if mv == sel_m and yv == sel_y:
+                    s_val = str(r.get('Statut', '')).strip().lower()
+                    p_val = str(r.get('Paiement', '')).strip().lower()
                     
-                    date_mission = date(yv, mv, dv)
-                    # Détection stricte du paiement : seulement si contient "pay"
-                    is_paye = "pay" in p_clean 
-                    # Détection stricte du passé : avant AUJOURD'HUI
-                    is_passe = date_mission < aujourdhui
+                    # --- SÉCURITÉ : ON IGNORE LES FICHES SUPPRIMÉES/ARCHIVÉES ---
+                    if s_val in ["archivé", "archive", "supprimé", ""]:
+                        continue # On saute cette fiche, elle ne doit pas colorer le calendrier
+                    
+                    this_date = date(yv, mv, dv)
+                    is_paye = ("pay" in p_val) and (p_val != "")
+                    is_dans_le_passe = this_date < aujourdhui
                     
                     # --- LOGIQUE DE COULEUR ---
                     if is_passe:
