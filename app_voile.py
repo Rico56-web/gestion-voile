@@ -406,6 +406,54 @@ elif st.session_state.page == "PLANNING":
         h_cal += '</table>'
         st.markdown(h_cal, unsafe_allow_html=True)
         st.write("🔴 Impayé | 🔵 Payé | 🟢 OK | 🟡 Attente")
+# --- NOUVEAU : LISTE DÉTAILLÉE DES RÉSERVATIONS DU MOIS ---
+        st.markdown(f"### 📋 Détails des réservations - {m_noms[sel_m-1]} {sel_y}")
+        
+        # On filtre les données pour le mois et l'année sélectionnés
+        reservations_mois = []
+        for _, r in df_c.iterrows():
+            try:
+                d_str = str(r.get('DateNav', '')).strip()
+                if '/' in d_str:
+                    parts = d_str.split('/')
+                    d_m, d_y = int(parts[1]), int(parts[2])
+                    if d_y < 100: d_y += 2000
+                    
+                    if d_m == sel_m and d_y == sel_y:
+                        # On ne prend pas les refusés ou archivés dans le planning
+                        if str(r.get('Statut','')).lower() not in ["refusé", "archivé"]:
+                            reservations_mois.append(r)
+            except:
+                continue
+
+        if not reservations_mois:
+            st.info("Aucune réservation pour ce mois.")
+        else:
+            # Création d'un petit tableau propre ou de fiches compactes
+            for res in reservations_mois:
+                # Logique de couleur pour le paiement dans la liste
+                p_val = str(res.get('Paiement', '')).lower()
+                is_p = ("pay" in p_val) and not any(x in p_val for x in ["non", "pas", "un"])
+                p_txt = "✅ PAYÉ" if is_p else "⏳ À PAYER"
+                p_color = "#27ae60" if is_p else "#e67e22"
+                
+                # Affichage d'une ligne stylisée
+                st.markdown(f"""
+                <div style="display: flex; justify-content: space-between; align-items: center; 
+                            padding: 10px; border-bottom: 1px solid #eee; background: white; color: black;">
+                    <div style="flex: 2;">
+                        <b>{res.get('DateNav', '--')}</b> | {res.get('Prénom','')} {res.get('Nom','').upper()}
+                        <br><small style="color: #666;">{res.get('Société','PARTICULIER')}</small>
+                    </div>
+                    <div style="flex: 1; text-align: center;">
+                        ⛵ <b>{res.get('NbreJours', 1)} jrs</b>
+                    </div>
+                    <div style="flex: 1; text-align: right;">
+                        <b style="font-size: 1.1rem;">{res.get('Prix', '0')} €</b><br>
+                        <span style="color: {p_color}; font-size: 0.7rem; font-weight: bold;">{p_txt}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 # --- NOUVEAU : RÉCAPITULATIF DU MOIS SÉLECTIONNÉ ---
         st.divider()
         
