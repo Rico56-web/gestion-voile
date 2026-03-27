@@ -611,7 +611,7 @@ elif st.session_state.page == "MAINT":
             sauvegarder_data(df_m, "maint.json"); st.session_state.m_edit_idx = None; st.rerun()
     else:
         for i, r in df_m.iterrows():
-            st.markdown(f'<div class="fiche-globale">📅 {r["Date"]} | 🏷️ {r["Cause"]} | 💰 <b>{float(r["Prix"] or 0):.2f} €</b></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="fiche-globale">📅 {r.get("Date", "N/A")} | 🏷️ {r.get("Travaux", "N/A")} | 💰 <b>{float(r.get("Montant", 0)):.2f} €</b></div>', unsafe_allow_html=True)
             if st.session_state.maint_confirm_del == i:
                 st.warning("Confirmer la suppression ?")
                 c1, c2 = st.columns(2)
