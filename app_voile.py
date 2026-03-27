@@ -326,22 +326,22 @@ elif st.session_state.page == "PLANNING":
         sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
 
     # 3. FILTRAGE ET LOGIQUE DES COULEURS
-        jours_occ = {}
-        for _, r in df_c.iterrows():
-            try:
-                d_str = str(r.get('DateNav', '')).strip()
-                if '/' not in d_str: continue
-                parts = d_str.split('/')
-                dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
-                if yv < 100: yv += 2000
+    jours_occ = {}
+    for _, r in df_c.iterrows():
+     try:
+    d_str = str(r.get('DateNav', '')).strip()
+     if '/' not in d_str: continue
+    parts = d_str.split('/')
+    dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
+    if yv < 100: yv += 2000
                 
-                # --- LA LIGNE 311 EST ICI (BIEN ALIGNÉE) ---
-                if mv == sel_m and yv == sel_y:
-                    s_val = str(r.get('Statut', '')).strip().lower()
-                    p_val = str(r.get('Paiement', '')).strip().lower()
+    # --- LA LIGNE 311 EST ICI (BIEN ALIGNÉE) ---
+    if mv == sel_m and yv == sel_y:
+    s_val = str(r.get('Statut', '')).strip().lower()
+     p_val = str(r.get('Paiement', '')).strip().lower()
                     
-                    # On ignore les fiches vides ou archivées
-                    if s_val in ["", "archivé", "archive", "supprimé"]:
+    # On ignore les fiches vides ou archivées
+    if s_val in ["", "archivé", "archive", "supprimé"]:
                         continue
                     
                     this_date = date(yv, mv, dv)
