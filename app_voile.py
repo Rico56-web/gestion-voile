@@ -521,17 +521,30 @@ elif st.session_state.page == "STATS":
                 else: stats_mois[m_idx]["prev"] += prix
         except: continue
 
-    # --- CALCUL DES FRAIS RÉELS (Depuis maint.json chargé plus haut) ---
+# --- CALCUL DES FRAIS RÉELS (VERSION BLINDÉE) ---
     for _, f in df_m_stats.iterrows():
         try:
-            # On cherche dans toutes les colonnes possibles (Montant, Prix, ou Cause/Prix)
-            m_frais = float(str(f.get('Montant', f.get('Prix', 0))).replace('€','').replace(' ','').strip() or 0)
+            # 1. NETTOYAGE DU MONTANT (On gère €, espaces, virgules et points)
+            brut_prix = str(f.get('Montant', f.get('Prix', '0')))
+            clean_prix = brut_prix.replace('€','').replace(' ','').replace(',','.').strip()
+            m_frais = float(clean_prix if clean_prix else 0)
+            
+            # 2. EXTRACTION DU MOIS (On gère les dates JJ/MM/AAAA ou AAAA-MM-DD)
             d_frais = str(f.get('Date', ''))
-            if '/' in d_frais:
+            m_idx = None
+            
+            if '/' in d_frais: # Format JJ/MM/AAAA
                 m_idx = int(d_frais.split('/')[1])
-                if m_idx in stats_mois:
-                    stats_mois[m_idx]["frais"] += m_frais
-        except: continue
+            elif '-' in d_frais: # Format AAAA-MM-DD
+                parts = d_frais.split('-')
+                m_idx = int(parts[1]) if len(parts[0]) == 4 else int(parts[1])
+
+            # 3. MISE À JOUR DES STATS
+            if m_idx and 1 <= m_idx <= 12:
+                stats_mois[m_idx]["frais"] += m_frais
+        except Exception as e:
+            # Si une ligne pose problème, on passe à la suivante sans tout bloquer
+            continue
 
     # 2. CRÉATION DU TABLEAU BILAN CHRONOLOGIQUE
     data_table = []
