@@ -634,7 +634,7 @@ elif st.session_state.page == "MAINT":
     ca2.metric("Panier Moyen", f"{panier_moyen:.2f} €", help="Revenu moyen par contrat encaissé")
     
     
-    # --- 9. PAGE FACTURES ---
+# --- 9. PAGE FACTURES ---
     elif st.session_state.page == "FACTURES":
     st.subheader("📄 Facturation Mensuelle (CMN)")
     prev_m_idx = now.month - 1 if now.month > 1 else 12
