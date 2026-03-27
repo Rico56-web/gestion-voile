@@ -215,10 +215,20 @@ if st.session_state.page == "CONTACTS":
     # --- 3. AFFICHAGE VISUEL DES FICHES ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-    for i, r in df_disp.iterrows():
-        s, p = r.get('Statut', 'En attente'), r.get('Paiement', 'Unpaid')
+     for i, r in df_disp.iterrows():
+        s = r.get('Statut', 'En attente')
+        p = r.get('Paiement', 'Non payé')
+        
+        # --- COULEUR STATUT ---
         s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
-        p_col = "#27ae60" if p == "Paid" else "#e67e22"
+        
+        # --- COULEUR PAIEMENT (DÉTECTION LARGE) ---
+        p_str = str(p).lower()
+        # Si c'est un vrai paiement positif (contient "pay" mais pas "non/un/pas")
+        is_p_ok = ("pay" in p_str) and ("non" not in p_str) and ("un" not in p_str) and ("pas" not in p_str)
+        p_col = "#27ae60" if is_p_ok else "#e67e22" # Vert foncé si payé, Orange sinon
+        
+        # --- INFOS CONTACT ---
         t_raw = str(r.get('Téléphone','')).strip()
         t_link = t_raw.replace(" ", "").replace(".", "").replace("-", "")
         mail = str(r.get('Email', '')).strip()
