@@ -95,6 +95,19 @@ for i, name in enumerate(menu):
 df_c = charger_data("contacts.json")
 df_m = charger_data("maint.json")
 
+# --- NETTOYAGE AUTOMATIQUE DES DONNÉES ---
+def harmoniser_paiements(val):
+    v = str(val).strip().lower()
+    if not v or "un" in v or "non" in v or "pas" in v:
+        return "Non payé"
+    if "pay" in v:
+        return "Payé"
+    return "Non payé"
+
+# On applique le nettoyage sur toute la colonne d'un coup
+if 'Paiement' in df_c.columns:
+    df_c['Paiement'] = df_c['Paiement'].apply(harmoniser_paiements)
+
 # --- TRI CHRONOLOGIQUE SÉCURISÉ (Version Robuste) ---
 if not df_c.empty and 'DateNav' in df_c.columns:
     try:
