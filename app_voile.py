@@ -248,10 +248,7 @@ if st.session_state.page == "CONTACTS":
 
     # --- 3. AFFICHAGE VISUEL DES FICHES ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
-
-    
-        
-        # --- COULEUR PAIEMENT (DÉTECTION LARGE) ---
+    # --- COULEUR PAIEMENT (DÉTECTION LARGE) ---
         p_str = str(p).lower()
         # Si c'est un vrai paiement positif (contient "pay" mais pas "non/un/pas")
         is_p_ok = ("pay" in p_str) and ("non" not in p_str) and ("un" not in p_str) and ("pas" not in p_str)
