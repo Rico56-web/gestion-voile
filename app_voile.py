@@ -565,53 +565,86 @@ elif st.session_state.page == "STATS":
     ca1.metric("Jours en mer", f"{int(jours)} j")
     ca2.metric("Panier Moyen", f"{panier:.2f} €")
 
-    
 # =================================================================
-# --- 8. PAGE MAINTENANCE (CARNET DE SANTÉ VESTA) ---
+# --- 8. PAGE MAINTENANCE (CORRIGÉE : SUPPRESSION & ÉDITION) ---
 # =================================================================
 elif st.session_state.page == "MAINT":
     st.subheader("🔧 Maintenance & Frais")
     
-    # 1. BOUTON NOUVEAU
-    if st.button("➕ NOUVEAU FRAIS", use_container_width=True):
-        new_m = {"Date": datetime.now().strftime("%d/%m/%Y"), "Travaux": "Achat", "Montant": 0.0, "Etat": "Fini"}
+    # 1. BOUTON NOUVEAU (Toujours en haut)
+    if st.button("➕ AJOUTER UN NOUVEAU FRAIS", use_container_width=True):
+        new_m = {"Date": datetime.now().strftime("%d/%m/%Y"), "Travaux": "Nouvel achat", "Montant": 0.0}
+        # On insère en haut de la liste (index 0)
         df_m = pd.concat([pd.DataFrame([new_m]), df_m], ignore_index=True)
-        sauvegarder_data(df_m, "maintenance.json"); st.rerun()
+        sauvegarder_data(df_m, "maintenance.json")
+        st.rerun()
 
-    # 2. ÉDITION
+    st.divider()
+
+    # 2. ZONE D'ÉDITION (Si un index est sélectionné)
     if st.session_state.get('m_edit_idx') is not None:
         idx = st.session_state.m_edit_idx
-        r = df_m.loc[idx]
-        with st.form("edit_maint"):
-            u_d = st.text_input("Date", r.get('Date', ''))
-            u_t = st.text_input("Travaux", r.get('Travaux', ''))
-            u_m = st.text_input("Montant", str(r.get('Montant', '0.00')))
-            if st.form_submit_button("💾 ENREGISTRER"):
-                df_m.at[idx, 'Date'] = u_d
-                df_m.at[idx, 'Travaux'] = u_t
-                df_m.at[idx, 'Montant'] = float(u_m.replace('€','').strip() or 0)
-                sauvegarder_data(df_m, "maintenance.json")
-                st.session_state.m_edit_idx = None
-                st.rerun()
-    
-    # 3. LISTE DES FICHES
+        # Sécurité : on vérifie que l'index existe encore dans le DF
+        if idx in df_m.index:
+            r = df_m.loc[idx]
+            st.warning(f"Modification de l'entrée n°{idx}")
+            with st.form("edit_maint_form"):
+                u_d = st.text_input("Date", str(r.get('Date', '')))
+                u_t = st.text_input("Travaux / Cause", str(r.get('Travaux', r.get('Cause', ''))))
+                u_m = st.text_input("Montant (€)", str(r.get('Montant', r.get('Prix', '0'))))
+                
+                col_btn1, col_btn2 = st.columns(2)
+                if col_btn1.form_submit_button("💾 ENREGISTRER"):
+                    df_m.at[idx, 'Date'] = u_d
+                    df_m.at[idx, 'Travaux'] = u_t
+                    # On nettoie le prix pour être sûr que c'est un nombre
+                    clean_price = u_m.replace('€','').replace(',','.').strip()
+                    df_m.at[idx, 'Montant'] = float(clean_price or 0)
+                    
+                    sauvegarder_data(df_m, "maintenance.json")
+                    st.session_state.m_edit_idx = None # On quitte le mode édition
+                    st.rerun()
+                
+                if col_btn2.form_submit_button("❌ ANNULER"):
+                    st.session_state.m_edit_idx = None
+                    st.rerun()
+        else:
+            st.session_state.m_edit_idx = None
+            st.rerun()
+
+    # 3. AFFICHAGE DE LA LISTE
     else:
-        for i, r in df_m.iterrows():
-            # Affichage premium
-            st.markdown(f'''
-            <div style="border:1px solid #ddd; padding:10px; border-radius:10px; background:white; color:black; margin-bottom:5px;">
-                📅 {r.get("Date", "N/A")} | 🏷️ {r.get("Travaux", "N/A")} | 💰 <b>{float(r.get("Montant", 0)):.2f} €</b>
-            </div>
-            ''', unsafe_allow_html=True)
-            
-            c1, c2 = st.columns([1, 4])
-            if c1.button("✏️", key=f"em_{i}"):
-                st.session_state.m_edit_idx = i
-                st.rerun()
-            if c2.button("🗑️ SUPPRIMER", key=f"dm_{i}"):
-                df_m = df_m.drop(i).reset_index(drop=True)
-                sauvegarder_data(df_m, "maintenance.json")
-                st.rerun()
+        if df_m.empty:
+            st.info("Aucun frais enregistré.")
+        else:
+            for i, r in df_m.iterrows():
+                # On récupère les valeurs peu importe le nom de la colonne (Montant ou Prix)
+                val_travaux = r.get('Travaux', r.get('Cause', 'N/A'))
+                val_montant = r.get('Montant', r.get('Prix', 0))
+                
+                # Style "Fiche" pour iPhone
+                st.markdown(f'''
+                <div style="border:1px solid #eee; padding:12px; border-radius:10px; background:white; color:black; margin-bottom:5px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <span style="color:#1a2a6c; font-weight:bold;">📅 {r.get("Date", "N/A")}</span><br>
+                    <span style="font-size:1.1rem;">🛠️ {val_travaux}</span><br>
+                    <span style="color:#27ae60; font-weight:bold;">💰 {float(val_montant):.2f} €</span>
+                </div>
+                ''', unsafe_allow_html=True)
+                
+                c1, c2 = st.columns([1, 1])
+                # Bouton Édition
+                if c1.button("✏️ Modifier", key=f"edit_btn_{i}", use_container_width=True):
+                    st.session_state.m_edit_idx = i
+                    st.rerun()
+                
+                # Bouton Suppression
+                if c2.button("🗑️ Supprimer", key=f"del_btn_{i}", use_container_width=True):
+                    # On supprime, on reset l'index et on SAUVEGARDE immédiatement
+                    df_m = df_m.drop(i).reset_index(drop=True)
+                    sauvegarder_data(df_m, "maintenance.json")
+                    st.session_state.m_edit_idx = None # Sécurité pour ne pas éditer un vide
+                    st.rerun()    
+
 
 # --- 10. PAGE NOTES ---
 elif st.session_state.page == "NOTES":
