@@ -445,11 +445,11 @@ else:
 st.divider()
 # ... (Insérez ici le code des 3 colonnes c1, c2, c3 que nous avons vu précédemment) ...
 
-    # --- LISTE DÉTAILLÉE ---
-    st.markdown(f"### 📋 Détails des réservations - {m_noms[sel_m-1]} {sel_y}")
+# --- LISTE DÉTAILLÉE ---
+st.markdown(f"### 📋 Détails des réservations - {m_noms[sel_m-1]} {sel_y}")
     
-    reservations_mois = []
-    # ... (Le reste de votre boucle de filtrage) ...
+reservations_mois = []
+# ... (Le reste de votre boucle de filtrage) ...
 
 
 # --- 8. PAGE MAINTENANCE ---
