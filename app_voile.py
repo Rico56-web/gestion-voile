@@ -519,29 +519,39 @@ elif st.session_state.page == "STATS":
                 else: stats_mois[m_idx]["pre"] += p
         except: continue
 
-    # --- CALCULS FRAIS (MAINTENANCE) - CORRECTION ICI ---
+ # --- CALCULS FRAIS (VERSION COMPATIBLE TIMESTAMP) ---
     if not df_m_stats.empty:
         for _, f in df_m_stats.iterrows():
             try:
-                # 1. Montant
+                # 1. Récupération du montant
                 v_f = f.get('Montant', f.get('Prix', 0))
                 m_frais = float(str(v_f).replace('€','').replace(',','.').strip() or 0)
                 
-                # 2. Extraction précise du mois
-                d_f = str(f.get('Date', ''))
+                # 2. Extraction du mois avec détection de Timestamp
+                d_f = f.get('Date', '')
                 m_idx = None
                 
-                if '/' in d_f:
+                # Cas 1 : C'est un grand nombre (Timestamp comme 1774569600000)
+                if isinstance(d_f, (int, float)) or (isinstance(d_f, str) and d_f.isdigit()):
+                    # On convertit le timestamp en date réelle
+                    dt_object = pd.to_datetime(int(d_f), unit='ms')
+                    m_idx = dt_object.month
+                
+                # Cas 2 : C'est une date texte (JJ/MM/AAAA)
+                elif isinstance(d_f, str) and '/' in d_f:
                     parts = d_f.split('/')
                     if len(parts) >= 2:
-                        # On force la lecture du DEUXIÈME nombre comme étant le mois
-                        m_idx = int(parts[1]) 
-                elif '-' in d_f:
-                    m_idx = int(d_f.split('-')[1])
+                        m_idx = int(parts[1])
+                
+                # Cas 3 : C'est déjà un objet date Python
+                elif hasattr(d_f, 'month'):
+                    m_idx = d_f.month
 
+                # 3. Attribution au mois
                 if m_idx and 1 <= m_idx <= 12:
                     stats_mois[m_idx]["fra"] += m_frais
-            except: continue
+            except: 
+                continue
 
     # --- 2. CONSTRUCTION DU TABLEAU ---
     data_table = []
