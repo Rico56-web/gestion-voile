@@ -318,30 +318,34 @@ elif st.session_state.page == "PLANNING":
                         continue
                     
                     this_date = date(yv, mv, dv)
-    # --- DÉTECTION BILINGUE (VERSION FINALE SÉCURISÉE) ---
-                    # 1. On nettoie bien le texte
+ # --- DÉTECTION "ZÉRO ERREUR" ---
                     p_val = str(r.get('Paiement', '')).strip().lower()
                     
-                    # 2. On définit ce qui est "NON PAYÉ" (Priorité au négatif)
-                    # Si on trouve "un" (unpaid), "non" (non payé) ou "pas" (pas payé)
-                    est_negatif = ("un" in p_val) or ("non" in p_val) or ("pas" in p_val) or (p_val == "")
+                    # On définit très largement ce qui est PAYÉ
+                    # Si ça contient "pay" ou "paid"
+                    contient_pay = ("pay" in p_val) or ("paid" in p_val)
                     
-                    # 3. On définit ce qui est "PAYÉ"
-                    # Il faut qu'il y ait "pay" ET que ce ne soit pas un mot négatif
-                    is_paye = ("pay" in p_val) and not est_negatif
+                    # On définit ce qui ANNULE le paiement (le négatif)
+                    # Si ça contient "un" (unpaid) ou "pas" (pas payé) ou "non"
+                    est_negatif = ("un" in p_val) or ("pas" in p_val) or ("non" in p_val)
+                    
+                    # La règle finale :
+                    is_paye = contient_pay and not est_negatif
                     
                     # --- CALCUL COULEUR ---
                     if this_date < aujourdhui:
-                        # PASSÉ (ex: le 14) : Bleu si payé, sinon Rouge
-                        current_c = "#3498db" if is_paye else "#e74c3c"
+                        # PASSÉ : Bleu si payé, Rouge si impayé
+                        if is_paye:
+                            current_c = "#3498db" # BLEU
+                        else:
+                            current_c = "#e74c3c" # ROUGE
                     elif "ok" in s_val:
-                        # FUTUR : Vert
-                        current_c = "#2ecc71"
+                        current_c = "#2ecc71" # VERT
                     elif "attente" in s_val:
-                        # FUTUR : Jaune
-                        current_c = "#f1c40f"
+                        current_c = "#f1c40f" # JAUNE
                     else:
-                        current_c = "transparent"           
+                        current_c = "transparent"
+                        
              
 
                     # --- GESTION DES CONFLITS ---
