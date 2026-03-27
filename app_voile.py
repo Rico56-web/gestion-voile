@@ -570,80 +570,46 @@ elif st.session_state.page == "STATS":
 # --- 8. PAGE MAINTENANCE (CARNET DE SANTÉ VESTA) ---
 # =================================================================
 elif st.session_state.page == "MAINT":
-    st.subheader("🔧 Maintenance & Carnet d'entretien")
-
-    # --- SECTION A : LE QUESTIONNAIRE ---
-    with st.expander("➕ Enregistrer une nouvelle intervention", expanded=False):
-        with st.form("form_maint_2026"):
-            c1, c2, c3 = st.columns([1, 2, 1])
-            f_date = c1.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
-            f_travaux = c2.text_input("Travaux / Achat", placeholder="ex: Révision moteur Yanmar")
-            f_priorite = c3.selectbox("Priorité", ["Basse", "Moyenne", "Haute", "URGENT"])
-            
-            c4, c5 = st.columns(2)
-            f_cout = c4.number_input("Coût TTC (€)", min_value=0.0, step=10.0)
-            f_etat = c5.selectbox("Statut", ["Pas fini", "Fini"])
-            
-            f_comm = st.text_area("Commentaires / Références pièces")
-            
-            if st.form_submit_button("💾 ENREGISTRER L'INTERVENTION"):
-                new_line = {
-                    "Date": f_date, "Travaux": f_travaux, "Montant": f_cout,
-                    "Etat": f_etat, "Priorité": f_priorite, "Commentaires": f_comm
-                }
-                df_m = pd.concat([df_m, pd.DataFrame([new_line])], ignore_index=True)
-                # Sauvegarde via votre fonction habituelle
-                sauvegarder_data(df_m, "maintenance.json") 
-                st.success("Carnet mis à jour !")
-                st.rerun()
-
-    st.divider()
-
-    # --- SECTION B : LE RÉCAPITULATIF (TABLEAU) ---
-    st.write("📋 **Historique des travaux**")
+    st.subheader("🔧 Maintenance & Frais")
     
-    if df_m.empty:
-        st.info("Le carnet d'entretien est vide.")
+    # 1. BOUTON NOUVEAU
+    if st.button("➕ NOUVEAU FRAIS", use_container_width=True):
+        new_m = {"Date": datetime.now().strftime("%d/%m/%Y"), "Travaux": "Achat", "Montant": 0.0, "Etat": "Fini"}
+        df_m = pd.concat([pd.DataFrame([new_m]), df_m], ignore_index=True)
+        sauvegarder_data(df_m, "maintenance.json"); st.rerun()
+
+    # 2. ÉDITION
+    if st.session_state.get('m_edit_idx') is not None:
+        idx = st.session_state.m_edit_idx
+        r = df_m.loc[idx]
+        with st.form("edit_maint"):
+            u_d = st.text_input("Date", r.get('Date', ''))
+            u_t = st.text_input("Travaux", r.get('Travaux', ''))
+            u_m = st.text_input("Montant", str(r.get('Montant', '0.00')))
+            if st.form_submit_button("💾 ENREGISTRER"):
+                df_m.at[idx, 'Date'] = u_d
+                df_m.at[idx, 'Travaux'] = u_t
+                df_m.at[idx, 'Montant'] = float(u_m.replace('€','').strip() or 0)
+                sauvegarder_data(df_m, "maintenance.json")
+                st.session_state.m_edit_idx = None
+                st.rerun()
+    
+    # 3. LISTE DES FICHES
     else:
-        # Tri automatique par date (plus récent en haut)
-        df_m['Date_dt'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
-        df_m_disp = df_m.sort_values('Date_dt', ascending=False).drop(columns=['Date_dt'])
-
-        # Configuration visuelle du tableau
-        st.dataframe(
-            df_m_disp,
-            column_config={
-                "Montant": st.column_config.NumberColumn("Coût", format="%.2f €"),
-                "Etat": st.column_config.SelectboxColumn("État", options=["Fini", "Pas fini"]),
-                "Priorité": st.column_config.TextColumn("Priorité"),
-            },
-            use_container_width=True,
-            hide_index=True
-        )
-
-        # --- SECTION C : BILAN ET ALERTES ---
-        total_maint = df_m["Montant"].sum()
-        urgents = len(df_m[(df_m["Etat"] == "Pas fini") & (df_m["Priorité"] == "URGENT")])
-        
-        st.divider()
-        col_a, col_b = st.columns(2)
-        col_a.metric("Total Investi Maintenance", f"{total_maint:,.2f} €")
-        
-        if urgents > 0:
-            col_b.error(f"⚠️ {urgents} TRAVAUX URGENTS À FINIR")
-        else:
-            col_b.success("✅ Aucun travail urgent en attente")
-
-    # --- SECTION D : ADMINISTRATION ---
-    with st.expander("🗑️ Supprimer une entrée"):
-        # Liste pour choisir quelle ligne supprimer
-        if not df_m.empty:
-            list_m = [f"{i} - {r['Date']} : {r['Travaux']}" for i, r in df_m.iterrows()]
-            to_del = st.selectbox("Choisir l'intervention à effacer", list_m)
-            idx_del = int(to_del.split(" - ")[0])
+        for i, r in df_m.iterrows():
+            # Affichage premium
+            st.markdown(f'''
+            <div style="border:1px solid #ddd; padding:10px; border-radius:10px; background:white; color:black; margin-bottom:5px;">
+                📅 {r.get("Date", "N/A")} | 🏷️ {r.get("Travaux", "N/A")} | 💰 <b>{float(r.get("Montant", 0)):.2f} €</b>
+            </div>
+            ''', unsafe_allow_html=True)
             
-            if st.button("Confirmer la suppression"):
-                df_m = df_m.drop(idx_del).reset_index(drop=True)
+            c1, c2 = st.columns([1, 4])
+            if c1.button("✏️", key=f"em_{i}"):
+                st.session_state.m_edit_idx = i
+                st.rerun()
+            if c2.button("🗑️ SUPPRIMER", key=f"dm_{i}"):
+                df_m = df_m.drop(i).reset_index(drop=True)
                 sauvegarder_data(df_m, "maintenance.json")
                 st.rerun()
 
