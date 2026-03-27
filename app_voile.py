@@ -281,20 +281,20 @@ if st.session_state.page == "CONTACTS":
             if b2.button("❌ NON", key=f"no_{confirm_key}", use_container_width=True):
                 st.session_state[confirm_key] = False
                 st.rerun()
-  # --- 6. PAGE PLANNING ---
+
+# --- 6. PAGE PLANNING (CORRIGÉE) ---
     elif st.session_state.page == "PLANNING":
-        # DIAGNOSTIC (À supprimer quand c'est résolu)
-        aujourdhui = datetime.now().date()
-        st.info(f"📅 Date détectée par l'app : {aujourdhui} (Nous sommes le 27 Mars 2026)")
-        
         st.subheader("🗓️ Planning de Navigation")
         
-        # --- MENUS DÉROULANTS ---
+        # Date charnière : Aujourd'hui le 27 Mars 2026
+        maintenant = datetime.now()
+        aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
+        
+        # --- MENUS ---
         col_m, col_y = st.columns(2)
         with col_m:
             m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-            sel_m_nom = st.selectbox("Mois", m_noms, index=aujourdhui.month - 1)
-            sel_m = m_noms.index(sel_m_nom) + 1
+            sel_m = m_noms.index(st.selectbox("Mois", m_noms, index=aujourdhui.month - 1)) + 1
         with col_y:
             sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
 
@@ -303,64 +303,71 @@ if st.session_state.page == "CONTACTS":
 
         for _, r in df_c.iterrows():
             try:
-                d_str = str(r.get('DateNav', '')).replace(" ", "")
+                d_str = str(r.get('DateNav', '')).strip()
                 if '/' not in d_str: continue
                 parts = d_str.split('/')
                 dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
                 if yv < 100: yv += 2000
                 
-           if mv == sel_m and yv == sel_y:
+                if mv == sel_m and yv == sel_y:
                     s_val = str(r.get('Statut', '')).strip().lower()
                     p_val = str(r.get('Paiement', '')).strip().lower()
                     
-                    # --- SÉCURITÉ : ON IGNORE LES FICHES SUPPRIMÉES/ARCHIVÉES ---
-                    if s_val in ["archivé", "archive", "supprimé", ""]:
-                        continue # On saute cette fiche, elle ne doit pas colorer le calendrier
+                    # --- SÉCURITÉ ANTI-FANTÔMES ---
+                    # On ignore les fiches vides ou archivées pour nettoyer le calendrier
+                    if s_val in ["", "archivé", "archive", "supprimé"]:
+                        continue
                     
                     this_date = date(yv, mv, dv)
                     is_paye = ("pay" in p_val) and (p_val != "")
                     is_dans_le_passe = this_date < aujourdhui
                     
                     # --- LOGIQUE DE COULEUR ---
-                    if is_passe:
-                        # Si c'est passé (ex: le 14), c'est soit BLEU (payé) soit ROUGE (impayé)
+                    if is_dans_le_passe:
+                        # PASSÉ (ex: le 14) : Bleu si payé, sinon Rouge Alerte
                         current_c = "#3498db" if is_paye else "#e74c3c"
                     else:
-                        # Si c'est le futur (ex: le 30), c'est VERT (ok) ou JAUNE (attente)
-                        if "ok" in s_clean:
+                        # FUTUR ou AUJOURD'HUI (ex: le 28) : Vert si OK, Jaune si Attente
+                        if "ok" in s_val:
                             current_c = "#2ecc71"
-                        elif "attente" in s_clean:
+                        elif "attente" in s_val:
                             current_c = "#f1c40f"
                         else:
                             current_c = "transparent"
 
-                    # --- CONFLITS (Le Rouge gagne sur le Bleu) ---
+                    # --- GESTION CONFLITS (Plusieurs fiches le même jour) ---
                     n_j = int(r.get('NbreJours', 1))
                     for j in range(dv, dv + n_j):
                         if j in jours_occ:
                             old_c = jours_occ[j]["c"]
-                            if "#e74c3c" in [current_c, old_c]: current_c = "#e74c3c"
-                            elif "#2ecc71" in [current_c, old_c]: current_c = "#2ecc71"
-                        jours_occ[j] = {"c": current_c}
-                    
-                    missions_detail.append({"date": d_str, "jour_num": dv, "nom": f"{r.get('Prénom','')} {str(r.get('Nom','')).upper()}", "color": current_c, "statut": r.get('Statut'), "paye": r.get('Paiement')})
+                            # Le ROUGE gagne sur tout (Alerte impayé)
+                            if "#e74c3c" in [current_c, old_c]: final_c = "#e74c3c"
+                            # Le VERT gagne sur le Bleu (Mission à venir)
+                            elif "#2ecc71" in [current_c, old_c]: final_c = "#2ecc71"
+                            else: final_c = current_c
+                            jours_occ[j]["c"] = final_c
+                        else:
+                            jours_occ[j] = {"c": current_c}
             except: continue
 
-        # --- DESSIN DU CALENDRIER ---
+        # --- DESSIN DU CALENDRIER SVG ---
         h_cal = '<table style="width:100%; border-collapse: collapse; text-align: center;">'
         cal_mat = calendar.monthcalendar(sel_y, sel_m)
         for sem in cal_mat:
             h_cal += '<tr>'
             for jour in sem:
-                if jour == 0: h_cal += '<td style="height:40px; border:0.5px solid #eee;"></td>'
+                if jour == 0: h_cal += '<td style="height:45px; border:0.5px solid #eee;"></td>'
                 else:
                     bg = jours_occ.get(jour, {}).get("c", "transparent")
-                    txt_c = "white" if bg != "transparent" and bg != "#f1c40f" else "black"
-                    content = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:28px; height:28px; line-height:28px; margin:auto; font-weight:bold; font-size:12px;">{jour}</div>'
-                    h_cal += f'<td style="border:0.5px solid #eee; height:45px;">{content}</td>'
+                    txt_c = "white" if bg in ["#3498db", "#e74c3c", "#2ecc71"] else "black"
+                    circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:30px; height:30px; line-height:30px; margin:auto; font-weight:bold; font-size:13px;">{jour}</div>'
+                    h_cal += f'<td style="border:0.5px solid #eee; height:48px;">{circle if bg != "transparent" else jour}</td>'
             h_cal += '</tr>'
         h_cal += '</table>'
-        st.markdown(h_cal, unsafe_allow_html=True)  
+        st.markdown(h_cal, unsafe_allow_html=True)
+
+        # LÉGENDE RAPIDE
+        st.markdown('<div style="font-size:0.7rem; text-align:center; margin-top:10px;">🔴 Impayé | 🔵 Payé | 🟢 À venir | 🟡 Attente</div>', unsafe_allow_html=True)
 
 # --- 7. PAGE STATS ---
 elif st.session_state.page == "STATS":
