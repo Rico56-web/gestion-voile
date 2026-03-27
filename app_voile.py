@@ -531,7 +531,7 @@ elif st.session_state.page == "STATS":
                         stats_mois[m_idx]["fra"] += m_frais
             except: continue
 
-    # 4. CONSTRUCTION DU TABLEAU (Formatage 2 décimales)
+ # 4. CONSTRUCTION DU TABLEAU (Formatage 2 décimales)
     data_table = []
     for i in range(1, 13):
         rec = round(stats_mois[i]["rec"], 2)
@@ -546,9 +546,12 @@ elif st.session_state.page == "STATS":
         })
     df_stats = pd.DataFrame(data_table)
 
-    # 5. AFFICHAGE DES COURBES (Le retour !)
-    st.write("📈 **Évolution mensuelle (Recettes vs Prévisionnel)**")
-    # On prépare les données du graphique
+    # --- FORCER L'ORDRE CHRONOLOGIQUE ---
+    df_stats['Mois'] = pd.Categorical(df_stats['Mois'], categories=m_noms_courts, ordered=True)
+    df_stats = df_stats.sort_values('Mois')
+
+    # 5. AFFICHAGE DES COURBES (Dans le bon ordre)
+    st.write("📈 **Évolution mensuelle (Janvier à Décembre)**")
     df_graph = df_stats.set_index('Mois')[["Recettes", "Prévisionnel"]]
     st.bar_chart(df_graph, color=["#27ae60", "#f1c40f"])
 
