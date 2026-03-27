@@ -299,9 +299,6 @@ elif st.session_state.page == "PLANNING":
         sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
 
     # 3. FILTRAGE ET LOGIQUE DES COULEURS
-    jours_occ = {}
-    
-    # 3. FILTRAGE ET LOGIQUE DES COULEURS
         jours_occ = {}
         for _, r in df_c.iterrows():
             try:
