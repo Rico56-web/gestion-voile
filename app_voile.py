@@ -488,18 +488,14 @@ elif st.session_state.page == "PLANNING":
 
 # --- FIN DU BLOC PLANNING ---
 # =================================================================
-# --- 7. PAGE STATS (VERSION HARMONISÉE & SYNCHRONISÉE) ---
-# ================================================================
-# =================================================================
-# --- 7. PAGE STATS (SYNCHRO SUR MAINTENANCE.JSON) ---
+# --- 7. PAGE STATS (VERSION FINALE VALIDÉE) ---
 # ================================================================
 elif st.session_state.page == "STATS":
     st.subheader("📊 Bilan & Performance Vesta 2026")
 
-    # --- 1. CHARGEMENT DU BON FICHIER (MAINTENANCE.JSON) ---
+    # 1. CHARGEMENT DU BON FICHIER
     try:
-        # On pointe enfin sur le fichier actif de 46 min
-        df_m_stats = pd.read_json("maintenance.json") 
+        df_m_stats = pd.read_json("maintenance.json")
     except:
         df_m_stats = pd.DataFrame()
 
@@ -507,7 +503,7 @@ elif st.session_state.page == "STATS":
     m_noms_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     stats_mois = {i: {"rec": 0.0, "pre": 0.0, "fra": 0.0} for i in range(1, 13)}
 
-    # --- 2. CALCULS REVENUS (Contacts) ---
+    # 2. CALCULS REVENUS (Contacts)
     for _, r in df_c.iterrows():
         try:
             statut = str(r.get('Statut', '')).lower()
@@ -522,47 +518,63 @@ elif st.session_state.page == "STATS":
                 else: stats_mois[m_idx]["pre"] += p
         except: continue
 
-    # --- 3. CALCULS FRAIS (Depuis maintenance.json) ---
+    # 3. CALCULS FRAIS (Maintenance)
     if not df_m_stats.empty:
         for _, f in df_m_stats.iterrows():
             try:
-                # Montant (On teste Montant puis Prix)
                 v_f = f.get('Montant', f.get('Prix', 0))
                 m_frais = float(str(v_f).replace('€','').replace(',','.').replace(' ','').strip() or 0)
-                
-                # Date (On utilise pd.to_datetime pour gérer le format ISO de 46 min)
-                raw_date = f.get('Date', '')
-                dt_obj = pd.to_datetime(raw_date, errors='coerce')
-                
+                dt_obj = pd.to_datetime(f.get('Date', ''), errors='coerce')
                 if pd.notnull(dt_obj):
                     m_idx = dt_obj.month
                     if 1 <= m_idx <= 12:
                         stats_mois[m_idx]["fra"] += m_frais
             except: continue
 
-    # --- 4. CONSTRUCTION DU TABLEAU ---
+    # 4. CONSTRUCTION DU TABLEAU (Formatage 2 décimales)
     data_table = []
     for i in range(1, 13):
+        rec = round(stats_mois[i]["rec"], 2)
+        fra = round(stats_mois[i]["fra"], 2)
+        pre = round(stats_mois[i]["pre"], 2)
         data_table.append({
             "Mois": m_noms_courts[i-1],
-            "Recettes": stats_mois[i]["rec"],
-            "Frais": stats_mois[i]["fra"],
-            "Solde Net": stats_mois[i]["rec"] - stats_mois[i]["fra"]
+            "Recettes": rec,
+            "Prévisionnel": pre,
+            "Frais": fra,
+            "Solde Net": round(rec - fra, 2)
         })
     df_stats = pd.DataFrame(data_table)
 
-    # --- 5. AFFICHAGE DES CHIFFRES ---
-    st.write("📋 **Bilan financier mensuel**")
-    st.table(df_stats) # Pour bien voir Mars vs Décembre
+    # 5. AFFICHAGE DES COURBES (Le retour !)
+    st.write("📈 **Évolution mensuelle (Recettes vs Prévisionnel)**")
+    # On prépare les données du graphique
+    df_graph = df_stats.set_index('Mois')[["Recettes", "Prévisionnel"]]
+    st.bar_chart(df_graph, color=["#27ae60", "#f1c40f"])
 
-    # Bilan Global
+    # 6. TABLEAU RÉCAPITULATIF
+    st.write("📋 **Détail financier par mois**")
+    st.dataframe(
+        df_stats, 
+        use_container_width=True, 
+        hide_index=True,
+        column_config={
+            "Recettes": st.column_config.NumberColumn(format="%.2f €"),
+            "Prévisionnel": st.column_config.NumberColumn(format="%.2f €"),
+            "Frais": st.column_config.NumberColumn(format="%.2f €"),
+            "Solde Net": st.column_config.NumberColumn(format="%.2f €")
+        }
+    )
+
+    # 7. BILAN GLOBAL (KPI)
+    st.divider()
     t_rec = df_stats["Recettes"].sum()
     t_fra = df_stats["Frais"].sum()
-    st.divider()
+    
     c1, c2, c3 = st.columns(3)
     c1.metric("Encaissé", f"{t_rec:,.2f} €")
-    c2.metric("Frais", f"{t_fra:,.2f} €", delta_color="inverse")
-    c3.metric("NET", f"{(t_rec - t_fra):,.2f} €")
+    c2.metric("Total Frais", f"{t_fra:,.2f} €", delta=f"-{t_fra:,.2f}", delta_color="inverse")
+    c3.metric("SOLDE NET", f"{(t_rec - t_fra):,.2f} €")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
