@@ -493,74 +493,81 @@ elif st.session_state.page == "PLANNING":
 elif st.session_state.page == "STATS":
     st.subheader("📊 Bilan & Performance Vesta 2026")
 
-    # --- CHARGEMENT FORCÉ DE LA MAINTENANCE ---
+    # 1. CHARGEMENT DU FICHIER RÉCENT
     try:
-        # On charge le fichier que tu utilises dans la page MAINT
         df_m_stats = pd.read_json("maint.json")
     except:
-        df_m_stats = pd.DataFrame(columns=["Date", "Cause", "Prix", "Travaux", "Montant"])
+        df_m_stats = pd.DataFrame()
 
-    # 1. INITIALISATION
+    # 2. INITIALISATION DES MOIS (Jan à Déc)
     m_noms_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     stats_mois = {i: {"recettes": 0.0, "prev": 0.0, "frais": 0.0} for i in range(1, 13)}
 
-    # --- CALCULS DEPUIS CONTACTS ---
+    # --- CALCULS REVENUS (Depuis tes Contacts) ---
     for _, r in df_c.iterrows():
         try:
             statut = str(r.get('Statut', '')).lower()
-            if statut in ["refusé", "archivé", "supprimé"]: continue
+            if statut in ["refusé", "archivé"]: continue
             
-            prix = float(str(r.get('Prix', '0')).replace('€','').replace(' ','').strip() or 0)
+            # Nettoyage prix contact
+            p = float(str(r.get('Prix', '0')).replace('€','').replace(' ','').replace(',','.').strip() or 0)
+            
+            # Logique payé / non payé
             p_val = str(r.get('Paiement', '')).lower()
             is_paye = ("pay" in p_val) and not any(x in p_val for x in ["un", "non", "pas"])
             
             d_str = str(r.get('DateNav', ''))
             if '/' in d_str:
                 m_idx = int(d_str.split('/')[1])
-                if is_paye: stats_mois[m_idx]["recettes"] += prix
-                else: stats_mois[m_idx]["prev"] += prix
+                if is_paye: stats_mois[m_idx]["recettes"] += p
+                else: stats_mois[m_idx]["prev"] += p
         except: continue
 
-# --- CALCUL DES FRAIS RÉELS (VERSION BLINDÉE) ---
-    for _, f in df_m_stats.iterrows():
-        try:
-            # 1. NETTOYAGE DU MONTANT (On gère €, espaces, virgules et points)
-            brut_prix = str(f.get('Montant', f.get('Prix', '0')))
-            clean_prix = brut_prix.replace('€','').replace(' ','').replace(',','.').strip()
-            m_frais = float(clean_prix if clean_prix else 0)
-            
-            # 2. EXTRACTION DU MOIS (On gère les dates JJ/MM/AAAA ou AAAA-MM-DD)
-            d_frais = str(f.get('Date', ''))
-            m_idx = None
-            
-            if '/' in d_frais: # Format JJ/MM/AAAA
-                m_idx = int(d_frais.split('/')[1])
-            elif '-' in d_frais: # Format AAAA-MM-DD
-                parts = d_frais.split('-')
-                m_idx = int(parts[1]) if len(parts[0]) == 4 else int(parts[1])
+    # --- CALCULS FRAIS (Depuis maint.json d'il y a 18 min) ---
+    if not df_m_stats.empty:
+        for _, f in df_m_stats.iterrows():
+            try:
+                # On cherche le montant dans TOUTES les colonnes possibles
+                v_brute = f.get('Montant', f.get('Prix', f.get('cout', 0)))
+                # On nettoie les virgules et symboles
+                c_f = str(v_brute).replace('€','').replace(' ','').replace(',','.').strip()
+                m_frais = float(c_f if c_f and c_f != 'None' else 0)
+                
+                # On cherche la date
+                d_f = str(f.get('Date', ''))
+                m_idx = None
+                if '/' in d_f: m_idx = int(d_f.split('/')[1])
+                elif '-' in d_f: m_idx = int(d_f.split('-')[1])
 
-            # 3. MISE À JOUR DES STATS
-            if m_idx and 1 <= m_idx <= 12:
-                stats_mois[m_idx]["frais"] += m_frais
-        except Exception as e:
-            # Si une ligne pose problème, on passe à la suivante sans tout bloquer
-            continue
+                if m_idx and 1 <= m_idx <= 12:
+                    stats_mois[m_idx]["frais"] += m_frais
+            except: continue
 
-    # 2. CRÉATION DU TABLEAU BILAN CHRONOLOGIQUE
+    # 3. CRÉATION DU TABLEAU DE SYNTHÈSE
     data_table = []
     for i in range(1, 13):
         data_table.append({
             "Mois": m_noms_courts[i-1],
             "Recettes (Payé)": stats_mois[i]["recettes"],
-            "Prévisionnel": stats_mois[i]["prev"],
-            "Frais": stats_mois[i]["frais"],
-            "Solde Réel": stats_mois[i]["recettes"] - stats_mois[i]["frais"]
+            "Frais (Maintenance)": stats_mois[i]["frais"],
+            "Solde Net": stats_mois[i]["recettes"] - stats_mois[i]["frais"]
         })
-
     df_stats = pd.DataFrame(data_table)
-    # Force l'ordre
-    df_stats['Mois'] = pd.Categorical(df_stats['Mois'], categories=m_noms_courts, ordered=True)
-    df_stats = df_stats.sort_values('Mois')
+
+    # 4. AFFICHAGE
+    st.write("📋 **Détail financier mensuel**")
+    st.table(df_stats) # Utilisation de st.table pour être sûr que tout s'affiche bien sur iPhone
+
+    # 5. LE GRAND BILAN (KPI)
+    st.divider()
+    t_encaissé = df_stats["Recettes (Payé)"].sum()
+    t_frais = df_stats["Frais (Maintenance)"].sum()
+    
+    col1, col2 = st.columns(2)
+    col1.metric("TOTAL ENCAISSÉ", f"{t_encaissé:,.2f} €")
+    col2.metric("TOTAL FRAIS", f"{t_frais:,.2f} €", delta=f"-{t_frais:,.2f}", delta_color="inverse")
+    
+    st.success(f"💰 **SOLDE NET FINAL : {(t_encaissé - t_frais):,.2f} €**")
 
     # 3. GRAPHIQUE
     st.write("📈 **Évolution mensuelle (Recettes vs Prévisionnel)**")
