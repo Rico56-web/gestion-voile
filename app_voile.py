@@ -215,7 +215,7 @@ if st.session_state.page == "CONTACTS":
     # --- 3. AFFICHAGE VISUEL DES FICHES ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-     for i, r in df_disp.iterrows():
+    for i, r in df_disp.iterrows():
         s = r.get('Statut', 'En attente')
         p = r.get('Paiement', 'Non payé')
         
