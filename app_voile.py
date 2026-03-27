@@ -651,47 +651,47 @@ elif st.session_state.page == "MAINT":
                 if c2.button("🗑️ Supprimer", key=f"del_req_{i}", use_container_width=True):
                     st.session_state.m_confirm_del = i
                     st.rerun()
-  # --- 4. TABLEAU RÉCAPITULATIF GLOBAL (EN BAS DE PAGE) ---
+    # --- 4. TABLEAU RÉCAPITULATIF GLOBAL (TRIÉ PAR DATE) ---
     st.divider()
-    st.write("📊 **Vue d'ensemble du carnet d'entretien**")
+    st.write("📊 **Historique de l'entretien (Du plus récent au plus ancien)**")
 
     if not df_m.empty:
-        # On prépare une copie propre pour l'affichage
+        # 1. On crée une copie pour ne pas abîmer les données sources
         df_tableau = df_m.copy()
         
-        # --- FIX : Conversion des dates "Timestamp" en texte lisible ---
-        try:
-            # errors='coerce' transforme les trucs bizarres en NaT (Not a Time)
-            # dt.strftime('%d/%m/%Y') force le format Jour/Mois/Année
-            df_tableau['Date'] = pd.to_datetime(df_tableau['Date'], errors='coerce').dt.strftime('%d/%m/%Y')
-            # On remplit les dates qui auraient échoué avec la valeur d'origine ou "N/A"
-            df_tableau['Date'] = df_tableau['Date'].fillna("Date inconnue")
-        except:
-            pass
+        # 2. Conversion forcée en vraie date pour pouvoir TRIER
+        # On transforme le Timestamp 1774569600000 en objet date Python
+        df_tableau['Date_Tri'] = pd.to_datetime(df_tableau['Date'], errors='coerce')
+        
+        # 3. TRI : du plus récent au plus ancien
+        df_tableau = df_tableau.sort_values(by='Date_Tri', ascending=False)
 
-        # On gère les anciens noms "Cause/Prix" au cas où
+        # 4. FORMATAGE de l'affichage (JJ/MM/AAAA)
+        df_tableau['Date'] = df_tableau['Date_Tri'].dt.strftime('%d/%m/%Y').fillna("Date inconnue")
+
+        # 5. Gestion des noms de colonnes (Compatibilité anciens fichiers)
         if 'Cause' in df_tableau.columns and 'Travaux' not in df_tableau.columns:
             df_tableau = df_tableau.rename(columns={'Cause': 'Travaux'})
         if 'Prix' in df_tableau.columns and 'Montant' not in df_tableau.columns:
             df_tableau = df_tableau.rename(columns={'Prix': 'Montant'})
 
-        # Affichage du tableau interactif
+        # 6. AFFICHAGE DU TABLEAU
         st.dataframe(
             df_tableau[['Date', 'Travaux', 'Montant']], 
             column_config={
-                "Date": st.column_config.TextColumn("Date"),
-                "Travaux": st.column_config.TextColumn("Nature des travaux"),
+                "Date": st.column_config.TextColumn("Date 📅"),
+                "Travaux": st.column_config.TextColumn("Nature des travaux 🔧"),
                 "Montant": st.column_config.NumberColumn("Coût (€)", format="%.2f €"),
             },
             use_container_width=True,
             hide_index=True
         )
 
-        # Petit rappel du total en pied de tableau
+        # Total en bas du tableau
         total_m = pd.to_numeric(df_tableau['Montant'], errors='coerce').sum()
-        st.info(f"💰 **Total cumulé des frais : {total_m:,.2f} €**")
+        st.success(f"💰 **Total cumulé des frais de maintenance : {total_m:,.2f} €**")
     else:
-        st.write("Aucune donnée à afficher dans le tableau.")           
+        st.info("Aucun frais enregistré pour le moment.")  
 
 # --- 10. PAGE NOTES ---
 elif st.session_state.page == "NOTES":
