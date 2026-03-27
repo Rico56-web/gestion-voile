@@ -633,45 +633,86 @@ elif st.session_state.page == "MAINT":
     ca1.metric("Jours en mer", f"{int(jours_travailles)} j", help="Total des jours de navigation validés")
     ca2.metric("Panier Moyen", f"{panier_moyen:.2f} €", help="Revenu moyen par contrat encaissé")
     
-    
-# --- 9. PAGE FACTURES ---
-    elif st.session_state.page == "FACTURES":
-    st.subheader("📄 Facturation Mensuelle (CMN)")
-    prev_m_idx = now.month - 1 if now.month > 1 else 12
-    prev_y = now.year if now.month > 1 else now.year - 1
-    m_noms_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-    nom_mois_prev = m_noms_fr[prev_m_idx - 1]
-    
-    st.info(f"Missions CMN de {nom_mois_prev} {prev_y}")
-    missions_potentielles = []
-    if not df_c.empty:
-        for idx, r in df_c.iterrows():
-            try:
-                date_str = safe_get(r, 'DateNav').replace(" ", "")
-                dp = date_str.split('/')
-                m, y = int(dp[1]), int(dp[2])
-                if y < 100: y += 2000
-                if m == prev_m_idx and y == prev_y and "CMN" in safe_get(r, 'Société').upper() and safe_get(r, 'Paiement') != "Payé":
-                    missions_potentielles.append({"id": idx, "Date": safe_get(r, 'DateNav'), "Client": f"{safe_get(r, 'Prénom')} {safe_get(r, 'Nom').upper()}", "Prix": float(safe_get(r, 'Prix') or 0)})
-            except: continue
+# =================================================================
+# --- 8. PAGE MAINTENANCE (CARNET DE SANTÉ VESTA) ---
+# =================================================================
+elif st.session_state.page == "MAINT":
+    st.subheader("🔧 Maintenance & Carnet d'entretien")
 
-    if not missions_potentielles: st.warning("Aucune mission CMN à facturer.")
+    # --- SECTION A : LE QUESTIONNAIRE ---
+    with st.expander("➕ Enregistrer une nouvelle intervention", expanded=False):
+        with st.form("form_maint_2026"):
+            c1, c2, c3 = st.columns([1, 2, 1])
+            f_date = c1.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
+            f_travaux = c2.text_input("Travaux / Achat", placeholder="ex: Révision moteur Yanmar")
+            f_priorite = c3.selectbox("Priorité", ["Basse", "Moyenne", "Haute", "URGENT"])
+            
+            c4, c5 = st.columns(2)
+            f_cout = c4.number_input("Coût TTC (€)", min_value=0.0, step=10.0)
+            f_etat = c5.selectbox("Statut", ["Pas fini", "Fini"])
+            
+            f_comm = st.text_area("Commentaires / Références pièces")
+            
+            if st.form_submit_button("💾 ENREGISTRER L'INTERVENTION"):
+                new_line = {
+                    "Date": f_date, "Travaux": f_travaux, "Montant": f_cout,
+                    "Etat": f_etat, "Priorité": f_priorite, "Commentaires": f_comm
+                }
+                df_m = pd.concat([df_m, pd.DataFrame([new_line])], ignore_index=True)
+                # Sauvegarde via votre fonction habituelle
+                sauvegarder_data(df_m, "maintenance.json") 
+                st.success("Carnet mis à jour !")
+                st.rerun()
+
+    st.divider()
+
+    # --- SECTION B : LE RÉCAPITULATIF (TABLEAU) ---
+    st.write("📋 **Historique des travaux**")
+    
+    if df_m.empty:
+        st.info("Le carnet d'entretien est vide.")
     else:
-        selection = {}; total_sel = 0.0
-        for m in missions_potentielles:
-            c1, c2, c3 = st.columns([1, 3, 2])
-            if c1.checkbox("", value=True, key=f"s_{m['id']}"):
-                selection[m['id']] = m; total_sel += m['Prix']
-            c2.write(f"{m['Date']} - {m['Client']}"); c3.write(f"{m['Prix']:.2f} €")
+        # Tri automatique par date (plus récent en haut)
+        df_m['Date_dt'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
+        df_m_disp = df_m.sort_values('Date_dt', ascending=False).drop(columns=['Date_dt'])
+
+        # Configuration visuelle du tableau
+        st.dataframe(
+            df_m_disp,
+            column_config={
+                "Montant": st.column_config.NumberColumn("Coût", format="%.2f €"),
+                "Etat": st.column_config.SelectboxColumn("État", options=["Fini", "Pas fini"]),
+                "Priorité": st.column_config.TextColumn("Priorité"),
+            },
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # --- SECTION C : BILAN ET ALERTES ---
+        total_maint = df_m["Montant"].sum()
+        urgents = len(df_m[(df_m["Etat"] == "Pas fini") & (df_m["Priorité"] == "URGENT")])
         
-        if total_sel > 0:
-            corps = st.text_area("Message :", f"Bonjour,\n\nPrestations {nom_mois_prev} :\n" + "".join([f"- {m['Date']} : {m['Client']} | {m['Prix']:.2f}€\n" for m in selection.values()]) + f"\nTOTAL : {total_sel:.2f}€\n\nMerci.")
-            if st.button(f"📧 CONFIRMER ({total_sel:.2f} €)"):
-                for m_id in selection.keys(): df_c.at[m_id, 'Paiement'] = "Payé"; df_c.at[m_id, 'Statut'] = "Terminé"
-                sauvegarder_data(df_c, "contacts.json")
-                import urllib.parse
-                mailto = f"mailto:tresorier@cmn-asso.fr?subject=Facture {nom_mois_prev}&body={urllib.parse.quote(corps)}"
-                st.markdown(f'<a href="{mailto}" target="_blank" style="display:block;text-align:center;background:#2ecc71;color:white;padding:15px;text-decoration:none;border-radius:10px;font-weight:bold;">🚀 ENVOYER LE MAIL</a>', unsafe_allow_html=True)
+        st.divider()
+        col_a, col_b = st.columns(2)
+        col_a.metric("Total Investi Maintenance", f"{total_maint:,.2f} €")
+        
+        if urgents > 0:
+            col_b.error(f"⚠️ {urgents} TRAVAUX URGENTS À FINIR")
+        else:
+            col_b.success("✅ Aucun travail urgent en attente")
+
+    # --- SECTION D : ADMINISTRATION ---
+    with st.expander("🗑️ Supprimer une entrée"):
+        # Liste pour choisir quelle ligne supprimer
+        if not df_m.empty:
+            list_m = [f"{i} - {r['Date']} : {r['Travaux']}" for i, r in df_m.iterrows()]
+            to_del = st.selectbox("Choisir l'intervention à effacer", list_m)
+            idx_del = int(to_del.split(" - ")[0])
+            
+            if st.button("Confirmer la suppression"):
+                df_m = df_m.drop(idx_del).reset_index(drop=True)
+                sauvegarder_data(df_m, "maintenance.json")
+                st.rerun()
 
 # --- 10. PAGE NOTES ---
 elif st.session_state.page == "NOTES":
