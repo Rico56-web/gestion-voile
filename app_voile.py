@@ -438,18 +438,33 @@ elif st.session_state.page == "PLANNING":
         # Tri par jour
         res_list.sort(key=lambda x: int(str(x.get('DateNav')).split('/')[0]))
         
+     # --- DANS VOTRE BOUCLE FOR RES IN RES_LIST ---
         for res in res_list:
             p_v = str(res.get('Paiement', '')).lower()
             is_p = ("pay" in p_v) and not any(x in p_v for x in ["un", "non"])
             p_color = "#27ae60" if is_p else "#e67e22"
             
-            st.markdown(f"""
-            <div style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; background: white; color: black; margin-bottom: 5px; border-radius: 5px;">
-                <div style="flex: 2;"><b>{res.get('DateNav')}</b> - {res.get('Prénom')} {res.get('Nom','').upper()} <br><small>{res.get('Société','-')}</small></div>
-                <div style="flex: 1; text-align: center;">⛵ {res.get('NbreJours', 1)}j</div>
-                <div style="flex: 1; text-align: right;"><b>{res.get('Prix')} €</b><br><span style="color:{p_color}; font-size:10px;">{'PAYÉ' if is_p else 'À PAYER'}</span></div>
-            </div>
-            """, unsafe_allow_html=True)
+            # On crée un identifiant unique pour le bouton
+            nom_client = f"{res.get('Prénom')} {res.get('Nom','').upper()}"
+            btn_key = f"goto_{res.get('Nom')}_{res.get('DateNav').replace('/','')}"
+
+            # Affichage de la ligne avec un bouton discret pour naviguer
+            col_info, col_btn = st.columns([4, 1])
+            
+            with col_info:
+                st.markdown(f"""
+                <div style="padding: 10px; border-left: 5px solid {p_color}; background: white; color: black; border-radius: 5px; margin-bottom: 5px;">
+                    <b>{res.get('DateNav')}</b> - {nom_client} <br>
+                    <small>{res.get('Société','-')} | ⛵ {res.get('NbreJours', 1)}j | <b>{res.get('Prix')} €</b></small>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col_btn:
+                if st.button("Voir Fiche 🔍", key=btn_key):
+                    # ACTION : On change de page et on pré-remplit une recherche
+                    st.session_state.page = "CONTACTS"
+                    st.session_state.search_contact = res.get('Nom','') 
+                    st.rerun()  
 
     # 6. RÉCAPITULATIF FINANCIER DU MOIS
     st.divider()
