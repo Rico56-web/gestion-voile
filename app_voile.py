@@ -282,7 +282,7 @@ if st.session_state.page == "CONTACTS":
                 st.session_state[confirm_key] = False
                 st.rerun()
                 
-        elif st.session_state.page == "PLANNING":
+             elif st.session_state.page == "PLANNING":
         st.subheader("🗓️ Planning Vesta 2026")
         
         # 1. RÉCUPÉRATION DE LA DATE DU JOUR
