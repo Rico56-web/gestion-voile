@@ -488,103 +488,99 @@ elif st.session_state.page == "PLANNING":
 
 # --- FIN DU BLOC PLANNING ---
 # =================================================================
-# --- 7. PAGE STATS (TABLEAU DE BORD FINANCIER 2026) ---
+# --- 7. PAGE STATS (VERSION HARMONISÉE & SYNCHRONISÉE) ---
 # ================================================================
 elif st.session_state.page == "STATS":
     st.subheader("📊 Bilan & Performance Vesta 2026")
 
-    # 1. CHARGEMENT DU FICHIER RÉCENT
+    # --- CHARGEMENT SÉCURISÉ DE LA MAINTENANCE ---
     try:
+        # On force la lecture du fichier utilisé dans l'onglet MAINT
         df_m_stats = pd.read_json("maint.json")
     except:
         df_m_stats = pd.DataFrame()
 
-    # 2. INITIALISATION DES MOIS (Jan à Déc)
+    # 1. INITIALISATION DES MOIS
     m_noms_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
-    stats_mois = {i: {"recettes": 0.0, "prev": 0.0, "frais": 0.0} for i in range(1, 13)}
+    stats_mois = {i: {"rec": 0.0, "pre": 0.0, "fra": 0.0} for i in range(1, 13)}
 
-    # --- CALCULS REVENUS (Depuis tes Contacts) ---
+    # --- CALCULS REVENUS (Depuis Contacts) ---
     for _, r in df_c.iterrows():
         try:
             statut = str(r.get('Statut', '')).lower()
             if statut in ["refusé", "archivé"]: continue
             
-            # Nettoyage prix contact
-            p = float(str(r.get('Prix', '0')).replace('€','').replace(' ','').replace(',','.').strip() or 0)
+            # Nettoyage prix
+            val_p = str(r.get('Prix', '0')).replace('€','').replace(' ','').replace(',','.').strip()
+            p = float(val_p if val_p else 0)
             
-            # Logique payé / non payé
+            # Logique Paiement
             p_val = str(r.get('Paiement', '')).lower()
             is_paye = ("pay" in p_val) and not any(x in p_val for x in ["un", "non", "pas"])
             
             d_str = str(r.get('DateNav', ''))
             if '/' in d_str:
                 m_idx = int(d_str.split('/')[1])
-                if is_paye: stats_mois[m_idx]["recettes"] += p
-                else: stats_mois[m_idx]["prev"] += p
+                if is_paye: stats_mois[m_idx]["rec"] += p
+                else: stats_mois[m_idx]["pre"] += p
         except: continue
 
-    # --- CALCULS FRAIS (Depuis maint.json d'il y a 18 min) ---
+    # --- CALCULS FRAIS (Depuis Maintenance) ---
     if not df_m_stats.empty:
         for _, f in df_m_stats.iterrows():
             try:
-                # On cherche le montant dans TOUTES les colonnes possibles
-                v_brute = f.get('Montant', f.get('Prix', f.get('cout', 0)))
-                # On nettoie les virgules et symboles
-                c_f = str(v_brute).replace('€','').replace(' ','').replace(',','.').strip()
+                # On cherche le prix dans toutes les colonnes possibles
+                v_f = f.get('Montant', f.get('Prix', f.get('cout', 0)))
+                c_f = str(v_f).replace('€','').replace(' ','').replace(',','.').strip()
                 m_frais = float(c_f if c_f and c_f != 'None' else 0)
                 
-                # On cherche la date
+                # Date
                 d_f = str(f.get('Date', ''))
                 m_idx = None
                 if '/' in d_f: m_idx = int(d_f.split('/')[1])
                 elif '-' in d_f: m_idx = int(d_f.split('-')[1])
 
                 if m_idx and 1 <= m_idx <= 12:
-                    stats_mois[m_idx]["frais"] += m_frais
+                    stats_mois[m_idx]["fra"] += m_frais
             except: continue
 
- # 3. CRÉATION DU TABLEAU DE SYNTHÈSE (Noms Simplifiés)
+    # 2. CONSTRUCTION DU TABLEAU (Noms de colonnes fixes)
     data_table = []
     for i in range(1, 13):
         data_table.append({
             "Mois": m_noms_courts[i-1],
-            "Recettes": stats_mois[i]["recettes"],
-            "Prévisionnel": stats_mois[i]["prev"],
-            "Frais": stats_mois[i]["frais"],
-            "Solde": stats_mois[i]["recettes"] - stats_mois[i]["frais"]
+            "Recettes": stats_mois[i]["rec"],
+            "Prévisionnel": stats_mois[i]["pre"],
+            "Frais": stats_mois[i]["fra"],
+            "Solde Net": stats_mois[i]["rec"] - stats_mois[i]["fra"]
         })
     df_stats = pd.DataFrame(data_table)
 
-    # 4. AFFICHAGE DU GRAPHIQUE (Correction KeyError)
+    # 3. AFFICHAGE DU GRAPHIQUE
     st.write("📈 **Évolution mensuelle**")
+    st.bar_chart(df_stats.set_index('Mois')[["Recettes", "Prévisionnel"]], color=["#27ae60", "#f1c40f"])
     
-    # On vérifie que les colonnes existent bien avant de tracer
-    colonnes_graph = ["Recettes", "Prévisionnel"]
-    df_graph = df_stats.set_index('Mois')[colonnes_graph]
-    
-    st.bar_chart(df_graph, color=["#27ae60", "#f1c40f"])
-
-    # 5. TABLEAU RÉCAPITULATIF
+    # 4. TABLEAU RÉCAPITULATIF
     st.write("📋 **Détail financier par mois**")
     st.dataframe(df_stats, use_container_width=True, hide_index=True)
 
-    # 5. BILAN GLOBAL (KPI)
+    # 5. BILAN GLOBAL (FINI LES KEYERROR)
     st.divider()
-    total_recettes = df_stats["Recettes (Payé)"].sum()
+    total_recettes = df_stats["Recettes"].sum()
     total_prev = df_stats["Prévisionnel"].sum()
     total_frais = df_stats["Frais"].sum()
     bilan_final = total_recettes - total_frais
 
+    st.write("### 🏁 Bilan Annuel")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total Encaissé", f"{total_recettes:,.2f} €")
-    c2.metric("Attendu", f"{total_prev:,.2f} €")
+    c2.metric("Total Attendu", f"{total_prev:,.2f} €")
     c3.metric("Total Frais", f"{total_frais:,.2f} €", delta=f"-{total_frais:,.2f}", delta_color="inverse")
     c4.metric("SOLDE NET", f"{bilan_final:,.2f} €")
 
     # --- ANALYSE D'ACTIVITÉ ---
     st.divider()
     df_v = df_c[~df_c['Statut'].isin(["Refusé", "Archivé"])]
-    # Sécurité pour les jours
     serie_j = pd.to_numeric(df_v['NbreJours'], errors='coerce').fillna(0)
     jours = serie_j.sum()
     panier = total_recettes / len(df_v) if len(df_v) > 0 else 0
