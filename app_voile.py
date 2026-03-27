@@ -519,7 +519,7 @@ elif st.session_state.page == "STATS":
                 else: stats_mois[m_idx]["pre"] += p
         except: continue
 
-# --- CALCULS FRAIS (FORCE MARS = 3) ---
+# --- CALCULS FRAIS (VERSION NETTOYAGE RADICAL) ---
     if not df_m_stats.empty:
         for _, f in df_m_stats.iterrows():
             try:
@@ -527,34 +527,46 @@ elif st.session_state.page == "STATS":
                 v_f = f.get('Montant', f.get('Prix', 0))
                 m_frais = float(str(v_f).replace('€','').replace(',','.').replace(' ','').strip() or 0)
                 
-                # 2. Date avec conversion forcée
-                raw_date = f.get('Date', None)
-                dt_objet = pd.to_datetime(raw_date, dayfirst=True, errors='coerce')
+                # 2. Date : On force le formatage en texte pour éviter les surprises
+                raw_date = str(f.get('Date', ''))
                 
-                if pd.notnull(dt_objet):
-                    m_idx = int(dt_objet.month) # 1 pour Janvier, 3 pour Mars, etc.
-                    
-                    # 3. Sécurité d'attribution
-                    if 1 <= m_idx <= 12:
-                        stats_mois[m_idx]["fra"] += m_frais
+                # On essaie de deviner le mois manuellement si pd.to_datetime échoue
+                m_idx = None
+                
+                # Si la date ressemble à 2026-03-27...
+                if '-' in raw_date:
+                    parts = raw_date.split('-')
+                    # Si c'est AAAA-MM-DD, le mois est en 2ème position (index 1)
+                    if len(parts[0]) == 4: m_idx = int(parts[1])
+                    # Si c'est DD-MM-AAAA, le mois est aussi en index 1
+                    else: m_idx = int(parts[1])
+                
+                # Si la date ressemble à 27/03/2026...
+                elif '/' in raw_date:
+                    parts = raw_date.split('/')
+                    m_idx = int(parts[1])
+                
+                # Sécurité finale avec Pandas si le manuel a échoué
+                if m_idx is None:
+                    dt_objet = pd.to_datetime(raw_date, errors='coerce')
+                    if pd.notnull(dt_objet):
+                        m_idx = dt_objet.month
+
+                # 3. On range dans le bon mois (1=Jan, 3=Mar...)
+                if m_idx and 1 <= m_idx <= 12:
+                    stats_mois[m_idx]["fra"] += m_frais
             except: 
                 continue
 
-    # --- 2. CONSTRUCTION DU TABLEAU (Vérification des index) ---
+    # --- RECONSTRUCTION DU TABLEAU (SANS DÉCALAGE) ---
     data_table = []
-    # On boucle de 1 à 12 pour être certain de l'ordre des mois
     for i in range(1, 13):
-        nom_mois = m_noms_courts[i-1] # Jan est à l'index 0 de la liste des noms
-        frais_du_mois = stats_mois[i]["fra"]
-        recettes_du_mois = stats_mois[i]["rec"]
-        
         data_table.append({
-            "Mois": nom_mois,
-            "Recettes": recettes_du_mois,
-            "Frais": frais_du_mois,
-            "Solde Net": recettes_du_mois - frais_du_mois
+            "Mois": m_noms_courts[i-1],
+            "Recettes": stats_mois[i]["rec"],
+            "Frais": stats_mois[i]["fra"],
+            "Solde Net": stats_mois[i]["rec"] - stats_mois[i]["fra"]
         })
-    
     df_stats = pd.DataFrame(data_table)
 
     # --- 3. AFFICHAGE ---
