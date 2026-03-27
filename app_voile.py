@@ -631,7 +631,7 @@ elif st.session_state.page == "MAINT":
     
     
     --- 9. PAGE FACTURES ---
-elif st.session_state.page == "FACTURES":
+    elif st.session_state.page == "FACTURES":
     st.subheader("📄 Facturation Mensuelle (CMN)")
     prev_m_idx = now.month - 1 if now.month > 1 else 12
     prev_y = now.year if now.month > 1 else now.year - 1
