@@ -519,35 +519,25 @@ elif st.session_state.page == "STATS":
                 else: stats_mois[m_idx]["pre"] += p
         except: continue
 
- # --- CALCULS FRAIS (VERSION COMPATIBLE TIMESTAMP) ---
+# --- CALCULS FRAIS (UNIVERSEL : SLASH, TIRETS OU OBJET DATE) ---
     if not df_m_stats.empty:
         for _, f in df_m_stats.iterrows():
             try:
-                # 1. Récupération du montant
+                # 1. Montant
                 v_f = f.get('Montant', f.get('Prix', 0))
                 m_frais = float(str(v_f).replace('€','').replace(',','.').strip() or 0)
                 
-                # 2. Extraction du mois avec détection de Timestamp
-                d_f = f.get('Date', '')
+                # 2. Extraction du mois intelligente
+                raw_date = f.get('Date', '')
                 m_idx = None
                 
-                # Cas 1 : C'est un grand nombre (Timestamp comme 1774569600000)
-                if isinstance(d_f, (int, float)) or (isinstance(d_f, str) and d_f.isdigit()):
-                    # On convertit le timestamp en date réelle
-                    dt_object = pd.to_datetime(int(d_f), unit='ms')
-                    m_idx = dt_object.month
+                # On utilise Pandas pour convertir n'importe quel format (ISO, Slash, etc.)
+                date_clean = pd.to_datetime(raw_date, errors='coerce')
                 
-                # Cas 2 : C'est une date texte (JJ/MM/AAAA)
-                elif isinstance(d_f, str) and '/' in d_f:
-                    parts = d_f.split('/')
-                    if len(parts) >= 2:
-                        m_idx = int(parts[1])
+                if pd.notnull(date_clean):
+                    m_idx = date_clean.month
                 
-                # Cas 3 : C'est déjà un objet date Python
-                elif hasattr(d_f, 'month'):
-                    m_idx = d_f.month
-
-                # 3. Attribution au mois
+                # 3. Attribution au mois dans le dictionnaire stats_mois
                 if m_idx and 1 <= m_idx <= 12:
                     stats_mois[m_idx]["fra"] += m_frais
             except: 
