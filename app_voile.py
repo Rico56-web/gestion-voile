@@ -308,27 +308,31 @@ elif st.session_state.page == "PLANNING":
             dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
             if yv < 100: yv += 2000
             
-            if mv == sel_m and yv == sel_y:
-                s_val = str(r.get('Statut', '')).strip().lower()
-                p_val = str(r.get('Paiement', '')).strip().lower()
-                
-                # --- FILTRE ANTI-FANTÔMES ---
-                if s_val in ["", "archivé", "archive", "supprimé"]:
-                    continue
-                
-                this_date = date(yv, mv, dv)
-                is_paye = "paid" in p_val or "pay" in p_val
-                
-                # --- CALCUL COULEUR ---
-                if this_date < aujourdhui:
-                    # PASSÉ : Bleu si payé, Rouge si impayé
-                    current_c = "#3498db" if is_paye else "#e74c3c"
-                elif "ok" in s_val:
-                    current_c = "#2ecc71" # Vert
-                elif "attente" in s_val:
-                    current_c = "#f1c40f" # Jaune
-                else:
-                    current_c = "transparent"
+ if mv == sel_m and yv == sel_y:
+                    s_val = str(r.get('Statut', '')).strip().lower()
+                    p_val = str(r.get('Paiement', '')).strip().lower()
+                    
+                    if s_val in ["", "archivé", "archive", "supprimé"]:
+                        continue
+                    
+                    this_date = date(yv, mv, dv)
+                    
+                    # --- DÉTECTION "TOUTES LANGUES" ---
+                    # On considère que c'est PAYÉ si on trouve "paid" ou "payé" (avec ou sans accent)
+                    # MAIS on vérifie que ce n'est pas "unpaid" ou "non payé"
+                    is_paye = ("paid" in p_val or "payé" in p_val or "paye" in p_val) and "unpaid" not in p_val and "non" not in p_val
+                    
+                    # --- CALCUL COULEUR ---
+                    if this_date < aujourdhui:
+                        # PASSÉ : Bleu si payé, sinon Rouge Alerte
+                        current_c = "#3498db" if is_paye else "#e74c3c"
+                    elif "ok" in s_val:
+                        # FUTUR : Vert si validé
+                        current_c = "#2ecc71"
+                    elif "attente" in s_val:
+                        current_c = "#f1c40f"
+                    else:
+                        current_c = "transparent"
 
                 # --- GESTION DES CONFLITS ---
                 n_j = int(r.get('NbreJours', 1))
