@@ -692,6 +692,28 @@ elif st.session_state.page == "MAINT":
         st.success(f"💰 **Total cumulé des frais de maintenance : {total_m:,.2f} €**")
     else:
         st.info("Aucun frais enregistré pour le moment.")  
+        # --- SYSTÈME D'ALERTE MAINTENANCE PRÉVENTIVE ---
+    # Remplace '2450' par une variable si tu saisis tes heures ailleurs
+    heures_actuelles = 2450  # Seuil que tu as fixé
+    seuil_vidange = 2450
+    
+    if heures_actuelles >= seuil_vidange:
+        st.error(f"⚠️ **ALERTE ENTRETIEN MOTEUR**")
+        st.markdown(f"""
+        **Heures moteur : {heures_actuelles} h** Il est temps d'effectuer la **vidange moteur** (Seuil : {seuil_vidange} h).
+        """)
+        if st.button("✅ MARQUER VIDANGE COMME FAITE"):
+            # Crée un frais automatique pour la vidange
+            new_v = {
+                "Date": datetime.now().strftime("%d/%m/%Y"), 
+                "Travaux": f"Vidange moteur faite à {heures_actuelles}h", 
+                "Montant": 0.0
+            }
+            df_m = pd.concat([pd.DataFrame([new_v]), df_m], ignore_index=True)
+            sauvegarder_data(df_m, "maintenance.json")
+            st.success("Entretien enregistré ! N'oublie pas de modifier le montant du forfait.")
+            st.rerun()
+    st.divider()
 
 # --- 10. PAGE NOTES ---
 elif st.session_state.page == "NOTES":
