@@ -94,6 +94,10 @@ for i, name in enumerate(menu):
 # --- CHARGEMENT DES DONNÉES ---
 df_c = charger_data("contacts.json")
 df_m = charger_data("maint.json")
+try:
+    df_m = pd.read_json("maintenance.json")
+except:
+    df_m = pd.DataFrame(columns=["Date", "Travaux", "Montant", "Etat", "Priorité", "Commentaires"])
 
 # --- NETTOYAGE AUTOMATIQUE DES DONNÉES ---
 def harmoniser_paiements(val):
