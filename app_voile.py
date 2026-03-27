@@ -128,85 +128,99 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except Exception:
         pass
-
-# --- 5. PAGE CONTACTS ---
+# =================================================================
+# --- 5. PAGE CONTACTS (COMPLÈTE AVEC LIEN PLANNING) ---
+# =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta - Missions")
     
-# --- 1. LE FORMULAIRE DE MODIFICATION ---
+    # --- GESTION DU FILTRE DEPUIS LE PLANNING ---
+    if 'search_contact' not in st.session_state:
+        st.session_state.search_contact = ""
+    
+    val_recherche = st.session_state.search_contact
+
+    # Barre de recherche intelligente
+    col_search, col_reset = st.columns([3, 1])
+    with col_search:
+        recherche = st.text_input("🔍 Rechercher un nom ou une société", value=val_recherche)
+    with col_reset:
+        if val_recherche:
+            if st.button("❌ Effacer filtre", use_container_width=True):
+                st.session_state.search_contact = ""
+                st.rerun()
+
+    # --- 1. LE FORMULAIRE DE MODIFICATION ---
     if st.session_state.get('edit_idx') is not None:
         idx = st.session_state.edit_idx
-        r = df_c.iloc[idx]
-        
-        with st.expander(f"📝 MODIFIER : {r.get('Prénom','')} {r.get('Nom','')}", expanded=True):
-            with st.form(key=f"edit_form_secure_{idx}"):
-                c1, c2 = st.columns(2)
-                u_pre = c1.text_input("Prénom", value=str(r.get('Prénom', '')))
-                u_nom = c2.text_input("Nom", value=str(r.get('Nom', '')))
-                u_soc = c1.text_input("Société", value=str(r.get('Société', 'PARTICULIER')))
-                u_tel = c2.text_input("Téléphone", value=str(r.get('Téléphone', '')))
-                u_mail = st.text_input("Email", value=str(r.get('Email', '')))
-                
-                c_st, c_pa = st.columns(2)
-                l_s = ["En attente", "OK", "Refusé", "Terminé"]
-                u_statut = c_st.selectbox("Statut Mission", l_s, index=l_s.index(r.get('Statut')) if r.get('Statut') in l_s else 0)
-                # --- REMPLACEZ LA LIGNE 134 PAR CE BLOC ---
-                options_p = ["Non payé", "Payé"]
-                val_actuelle = str(r.get('Paiement', '')).lower()
-
-                # On définit l'index : 1 (Payé) si on trouve "pay" ou "paid", sinon 0
-                idx_p = 1 if ("pay" in val_actuelle and "non" not in val_actuelle and "un" not in val_actuelle) else 0
-
-                u_paye = c_pa.selectbox("Paiement", options_p, index=idx_p)
-                
-                c3, c4, c5 = st.columns(3)
-                u_date = c3.text_input("Date Nav", value=str(r.get('DateNav', '')))
-                
-                # --- SÉCURITÉ POUR LES NOMBRES (Évite le ValueError) ---
-                try:
-                    val_jours = int(float(r.get('NbreJours', 1)))
-                except:
-                    val_jours = 1
-                try:
-                    val_pers = int(float(r.get('NbrePers', 1)))
-                except:
-                    val_pers = 1
-                
-                u_jours = c4.number_input("Jours", value=val_jours, min_value=1)
-                u_pers = c5.number_input("Pers.", value=val_pers, min_value=1)
-                
-                u_prix = st.text_input("Prix total (€)", value=str(r.get('Prix', '0.00')))
-                u_comm = st.text_area("Commentaires", value=str(r.get('Commentaires', '')))
-
-                # --- BOUTON D'ENREGISTREMENT (Indispensable ici) ---
-                submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS")
-
-                if submitted:
-                    df_c.at[idx, 'Prénom'] = u_pre
-                    df_c.at[idx, 'Nom'] = u_nom
-                    df_c.at[idx, 'Société'] = u_soc
-                    df_c.at[idx, 'Téléphone'] = u_tel
-                    df_c.at[idx, 'Email'] = u_mail
-                    df_c.at[idx, 'Statut'] = u_statut
-                    df_c.at[idx, 'Paiement'] = u_paye
-                    df_c.at[idx, 'Prix'] = u_prix
-                    df_c.at[idx, 'DateNav'] = u_date
-                    df_c.at[idx, 'NbreJours'] = u_jours
-                    df_c.at[idx, 'NbrePers'] = u_pers
-                    df_c.at[idx, 'Commentaires'] = u_comm
+        # Sécurité pour éviter l'erreur si l'index a changé après suppression
+        if idx < len(df_c):
+            r = df_c.iloc[idx]
+            
+            with st.expander(f"📝 MODIFIER : {r.get('Prénom','')} {r.get('Nom','')}", expanded=True):
+                with st.form(key=f"edit_form_secure_{idx}"):
+                    c1, c2 = st.columns(2)
+                    u_pre = c1.text_input("Prénom", value=str(r.get('Prénom', '')))
+                    u_nom = c2.text_input("Nom", value=str(r.get('Nom', '')))
+                    u_soc = c1.text_input("Société", value=str(r.get('Société', 'PARTICULIER')))
+                    u_tel = c2.text_input("Téléphone", value=str(r.get('Téléphone', '')))
+                    u_mail = st.text_input("Email", value=str(r.get('Email', '')))
                     
-                    sauvegarder_data(df_c, "contacts.json")
-                    st.session_state.edit_idx = None
-                    st.rerun()
+                    c_st, c_pa = st.columns(2)
+                    l_s = ["En attente", "OK", "Refusé", "Terminé"]
+                    u_statut = c_st.selectbox("Statut Mission", l_s, index=l_s.index(r.get('Statut')) if r.get('Statut') in l_s else 0)
+                    
+                    # --- LOGIQUE PAIEMENT LIGNE 134 ---
+                    options_p = ["Non payé", "Payé"]
+                    val_actuelle = str(r.get('Paiement', '')).lower()
+                    idx_p = 1 if ("pay" in val_actuelle and "non" not in val_actuelle and "un" not in val_actuelle) else 0
+                    u_paye = c_pa.selectbox("Paiement", options_p, index=idx_p)
+                    
+                    c3, c4, c5 = st.columns(3)
+                    u_date = c3.text_input("Date Nav", value=str(r.get('DateNav', '')))
+                    
+                    try:
+                        val_jours = int(float(r.get('NbreJours', 1)))
+                    except:
+                        val_jours = 1
+                    try:
+                        val_pers = int(float(r.get('NbrePers', 1)))
+                    except:
+                        val_pers = 1
+                    
+                    u_jours = c4.number_input("Jours", value=val_jours, min_value=1)
+                    u_pers = c5.number_input("Pers.", value=val_pers, min_value=1)
+                    
+                    u_prix = st.text_input("Prix total (€)", value=str(r.get('Prix', '0.00')))
+                    u_comm = st.text_area("Commentaires", value=str(r.get('Commentaires', '')))
 
-        if st.button("❌ Fermer sans enregistrer", key="close_edit"):
-            st.session_state.edit_idx = None
-            st.rerun()
+                    submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS")
 
- # --- 2. NAVIGATION AVEC INDICATEUR D'ÉTAT ---
+                    if submitted:
+                        df_c.at[idx, 'Prénom'] = u_pre
+                        df_c.at[idx, 'Nom'] = u_nom
+                        df_c.at[idx, 'Société'] = u_soc
+                        df_c.at[idx, 'Téléphone'] = u_tel
+                        df_c.at[idx, 'Email'] = u_mail
+                        df_c.at[idx, 'Statut'] = u_statut
+                        df_c.at[idx, 'Paiement'] = u_paye
+                        df_c.at[idx, 'Prix'] = u_prix
+                        df_c.at[idx, 'DateNav'] = u_date
+                        df_c.at[idx, 'NbreJours'] = u_jours
+                        df_c.at[idx, 'NbrePers'] = u_pers
+                        df_c.at[idx, 'Commentaires'] = u_comm
+                        
+                        sauvegarder_data(df_c, "contacts.json")
+                        st.session_state.edit_idx = None
+                        st.rerun()
+
+            if st.button("❌ Fermer sans enregistrer", key="close_edit"):
+                st.session_state.edit_idx = None
+                st.rerun()
+
+    # --- 2. NAVIGATION AVEC INDICATEUR D'ÉTAT ---
     st.divider()
     n1, n2, n3 = st.columns(3)
-    
     view_arc = st.session_state.get('view_archive', False)
 
     if n1.button("📂 En Cours", key="nav_active", use_container_width=True, type="primary" if not view_arc else "secondary"):
@@ -224,39 +238,32 @@ if st.session_state.page == "CONTACTS":
         st.session_state.edit_idx = len(df_c) - 1
         st.rerun()
 
-    # --- 3. CRÉATION DE DF_DISP (Indispensable avant la boucle) ---
+    # --- 3. FILTRAGE ET AFFICHAGE ---
     if view_arc:
         df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])]
     else:
         df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-    # --- 4. AFFICHAGE DES FICHES ---
+    # Application de la recherche (Filtre dynamique)
+    if recherche:
+        mask = df_disp.apply(lambda row: recherche.lower() in str(row.values).lower(), axis=1)
+        df_disp = df_disp[mask]
+
     for i, r in df_disp.iterrows():
-        # 1. On récupère la valeur brute enregistrée (ex: "Payé", "Paid", "Non payé")
         p_brut = str(r.get('Paiement', 'Non payé')).strip()
         p_test = p_brut.lower()
         
-        # 2. LA RÈGLE DÉFINITIVE (Celle qui commande le badge)
-        # On est "Payé" si : le mot contient 'pay' ou 'paid' 
-        # ET qu'il n'y a pas 'non', 'un' ou 'pas'
         is_p_ok = ("pay" in p_test or "paid" in p_test) and ("non" not in p_test and "un" not in p_test and "pas" not in p_test)
         
-        # 3. ON DÉFINIT LE TEXTE ET LA COULEUR DU BADGE
         p_label = "Payé" if is_p_ok else "Non payé"
-        p_col = "#27ae60" if is_p_ok else "#e67e22" # Vert si OK, Orange sinon
+        p_col = "#27ae60" if is_p_ok else "#e67e22"
         
-        # 4. STATUT (OK, En attente, etc.)
         s = str(r.get('Statut', 'En attente'))
         s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
         
-        
-        # --- INFOS CONTACT ---
         t_raw = str(r.get('Téléphone','')).strip()
         t_link = t_raw.replace(" ", "").replace(".", "").replace("-", "")
-        mail = str(r.get('Email', '')).strip()
 
-        # HTML Premium (Forçage noir pour iPhone)
-        # --- HTML DU BADGE (CORRIGÉ POUR ÉVITER LE NAMEERROR) ---
         h = f'''
         <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: white; color: black;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
@@ -278,25 +285,23 @@ if st.session_state.page == "CONTACTS":
             </div>
         </div>
         '''
-        st.markdown(h, unsafe_allow_html=True)  
-# --- BOUTONS ACTIONS (✏️ et 🗑️) ---
+        st.markdown(h, unsafe_allow_html=True)
+
+        # --- ACTIONS ---
         c_ed, c_del = st.columns([1, 4])
         suffix = "arc" if view_arc else "act"
         
-        # Bouton Modifier
         if c_ed.button("✏️", key=f"btn_ed_{suffix}_{i}"):
             st.session_state.edit_idx = i
             st.rerun()
 
-        # LOGIQUE DE CONFIRMATION DE SUPPRESSION
         confirm_key = f"confirm_del_{suffix}_{i}"
-        
         if not st.session_state.get(confirm_key, False):
             if c_del.button("🗑️ SUPPRIMER CETTE MISSION", key=f"btn_del_{suffix}_{i}", use_container_width=True):
                 st.session_state[confirm_key] = True
                 st.rerun()
         else:
-            c_del.warning("⚠️ Confirmer la suppression ?")
+            c_del.warning("⚠️ Confirmer ?")
             b1, b2 = c_del.columns(2)
             if b1.button("✅ OUI", key=f"yes_{confirm_key}", use_container_width=True):
                 df_c = df_c.drop(i).reset_index(drop=True)
