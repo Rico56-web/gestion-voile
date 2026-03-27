@@ -281,16 +281,17 @@ if st.session_state.page == "CONTACTS":
             if b2.button("❌ NON", key=f"no_{confirm_key}", use_container_width=True):
                 st.session_state[confirm_key] = False
                 st.rerun()
+# --- FIN DE LA PAGE PRÉCÉDENTE ---
+    # Vérifiez bien qu'il n'y a pas de code qui "dépasse" ici
 
-# --- 6. PAGE PLANNING (CORRIGÉE) ---
-        elif st.session_state.page == "PLANNING":
-        st.subheader("🗓️ Planning de Navigation")
+    elif st.session_state.page == "PLANNING":
+        st.subheader("🗓️ Planning Vesta 2026")
         
-        # Date charnière : Aujourd'hui le 27 Mars 2026
+        # 1. RÉCUPÉRATION DE LA DATE DU JOUR
         maintenant = datetime.now()
         aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
         
-        # --- MENUS ---
+        # 2. SÉLECTION MOIS/ANNÉE
         col_m, col_y = st.columns(2)
         with col_m:
             m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
@@ -298,9 +299,8 @@ if st.session_state.page == "CONTACTS":
         with col_y:
             sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
 
+        # 3. FILTRAGE ET LOGIQUE DES COULEURS
         jours_occ = {}
-        missions_detail = []
-
         for _, r in df_c.iterrows():
             try:
                 d_str = str(r.get('DateNav', '')).strip()
@@ -313,50 +313,44 @@ if st.session_state.page == "CONTACTS":
                     s_val = str(r.get('Statut', '')).strip().lower()
                     p_val = str(r.get('Paiement', '')).strip().lower()
                     
-                    # --- SÉCURITÉ ANTI-FANTÔMES ---
-                    # On ignore les fiches vides ou archivées pour nettoyer le calendrier
+                    # --- FILTRE ANTI-FANTÔMES (On ignore le vide/archivé) ---
                     if s_val in ["", "archivé", "archive", "supprimé"]:
                         continue
                     
                     this_date = date(yv, mv, dv)
-                    is_paye = ("pay" in p_val) and (p_val != "")
-                    is_dans_le_passe = this_date < aujourdhui
+                    is_paye = "pay" in p_val
                     
-                    # --- LOGIQUE DE COULEUR ---
-                    if is_dans_le_passe:
-                        # PASSÉ (ex: le 14) : Bleu si payé, sinon Rouge Alerte
-                        current_c = "#3498db" if is_paye else "#e74c3c"
+                    # --- CALCUL COULEUR ---
+                    if this_date < aujourdhui:
+                        current_c = "#3498db" if is_paye else "#e74c3c" # Bleu ou Rouge
+                    elif "ok" in s_val:
+                        current_c = "#2ecc71" # Vert
+                    elif "attente" in s_val:
+                        current_c = "#f1c40f" # Jaune
                     else:
-                        # FUTUR ou AUJOURD'HUI (ex: le 28) : Vert si OK, Jaune si Attente
-                        if "ok" in s_val:
-                            current_c = "#2ecc71"
-                        elif "attente" in s_val:
-                            current_c = "#f1c40f"
-                        else:
-                            current_c = "transparent"
+                        current_c = "transparent"
 
-                    # --- GESTION CONFLITS (Plusieurs fiches le même jour) ---
+                    # --- GESTION DES CONFLITS ---
                     n_j = int(r.get('NbreJours', 1))
                     for j in range(dv, dv + n_j):
                         if j in jours_occ:
                             old_c = jours_occ[j]["c"]
-                            # Le ROUGE gagne sur tout (Alerte impayé)
-                            if "#e74c3c" in [current_c, old_c]: final_c = "#e74c3c"
-                            # Le VERT gagne sur le Bleu (Mission à venir)
-                            elif "#2ecc71" in [current_c, old_c]: final_c = "#2ecc71"
+                            if "#e74c3c" in [current_c, old_c]: final_c = "#e74c3c" # Rouge gagne
+                            elif "#2ecc71" in [current_c, old_c]: final_c = "#2ecc71" # Vert gagne
                             else: final_c = current_c
-                            jours_occ[j]["c"] = final_c
+                            jours_occ[j] = {"c": final_c}
                         else:
                             jours_occ[j] = {"c": current_c}
             except: continue
 
-        # --- DESSIN DU CALENDRIER SVG ---
+        # 4. AFFICHAGE DU CALENDRIER
         h_cal = '<table style="width:100%; border-collapse: collapse; text-align: center;">'
         cal_mat = calendar.monthcalendar(sel_y, sel_m)
         for sem in cal_mat:
             h_cal += '<tr>'
             for jour in sem:
-                if jour == 0: h_cal += '<td style="height:45px; border:0.5px solid #eee;"></td>'
+                if jour == 0:
+                    h_cal += '<td style="height:45px; border:0.5px solid #eee;"></td>'
                 else:
                     bg = jours_occ.get(jour, {}).get("c", "transparent")
                     txt_c = "white" if bg in ["#3498db", "#e74c3c", "#2ecc71"] else "black"
@@ -365,9 +359,7 @@ if st.session_state.page == "CONTACTS":
             h_cal += '</tr>'
         h_cal += '</table>'
         st.markdown(h_cal, unsafe_allow_html=True)
-
-        # LÉGENDE RAPIDE
-        st.markdown('<div style="font-size:0.7rem; text-align:center; margin-top:10px;">🔴 Impayé | 🔵 Payé | 🟢 À venir | 🟡 Attente</div>', unsafe_allow_html=True)
+        st.write("🔴 Impayé | 🔵 Payé | 🟢 OK | 🟡 Attente")
 
 # --- 7. PAGE STATS ---
 elif st.session_state.page == "STATS":
