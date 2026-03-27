@@ -438,7 +438,7 @@ elif st.session_state.page == "PLANNING":
         # Tri par jour
         res_list.sort(key=lambda x: int(str(x.get('DateNav')).split('/')[0]))
         
-# --- BOUCLE DE LA LISTE DES RÉSERVATIONS (OPTIMISÉE IPHONE) ---
+# --- BOUCLE DE LA LISTE DES RÉSERVATIONS (CORRIGÉE SANS NAMEERROR) ---
         for res in res_list:
             p_v = str(res.get('Paiement', '')).lower()
             is_p = ("pay" in p_v) and not any(x in p_v for x in ["un", "non"])
@@ -449,8 +449,10 @@ elif st.session_state.page == "PLANNING":
             
             nom_c = f"{res.get('Prénom')} {res.get('Nom','').upper()}"
             nom_famille = res.get('Nom','')
+            # On crée une clé unique basée sur le nom et la date pour éviter le NameError
+            unique_key = f"btn_{nom_famille}_{str(res.get('DateNav')).replace('/','')}"
 
-            # AFFICHAGE UNIQUE : TOUT DANS LE HTML
+            # AFFICHAGE HTML (Identique à ce qu'on voulait pour l'iPhone)
             st.markdown(f"""
             <div style="padding: 15px; border-left: 6px solid {p_color}; background: white; color: black; border-radius: 10px; margin-bottom: 10px; box-shadow: 0px 2px 5px rgba(0,0,0,0.1); border: 1px solid #eee;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
@@ -464,16 +466,11 @@ elif st.session_state.page == "PLANNING":
                     📅 <b>{res.get('DateNav')}</b> | ⛵ {res.get('NbreJours', 1)}j | 💰 <b>{res.get('Prix')} €</b><br>
                     <small style="color: #555;">🏢 {res.get('Société','-')}</small>
                 </div>
-                <hr style="margin: 12px 0; border: 0; border-top: 1px solid #eee;">
-                <div style="text-align: center;">
-                    <p style="font-size: 0.8rem; color: #1a2a6c; font-weight: bold; margin-bottom: 5px;">Pour voir la fiche, utilise la recherche CONTACTS :</p>
-                    <code style="background: #f0f2f6; padding: 5px 10px; border-radius: 5px; color: #1a2a6c; font-size: 1rem;">{nom_famille}</code>
-                </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # Le bouton Streamlit est placé ICI, sans colonnes, pour être bien visible sur iOS
-            if st.button(f"🔎 VOIR LA FICHE DE {nom_famille.upper()}", key=f"btn_{nom_famille}_{idx}", use_container_width=True):
+            # LE BOUTON AVEC LA CLÉ CORRIGÉE
+            if st.button(f"🔎 VOIR LA FICHE DE {nom_famille.upper()}", key=unique_key, use_container_width=True):
                 st.session_state.search_contact = nom_famille
                 st.session_state.page = "CONTACTS"
                 st.rerun()
