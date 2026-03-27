@@ -300,100 +300,74 @@ elif st.session_state.page == "PLANNING":
 
     # 3. FILTRAGE ET LOGIQUE DES COULEURS
     jours_occ = {}
-    for _, r in df_c.iterrows():
-        try:
-            d_str = str(r.get('DateNav', '')).strip()
-            if '/' not in d_str: continue
-            parts = d_str.split('/')
-            dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
-            if yv < 100: yv += 2000
-            
- if mv == sel_m and yv == sel_y:
+# 3. FILTRAGE ET LOGIQUE DES COULEURS
+        jours_occ = {}
+        for _, r in df_c.iterrows():
+            try:
+                d_str = str(r.get('DateNav', '')).strip()
+                if '/' not in d_str: continue
+                parts = d_str.split('/')
+                dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
+                if yv < 100: yv += 2000
+                
+                # --- LA LIGNE 311 EST ICI (BIEN ALIGNÉE) ---
+                if mv == sel_m and yv == sel_y:
                     s_val = str(r.get('Statut', '')).strip().lower()
                     p_val = str(r.get('Paiement', '')).strip().lower()
                     
+                    # On ignore les fiches vides ou archivées
                     if s_val in ["", "archivé", "archive", "supprimé"]:
                         continue
                     
                     this_date = date(yv, mv, dv)
                     
-                    # --- DÉTECTION "TOUTES LANGUES" ---
-                    # On considère que c'est PAYÉ si on trouve "paid" ou "payé" (avec ou sans accent)
-                    # MAIS on vérifie que ce n'est pas "unpaid" ou "non payé"
-                    is_paye = ("paid" in p_val or "payé" in p_val or "paye" in p_val) and "unpaid" not in p_val and "non" not in p_val
+                    # --- DÉTECTION BILINGUE (Paid / Non payé) ---
+                    # Est payé SI contient "pay" MAIS NE CONTIENT PAS "un" ou "non"
+                    is_paye = ("pay" in p_val) and ("un" not in p_val) and ("non" not in p_val)
                     
                     # --- CALCUL COULEUR ---
                     if this_date < aujourdhui:
-                        # PASSÉ : Bleu si payé, sinon Rouge Alerte
+                        # PASSÉ (ex: le 14) : Bleu si payé, sinon Rouge
                         current_c = "#3498db" if is_paye else "#e74c3c"
                     elif "ok" in s_val:
-                        # FUTUR : Vert si validé
+                        # FUTUR : Vert
                         current_c = "#2ecc71"
                     elif "attente" in s_val:
                         current_c = "#f1c40f"
                     else:
                         current_c = "transparent"
 
-                # --- GESTION DES CONFLITS ---
-                n_j = int(r.get('NbreJours', 1))
-                for j in range(dv, dv + n_j):
-                    if j in jours_occ:
-                        old_c = jours_occ[j]["c"]
-                        if "#e74c3c" in [current_c, old_c]: final_c = "#e74c3c"
-                        elif "#2ecc71" in [current_c, old_c]: final_c = "#2ecc71"
-                        else: final_c = current_c
-                        jours_occ[j] = {"c": final_c}
-                    else:
-                        jours_occ[j] = {"c": current_c}
-        except: continue
+                    # --- GESTION DES CONFLITS ---
+                    n_j = int(r.get('NbreJours', 1))
+                    for j in range(dv, dv + n_j):
+                        if j in jours_occ:
+                            old_c = jours_occ[j]["c"]
+                            if "#e74c3c" in [current_c, old_c]: final_c = "#e74c3c"
+                            elif "#2ecc71" in [current_c, old_c]: final_c = "#2ecc71"
+                            else: final_c = current_c
+                            jours_occ[j] = {"c": final_c}
+                        else:
+                            jours_occ[j] = {"c": current_c}
+            except: 
+                continue
 
-    # 4. AFFICHAGE DU CALENDRIER
-    h_cal = '<table style="width:100%; border-collapse: collapse; text-align: center;">'
-    cal_mat = calendar.monthcalendar(sel_y, sel_m)
-    for sem in cal_mat:
-        h_cal += '<tr>'
-        for jour in sem:
-            if jour == 0:
-                h_cal += '<td style="height:45px; border:0.5px solid #eee;"></td>'
-            else:
-                bg = jours_occ.get(jour, {}).get("c", "transparent")
-                txt_c = "white" if bg in ["#3498db", "#e74c3c", "#2ecc71"] else "black"
-                circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:30px; height:30px; line-height:30px; margin:auto; font-weight:bold; font-size:13px;">{jour}</div>'
-                h_cal += f'<td style="border:0.5px solid #eee; height:48px;">{circle if bg != "transparent" else jour}</td>'
-        h_cal += '</tr>'
-    h_cal += '</table>'
-    st.markdown(h_cal, unsafe_allow_html=True)
-    st.write("🔴 Impayé | 🔵 Payé | 🟢 OK | 🟡 Attente")
-                
-# --- 7. PAGE STATS ---
-elif st.session_state.page == "STATS":
-    st.subheader("📊 Historique Financier 2026")
-    stats_data = []
-    m_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
-    for m_idx in range(1, 13):
-        rec, prev, frs = 0.0, 0.0, 0.0
-        if not df_c.empty:
-            for _, r in df_c.iterrows():
-                try:
-                    rm = int(safe_get(r, 'DateNav').split('/')[1])
-                    if rm == m_idx:
-                        p = float(safe_get(r, 'Prix') or 0)
-                        if safe_get(r, 'Paiement') == "Payé": rec += p
-                        elif safe_get(r, 'Statut') == "OK": prev += p
-                except: continue
-        if not df_m.empty:
-            for _, r in df_m.iterrows():
-                try:
-                    rm = int(safe_get(r, 'Date').split('/')[1])
-                    if rm == m_idx: frs += float(safe_get(r, 'Prix') or 0)
-                except: continue
-        stats_data.append({"Mois": m_courts[m_idx-1], "Recettes (€)": f"{rec:.2f}", "Prévisions (€)": f"{prev:.2f}", "Frais (€)": f"{frs:.2f}", "Total (€)": f"{(rec - frs):.2f}"})
-    st_df = pd.DataFrame(stats_data)
-    t_rec = sum(float(x) for x in st_df["Recettes (€)"])
-    t_pre = sum(float(x) for x in st_df["Prévisions (€)"])
-    t_frs = sum(float(x) for x in st_df["Frais (€)"])
-    tot_row = pd.DataFrame([{"Mois": "TOTAL", "Recettes (€)": f"{t_rec:.2f}", "Prévisions (€)": f"{t_pre:.2f}", "Frais (€)": f"{t_frs:.2f}", "Total (€)": f"{(t_rec - t_frs):.2f}"}])
-    st.table(pd.concat([st_df, tot_row], ignore_index=True).set_index("Mois"))
+        # 4. AFFICHAGE DU CALENDRIER
+        h_cal = '<table style="width:100%; border-collapse: collapse; text-align: center;">'
+        cal_mat = calendar.monthcalendar(sel_y, sel_m)
+        for sem in cal_mat:
+            h_cal += '<tr>'
+            for jour in sem:
+                if jour == 0:
+                    h_cal += '<td style="height:45px; border:0.5px solid #eee;"></td>'
+                else:
+                    bg = jours_occ.get(jour, {}).get("c", "transparent")
+                    txt_c = "white" if bg in ["#3498db", "#e74c3c", "#2ecc71"] else "black"
+                    circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:30px; height:30px; line-height:30px; margin:auto; font-weight:bold; font-size:13px;">{jour}</div>'
+                    h_cal += f'<td style="border:0.5px solid #eee; height:48px;">{circle if bg != "transparent" else jour}</td>'
+            h_cal += '</tr>'
+        h_cal += '</table>'
+        st.markdown(h_cal, unsafe_allow_html=True)
+        st.write("🔴 Impayé | 🔵 Payé | 🟢 OK | 🟡 Attente")
 
 # --- 8. PAGE MAINTENANCE ---
 elif st.session_state.page == "MAINT":
