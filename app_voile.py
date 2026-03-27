@@ -617,8 +617,20 @@ elif st.session_state.page == "MAINT":
                 c1, c2 = st.columns([1, 4])
                 if c1.button("✏️", key=f"em_{i}"): st.session_state.m_edit_idx = i; st.rerun()
                 if c2.button("🗑️", key=f"dm_{i}"): st.session_state.maint_confirm_del = i; st.rerun()
+# --- CALCULS SUPPLÉMENTAIRES ---
+    jours_travailles = df_c[~df_c['Statut'].isin(["Refusé", "Archivé"])]['NbreJours'].sum()
+    nb_missions = len(df_c[~df_c['Statut'].isin(["Refusé", "Archivé"])])
+    panier_moyen = total_recettes / nb_missions if nb_missions > 0 else 0
 
-# --- 9. PAGE FACTURES ---
+    st.write("💡 **Analyse de l'activité**")
+    ca1, ca2 = st.columns(2)
+    
+    # Taux d'occupation annuel (basé sur 200 jours de saison par ex)
+    ca1.metric("Jours en mer", f"{int(jours_travailles)} j", help="Total des jours de navigation validés")
+    ca2.metric("Panier Moyen", f"{panier_moyen:.2f} €", help="Revenu moyen par contrat encaissé")
+    
+    
+    --- 9. PAGE FACTURES ---
 elif st.session_state.page == "FACTURES":
     st.subheader("📄 Facturation Mensuelle (CMN)")
     prev_m_idx = now.month - 1 if now.month > 1 else 12
