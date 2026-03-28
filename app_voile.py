@@ -222,11 +222,7 @@ if st.session_state.page == "CONTACTS":
                 sauvegarder_data(df_c, "contacts.json")
                 st.rerun()
 
-# --- ICI LE ELIF (DOIT ÊTRE COLLÉ À GAUCHE) ---
-elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Planning Vesta 2026")
-
-       
+      
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION COMPLÈTE & CORRIGÉE) ---
 # =================================================================
