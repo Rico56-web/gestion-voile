@@ -164,32 +164,37 @@ if st.session_state.page == "CONTACTS":
     # Filtre des données
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-    # 3. BOUCLE D'AFFICHAGE UNIQUE
+# 3. BOUCLE D'AFFICHAGE UNIQUE (VERSION SÉCURISÉE)
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # --- Préparation des données ---
-        p_nom = clean_val(r.get('Prénom') or r.get('Prenom'))
-        n_nom = clean_val(r.get('Nom')).upper()
+        # --- Nettoyage des données pour éviter de casser le HTML ---
+        def clean_html(text):
+            t = clean_val(text)
+            # On remplace les guillemets et apostrophes qui cassent les balises
+            return t.replace('"', '&quot;').replace("'", "&apos;").replace("\n", " ")
+
+        p_nom = clean_html(r.get('Prénom') or r.get('Prenom'))
+        n_nom = clean_html(r.get('Nom')).upper()
         nom_complet = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche n°{num_f}"
         
-        soc = clean_val(r.get('Société') or r.get('Societe')) or "PARTICULIER"
+        soc = clean_html(r.get('Société') or r.get('Societe')) or "PARTICULIER"
         tel_raw = clean_val(r.get('Téléphone') or r.get('Telephone'))
-        notes = clean_val(r.get('Notes') or r.get('Commentaires') or r.get('Notes '))
+        # Important : On nettoie les notes car elles contiennent souvent des retours à la ligne
+        notes_clean = clean_html(r.get('Notes') or r.get('Commentaires') or "")
         
-        # Statuts et Infos (Jours/Pers)
         s = clean_val(r.get('Statut')) or "En attente"
         s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
+        
         nb_j = r.get('NbreJours', 1)
         nb_p = r.get('NbrePers', 1)
         prix = r.get('Prix', '0')
 
-        # Liens (Bleu et Vert forcés)
         tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "") if tel_raw else "#"
         display_tel = f"📞 {tel_raw}" if tel_raw else "📞 (SANS NUMÉRO)"
 
-        # --- AFFICHAGE DE LA FICHE (ST.MARKDOWN UNIQUE) ---
-        st.markdown(f'''
+        # --- AFFICHAGE (Le f-string est maintenant protégé) ---
+        html_fiche = f'''
         <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: white; color: black;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <b style="color: #1a2a6c; font-size: 1.1rem;">Fiche n°{num_f} — {nom_complet}</b>
@@ -199,13 +204,14 @@ if st.session_state.page == "CONTACTS":
             <div style="font-size: 0.9rem; border-top: 1px solid #eee; padding-top: 5px; margin-top:5px;">
                 📅 <b>{r.get('DateNav','--')}</b> | ⛵ {nb_j} jrs | 👥 {nb_p} pers. | 💰 {prix} €
             </div>
-            {f'<div style="margin-top:10px; padding:8px; background:#f8f9fa; border-left:3px solid #1a2a6c; font-size:0.8rem; font-style:italic; color:#333;">📝 {notes}</div>' if notes else ""}
+            {f'<div style="margin-top:10px; padding:8px; background:#f8f9fa; border-left:3px solid #1a2a6c; font-size:0.8rem; font-style:italic; color:#333;">📝 {notes_clean}</div>' if notes_clean else ""}
             <div style="margin-top: 15px; display: flex; gap: 8px;">
                 <a href="tel:{tel_link}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">{display_tel}</a>
                 <a href="https://wa.me/{tel_link}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">💬 WHATSAPP</a>
             </div>
         </div>
-        ''', unsafe_allow_html=True)
+        '''
+        st.markdown(html_fiche, unsafe_allow_html=True)
 
         # --- BOUTONS DE GESTION ---
         c1, c2 = st.columns([1, 4])
