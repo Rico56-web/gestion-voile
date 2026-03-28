@@ -222,7 +222,7 @@ if st.session_state.page == "CONTACTS":
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()
         
-# --- 2. CRÉATION DE DF_DISP (L'étape qui manquait !) ---
+# ---  CRÉATION DE DF_DISP (L'étape qui manquait !) ---
     # On définit df_disp AVANT de l'utiliser dans la boucle for
     if view_arc:
         # On affiche uniquement les fiches terminées ou refusées
@@ -230,13 +230,13 @@ if st.session_state.page == "CONTACTS":
     else:
         # On affiche tout sauf ce qui est archivé
         df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
-        
-# --- 5. AFFICHAGE DES FICHES EN MODE "BULLE ÉTANCHE" ---
-# --- DANS TA BOUCLE FOR (DANS LA PAGE CONTACTS) ---
+  # --- 5. FILTRAGE ET AFFICHAGE DES FICHES ---
+    df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
+
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # Nettoyage de sécurité (html.escape doit être importé en haut)
+        # Sécurité maximale contre les DIV et bugs iPhone
         def safe(val):
             v = str(val).strip()
             if v.lower() in ["none", "nan", "", "null"]: return ""
@@ -248,51 +248,77 @@ if st.session_state.page == "CONTACTS":
         mail = safe(r.get('Email'))
         note = safe(r.get('Notes'))
         
-        # Gestion des couleurs de Statut
-        statut = safe(r.get('Statut')) or "En attente"
-        s_col = "#2ecc71" if "OK" in statut.upper() else "#f1c40f" if "ATTENTE" in statut.upper() else "#e74c3c"
-        
-        # Gestion du Paiement (Nouveau)
+        s = safe(r.get('Statut')) or "En attente"
+        s_col = "#2ecc71" if "OK" in s.upper() else "#f1c40f" if "ATTENTE" in s.upper() else "#e74c3c"
         pay = safe(r.get('Paiement')) or "Non payé"
         p_col = "#3498db" if "PAYÉ" in pay.upper() else "#e67e22"
 
-        fiche_html = f"""
-        <div style="font-family: sans-serif; border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; background: white; color: black; margin-bottom:10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: #1a2a6c; font-weight: bold; font-size: 16px;">#{num_f} — {nom}</span>
-                <div style="display: flex; gap: 5px;">
-                    <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:bold;">{statut.upper()}</span>
-                    <span style="background:{p_col}; color:white; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:bold;">{pay.upper()}</span>
+        # --- AFFICHAGE DE LA FICHE (Sans iframe pour éviter les coupures) ---
+        st.markdown(f"""
+        <div style="border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; margin-bottom: 5px; background: white; color: black;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                <b style="color: #1a2a6c; font-size: 1.05rem;">#{num_f} — {nom}</b>
+                <div style="display: flex; flex-direction: column; gap: 3px; align-items: flex-end;">
+                    <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:10px; font-size:0.65rem; font-weight:bold;">{s.upper()}</span>
+                    <span style="background:{p_col}; color:white; padding:2px 8px; border-radius:10px; font-size:0.65rem; font-weight:bold;">{pay.upper()}</span>
                 </div>
             </div>
-            
-            <div style="color: #7f8c8d; font-size: 12px; margin: 4px 0;">🏢 {soc}</div>
-            
-            <div style="font-size: 13px; border-top: 1px solid #eee; padding-top: 8px; margin-top:5px; display: grid; grid-template-columns: 1fr 1fr;">
-                <span>📅 <b>{r.get('DateNav','--')}</b></span>
-                <span style="text-align:right;">💰 <b>{r.get('Prix', 0)}€</b></span>
+            <div style="color: #666; font-size: 0.8rem; margin-bottom: 10px;">🏢 {soc}</div>
+            <div style="font-size: 0.9rem; border-top: 1px solid #eee; padding-top: 8px; color: #333;">
+                📅 <b>{r.get('DateNav','--')}</b> | 💰 <b>{r.get('Prix', 0)}€</b>
             </div>
-
-            {f'<div style="margin-top:8px; padding:8px; background:#f9f9f9; border-left:3px solid #1a2a6c; font-size:12px; color:#444;">📝 {note}</div>' if note else ""}
-            
-            <div style="margin-top: 12px; display: flex; gap: 6px;">
-                <a href="tel:{tel}" style="flex:1; background:#34495e; color:white; padding:10px; border-radius:6px; text-decoration:none; text-align:center; font-size:11px; font-weight:bold;">📞 APPEL</a>
-                <a href="https://wa.me/{tel}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:6px; text-decoration:none; text-align:center; font-size:11px; font-weight:bold;">💬 WA</a>
-                <a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white; padding:10px; border-radius:6px; text-decoration:none; text-align:center; font-size:11px; font-weight:bold;">📧 MAIL</a>
+            {f'<div style="margin-top:8px; padding:8px; background:#f9f9f9; border-left:3px solid #1a2a6c; font-size:0.8rem; color:#444;">📝 {note}</div>' if note else ""}
+            <div style="margin-top: 15px; display: flex; gap: 5px;">
+                <a href="tel:{tel}" style="flex:1; background:#34495e; color:white !important; padding:10px 2px; border-radius:6px; text-decoration:none; text-align:center; font-size:0.75rem; font-weight:bold;">📞 {tel if tel else "APPEL"}</a>
+                <a href="https://wa.me/{tel}" style="flex:1; background:#25D366; color:white !important; padding:10px 2px; border-radius:6px; text-decoration:none; text-align:center; font-size:0.75rem; font-weight:bold;">💬 WA</a>
+                <a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white !important; padding:10px 2px; border-radius:6px; text-decoration:none; text-align:center; font-size:0.75rem; font-weight:bold;">📧 MAIL</a>
             </div>
         </div>
-        """
-        # On affiche la fiche isolée
-        st.components.v1.html(fiche_html, height=210)
+        """, unsafe_allow_html=True)
 
-        # Boutons de gestion
+        # --- BOUTONS ET LOGIQUE DE GESTION SUR PLACE ---
         c1, c2 = st.columns([1, 4])
-        if c1.button(f"✏️ {num_f}", key=f"ed_{i}"):
+        
+        # BOUTON MODIFIER
+        if c1.button(f"✏️ {num_f}", key=f"ed_btn_{i}", use_container_width=True):
             st.session_state.edit_idx = i
             st.rerun()
-        if c2.button(f"🗑️ Supprimer n°{num_f}", key=f"del_{i}"):
+            
+        # BOUTON SUPPRIMER (SANS REMONTER EN HAUT)
+        if c2.button(f"🗑️ Supprimer n°{num_f}", key=f"del_btn_{i}", use_container_width=True):
             st.session_state.confirm_del_idx = i
             st.rerun()
+
+        # LOGIQUE DE CONFIRMATION SOUS LE BOUTON
+        if st.session_state.get('confirm_del_idx') == i:
+            st.warning(f"⚠️ Supprimer la fiche {num_f} ?")
+            col_y, col_n = st.columns(2)
+            if col_y.button("OUI ✅", key=f"y_{i}"):
+                df_c = df_c.drop(i).reset_index(drop=True)
+                sauvegarder_data(df_c, "contacts.json")
+                st.session_state.confirm_del_idx = None
+                st.rerun()
+            if col_n.button("NON ❌", key=f"n_{i}"):
+                st.session_state.confirm_del_idx = None
+                st.rerun()
+
+        # LOGIQUE D'ÉDITION SOUS LA FICHE
+        if st.session_state.get('edit_idx') == i:
+            with st.expander(f"⚙️ Modifier la mission #{num_f}", expanded=True):
+                with st.form(f"form_{i}"):
+                    u_statut = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=0)
+                    u_pay = st.selectbox("Paiement", ["Non payé", "Payé"], index=0)
+                    u_prix = st.text_input("Prix €", value=str(r.get('Prix', '0')))
+                    u_notes = st.text_area("Notes", value=str(r.get('Notes', '')))
+                    if st.form_submit_button("✅ Valider"):
+                        df_c.at[i, 'Statut'] = u_statut
+                        df_c.at[i, 'Paiement'] = u_pay
+                        df_c.at[i, 'Prix'] = u_prix
+                        df_c.at[i, 'Notes'] = u_notes
+                        sauvegarder_data(df_c, "contacts.json")
+                        st.session_state.edit_idx = None
+                        st.rerun()      
+
 # =================================================================
 # --- 6. PAGE PLANNING (DÉBUT DU BLOC) ---
 # =================================================================
