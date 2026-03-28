@@ -168,9 +168,32 @@ if st.session_state.page == "CONTACTS":
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # ... (tout ton code de nettoyage ici, bien décalé) ...
+        # 1. Récupération et Nettoyage des données (IMPORTANT)
+        p_nom = clean_val(r.get('Prénom') or r.get('Prenom'))
+        n_nom = clean_val(r.get('Nom')).upper()
+        nom_complet = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche n°{num_f}"
         
-        # HTML de la Fiche
+        soc = clean_val(r.get('Société') or r.get('Societe')) or "PARTICULIER"
+        tel_raw = clean_val(r.get('Téléphone') or r.get('Telephone'))
+        notes = clean_val(r.get('Notes') or r.get('Commentaires') or r.get('Notes '))
+
+        # 2. Gestion des Boutons Appel / WA
+        if tel_raw:
+            tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "")
+            btn_label = f"📞 {tel_raw}"
+            btn_color = "#3498db" 
+            wa_color = "#25D366"  
+        else:
+            tel_link = "#"
+            btn_label = "📞 (SANS NUMÉRO)"
+            btn_color = "#bdc3c7" 
+            wa_color = "#bdc3c7"  
+
+        # 3. Couleurs Statut
+        s = clean_val(r.get('Statut')) or "En attente"
+        s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
+        
+        # 4. AFFICHAGE HTML (UNE SEULE FOIS)
         st.markdown(f'''
         <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: white; color: black;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -189,44 +212,12 @@ if st.session_state.page == "CONTACTS":
         </div>
         ''', unsafe_allow_html=True)
         
-        # --- ATTENTION : CES LIGNES DOIVENT RESTER ALIGNÉES SOUS LE ST.MARKDOWN ---
+        # 5. BOUTONS DE GESTION (BIEN ALIGNÉS)
         c_ed, c_del = st.columns([1, 4])
         if c_ed.button(f"✏️ Modifier n°{num_f}", key=f"ed_{i}"):
             st.session_state.edit_idx = i
             st.rerun()
             
-        if c_del.button(f"🗑️ Supprimer n°{num_f}", key=f"del_{i}"):
-            df_c = df_c.drop(i).reset_index(drop=True)
-            sauvegarder_data(df_c, "contacts.json")
-            st.rerun()
-        # Couleurs Statut
-        s = clean_val(r.get('Statut')) or "En attente"
-        s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
-        
-        # HTML de la Fiche
-        st.markdown(f'''
-        <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: white; color: black;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <b style="color: #1a2a6c; font-size: 1.1rem;">{nom_complet}</b>
-                <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold;">{s}</span>
-            </div>
-            <div style="color: #666; font-size: 0.8rem; margin: 5px 0;">🏢 {soc.upper()}</div>
-            <div style="font-size: 0.9rem;">
-                📅 <b>{r.get('DateNav','--')}</b> | 💰 {r.get('Prix','0')} €
-            </div>
-            {f'<div style="margin-top:10px; padding:8px; background:#f8f9fa; border-left:3px solid #1a2a6c; font-size:0.8rem; font-style:italic;">📝 {notes}</div>' if notes else ""}
-            <div style="margin-top: 15px; display: flex; gap: 8px;">
-                <a href="tel:{tel_link}" style="flex:1; background:{btn_color}; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.75rem; font-weight:bold;">{btn_label}</a>
-                <a href="https://wa.me/{tel_link}" style="flex:1; background:{wa_color}; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.75rem; font-weight:bold;">💬 WHATSAPP</a>
-            </div>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-# Boutons de gestion
-        c_ed, c_del = st.columns([1, 4])
-        if c_ed.button(f"✏️ Modifier n°{num_f}", key=f"ed_{i}"):
-            st.session_state.edit_idx = i
-            st.rerun()
         if c_del.button(f"🗑️ Supprimer n°{num_f}", key=f"del_{i}"):
             df_c = df_c.drop(i).reset_index(drop=True)
             sauvegarder_data(df_c, "contacts.json")
