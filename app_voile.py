@@ -207,7 +207,7 @@ if st.session_state.page == "CONTACTS":
         </div>
         ''', unsafe_allow_html=True)
 
-        # --- BOUTONS DE GESTION (MODIFIER / SUPPRIMER) ---
+        # --- BOUTONS DE GESTION ---
         c1, c2 = st.columns([1, 4])
         if c1.button(f"✏️ n°{num_f}", key=f"ed_{i}"):
             st.session_state.edit_idx = i
@@ -217,16 +217,13 @@ if st.session_state.page == "CONTACTS":
             sauvegarder_data(df_c, "contacts.json")
             st.rerun()
 
-# --- FIN DU BLOC CONTACTS ---
-elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Planning Vesta 2026")
 # =================================================================
-# --- 6. PAGE PLANNING (VERSION COMPLÈTE & CORRIGÉE) ---
+# --- 6. PAGE PLANNING (DÉBUT DU BLOC) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Vesta 2026")
     
-    # 1. RÉCUPÉRATION DE LA DATE DU JOUR
+    # RÉCUPÉRATION DE LA DATE DU JOUR
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
     
