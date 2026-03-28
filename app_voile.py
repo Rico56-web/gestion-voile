@@ -219,7 +219,6 @@ if st.session_state.page == "CONTACTS":
         df_c = pd.concat([df_c, pd.DataFrame([new])], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()
-import html # À mettre tout en haut de ton fichier ou ici
 
     # --- 5. FILTRAGE ET AFFICHAGE DES FICHES ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
