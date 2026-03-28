@@ -132,82 +132,72 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except Exception:
         pass
-# =================================================================
-# --- 5. PAGE CONTACTS (VERSION RESTAURÉE ET SÉCURISÉE) ---
+
+   # =================================================================
+# --- 5. PAGE CONTACTS (COMPLÈTE ET COMPATIBLE JSON) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta - Missions")
     
-    # --- 1. TRI ET PRÉPARATION (Date la plus proche en haut) ---
+    # --- 1. TRI CHRONOLOGIQUE (Le plus proche en haut) ---
     if not df_c.empty:
+        # On s'assure que DateNav est bien au format date pour le tri
         df_c['tmp_date'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         df_c = df_c.sort_values(by='tmp_date', ascending=True).drop(columns=['tmp_date'])
         df_c = df_c.reset_index(drop=True)
 
-    # --- GESTION DU FILTRE DEPUIS LE PLANNING ---
-    if 'search_contact' not in st.session_state:
-        st.session_state.search_contact = ""
-    val_recherche = st.session_state.search_contact
+    # --- RECHERCHE ---
+    if 'search_contact' not in st.session_state: st.session_state.search_contact = ""
+    recherche = st.text_input("🔍 Rechercher (Nom, Société...)", value=st.session_state.search_contact)
 
-    col_search, col_reset = st.columns([3, 1])
-    with col_search:
-        recherche = st.text_input("🔍 Rechercher un nom ou une société", value=val_recherche)
-    with col_reset:
-        if val_recherche:
-            if st.button("❌ Effacer filtre", use_container_width=True):
-                st.session_state.search_contact = ""
-                st.rerun()
-
-    # --- 2. LE FORMULAIRE DE MODIFICATION (SÉCURISÉ) ---
+    # --- 2. FORMULAIRE DE MODIFICATION ---
     if st.session_state.get('edit_idx') is not None:
         idx = st.session_state.edit_idx
         if idx < len(df_c):
             r = df_c.iloc[idx]
-            
-            with st.expander(f"📝 MODIFIER FICHE n°{idx + 1} : {r.get('Prénom','')} {r.get('Nom','')}", expanded=True):
-                # DEBUT DU FORMULAIRE
-                with st.form(key=f"edit_form_final_{idx}"):
+            with st.expander(f"📝 MODIFIER FICHE n°{idx + 1}", expanded=True):
+                with st.form(key=f"form_contact_edit_{idx}"):
                     c1, c2 = st.columns(2)
-                    u_pre = c1.text_input("Prénom", value=str(r.get('Prénom', '')))
+                    u_pre = c1.text_input("Prénom", value=str(r.get('Prénom') or r.get('Prenom') or ""))
                     u_nom = c2.text_input("Nom", value=str(r.get('Nom', '')))
-                    u_soc = c1.text_input("Société", value=str(r.get('Société', 'PARTICULIER')))
-                    u_tel = c2.text_input("Téléphone", value=str(r.get('Téléphone', '')))
-                    u_mail = st.text_input("Email", value=str(r.get('Email', '')))
+                    u_soc = c1.text_input("Société", value=str(r.get('Société') or r.get('Societe') or 'PARTICULIER'))
+                    u_tel = c2.text_input("Téléphone", value=str(r.get('Téléphone') or r.get('Telephone') or ""))
+                    u_mail = st.text_input("Email", value=str(r.get('Email') or r.get('Mail') or ""))
                     
                     c_st, c_pa = st.columns(2)
                     l_s = ["En attente", "OK", "Refusé", "Terminé"]
-                    u_statut = c_st.selectbox("Statut Mission", l_s, index=l_s.index(r.get('Statut')) if r.get('Statut') in l_s else 0)
+                    u_statut = c_st.selectbox("Statut", l_s, index=l_s.index(r.get('Statut')) if r.get('Statut') in l_s else 0)
                     
                     options_p = ["Non payé", "Payé"]
-                    val_actuelle = str(r.get('Paiement', '')).lower()
-                    idx_p = 1 if ("pay" in val_actuelle and "non" not in val_actuelle) else 0
-                    u_paye = c_pa.selectbox("Paiement", options_p, index=idx_p)
+                    p_val = str(r.get('Paiement', '')).lower()
+                    u_paye = c_pa.selectbox("Paiement", options_p, index=1 if "pay" in p_val and "non" not in p_val else 0)
                     
                     c3, c4, c5 = st.columns(3)
                     u_date = c3.text_input("Date Nav", value=str(r.get('DateNav', '')))
                     
-                    # Sécurité sur les nombres (NbreJours / NbrePers)
-                    try: v_j = int(float(str(r.get('NbreJours', 1)).strip() or 1))
-                    except: v_j = 1
-                    try: v_p = int(float(str(r.get('NbrePers', 1)).strip() or 1))
-                    except: v_p = 1
-
-                    u_jours = c4.number_input("Jours", value=v_j, min_value=1)
-                    u_pers = c5.number_input("Pers.", value=v_p, min_value=1)
+                    # Sécurité nombres
+                    def to_int(v):
+                        try: return int(float(str(v)))
+                        except: return 1
                     
-                    u_prix = st.text_input("Prix total (€)", value=str(r.get('Prix', '0.00')))
-                    u_comm = st.text_area("Commentaires", value=str(r.get('Commentaires', '')))
+                    u_jours = c4.number_input("Jours", value=to_int(r.get('NbreJours')), min_value=1)
+                    u_pers = c5.number_input("Pers.", value=to_int(r.get('NbrePers')), min_value=1)
+                    u_prix = st.text_input("Prix (€)", value=str(r.get('Prix', '0.00')))
+                    
+                    # Fusion des notes et commentaires
+                    note_init = r.get('Notes') or r.get('Commentaires') or ""
+                    u_comm = st.text_area("Notes / Commentaires", value=str(note_init) if note_init != "None" else "")
 
-                    # SEUL BOUTON AUTORISÉ DANS LE FORMULAIRE
-                    submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS")
+                    save_btn = st.form_submit_button("💾 ENREGISTRER")
 
-                # BOUTON FERMER (DOIT ÊTRE APRÈS st.form)
-                if st.button("❌ Fermer sans enregistrer", key="close_edit"):
+                if st.button("❌ Annuler"):
                     st.session_state.edit_idx = None
                     st.rerun()
 
-                if submitted:
-                    df_c.loc[idx] = [u_pre, u_nom, u_soc, u_tel, u_mail, u_statut, u_paye, u_prix, u_date, u_jours, u_pers, u_comm]
+                if save_btn:
+                    # On enregistre dans un format propre
+                    df_c.loc[idx, ['Prénom','Nom','Société','Téléphone','Email','Statut','Paiement','Prix','DateNav','NbreJours','NbrePers','Commentaires']] = \
+                        [u_pre, u_nom, u_soc, u_tel, u_mail, u_statut, u_paye, u_prix, u_date, u_jours, u_pers, u_comm]
                     sauvegarder_data(df_c, "contacts.json")
                     st.session_state.edit_idx = None
                     st.rerun()
@@ -216,81 +206,73 @@ if st.session_state.page == "CONTACTS":
     st.divider()
     n1, n2, n3 = st.columns(3)
     view_arc = st.session_state.get('view_archive', False)
-
-    if n1.button("📂 En Cours", key="nav_active", use_container_width=True, type="primary" if not view_arc else "secondary"):
+    if n1.button("📂 En Cours", use_container_width=True, type="primary" if not view_arc else "secondary"):
         st.session_state.view_archive = False
         st.rerun()
-    if n2.button("🗄️ Archives", key="nav_archive", use_container_width=True, type="primary" if view_arc else "secondary"):
+    if n2.button("🗄️ Archives", use_container_width=True, type="primary" if view_arc else "secondary"):
         st.session_state.view_archive = True
         st.rerun()
-    if n3.button("➕ Ajouter", key="nav_add_new", use_container_width=True):
-        new_row = {"Prénom": "Nouveau", "Nom": "Contact", "Société": "PARTICULIER", "Statut": "En attente", "Paiement": "Non payé", "DateNav": "01/01/2026"}
-        df_c = pd.concat([df_c, pd.DataFrame([new_row])], ignore_index=True)
+    if n3.button("➕ Ajouter", use_container_width=True):
+        new = {"Prénom": "Nouveau", "Nom": "Contact", "Société": "PARTICULIER", "Statut": "En attente", "Paiement": "Non payé", "DateNav": "01/05/2026", "NbreJours": 1, "NbrePers": 1}
+        df_c = pd.concat([df_c, pd.DataFrame([new])], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()
 
-   # --- 4. AFFICHAGE DES FICHES (Design Bleu avec Récupération Intelligente) ---
-df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
+    # --- 4. AFFICHAGE DES FICHES ---
+    # Filtrage archive
+    df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
+    if recherche:
+        df_disp = df_disp[df_disp.apply(lambda row: recherche.lower() in str(row.values).lower(), axis=1)]
 
-if recherche:
-    df_disp = df_disp[df_disp.apply(lambda row: recherche.lower() in str(row.values).lower(), axis=1)]
+    for i, r in df_disp.iterrows():
+        num_f = i + 1
+        
+        # Récupération intelligente pour éviter les "None" ou colonnes manquantes
+        nom_complet = f"{r.get('Prénom') or r.get('Prenom') or ''} {str(r.get('Nom', '')).upper()}"
+        societe = str(r.get('Société') or r.get('Societe') or 'PARTICULIER').upper()
+        telephone = str(r.get('Téléphone') or r.get('Telephone') or '').strip()
+        tel_link = telephone.replace(" ", "").replace(".", "").replace("-", "")
+        if tel_link == "None" or not tel_link: tel_link = ""
+        
+        # Gestion des notes (Elisabeth, Pedro, Benoit utilisent 'Notes')
+        notes = r.get('Notes') or r.get('Commentaires') or ""
+        notes_html = f'<div style="margin-top:10px; padding:8px; background:#f0f2f6; border-left:3px solid #1a2a6c; font-size:0.8rem; color:#333;">📝 {notes}</div>' if notes and str(notes) != "None" else ""
 
-for i, r in df_disp.iterrows():
-    num_f = i + 1
-    
-    # Récupération sécurisée des prix et stats
-    prix = r.get('Prix', '0.00')
-    date_nav = r.get('DateNav', '--')
-    
-    # Gestion des notes (récupère 'Notes' ou 'Commentaires' selon ce qui est rempli)
-    note_client = r.get('Notes') if pd.notnull(r.get('Notes')) else r.get('Commentaires', '')
-    if note_client == "None" or note_client is None: note_client = ""
+        # Couleurs Statut / Paiement
+        s = str(r.get('Statut', 'En attente'))
+        s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
+        p_val = str(r.get('Paiement', '')).lower()
+        is_p = "pay" in p_val and "non" not in p_val
+        p_col = "#27ae60" if is_p else "#e67e22"
+        p_txt = "PAYÉ" if is_p else "À PAYER"
 
-    # Calcul des badges Statut et Paiement
-    p_brut = str(r.get('Paiement', 'Non payé')).strip().lower()
-    is_p_ok = ("pay" in p_brut) and ("non" not in p_brut)
-    p_label, p_col = ("Payé", "#27ae60") if is_p_ok else ("Non payé", "#e67e22")
-    
-    s = str(r.get('Statut', 'En attente'))
-    s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
-    
-    t_raw = str(r.get('Téléphone','')).strip()
-    t_link = t_raw.replace(" ", "").replace(".", "").replace("-", "")
-
-    # HTML de la fiche
-    st.markdown(f'''
-    <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: white; color: black;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-            <b style="font-size: 1.1rem; color: #1a2a6c;">Fiche n°{num_f} — {r.get('Prénom','')} {str(r.get('Nom','')).upper()}</b>
-            <div>
+        st.markdown(f'''
+        <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: white; color: black;">
+            <div style="display: flex; justify-content: space-between;">
+                <b style="color: #1a2a6c; font-size: 1.1rem;">Fiche n°{num_f} — {nom_complet}</b>
                 <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold;">{s}</span>
-                <span style="background:{p_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold; margin-left:5px;">{p_label}</span>
+            </div>
+            <div style="color: #666; font-size: 0.8rem; font-weight: bold;">🏢 {societe} | 💰 {r.get('Prix','0')} € <span style="color:{p_col}">({p_txt})</span></div>
+            <div style="font-size: 0.9rem; margin-top:5px;">📅 <b>{r.get('DateNav','--')}</b> | ⛵ {r.get('NbreJours', 1)} jrs | 👥 {r.get('NbrePers', 1)} pers.</div>
+            {notes_html}
+            <div style="margin-top: 15px; display: flex; gap: 5px;">
+                <a href="tel:{tel_link}" style="flex:1; background:#3498db; color:white; padding:8px; border-radius:5px; text-decoration:none; text-align:center; font-size:0.7rem; font-weight:bold;">{ '📞 APPEL' if tel_link else '📞 (PAS DE TEL)' }</a>
+                <a href="https://wa.me/{tel_link}" style="flex:1; background:#25D366; color:white; padding:8px; border-radius:5px; text-decoration:none; text-align:center; font-size:0.7rem; font-weight:bold;">{ '💬 WA' if tel_link else '💬 (PAS DE WA)' }</a>
             </div>
         </div>
-        <div style="color: #666; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px;">🏢 {str(r.get('Société','PARTICULIER')).upper()}</div>
-        <div style="font-size: 0.9rem; color: black; line-height: 1.4;">
-            📅 <b>Date :</b> {date_nav}<br>
-            💰 <b>Prix :</b> {prix} €<br>
-            ⛵ <b>Jours :</b> {r.get('NbreJours', 1)} | 👥 <b>Pers :</b> {r.get('NbrePers', 1)}
-        </div>
-        {f'<div style="margin-top:10px; padding:8px; background:#f8f9fa; border-left:3px solid #1a2a6c; font-style:italic; font-size:0.85rem;">📝 {note_client}</div>' if note_client else ""}
-        <div style="margin-top: 15px; display: flex; gap: 5px;">
-            <a href="tel:{t_link}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">APPEL</a>
-            <a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">WA</a>
-        </div>
-    </div>
-    ''', unsafe_allow_html=True)
+        ''', unsafe_allow_html=True)
 
-    # Boutons d'action
-    c_ed, c_del = st.columns([1, 4])
-if c_ed.button(f"✏️ n°{num_f}", key=f"ed_{i}"):
-        st.session_state.edit_idx = i
-        st.rerun()
-if c_del.button(f"🗑️ SUPPRIMER FICHE n°{num_f}", key=f"del_{i}"):
-        df_c = df_c.drop(i).reset_index(drop=True)
-        sauvegarder_data(df_c, "contacts.json")
-        st.rerun()       
-    
+        c_ed, c_del = st.columns([1, 4])
+        if c_ed.button(f"✏️ Modifier n°{num_f}", key=f"ed_{i}"):
+            st.session_state.edit_idx = i
+            st.rerun()
+        if c_del.button(f"🗑️ SUPPRIMER n°{num_f}", key=f"del_{i}"):
+            df_c = df_c.drop(i).reset_index(drop=True)
+            sauvegarder_data(df_c, "contacts.json")
+            st.rerun()
+
+# --- ICI COMMENCE LE PLANNING ---
+elif st.session_state.page == "PLANNING": 
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION COMPLÈTE & CORRIGÉE) ---
 # =================================================================
