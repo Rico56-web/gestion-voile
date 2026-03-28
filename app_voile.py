@@ -164,65 +164,58 @@ if st.session_state.page == "CONTACTS":
     # Filtre des données
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-# 3. BOUCLE D'AFFICHAGE UNIQUE (VERSION SÉCURISÉE)
+# 3. BOUCLE D'AFFICHAGE (VERSION NATIVE SÉCURISÉE)
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # --- Nettoyage des données pour éviter de casser le HTML ---
-        def clean_html(text):
-            t = clean_val(text)
-            # On remplace les guillemets et apostrophes qui cassent les balises
-            return t.replace('"', '&quot;').replace("'", "&apos;").replace("\n", " ")
-
-        p_nom = clean_html(r.get('Prénom') or r.get('Prenom'))
-        n_nom = clean_html(r.get('Nom')).upper()
+        # Données
+        p_nom = clean_val(r.get('Prénom') or r.get('Prenom'))
+        n_nom = clean_val(r.get('Nom')).upper()
         nom_complet = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche n°{num_f}"
-        
-        soc = clean_html(r.get('Société') or r.get('Societe')) or "PARTICULIER"
+        soc = clean_val(r.get('Société') or r.get('Societe')) or "PARTICULIER"
         tel_raw = clean_val(r.get('Téléphone') or r.get('Telephone'))
-        # Important : On nettoie les notes car elles contiennent souvent des retours à la ligne
-        notes_clean = clean_html(r.get('Notes') or r.get('Commentaires') or "")
+        notes = clean_val(r.get('Notes') or r.get('Commentaires') or "")
         
         s = clean_val(r.get('Statut')) or "En attente"
         s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
         
-        nb_j = r.get('NbreJours', 1)
-        nb_p = r.get('NbrePers', 1)
-        prix = r.get('Prix', '0')
+        # Affichage dans un container Streamlit (Incassable)
+        with st.container(border=True):
+            # Ligne 1 : Titre et Statut
+            c_t1, c_t2 = st.columns([3, 1])
+            c_t1.markdown(f"### {nom_complet}")
+            c_t2.markdown(f'<p style="background:{s_col}; color:white; text-align:center; border-radius:5px; font-weight:bold;">{s.upper()}</p>', unsafe_allow_html=True)
+            
+            # Ligne 2 : Société
+            st.caption(f"🏢 {soc.upper()}")
+            
+            # Ligne 3 : Infos Nav
+            st.write(f"📅 **{r.get('DateNav','--')}** | ⛵ {r.get('NbreJours', 1)} jrs | 👥 {r.get('NbrePers', 1)} pers. | 💰 {r.get('Prix', 0)} €")
+            
+            # Ligne 4 : Notes
+            if notes:
+                st.info(f"📝 {notes}")
+                
+            # Ligne 5 : Boutons de Contact (On garde le HTML ici car c'est un petit bloc simple)
+            tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "") if tel_raw else "#"
+            display_tel = f"📞 {tel_raw}" if tel_raw else "📞 (SANS NUMÉRO)"
+            
+            st.markdown(f'''
+                <div style="display: flex; gap: 8px; margin-bottom:10px;">
+                    <a href="tel:{tel_link}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold;">{display_tel}</a>
+                    <a href="https://wa.me/{tel_link}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold;">💬 WHATSAPP</a>
+                </div>
+            ''', unsafe_allow_html=True)
 
-        tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "") if tel_raw else "#"
-        display_tel = f"📞 {tel_raw}" if tel_raw else "📞 (SANS NUMÉRO)"
-
-        # --- AFFICHAGE (Le f-string est maintenant protégé) ---
-        html_fiche = f'''
-        <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: white; color: black;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <b style="color: #1a2a6c; font-size: 1.1rem;">Fiche n°{num_f} — {nom_complet}</b>
-                <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.75rem; font-weight:bold;">{s.upper()}</span>
-            </div>
-            <div style="color: #666; font-size: 0.85rem; margin: 5px 0;">🏢 {soc.upper()}</div>
-            <div style="font-size: 0.9rem; border-top: 1px solid #eee; padding-top: 5px; margin-top:5px;">
-                📅 <b>{r.get('DateNav','--')}</b> | ⛵ {nb_j} jrs | 👥 {nb_p} pers. | 💰 {prix} €
-            </div>
-            {f'<div style="margin-top:10px; padding:8px; background:#f8f9fa; border-left:3px solid #1a2a6c; font-size:0.8rem; font-style:italic; color:#333;">📝 {notes_clean}</div>' if notes_clean else ""}
-            <div style="margin-top: 15px; display: flex; gap: 8px;">
-                <a href="tel:{tel_link}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">{display_tel}</a>
-                <a href="https://wa.me/{tel_link}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">💬 WHATSAPP</a>
-            </div>
-        </div>
-        '''
-        st.markdown(html_fiche, unsafe_allow_html=True)
-
-        # --- BOUTONS DE GESTION ---
-        c1, c2 = st.columns([1, 4])
-        if c1.button(f"✏️ n°{num_f}", key=f"ed_{i}"):
-            st.session_state.edit_idx = i
-            st.rerun()
-        if c2.button(f"🗑️ n°{num_f}", key=f"del_{i}"):
-            df_c = df_c.drop(i).reset_index(drop=True)
-            sauvegarder_data(df_c, "contacts.json")
-            st.rerun()
-
+            # Ligne 6 : Gestion
+            col_ed, col_del = st.columns([1, 4])
+            if col_ed.button(f"✏️ n°{num_f}", key=f"ed_{i}"):
+                st.session_state.edit_idx = i
+                st.rerun()
+            if col_del.button(f"🗑️ n°{num_f}", key=f"del_{i}"):
+                df_c = df_c.drop(i).reset_index(drop=True)
+                sauvegarder_data(df_c, "contacts.json")
+                st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (DÉBUT DU BLOC) ---
 # =================================================================
