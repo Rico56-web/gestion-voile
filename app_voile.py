@@ -279,7 +279,68 @@ if st.session_state.page == "CONTACTS":
         if c_del.button(f"🗑️ SUPPRIMER FICHE n°{num_f}", key=f"del_{num_f}_{i}", use_container_width=True):
             df_c = df_c.drop(i).reset_index(drop=True)
             sauvegarder_data(df_c, "contacts.json")
-            st.rerun()
+   # --- 4. AFFICHAGE DES FICHES (Design Bleu avec Récupération Intelligente) ---
+df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
+
+if recherche:
+    df_disp = df_disp[df_disp.apply(lambda row: recherche.lower() in str(row.values).lower(), axis=1)]
+
+for i, r in df_disp.iterrows():
+    num_f = i + 1
+    
+    # Récupération sécurisée des prix et stats
+    prix = r.get('Prix', '0.00')
+    date_nav = r.get('DateNav', '--')
+    
+    # Gestion des notes (récupère 'Notes' ou 'Commentaires' selon ce qui est rempli)
+    note_client = r.get('Notes') if pd.notnull(r.get('Notes')) else r.get('Commentaires', '')
+    if note_client == "None" or note_client is None: note_client = ""
+
+    # Calcul des badges Statut et Paiement
+    p_brut = str(r.get('Paiement', 'Non payé')).strip().lower()
+    is_p_ok = ("pay" in p_brut) and ("non" not in p_brut)
+    p_label, p_col = ("Payé", "#27ae60") if is_p_ok else ("Non payé", "#e67e22")
+    
+    s = str(r.get('Statut', 'En attente'))
+    s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
+    
+    t_raw = str(r.get('Téléphone','')).strip()
+    t_link = t_raw.replace(" ", "").replace(".", "").replace("-", "")
+
+    # HTML de la fiche
+    st.markdown(f'''
+    <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background-color: white; color: black;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <b style="font-size: 1.1rem; color: #1a2a6c;">Fiche n°{num_f} — {r.get('Prénom','')} {str(r.get('Nom','')).upper()}</b>
+            <div>
+                <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold;">{s}</span>
+                <span style="background:{p_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold; margin-left:5px;">{p_label}</span>
+            </div>
+        </div>
+        <div style="color: #666; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px;">🏢 {str(r.get('Société','PARTICULIER')).upper()}</div>
+        <div style="font-size: 0.9rem; color: black; line-height: 1.4;">
+            📅 <b>Date :</b> {date_nav}<br>
+            💰 <b>Prix :</b> {prix} €<br>
+            ⛵ <b>Jours :</b> {r.get('NbreJours', 1)} | 👥 <b>Pers :</b> {r.get('NbrePers', 1)}
+        </div>
+        {f'<div style="margin-top:10px; padding:8px; background:#f8f9fa; border-left:3px solid #1a2a6c; font-style:italic; font-size:0.85rem;">📝 {note_client}</div>' if note_client else ""}
+        <div style="margin-top: 15px; display: flex; gap: 5px;">
+            <a href="tel:{t_link}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">APPEL</a>
+            <a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">WA</a>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # Boutons d'action
+    c_ed, c_del = st.columns([1, 4])
+    if c_ed.button(f"✏️ n°{num_f}", key=f"ed_{i}"):
+        st.session_state.edit_idx = i
+        st.rerun()
+
+    if c_del.button(f"🗑️ SUPPRIMER FICHE n°{num_f}", key=f"del_{i}"):
+        df_c = df_c.drop(i).reset_index(drop=True)
+        sauvegarder_data(df_c, "contacts.json")
+        st.rerun()         st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION COMPLÈTE & CORRIGÉE) ---
 # =================================================================
