@@ -132,43 +132,16 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except Exception:
         pass
-
-# =================================================================
-# --- 5. PAGE CONTACTS (VERSION FINALE NETTOYÉE) ---
-# =================================================================
-if st.session_state.page == "CONTACTS":
-    st.title("👥 Vesta - Missions")
-
-    # --- FONCTION DE NETTOYAGE INTERNE ---
-    def clean_val(v):
-        val = str(v).strip()
-        if val.lower() in ["none", "nan", "", "null", "undefined"]: 
-            return ""
-        return val
-
-    # --- TRI ET FILTRAGE ---
-    df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if st.session_state.get('view_archive', False) else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
-    
-    # --- NAVIGATION ---
-    st.divider()
-    n1, n2, n3 = st.columns(3)
-    if n1.button("📂 En Cours", use_container_width=True):
-        st.session_state.view_archive = False
-        st.rerun()
-    if n2.button("🗄️ Archives", use_container_width=True):
-        st.session_state.view_archive = True
-        st.rerun()
-    if n3.button("➕ Ajouter", use_container_width=True):
-        new = {"Prénom": "Nouveau", "Nom": "Contact", "Statut": "En attente", "Paiement": "Non payé", "DateNav": "01/05/2026"}
-        df_c = pd.concat([df_c, pd.DataFrame([new])], ignore_index=True)
-        sauvegarder_data(df_c, "contacts.json")
-        st.rerun()
-
 # --- BOUCLE D'AFFICHAGE DES FICHES ---
     for i, r in df_disp.iterrows():
-        num_f = i + 1
+        num_f = i + 1  # <-- Le numéro de fiche est ici
         
-        # 1. Récupération et Nettoyage des données (IMPORTANT)
+        # 1. Nettoyage des données
+        def clean_val(v):
+            val = str(v).strip()
+            if val.lower() in ["none", "nan", "", "null"]: return ""
+            return val
+
         p_nom = clean_val(r.get('Prénom') or r.get('Prenom'))
         n_nom = clean_val(r.get('Nom')).upper()
         nom_complet = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche n°{num_f}"
@@ -176,43 +149,39 @@ if st.session_state.page == "CONTACTS":
         soc = clean_val(r.get('Société') or r.get('Societe')) or "PARTICULIER"
         tel_raw = clean_val(r.get('Téléphone') or r.get('Telephone'))
         notes = clean_val(r.get('Notes') or r.get('Commentaires') or r.get('Notes '))
+        
+        # 2. Gestion des Boutons (On garde les couleurs même sans numéro)
+        tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "") if tel_raw else ""
+        display_tel = f"📞 {tel_raw}" if tel_raw else "📞 (SANS NUMÉRO)"
 
-        # 2. Gestion des Boutons Appel / WA
-        if tel_raw:
-            tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "")
-            btn_label = f"📞 {tel_raw}"
-            btn_color = "#3498db" 
-            wa_color = "#25D366"  
-        else:
-            tel_link = "#"
-            btn_label = "📞 (SANS NUMÉRO)"
-            btn_color = "#bdc3c7" 
-            wa_color = "#bdc3c7"  
-
-        # 3. Couleurs Statut
+        # 3. Statut et Infos Techniques
         s = clean_val(r.get('Statut')) or "En attente"
         s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
         
-        # 4. AFFICHAGE HTML (UNE SEULE FOIS)
+        nb_j = r.get('NbreJours', 1)
+        nb_p = r.get('NbrePers', 1)
+        prix = r.get('Prix', '0')
+
+        # 4. AFFICHAGE HTML UNIQUE (Sans doublons)
         st.markdown(f'''
         <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: white; color: black;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <b style="color: #1a2a6c; font-size: 1.1rem;">{nom_complet}</b>
-                <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold;">{s}</span>
+                <b style="color: #1a2a6c; font-size: 1.1rem;">Fiche n°{num_f} — {nom_complet}</b>
+                <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.75rem; font-weight:bold;">{s.upper()}</span>
             </div>
-            <div style="color: #666; font-size: 0.8rem; margin: 5px 0;">🏢 {soc.upper()}</div>
-            <div style="font-size: 0.9rem;">
-                📅 <b>{r.get('DateNav','--')}</b> | 💰 {r.get('Prix','0')} €
+            <div style="color: #666; font-size: 0.85rem; margin: 5px 0;">🏢 {soc.upper()}</div>
+            <div style="font-size: 0.9rem; border-top: 1px solid #eee; padding-top: 5px;">
+                📅 <b>{r.get('DateNav','--')}</b> | ⛵ {nb_j} jrs | 👥 {nb_p} pers. | 💰 {prix} €
             </div>
             {f'<div style="margin-top:10px; padding:8px; background:#f8f9fa; border-left:3px solid #1a2a6c; font-size:0.8rem; font-style:italic;">📝 {notes}</div>' if notes else ""}
             <div style="margin-top: 15px; display: flex; gap: 8px;">
-                <a href="tel:{tel_link}" style="flex:1; background:{btn_color}; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.75rem; font-weight:bold;">{btn_label}</a>
-                <a href="https://wa.me/{tel_link}" style="flex:1; background:{wa_color}; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.75rem; font-weight:bold;">💬 WHATSAPP</a>
+                <a href="tel:{tel_link}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">{display_tel}</a>
+                <a href="https://wa.me/{tel_link}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">💬 WHATSAPP</a>
             </div>
         </div>
         ''', unsafe_allow_html=True)
-        
-        # 5. BOUTONS DE GESTION (BIEN ALIGNÉS)
+
+        # 5. Boutons de gestion (Alignés dans la boucle)
         c_ed, c_del = st.columns([1, 4])
         if c_ed.button(f"✏️ Modifier n°{num_f}", key=f"ed_{i}"):
             st.session_state.edit_idx = i
@@ -220,7 +189,10 @@ if st.session_state.page == "CONTACTS":
         if c_del.button(f"🗑️ Supprimer n°{num_f}", key=f"del_{i}"):
             df_c = df_c.drop(i).reset_index(drop=True)
             sauvegarder_data(df_c, "contacts.json")
-            st.rerun()  
+            st.rerun()
+
+# --- ICI LE ELIF PLANNING (COLLÉ À GAUCHE) ---
+elif st.session_state.page == "PLANNING":
        
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION COMPLÈTE & CORRIGÉE) ---
