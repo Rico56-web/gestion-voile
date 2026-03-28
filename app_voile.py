@@ -133,33 +133,29 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     except Exception:
         pass
 # =================================================================
-# --- 5. PAGE CONTACTS (VERSION CORRIGÉE ET TRIÉE) ---
+# --- 5. PAGE CONTACTS (VERSION SÉCURISÉE FINALE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta - Missions")
     
-    # --- 1. PRÉPARATION DES DONNÉES ET TRI CHRONOLOGIQUE ---
+    # --- 1. TRI CHRONOLOGIQUE PROCHE -> LOINTAIN ---
     if not df_c.empty:
-        # Conversion en date pour le tri
         df_c['tmp_date'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
-        # TRI : La date la plus proche du jour actuel en haut
+        # On trie pour avoir les dates les plus proches en haut
         df_c = df_c.sort_values(by='tmp_date', ascending=True).drop(columns=['tmp_date'])
-        # Réinitialisation de l'index pour la sécurité des boutons
         df_c = df_c.reset_index(drop=True)
 
-    # --- FILTRE RECHERCHE ---
-    if 'search_contact' not in st.session_state: st.session_state.search_contact = ""
-    recherche = st.text_input("🔍 Rechercher", value=st.session_state.search_contact)
+    # --- RECHERCHE ---
+    recherche = st.text_input("🔍 Rechercher", value=st.session_state.get('search_contact', ""))
 
-    # --- 2. LE FORMULAIRE DE MODIFICATION (SÉCURISÉ) ---
+    # --- 2. FORMULAIRE DE MODIFICATION ---
     if st.session_state.get('edit_idx') is not None:
         idx = st.session_state.edit_idx
         if idx < len(df_c):
             r = df_c.iloc[idx]
             
             with st.expander(f"📝 MODIFIER FICHE n°{idx + 1}", expanded=True):
-                # ON DÉCLARE LE FORMULAIRE
-                with st.form(key=f"form_contact_{idx}"):
+                with st.form(key=f"form_v4_{idx}"):
                     c1, c2 = st.columns(2)
                     u_pre = c1.text_input("Prénom", value=str(r.get('Prénom', '')))
                     u_nom = c2.text_input("Nom", value=str(r.get('Nom', '')))
@@ -172,22 +168,29 @@ if st.session_state.page == "CONTACTS":
                     u_statut = c_st.selectbox("Statut", l_s, index=l_s.index(r.get('Statut')) if r.get('Statut') in l_s else 0)
                     
                     options_p = ["Non payé", "Payé"]
-                    idx_p = 1 if "pay" in str(r.get('Paiement','')).lower() and "non" not in str(r.get('Paiement','')).lower() else 0
+                    p_val = str(r.get('Paiement','')).lower()
+                    idx_p = 1 if "pay" in p_val and "non" not in p_val else 0
                     u_paye = c_pa.selectbox("Paiement", options_p, index=idx_p)
                     
                     c3, c4, c5 = st.columns(3)
                     u_date = c3.text_input("Date Nav", value=str(r.get('DateNav', '')))
-                    u_jours = c4.number_input("Jours", value=int(float(r.get('NbreJours', 1))), min_value=1)
-                    u_pers = c5.number_input("Pers.", value=int(float(r.get('NbrePers', 1))), min_value=1)
+                    
+                    # --- SÉCURITÉ ANTI-CRASH SUR LES NOMBRES ---
+                    def safe_int(val):
+                        try: return int(float(str(val).strip() or 1))
+                        except: return 1
+
+                    u_jours = c4.number_input("Jours", value=safe_int(r.get('NbreJours')), min_value=1)
+                    u_pers = c5.number_input("Pers.", value=safe_int(r.get('NbrePers')), min_value=1)
                     
                     u_prix = st.text_input("Prix (€)", value=str(r.get('Prix', '0.00')))
                     u_comm = st.text_area("Commentaires", value=str(r.get('Commentaires', '')))
 
-                    # LE SEUL BOUTON DANS LE FORMULAIRE
+                    # Bouton de validation (OBLIGATOIRE DANS LE FORM)
                     save_btn = st.form_submit_button("💾 ENREGISTRER")
 
-                # BOUTON FERMER (HORS DU FORMULAIRE)
-                if st.button("❌ Annuler / Fermer", key="btn_cancel_edit"):
+                # Bouton Annuler (DOIT ÊTRE APRÈS LE FORM)
+                if st.button("❌ Annuler / Fermer"):
                     st.session_state.edit_idx = None
                     st.rerun()
 
@@ -195,50 +198,30 @@ if st.session_state.page == "CONTACTS":
                     df_c.loc[idx] = [u_pre, u_nom, u_soc, u_tel, u_mail, u_statut, u_paye, u_prix, u_date, u_jours, u_pers, u_comm]
                     sauvegarder_data(df_c, "contacts.json")
                     st.session_state.edit_idx = None
-                    st.success("Modifications enregistrées !")
                     st.rerun()
 
-    # --- 3. NAVIGATION ---
+    # --- 3. AFFICHAGE DES FICHES ---
     st.divider()
-    n1, n2, n3 = st.columns(3)
-    view_arc = st.session_state.get('view_archive', False)
-
-    if n1.button("📂 En Cours", type="primary" if not view_arc else "secondary", use_container_width=True):
-        st.session_state.view_archive = False
-        st.rerun()
-    if n2.button("🗄️ Archives", type="primary" if view_arc else "secondary", use_container_width=True):
-        st.session_state.view_archive = True
-        st.rerun()
-    if n3.button("➕ Ajouter", use_container_width=True):
-        new_row = {"Prénom": "Nouveau", "Nom": "Contact", "Société": "PARTICULIER", "Statut": "En attente", "Paiement": "Non payé", "DateNav": "01/05/2026"}
-        df_c = pd.concat([df_c, pd.DataFrame([new_row])], ignore_index=True)
-        sauvegarder_data(df_c, "contacts.json")
-        st.rerun()
-
-    # --- 4. AFFICHAGE DES FICHES ---
-    df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
+    df_disp = df_c # On affiche tout selon le tri
     
     if recherche:
         df_disp = df_disp[df_disp.apply(lambda row: recherche.lower() in str(row.values).lower(), axis=1)]
 
     for i, r in df_disp.iterrows():
         num_f = i + 1
-        
-        # Style HTML simplifié
         st.markdown(f'''
         <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 12px; margin-bottom: 10px; background: white; color: black;">
             <b style="color: #1a2a6c;">Fiche n°{num_f} — {r.get('DateNav','--')}</b><br>
-            <span style="font-size:1.1rem;">{r.get('Prénom','')} <b>{r.get('Nom','').upper()}</b></span><br>
-            🏢 {str(r.get('Société','')).upper()} | 💰 {r.get('Prix','0')} €
+            <span style="font-size:1.1rem;">{r.get('Prénom','')} <b>{r.get('Nom','').upper()}</b></span>
         </div>
         ''', unsafe_allow_html=True)
 
-        c_ed, c_del = st.columns(2)
-        if c_ed.button(f"✏️ Modifier n°{num_f}", key=f"ed_{i}", use_container_width=True):
+        col_ed, col_del = st.columns(2)
+        if col_ed.button(f"✏️ Modifier n°{num_f}", key=f"ed_{i}"):
             st.session_state.edit_idx = i
             st.rerun()
         
-        if c_del.button(f"🗑️ Supprimer n°{num_f}", key=f"del_{i}", use_container_width=True):
+        if col_del.button(f"🗑️ Supprimer n°{num_f}", key=f"del_{i}"):
             df_c = df_c.drop(i).reset_index(drop=True)
             sauvegarder_data(df_c, "contacts.json")
             st.rerun()
