@@ -2,6 +2,7 @@ import requests, base64, json, time, calendar
 import streamlit as st
 import pandas as pd
 import html
+import streamlit.components.v1 as components
 from datetime import datetime, date
 
 # --- 1. CONFIGURATION & STYLE ---
@@ -221,59 +222,55 @@ if st.session_state.page == "CONTACTS":
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()
 
-    # --- 5. FILTRAGE ET AFFICHAGE DES FICHES ---
-    df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
-
+    # --- 5. AFFICHAGE DES FICHES EN MODE "BULLE ÉTANCHE" ---
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # NETTOYAGE ULTIME : On transforme tout en texte sûr pour le HTML
-        def safe_txt(val):
+        # Nettoyage ultra-strict
+        def ultra_safe(val):
             v = str(val).strip()
             if v.lower() in ["none", "nan", "", "null"]: return ""
-            # html.escape transforme les " , ' , & , < , > en codes incassables
+            # On encode TOUT pour le web
             return html.escape(v).replace("\n", " ").replace("\r", "")
 
-        p_nom = safe_txt(r.get('Prénom', ''))
-        n_nom = safe_txt(r.get('Nom', '')).upper()
-        nom_complet = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche n°{num_f}"
-        soc = safe_txt(r.get('Société', '')) or "PARTICULIER"
-        tel_raw = safe_txt(r.get('Téléphone', ''))
-        mail_raw = safe_txt(r.get('Email', ''))
-        notes = safe_txt(r.get('Notes', ''))
-        
-        s = safe_txt(r.get('Statut', 'En attente'))
-        s_col = "#2ecc71" if "OK" in s.upper() else "#f1c40f" if "ATTENTE" in s.upper() else "#e74c3c"
-        
-        tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "")
-        mail_link = f"mailto:{mail_raw}" if mail_raw else "#"
+        nom = f"{ultra_safe(r.get('Prénom'))} {ultra_safe(r.get('Nom')).upper()}"
+        soc = ultra_safe(r.get('Société')).upper() or "PARTICULIER"
+        tel = ultra_safe(r.get('Téléphone')).replace(" ", "")
+        mail = ultra_safe(r.get('Email'))
+        note = ultra_safe(r.get('Notes'))
+        statut = ultra_safe(r.get('Statut')) or "En attente"
+        color = "#2ecc71" if "OK" in statut.upper() else "#f1c40f" if "ATTENTE" in statut.upper() else "#e74c3c"
 
-        # On utilise des TRIPLE GUILLEMETS f""" pour bloquer le contenu
-        st.markdown(f"""
-        <div style="border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; margin-bottom: 8px; background: white; color: black;">
+        # On prépare le HTML de la fiche
+        fiche_html = f"""
+        <div style="font-family: sans-serif; border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; background: white; color: black;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: #1a2a6c; font-weight: bold; font-size: 1.1rem;">Fiche n°{num_f} — {nom_complet}</span>
-                <span style="background:{s_col}; color:white; padding:3px 10px; border-radius:15px; font-size:0.75rem; font-weight:bold;">{s.upper()}</span>
+                <span style="color: #1a2a6c; font-weight: bold;">Fiche n°{num_f} — {nom}</span>
+                <span style="background:{color}; color:white; padding:3px 10px; border-radius:15px; font-size:12px; font-weight:bold;">{statut.upper()}</span>
             </div>
-            <div style="color: #7f8c8d; font-size: 0.85rem; margin: 4px 0; font-style: italic;">🏢 {soc.upper()}</div>
-            <div style="font-size: 0.95rem; border-top: 1px solid #eee; padding-top: 8px; margin-top:5px; color: #2c3e50;">
-                📅 <b>{r.get('DateNav','--')}</b> | 💰 {r.get('Prix', 0)} € | 💳 {r.get('Paiement', 'Non payé')}
+            <div style="color: #7f8c8d; font-size: 13px; margin: 5px 0;">🏢 {soc}</div>
+            <div style="font-size: 14px; border-top: 1px solid #eee; padding-top: 8px; margin-top:5px;">
+                📅 <b>{r.get('DateNav','--')}</b> | 💰 {r.get('Prix', 0)}€ | 💳 {r.get('Paiement', 'Non payé')}
             </div>
-            {f'<div style="margin-top:10px; padding:10px; background:#f9f9f9; border-left:4px solid #1a2a6c; font-size:0.85rem; color:#444;">📝 {notes}</div>' if notes else ""}
-            <div style="margin-top: 15px; display: flex; flex-wrap: wrap; gap: 8px;">
-                <a href="tel:{tel_link}" style="flex:1; min-width:100px; background:#3498db; color:white !important; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">📞 APPEL</a>
-                <a href="https://wa.me/{tel_link}" style="flex:1; min-width:100px; background:#25D366; color:white !important; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">💬 WA</a>
-                <a href="{mail_link}" style="flex:1; min-width:100px; background:#e67e22; color:white !important; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">📧 EMAIL</a>
+            {f'<div style="margin-top:10px; padding:10px; background:#f9f9f9; border-left:4px solid #1a2a6c; font-size:13px;">📝 {note}</div>' if note else ""}
+            <div style="margin-top: 15px; display: flex; gap: 8px;">
+                <a href="tel:{tel}" style="flex:1; background:#3498db; color:white; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:12px;">📞 APPEL</a>
+                <a href="https://wa.me/{tel}" style="flex:1; background:#25D366; color:white; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:12px;">💬 WA</a>
+                <a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:12px;">📧 EMAIL</a>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """
+        
+        # L'ASTUCE : On affiche le HTML dans un composant isolé (iframe)
+        # Cela empêche les caractères bizarres de "casser" le reste de l'appli
+        components.html(fiche_html, height=220)
 
-        # BOUTONS DE GESTION (SÉPARÉS DU HTML)
+        # Boutons de gestion Streamlit (toujours dehors pour fonctionner)
         c1, c2 = st.columns([1, 4])
-        if c1.button(f"✏️ {num_f}", key=f"ed_btn_{i}"):
+        if c1.button(f"✏️ {num_f}", key=f"ed_{i}"):
             st.session_state.edit_idx = i
             st.rerun()
-        if c2.button(f"🗑️ Supprimer n°{num_f}", key=f"del_btn_{i}"):
+        if c2.button(f"🗑️ Supprimer n°{num_f}", key=f"del_{i}"):
             st.session_state.confirm_del_idx = i
             st.rerun()
 # =================================================================
