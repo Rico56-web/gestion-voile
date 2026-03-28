@@ -132,16 +132,44 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except Exception:
         pass
-# --- BOUCLE D'AFFICHAGE DES FICHES ---
-    for i, r in df_disp.iterrows():
-        num_f = i + 1  # Numérotation
-        
-        # 1. Nettoyage
-        def clean_val(v):
-            val = str(v).strip()
-            if val.lower() in ["none", "nan", "", "null"]: return ""
-            return val
+# =================================================================
+# --- 5. PAGE CONTACTS (VERSION VESTA SKIPPER 2026 - FINALE) ---
+# =================================================================
+if st.session_state.page == "CONTACTS":
+    st.title("👥 Vesta - Missions")
 
+    # --- FONCTION DE NETTOYAGE DES DONNÉES ---
+    def clean_val(v):
+        val = str(v).strip()
+        if val.lower() in ["none", "nan", "", "null", "undefined"]: 
+            return ""
+        return val
+
+    # --- NAVIGATION ET FILTRAGE ---
+    st.divider()
+    n1, n2, n3 = st.columns(3)
+    view_arc = st.session_state.get('view_archive', False)
+    
+    if n1.button("📂 En Cours", use_container_width=True, type="primary" if not view_arc else "secondary"):
+        st.session_state.view_archive = False
+        st.rerun()
+    if n2.button("🗄️ Archives", use_container_width=True, type="primary" if view_arc else "secondary"):
+        st.session_state.view_archive = True
+        st.rerun()
+    if n3.button("➕ Ajouter", use_container_width=True):
+        new = {"Prénom": "Nouveau", "Nom": "Contact", "Statut": "En attente", "DateNav": "01/05/2026"}
+        df_c = pd.concat([df_c, pd.DataFrame([new])], ignore_index=True)
+        sauvegarder_data(df_c, "contacts.json")
+        st.rerun()
+
+    # Sélection des données selon l'onglet
+    df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
+
+    # --- BOUCLE D'AFFICHAGE DES FICHES ---
+    for i, r in df_disp.iterrows():
+        num_f = i + 1
+        
+        # Préparation des variables
         p_nom = clean_val(r.get('Prénom') or r.get('Prenom'))
         n_nom = clean_val(r.get('Nom')).upper()
         nom_complet = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche n°{num_f}"
@@ -150,18 +178,20 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         tel_raw = clean_val(r.get('Téléphone') or r.get('Telephone'))
         notes = clean_val(r.get('Notes') or r.get('Commentaires') or r.get('Notes '))
         
-        # 2. Boutons (Toujours en couleur)
-        tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "") if tel_raw else ""
-        display_tel = f"📞 {tel_raw}" if tel_raw else "📞 (SANS NUMÉRO)"
-
-        # 3. Infos techniques
+        # Gestion des Statuts et Couleurs
         s = clean_val(r.get('Statut')) or "En attente"
         s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
+        
+        # Infos techniques
         nb_j = r.get('NbreJours', 1)
         nb_p = r.get('NbrePers', 1)
         prix = r.get('Prix', '0')
 
-        # 4. AFFICHAGE HTML (UN SEUL BLOC SÉCURISÉ)
+        # Gestion des liens (Couleurs vives conservées)
+        tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "") if tel_raw else "#"
+        display_tel = f"📞 {tel_raw}" if tel_raw else "📞 (SANS NUMÉRO)"
+
+        # AFFICHAGE HTML UNIQUE
         st.markdown(f'''
         <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: white; color: black;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -180,7 +210,7 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         </div>
         ''', unsafe_allow_html=True)
 
-        # 5. Boutons de gestion (Alignés à l'intérieur de la boucle)
+        # BOUTONS DE GESTION (Bien décalés à l'intérieur du "for")
         c_ed, c_del = st.columns([1, 4])
         with c_ed:
             if st.button(f"✏️ Modifier n°{num_f}", key=f"ed_{i}"):
@@ -192,7 +222,7 @@ if not df_c.empty and 'DateNav' in df_c.columns:
                 sauvegarder_data(df_c, "contacts.json")
                 st.rerun()
 
-# --- ICI LE ELIF (DOIT ÊTRE COLLÉ À GAUCHE LIGNE 200) ---
+# --- ICI LE ELIF (DOIT ÊTRE COLLÉ À GAUCHE) ---
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Vesta 2026")
 
