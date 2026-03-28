@@ -283,14 +283,14 @@ for i, r in df_disp.iterrows():
 
     # Boutons d'action
     c_ed, c_del = st.columns([1, 4])
-    if c_ed.button(f"✏️ n°{num_f}", key=f"ed_{i}"):
+if c_ed.button(f"✏️ n°{num_f}", key=f"ed_{i}"):
         st.session_state.edit_idx = i
         st.rerun()
-
-    if c_del.button(f"🗑️ SUPPRIMER FICHE n°{num_f}", key=f"del_{i}"):
+if c_del.button(f"🗑️ SUPPRIMER FICHE n°{num_f}", key=f"del_{i}"):
         df_c = df_c.drop(i).reset_index(drop=True)
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()       
+    
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION COMPLÈTE & CORRIGÉE) ---
 # =================================================================
