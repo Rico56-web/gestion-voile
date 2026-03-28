@@ -211,8 +211,7 @@ if st.session_state.page == "CONTACTS":
             </div>
         </div>
         ''', unsafe_allow_html=True)
-
-        # Boutons de gestion
+     # Boutons de gestion
         c_ed, c_del = st.columns([1, 4])
         if c_ed.button(f"✏️ Modifier n°{num_f}", key=f"ed_{i}"):
             st.session_state.edit_idx = i
@@ -221,8 +220,6 @@ if st.session_state.page == "CONTACTS":
             df_c = df_c.drop(i).reset_index(drop=True)
             sauvegarder_data(df_c, "contacts.json")
             st.rerun()
-
-
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION COMPLÈTE & CORRIGÉE) ---
 # =================================================================
