@@ -290,7 +290,7 @@ for i, r in df_disp.iterrows():
     if c_del.button(f"🗑️ SUPPRIMER FICHE n°{num_f}", key=f"del_{i}"):
         df_c = df_c.drop(i).reset_index(drop=True)
         sauvegarder_data(df_c, "contacts.json")
-        st.rerun()         st.rerun()
+        st.rerun()       
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION COMPLÈTE & CORRIGÉE) ---
 # =================================================================
