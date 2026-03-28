@@ -219,28 +219,38 @@ if st.session_state.page == "CONTACTS":
         df_c = pd.concat([df_c, pd.DataFrame([new])], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()
+import html # À mettre tout en haut de ton fichier ou ici
 
     # --- 5. FILTRAGE ET AFFICHAGE DES FICHES ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
     for i, r in df_disp.iterrows():
         num_f = i + 1
-        p_nom = protect(r.get('Prénom', ''))
-        n_nom = protect(r.get('Nom', '')).upper()
-        nom_complet = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche n°{num_f}"
-        soc = protect(r.get('Société', '')) or "PARTICULIER"
-        tel_raw = protect(r.get('Téléphone', ''))
-        mail_raw = protect(r.get('Email', ''))
-        notes = protect(r.get('Notes', ''))
         
-        s = protect(r.get('Statut', 'En attente'))
+        # NETTOYAGE ULTIME : On transforme tout en texte sûr pour le HTML
+        def safe_txt(val):
+            v = str(val).strip()
+            if v.lower() in ["none", "nan", "", "null"]: return ""
+            # html.escape transforme les " , ' , & , < , > en codes incassables
+            return html.escape(v).replace("\n", " ").replace("\r", "")
+
+        p_nom = safe_txt(r.get('Prénom', ''))
+        n_nom = safe_txt(r.get('Nom', '')).upper()
+        nom_complet = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche n°{num_f}"
+        soc = safe_txt(r.get('Société', '')) or "PARTICULIER"
+        tel_raw = safe_txt(r.get('Téléphone', ''))
+        mail_raw = safe_txt(r.get('Email', ''))
+        notes = safe_txt(r.get('Notes', ''))
+        
+        s = safe_txt(r.get('Statut', 'En attente'))
         s_col = "#2ecc71" if "OK" in s.upper() else "#f1c40f" if "ATTENTE" in s.upper() else "#e74c3c"
         
-        tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "") if tel_raw else "#"
+        tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "")
         mail_link = f"mailto:{mail_raw}" if mail_raw else "#"
 
+        # On utilise des TRIPLE GUILLEMETS f""" pour bloquer le contenu
         st.markdown(f"""
-        <div style="border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; margin-bottom: 5px; background: white; color: black; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+        <div style="border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; margin-bottom: 8px; background: white; color: black;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <span style="color: #1a2a6c; font-weight: bold; font-size: 1.1rem;">Fiche n°{num_f} — {nom_complet}</span>
                 <span style="background:{s_col}; color:white; padding:3px 10px; border-radius:15px; font-size:0.75rem; font-weight:bold;">{s.upper()}</span>
@@ -249,21 +259,21 @@ if st.session_state.page == "CONTACTS":
             <div style="font-size: 0.95rem; border-top: 1px solid #eee; padding-top: 8px; margin-top:5px; color: #2c3e50;">
                 📅 <b>{r.get('DateNav','--')}</b> | 💰 {r.get('Prix', 0)} € | 💳 {r.get('Paiement', 'Non payé')}
             </div>
-            {f'<div style="margin-top:10px; padding:10px; background:#fdfdfd; border-left:4px solid #1a2a6c; font-size:0.85rem; color:#444; border-radius:4px;">📝 {notes}</div>' if notes else ""}
+            {f'<div style="margin-top:10px; padding:10px; background:#f9f9f9; border-left:4px solid #1a2a6c; font-size:0.85rem; color:#444;">📝 {notes}</div>' if notes else ""}
             <div style="margin-top: 15px; display: flex; flex-wrap: wrap; gap: 8px;">
-                <a href="tel:{tel_link}" style="flex:1; min-width:120px; background:#3498db; color:white !important; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">📞 APPEL</a>
-                <a href="https://wa.me/{tel_link}" style="flex:1; min-width:120px; background:#25D366; color:white !important; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">💬 WHATSAPP</a>
-                <a href="{mail_link}" style="flex:1; min-width:120px; background:#e67e22; color:white !important; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">📧 EMAIL</a>
+                <a href="tel:{tel_link}" style="flex:1; min-width:100px; background:#3498db; color:white !important; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">📞 APPEL</a>
+                <a href="https://wa.me/{tel_link}" style="flex:1; min-width:100px; background:#25D366; color:white !important; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">💬 WA</a>
+                <a href="{mail_link}" style="flex:1; min-width:100px; background:#e67e22; color:white !important; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">📧 EMAIL</a>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        # BOUTONS DE GESTION
+        # BOUTONS DE GESTION (SÉPARÉS DU HTML)
         c1, c2 = st.columns([1, 4])
-        if c1.button(f"✏️ {num_f}", key=f"btn_ed_{i}", use_container_width=True):
+        if c1.button(f"✏️ {num_f}", key=f"ed_btn_{i}"):
             st.session_state.edit_idx = i
             st.rerun()
-        if c2.button(f"🗑️ Supprimer n°{num_f}", key=f"btn_del_{i}", use_container_width=True):
+        if c2.button(f"🗑️ Supprimer n°{num_f}", key=f"del_btn_{i}"):
             st.session_state.confirm_del_idx = i
             st.rerun()
 # =================================================================
