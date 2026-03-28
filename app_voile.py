@@ -164,55 +164,58 @@ if st.session_state.page == "CONTACTS":
     # Filtre des données
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-# 3. BOUCLE D'AFFICHAGE (VERSION NATIVE SÉCURISÉE)
+# 3. BOUCLE D'AFFICHAGE "DESIGN PRO" (STABLE & ÉLÉGANT)
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # Données
-        p_nom = clean_val(r.get('Prénom') or r.get('Prenom'))
-        n_nom = clean_val(r.get('Nom')).upper()
+        # --- Sécurisation des données contre le bug des DIV ---
+        def protect(val):
+            v = clean_val(val)
+            # On enlève les guillemets et retours à la ligne qui cassent le HTML
+            return v.replace('"', "''").replace("\n", " ").replace("\r", "")
+
+        p_nom = protect(r.get('Prénom') or r.get('Prenom'))
+        n_nom = protect(r.get('Nom')).upper()
         nom_complet = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche n°{num_f}"
-        soc = clean_val(r.get('Société') or r.get('Societe')) or "PARTICULIER"
-        tel_raw = clean_val(r.get('Téléphone') or r.get('Telephone'))
-        notes = clean_val(r.get('Notes') or r.get('Commentaires') or "")
+        soc = protect(r.get('Société') or r.get('Societe')) or "PARTICULIER"
+        tel_raw = protect(r.get('Téléphone') or r.get('Telephone'))
+        notes = protect(r.get('Notes') or r.get('Commentaires') or "")
         
-        s = clean_val(r.get('Statut')) or "En attente"
+        # Statut et Couleurs
+        s = protect(r.get('Statut')) or "En attente"
         s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
         
-        # Affichage dans un container Streamlit (Incassable)
-        with st.container(border=True):
-            # Ligne 1 : Titre et Statut
-            c_t1, c_t2 = st.columns([3, 1])
-            c_t1.markdown(f"### {nom_complet}")
-            c_t2.markdown(f'<p style="background:{s_col}; color:white; text-align:center; border-radius:5px; font-weight:bold;">{s.upper()}</p>', unsafe_allow_html=True)
-            
-            # Ligne 2 : Société
-            st.caption(f"🏢 {soc.upper()}")
-            
-            # Ligne 3 : Infos Nav
-            st.write(f"📅 **{r.get('DateNav','--')}** | ⛵ {r.get('NbreJours', 1)} jrs | 👥 {r.get('NbrePers', 1)} pers. | 💰 {r.get('Prix', 0)} €")
-            
-            # Ligne 4 : Notes
-            if notes:
-                st.info(f"📝 {notes}")
-                
-            # Ligne 5 : Boutons de Contact (On garde le HTML ici car c'est un petit bloc simple)
-            tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "") if tel_raw else "#"
-            display_tel = f"📞 {tel_raw}" if tel_raw else "📞 (SANS NUMÉRO)"
-            
-            st.markdown(f'''
-                <div style="display: flex; gap: 8px; margin-bottom:10px;">
-                    <a href="tel:{tel_link}" style="flex:1; background:#3498db; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold;">{display_tel}</a>
-                    <a href="https://wa.me/{tel_link}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold;">💬 WHATSAPP</a>
-                </div>
-            ''', unsafe_allow_html=True)
+        # Liens Téléphone / WA
+        tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "") if tel_raw else "#"
+        display_tel = f"📞 {tel_raw}" if tel_raw else "📞 (SANS NUMÉRO)"
 
-            # Ligne 6 : Gestion
-            col_ed, col_del = st.columns([1, 4])
-            if col_ed.button(f"✏️ n°{num_f}", key=f"ed_{i}"):
+        # --- AFFICHAGE HTML ÉLÉGANT ---
+        st.markdown(f"""
+        <div style="border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; margin-bottom: 5px; background: white; color: black; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #1a2a6c; font-weight: bold; font-size: 1.1rem;">Fiche n°{num_f} — {nom_complet}</span>
+                <span style="background:{s_col}; color:white; padding:3px 10px; border-radius:15px; font-size:0.75rem; font-weight:bold;">{s.upper()}</span>
+            </div>
+            <div style="color: #7f8c8d; font-size: 0.85rem; margin: 4px 0; font-style: italic;">🏢 {soc.upper()}</div>
+            <div style="font-size: 0.95rem; border-top: 1px solid #eee; padding-top: 8px; margin-top:5px; color: #2c3e50;">
+                📅 <b>{r.get('DateNav','--')}</b> | ⛵ {r.get('NbreJours', 1)} jrs | 👥 {r.get('NbrePers', 1)} pers. | 💰 {r.get('Prix', 0)} €
+            </div>
+            {f'<div style="margin-top:10px; padding:10px; background:#fdfdfd; border-left:4px solid #1a2a6c; font-size:0.85rem; color:#444; border-radius:4px;">📝 {notes}</div>' if notes else ""}
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <a href="tel:{tel_link}" style="flex:1; background:#3498db; color:white !important; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.85rem; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"> {display_tel}</a>
+                <a href="https://wa.me/{tel_link}" style="flex:1; background:#25D366; color:white !important; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.85rem; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💬 WHATSAPP</a>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Boutons de gestion (Modif/Suppr) placés juste sous la fiche
+        c1, c2 = st.columns([1, 4])
+        with c1:
+            if st.button(f"✏️ {num_f}", key=f"ed_{i}", use_container_width=True):
                 st.session_state.edit_idx = i
                 st.rerun()
-            if col_del.button(f"🗑️ n°{num_f}", key=f"del_{i}"):
+        with c2:
+            if st.button(f"🗑️ Supprimer la mission n°{num_f}", key=f"del_{i}", use_container_width=True):
                 df_c = df_c.drop(i).reset_index(drop=True)
                 sauvegarder_data(df_c, "contacts.json")
                 st.rerun()
