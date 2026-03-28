@@ -1,6 +1,7 @@
 import requests, base64, json, time, calendar
 import streamlit as st
 import pandas as pd
+import html
 from datetime import datetime, date
 
 # --- 1. CONFIGURATION & STYLE ---
