@@ -245,7 +245,7 @@ if st.session_state.page == "CONTACTS":
         is_p = "pay" in p_val and "non" not in p_val
         p_col = "#27ae60" if is_p else "#e67e22"
         p_txt = "PAYÉ" if is_p else "À PAYER"
-
+# --- FIN DU BLOC HTML DE LA FICHE ---
         st.markdown(f'''
         <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: white; color: black;">
             <div style="display: flex; justify-content: space-between;">
@@ -262,14 +262,16 @@ if st.session_state.page == "CONTACTS":
         </div>
         ''', unsafe_allow_html=True)
 
+        # Boutons sous la fiche (doivent être décalés vers la droite)
         c_ed, c_del = st.columns([1, 4])
-        if c_ed.button(f"✏️ Modifier n°{num_f}", key=f"ed_{i}"):
+        if c_ed.button(f"✏️ n°{num_f}", key=f"ed_{i}"):
             st.session_state.edit_idx = i
             st.rerun()
-        if c_del.button(f"🗑️ SUPPRIMER n°{num_f}", key=f"del_{i}"):
+        if c_del.button(f"🗑️ n°{num_f}", key=f"del_{i}"):
             df_c = df_c.drop(i).reset_index(drop=True)
             sauvegarder_data(df_c, "contacts.json")
             st.rerun()
+
 
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION COMPLÈTE & CORRIGÉE) ---
