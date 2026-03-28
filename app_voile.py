@@ -222,8 +222,6 @@ if st.session_state.page == "CONTACTS":
             sauvegarder_data(df_c, "contacts.json")
             st.rerun()
 
-# --- BLOC SUIVANT (Vérifie bien l'alignement tout à gauche) ---
-elif st.session_state.page == "PLANNING":
 
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION COMPLÈTE & CORRIGÉE) ---
