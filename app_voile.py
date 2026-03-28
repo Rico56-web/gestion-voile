@@ -221,7 +221,15 @@ if st.session_state.page == "CONTACTS":
         df_c = pd.concat([df_c, pd.DataFrame([new])], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()
-
+        
+# --- 2. CRÉATION DE DF_DISP (L'étape qui manquait !) ---
+    # On définit df_disp AVANT de l'utiliser dans la boucle for
+    if view_arc:
+        # On affiche uniquement les fiches terminées ou refusées
+        df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])]
+    else:
+        # On affiche tout sauf ce qui est archivé
+        df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
     # --- 5. AFFICHAGE DES FICHES EN MODE "BULLE ÉTANCHE" ---
     for i, r in df_disp.iterrows():
         num_f = i + 1
