@@ -230,50 +230,62 @@ if st.session_state.page == "CONTACTS":
     else:
         # On affiche tout sauf ce qui est archivé
         df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
-    # --- 5. AFFICHAGE DES FICHES EN MODE "BULLE ÉTANCHE" ---
+        
+# --- 5. AFFICHAGE DES FICHES EN MODE "BULLE ÉTANCHE" ---
+# --- DANS TA BOUCLE FOR (DANS LA PAGE CONTACTS) ---
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # Nettoyage ultra-strict
-        def ultra_safe(val):
+        # Nettoyage de sécurité (html.escape doit être importé en haut)
+        def safe(val):
             v = str(val).strip()
             if v.lower() in ["none", "nan", "", "null"]: return ""
-            # On encode TOUT pour le web
             return html.escape(v).replace("\n", " ").replace("\r", "")
 
-        nom = f"{ultra_safe(r.get('Prénom'))} {ultra_safe(r.get('Nom')).upper()}"
-        soc = ultra_safe(r.get('Société')).upper() or "PARTICULIER"
-        tel = ultra_safe(r.get('Téléphone')).replace(" ", "")
-        mail = ultra_safe(r.get('Email'))
-        note = ultra_safe(r.get('Notes'))
-        statut = ultra_safe(r.get('Statut')) or "En attente"
-        color = "#2ecc71" if "OK" in statut.upper() else "#f1c40f" if "ATTENTE" in statut.upper() else "#e74c3c"
+        nom = f"{safe(r.get('Prénom'))} {safe(r.get('Nom')).upper()}"
+        soc = safe(r.get('Société')).upper() or "PARTICULIER"
+        tel = safe(r.get('Téléphone')).replace(" ", "")
+        mail = safe(r.get('Email'))
+        note = safe(r.get('Notes'))
+        
+        # Gestion des couleurs de Statut
+        statut = safe(r.get('Statut')) or "En attente"
+        s_col = "#2ecc71" if "OK" in statut.upper() else "#f1c40f" if "ATTENTE" in statut.upper() else "#e74c3c"
+        
+        # Gestion du Paiement (Nouveau)
+        pay = safe(r.get('Paiement')) or "Non payé"
+        p_col = "#3498db" if "PAYÉ" in pay.upper() else "#e67e22"
 
-        # On prépare le HTML de la fiche
         fiche_html = f"""
-        <div style="font-family: sans-serif; border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; background: white; color: black;">
+        <div style="font-family: sans-serif; border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; background: white; color: black; margin-bottom:10px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: #1a2a6c; font-weight: bold;">Fiche n°{num_f} — {nom}</span>
-                <span style="background:{color}; color:white; padding:3px 10px; border-radius:15px; font-size:12px; font-weight:bold;">{statut.upper()}</span>
+                <span style="color: #1a2a6c; font-weight: bold; font-size: 16px;">#{num_f} — {nom}</span>
+                <div style="display: flex; gap: 5px;">
+                    <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:bold;">{statut.upper()}</span>
+                    <span style="background:{p_col}; color:white; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:bold;">{pay.upper()}</span>
+                </div>
             </div>
-            <div style="color: #7f8c8d; font-size: 13px; margin: 5px 0;">🏢 {soc}</div>
-            <div style="font-size: 14px; border-top: 1px solid #eee; padding-top: 8px; margin-top:5px;">
-                📅 <b>{r.get('DateNav','--')}</b> | 💰 {r.get('Prix', 0)}€ | 💳 {r.get('Paiement', 'Non payé')}
+            
+            <div style="color: #7f8c8d; font-size: 12px; margin: 4px 0;">🏢 {soc}</div>
+            
+            <div style="font-size: 13px; border-top: 1px solid #eee; padding-top: 8px; margin-top:5px; display: grid; grid-template-columns: 1fr 1fr;">
+                <span>📅 <b>{r.get('DateNav','--')}</b></span>
+                <span style="text-align:right;">💰 <b>{r.get('Prix', 0)}€</b></span>
             </div>
-            {f'<div style="margin-top:10px; padding:10px; background:#f9f9f9; border-left:4px solid #1a2a6c; font-size:13px;">📝 {note}</div>' if note else ""}
-            <div style="margin-top: 15px; display: flex; gap: 8px;">
-                <a href="tel:{tel}" style="flex:1; background:#3498db; color:white; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:12px;">📞 APPEL</a>
-                <a href="https://wa.me/{tel}" style="flex:1; background:#25D366; color:white; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:12px;">💬 WA</a>
-                <a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:12px;">📧 EMAIL</a>
+
+            {f'<div style="margin-top:8px; padding:8px; background:#f9f9f9; border-left:3px solid #1a2a6c; font-size:12px; color:#444;">📝 {note}</div>' if note else ""}
+            
+            <div style="margin-top: 12px; display: flex; gap: 6px;">
+                <a href="tel:{tel}" style="flex:1; background:#34495e; color:white; padding:10px; border-radius:6px; text-decoration:none; text-align:center; font-size:11px; font-weight:bold;">📞 APPEL</a>
+                <a href="https://wa.me/{tel}" style="flex:1; background:#25D366; color:white; padding:10px; border-radius:6px; text-decoration:none; text-align:center; font-size:11px; font-weight:bold;">💬 WA</a>
+                <a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white; padding:10px; border-radius:6px; text-decoration:none; text-align:center; font-size:11px; font-weight:bold;">📧 MAIL</a>
             </div>
         </div>
         """
-        
-        # L'ASTUCE : On affiche le HTML dans un composant isolé (iframe)
-        # Cela empêche les caractères bizarres de "casser" le reste de l'appli
-        components.html(fiche_html, height=220)
+        # On affiche la fiche isolée
+        st.components.v1.html(fiche_html, height=210)
 
-        # Boutons de gestion Streamlit (toujours dehors pour fonctionner)
+        # Boutons de gestion
         c1, c2 = st.columns([1, 4])
         if c1.button(f"✏️ {num_f}", key=f"ed_{i}"):
             st.session_state.edit_idx = i
