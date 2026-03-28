@@ -133,17 +133,18 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     except Exception:
         pass
 # =================================================================
-# --- 5. PAGE CONTACTS (NETTOYAGE TOTAL DES DOUBLONS) ---
+# --- 5. PAGE CONTACTS (VERSION NETTOYÉE ET UNIQUE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta - Missions")
 
+    # 1. Fonction de nettoyage (pour éviter les "None")
     def clean_val(v):
         val = str(v).strip()
         if val.lower() in ["none", "nan", "", "null"]: return ""
         return val
 
-    # Navigation
+    # 2. Barre de navigation
     st.divider()
     n1, n2, n3 = st.columns(3)
     view_arc = st.session_state.get('view_archive', False)
@@ -155,26 +156,28 @@ if st.session_state.page == "CONTACTS":
         st.session_state.view_archive = True
         st.rerun()
     if n3.button("➕ Ajouter", use_container_width=True):
-        new = {"Prénom": "Nouveau", "Nom": "Contact", "Statut": "En attente", "DateNav": "01/05/2026"}
+        new = {"Prénom": "Nouveau", "Nom": "Contact", "Statut": "En attente"}
         df_c = pd.concat([df_c, pd.DataFrame([new])], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()
 
+    # Filtre des données
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-    # --- DÉBUT DE LA BOUCLE ---
+    # 3. BOUCLE D'AFFICHAGE UNIQUE
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # Données propres
+        # --- Préparation des données ---
         p_nom = clean_val(r.get('Prénom') or r.get('Prenom'))
         n_nom = clean_val(r.get('Nom')).upper()
         nom_complet = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche n°{num_f}"
+        
         soc = clean_val(r.get('Société') or r.get('Societe')) or "PARTICULIER"
         tel_raw = clean_val(r.get('Téléphone') or r.get('Telephone'))
         notes = clean_val(r.get('Notes') or r.get('Commentaires') or r.get('Notes '))
         
-        # Statut et Infos (⛵ et 👥)
+        # Statuts et Infos (Jours/Pers)
         s = clean_val(r.get('Statut')) or "En attente"
         s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
         nb_j = r.get('NbreJours', 1)
@@ -185,7 +188,7 @@ if st.session_state.page == "CONTACTS":
         tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "") if tel_raw else "#"
         display_tel = f"📞 {tel_raw}" if tel_raw else "📞 (SANS NUMÉRO)"
 
-        # AFFICHAGE HTML (UN SEUL ST.MARKDOWN PAR BOUCLE)
+        # --- AFFICHAGE DE LA FICHE (ST.MARKDOWN UNIQUE) ---
         st.markdown(f'''
         <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: white; color: black;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -204,7 +207,7 @@ if st.session_state.page == "CONTACTS":
         </div>
         ''', unsafe_allow_html=True)
 
-        # Boutons de gestion
+        # --- BOUTONS DE GESTION (MODIFIER / SUPPRIMER) ---
         c1, c2 = st.columns([1, 4])
         if c1.button(f"✏️ n°{num_f}", key=f"ed_{i}"):
             st.session_state.edit_idx = i
@@ -214,6 +217,9 @@ if st.session_state.page == "CONTACTS":
             sauvegarder_data(df_c, "contacts.json")
             st.rerun()
 
+# --- FIN DU BLOC CONTACTS ---
+elif st.session_state.page == "PLANNING":
+    st.subheader("🗓️ Planning Vesta 2026")
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION COMPLÈTE & CORRIGÉE) ---
 # =================================================================
