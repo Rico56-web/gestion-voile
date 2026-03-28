@@ -138,7 +138,25 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta - Missions")
-    
+
+    # --- HARMONISATION DU JSON (Nettoyage des colonnes) ---
+    if not df_c.empty:
+        # On crée les colonnes manquantes si elles n'existent pas sous ce nom
+        if 'Notes' not in df_c.columns: df_c['Notes'] = ""
+        if 'Commentaires' not in df_c.columns: df_c['Commentaires'] = ""
+        
+        # On fusionne les variantes de noms (Prénom/Prenom, Société/Societe, etc.)
+        for col_dest, variantes in {
+            'Prénom': ['Prenom', 'Prénom'],
+            'Société': ['Societe', 'Société', 'Societe '],
+            'Téléphone': ['Telephone', 'Téléphone', 'Tél'],
+            'Note_Finale': ['Notes', 'Commentaires', 'Notes ']
+        }.items():
+            for var in variantes:
+                if var in df_c.columns:
+                    df_c[col_dest] = df_c[col_dest].fillna(df_c[var]) if col_dest in df_c.columns else df_c[var]
+
+    # --- LE RESTE DU CODE (TRI ET AFFICHAGE) --- 
     # --- 1. TRI CHRONOLOGIQUE (Le plus proche en haut) ---
     if not df_c.empty:
         # On s'assure que DateNav est bien au format date pour le tri
