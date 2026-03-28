@@ -133,19 +133,17 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     except Exception:
         pass
 # =================================================================
-# --- 5. PAGE CONTACTS (VERSION VESTA SKIPPER 2026 - FINALE) ---
+# --- 5. PAGE CONTACTS (NETTOYAGE TOTAL DES DOUBLONS) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta - Missions")
 
-    # --- FONCTION DE NETTOYAGE DES DONNÉES ---
     def clean_val(v):
         val = str(v).strip()
-        if val.lower() in ["none", "nan", "", "null", "undefined"]: 
-            return ""
+        if val.lower() in ["none", "nan", "", "null"]: return ""
         return val
 
-    # --- NAVIGATION ET FILTRAGE ---
+    # Navigation
     st.divider()
     n1, n2, n3 = st.columns(3)
     view_arc = st.session_state.get('view_archive', False)
@@ -162,36 +160,32 @@ if st.session_state.page == "CONTACTS":
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()
 
-    # Sélection des données selon l'onglet
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-    # --- BOUCLE D'AFFICHAGE DES FICHES ---
+    # --- DÉBUT DE LA BOUCLE ---
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # Préparation des variables
+        # Données propres
         p_nom = clean_val(r.get('Prénom') or r.get('Prenom'))
         n_nom = clean_val(r.get('Nom')).upper()
         nom_complet = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche n°{num_f}"
-        
         soc = clean_val(r.get('Société') or r.get('Societe')) or "PARTICULIER"
         tel_raw = clean_val(r.get('Téléphone') or r.get('Telephone'))
         notes = clean_val(r.get('Notes') or r.get('Commentaires') or r.get('Notes '))
         
-        # Gestion des Statuts et Couleurs
+        # Statut et Infos (⛵ et 👥)
         s = clean_val(r.get('Statut')) or "En attente"
         s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
-        
-        # Infos techniques
         nb_j = r.get('NbreJours', 1)
         nb_p = r.get('NbrePers', 1)
         prix = r.get('Prix', '0')
 
-        # Gestion des liens (Couleurs vives conservées)
+        # Liens (Bleu et Vert forcés)
         tel_link = tel_raw.replace(" ", "").replace(".", "").replace("-", "") if tel_raw else "#"
         display_tel = f"📞 {tel_raw}" if tel_raw else "📞 (SANS NUMÉRO)"
 
-        # AFFICHAGE HTML UNIQUE
+        # AFFICHAGE HTML (UN SEUL ST.MARKDOWN PAR BOUCLE)
         st.markdown(f'''
         <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: white; color: black;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -210,19 +204,19 @@ if st.session_state.page == "CONTACTS":
         </div>
         ''', unsafe_allow_html=True)
 
-        # BOUTONS DE GESTION (Bien décalés à l'intérieur du "for")
-        c_ed, c_del = st.columns([1, 4])
-        with c_ed:
-            if st.button(f"✏️ Modifier n°{num_f}", key=f"ed_{i}"):
-                st.session_state.edit_idx = i
-                st.rerun()
-        with c_del:
-            if st.button(f"🗑️ Supprimer n°{num_f}", key=f"del_{i}"):
-                df_c = df_c.drop(i).reset_index(drop=True)
-                sauvegarder_data(df_c, "contacts.json")
-                st.rerun()
+        # Boutons de gestion
+        c1, c2 = st.columns([1, 4])
+        if c1.button(f"✏️ n°{num_f}", key=f"ed_{i}"):
+            st.session_state.edit_idx = i
+            st.rerun()
+        if c2.button(f"🗑️ n°{num_f}", key=f"del_{i}"):
+            df_c = df_c.drop(i).reset_index(drop=True)
+            sauvegarder_data(df_c, "contacts.json")
+            st.rerun()
 
-      
+# --- ICI LE ELIF (À COLLER TOUT À GAUCHE) ---
+elif st.session_state.page == "PLANNING":
+    st.subheader("🗓️ Planning Vesta 2026")
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION COMPLÈTE & CORRIGÉE) ---
 # =================================================================
