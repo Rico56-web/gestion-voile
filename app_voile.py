@@ -133,42 +133,33 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     except Exception:
         pass
 # =================================================================
-# --- 5. PAGE CONTACTS (VERSION SÉCURISÉE & NUMÉROTÉE) ---
+# --- 5. PAGE CONTACTS (VERSION CORRIGÉE ET TRIÉE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta - Missions")
     
-    # --- PRÉPARATION DES DONNÉES (TRI ET INDEX) ---
+    # --- 1. PRÉPARATION DES DONNÉES ET TRI CHRONOLOGIQUE ---
     if not df_c.empty:
-        # On crée une colonne de tri propre (invisible)
+        # Conversion en date pour le tri
         df_c['tmp_date'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
-        # On trie : les plus récentes en premier
-        df_c = df_c.sort_values(by='tmp_date', ascending=False).drop(columns=['tmp_date'])
-        # IMPORTANT : On réinitialise l'index pour que la position 0 soit toujours la 1ère fiche affichée
+        # TRI : La date la plus proche du jour actuel en haut
+        df_c = df_c.sort_values(by='tmp_date', ascending=True).drop(columns=['tmp_date'])
+        # Réinitialisation de l'index pour la sécurité des boutons
         df_c = df_c.reset_index(drop=True)
 
-    # --- GESTION DU FILTRE DEPUIS LE PLANNING ---
-    if 'search_contact' not in st.session_state:
-        st.session_state.search_contact = ""
-    val_recherche = st.session_state.search_contact
+    # --- FILTRE RECHERCHE ---
+    if 'search_contact' not in st.session_state: st.session_state.search_contact = ""
+    recherche = st.text_input("🔍 Rechercher", value=st.session_state.search_contact)
 
-    col_search, col_reset = st.columns([3, 1])
-    with col_search:
-        recherche = st.text_input("🔍 Rechercher un nom ou une société", value=val_recherche)
-    with col_reset:
-        if val_recherche:
-            if st.button("❌ Effacer filtre", use_container_width=True):
-                st.session_state.search_contact = ""
-                st.rerun()
-
-    # --- 1. LE FORMULAIRE DE MODIFICATION ---
+    # --- 2. LE FORMULAIRE DE MODIFICATION (SÉCURISÉ) ---
     if st.session_state.get('edit_idx') is not None:
         idx = st.session_state.edit_idx
         if idx < len(df_c):
             r = df_c.iloc[idx]
-            # Affichage du numéro de fiche dans le titre du formulaire
-            with st.expander(f"📝 MODIFIER FICHE n°{idx + 1} : {r.get('Prénom','')} {r.get('Nom','')}", expanded=True):
-                with st.form(key=f"edit_form_v3_{idx}"):
+            
+            with st.expander(f"📝 MODIFIER FICHE n°{idx + 1}", expanded=True):
+                # ON DÉCLARE LE FORMULAIRE
+                with st.form(key=f"form_contact_{idx}"):
                     c1, c2 = st.columns(2)
                     u_pre = c1.text_input("Prénom", value=str(r.get('Prénom', '')))
                     u_nom = c2.text_input("Nom", value=str(r.get('Nom', '')))
@@ -178,11 +169,10 @@ if st.session_state.page == "CONTACTS":
                     
                     c_st, c_pa = st.columns(2)
                     l_s = ["En attente", "OK", "Refusé", "Terminé"]
-                    u_statut = c_st.selectbox("Statut Mission", l_s, index=l_s.index(r.get('Statut')) if r.get('Statut') in l_s else 0)
+                    u_statut = c_st.selectbox("Statut", l_s, index=l_s.index(r.get('Statut')) if r.get('Statut') in l_s else 0)
                     
                     options_p = ["Non payé", "Payé"]
-                    val_actuelle = str(r.get('Paiement', '')).lower()
-                    idx_p = 1 if ("pay" in val_actuelle and "non" not in val_actuelle) else 0
+                    idx_p = 1 if "pay" in str(r.get('Paiement','')).lower() and "non" not in str(r.get('Paiement','')).lower() else 0
                     u_paye = c_pa.selectbox("Paiement", options_p, index=idx_p)
                     
                     c3, c4, c5 = st.columns(3)
@@ -190,113 +180,68 @@ if st.session_state.page == "CONTACTS":
                     u_jours = c4.number_input("Jours", value=int(float(r.get('NbreJours', 1))), min_value=1)
                     u_pers = c5.number_input("Pers.", value=int(float(r.get('NbrePers', 1))), min_value=1)
                     
-                    u_prix = st.text_input("Prix total (€)", value=str(r.get('Prix', '0.00')))
+                    u_prix = st.text_input("Prix (€)", value=str(r.get('Prix', '0.00')))
                     u_comm = st.text_area("Commentaires", value=str(r.get('Commentaires', '')))
 
-                    if st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS"):
-                        # Mise à jour directe via l'index stabilisé
-                        df_c.loc[idx] = [u_pre, u_nom, u_soc, u_tel, u_mail, u_statut, u_paye, u_prix, u_date, u_jours, u_pers, u_comm]
-                        sauvegarder_data(df_c, "contacts.json")
-                        st.session_state.edit_idx = None
-                        st.rerun()
+                    # LE SEUL BOUTON DANS LE FORMULAIRE
+                    save_btn = st.form_submit_button("💾 ENREGISTRER")
 
-            if st.button("❌ Fermer sans enregistrer", key="close_edit"):
-                st.session_state.edit_idx = None
-                st.rerun()
+                # BOUTON FERMER (HORS DU FORMULAIRE)
+                if st.button("❌ Annuler / Fermer", key="btn_cancel_edit"):
+                    st.session_state.edit_idx = None
+                    st.rerun()
 
-    # --- 2. NAVIGATION ---
+                if save_btn:
+                    df_c.loc[idx] = [u_pre, u_nom, u_soc, u_tel, u_mail, u_statut, u_paye, u_prix, u_date, u_jours, u_pers, u_comm]
+                    sauvegarder_data(df_c, "contacts.json")
+                    st.session_state.edit_idx = None
+                    st.success("Modifications enregistrées !")
+                    st.rerun()
+
+    # --- 3. NAVIGATION ---
     st.divider()
     n1, n2, n3 = st.columns(3)
     view_arc = st.session_state.get('view_archive', False)
 
-    if n1.button("📂 En Cours", key="nav_active", use_container_width=True, type="primary" if not view_arc else "secondary"):
+    if n1.button("📂 En Cours", type="primary" if not view_arc else "secondary", use_container_width=True):
         st.session_state.view_archive = False
         st.rerun()
-    if n2.button("🗄️ Archives", key="nav_archive", use_container_width=True, type="primary" if view_arc else "secondary"):
+    if n2.button("🗄️ Archives", type="primary" if view_arc else "secondary", use_container_width=True):
         st.session_state.view_archive = True
         st.rerun()
-    if n3.button("➕ Ajouter", key="nav_add_new", use_container_width=True):
-        new_row = {"Prénom": "Nouveau", "Nom": "Contact", "Société": "PARTICULIER", "Statut": "En attente", "Paiement": "Non payé", "DateNav": "01/01/2026"}
+    if n3.button("➕ Ajouter", use_container_width=True):
+        new_row = {"Prénom": "Nouveau", "Nom": "Contact", "Société": "PARTICULIER", "Statut": "En attente", "Paiement": "Non payé", "DateNav": "01/05/2026"}
         df_c = pd.concat([df_c, pd.DataFrame([new_row])], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
-        st.session_state.edit_idx = 0 # Le nouveau sera en haut grâce au tri
         st.rerun()
 
-    # --- 3. FILTRAGE ET AFFICHAGE ---
-    if view_arc:
-        df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])]
-    else:
-        df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
-
+    # --- 4. AFFICHAGE DES FICHES ---
+    df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
+    
     if recherche:
-        mask = df_disp.apply(lambda row: recherche.lower() in str(row.values).lower(), axis=1)
-        df_disp = df_disp[mask]
+        df_disp = df_disp[df_disp.apply(lambda row: recherche.lower() in str(row.values).lower(), axis=1)]
 
-    # --- BOUCLE D'AFFICHAGE DES FICHES ---
     for i, r in df_disp.iterrows():
-        # Numéro de fiche basé sur l'index réel du DataFrame trié
         num_f = i + 1
         
-        # Calcul des labels de paiement
-        p_test = str(r.get('Paiement', 'Non payé')).lower()
-        is_p_ok = ("pay" in p_test) and ("non" not in p_test)
-        p_label, p_col = ("Payé", "#27ae60") if is_p_ok else ("Non payé", "#e67e22")
-        
-        s = str(r.get('Statut', 'En attente'))
-        s_col = "#2ecc71" if s == "OK" else "#f1c40f" if s == "En attente" else "#e74c3c"
-        
-        t_raw = str(r.get('Téléphone','')).strip()
-        t_link = t_raw.replace(" ", "").replace(".", "").replace("-", "")
-
-        # HTML de la fiche avec Numérotation
-        h = f'''
-        <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 15px; margin-bottom: 10px; background-color: white; color: black;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="background:#1a2a6c; color:white; padding:2px 10px; border-radius:15px; font-size:0.8rem;">Fiche n°{num_f}</span>
-                <div>
-                    <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold;">{s}</span>
-                    <span style="background:{p_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.7rem; font-weight:bold; margin-left:5px;">{p_label}</span>
-                </div>
-            </div>
-            <div style="margin-top:10px;">
-                <b style="font-size: 1.1rem; color: #1a2a6c;">{r.get('Prénom','')} {r.get('Nom','').upper()}</b><br>
-                <small>🏢 {str(r.get('Société','PARTICULIER')).upper()}</small>
-            </div>
-            <div style="font-size: 0.9rem; color: black; margin-top: 10px;">
-                📅 <b>Date :</b> {r.get('DateNav','--')} | 💰 <b>Prix :</b> {r.get('Prix','0.00')} €
-            </div>
-            <div style="margin-top: 15px; display: flex; gap: 5px;">
-                <a href="tel:{t_link}" style="flex:1; background:#3498db; color:white; padding:8px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">APPEL</a>
-                <a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white; padding:8px; border-radius:8px; text-decoration:none; text-align:center; font-weight:bold; font-size:0.7rem;">WA</a>
-            </div>
+        # Style HTML simplifié
+        st.markdown(f'''
+        <div style="border: 2px solid #1a2a6c; border-radius: 10px; padding: 12px; margin-bottom: 10px; background: white; color: black;">
+            <b style="color: #1a2a6c;">Fiche n°{num_f} — {r.get('DateNav','--')}</b><br>
+            <span style="font-size:1.1rem;">{r.get('Prénom','')} <b>{r.get('Nom','').upper()}</b></span><br>
+            🏢 {str(r.get('Société','')).upper()} | 💰 {r.get('Prix','0')} €
         </div>
-        '''
-        st.markdown(h, unsafe_allow_html=True)
+        ''', unsafe_allow_html=True)
 
-        # --- BOUTONS D'ACTION AVEC NUMÉRO ---
-        c_ed, c_del = st.columns([1, 1])
-        
-        if c_ed.button(f"✏️ Modifier n°{num_f}", key=f"ed_{num_f}_{i}", use_container_width=True):
+        c_ed, c_del = st.columns(2)
+        if c_ed.button(f"✏️ Modifier n°{num_f}", key=f"ed_{i}", use_container_width=True):
             st.session_state.edit_idx = i
             st.rerun()
-
-        # Système de suppression sécurisé
-        confirm_key = f"del_confirm_{i}"
-        if not st.session_state.get(confirm_key, False):
-            if c_del.button(f"🗑️ Supprimer n°{num_f}", key=f"del_{num_f}_{i}", use_container_width=True):
-                st.session_state[confirm_key] = True
-                st.rerun()
-        else:
-            c_del.warning(f"Confirmer n°{num_f} ?")
-            b1, b2 = c_del.columns(2)
-            if b1.button("✅ OUI", key=f"y_{i}"):
-                df_c = df_c.drop(i).reset_index(drop=True)
-                sauvegarder_data(df_c, "contacts.json")
-                st.session_state[confirm_key] = False
-                st.rerun()
-            if b2.button("❌ NON", key=f"n_{i}"):
-                st.session_state[confirm_key] = False
-                st.rerun()
+        
+        if c_del.button(f"🗑️ Supprimer n°{num_f}", key=f"del_{i}", use_container_width=True):
+            df_c = df_c.drop(i).reset_index(drop=True)
+            sauvegarder_data(df_c, "contacts.json")
+            st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION COMPLÈTE & CORRIGÉE) ---
 # =================================================================
