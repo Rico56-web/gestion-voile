@@ -538,7 +538,34 @@ if st.session_state.page == "STATS":
         st.table(mensuel[['Mois', 'CA', 'Frais', 'Net']].set_index('Mois').style.format("{:.0f} €"))
     
     st.divider()
-
+    
+# --- 4.bis VISUALISATION GRAPHIQUE ---
+    st.subheader("📈 Analyse de l'Activité")
+    
+    if not mensuel.empty:
+        col_chart1, col_chart2 = st.columns([2, 1])
+        
+        with col_chart1:
+            # Courbe de l'évolution du CA vs Frais
+            st.write("**Évolution mensuelle (€)**")
+            # On prépare les données pour le graphique en ligne
+            chart_data = mensuel.set_index('Mois')[['CA', 'Frais']]
+            st.line_chart(chart_data, color=["#2ecc71", "#e74c3c"]) # Vert pour CA, Rouge pour Frais
+            
+        with col_chart2:
+            # Graphique en "fromage" pour les Sociétés
+            st.write("**Répartition Clients**")
+            if 'Société' in df_st.columns:
+                # On compte le nombre de missions par société
+                stats_soc = df_st['Société'].value_counts()
+                st.write("") # Petit espace pour centrer
+                # Streamlit n'a pas de st.pie_chart natif simple, on utilise donc une astuce efficace :
+                st.dataframe(stats_soc, use_container_width=True)
+                # Note : Si tu veux un vrai cercle, on pourrait utiliser Plotly, 
+                # mais le tableau de répartition est souvent plus lisible sur iPhone.
+    else:
+        st.info("Pas assez de données pour générer les graphiques.")
+        
     # --- 4. INDICATEURS DE TRÉSORERIE ---
     col1, col2 = st.columns(2)
     tot_encaisse = df_st[df_st['Paiement'].astype(str).str.upper().str.strip() == "PAYÉ"]['PrixNum'].sum()
