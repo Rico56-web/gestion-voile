@@ -141,15 +141,16 @@ if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta - Missions")
     import html
 
+    # --- 1. FONCTIONS ET PARAMÈTRES ---
     def safe(val):
         v = str(val).strip()
         if v.lower() in ["none", "nan", "", "null", "undefined"]: return ""
         return html.escape(v).replace("\n", " ").replace("\r", "")
 
-    # --- 1. CONFIGURATION DES SOCIÉTÉS ---
-    LISTE_SOC = ["PARTICULIER", "CLICK", "VOG", "CMN", "Autres"]
+    # Ajout de l'option "AUTRES" comme demandé
+    LISTE_SOC = ["PARTICULIER", "CLICK", "VOG", "CMN", "AUTRES"]
 
-    # --- 2. NAVIGATION ET AJOUT ---
+    # --- 2. NAVIGATION ET AJOUT (EN HAUT) ---
     c_n1, c_n2, c_add = st.columns([1, 1, 2])
     view_arc = st.session_state.get('view_archive', False)
 
@@ -162,11 +163,12 @@ if st.session_state.page == "CONTACTS":
     
     if c_add.button("➕ NOUVELLE MISSION", type="primary", use_container_width=True):
         new_row = pd.DataFrame([{
-            "Prénom": "Nouveau", "Nom": "Contact", "Société": "PARTICULIER", 
+            "Prénom": "", "Nom": "", "Société": "PARTICULIER", 
             "Téléphone": "", "Email": "", "Statut": "En attente", 
             "Paiement": "Non payé", "DateNav": "01/01/2026", 
             "Prix": "0", "NbreJours": "1", "NbrePers": "1", "Notes": ""
         }])
+        # Insertion en haut de liste
         df_c = pd.concat([new_row, df_c], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.session_state.edit_idx = 0 
@@ -177,11 +179,11 @@ if st.session_state.page == "CONTACTS":
     # --- 3. FILTRAGE ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-    # --- 4. BOUCLE D'AFFICHAGE ---
+    # --- 4. BOUCLE D'AFFICHAGE DES FICHES ---
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # Données
+        # Extraction et nettoyage des données
         p_nom = safe(r.get('Prénom', ''))
         n_nom = safe(r.get('Nom', '')).upper()
         nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche #{num_f}"
@@ -194,15 +196,15 @@ if st.session_state.page == "CONTACTS":
         jours = safe(r.get('NbreJours', '1'))
         pers  = safe(r.get('NbrePers', '1'))
         
-        # Statuts et Couleurs
+        # Logique de Statuts et Couleurs
         s_val = safe(r.get('Statut', 'En attente'))
         s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
-        if "CMN" in soc: s_col = "#3498db" 
+        if "CMN" in soc: s_col = "#3498db" # Spécificité CMN en Bleu
         
         p_val = safe(r.get('Paiement', 'Non payé'))
         p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
 
-        # --- HTML FICHE ---
+        # --- DESIGN DE LA FICHE (Optimisé iPhone) ---
         card_html = (
             f'<div style="border:2px solid #1a2a6c;border-radius:12px;padding:15px;margin-bottom:8px;background:white;color:black;">'
             f'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'
@@ -233,7 +235,7 @@ if st.session_state.page == "CONTACTS":
             st.session_state.confirm_del_idx = i
             st.rerun()
 
-        # --- FORMULAIRE D'ÉDITION ---
+        # --- FORMULAIRE D'ÉDITION COMPLET ---
         if st.session_state.get('edit_idx') == i:
             with st.expander(f"⚙️ ÉDITION #{num_f}", expanded=True):
                 with st.form(f"f_edit_{i}"):
@@ -241,25 +243,26 @@ if st.session_state.page == "CONTACTS":
                     u_pre = c1.text_input("Prénom", value=r.get('Prénom', ''))
                     u_nom = c2.text_input("Nom", value=r.get('Nom', ''))
                     
-                    # CHANGEMENT ICI : Menu déroulant pour Société
+                    # Menu déroulant avec "AUTRES"
                     idx_soc = LISTE_SOC.index(soc) if soc in LISTE_SOC else 0
                     u_soc = c1.selectbox("Société", LISTE_SOC, index=idx_soc)
-                    
                     u_tel = c2.text_input("Téléphone", value=r.get('Téléphone', ''))
+                    
                     u_mai = c1.text_input("Email", value=r.get('Email', ''))
-                    u_dat = c2.text_input("Date (JJ/MM/AAAA)", value=r.get('DateNav', r.get('Date', '')))
+                    u_dat = c2.text_input("Date (JJ/MM/AAAA)", value=date)
                     
                     c3, c4 = st.columns(2)
-                    u_jr  = c3.text_input("Nbre de jours", value=jours)
-                    u_ps  = c4.text_input("Nbre de personnes", value=pers)
+                    u_jr  = c3.text_input("Nombre de jours", value=jours)
+                    u_ps  = c4.text_input("Nombre de personnes", value=pers)
                     u_prix = c3.text_input("Prix Total (€)", value=prix)
-                    u_stat = c4.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], 
+                    u_stat = c4.selectbox("Statut Mission", ["En attente", "OK", "Terminé", "Refusé"], 
                                           index=["En attente", "OK", "Terminé", "Refusé"].index(s_val) if s_val in ["En attente", "OK", "Terminé", "Refusé"] else 0)
-                    u_paye = c3.selectbox("Paiement", ["Non payé", "Payé"], index=1 if "PAYÉ" in p_val.upper() else 0)
+                    u_paye = c3.selectbox("Suivi Paiement", ["Non payé", "Payé"], index=1 if "PAYÉ" in p_val.upper() else 0)
+                    
                     u_note = st.text_area("Notes", value=r.get('Notes', ''))
                     
                     b_save, b_ann = st.columns(2)
-                    if b_save.form_submit_button("✅ ENREGISTRER", use_container_width=True):
+                    if b_save.form_submit_button("✅ SAUVEGARDER", use_container_width=True):
                         df_c.at[i, 'Prénom'] = u_pre
                         df_c.at[i, 'Nom'] = u_nom
                         df_c.at[i, 'Société'] = u_soc
