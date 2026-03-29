@@ -141,14 +141,13 @@ if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta - Missions")
     import html
 
-    # --- 1. NETTOYAGE RADICAL ---
+    # --- 1. NETTOYAGE STRICT ---
     def safe(val):
         v = str(val).strip()
         if v.lower() in ["none", "nan", "", "null", "undefined"]: return ""
-        # On échappe tout et on retire les retours à la ligne qui brisent le Markdown
         return html.escape(v).replace("\n", " ").replace("\r", "")
 
-    # --- 2. NAVIGATION ET AJOUT (EN HAUT) ---
+    # --- 2. BARRE D'ACTION (EN HAUT) ---
     c_n1, c_n2, c_add = st.columns([1, 1, 2])
     view_arc = st.session_state.get('view_archive', False)
 
@@ -160,8 +159,9 @@ if st.session_state.page == "CONTACTS":
         st.rerun()
     
     if c_add.button("➕ NOUVELLE MISSION", type="primary", use_container_width=True):
-        new_row = pd.DataFrame([{"Prénom": "Nouveau", "Nom": "Contact", "Statut": "En attente", "Paiement": "Non payé", "DateNav": "01/01/2026"}])
-        df_c = pd.concat([new_row, df_c], ignore_index=True) # AJOUT EN HAUT
+        # Insertion à l'index 0 pour apparaître en haut de liste
+        new_row = pd.DataFrame([{"Prénom": "Nouveau", "Nom": "Contact", "Statut": "En attente", "Paiement": "Non payé", "DateNav": "01/01/2026", "Prix": "0"}])
+        df_c = pd.concat([new_row, df_c], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.session_state.edit_idx = 0 
         st.rerun()
@@ -175,7 +175,7 @@ if st.session_state.page == "CONTACTS":
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # Variables propres
+        # Variables nettoyées
         p_nom = safe(r.get('Prénom'))
         n_nom = safe(r.get('Nom')).upper()
         nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche #{num_f}"
@@ -183,82 +183,76 @@ if st.session_state.page == "CONTACTS":
         tel = safe(r.get('Téléphone')).replace(" ", "")
         mail = safe(r.get('Email'))
         note = safe(r.get('Notes'))
+        prix = safe(r.get('Prix'))
+        date = safe(r.get('DateNav'))
         
-        # Statuts
+        # Statuts et Couleurs
         s_val = safe(r.get('Statut')) or "ATTENTE"
         s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
         p_val = safe(r.get('Paiement')) or "NON PAYÉ"
         p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
 
-        # --- LE DESIGN (Utilisation de Triple guillemets SANS f-string pour le template) ---
-        # Cette méthode évite que les accolades du CSS ne se mélangent avec les variables Python
-        html_card = """
-        <div style="border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; margin-bottom: 5px; background: white; color: black;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <b style="color: #1a2a6c; font-size: 1.1rem;">#{} — {}</b>
-                <div style="text-align: right;">
-                    <span style="background:{}; color:white; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:bold;">{}</span><br>
-                    <span style="background:{}; color:white; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:bold; margin-top:4px; display:inline-block;">{}</span>
-                </div>
-            </div>
-            <p style="color: #666; font-size: 0.85rem; margin: 5px 0;">🏢 {}</p>
-            <div style="font-size: 0.95rem; border-top: 1px solid #eee; padding-top: 8px; margin-top:5px; color: #333;">
-                📅 <b>{}</b> | 💰 <b>{} €</b>
-            </div>
-            {}
-            <div style="margin-top: 15px; display: flex; gap: 8px;">
-                <a href="tel:{}" style="flex:1; background:#34495e; color:white !important; padding:12px 5px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">📞 APPEL</a>
-                <a href="https://wa.me/{}" style="flex:1; background:#25D366; color:white !important; padding:12px 5px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">💬 WA</a>
-                <a href="mailto:{}" style="flex:1; background:#e67e22; color:white !important; padding:12px 5px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">📧 MAIL</a>
-            </div>
-        </div>
-        """
+        # --- CONSTRUCTION DU HTML (SANS ESPACES POUR ÉVITER LE BUG DIV) ---
+        card_html = (
+            f'<div style="border:2px solid #1a2a6c;border-radius:12px;padding:15px;margin-bottom:8px;background:white;color:black;">'
+            f'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'
+            f'<b style="color:#1a2a6c;font-size:1.1rem;">#{num_f} — {nom_c}</b>'
+            f'<div style="text-align:right;display:flex;flex-direction:column;gap:4px;">'
+            f'<span style="background:{s_col};color:white;padding:2px 10px;border-radius:12px;font-size:0.7rem;font-weight:bold;">{s_val.upper()}</span>'
+            f'<span style="background:{p_col};color:white;padding:2px 10px;border-radius:12px;font-size:0.7rem;font-weight:bold;">{p_val.upper()}</span>'
+            f'</div></div>'
+            f'<div style="color:#666;font-size:0.85rem;margin-bottom:8px;">🏢 {soc}</div>'
+            f'<div style="font-size:0.95rem;border-top:1px solid #eee;padding-top:8px;color:#333;">'
+            f'📅 <b>{date}</b> | 💰 <b>{prix} €</b></div>'
+            f'{"<div style=\'margin-top:10px;padding:10px;background:#f8f9fa;border-left:4px solid #1a2a6c;font-size:0.85rem;border-radius:4px;\'>📝 " + note + "</div>" if note else ""}'
+            f'<div style="margin-top:15px;display:flex;gap:8px;">'
+            f'<a href="tel:{tel}" style="flex:1;background:#34495e;color:white !important;padding:12px 5px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.8rem;font-weight:bold;">📞 APPEL</a>'
+            f'<a href="https://wa.me/{tel}" style="flex:1;background:#25D366;color:white !important;padding:12px 5px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.8rem;font-weight:bold;">💬 WA</a>'
+            f'<a href="mailto:{mail}" style="flex:1;background:#e67e22;color:white !important;padding:12px 5px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.8rem;font-weight:bold;">📧 MAIL</a>'
+            f'</div></div>'
+        )
         
-        # On injecte les données proprement
-        note_div = f'<div style="margin-top:10px; padding:10px; background:#f8f9fa; border-left:4px solid #1a2a6c; font-size:0.85rem;">📝 {note}</div>' if note else ""
-        
-        st.markdown(html_card.format(
-            num_f, nom_c, s_col, s_val.upper(), p_col, p_val.upper(), 
-            soc, safe(r.get('DateNav')), safe(r.get('Prix')), 
-            note_div, tel, tel, mail
-        ), unsafe_allow_html=True)
+        st.markdown(card_html, unsafe_allow_html=True)
 
-        # --- ACTIONS LOCALES (SOUS LA FICHE) ---
+        # --- ACTIONS LOCALES (SOUS CHAQUE FICHE) ---
         c_ed, c_del = st.columns([1, 3])
+        
         if c_ed.button(f"✏️ {num_f}", key=f"ed_{i}", use_container_width=True):
             st.session_state.edit_idx = i
             st.rerun()
-        if c_del.button(f"🗑️ {num_f}", key=f"del_{i}", use_container_width=True):
+            
+        if c_del.button(f"🗑️ Supprimer {num_f}", key=f"del_{i}", use_container_width=True):
             st.session_state.confirm_del_idx = i
             st.rerun()
 
-        # Confirmation Suppression
-        if st.session_state.get('confirm_del_idx') == i:
-            st.error(f"Supprimer la fiche #{num_f} ?")
-            cy, cn = st.columns(2)
-            if cy.button("OUI ✅", key=f"y_{i}"):
-                df_c = df_c.drop(i).reset_index(drop=True)
-                sauvegarder_data(df_c, "contacts.json")
-                st.session_state.confirm_del_idx = None
-                st.rerun()
-            if cn.button("NON ❌", key=f"n_{i}"):
-                st.session_state.confirm_del_idx = None
-                st.rerun()
-
-        # Formulaire Edition
+        # FORMULAIRE D'ÉDITION LOCAL
         if st.session_state.get('edit_idx') == i:
-            with st.expander(f"⚙️ Modifier #{num_f}", expanded=True):
-                with st.form(f"f_{i}"):
+            with st.expander(f"⚙️ Modification #{num_f}", expanded=True):
+                with st.form(f"f_edit_{i}"):
                     u_statut = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=0)
                     u_pay = st.selectbox("Paiement", ["Non payé", "Payé"], index=0)
                     u_note = st.text_area("Notes", value=r.get('Notes', ''))
-                    if st.form_submit_button("Sauvegarder"):
+                    if st.form_submit_button("Sauvegarder ✅"):
                         df_c.at[i, 'Statut'] = u_statut
                         df_c.at[i, 'Paiement'] = u_pay
                         df_c.at[i, 'Notes'] = u_note
                         sauvegarder_data(df_c, "contacts.json")
                         st.session_state.edit_idx = None
                         st.rerun()
+
+        # CONFIRMATION DE SUPPRESSION LOCALE
+        if st.session_state.get('confirm_del_idx') == i:
+            st.error(f"Supprimer la fiche #{num_f} ?")
+            col_y, col_n = st.columns(2)
+            if col_y.button("OUI ✅", key=f"y_{i}", use_container_width=True):
+                # Suppression par l'index original
+                df_c = df_c.drop(i).reset_index(drop=True)
+                sauvegarder_data(df_c, "contacts.json")
+                st.session_state.confirm_del_idx = None
+                st.rerun()
+            if col_n.button("NON ❌", key=f"n_{i}", use_container_width=True):
+                st.session_state.confirm_del_idx = None
+                st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (DÉBUT DU BLOC) ---
 # =================================================================
