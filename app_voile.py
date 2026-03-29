@@ -565,77 +565,86 @@ if st.session_state.page == "STATS":
     st.table(df_st[mask_ok & (~mask_paye)][['DateNav', 'Nom', 'Prix']])
 
 # =================================================================
-# --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
+# --- 8. PAGE MAINTENANCE (VERSION FINALE SÉCURISÉE) ---
 # =================================================================
 if st.session_state.page == "MAINT":
-    st.title("🔧 Maintenance Vesta")
+    st.title("🔧 Maintenance & Frais Vesta")
 
-    # 1. CHARGEMENT
+    # 1. CHARGEMENT SÉCURISÉ DU FICHIER
     if not os.path.exists('maintenance.json'):
-        with open('maintenance.json', 'w') as f:
+        with open('maintenance.json', 'w', encoding='utf-8') as f:
             json.dump([], f)
     
-    with open('maintenance.json', 'r') as f:
-        try:
+    try:
+        with open('maintenance.json', 'r', encoding='utf-8') as f:
             m_data = json.load(f)
-        except:
-            m_data = []
-if st.form_submit_button("ENREGISTRER MAINTENANT"):
-    if f_obj:
-        try:
-            # 1. Préparer la donnée
-            nouvelle_ligne = {
-                "Date": f_date, 
-                "Objet": f_obj, 
-                "Montant": float(f_mt), 
-                "Statut": "OK"
-            }
-            # 2. Ajouter à la liste locale
-            m_data.append(nouvelle_ligne)
+    except:
+        m_data = []
+
+    # 2. FORMULAIRE D'AJOUT (BOUTON BIEN À L'INTÉRIEUR)
+    with st.expander("➕ Ajouter une dépense / intervention", expanded=True):
+        with st.form("form_maintenance", clear_on_submit=True):
+            f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
+            f_obj = st.text_input("Objet (ex: Taxes 178€, Drisse, Antifouling)")
+            f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0)
             
-            # 3. Écriture forcée avec encodage UTF-8
-            with open('maintenance.json', 'w', encoding='utf-8') as f:
-                json.dump(m_data, f, indent=4, ensure_ascii=False)
-            
-            st.success(f"✅ Enregistré : {f_obj}")
-            st.rerun()
-            
-        except Exception as e:
-            st.error(f"❌ Erreur d'écriture : {e}")
-    else:
-        st.warning("⚠️ L'objet ne peut pas être vide.")
+            # CE BOUTON DOIT RESTER DÉCALÉ ICI (DANS LE WITH)
+            submitted = st.form_submit_button("ENREGISTRER MAINTENANT")
+
+            if submitted:
+                if f_obj:
+                    nouvelle_ligne = {
+                        "Date": f_date,
+                        "Objet": f_obj,
+                        "Montant": float(f_mt),
+                        "Statut": "OK"
+                    }
+                    m_data.append(nouvelle_ligne)
+                    # Écriture immédiate
+                    with open('maintenance.json', 'w', encoding='utf-8') as f:
+                        json.dump(m_data, f, indent=4, ensure_ascii=False)
+                    st.success(f"✅ Enregistré : {f_obj}")
+                    st.rerun()
+                else:
+                    st.error("Veuillez saisir un 'Objet' pour enregistrer.")
 
     st.divider()
 
-    # 3. AFFICHAGE ET GESTION
+    # 3. AFFICHAGE ET GESTION (MODIFIER / SUPPRIMER)
     if m_data:
-        total = sum(float(i['Montant']) for i in m_data)
-        st.metric("TOTAL CUMULÉ", f"{total:.2f} €")
+        # Calcul du Total
+        total_m = sum(float(i.get('Montant', 0)) for i in m_data)
+        st.metric("TOTAL FRAIS 2026", f"{total_m:.2f} €")
 
+        st.subheader("📋 Historique des frais")
+        
+        # On affiche du plus récent au plus ancien
         for index, item in enumerate(reversed(m_data)):
             real_index = len(m_data) - 1 - index
             
-            # On utilise un identifiant unique par ligne
             with st.expander(f"{item['Date']} - {item['Objet']} ({item['Montant']}€)"):
+                col1, col2 = st.columns([2, 1])
                 
-                # --- MODIFICATION ---
-                new_mt = st.number_input(f"Prix", value=float(item['Montant']), key=f"v_{real_index}")
+                with col1:
+                    # Modification du prix en direct
+                    new_val = st.number_input("Prix", value=float(item['Montant']), key=f"edit_val_{real_index}")
+                    if st.button("✅ Valider Modif", key=f"btn_v_{real_index}"):
+                        m_data[real_index]['Montant'] = new_val
+                        with open('maintenance.json', 'w', encoding='utf-8') as f:
+                            json.dump(m_data, f, indent=4)
+                        st.toast("Modifié !")
+                        st.rerun()
                 
-                if st.button("✅ Valider", key=f"save_{real_index}"):
-                    m_data[real_index]['Montant'] = new_mt
-                    with open('maintenance.json', 'w') as f:
-                        json.dump(m_data, f, indent=4)
-                    st.toast("Modification enregistrée !") # Petit message discret
-                    st.rerun() # <--- Réinitialise l'état des boutons
-                
-                # --- SUPPRESSION ---
-                if st.button("🗑️ Supprimer", key=f"del_{real_index}"):
-                    m_data.pop(real_index)
-                    with open('maintenance.json', 'w') as f:
-                        json.dump(m_data, f, indent=4)
-                    st.rerun() # <--- Réinitialise tout
+                with col2:
+                    # Suppression
+                    st.write("") # Petit espace
+                    if st.button("🗑️ Supprimer", key=f"btn_d_{real_index}"):
+                        m_data.pop(real_index)
+                        with open('maintenance.json', 'w', encoding='utf-8') as f:
+                            json.dump(m_data, f, indent=4)
+                        st.rerun()
     else:
-        st.info("Aucune donnée enregistrée.")
+        st.info("Le carnet est vide. Ajoutez vos premières dépenses ci-dessus.")
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
