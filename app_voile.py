@@ -482,16 +482,22 @@ elif st.session_state.page == "PLANNING":
 # =================================================================
 # --- 7. PAGE STATS (VERSION FINALE VALIDÉE) ---
 # ================================================================
+# =================================================================
+# --- 7. PAGE STATS (VERSION FINALE ET SÉCURISÉE 2026) ---
+# =================================================================
 if st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
 
     # --- 1. FONCTIONS DE NETTOYAGE ---
     def clean_val(val):
         try:
-            if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
+            if not val or str(val).lower() in ["nan", "none", ""]:
+                return 0.0
+            # On ne garde que les chiffres, points, virgules et signes moins
             s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
             return float(s.replace(",", "."))
-        except: return 0.0
+        except:
+            return 0.0
 
     def get_month_info(date_str):
         try:
@@ -500,30 +506,33 @@ if st.session_state.page == "STATS":
                 m_num = int(parts[1])
                 months = ["Janv", "Févr", "Mars", "Avril", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"]
                 return m_num, f"{m_num:02d}-{months[m_num-1]}"
-        except: pass
+        except:
+            pass
         return 99, "99-Inconnu"
 
-    # --- 2. PRÉPARATION DES REVENUS (Contacts) ---
+    # --- 2. PRÉPARATION DES REVENUS (Depuis Contacts) ---
     df_st = df_c.copy()
-    df_st['PrixNum'] = df_st['Prix'].apply(clean_val) if 'Prix' in df_st.columns else 0.0
-    df_st['M_Sort'], df_st['Mois'] = zip(*df_st['DateNav'].apply(get_month_info))
-
-    mask_paye = df_st['Paiement'].astype(str).str.upper().str.strip() == "PAYÉ"
-    mask_ok = df_st['Statut'].astype(str).str.upper() == "OK"
-    df_st['CA_Calcul'] = df_st.where(mask_paye | mask_ok)['PrixNum'].fillna(0)
-    
-     # --- 3. PRÉPARATION DES FRAIS (Maintenance.json) ---
-    try:
-         with open('maintenance.json', 'r', encoding='utf-8') as f:
-            m_data = json.load(f)
-            df_maint_stats = pd.DataFrame(m_data)
+    if not df_st.empty and 'Prix' in df_st.columns:
+        df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
+        df_st['M_Sort'], df_st['Mois'] = zip(*df_st['DateNav'].apply(get_month_info))
         
-         if not df_maint_stats.empty and 'Date' in df_maint_stats.columns:
+        # Filtres pour le calcul du CA (Payé ou confirmé OK)
+        mask_paye = df_st['Paiement'].astype(str).str.upper().str.strip() == "PAYÉ"
+        mask_ok = df_st['Statut'].astype(str).str.upper() == "OK"
+        df_st['CA_Calcul'] = df_st.apply(lambda x: x['PrixNum'] if (mask_paye[x.name] or mask_ok[x.name]) else 0.0, axis=1)
+    else:
+        df_st = pd.DataFrame(columns=['M_Sort', 'Mois', 'CA_Calcul', 'PrixNum', 'Paiement', 'Statut'])
+
+    # --- 3. PRÉPARATION DES FRAIS (Depuis maintenance.json) ---
+    try:
+        with open('maintenance.json', 'r', encoding='utf-8') as f:
+            m_data_stats = json.load(f)
+        df_maint_stats = pd.DataFrame(m_data_stats)
+        
+        if not df_maint_stats.empty and 'Date' in df_maint_stats.columns:
             df_maint_stats['M_Sort'], df_maint_stats['Mois'] = zip(*df_maint_stats['Date'].apply(get_month_info))
-            # Sécurité : on vérifie si 'Montant' existe
-            col_mt = 'Montant' if 'Montant' in df_maint_stats.columns else df_maint_stats.columns[0]
-            df_maint_stats['FraisNum'] = df_maint_stats[col_mt].apply(clean_val)
-         else:
+            df_maint_stats['FraisNum'] = df_maint_stats['Montant'].apply(clean_val)
+        else:
             df_maint_stats = pd.DataFrame(columns=['M_Sort', 'Mois', 'FraisNum'])
     except:
         df_maint_stats = pd.DataFrame(columns=['M_Sort', 'Mois', 'FraisNum'])
@@ -531,12 +540,9 @@ if st.session_state.page == "STATS":
     # --- 4. SYNTHÈSE MENSUELLE COMBINÉE ---
     st.subheader("📅 Synthèse Mensuelle 2026")
     
-    # Groupement CA
     stats_ca = df_st.groupby(['M_Sort', 'Mois'])['CA_Calcul'].sum().reset_index()
-    # Groupement Frais
     stats_fr = df_maint_stats.groupby(['M_Sort', 'Mois'])['FraisNum'].sum().reset_index()
     
-    # Fusion des deux tableaux
     mensuel = pd.merge(stats_ca, stats_fr, on=['M_Sort', 'Mois'], how='outer').fillna(0)
     mensuel.columns = ['M_Sort', 'Mois', 'CA', 'Frais']
     mensuel = mensuel.sort_values('M_Sort')
@@ -544,72 +550,57 @@ if st.session_state.page == "STATS":
     
     if not mensuel.empty:
         st.table(mensuel[['Mois', 'CA', 'Frais', 'Net']].set_index('Mois').style.format("{:.0f} €"))
-        
         t_ca, t_fr, t_nt = mensuel['CA'].sum(), mensuel['Frais'].sum(), mensuel['Net'].sum()
         st.info(f"**Bilan Global :** CA {t_ca:.0f}€ | Frais {t_fr:.0f}€ | **Net {t_nt:.0f}€**")
     else:
-        st.info("Aucune donnée enregistrée.")
+        st.info("Aucune donnée enregistrée pour le moment.")
 
     st.divider()
 
-    # --- 5. INDICATEURS DE TRÉSORERIE (Uniquement Revenus) ---
-    tot_r = df_st[mask_paye]['PrixNum'].sum()
-    tot_f = df_st[mask_ok & (~mask_paye)]['PrixNum'].sum()
+    # --- 5. INDICATEURS DE TRÉSORERIE ---
+    col1, col2 = st.columns(2)
+    if not df_st.empty:
+        # On définit les masques à nouveau pour être sûr
+        m_p = df_st['Paiement'].astype(str).str.upper().str.strip() == "PAYÉ"
+        m_o = df_st['Statut'].astype(str).str.upper() == "OK"
+        
+        tot_encaisse = df_st[m_p]['PrixNum'].sum()
+        tot_a_venir = df_st[m_o & (~m_p)]['PrixNum'].sum()
+        
+        col1.metric("💰 ENCAISSÉ", f"{tot_encaisse:,.0f}€")
+        col2.metric("🕒 À VENIR", f"{tot_a_venir:,.0f}€")
     
-    c1, c2 = st.columns(2)
-    c1.metric("💰 ENCAISSÉ", f"{tot_r:,.0f}€")
-    c2.metric("🕒 À VENIR", f"{tot_f:,.0f}€")
-
-    # --- 6. DÉTAILS ---
-    st.subheader("⏳ À VENIR (OK)")
-    st.table(df_st[mask_ok & (~mask_paye)][['DateNav', 'Nom', 'Prix']])
-
-# --- 6. DÉTAILS ---
-    st.subheader("⏳ À VENIR (OK)")
-    st.table(df_st[mask_ok & (~mask_paye)][['DateNav', 'Nom', 'Prix']])
-
-    # --- LE BOUTON D'ARCHIVAGE (À AJOUTER ICI) ---
+    # --- 6. ZONE D'ARCHIVAGE (SÉCURISÉE) ---
     st.divider()
     with st.expander("📁 Archivage de la Saison"):
-        st.info("Cette option déplace les missions 'Terminées' ou 'Refusées' vers un fichier archive.")
-        if st.button("📦 ARCHIVER LES MISSIONS 2026", use_container_width=True):
-            mask_archive = df_c['Statut'].isin(["Terminé", "Refusé"])
-            df_a_archiver = df_c[mask_archive]
-            df_qui_reste = df_c[~mask_archive]
-            
-            if not df_a_archiver.empty:
-                # Sauvegarde locale
-                df_a_archiver.to_json("archives_2026.json", orient="records", indent=4)
-                sauvegarder_data(df_qui_reste, "contacts.json")
-                st.success(f"{len(df_a_archiver)} missions archivées !")
-                st.rerun()
-            else:
-                st.warning("Aucune mission 'Terminée' à archiver.")
-    
-    # 2. Bouton de transfert
-    if st.button(f"📦 ARCHIVER LES MISSIONS {annee_archive}", use_container_width=True):
-        # On sépare : ce qui reste en cours / ce qui part en archive
-        mask_archive = df_c['Statut'].isin(["Terminé", "Refusé"])
-        df_a_archiver = df_c[mask_archive]
-        df_qui_reste = df_c[~mask_archive]
+        st.info("Déplace les missions 'Terminé' ou 'Refusé' vers un fichier archive.")
         
-        if not df_a_archiver.empty:
-            # Sauvegarde des archives (on ajoute à l'existant si le fichier existe déjà)
-            if os.path.exists(nom_archive):
-                old_arch = pd.read_json(nom_archive)
-                df_final_arch = pd.concat([old_arch, df_a_archiver], ignore_index=True)
+        # Définition de l'année pour éviter le NameError
+        annee_archive = datetime.now().year
+        
+        if st.button(f"📦 ARCHIVER LES MISSIONS {annee_archive}", use_container_width=True):
+            if not df_c.empty:
+                # Filtrage
+                mask_arch = df_c['Statut'].isin(["Terminé", "Refusé"])
+                df_a_archiver = df_c[mask_arch]
+                df_qui_reste = df_c[~mask_arch]
+                
+                if not df_a_archiver.empty:
+                    nom_fic = f"archives_{annee_archive}.json"
+                    
+                    # 1. Sauvegarde locale de l'archive
+                    df_a_archiver.to_json(nom_fic, orient="records", indent=4)
+                    
+                    # 2. Mise à jour du fichier principal via ta fonction GitHub
+                    sauvegarder_data(df_qui_reste, "contacts.json")
+                    
+                    st.success(f"✅ {len(df_a_archiver)} missions archivées dans {nom_fic}")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.warning("Aucune mission avec le statut 'Terminé' ou 'Refusé' à archiver.")
             else:
-                df_final_arch = df_a_archiver
-            
-            # Écriture des deux fichiers
-            df_final_arch.to_json(nom_archive, orient="records", indent=4)
-            sauvegarder_data(df_qui_reste, "contacts.json")
-            
-            st.success(f"{len(df_a_archiver)} missions déplacées vers {nom_archive} !")
-            time.sleep(1)
-            st.rerun()
-        else:
-            st.warning("Aucune mission terminée à archiver.")
+                st.error("La liste de contacts est vide.")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION FINALE VALIDÉE 2026) ---
