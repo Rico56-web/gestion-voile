@@ -710,15 +710,31 @@ if st.session_state.page == "FACTURES":
             
             st.metric("Total à facturer", f"{total_cmn:.2f} €")
             
-            # --- 3. PRÉPARATION DE L'EMAIL ---
+         # --- 3. PRÉPARATION DU TEXTE ALIGNÉ ---
             st.divider()
             st.subheader("✉️ Préparation de l'envoi")
             
+            # Création manuelle des lignes pour maîtriser l'espacement
+            # Date (10 car.) + 12 espaces + Nom + 3 espaces + Prix
+            lignes_missions = []
+            espaces_12 = " " * 12
+            espaces_3  = " " * 3
+            
+            for _, row in df_cmn_mois.iterrows():
+                date_str = str(row['DateNav']).ljust(10) # Formate la date sur 10 caractères
+                nom_str  = str(row['Nom'])
+                prix_str = f"{row['PrixNum']:.2f} €"
+                
+                # Assemblage de la ligne avec tes espacements précis
+                ligne = f"{date_str}{espaces_12}{nom_str}{espaces_3}{prix_str}"
+                lignes_missions.append(ligne)
+            
+            texte_missions = "\n".join(lignes_missions)
+
             destinataire = "tresorier@cmn-asso.fr"
             objet = f"Facturation Missions Vesta - {sel_mois} {sel_annee}"
             
-            # Construction du texte sympathique
-            corps_mail = f"""Bonjour,
+            corps_mail = f"""Bonjour,  
 
 J'espère que vous allez bien ! ⛵
 
