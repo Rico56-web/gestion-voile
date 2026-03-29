@@ -516,7 +516,7 @@ if st.session_state.page == "STATS":
     try:
          with open('maintenance.json', 'r', encoding='utf-8') as f:
             m_data = json.load(f)
-        df_maint_stats = pd.DataFrame(m_data)
+            df_maint_stats = pd.DataFrame(m_data)
         
         if not df_maint_stats.empty and 'Date' in df_maint_stats.columns:
             df_maint_stats['M_Sort'], df_maint_stats['Mois'] = zip(*df_maint_stats['Date'].apply(get_month_info))
