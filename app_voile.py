@@ -149,18 +149,31 @@ if st.session_state.page == "CONTACTS":
 
     # Ajout de l'option "AUTRES" comme demandé
     LISTE_SOC = ["PARTICULIER", "CLICK", "VOG", "CMN", "AUTRES"]
+# --- 1. CONFIGURATION DES SOCIÉTÉS ---
+    LISTE_SOC = ["PARTICULIER", "CLICK", "VOG", "CMN", "AUTRES"]
 
-    # --- 2. NAVIGATION ET AJOUT (EN HAUT) ---
+    # --- 2. CSS POUR LE BOUTON VERT ET NAVIGATION ---
+    st.markdown("""
+        <style>
+        div.stButton > button:first-child[kind="primary"] {
+            background-color: #27ae60 !important;
+            border-color: #27ae60 !important;
+            color: white !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     c_n1, c_n2, c_add = st.columns([1, 1, 2])
     view_arc = st.session_state.get('view_archive', False)
 
-    if c_n1.button("📂 En Cours", use_container_width=True, type="primary" if not view_arc else "secondary"):
+    if c_n1.button("📂 En Cours", use_container_width=True, type="secondary" if view_arc else "primary"):
         st.session_state.view_archive = False
         st.rerun()
     if c_n2.button("🗄️ Archives", use_container_width=True, type="primary" if view_arc else "secondary"):
         st.session_state.view_archive = True
         st.rerun()
     
+    # Ce bouton utilisera maintenant le style VERT défini au-dessus
     if c_add.button("➕ NOUVELLE MISSION", type="primary", use_container_width=True):
         new_row = pd.DataFrame([{
             "Prénom": "", "Nom": "", "Société": "PARTICULIER", 
@@ -168,11 +181,11 @@ if st.session_state.page == "CONTACTS":
             "Paiement": "Non payé", "DateNav": "01/01/2026", 
             "Prix": "0", "NbreJours": "1", "NbrePers": "1", "Notes": ""
         }])
-        # Insertion en haut de liste
         df_c = pd.concat([new_row, df_c], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.session_state.edit_idx = 0 
         st.rerun()
+  
 
     st.divider()
 
