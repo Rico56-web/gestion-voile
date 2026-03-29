@@ -570,6 +570,11 @@ if st.session_state.page == "STATS":
 if st.session_state.page == "MAINT":
     st.title("🔧 Maintenance Vesta")
 
+# TEST DE LECTURE DIRECTE
+if os.path.exists('maintenance.json'):
+    with open('maintenance.json', 'r', encoding='utf-8') as f:
+        debug_content = f.read()
+    st.text(f"Contenu réel du fichier : {debug_content}") # <--- AFFICHE ÇA
     # 1. CHARGEMENT
     m_data = []
     if os.path.exists('maintenance.json'):
