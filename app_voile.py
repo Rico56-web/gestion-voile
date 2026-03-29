@@ -499,15 +499,16 @@ if st.session_state.page == "STATS":
     df_st = df_c.copy()
     df_st['PrixNum'] = df_st['Prix'].apply(clean_price)
 
-    # --- 2. FILTRES DE CALCUL ---
-    # On cherche tout ce qui contient "PAYÉ" (insensible à la casse)
-    mask_paye = df_st['Paiement'].astype(str).str.contains("PAYÉ", case=False, na=False)
+# --- 2. CALCULS STRICTS ---
+    # On ne prend QUE les lignes où la colonne 'Paiement' est EXACTEMENT "Payé"
+    # On évite les "contient" qui pourraient attraper "Non payé" par erreur
+    mask_paye = df_st['Paiement'].astype(str).apply(lambda x: x.strip().upper() == "PAYÉ")
     df_paye = df_st[mask_paye]
     
     total_encaisse = df_paye['PrixNum'].sum()
 
-    # --- 3. AFFICHAGE DES CHIFFRES ---
-    st.metric("💰 TOTAL ENCAISSÉ", f"{total_encaisse:,.2f} €".replace(",", " "))
+    # --- 3. AFFICHAGE ---
+    st.metric("💰 TOTAL ENCAISSÉ (REEL)", f"{total_encaisse:,.2f} €".replace(",", " "))
     
     if total_encaisse != 1509:
         st.error(f"⚠️ Écart détecté ! Tu attends 1509 €, l'app calcule {total_encaisse:,.2f} €.")
