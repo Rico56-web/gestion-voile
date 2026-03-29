@@ -572,62 +572,72 @@ if st.session_state.page == "STATS":
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
 # =================================================================
+import streamlit as st
+import pandas as pd
+import json
+import os
+from datetime import datetime
+
+# --- 1. FONCTIONS DE GESTION DU FICHIER ---
+def charger_maint():
+    if not os.path.exists('maintenance.json'):
+        with open('maintenance.json', 'w') as f:
+            json.dump([], f)
+    with open('maintenance.json', 'r') as f:
+        return json.load(f)
+
+def sauvegarder_maint(data):
+    with open('maintenance.json', 'w') as f:
+        json.dump(data, f, indent=4)
+
 if st.session_state.page == "MAINTENANCE":
-    st.title("🔧 Maintenance & Technique")
+    st.title("🔧 Carnet d'Entretien")
 
-    # --- 1. CHARGEMENT ET NETTOYAGE ---
-    # On travaille sur une copie propre
-    df_m = df_c.copy()
+    # --- 2. CHARGEMENT ---
+    data_m = charger_maint()
+    df_m = pd.DataFrame(data_m)
 
-    # Fonction pour nettoyer les prix (Gère les 178€ qu'ils soient en texte ou nombre)
-    def clean_price(val):
-        try:
-            if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
-            s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
-            return float(s.replace(",", "."))
-        except: return 0.0
-
-    # --- 2. FILTRAGE RIGOUREUX ---
-    # On cherche 'MAINTENANCE' dans la colonne 'Société' 
-    # (Vérifie bien que c'est le mot que tu utilises dans ton JSON)
-    mask = df_m['Société'].str.contains("MAINTENANCE", case=False, na=False)
-    df_result = df_m[mask].copy()
-
-    # --- 3. AFFICHAGE ---
-    if not df_result.empty:
-        # On s'assure que la colonne Frais est bien traitée
-        total_frais = df_result['Frais'].apply(clean_price).sum()
+    # --- 3. RÉSUMÉ FINANCIER ---
+    if not df_m.empty:
+        total = pd.to_numeric(df_m['Montant'], errors='coerce').sum()
+        st.metric("🛠️ TOTAL DÉPENSES", f"{total:,.2f} €".replace(",", " "))
         
-        c1, c2 = st.columns(2)
-        c1.metric("🛠️ TOTAL FRAIS", f"{total_frais:,.0f} €")
-        
-        # Compteur de tâches à faire
-        a_faire = len(df_result[df_result['Statut'].str.upper() != "OK"])
-        c2.metric("⚠️ EN COURS", a_faire)
-
-        st.divider()
-
-        # Tableau pour iPhone (on ne garde que l'essentiel pour que ça rentre)
-        # On ajoute 'Commentaires' si tu veux voir tes notes
-        colonnes_mobiles = ['DateNav', 'Nom', 'Statut', 'Frais', 'Commentaires']
-        
-        # Sécurité : On vérifie que ces colonnes existent avant d'afficher
-        cols_existantes = [c for c in colonnes_mobiles if c in df_result.columns]
-        
-        st.table(df_result[cols_existantes].rename(columns={
-            'DateNav': 'Date',
-            'Nom': 'Objet',
-            'Statut': 'État',
-            'Frais': 'Coût'
-        }))
+        st.subheader("📋 Historique")
+        # Affichage du tableau (ordre chronologique inverse pour voir le plus récent en haut)
+        df_visu = df_m[['Date', 'Type', 'Objet', 'Montant', 'Statut']].copy()
+        st.table(df_visu.iloc[::-1]) # Inversion pour iPhone
     else:
-        st.error("Désolé, aucune ligne 'MAINTENANCE' trouvée dans le fichier.")
-        
-        # --- DEBUG VISUEL (Pour t'aider à comprendre pourquoi c'est vide) ---
-        with st.expander("🔍 Debug : Pourquoi est-ce vide ?"):
-            st.write("Voici les noms de Sociétés détectés dans ton fichier :")
-            st.write(df_m['Société'].unique())
-            st.write("Vérifie si 'MAINTENANCE' est écrit différemment.")
+        st.info("Aucune dépense ou intervention enregistrée.")
+
+    st.divider()
+
+    # --- 4. FORMULAIRE D'AJOUT (INTERVENTION OU ACHAT) ---
+    with st.expander("➕ Nouvelle Intervention / Achat"):
+        with st.form("form_maint_new"):
+            col1, col2 = st.columns(2)
+            f_date = col1.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
+            f_type = col2.selectbox("Type", ["Achat", "Intervention", "Taxe"])
+            
+            f_objet = st.text_input("Désignation (ex: Vidange, Drisse, Taxe annuelle)")
+            f_montant = st.number_input("Montant (€)", min_value=0.0, step=1.0)
+            f_statut = st.selectbox("État", ["OK", "À faire", "Commandé"])
+            f_notes = st.text_area("Commentaires / Références")
+            
+            submit = st.form_submit_button("Enregistrer")
+            
+            if submit:
+                nouvel_item = {
+                    "Date": f_date,
+                    "Type": f_type,
+                    "Objet": f_objet,
+                    "Montant": f_montant,
+                    "Statut": f_statut,
+                    "Notes": f_notes
+                }
+                data_m.append(nouvel_item)
+                sauvegarder_maint(data_m)
+                st.success("Enregistré avec succès !")
+                st.rerun() # Rafraîchit la page pour afficher le tableau à jour
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
