@@ -141,13 +141,13 @@ if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta - Missions")
     import html
 
-    # --- 1. NETTOYAGE STRICT ---
+    # --- 1. FONCTION DE NETTOYAGE ---
     def safe(val):
         v = str(val).strip()
         if v.lower() in ["none", "nan", "", "null", "undefined"]: return ""
         return html.escape(v).replace("\n", " ").replace("\r", "")
 
-    # --- 2. BARRE D'ACTION (EN HAUT) ---
+    # --- 2. NAVIGATION ET AJOUT (EN HAUT) ---
     c_n1, c_n2, c_add = st.columns([1, 1, 2])
     view_arc = st.session_state.get('view_archive', False)
 
@@ -159,8 +159,7 @@ if st.session_state.page == "CONTACTS":
         st.rerun()
     
     if c_add.button("➕ NOUVELLE MISSION", type="primary", use_container_width=True):
-        # Insertion à l'index 0 pour apparaître en haut de liste
-        new_row = pd.DataFrame([{"Prénom": "Nouveau", "Nom": "Contact", "Statut": "En attente", "Paiement": "Non payé", "DateNav": "01/01/2026", "Prix": "0"}])
+        new_row = pd.DataFrame([{"Prénom": "", "Nom": "", "Société": "", "Téléphone": "", "Email": "", "Statut": "En attente", "Paiement": "Non payé", "DateNav": "01/01/2026", "Prix": "0", "Notes": ""}])
         df_c = pd.concat([new_row, df_c], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.session_state.edit_idx = 0 
@@ -175,7 +174,7 @@ if st.session_state.page == "CONTACTS":
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # Variables nettoyées
+        # Données pour la fiche
         p_nom = safe(r.get('Prénom'))
         n_nom = safe(r.get('Nom')).upper()
         nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche #{num_f}"
@@ -183,16 +182,19 @@ if st.session_state.page == "CONTACTS":
         tel = safe(r.get('Téléphone')).replace(" ", "")
         mail = safe(r.get('Email'))
         note = safe(r.get('Notes'))
-        prix = safe(r.get('Prix'))
-        date = safe(r.get('DateNav'))
+        prix = safe(r.get('Prix')) or "0"
+        date = safe(r.get('DateNav')) or "--/--/--"
         
         # Statuts et Couleurs
         s_val = safe(r.get('Statut')) or "ATTENTE"
         s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
+        # Spécificité CMN en bleu
+        if "CMN" in soc.upper(): s_col = "#3498db"
+        
         p_val = safe(r.get('Paiement')) or "NON PAYÉ"
         p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
 
-        # --- CONSTRUCTION DU HTML (SANS ESPACES POUR ÉVITER LE BUG DIV) ---
+        # --- CONSTRUCTION DU HTML (SANS ESPACES) ---
         card_html = (
             f'<div style="border:2px solid #1a2a6c;border-radius:12px;padding:15px;margin-bottom:8px;background:white;color:black;">'
             f'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'
@@ -211,13 +213,12 @@ if st.session_state.page == "CONTACTS":
             f'<a href="mailto:{mail}" style="flex:1;background:#e67e22;color:white !important;padding:12px 5px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.8rem;font-weight:bold;">📧 MAIL</a>'
             f'</div></div>'
         )
-        
         st.markdown(card_html, unsafe_allow_html=True)
 
-        # --- ACTIONS LOCALES (SOUS CHAQUE FICHE) ---
+        # --- ACTIONS LOCALES ---
         c_ed, c_del = st.columns([1, 3])
         
-        if c_ed.button(f"✏️ {num_f}", key=f"ed_{i}", use_container_width=True):
+        if c_ed.button(f"✏️ Modifier {num_f}", key=f"ed_{i}", use_container_width=True):
             st.session_state.edit_idx = i
             st.rerun()
             
@@ -225,32 +226,56 @@ if st.session_state.page == "CONTACTS":
             st.session_state.confirm_del_idx = i
             st.rerun()
 
-        # FORMULAIRE D'ÉDITION LOCAL
+        # --- FORMULAIRE D'ÉDITION COMPLET ---
         if st.session_state.get('edit_idx') == i:
-            with st.expander(f"⚙️ Modification #{num_f}", expanded=True):
+            with st.expander(f"⚙️ ÉDITION COMPLÈTE - FICHE #{num_f}", expanded=True):
                 with st.form(f"f_edit_{i}"):
-                    u_statut = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=0)
-                    u_pay = st.selectbox("Paiement", ["Non payé", "Payé"], index=0)
-                    u_note = st.text_area("Notes", value=r.get('Notes', ''))
-                    if st.form_submit_button("Sauvegarder ✅"):
-                        df_c.at[i, 'Statut'] = u_statut
-                        df_c.at[i, 'Paiement'] = u_pay
+                    col1, col2 = st.columns(2)
+                    u_pre = col1.text_input("Prénom", value=r.get('Prénom', ''))
+                    u_nom = col2.text_input("Nom", value=r.get('Nom', ''))
+                    u_soc = col1.text_input("Société", value=r.get('Société', ''))
+                    u_tel = col2.text_input("Téléphone", value=r.get('Téléphone', ''))
+                    u_mai = col1.text_input("Email", value=r.get('Email', ''))
+                    u_dat = col2.text_input("Date (JJ/MM/AAAA)", value=r.get('DateNav', ''))
+                    
+                    col3, col4 = st.columns(2)
+                    u_prix = col3.text_input("Prix (€)", value=r.get('Prix', '0'))
+                    u_stat = col4.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], 
+                                            index=["En attente", "OK", "Terminé", "Refusé"].index(s_val) if s_val in ["En attente", "OK", "Terminé", "Refusé"] else 0)
+                    u_paye = col3.selectbox("Paiement", ["Non payé", "Payé"], index=1 if "PAYÉ" in p_val.upper() else 0)
+                    
+                    u_note = st.text_area("Notes particulières", value=r.get('Notes', ''))
+                    
+                    b_save, b_ann = st.columns(2)
+                    if b_save.form_submit_button("✅ ENREGISTRER", use_container_width=True):
+                        df_c.at[i, 'Prénom'] = u_pre
+                        df_c.at[i, 'Nom'] = u_nom
+                        df_c.at[i, 'Société'] = u_soc
+                        df_c.at[i, 'Téléphone'] = u_tel
+                        df_c.at[i, 'Email'] = u_mai
+                        df_c.at[i, 'DateNav'] = u_dat
+                        df_c.at[i, 'Prix'] = u_prix
+                        df_c.at[i, 'Statut'] = u_stat
+                        df_c.at[i, 'Paiement'] = u_paye
                         df_c.at[i, 'Notes'] = u_note
                         sauvegarder_data(df_c, "contacts.json")
                         st.session_state.edit_idx = None
                         st.rerun()
+                    
+                    if b_ann.form_submit_button("❌ ANNULER", use_container_width=True):
+                        st.session_state.edit_idx = None
+                        st.rerun()
 
-        # CONFIRMATION DE SUPPRESSION LOCALE
+        # --- CONFIRMATION SUPPRESSION ---
         if st.session_state.get('confirm_del_idx') == i:
-            st.error(f"Supprimer la fiche #{num_f} ?")
+            st.error(f"Supprimer la mission #{num_f} ?")
             col_y, col_n = st.columns(2)
-            if col_y.button("OUI ✅", key=f"y_{i}", use_container_width=True):
-                # Suppression par l'index original
+            if col_y.button("OUI, SUPPRIMER ✅", key=f"y_{i}", use_container_width=True):
                 df_c = df_c.drop(i).reset_index(drop=True)
                 sauvegarder_data(df_c, "contacts.json")
                 st.session_state.confirm_del_idx = None
                 st.rerun()
-            if col_n.button("NON ❌", key=f"n_{i}", use_container_width=True):
+            if col_n.button("NON, GARDER ❌", key=f"n_{i}", use_container_width=True):
                 st.session_state.confirm_del_idx = None
                 st.rerun()
 # =================================================================
