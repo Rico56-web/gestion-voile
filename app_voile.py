@@ -567,65 +567,52 @@ if st.session_state.page == "STATS":
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION FINALE SÉCURISÉE) ---
 # =================================================================
-# =================================================================
-# --- 8. PAGE MAINTENANCE (SANS FORMULAIRE - ULTRA FIABLE) ---
-# =================================================================
 if st.session_state.page == "MAINT":
     st.title("🔧 Maintenance Vesta")
 
     # 1. CHARGEMENT
-    if not os.path.exists('maintenance.json'):
-        with open('maintenance.json', 'w', encoding='utf-8') as f:
-            json.dump([], f)
-    
-    try:
-        with open('maintenance.json', 'r', encoding='utf-8') as f:
-            m_data = json.load(f)
-    except:
-        m_data = []
+    m_data = []
+    if os.path.exists('maintenance.json'):
+        try:
+            with open('maintenance.json', 'r', encoding='utf-8') as f:
+                content = f.read()
+                if content:
+                    m_data = json.loads(content)
+        except Exception as e:
+            st.error(f"Erreur lecture : {e}")
 
-    # 2. SAISIE DIRECTE (SANS ST.FORM)
+    # 2. SAISIE
     st.subheader("➕ Ajouter un frais")
-    f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
-    f_obj = st.text_input("Objet (ex: Taxes 178€)")
-    f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0)
+    f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"), key="date_in")
+    f_obj = st.text_input("Objet (ex: Taxes)", key="obj_in")
+    f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0, key="mt_in")
     
-    # Bouton direct
-    if st.button("💾 ENREGISTRER DANS LE FICHIER"):
-        if f_obj:
+    if st.button("💾 BOUTON FORCE : ENREGISTRER"):
+        if not f_obj:
+            st.warning("L'objet est vide !")
+        else:
             try:
+                # Création de la ligne
                 nouvelle_ligne = {"Date": f_date, "Objet": f_obj, "Montant": float(f_mt), "Statut": "OK"}
                 m_data.append(nouvelle_ligne)
                 
-                # Écriture forcée
+                # TEST D'ÉCRITURE
+                st.write("Tentative d'écriture en cours...")
+                
                 with open('maintenance.json', 'w', encoding='utf-8') as f:
                     json.dump(m_data, f, indent=4, ensure_ascii=False)
                 
-                st.success("✅ Enregistré avec succès !")
-                # On attend une seconde avant de recharger pour être sûr que l'iPhone a vu le message
+                st.balloons() # Si tu vois les ballons, c'est que c'est passé !
+                st.success(f"BRAVO ! Enregistré : {f_obj}")
+                
+                # Pause forcée pour laisser l'iPhone respirer avant le rerun
+                import time
+                time.sleep(1)
                 st.rerun()
+                
             except Exception as e:
-                st.error(f"Erreur d'écriture : {e}")
-        else:
-            st.warning("Indiquez l'objet (ex: Taxes).")
-
-    st.divider()
-
-    # 3. AFFICHAGE
-    if m_data:
-        total_m = sum(float(i.get('Montant', 0)) for i in m_data)
-        st.metric("TOTAL CUMULÉ", f"{total_m:.2f} €")
-        
-        for index, item in enumerate(reversed(m_data)):
-            real_index = len(m_data) - 1 - index
-            with st.expander(f"{item['Date']} - {item['Objet']} ({item['Montant']}€)"):
-                if st.button("🗑️ Supprimer", key=f"del_{real_index}"):
-                    m_data.pop(real_index)
-                    with open('maintenance.json', 'w', encoding='utf-8') as f:
-                        json.dump(m_data, f, indent=4)
-                    st.rerun()
-    else:
-        st.info("Le fichier maintenance.json est vide.")
+                st.error("❌ ERREUR CRITIQUE D'ÉCRITURE :")
+                st.code(str(e)) # Affiche l'erreur technique exacte
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
