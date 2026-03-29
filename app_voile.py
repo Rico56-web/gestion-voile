@@ -606,11 +606,10 @@ if st.session_state.page == "STATS":
 if st.session_state.page == "MAINT":
     st.title("🔧 Maintenance Vesta")
 
-    # 1. CHARGEMENT VIA GITHUB (Pour la permanence)
-    file_path = 'maintenance.json'
-    df_m = charger_data(file_path)
+    # 1. CHARGEMENT VIA GITHUB
+    file_path_m = 'maintenance.json'
+    df_m = charger_data(file_path_m)
     
-    # Si le fichier est vide ou n'existe pas, on crée la structure
     if df_m.empty:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut"])
 
@@ -622,22 +621,19 @@ if st.session_state.page == "MAINT":
         
         if st.button("💾 ENREGISTRER SUR GITHUB", type="primary", use_container_width=True):
             if f_obj:
-                # Création de la nouvelle ligne
                 nouvelle_ligne = pd.DataFrame([{
                     "Date": f_date,
                     "Objet": f_obj,
                     "Montant": float(f_mt),
                     "Statut": "OK"
                 }])
-                
-                # Ajout au DataFrame existant
                 df_m = pd.concat([df_m, nouvelle_ligne], ignore_index=True)
                 
-                # SAUVEGARDE PERMANENTE SUR GITHUB
-                sauvegarder_data(df_m, file_path)
+                # SAUVEGARDE SUR GITHUB
+                sauvegarder_data(df_m, file_path_m)
                 
                 st.balloons()
-                st.success(f"Enregistré : {f_obj} ({f_mt}€)")
+                st.success(f"Enregistré : {f_obj}")
                 time.sleep(1)
                 st.rerun()
             else:
@@ -647,185 +643,43 @@ if st.session_state.page == "MAINT":
 
     # 3. AFFICHAGE DE L'HISTORIQUE
     if not df_m.empty:
-        # Calcul du total depuis le DataFrame
-        total_frais = df_m['Montant'].astype(float).sum()
+        total_frais = pd.to_numeric(df_m['Montant'], errors='coerce').sum()
         st.metric("TOTAL CUMULÉ 2026", f"{total_frais:.2f} €")
 
-        st.subheader("📋 Historique des interventions")
-        
-        # Affichage inversé (plus récent en haut)
         for index, item in df_m.iloc[::-1].iterrows():
             with st.expander(f"📅 {item['Date']} - {item['Objet']} ({item['Montant']}€)"):
-                if st.button(f"🗑️ Supprimer cette ligne", key=f"del_m_{index}", use_container_width=True):
+                if st.button(f"🗑️ Supprimer", key=f"del_m_{index}", use_container_width=True):
                     df_m = df_m.drop(index).reset_index(drop=True)
-                    sauvegarder_data(df_m, file_path) # Sauvegarde après suppression
+                    sauvegarder_data(df_m, file_path_m)
                     st.rerun()
 
-    # --- 4. ZONE DE DANGER : VIDER TOUT ---
+    # 4. ZONE DE DANGER
     st.write("---")
     with st.expander("⚠️ Zone de Danger"):
-        if st.checkbox("Confirmer la suppression de TOUS les frais"):
-            if st.button("🔴 VIDER TOUT LE FICHIER", type="primary", use_container_width=True):
+        if st.checkbox("Confirmer la suppression totale"):
+            if st.button("🔴 VIDER LE FICHIER", type="primary", use_container_width=True):
                 df_vide = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut"])
-                sauvegarder_data(df_vide, file_path)
+                sauvegarder_data(df_vide, file_path_m)
                 st.rerun()
 
-# --- 11. PAGE LIVRE DE BORD (LOG) ---
+# =================================================================
+# --- 9. PAGE LOG (CONSULTATION DES ARCHIVES) ---
+# =================================================================
 elif st.session_state.page == "LOG":
-    st.subheader("📖 Livre de Bord")
+    st.title("📂 Archives & Logs")
     
-    # 1. Initialisation des états
-    if "log_edit_idx" not in st.session_state: st.session_state.log_edit_idx = None
-    if "log_confirm_del" not in st.session_state: st.session_state.log_confirm_del = None
-
-    # 2. Chargement des données
-    df_log = charger_data("logbook.json")
-
-    # 3. Nettoyage automatique des doublons (Sécurité)
-    if not df_log.empty:
-        avant = len(df_log)
-        df_log = df_log.drop_duplicates(subset=['Date', 'PortDep', 'MotArr'], keep='first')
-        if len(df_log) != avant:
-            sauvegarder_data(df_log, "logbook.json")
-
-# 4. Statistiques et Totalisateurs (Calculés à partir du 21/02)
-    if not df_log.empty:
-        # --- CONFIGURATION INITIALE (VALEURS AU 21/02) ---
-        # Remplacez ces chiffres par les vrais relevés de vos compteurs ce jour-là
-        MILLES_INITIAUX = 0.0  
-        HEURES_INITIALES = 0.0 
-
-        # Conversion des colonnes en numérique pour éviter les erreurs
-        df_log['TotalMil'] = pd.to_numeric(df_log['TotalMil'], errors='coerce').fillna(0)
-        df_log['TotalMot'] = pd.to_numeric(df_log['TotalMot'], errors='coerce').fillna(0)
-        df_log['MotArr'] = pd.to_numeric(df_log['MotArr'], errors='coerce').fillna(0)
-        df_log['MilArr'] = pd.to_numeric(df_log['MilArr'], errors='coerce').fillna(0)
-
-        # Calcul du cumul saison (Somme de toutes les navigations enregistrées)
-        cumul_milles_saison = df_log['TotalMil'].sum()
-        cumul_heures_saison = df_log['TotalMot'].sum()
-        
-        # Calcul des Totalisateurs réels (Valeur initiale + Cumul saison)
-        total_milles_bateau = MILLES_INITIAUX + cumul_milles_saison
-        total_heures_bateau = HEURES_INITIALES + cumul_heures_saison
-
-        st.markdown(f"""
-            <div style="background:#1a2a6c; color:white; padding:15px; border-radius:10px; margin-bottom:20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                <div style="text-align:center; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:10px; margin-bottom:10px;">
-                    🚢 <b>VESTA SKIPPER 2026 - ÉTAT DES COMPTEURS</b>
-                </div>
-                <div style="display: flex; justify-content: space-around; text-align:center;">
-                    <div>
-                        <small>CUMUL DEPUIS LE 21/02</small><br>
-                        <span style="font-size:1.2rem;"><b>{cumul_milles_saison:.1f} MN</b> | <b>{cumul_heures_saison:.1f} h</b></span>
-                    </div>
-                    <div style="border-left: 1px solid rgba(255,255,255,0.3); padding-left:20px;">
-                        <small>TOTALISATEURS GÉNÉRAUX</small><br>
-                        <span style="font-size:1.2rem;"><b>{total_milles_bateau:.1f} MN</b> | <b>{total_heures_bateau:.1f} h</b></span>
-                    </div>
-                </div>
-                <div style="text-align:center; font-size:0.7rem; margin-top:10px; opacity:0.8;">
-                    Valeurs initiales au 21/02 : {MILLES_INITIAUX} MN / {HEURES_INITIALES} h
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-
-    # 5. Mode Édition ou Nouvelle Entrée
-    is_editing = st.session_state.log_edit_idx is not None
-    if is_editing:
-        idx = st.session_state.log_edit_idx
-        r_data = df_log.loc[idx]
-        titre_form = "📝 MODIFIER LA NAVIGATION"
-        bouton_label = "💾 ENREGISTRER LES MODIFICATIONS"
+    annee_actuelle = datetime.now().year
+    nom_archive = f"archives_{annee_actuelle}.json"
+    
+    df_arch = charger_data(nom_archive)
+    
+    if not df_arch.empty:
+        st.write(f"### 📋 Missions Archivées {annee_actuelle}")
+        st.dataframe(df_arch, use_container_width=True)
     else:
-        r_data = None
-        titre_form = "➕ NOUVELLE NAVIGATION"
-        bouton_label = "💾 ENREGISTRER AU LIVRE DE BORD"
+        st.info("Aucune archive trouvée pour cette saison.")
 
-    with st.expander(titre_form, expanded=is_editing):
-        c1, c2 = st.columns(2)
-        l_date = c1.text_input("Date", value=safe_get(r_data, 'Date') if is_editing else datetime.now().strftime("%d/%m/%Y"))
-        l_meteo = c2.text_input("Météo (Vent/Mer)", value=safe_get(r_data, 'Meteo') if is_editing else "")
-
-        st.divider()
-        col_dep, col_arr = st.columns(2)
-        
-        with col_dep:
-            st.markdown("### 🛫 Départ")
-            l_port_dep = st.text_input("Port de départ", value=safe_get(r_data, 'PortDep') if is_editing else "")
-            val_mot_dep = float(r_data['MotDep']) if (is_editing and 'MotDep' in r_data) else 0.0
-            val_mil_dep = float(r_data['MilDep']) if (is_editing and 'MilDep' in r_data) else 0.0
-            l_mot_dep = st.number_input("Compteur Moteur Départ (h)", value=val_mot_dep, step=0.1, key="md_input")
-            l_mil_dep = st.number_input("Compteur Milles Départ (MN)", value=val_mil_dep, step=0.1, key="ld_input")
-            
-        with col_arr:
-            st.markdown("### 🛬 Arrivée")
-            l_port_arr = st.text_input("Port d'arrivée", value=safe_get(r_data, 'PortArr') if is_editing else "")
-            val_mot_arr = float(r_data['MotArr']) if (is_editing and 'MotArr' in r_data) else 0.0
-            val_mil_arr = float(r_data['MilArr']) if (is_editing and 'MilArr' in r_data) else 0.0
-            l_mot_arr = st.number_input("Compteur Moteur Arrivée (h)", value=val_mot_arr, step=0.1, key="ma_input")
-            l_mil_arr = st.number_input("Compteur Milles Arrivée (MN)", value=val_mil_arr, step=0.1, key="la_input")
-
-        st.divider()
-        diff_mot = round(l_mot_arr - l_mot_dep, 1)
-        diff_mil = round(l_mil_arr - l_mil_dep, 1)
-        
-        st.info(f"✨ **Calcul automatique :** +{diff_mot} h moteur | +{diff_mil} MN parcourus")
-        l_obs = st.text_area("Observations", value=safe_get(r_data, 'Observations') if is_editing else "")
-        
-        c_save, c_annul = st.columns(2)
-        if c_save.button(bouton_label, type="primary", use_container_width=True):
-            entree = {
-                "Date": l_date, "Meteo": l_meteo, 
-                "PortDep": l_port_dep, "PortArr": l_port_arr,
-                "MotDep": l_mot_dep, "MotArr": l_mot_arr, 
-                "MilDep": l_mil_dep, "MilArr": l_mil_arr,
-                "TotalMot": diff_mot, "TotalMil": diff_mil, 
-                "Observations": l_obs
-            }
-            if is_editing:
-                for k, v in entree.items(): df_log.at[idx, k] = v
-            else:
-                df_log = pd.concat([pd.DataFrame([entree]), df_log], ignore_index=True)
-            
-            sauvegarder_data(df_log, "logbook.json")
-            st.session_state.log_edit_idx = None
-            st.success("Enregistré !"); time.sleep(0.5); st.rerun()
-            
-        if is_editing and c_annul.button("❌ ANNULER", use_container_width=True):
-            st.session_state.log_edit_idx = None; st.rerun()
-
-    st.markdown("---")
-
-    # 6. Affichage de l'Historique
-    if not df_log.empty:
-        for i, e in df_log.iterrows():
-            # Détection CMN pour couleur bleue
-            is_cmn = "CMN" in str(safe_get(e, 'PortDep')).upper() or "CMN" in str(safe_get(e, 'PortArr')).upper()
-            color_border = "#0055ff" if is_cmn else "#1a2a6c"
-            bg_card = "#f0f8ff" if is_cmn else "#ffffff"
-
-            st.markdown(f"""
-            <div style="background:{bg_card}; padding:15px; border-radius:10px; border:1px solid #ddd; border-left:8px solid {color_border}; margin-bottom:10px;">
-                <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding-bottom:5px;">
-                    <span style="font-weight:bold; color:#1a2a6c;">📅 {safe_get(e, 'Date')}</span>
-                    <span style="color:{color_border}; font-weight:bold;">📍 {safe_get(e, 'PortDep')} ➜ {safe_get(e, 'PortArr')}</span>
-                </div>
-                <div style="margin-top:10px; font-size:0.9rem;">
-                    ☁️ {safe_get(e, 'Meteo')} | ⚙️ <b>+{safe_get(e, 'TotalMot')}h</b> | ⛵ <b>+{safe_get(e, 'TotalMil')} MN</b>
-                </div>
-                <div style="margin-top:5px; font-size:0.85rem; color:#666; font-style:italic;">"{safe_get(e, 'Observations')}"</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Actions
-            c1, c2 = st.columns(2)
-            if c1.button("📝 MODIFIER", key=f"ed_l_{i}", use_container_width=True):
-                st.session_state.log_edit_idx = i; st.rerun()
-            if c2.button("🗑️ SUPPRIMER", key=f"del_l_{i}", use_container_width=True):
-                df_log = df_log.drop(i); sauvegarder_data(df_log, "logbook.json"); st.rerun()
-    else:
-        st.info("Aucun trajet dans le livre de bord.")
+# --- FIN DU FICHIER ---
         
 
 
