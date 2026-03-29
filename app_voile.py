@@ -514,7 +514,7 @@ if st.session_state.page == "STATS":
     
      # --- 3. PRÉPARATION DES FRAIS (Maintenance.json) ---
     try:
-        with open('maintenance.json', 'r') as f:
+         with open('maintenance.json', 'r', encoding='utf-8') as f:
             m_data = json.load(f)
         df_maint_stats = pd.DataFrame(m_data)
         
