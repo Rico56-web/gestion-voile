@@ -481,94 +481,59 @@ elif st.session_state.page == "PLANNING":
 # =================================================================
 # --- 7. PAGE STATS (VERSION FINALE VALIDÉE) ---
 # ================================================================
-elif st.session_state.page == "STATS":
-    st.subheader("📊 Bilan & Performance Vesta 2026")
+if st.session_state.page == "STATS":
+    st.title("📊 Vesta - Statistiques 2026")
 
-    # 1. CHARGEMENT DU BON FICHIER
-    try:
-        df_m_stats = pd.read_json("maintenance.json")
-    except:
-        df_m_stats = pd.DataFrame()
-
-    # Initialisation
-    m_noms_courts = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
-    stats_mois = {i: {"rec": 0.0, "pre": 0.0, "fra": 0.0} for i in range(1, 13)}
-
-    # 2. CALCULS REVENUS (Contacts)
-    for _, r in df_c.iterrows():
+    # --- 1. NETTOYAGE DES DONNÉES PRIX ---
+    # Cette fonction transforme "500 €" ou "500,00" en nombre 500.0
+    def clean_price(val):
         try:
-            statut = str(r.get('Statut', '')).lower()
-            if statut in ["refusé", "archivé"]: continue
-            p = float(str(r.get('Prix', '0')).replace('€','').replace(' ','').replace(',','.').strip() or 0)
-            p_val = str(r.get('Paiement', '')).lower()
-            is_paye = ("pay" in p_val) and not any(x in p_val for x in ["un", "non", "pas"])
-            d_str = str(r.get('DateNav', ''))
-            if '/' in d_str:
-                m_idx = int(d_str.split('/')[1])
-                if is_paye: stats_mois[m_idx]["rec"] += p
-                else: stats_mois[m_idx]["pre"] += p
-        except: continue
+            if not val or str(val).lower() == "nan": return 0.0
+            s = str(val).replace("€", "").replace(" ", "").replace(",", ".").strip()
+            return float(s)
+        except:
+            return 0.0
 
-    # 3. CALCULS FRAIS (Maintenance)
-    if not df_m_stats.empty:
-        for _, f in df_m_stats.iterrows():
-            try:
-                v_f = f.get('Montant', f.get('Prix', 0))
-                m_frais = float(str(v_f).replace('€','').replace(',','.').replace(' ','').strip() or 0)
-                dt_obj = pd.to_datetime(f.get('Date', ''), errors='coerce')
-                if pd.notnull(dt_obj):
-                    m_idx = dt_obj.month
-                    if 1 <= m_idx <= 12:
-                        stats_mois[m_idx]["fra"] += m_frais
-            except: continue
+    # Copie de travail pour ne pas abîmer le fichier original
+    df_stats = df_c.copy()
+    df_stats['PrixNum'] = df_stats['Prix'].apply(clean_price)
 
- # 4. CONSTRUCTION DU TABLEAU (Formatage 2 décimales)
-    data_table = []
-    for i in range(1, 13):
-        rec = round(stats_mois[i]["rec"], 2)
-        fra = round(stats_mois[i]["fra"], 2)
-        pre = round(stats_mois[i]["pre"], 2)
-        data_table.append({
-            "Mois": m_noms_courts[i-1],
-            "Recettes": rec,
-            "Prévisionnel": pre,
-            "Frais": fra,
-            "Solde Net": round(rec - fra, 2)
-        })
-    df_stats = pd.DataFrame(data_table)
+    # --- 2. CALCULS ---
+    # Encaisse Réelle = Tout ce qui est marqué "Payé"
+    df_paye = df_stats[df_stats['Paiement'].str.upper().contains("PAYÉ", na=False)]
+    total_encaisse = df_paye['PrixNum'].sum()
 
-    # --- FORCER L'ORDRE CHRONOLOGIQUE ---
-    df_stats['Mois'] = pd.Categorical(df_stats['Mois'], categories=m_noms_courts, ordered=True)
-    df_stats = df_stats.sort_values('Mois')
+    # En Attente = Statut "OK" mais "Non payé"
+    df_attente = df_stats[(df_stats['Statut'] == "OK") & (df_stats['Paiement'] != "Payé")]
+    total_attente = df_attente['PrixNum'].sum()
 
-    # 5. AFFICHAGE DES COURBES (Dans le bon ordre)
-    st.write("📈 **Évolution mensuelle (Janvier à Décembre)**")
-    df_graph = df_stats.set_index('Mois')[["Recettes", "Prévisionnel"]]
-    st.bar_chart(df_graph, color=["#27ae60", "#f1c40f"])
-
-    # 6. TABLEAU RÉCAPITULATIF
-    st.write("📋 **Détail financier par mois**")
-    st.dataframe(
-        df_stats, 
-        use_container_width=True, 
-        hide_index=True,
-        column_config={
-            "Recettes": st.column_config.NumberColumn(format="%.2f €"),
-            "Prévisionnel": st.column_config.NumberColumn(format="%.2f €"),
-            "Frais": st.column_config.NumberColumn(format="%.2f €"),
-            "Solde Net": st.column_config.NumberColumn(format="%.2f €")
-        }
-    )
-
-    # 7. BILAN GLOBAL (KPI)
-    st.divider()
-    t_rec = df_stats["Recettes"].sum()
-    t_fra = df_stats["Frais"].sum()
-    
+    # --- 3. AFFICHAGE DES INDICATEURS ---
     c1, c2, c3 = st.columns(3)
-    c1.metric("Encaissé", f"{t_rec:,.2f} €")
-    c2.metric("Total Frais", f"{t_fra:,.2f} €", delta=f"-{t_fra:,.2f}", delta_color="inverse")
-    c3.metric("SOLDE NET", f"{(t_rec - t_fra):,.2f} €")
+    
+    with c1:
+        st.metric("💰 ENCAISSÉ", f"{total_encaisse:,.2f} €".replace(",", " "))
+    with c2:
+        st.metric("⏳ EN ATTENTE", f"{total_attente:,.2f} €".replace(",", " "))
+    with c3:
+        st.metric("📈 MISSIONS OK", len(df_stats[df_stats['Statut'] == "OK"]))
+
+    st.divider()
+
+    # --- 4. DÉTAIL DES ENTRÉES (POUR CONTRÔLE) ---
+    st.subheader("🔍 Détail des paiements reçus")
+    if not df_paye.empty:
+        # On affiche uniquement les colonnes utiles pour vérifier le calcul
+        df_verif = df_paye[['DateNav', 'Société', 'Nom', 'Prix']].copy()
+        st.dataframe(df_verif, use_container_width=True, hide_index=True)
+        
+        st.info(f"Le total de **{total_encaisse:,.2f} €** est calculé sur ces {len(df_paye)} lignes.")
+    else:
+        st.warning("Aucun paiement marqué comme 'Payé' pour le moment.")
+
+    # --- 5. RÉPARTITION PAR SOCIÉTÉ (OPTIONNEL) ---
+    if st.checkbox("Voir la répartition par Société"):
+        repart = df_paye.groupby('Société')['PrixNum'].sum().sort_values(ascending=False)
+        st.bar_chart(repart)
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
