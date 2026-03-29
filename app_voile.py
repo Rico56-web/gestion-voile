@@ -731,7 +731,7 @@ if st.session_state.page == "FACTURES":
             
             texte_missions = "\n".join(lignes_missions)
 
-            destinataire = "tresorier@cmn-asso.fr"
+            destinataire = "tresorier@cmn-asso.fr","aurelienfaucheux@gmail.com"
             objet = f"Facturation Missions Vesta - {sel_mois} {sel_annee}"
             
             corps_mail = f"""Bonjour,  
