@@ -482,10 +482,10 @@ elif st.session_state.page == "PLANNING":
 # --- 7. PAGE STATS (VERSION FINALE VALIDÉE) ---
 # ================================================================
 if st.session_state.page == "STATS":
-    st.title("📊 Vesta - Pilotage Financier 2026")
+    st.title("📊 Vesta - Pilotage")
 
-    # --- 1. NETTOYAGE ET SÉCURISATION DES DONNÉES ---
-    def clean_price(val):
+    # --- 1. NETTOYAGE PRÉCIS ---
+    def clean_p(val):
         try:
             if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
             s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
@@ -493,62 +493,56 @@ if st.session_state.page == "STATS":
         except: return 0.0
 
     df_st = df_c.copy()
-    df_st['PrixNum'] = df_st['Prix'].apply(clean_price)
+    df_st['PrixNum'] = df_st['Prix'].apply(clean_p)
 
-    # --- 2. LOGIQUE DE FILTRAGE STRICTE ---
-    # Déjà payé (Argent en banque)
+    # --- 2. FILTRES STRICTS ---
+    # Uniquement ce qui est marqué "PAYÉ" exactement
     mask_paye = df_st['Paiement'].astype(str).apply(lambda x: x.strip().upper() == "PAYÉ")
     df_encaisse = df_st[mask_paye]
     
-    # Futur (Missions validées "OK" mais pas encore payées)
+    # Futur : Statut "OK" mais Pas Payé
     mask_futur = (df_st['Statut'].astype(str).str.upper() == "OK") & (~mask_paye)
     df_futur = df_st[mask_futur]
 
-    # --- 3. LES INDICATEURS CLÉS ---
-    c1, c2, c3 = st.columns(3)
-    total_r = df_encaisse['PrixNum'].sum()
-    total_f = df_futur['PrixNum'].sum()
+    # --- 3. RÉSUMÉ COMPACT (Metrics sur 2 colonnes pour iPhone) ---
+    tot_r = df_encaisse['PrixNum'].sum()
+    tot_f = df_futur['PrixNum'].sum()
     
-    with c1:
-        st.metric("💰 ENCAISSÉ (Réel)", f"{total_r:,.0f} €".replace(",", " "))
-    with c2:
-        st.metric("🕒 FUTUR (Validé)", f"{total_f:,.0f} €".replace(",", " "))
-    with c3:
-        st.metric("📈 TOTAL PRÉVU", f"{(total_r + total_f):,.0f} €".replace(",", " "))
+    c1, c2 = st.columns(2)
+    c1.metric("💰 REEL", f"{tot_r:,.0f}€")
+    c2.metric("🕒 FUTUR", f"{tot_f:,.0f}€")
+    st.write(f"**📈 TOTAL PRÉVU : {tot_r + tot_f:,.0f} €**")
 
     st.divider()
 
-    # --- 4. TABLEAU 1 : L'ENCAISSÉ (DÉBUT MARS) ---
-    st.subheader("✅ Détail de l'Encaissé (Payé)")
+    # --- 4. TABLEAU ENCAISSÉ (Colonnes réduites pour mobile) ---
+    st.subheader("✅ PAYÉ")
     if not df_encaisse.empty:
-        # On affiche les colonnes essentielles pour ton pointage
+        # On ne garde que Date, Nom et Prix pour gagner de la place
         st.dataframe(
-            df_encaisse[['DateNav', 'Société', 'Nom', 'Prix']], 
+            df_encaisse[['DateNav', 'Nom', 'Prix']], 
             use_container_width=True, 
             hide_index=True
         )
     else:
-        st.info("Aucun encaissement enregistré.")
+        st.info("Rien d'encaissé.")
 
-    st.divider()
-
-    # --- 5. TABLEAU 2 : LE FUTUR (À VENIR) ---
-    st.subheader("⏳ Détail du Futur (Attente Paiement)")
+    # --- 5. TABLEAU FUTUR ---
+    st.subheader("⏳ À VENIR (OK)")
     if not df_futur.empty:
         st.dataframe(
-            df_futur[['DateNav', 'Société', 'Nom', 'Prix']], 
+            df_futur[['DateNav', 'Nom', 'Prix']], 
             use_container_width=True, 
             hide_index=True
         )
-        st.warning(f"Il reste **{total_f:,.0f} €** à récupérer sur ces missions validées.")
     else:
-        st.success("Toutes les missions validées sont payées !")
+        st.success("Tout est payé !")
 
-    # --- 6. RÉPARTITION PAR SOCIÉTÉ (POUR TON ANALYSE) ---
-    if st.checkbox("Voir la force des apporteurs d'affaires"):
-        st.write("Répartition du CA Total (Encaissé + Futur) :")
-        ca_soc = df_st[mask_paye | mask_futur].groupby('Société')['PrixNum'].sum().sort_values()
-        st.bar_chart(ca_soc)
+    # --- 6. MINI GRAPHIQUE ---
+    if not df_st[mask_paye | mask_futur].empty:
+        st.write("📂 Par Société :")
+        ca_soc = df_st[mask_paye | mask_futur].groupby('Société')['PrixNum'].sum()
+        st.bar_chart(ca_soc, height=200) # Hauteur réduite pour mobile
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
