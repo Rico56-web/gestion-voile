@@ -656,6 +656,23 @@ if st.session_state.page == "MAINT":
                         st.rerun()
     else:
         st.info("Aucune donnée enregistrée dans maintenance.json.")
+        
+ # --- 4. ZONE DANGER : RÉINITIALISATION (Tout en bas) ---
+    st.write("---")
+    with st.expander("⚠️ Zone de Danger - Options Avancées"):
+        st.warning("Attention : Cette action est irréversible.")
+        
+        # Étape 1 : Cocher la case pour débloquer le bouton
+        confirm_check = st.checkbox("Je souhaite supprimer TOUT l'historique 2026")
+        
+        if confirm_check:
+            # Étape 2 : Cliquer sur le bouton qui apparaît
+            if st.button("🔴 VIDER MAINTENANCE.JSON", type="primary", use_container_width=True):
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump([], f)
+                st.success("L'historique a été vidé avec succès.")
+                time.sleep(1)
+                st.rerun()  
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
