@@ -492,56 +492,45 @@ if st.session_state.page == "STATS":
             return float(s.replace(",", "."))
         except: return 0.0
 
-    def get_month(date_str):
-        try:
-            parts = str(date_str).split('/')
-            if len(parts) >= 2:
-                m_num = int(parts[1])
-                months = ["Janv", "Févr", "Mars", "Avril", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"]
-                return f"{m_num:02d} - {months[m_num-1]}"
-        except: return "99 - Inconnu"
-        return "99 - Inconnu"
-
-    # Préparation
     df_st = df_c.copy()
     df_st['PrixNum'] = df_st['Prix'].apply(clean_p)
-    df_st['Mois'] = df_st['DateNav'].apply(get_month)
 
-    # --- 2. FILTRES STRICTS ---
+    # --- 2. FILTRES ---
+    # Payé
     mask_paye = df_st['Paiement'].astype(str).apply(lambda x: x.strip().upper() == "PAYÉ")
     df_encaisse = df_st[mask_paye]
     
+    # Futur (Statut OK mais Pas Payé)
     mask_futur = (df_st['Statut'].astype(str).str.upper() == "OK") & (~mask_paye)
-    df_futur = df_st[mask_futur]
+    df_futur = df_st[mask_futur][['DateNav', 'Nom', 'Prix']] # Sélection colonnes iPhone
 
-    # --- 3. RÉSUMÉ COMPACT (iPhone) ---
+    # --- 3. RÉSUMÉ COMPACT ---
     tot_r = df_encaisse['PrixNum'].sum()
-    tot_f = df_futur['PrixNum'].sum()
+    tot_f = df_futur['PrixNum'].sum() if not df_futur.empty else 0
     
     c1, c2 = st.columns(2)
     c1.metric("💰 REEL", f"{tot_r:,.0f}€")
     c2.metric("🕒 FUTUR", f"{tot_f:,.0f}€")
     st.write(f"**📈 TOTAL PRÉVU : {tot_r + tot_f:,.0f} €**")
 
-    st.divider() # <--- VERIFIEZ BIEN L'ALIGNEMENT ICI
+    st.divider()
 
-    # --- 4. VISION MENSUELLE ---
-    st.subheader("📅 Calendrier Mensuel")
-    df_plan = df_st[mask_paye | mask_futur]
-    if not df_plan.empty:
-        mensuel = df_plan.groupby('Mois').agg(CA=('PrixNum', 'sum'), Missions=('Nom', 'count')).sort_index()
-        st.table(mensuel.style.format({"CA": "{:.0f} €"}))
+    # --- 4. TABLEAU FUTUR (SANS ASCENSEUR) ---
+    st.subheader("⏳ À VENIR (OK)")
+    if not df_futur.empty:
+        # st.table affiche TOUTES les lignes d'un coup, idéal pour iPhone
+        st.table(df_futur)
     else:
-        st.info("Aucune donnée.")
+        st.success("Aucune mission en attente de paiement !")
 
     st.divider()
 
-    # --- 5. DÉTAIL DES MOIS (RÉDUIT MOBILE) ---
+    # --- 5. TABLEAU ENCAISSÉ (SANS ASCENSEUR) ---
     st.subheader("✅ PAYÉ")
-    st.dataframe(df_encaisse[['DateNav', 'Nom', 'Prix']], use_container_width=True, hide_index=True)
-
-    st.subheader("⏳ À VENIR (OK)")
-    st.dataframe(df_futur[['DateNav', 'Nom', 'Prix']], use_container_width=True, hide_index=True)
+    if not df_encaisse.empty:
+        st.table(df_encaisse[['DateNav', 'Nom', 'Prix']])
+    else:
+        st.info("Rien d'encaissé pour le moment.")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
