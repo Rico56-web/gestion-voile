@@ -489,7 +489,6 @@ if st.session_state.page == "STATS":
     def clean_val(val):
         try:
             if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
-            # Nettoyage des caractères non numériques pour le calcul
             s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
             return float(s.replace(",", "."))
         except: return 0.0
@@ -504,40 +503,43 @@ if st.session_state.page == "STATS":
         except: pass
         return 99, "99-Inconnu"
 
-    # --- 2. PRÉPARATION DES DONNÉES ---
+    # --- 2. PRÉPARATION DES REVENUS (Contacts) ---
     df_st = df_c.copy()
-    
-    # On s'assure que les colonnes de calcul existent
     df_st['PrixNum'] = df_st['Prix'].apply(clean_val) if 'Prix' in df_st.columns else 0.0
-    df_st['FraisNum'] = df_st['Frais'].apply(clean_val) if 'Frais' in df_st.columns else 0.0
-    
-    # Extraction du mois pour le groupement
     df_st['M_Sort'], df_st['Mois'] = zip(*df_st['DateNav'].apply(get_month_info))
 
-    # Masques de filtrage pour le CA (Uniquement validé ou payé)
-    mask_paye = df_st['Paiement'].astype(str).apply(lambda x: x.strip().upper() == "PAYÉ")
+    mask_paye = df_st['Paiement'].astype(str).str.upper().str.strip() == "PAYÉ"
     mask_ok = df_st['Statut'].astype(str).str.upper() == "OK"
-    
-    # On calcule le CA uniquement sur les missions confirmées
     df_st['CA_Calcul'] = df_st.where(mask_paye | mask_ok)['PrixNum'].fillna(0)
 
-    # --- 3. SYNTHÈSE MENSUELLE (SANS ASCENSEUR) ---
+    # --- 3. PRÉPARATION DES FRAIS (Maintenance.json) ---
+    try:
+        with open('maintenance.json', 'r') as f:
+            m_data = json.load(f)
+        df_maint_stats = pd.DataFrame(m_data)
+        # On extrait le mois des dates de maintenance (format JJ/MM/AAAA)
+        df_maint_stats['M_Sort'], df_maint_stats['Mois'] = zip(*df_maint_stats['Date'].apply(get_month_info))
+        df_maint_stats['FraisNum'] = df_maint_stats['Montant'].apply(clean_val)
+    except:
+        df_maint_stats = pd.DataFrame(columns=['M_Sort', 'Mois', 'FraisNum'])
+
+    # --- 4. SYNTHÈSE MENSUELLE COMBINÉE ---
     st.subheader("📅 Synthèse Mensuelle 2026")
     
-    # On groupe tout le fichier : les frais (maintenance) seront inclus automatiquement
-    mensuel = df_st.groupby(['M_Sort', 'Mois']).agg(
-        CA=('CA_Calcul', 'sum'),
-        Frais=('FraisNum', 'sum'),
-        Missions=('Nom', 'count')
-    ).reset_index().sort_values('M_Sort')
+    # Groupement CA
+    stats_ca = df_st.groupby(['M_Sort', 'Mois'])['CA_Calcul'].sum().reset_index()
+    # Groupement Frais
+    stats_fr = df_maint_stats.groupby(['M_Sort', 'Mois'])['FraisNum'].sum().reset_index()
     
+    # Fusion des deux tableaux
+    mensuel = pd.merge(stats_ca, stats_fr, on=['M_Sort', 'Mois'], how='outer').fillna(0)
+    mensuel.columns = ['M_Sort', 'Mois', 'CA', 'Frais']
+    mensuel = mensuel.sort_values('M_Sort')
     mensuel['Net'] = mensuel['CA'] - mensuel['Frais']
     
     if not mensuel.empty:
-        # Affichage du tableau de synthèse fixe pour iPhone
         st.table(mensuel[['Mois', 'CA', 'Frais', 'Net']].set_index('Mois').style.format("{:.0f} €"))
         
-        # Bilan Global
         t_ca, t_fr, t_nt = mensuel['CA'].sum(), mensuel['Frais'].sum(), mensuel['Net'].sum()
         st.info(f"**Bilan Global :** CA {t_ca:.0f}€ | Frais {t_fr:.0f}€ | **Net {t_nt:.0f}€**")
     else:
@@ -545,7 +547,7 @@ if st.session_state.page == "STATS":
 
     st.divider()
 
-    # --- 4. INDICATEURS DE TRÉSORERIE ---
+    # --- 5. INDICATEURS DE TRÉSORERIE (Uniquement Revenus) ---
     tot_r = df_st[mask_paye]['PrixNum'].sum()
     tot_f = df_st[mask_ok & (~mask_paye)]['PrixNum'].sum()
     
@@ -553,22 +555,9 @@ if st.session_state.page == "STATS":
     c1.metric("💰 ENCAISSÉ", f"{tot_r:,.0f}€")
     c2.metric("🕒 À VENIR", f"{tot_f:,.0f}€")
 
-    st.divider()
-
-    # --- 5. DÉTAILS COMPLETS (SANS ASCENSEUR) ---
+    # --- 6. DÉTAILS ---
     st.subheader("⏳ À VENIR (OK)")
-    df_f_disp = df_st[mask_ok & (~mask_paye)][['DateNav', 'Nom', 'Prix']]
-    if not df_f_disp.empty:
-        st.table(df_f_disp)
-    else:
-        st.write("Rien en attente.")
-
-    st.subheader("✅ DÉJÀ PAYÉ")
-    df_p_disp = df_st[mask_paye][['DateNav', 'Nom', 'Prix']]
-    if not df_p_disp.empty:
-        st.table(df_p_disp)
-    else:
-        st.write("Aucun paiement reçu.")
+    st.table(df_st[mask_ok & (~mask_paye)][['DateNav', 'Nom', 'Prix']])
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
