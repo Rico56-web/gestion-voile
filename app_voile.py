@@ -573,72 +573,60 @@ if st.session_state.page == "STATS":
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
 # =================================================================
-import streamlit as st
-import pandas as pd
-import json
-import os
-from datetime import datetime
-
-# --- 1. FONCTIONS DE GESTION DU FICHIER ---
-def charger_maint():
-    if not os.path.exists('maintenance.json'):
-        with open('maintenance.json', 'w') as f:
-            json.dump([], f)
-    with open('maintenance.json', 'r') as f:
-        return json.load(f)
-
-def sauvegarder_maint(data):
-    with open('maintenance.json', 'w') as f:
-        json.dump(data, f, indent=4)
-
 if st.session_state.page == "MAINTENANCE":
     st.title("🔧 Carnet d'Entretien")
 
-    # --- 2. CHARGEMENT ---
-    data_m = charger_maint()
+    # --- 1. CHARGEMENT SÉCURISÉ ---
+    # On vérifie si le fichier existe, sinon on crée une liste vide
+    if not os.path.exists('maintenance.json'):
+        with open('maintenance.json', 'w') as f:
+            json.dump([], f)
+    
+    with open('maintenance.json', 'r') as f:
+        try:
+            data_m = json.load(f)
+        except:
+            data_m = [] # En cas de fichier corrompu ou vide
+
     df_m = pd.DataFrame(data_m)
 
-    # --- 3. RÉSUMÉ FINANCIER ---
+    # --- 2. AFFICHAGE DES DONNÉES ---
     if not df_m.empty:
+        # Calcul du total
         total = pd.to_numeric(df_m['Montant'], errors='coerce').sum()
         st.metric("🛠️ TOTAL DÉPENSES", f"{total:,.2f} €".replace(",", " "))
         
         st.subheader("📋 Historique")
-        # Affichage du tableau (ordre chronologique inverse pour voir le plus récent en haut)
+        # Sélection et renommage pour l'iPhone
         df_visu = df_m[['Date', 'Type', 'Objet', 'Montant', 'Statut']].copy()
-        st.table(df_visu.iloc[::-1]) # Inversion pour iPhone
+        st.table(df_visu.iloc[::-1]) # Affiche le plus récent en haut
     else:
-        st.info("Aucune dépense ou intervention enregistrée.")
+        st.info("📭 Le carnet est vide. Ajoutez votre première intervention ci-dessous.")
 
     st.divider()
 
-    # --- 4. FORMULAIRE D'AJOUT (INTERVENTION OU ACHAT) ---
-    with st.expander("➕ Nouvelle Intervention / Achat"):
+    # --- 3. FORMULAIRE D'AJOUT ---
+    with st.expander("➕ Ajouter un Achat ou Travaux", expanded=df_m.empty):
         with st.form("form_maint_new"):
-            col1, col2 = st.columns(2)
-            f_date = col1.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
-            f_type = col2.selectbox("Type", ["Achat", "Intervention", "Taxe"])
+            c1, c2 = st.columns(2)
+            f_date = c1.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
+            f_type = c2.selectbox("Type", ["Achat", "Intervention", "Taxe", "Maintenance"])
             
-            f_objet = st.text_input("Désignation (ex: Vidange, Drisse, Taxe annuelle)")
-            f_montant = st.number_input("Montant (€)", min_value=0.0, step=1.0)
+            f_objet = st.text_input("Désignation (ex: 178€ Taxes)")
+            f_montant = st.number_input("Montant (€)", min_value=0.0)
             f_statut = st.selectbox("État", ["OK", "À faire", "Commandé"])
-            f_notes = st.text_area("Commentaires / Références")
+            f_notes = st.text_area("Commentaires")
             
-            submit = st.form_submit_button("Enregistrer")
-            
-            if submit:
-                nouvel_item = {
-                    "Date": f_date,
-                    "Type": f_type,
-                    "Objet": f_objet,
-                    "Montant": f_montant,
-                    "Statut": f_statut,
-                    "Notes": f_notes
+            if st.form_submit_button("Enregistrer dans maintenance.json"):
+                nouveau = {
+                    "Date": f_date, "Type": f_type, "Objet": f_objet,
+                    "Montant": f_montant, "Statut": f_statut, "Notes": f_notes
                 }
-                data_m.append(nouvel_item)
-                sauvegarder_maint(data_m)
-                st.success("Enregistré avec succès !")
-                st.rerun() # Rafraîchit la page pour afficher le tableau à jour
+                data_m.append(nouveau)
+                with open('maintenance.json', 'w') as f:
+                    json.dump(data_m, f, indent=4)
+                st.success("C'est enregistré !")
+                st.rerun()
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
