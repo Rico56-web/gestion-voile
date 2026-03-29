@@ -580,21 +580,30 @@ if st.session_state.page == "MAINT":
             m_data = json.load(f)
         except:
             m_data = []
-
-    # 2. FORMULAIRE D'AJOUT (Auto-nettoyant avec st.rerun)
-    with st.expander("➕ Nouvelle intervention"):
-        with st.form("add_maint", clear_on_submit=True): # <--- Option pour vider les champs
-            f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
-            f_obj = st.text_input("Objet")
-            f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0)
+if st.form_submit_button("ENREGISTRER MAINTENANT"):
+    if f_obj:
+        try:
+            # 1. Préparer la donnée
+            nouvelle_ligne = {
+                "Date": f_date, 
+                "Objet": f_obj, 
+                "Montant": float(f_mt), 
+                "Statut": "OK"
+            }
+            # 2. Ajouter à la liste locale
+            m_data.append(nouvelle_ligne)
             
-            if st.form_submit_button("Enregistrer"):
-                if f_obj: # Sécurité : ne pas enregistrer si vide
-                    m_data.append({"Date": f_date, "Objet": f_obj, "Montant": float(f_mt)})
-                    with open('maintenance.json', 'w') as f:
-                        json.dump(m_data, f, indent=4)
-                    st.success("Enregistré !")
-                    st.rerun() # <--- Force le rafraîchissement immédiat
+            # 3. Écriture forcée avec encodage UTF-8
+            with open('maintenance.json', 'w', encoding='utf-8') as f:
+                json.dump(m_data, f, indent=4, ensure_ascii=False)
+            
+            st.success(f"✅ Enregistré : {f_obj}")
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"❌ Erreur d'écriture : {e}")
+    else:
+        st.warning("⚠️ L'objet ne peut pas être vide.")
 
     st.divider()
 
