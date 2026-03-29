@@ -564,14 +564,27 @@ if st.session_state.page == "STATS":
     st.subheader("⏳ À VENIR (OK)")
     st.table(df_st[mask_ok & (~mask_paye)][['DateNav', 'Nom', 'Prix']])
 
-# --- 9. ZONE D'ARCHIVAGE ANNUEL (SÉCURISÉE) ---
-st.divider()
-with st.expander("📁 Archivage de la Saison"):
-    st.info("Cette option déplace les missions 'Terminées' ou 'Refusées' vers un fichier archive.")
-    
-    # 1. Préparation du nom de l'archive
-    annee_archive = datetime.now().year
-    nom_archive = f"archives_{annee_archive}.json"
+# --- 6. DÉTAILS ---
+    st.subheader("⏳ À VENIR (OK)")
+    st.table(df_st[mask_ok & (~mask_paye)][['DateNav', 'Nom', 'Prix']])
+
+    # --- LE BOUTON D'ARCHIVAGE (À AJOUTER ICI) ---
+    st.divider()
+    with st.expander("📁 Archivage de la Saison"):
+        st.info("Cette option déplace les missions 'Terminées' ou 'Refusées' vers un fichier archive.")
+        if st.button("📦 ARCHIVER LES MISSIONS 2026", use_container_width=True):
+            mask_archive = df_c['Statut'].isin(["Terminé", "Refusé"])
+            df_a_archiver = df_c[mask_archive]
+            df_qui_reste = df_c[~mask_archive]
+            
+            if not df_a_archiver.empty:
+                # Sauvegarde locale
+                df_a_archiver.to_json("archives_2026.json", orient="records", indent=4)
+                sauvegarder_data(df_qui_reste, "contacts.json")
+                st.success(f"{len(df_a_archiver)} missions archivées !")
+                st.rerun()
+            else:
+                st.warning("Aucune mission 'Terminée' à archiver.")
     
     # 2. Bouton de transfert
     if st.button(f"📦 ARCHIVER LES MISSIONS {annee_archive}", use_container_width=True):
