@@ -573,86 +573,61 @@ if st.session_state.page == "STATS":
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
 # =================================================================
 if st.session_state.page == "MAINTENANCE":
-    st.title("🔧 Maintenance & technique")
+    st.title("🔧 Maintenance & Technique")
 
-    # --- 1. NETTOYAGE DES MONTANTS ---
-    def clean_p(val):
+    # --- 1. CHARGEMENT ET NETTOYAGE ---
+    # On travaille sur une copie propre
+    df_m = df_c.copy()
+
+    # Fonction pour nettoyer les prix (Gère les 178€ qu'ils soient en texte ou nombre)
+    def clean_price(val):
         try:
             if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
             s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
             return float(s.replace(",", "."))
         except: return 0.0
 
-    # On filtre pour ne garder que la catégorie Maintenance
-    # (Assure-toi que tes lignes de frais ont bien 'MAINTENANCE' dans la colonne Société)
-    df_maint = df_c[df_c['Société'].str.upper() == "MAINTENANCE"].copy()
+    # --- 2. FILTRAGE RIGOUREUX ---
+    # On cherche 'MAINTENANCE' dans la colonne 'Société' 
+    # (Vérifie bien que c'est le mot que tu utilises dans ton JSON)
+    mask = df_m['Société'].str.contains("MAINTENANCE", case=False, na=False)
+    df_result = df_m[mask].copy()
 
-    # --- 2. RÉSUMÉ FINANCIER ---
-    total_maint = df_maint['Frais'].apply(clean_p).sum() if 'Frais' in df_maint.columns else 0.0
-    
-    c1, c2 = st.columns(2)
-    c1.metric("🛠️ TOTAL FRAIS", f"{total_maint:,.0f} €")
-    
-    # Calcul du nombre d'interventions restant "Pas OK"
-    en_cours = len(df_maint[df_maint['Statut'] != "OK"])
-    if en_cours > 0:
-        c2.warning(f"⚠️ {en_cours} à finir")
-    else:
-        c2.success("✅ Tout est OK")
-
-    st.divider()
-
-    # --- 3. TABLEAU D'INTERVENTION (SANS ASCENSEUR) ---
-    st.subheader("📋 Carnet de bord technique")
-
-    if not df_maint.empty:
-        # On prépare les colonnes pour l'iPhone (ordre logique)
-        # 'Nom' sert ici de désignation de l'intervention
-        # 'Commentaires' pour les détails
-        df_maint_visu = df_maint[['DateNav', 'Nom', 'Statut', 'Frais', 'Commentaires']].copy()
-        df_maint_visu.columns = ['Date', 'Intervention', 'État', 'Coût', 'Notes']
-
-        # Affichage en tableau fixe pour éviter l'ascenseur sur mobile
-        st.table(df_maint_visu)
-    else:
-        st.info("Aucune intervention enregistrée. Utilise l'onglet CONTACTS pour ajouter une ligne avec la société 'MAINTENANCE'.")
-
-    # --- 4. RAPPEL UTILE ---
-    st.info("💡 Pour que les frais apparaissent ici et dans les STATS, vérifie que la colonne 'Société' contient bien 'MAINTENANCE' et que le montant est dans 'Frais'.")
-
-# --- 10. PAGE NOTES ---
-elif st.session_state.page == "NOTES":
-    st.subheader("📝 Bloc-notes Professionnel")
-    
-    # 1. Chargement initial dans la session si ce n'est pas déjà fait
-    if "memo_temp" not in st.session_state:
-        df_n = charger_data("notes.json")
-        if not df_n.empty and 'contenu' in df_n.columns:
-            st.session_state.memo_temp = str(df_n.iloc[0]['contenu'])
-        else:
-            st.session_state.memo_temp = ""
-
-    # 2. Zone de texte utilisant la variable en session
-    # L'astuce est de NE PAS mettre 'value=' mais de laisser l'utilisateur écrire
-    nouveau_memo = st.text_area(
-        "Tes notes pour la saison 2026 :", 
-        value=st.session_state.memo_temp,
-        height=400,
-        placeholder="Saisis tes codes de port ou rappels ici...",
-        key="note_editor" # Clé unique pour stabiliser la saisie
-    )
-    
-    # 3. Bouton de sauvegarde
-    if st.button("💾 ENREGISTRER LES NOTES", type="primary", use_container_width=True):
-        # On récupère ce qui a été tapé dans le text_area
-        df_sauvegarde = pd.DataFrame([{"contenu": nouveau_memo}])
-        sauvegarder_data(df_sauvegarde, "notes.json")
+    # --- 3. AFFICHAGE ---
+    if not df_result.empty:
+        # On s'assure que la colonne Frais est bien traitée
+        total_frais = df_result['Frais'].apply(clean_price).sum()
         
-        # On met à jour la session pour le prochain affichage
-        st.session_state.memo_temp = nouveau_memo
-        st.success("✅ Notes sauvegardées sur GitHub !")
-        time.sleep(1)
-        st.rerun()
+        c1, c2 = st.columns(2)
+        c1.metric("🛠️ TOTAL FRAIS", f"{total_frais:,.0f} €")
+        
+        # Compteur de tâches à faire
+        a_faire = len(df_result[df_result['Statut'].str.upper() != "OK"])
+        c2.metric("⚠️ EN COURS", a_faire)
+
+        st.divider()
+
+        # Tableau pour iPhone (on ne garde que l'essentiel pour que ça rentre)
+        # On ajoute 'Commentaires' si tu veux voir tes notes
+        colonnes_mobiles = ['DateNav', 'Nom', 'Statut', 'Frais', 'Commentaires']
+        
+        # Sécurité : On vérifie que ces colonnes existent avant d'afficher
+        cols_existantes = [c for c in colonnes_mobiles if c in df_result.columns]
+        
+        st.table(df_result[cols_existantes].rename(columns={
+            'DateNav': 'Date',
+            'Nom': 'Objet',
+            'Statut': 'État',
+            'Frais': 'Coût'
+        }))
+    else:
+        st.error("Désolé, aucune ligne 'MAINTENANCE' trouvée dans le fichier.")
+        
+        # --- DEBUG VISUEL (Pour t'aider à comprendre pourquoi c'est vide) ---
+        with st.expander("🔍 Debug : Pourquoi est-ce vide ?"):
+            st.write("Voici les noms de Sociétés détectés dans ton fichier :")
+            st.write(df_m['Société'].unique())
+            st.write("Vérifie si 'MAINTENANCE' est écrit différemment.")
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
