@@ -670,7 +670,7 @@ if st.session_state.page == "MAINT":
                 sauvegarder_data(df_vide, file_path_m)
                 st.rerun()
 # =================================================================
-# --- 9. PAGE FACTURES ---
+# --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
 # =================================================================
 if st.session_state.page == "FACTURES":
     st.title("📑 Facturation & Rapports")
@@ -686,94 +686,87 @@ if st.session_state.page == "FACTURES":
 
     index_mois = mois_noms.index(sel_mois) + 1
 
-    # --- 2. FILTRAGE DES MISSIONS CMN ---
+    # --- 2. FILTRAGE ET CALCULS ---
     if not df_c.empty:
-        # On filtre par Société "CMN", par mois et par année
-        df_c['dt'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
+        # Conversion temporaire pour le filtrage
+        df_fact = df_c.copy()
+        df_fact['dt'] = pd.to_datetime(df_fact['DateNav'], format='%d/%m/%Y', errors='coerce')
         
-        mask_cmn = (df_c['Société'].astype(str).str.upper() == "CMN") & \
-                   (df_c['dt'].dt.month == index_mois) & \
-                   (df_c['dt'].dt.year == sel_annee)
+        # Filtre : Société CMN + Mois + Année
+        mask_cmn = (df_fact['Société'].astype(str).str.upper() == "CMN") & \
+                   (df_fact['dt'].dt.month == index_mois) & \
+                   (df_fact['dt'].dt.year == sel_annee)
         
-        df_cmn_mois = df_c[mask_cmn].copy()
+        df_cmn_mois = df_fact[mask_cmn].copy()
         
         if not df_cmn_mois.empty:
             st.subheader(f"Missions CMN - {sel_mois} {sel_annee}")
             
-            # Calcul du total
-            df_cmn_mois['PrixNum'] = df_cmn_mois['Prix'].apply(lambda x: float(str(x).replace(',','.').replace('€','')) if x else 0.0)
+            # Nettoyage des prix pour le calcul
+            def clean_prix(x):
+                try:
+                    s = "".join(c for c in str(x) if c.isdigit() or c in ".,")
+                    return float(s.replace(",", "."))
+                except: return 0.0
+
+            df_cmn_mois['PrixNum'] = df_cmn_mois['Prix'].apply(clean_prix)
             total_cmn = df_cmn_mois['PrixNum'].sum()
             
-            # Affichage du récapitulatif
-            recap_tab = df_cmn_mois[['DateNav', 'Nom', 'Prix']]
-            st.table(recap_tab.set_index('DateNav'))
-            
+            # Affichage du tableau de contrôle sur l'iPhone
+            st.table(df_cmn_mois[['DateNav', 'Nom', 'Prix']].set_index('DateNav'))
             st.metric("Total à facturer", f"{total_cmn:.2f} €")
             
- # --- 3. PRÉPARATION DU TEXTE ALIGNÉ ---
+            # --- 3. PRÉPARATION DU TEXTE ALIGNÉ (12 ET 3 ESPACES) ---
             st.divider()
-            st.subheader("✉️ Préparation de l'envoi")
+            st.subheader("✉️ Rapport pour le Trésorier")
             
-            # Construction des lignes avec tes espacements précis
             lignes_missions = []
-            espaces_12 = " " * 12
-            espaces_3  = " " * 3
+            esp12 = " " * 12
+            esp3  = " " * 3
             
             for _, row in df_cmn_mois.iterrows():
-                date_str = str(row['DateNav']).ljust(10)
-                nom_str  = str(row['Nom'])
-                prix_str = f"{row['PrixNum']:.2f} €"
-                # Assemblage de la ligne
-                ligne = f"{date_str}{espaces_12}{nom_str}{espaces_3}{prix_str}"
-                lignes_missions.append(ligne)
+                d_str = str(row['DateNav']).ljust(10)
+                n_str = str(row['Nom'])
+                p_str = f"{row['PrixNum']:.2f} €"
+                # Assemblage de la ligne demandée
+                lignes_missions.append(f"{d_str}{esp12}{n_str}{esp3}{p_str}")
             
             texte_missions = "\n".join(lignes_missions)
+            
+            destinataire = "tresorier@cmn-asso.fr"
+            objet = f"Facturation Missions Vesta - {sel_mois} {sel_annee}"
+            
+            # Utilisation des TRIPLES GUILLEMETS pour éviter la SyntaxError
+            corps_mail = f"""Bonjour,
 
-            corps_mail = f"""Bonjour,\n\nJ'espère que tu vas bien ! ⛵\n\nVoici le récapitulatif de mes missions pour la CMN concernant le mois de {sel_mois} {sel_annee} :\n\n{texte_missions}\n\nLe montant total s'élève à {total_cmn:.2f} €.\n\nMerci d'avance pour le règlement et à très vite sur l'eau !\n\nAmicalement,\nL'équipe Vesta Skipper"""
-            
-            # --- SOLUTION ANTI-BLOCAGE POUR GMAIL/IPHONE ---
-            
-            # 1. On affiche le texte dans une zone facile à copier
-            st.text_area("Texte prêt à être copié :", corps_mail, height=250)
-            
-            # 2. On affiche les infos de destination clairement
-            st.info(f"**Destinataire :** {destinataire}\n\n**Objet :** {objet}")
+J'espère que tu vas bien ! ⛵
 
-            # 3. Le bouton Mailto (on le garde mais on ajoute une alternative)
-            import urllib.parse
-            mail_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
-            
-            st.link_button("🚀 TENTER L'ENVOI DIRECT", mail_link, use_container_width=True)
-            
-            st.caption("Si la page bloque : copie le texte ci-dessus et colle-le dans un nouveau mail Gmail.")
+Voici le récapitulatif de mes missions pour la CMN concernant le mois de {sel_mois} {sel_annee} :
 
-Voici le récapitulatif des navigations de la CMN concernant le mois de {sel_mois} {sel_annee} :
-
-Date                        Client    Prix
-------------------------------------------------------------
 {texte_missions}
-------------------------------------------------------------
 
 Le montant total s'élève à {total_cmn:.2f} €.
 
 Merci d'avance pour le règlement et à très vite sur l'eau !
 
 Amicalement,
-Eric Vesta 
-"""
+L'équipe Vesta Skipper"""
+
+            # --- 4. ZONE D'ENVOI ET COPIE ---
+            st.text_area("Copier ce texte pour Gmail :", corps_mail, height=300)
             
-            st.text_area("Aperçu du message", corps_mail, height=250)
+            st.info(f"**Destinataire :** {destinataire}\n\n**Objet :** {objet}")
             
-            # Bouton de lien Mailto (Ouvre l'application de mail de l'iPhone)
             import urllib.parse
             mail_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
             
-            st.link_button("🚀 ENVOYER AU TRÉSORIER", mail_link, use_container_width=True)
+            st.link_button("🚀 TENTER L'ENVOI DIRECT (MAILTO)", mail_link, use_container_width=True)
+            st.caption("Note : Si le bouton bloque, utilise le copier-coller du texte ci-dessus dans ton appli Gmail.")
             
         else:
             st.info(f"Aucune mission CMN trouvée pour {sel_mois} {sel_annee}.")
     else:
-        st.warning("La base de données est vide.")
+        st.warning("La base de données 'Contacts' est vide.")
 # =================================================================
 # --- 10. PAGE LOG (CONSULTATION DES ARCHIVES) ---
 # =================================================================
