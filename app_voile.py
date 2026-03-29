@@ -741,7 +741,7 @@ if st.session_state.page == "FACTURES":
 
 J'espère que vous allez bien ! ⛵
 
-Voici le récapitulatif de mes missions pour la CMN concernant le mois de {sel_mois} {sel_annee} :
+Voici le récapitulatif des navigations de la CMN concernant le mois de {sel_mois} {sel_annee} :
 
 {texte_missions}
 
