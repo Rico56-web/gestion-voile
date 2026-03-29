@@ -479,9 +479,7 @@ elif st.session_state.page == "PLANNING":
     c3.metric("À percevoir", f"{ca_attente:.2f} €")
 
 # --- FIN DU BLOC PLANNING ---
-# =================================================================
-# --- 7. PAGE STATS (VERSION FINALE VALIDÉE) ---
-# ================================================================
+
 # =================================================================
 # --- 7. PAGE STATS (VERSION FINALE ET SÉCURISÉE 2026) ---
 # =================================================================
@@ -695,22 +693,27 @@ if st.session_state.page == "MAINT":
     else:
         st.info("Aucune donnée enregistrée dans maintenance.json.")
         
- # --- 4. ZONE DANGER : RÉINITIALISATION (Tout en bas) ---
-    st.write("---")
+   # --- 4. ZONE DE DANGER : RÉINITIALISATION (Tout en bas) ---
+    st.divider()
     with st.expander("⚠️ Zone de Danger - Options Avancées"):
-        st.warning("Attention : Cette action est irréversible.")
+        st.warning("Attention : Cette action supprimera TOUT l'historique des frais de maintenance 2026.")
         
-        # Étape 1 : Cocher la case pour débloquer le bouton
-        confirm_check = st.checkbox("Je souhaite supprimer TOUT l'historique 2026")
+        # Le "cran de sûreté" : il faut cocher pour voir le bouton
+        confirm_check = st.checkbox("Je confirme vouloir vider le fichier maintenance.json")
         
         if confirm_check:
-            # Étape 2 : Cliquer sur le bouton qui apparaît
-            if st.button("🔴 VIDER MAINTENANCE.JSON", type="primary", use_container_width=True):
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump([], f)
-                st.success("L'historique a été vidé avec succès.")
-                time.sleep(1)
-                st.rerun()  
+            if st.button("🔴 VIDER TOUTE LA MAINTENANCE", type="primary", use_container_width=True):
+                try:
+                    # On remet le fichier à une liste vide []
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        json.dump([], f, indent=4)
+                    
+                    st.success("L'historique a été réinitialisé.")
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur lors de la suppression : {e}")     
+
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
