@@ -495,18 +495,17 @@ if st.session_state.page == "STATS":
     df_st = df_c.copy()
     df_st['PrixNum'] = df_st['Prix'].apply(clean_p)
 
-    # --- 2. FILTRES ---
-    # Payé
+# --- 2. FILTRES ---
     mask_paye = df_st['Paiement'].astype(str).apply(lambda x: x.strip().upper() == "PAYÉ")
     df_encaisse = df_st[mask_paye]
     
     # Futur (Statut OK mais Pas Payé)
     mask_futur = (df_st['Statut'].astype(str).str.upper() == "OK") & (~mask_paye)
-    df_futur = df_st[mask_futur][['DateNav', 'Nom', 'Prix']] # Sélection colonnes iPhone
+    df_futur_full = df_st[mask_futur] # On garde tout ici pour le calcul
 
-    # --- 3. RÉSUMÉ COMPACT ---
+    # --- 3. RÉSUMÉ COMPACT (Calcul avant réduction de colonnes) ---
     tot_r = df_encaisse['PrixNum'].sum()
-    tot_f = df_futur['PrixNum'].sum() if not df_futur.empty else 0
+    tot_f = df_futur_full['PrixNum'].sum() if not df_futur_full.empty else 0
     
     c1, c2 = st.columns(2)
     c1.metric("💰 REEL", f"{tot_r:,.0f}€")
@@ -517,20 +516,22 @@ if st.session_state.page == "STATS":
 
     # --- 4. TABLEAU FUTUR (SANS ASCENSEUR) ---
     st.subheader("⏳ À VENIR (OK)")
-    if not df_futur.empty:
-        # st.table affiche TOUTES les lignes d'un coup, idéal pour iPhone
-        st.table(df_futur)
+    if not df_futur_full.empty:
+        # On ne sélectionne les colonnes QUE pour l'affichage final
+        df_futur_visu = df_futur_full[['DateNav', 'Nom', 'Prix']]
+        st.table(df_futur_visu)
     else:
-        st.success("Aucune mission en attente de paiement !")
+        st.success("Aucune mission en attente !")
 
     st.divider()
 
     # --- 5. TABLEAU ENCAISSÉ (SANS ASCENSEUR) ---
     st.subheader("✅ PAYÉ")
     if not df_encaisse.empty:
-        st.table(df_encaisse[['DateNav', 'Nom', 'Prix']])
+        df_encaisse_visu = df_encaisse[['DateNav', 'Nom', 'Prix']]
+        st.table(df_encaisse_visu)
     else:
-        st.info("Rien d'encaissé pour le moment.")
+        st.info("Rien d'encaissé.")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
