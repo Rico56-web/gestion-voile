@@ -146,7 +146,10 @@ if st.session_state.page == "CONTACTS":
         if v.lower() in ["none", "nan", "", "null", "undefined"]: return ""
         return html.escape(v).replace("\n", " ").replace("\r", "")
 
-    # --- NAVIGATION ET AJOUT ---
+    # --- 1. CONFIGURATION DES SOCIÉTÉS ---
+    LISTE_SOC = ["PARTICULIER", "CLICK", "VOG", "CMN", "Autres"]
+
+    # --- 2. NAVIGATION ET AJOUT ---
     c_n1, c_n2, c_add = st.columns([1, 1, 2])
     view_arc = st.session_state.get('view_archive', False)
 
@@ -159,7 +162,7 @@ if st.session_state.page == "CONTACTS":
     
     if c_add.button("➕ NOUVELLE MISSION", type="primary", use_container_width=True):
         new_row = pd.DataFrame([{
-            "Prénom": "Nouveau", "Nom": "Contact", "Société": "", 
+            "Prénom": "Nouveau", "Nom": "Contact", "Société": "PARTICULIER", 
             "Téléphone": "", "Email": "", "Statut": "En attente", 
             "Paiement": "Non payé", "DateNav": "01/01/2026", 
             "Prix": "0", "NbreJours": "1", "NbrePers": "1", "Notes": ""
@@ -171,29 +174,27 @@ if st.session_state.page == "CONTACTS":
 
     st.divider()
 
-    # --- FILTRAGE ---
+    # --- 3. FILTRAGE ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-    # --- BOUCLE D'AFFICHAGE ---
+    # --- 4. BOUCLE D'AFFICHAGE ---
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # Récupération des données
+        # Données
         p_nom = safe(r.get('Prénom', ''))
         n_nom = safe(r.get('Nom', '')).upper()
         nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche #{num_f}"
-        
         soc   = safe(r.get('Société', 'PARTICULIER')).upper()
         tel   = safe(r.get('Téléphone', ''))
         mail  = safe(r.get('Email', ''))
         note  = safe(r.get('Notes', ''))
         prix  = safe(r.get('Prix', '0'))
         date  = safe(r.get('DateNav', r.get('Date', '--/--/--')))
-        # Nouveaux champs
         jours = safe(r.get('NbreJours', '1'))
         pers  = safe(r.get('NbrePers', '1'))
         
-        # Couleurs et Badges
+        # Statuts et Couleurs
         s_val = safe(r.get('Statut', 'En attente'))
         s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
         if "CMN" in soc: s_col = "#3498db" 
@@ -201,7 +202,7 @@ if st.session_state.page == "CONTACTS":
         p_val = safe(r.get('Paiement', 'Non payé'))
         p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
 
-        # --- HTML DE LA FICHE ---
+        # --- HTML FICHE ---
         card_html = (
             f'<div style="border:2px solid #1a2a6c;border-radius:12px;padding:15px;margin-bottom:8px;background:white;color:black;">'
             f'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'
@@ -223,7 +224,7 @@ if st.session_state.page == "CONTACTS":
         )
         st.markdown(card_html, unsafe_allow_html=True)
 
-        # --- ACTIONS LOCALES ---
+        # --- ACTIONS ---
         c_ed, c_del = st.columns([1, 3])
         if c_ed.button(f"✏️ Modifier {num_f}", key=f"ed_{i}", use_container_width=True):
             st.session_state.edit_idx = i
@@ -232,25 +233,29 @@ if st.session_state.page == "CONTACTS":
             st.session_state.confirm_del_idx = i
             st.rerun()
 
-        # --- FORMULAIRE D'ÉDITION COMPLET ---
+        # --- FORMULAIRE D'ÉDITION ---
         if st.session_state.get('edit_idx') == i:
             with st.expander(f"⚙️ ÉDITION #{num_f}", expanded=True):
                 with st.form(f"f_edit_{i}"):
-                    col1, col2 = st.columns(2)
-                    u_pre = col1.text_input("Prénom", value=r.get('Prénom', ''))
-                    u_nom = col2.text_input("Nom", value=r.get('Nom', ''))
-                    u_soc = col1.text_input("Société", value=r.get('Société', ''))
-                    u_tel = col2.text_input("Téléphone", value=r.get('Téléphone', ''))
-                    u_mai = col1.text_input("Email", value=r.get('Email', ''))
-                    u_dat = col2.text_input("Date (JJ/MM/AAAA)", value=r.get('DateNav', r.get('Date', '')))
+                    c1, c2 = st.columns(2)
+                    u_pre = c1.text_input("Prénom", value=r.get('Prénom', ''))
+                    u_nom = c2.text_input("Nom", value=r.get('Nom', ''))
                     
-                    col3, col4 = st.columns(2)
-                    u_jr  = col3.text_input("Nbre de jours", value=jours)
-                    u_ps  = col4.text_input("Nbre de personnes", value=pers)
-                    u_prix = col3.text_input("Prix Total (€)", value=prix)
-                    u_stat = col4.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], 
+                    # CHANGEMENT ICI : Menu déroulant pour Société
+                    idx_soc = LISTE_SOC.index(soc) if soc in LISTE_SOC else 0
+                    u_soc = c1.selectbox("Société", LISTE_SOC, index=idx_soc)
+                    
+                    u_tel = c2.text_input("Téléphone", value=r.get('Téléphone', ''))
+                    u_mai = c1.text_input("Email", value=r.get('Email', ''))
+                    u_dat = c2.text_input("Date (JJ/MM/AAAA)", value=r.get('DateNav', r.get('Date', '')))
+                    
+                    c3, c4 = st.columns(2)
+                    u_jr  = c3.text_input("Nbre de jours", value=jours)
+                    u_ps  = c4.text_input("Nbre de personnes", value=pers)
+                    u_prix = c3.text_input("Prix Total (€)", value=prix)
+                    u_stat = c4.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], 
                                           index=["En attente", "OK", "Terminé", "Refusé"].index(s_val) if s_val in ["En attente", "OK", "Terminé", "Refusé"] else 0)
-                    u_paye = col3.selectbox("Paiement", ["Non payé", "Payé"], index=1 if "PAYÉ" in p_val.upper() else 0)
+                    u_paye = c3.selectbox("Paiement", ["Non payé", "Payé"], index=1 if "PAYÉ" in p_val.upper() else 0)
                     u_note = st.text_area("Notes", value=r.get('Notes', ''))
                     
                     b_save, b_ann = st.columns(2)
