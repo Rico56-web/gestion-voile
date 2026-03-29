@@ -543,6 +543,45 @@ if st.session_state.page == "STATS":
         st.write("📂 Par Société :")
         ca_soc = df_st[mask_paye | mask_futur].groupby('Société')['PrixNum'].sum()
         st.bar_chart(ca_soc, height=200) # Hauteur réduite pour mobile
+      st.divider()
+    st.subheader("📅 Calendrier Mensuel (CA Prévu)")
+
+    # --- 1. PRÉPARATION DES MOIS ---
+    # On s'assure que 'DateNav' est exploitable pour le tri
+    def get_month(date_str):
+        try:
+            # On cherche le mois dans le format JJ/MM/AAAA
+            parts = str(date_str).split('/')
+            if len(parts) >= 2:
+                month_num = int(parts[1])
+                months = ["Janv", "Févr", "Mars", "Avril", "Mai", "Juin", 
+                          "Juil", "Août", "Sept", "Oct", "Nov", "Déc"]
+                return f"{month_num:02d} - {months[month_num-1]}"
+        except:
+            return "99 - Inconnu"
+        return "99 - Inconnu"
+
+    # On ne travaille que sur les missions validées (Payé ou OK)
+    df_plan = df_st[mask_paye | mask_futur].copy()
+    df_plan['Mois'] = df_plan['DateNav'].apply(get_month)
+
+    # --- 2. CALCUL PAR MOIS ---
+    if not df_plan.empty:
+        # Groupement par mois pour avoir le total € et le nombre de missions
+        mensuel = df_plan.groupby('Mois').agg(
+            CA=('PrixNum', 'sum'),
+            Missions=('Nom', 'count')
+        ).sort_index()
+
+        # --- 3. AFFICHAGE COMPACT ---
+        # On utilise st.table pour que ce soit très lisible sur iPhone sans scroll
+        st.table(mensuel.style.format({"CA": "{:.0f} €"}))
+
+        # --- 4. PETIT GRAPHIQUE DE TENDANCE ---
+        st.write("📊 Évolution de l'activité :")
+        st.line_chart(mensuel['CA'], height=150)
+    else:
+        st.info("Aucune mission prévue ou payée pour le moment.")  
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
