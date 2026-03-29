@@ -740,7 +740,7 @@ J'espère que vous allez bien ! ⛵
 
 Voici le récapitulatif des navigations de la CMN concernant le mois de {sel_mois} {sel_annee} :
 
-Date            Espaces(12)      Client   Espaces(3)   Prix
+Date                     Client      Prix
 ------------------------------------------------------------
 {texte_missions}
 ------------------------------------------------------------
