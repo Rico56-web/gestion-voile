@@ -669,9 +669,85 @@ if st.session_state.page == "MAINT":
                 df_vide = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut"])
                 sauvegarder_data(df_vide, file_path_m)
                 st.rerun()
-
 # =================================================================
-# --- 9. PAGE LOG (CONSULTATION DES ARCHIVES) ---
+# --- 9. PAGE FACTURES ---
+# =================================================================
+if st.session_state.page == "FACTURES":
+    st.title("📑 Facturation & Rapports")
+
+    # --- 1. SÉLECTION DU MOIS ---
+    mois_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", 
+                 "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+    maintenant = datetime.now()
+    
+    col_m, col_a = st.columns(2)
+    sel_mois = col_m.selectbox("Choisir le mois", mois_noms, index=maintenant.month - 1)
+    sel_annee = col_a.selectbox("Année", [2025, 2026, 2027], index=1)
+
+    index_mois = mois_noms.index(sel_mois) + 1
+
+    # --- 2. FILTRAGE DES MISSIONS CMN ---
+    if not df_c.empty:
+        # On filtre par Société "CMN", par mois et par année
+        df_c['dt'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
+        
+        mask_cmn = (df_c['Société'].astype(str).str.upper() == "CMN") & \
+                   (df_c['dt'].dt.month == index_mois) & \
+                   (df_c['dt'].dt.year == sel_annee)
+        
+        df_cmn_mois = df_c[mask_cmn].copy()
+        
+        if not df_cmn_mois.empty:
+            st.subheader(f"Missions CMN - {sel_mois} {sel_annee}")
+            
+            # Calcul du total
+            df_cmn_mois['PrixNum'] = df_cmn_mois['Prix'].apply(lambda x: float(str(x).replace(',','.').replace('€','')) if x else 0.0)
+            total_cmn = df_cmn_mois['PrixNum'].sum()
+            
+            # Affichage du récapitulatif
+            recap_tab = df_cmn_mois[['DateNav', 'Nom', 'Prix']]
+            st.table(recap_tab.set_index('DateNav'))
+            
+            st.metric("Total à facturer", f"{total_cmn:.2f} €")
+            
+            # --- 3. PRÉPARATION DE L'EMAIL ---
+            st.divider()
+            st.subheader("✉️ Préparation de l'envoi")
+            
+            destinataire = "tresorier@cmn-asso.fr"
+            objet = f"Facturation Missions Vesta - {sel_mois} {sel_annee}"
+            
+            # Construction du texte sympathique
+            corps_mail = f"""Bonjour,
+
+J'espère que vous allez bien ! ⛵
+
+Voici le récapitulatif des navigations de la CMN concernant le mois de {sel_mois} {sel_annee} :
+
+{recap_tab.to_string(index=False)}
+
+Le montant total s'élève à {total_cmn:.2f} €.
+
+Merci d'avance pour le règlement et à très vite sur l'eau !
+
+Amicalement,
+Eric Vesta 
+"""
+            
+            st.text_area("Aperçu du message", corps_mail, height=250)
+            
+            # Bouton de lien Mailto (Ouvre l'application de mail de l'iPhone)
+            import urllib.parse
+            mail_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
+            
+            st.link_button("🚀 ENVOYER AU TRÉSORIER", mail_link, use_container_width=True)
+            
+        else:
+            st.info(f"Aucune mission CMN trouvée pour {sel_mois} {sel_annee}.")
+    else:
+        st.warning("La base de données est vide.")
+# =================================================================
+# --- 10. PAGE LOG (CONSULTATION DES ARCHIVES) ---
 # =================================================================
 elif st.session_state.page == "LOG":
     st.title("📂 Archives & Logs")
