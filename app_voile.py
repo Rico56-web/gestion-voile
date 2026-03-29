@@ -492,46 +492,76 @@ if st.session_state.page == "STATS":
             return float(s.replace(",", "."))
         except: return 0.0
 
+    def get_month_info(date_str):
+        try:
+            parts = str(date_str).split('/')
+            if len(parts) >= 2:
+                m_num = int(parts[1])
+                months = ["Janv", "Févr", "Mars", "Avril", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"]
+                return m_num, f"{m_num:02d} - {months[m_num-1]}"
+        except: pass
+        return 99, "99 - Inconnu"
+
+    # --- 2. PRÉPARATION DES DONNÉES ---
     df_st = df_c.copy()
     df_st['PrixNum'] = df_st['Prix'].apply(clean_p)
-
-# --- 2. FILTRES ---
-    mask_paye = df_st['Paiement'].astype(str).apply(lambda x: x.strip().upper() == "PAYÉ")
-    df_encaisse = df_st[mask_paye]
     
-    # Futur (Statut OK mais Pas Payé)
-    mask_futur = (df_st['Statut'].astype(str).str.upper() == "OK") & (~mask_paye)
-    df_futur_full = df_st[mask_futur] # On garde tout ici pour le calcul
+    # Extraction Mois
+    df_st['MoisSort'], df_st['MoisLabel'] = zip(*df_st['DateNav'].apply(get_month_info))
 
-    # --- 3. RÉSUMÉ COMPACT (Calcul avant réduction de colonnes) ---
-    tot_r = df_encaisse['PrixNum'].sum()
-    tot_f = df_futur_full['PrixNum'].sum() if not df_futur_full.empty else 0
+    # Filtres Stricts
+    mask_paye = df_st['Paiement'].astype(str).apply(lambda x: x.strip().upper() == "PAYÉ")
+    mask_ok = df_st['Statut'].astype(str).str.upper() == "OK"
+    mask_futur = mask_ok & (~mask_paye)
+
+    # --- 3. INDICATEURS EN HAUT ---
+    tot_r = df_st[mask_paye]['PrixNum'].sum()
+    tot_f = df_st[mask_futur]['PrixNum'].sum()
     
     c1, c2 = st.columns(2)
-    c1.metric("💰 REEL", f"{tot_r:,.0f}€")
-    c2.metric("🕒 FUTUR", f"{tot_f:,.0f}€")
-    st.write(f"**📈 TOTAL PRÉVU : {tot_r + tot_f:,.0f} €**")
+    c1.metric("💰 ENCAISSÉ", f"{tot_r:,.0f} €")
+    c2.metric("🕒 FUTUR", f"{tot_f:,.0f} €")
+    st.write(f"**📈 TOTAL PRÉVU (2026) : {tot_r + tot_f:,.0f} €**")
 
     st.divider()
 
-    # --- 4. TABLEAU FUTUR (SANS ASCENSEUR) ---
+    # --- 4. TABLEAU MENSUEL (TOUS LES MOIS) ---
+    st.subheader("📅 Calendrier Mensuel")
+    
+    # On ne prend que les missions validées (Payé ou OK)
+    df_valid = df_st[mask_paye | mask_futur]
+    
+    if not df_valid.empty:
+        # Groupement par label de mois
+        mensuel = df_valid.groupby(['MoisSort', 'MoisLabel']).agg(
+            CA=('PrixNum', 'sum'),
+            Missions=('Nom', 'count')
+        ).reset_index().sort_values('MoisSort')
+        
+        # Affichage sans l'index de tri
+        st.table(mensuel[['MoisLabel', 'CA', 'Missions']].set_index('MoisLabel').style.format({"CA": "{:.0f} €"}))
+    else:
+        st.info("Aucune mission validée pour le moment.")
+
+    st.divider()
+
+    # --- 5. DÉTAIL "À VENIR" (SANS ASCENSEUR) ---
     st.subheader("⏳ À VENIR (OK)")
-    if not df_futur_full.empty:
-        # On ne sélectionne les colonnes QUE pour l'affichage final
-        df_futur_visu = df_futur_full[['DateNav', 'Nom', 'Prix']]
-        st.table(df_futur_visu)
+    df_futur_disp = df_st[mask_futur][['DateNav', 'Nom', 'Prix']]
+    if not df_futur_disp.empty:
+        st.table(df_futur_disp)
     else:
-        st.success("Aucune mission en attente !")
+        st.success("Aucune mission en attente de paiement.")
 
     st.divider()
 
-    # --- 5. TABLEAU ENCAISSÉ (SANS ASCENSEUR) ---
-    st.subheader("✅ PAYÉ")
-    if not df_encaisse.empty:
-        df_encaisse_visu = df_encaisse[['DateNav', 'Nom', 'Prix']]
-        st.table(df_encaisse_visu)
+    # --- 6. DÉTAIL "PAYÉ" (SANS ASCENSEUR) ---
+    st.subheader("✅ DÉJÀ PAYÉ")
+    df_paye_disp = df_st[mask_paye][['DateNav', 'Nom', 'Prix']]
+    if not df_paye_disp.empty:
+        st.table(df_paye_disp)
     else:
-        st.info("Rien d'encaissé.")
+        st.info("Aucun paiement reçu affiché.")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
