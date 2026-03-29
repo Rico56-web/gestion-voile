@@ -573,52 +573,15 @@ if st.session_state.page == "STATS":
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
 # =================================================================
-# --- DEBUT DU BLOC MAINTENANCE ---
 if st.session_state.page == "MAINTENANCE":
-    st.title("🔧 Carnet d'Entretien")
-
-    # 1. CREATION DU FICHIER SI ABSENT (Force la présence)
-    if not os.path.exists('maintenance.json'):
+    st.title("🔧 TEST MAINTENANCE")
+    st.write("Si tu vois ce message, le menu fonctionne !")
+    
+    # Bouton de secours pour créer le fichier
+    if st.button("Initialiser le fichier maintenance.json"):
         with open('maintenance.json', 'w') as f:
             json.dump([], f)
-    
-    # 2. LECTURE DIRECTE
-    try:
-        with open('maintenance.json', 'r') as f:
-            m_data = json.load(f)
-    except:
-        m_data = []
-
-    # 3. AFFICHAGE DU TABLEAU
-    if m_data:
-        st.subheader("📋 Historique des frais")
-        df_m = pd.DataFrame(m_data)
-        # On affiche les colonnes principales
-        st.table(df_m[['Date', 'Objet', 'Montant', 'Statut']])
-        
-        total = sum(float(str(i['Montant']).replace(',', '.')) for i in m_data)
-        st.metric("TOTAL", f"{total:.2f} €")
-    else:
-        st.info("Le carnet est vide. Ajoutez votre première ligne ci-dessous.")
-
-    st.divider()
-
-    # 4. FORMULAIRE TOUJOURS VISIBLE
-    st.subheader("➕ Ajouter une ligne")
-    with st.form("form_simple_maint"):
-        f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
-        f_obj = st.text_input("Objet (ex: Taxes 178€)")
-        f_mt = st.number_input("Montant", min_value=0.0)
-        f_st = st.selectbox("Statut", ["OK", "A faire"])
-        
-        if st.form_submit_button("ENREGISTRER MAINTENANT"):
-            nouvelle_ligne = {"Date": f_date, "Objet": f_obj, "Montant": f_mt, "Statut": f_st}
-            m_data.append(nouvelle_ligne)
-            with open('maintenance.json', 'w') as f:
-                json.dump(m_data, f, indent=4)
-            st.success("Bien enregistré !")
-            st.rerun()
-# --- FIN DU BLOC MAINTENANCE ---
+        st.success("Fichier créé ! Tu peux maintenant ajouter tes 178€.")
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
