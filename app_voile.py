@@ -733,13 +733,13 @@ if st.session_state.page == "FACTURES":
             
             texte_missions = "\n".join(lignes_missions)
             
-            destinataire = "tresorier@cmn-asso.fr"
+            destinataire = "tresorier@cmn-asso.fr, aurelienfaucheux@gmail.com"
             objet = f"Facturation Missions Vesta - {sel_mois} {sel_annee}"
             
             # Utilisation des TRIPLES GUILLEMETS pour éviter la SyntaxError
             corps_mail = f"""Bonjour,
 
-J'espère que tu vas bien ! ⛵
+J'espère que vous allez bien ! ⛵
 
 Voici le récapitulatif de mes missions pour la CMN concernant le mois de {sel_mois} {sel_annee} :
 
@@ -750,7 +750,7 @@ Le montant total s'élève à {total_cmn:.2f} €.
 Merci d'avance pour le règlement et à très vite sur l'eau !
 
 Amicalement,
-L'équipe Vesta Skipper"""
+Eric (vesta)"""
 
             # --- 4. ZONE D'ENVOI ET COPIE ---
             st.text_area("Copier ce texte pour Gmail :", corps_mail, height=300)
