@@ -482,57 +482,73 @@ elif st.session_state.page == "PLANNING":
 # --- 7. PAGE STATS (VERSION FINALE VALIDÉE) ---
 # ================================================================
 if st.session_state.page == "STATS":
-    st.title("📊 Vesta - Statistiques 2026")
+    st.title("📊 Vesta - Pilotage Financier 2026")
 
-    # --- 1. FONCTION DE NETTOYAGE ULTRA-PRÉCISE ---
+    # --- 1. NETTOYAGE ET SÉCURISATION DES DONNÉES ---
     def clean_price(val):
         try:
-            if val is None or str(val).lower() in ["nan", "none", ""]: return 0.0
-            # On enlève tout sauf les chiffres et le point/virgule
+            if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
             s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
-            s = s.replace(",", ".")
-            return float(s)
-        except:
-            return 0.0
+            return float(s.replace(",", "."))
+        except: return 0.0
 
-    # Préparation des données
     df_st = df_c.copy()
     df_st['PrixNum'] = df_st['Prix'].apply(clean_price)
 
-# --- 2. CALCULS STRICTS ---
-    # On ne prend QUE les lignes où la colonne 'Paiement' est EXACTEMENT "Payé"
-    # On évite les "contient" qui pourraient attraper "Non payé" par erreur
+    # --- 2. LOGIQUE DE FILTRAGE STRICTE ---
+    # Déjà payé (Argent en banque)
     mask_paye = df_st['Paiement'].astype(str).apply(lambda x: x.strip().upper() == "PAYÉ")
-    df_paye = df_st[mask_paye]
+    df_encaisse = df_st[mask_paye]
     
-    total_encaisse = df_paye['PrixNum'].sum()
+    # Futur (Missions validées "OK" mais pas encore payées)
+    mask_futur = (df_st['Statut'].astype(str).str.upper() == "OK") & (~mask_paye)
+    df_futur = df_st[mask_futur]
 
-    # --- 3. AFFICHAGE ---
-    st.metric("💰 TOTAL ENCAISSÉ (REEL)", f"{total_encaisse:,.2f} €".replace(",", " "))
+    # --- 3. LES INDICATEURS CLÉS ---
+    c1, c2, c3 = st.columns(3)
+    total_r = df_encaisse['PrixNum'].sum()
+    total_f = df_futur['PrixNum'].sum()
     
-    if total_encaisse != 1509:
-        st.error(f"⚠️ Écart détecté ! Tu attends 1509 €, l'app calcule {total_encaisse:,.2f} €.")
-    else:
-        st.success("✅ Le compte est bon : 1509 €.")
+    with c1:
+        st.metric("💰 ENCAISSÉ (Réel)", f"{total_r:,.0f} €".replace(",", " "))
+    with c2:
+        st.metric("🕒 FUTUR (Validé)", f"{total_f:,.0f} €".replace(",", " "))
+    with c3:
+        st.metric("📈 TOTAL PRÉVU", f"{(total_r + total_f):,.0f} €".replace(",", " "))
 
     st.divider()
 
-    # --- 4. LE TABLEAU DE CONTRÔLE (L'EXPLICATION) ---
-    st.subheader("🔍 Liste des lignes comptées dans l'encaisse")
-    if not df_paye.empty:
-        # On affiche les colonnes pour identifier l'erreur
-        df_verif = df_paye[['DateNav', 'Société', 'Nom', 'Prix', 'PrixNum']].copy()
-        st.table(df_verif) # Utilisation de st.table pour une lecture plus claire sur mobile
-        
-        st.info("💡 Vérifie si une ligne est présente en double ou si une mission de 100 € est marquée 'Payé' par erreur.")
+    # --- 4. TABLEAU 1 : L'ENCAISSÉ (DÉBUT MARS) ---
+    st.subheader("✅ Détail de l'Encaissé (Payé)")
+    if not df_encaisse.empty:
+        # On affiche les colonnes essentielles pour ton pointage
+        st.dataframe(
+            df_encaisse[['DateNav', 'Société', 'Nom', 'Prix']], 
+            use_container_width=True, 
+            hide_index=True
+        )
     else:
-        st.warning("Aucune ligne marquée comme 'Payé'.")
+        st.info("Aucun encaissement enregistré.")
 
-    # --- 5. RAPPEL DES MISSIONS "OK" MAIS NON PAYÉES ---
-    st.subheader("⏳ Missions validées (Attente paiement)")
-    df_attente = df_st[(df_st['Statut'] == "OK") & (~mask_paye)]
-    if not df_attente.empty:
-        st.dataframe(df_attente[['DateNav', 'Nom', 'Prix']], use_container_width=True)
+    st.divider()
+
+    # --- 5. TABLEAU 2 : LE FUTUR (À VENIR) ---
+    st.subheader("⏳ Détail du Futur (Attente Paiement)")
+    if not df_futur.empty:
+        st.dataframe(
+            df_futur[['DateNav', 'Société', 'Nom', 'Prix']], 
+            use_container_width=True, 
+            hide_index=True
+        )
+        st.warning(f"Il reste **{total_f:,.0f} €** à récupérer sur ces missions validées.")
+    else:
+        st.success("Toutes les missions validées sont payées !")
+
+    # --- 6. RÉPARTITION PAR SOCIÉTÉ (POUR TON ANALYSE) ---
+    if st.checkbox("Voir la force des apporteurs d'affaires"):
+        st.write("Répartition du CA Total (Encaissé + Futur) :")
+        ca_soc = df_st[mask_paye | mask_futur].groupby('Société')['PrixNum'].sum().sort_values()
+        st.bar_chart(ca_soc)
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
