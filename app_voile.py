@@ -587,6 +587,30 @@ if st.session_state.page == "STATS":
     else:
         st.write("Aucune mission confirmée en attente de paiement.")
         
+    # --- 5.bis DÉTAIL DES MISSIONS À VENIR (OPTIMISÉ IPHONE) ---
+    st.subheader("⏳ Missions à venir (Détail)")
+    
+    # Filtrage : Statut "OK" et Paiement qui n'est pas "PAYÉ"
+    mask_detail_avenir = (df_st['Statut'].astype(str).str.upper() == "OK") & \
+                         (df_st['Paiement'].astype(str).str.upper().str.strip() != "PAYÉ")
+    
+    # On crée une copie pour ne pas impacter le reste du code
+    df_avenir = df_st[mask_detail_avenir].copy()
+
+    if not df_avenir.empty:
+        # On ne garde que les 3 colonnes essentielles : Date, Nom, Prix
+        # Suppression de la colonne 'Société' pour gagner de la place
+        tableau_mobile = df_avenir[['DateNav', 'Nom', 'PrixNum']]
+        tableau_mobile.columns = ['📅 Date', '👤 Client', '💰 €']
+        
+        # Tri par date pour avoir les prochaines sorties en haut
+        tableau_mobile = tableau_mobile.sort_values('📅 Date')
+        
+        # Affichage en format 'table' (statique et propre sur mobile)
+        st.table(tableau_mobile.set_index('📅 Date'))
+    else:
+        st.info("Aucune mission 'OK' en attente de paiement.")  
+        
     # --- 6. ZONE D'ARCHIVAGE (SÉCURISÉE) ---
     st.divider()
     with st.expander("📁 Archivage de la Saison"):
