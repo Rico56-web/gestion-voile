@@ -482,10 +482,10 @@ elif st.session_state.page == "PLANNING":
 # --- 7. PAGE STATS (VERSION FINALE VALIDÉE) ---
 # ================================================================
 if st.session_state.page == "STATS":
-    st.title("📊 Vesta - Pilotage")
+    st.title("📊 Vesta - Pilotage & Frais")
 
     # --- 1. FONCTIONS DE NETTOYAGE ---
-    def clean_p(val):
+    def clean_val(val):
         try:
             if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
             s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
@@ -498,70 +498,67 @@ if st.session_state.page == "STATS":
             if len(parts) >= 2:
                 m_num = int(parts[1])
                 months = ["Janv", "Févr", "Mars", "Avril", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"]
-                return m_num, f"{m_num:02d} - {months[m_num-1]}"
+                return m_num, f"{m_num:02d}-{months[m_num-1]}"
         except: pass
-        return 99, "99 - Inconnu"
+        return 99, "99-Inconnu"
 
-    # --- 2. PRÉPARATION DES DONNÉES ---
+    # --- 2. PRÉPARATION ---
     df_st = df_c.copy()
-    df_st['PrixNum'] = df_st['Prix'].apply(clean_p)
+    df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
+    # On nettoie aussi une colonne 'Frais' (assure-toi qu'elle existe dans ton JSON)
+    df_st['FraisNum'] = df_st.get('Frais', 0).apply(clean_val) if 'Frais' in df_st.columns else 0.0
     
-    # Extraction Mois
-    df_st['MoisSort'], df_st['MoisLabel'] = zip(*df_st['DateNav'].apply(get_month_info))
+    df_st['M_Sort'], df_st['Mois'] = zip(*df_st['DateNav'].apply(get_month_info))
 
-    # Filtres Stricts
+    # Filtres
     mask_paye = df_st['Paiement'].astype(str).apply(lambda x: x.strip().upper() == "PAYÉ")
     mask_ok = df_st['Statut'].astype(str).str.upper() == "OK"
-    mask_futur = mask_ok & (~mask_paye)
+    df_valid = df_st[mask_paye | mask_ok]
 
-    # --- 3. INDICATEURS EN HAUT ---
-    tot_r = df_st[mask_paye]['PrixNum'].sum()
-    tot_f = df_st[mask_futur]['PrixNum'].sum()
-    
-    c1, c2 = st.columns(2)
-    c1.metric("💰 ENCAISSÉ", f"{tot_r:,.0f} €")
-    c2.metric("🕒 FUTUR", f"{tot_f:,.0f} €")
-    st.write(f"**📈 TOTAL PRÉVU (2026) : {tot_r + tot_f:,.0f} €**")
-
-    st.divider()
-
-    # --- 4. TABLEAU MENSUEL (TOUS LES MOIS) ---
-    st.subheader("📅 Calendrier Mensuel")
-    
-    # On ne prend que les missions validées (Payé ou OK)
-    df_valid = df_st[mask_paye | mask_futur]
+    # --- 3. SYNTHÈSE MENSUELLE (CA / FRAIS / NET) ---
+    st.subheader("📅 Synthèse Mensuelle 2026")
     
     if not df_valid.empty:
-        # Groupement par label de mois
-        mensuel = df_valid.groupby(['MoisSort', 'MoisLabel']).agg(
+        # Groupement par mois
+        mensuel = df_valid.groupby(['M_Sort', 'Mois']).agg(
             CA=('PrixNum', 'sum'),
+            Frais=('FraisNum', 'sum'),
             Missions=('Nom', 'count')
-        ).reset_index().sort_values('MoisSort')
+        ).reset_index().sort_values('M_Sort')
         
-        # Affichage sans l'index de tri
-        st.table(mensuel[['MoisLabel', 'CA', 'Missions']].set_index('MoisLabel').style.format({"CA": "{:.0f} €"}))
+        # Calcul du Net
+        mensuel['Net'] = mensuel['CA'] - mensuel['Frais']
+        
+        # Affichage du tableau de synthèse
+        st.table(mensuel[['Mois', 'CA', 'Frais', 'Net']].set_index('Mois').style.format("{:.0f} €"))
+        
+        # --- TOTAL GÉNÉRAL ---
+        total_ca = mensuel['CA'].sum()
+        total_frais = mensuel['Frais'].sum()
+        total_net = mensuel['Net'].sum()
+        
+        st.info(f"**Total Annuel :** CA {total_ca:.0f}€ | Frais {total_frais:.0f}€ | **Net {total_net:.0f}€**")
     else:
-        st.info("Aucune mission validée pour le moment.")
+        st.info("Aucune mission validée.")
 
     st.divider()
 
-    # --- 5. DÉTAIL "À VENIR" (SANS ASCENSEUR) ---
+    # --- 4. INDICATEURS DE TRÉSORERIE ---
+    tot_r = df_st[mask_paye]['PrixNum'].sum()
+    tot_f = df_st[mask_ok & (~mask_paye)]['PrixNum'].sum()
+    
+    c1, c2 = st.columns(2)
+    c1.metric("💰 ENCAISSÉ REEL", f"{tot_r:,.0f}€")
+    c2.metric("🕒 FUTUR (A encaisser)", f"{tot_f:,.0f}€")
+
+    st.divider()
+
+    # --- 5. DÉTAILS (SANS ASCENSEUR) ---
     st.subheader("⏳ À VENIR (OK)")
-    df_futur_disp = df_st[mask_futur][['DateNav', 'Nom', 'Prix']]
-    if not df_futur_disp.empty:
-        st.table(df_futur_disp)
-    else:
-        st.success("Aucune mission en attente de paiement.")
+    st.table(df_st[mask_ok & (~mask_paye)][['DateNav', 'Nom', 'Prix']])
 
-    st.divider()
-
-    # --- 6. DÉTAIL "PAYÉ" (SANS ASCENSEUR) ---
     st.subheader("✅ DÉJÀ PAYÉ")
-    df_paye_disp = df_st[mask_paye][['DateNav', 'Nom', 'Prix']]
-    if not df_paye_disp.empty:
-        st.table(df_paye_disp)
-    else:
-        st.info("Aucun paiement reçu affiché.")
+    st.table(df_st[mask_paye][['DateNav', 'Nom', 'Prix']])
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
