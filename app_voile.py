@@ -601,119 +601,74 @@ if st.session_state.page == "STATS":
                 st.error("La liste de contacts est vide.")
 
 # =================================================================
-# --- 8. PAGE MAINTENANCE (VERSION FINALE VALIDÉE 2026) ---
+# --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
 if st.session_state.page == "MAINT":
     st.title("🔧 Maintenance Vesta")
 
-    # 1. CHARGEMENT ET SYNC DU FICHIER
+    # 1. CHARGEMENT VIA GITHUB (Pour la permanence)
     file_path = 'maintenance.json'
-    m_data = []
+    df_m = charger_data(file_path)
+    
+    # Si le fichier est vide ou n'existe pas, on crée la structure
+    if df_m.empty:
+        df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut"])
 
-    if not os.path.exists(file_path):
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump([], f)
-
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            m_data = json.load(f)
-    except Exception as e:
-        st.error(f"Erreur de lecture du fichier : {e}")
-        m_data = []
-
-    # 2. INTERFACE DE SAISIE (DIRECTE ET FIABLE)
+    # 2. INTERFACE DE SAISIE
     with st.expander("➕ Ajouter une nouvelle dépense", expanded=True):
         f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"), key="m_date")
-        f_obj = st.text_input("Objet (ex: Taxes DGAN, Drisse, Révision)", key="m_obj")
+        f_obj = st.text_input("Objet (ex: Taxes DGAN, Révision)", key="m_obj")
         f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0, key="m_mt")
         
-        if st.button("💾 ENREGISTRER MAINTENANT", type="primary"):
+        if st.button("💾 ENREGISTRER SUR GITHUB", type="primary", use_container_width=True):
             if f_obj:
-                try:
-                    # Création de l'entrée
-                    nouvelle_entree = {
-                        "Date": f_date,
-                        "Objet": f_obj,
-                        "Montant": float(f_mt),
-                        "Statut": "OK"
-                    }
-                    m_data.append(nouvelle_entree)
-                    
-                    # Écriture physique sur le disque
-                    with open(file_path, 'w', encoding='utf-8') as f:
-                        json.dump(m_data, f, indent=4, ensure_ascii=False)
-                    
-                    st.balloons()
-                    st.success(f"Enregistré : {f_obj} ({f_mt}€)")
-                    
-                    # Pause et rafraîchissement
-                    import time
-                    time.sleep(1)
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erreur lors de l'enregistrement : {e}")
+                # Création de la nouvelle ligne
+                nouvelle_ligne = pd.DataFrame([{
+                    "Date": f_date,
+                    "Objet": f_obj,
+                    "Montant": float(f_mt),
+                    "Statut": "OK"
+                }])
+                
+                # Ajout au DataFrame existant
+                df_m = pd.concat([df_m, nouvelle_ligne], ignore_index=True)
+                
+                # SAUVEGARDE PERMANENTE SUR GITHUB
+                sauvegarder_data(df_m, file_path)
+                
+                st.balloons()
+                st.success(f"Enregistré : {f_obj} ({f_mt}€)")
+                time.sleep(1)
+                st.rerun()
             else:
-                st.warning("Veuillez entrer un 'Objet' (ex: Taxes).")
+                st.warning("Veuillez entrer un 'Objet'.")
 
     st.divider()
 
-    # 3. AFFICHAGE DE L'HISTORIQUE ET DU TOTAL
-    if m_data:
-        # Calcul du total cumulé
-        total_frais = sum(float(item.get('Montant', 0)) for item in m_data)
+    # 3. AFFICHAGE DE L'HISTORIQUE
+    if not df_m.empty:
+        # Calcul du total depuis le DataFrame
+        total_frais = df_m['Montant'].astype(float).sum()
         st.metric("TOTAL CUMULÉ 2026", f"{total_frais:.2f} €")
 
         st.subheader("📋 Historique des interventions")
         
-        # On affiche du plus récent au plus ancien
-        for index, item in enumerate(reversed(m_data)):
-            # Calcul de l'index réel pour la suppression
-            real_index = len(m_data) - 1 - index
-            
-            # Affichage dans un bloc propre
-            with st.expander(f"📅 {item.get('Date')} - {item.get('Objet')} ({item.get('Montant')}€)"):
-                c1, c2 = st.columns([3, 1])
-                with c1:
-                    # Modification rapide du prix
-                    new_val = st.number_input("Modifier prix (€)", 
-                                             value=float(item.get('Montant', 0)), 
-                                             key=f"edit_{real_index}")
-                    if st.button("✅ Valider", key=f"v_{real_index}"):
-                        m_data[real_index]['Montant'] = new_val
-                        with open(file_path, 'w', encoding='utf-8') as f:
-                            json.dump(m_data, f, indent=4, ensure_ascii=False)
-                        st.rerun()
-                with c2:
-                    st.write("") # Espace
-                    if st.button("🗑️ Supprimer", key=f"del_{real_index}"):
-                        m_data.pop(real_index)
-                        with open(file_path, 'w', encoding='utf-8') as f:
-                            json.dump(m_data, f, indent=4, ensure_ascii=False)
-                        st.rerun()
-    else:
-        st.info("Aucune donnée enregistrée dans maintenance.json.")
-        
-   # --- 4. ZONE DE DANGER : RÉINITIALISATION (Tout en bas) ---
-    st.divider()
-    with st.expander("⚠️ Zone de Danger - Options Avancées"):
-        st.warning("Attention : Cette action supprimera TOUT l'historique des frais de maintenance 2026.")
-        
-        # Le "cran de sûreté" : il faut cocher pour voir le bouton
-        confirm_check = st.checkbox("Je confirme vouloir vider le fichier maintenance.json")
-        
-        if confirm_check:
-            if st.button("🔴 VIDER TOUTE LA MAINTENANCE", type="primary", use_container_width=True):
-                try:
-                    # On remet le fichier à une liste vide []
-                    with open(file_path, 'w', encoding='utf-8') as f:
-                        json.dump([], f, indent=4)
-                    
-                    st.success("L'historique a été réinitialisé.")
-                    time.sleep(1)
+        # Affichage inversé (plus récent en haut)
+        for index, item in df_m.iloc[::-1].iterrows():
+            with st.expander(f"📅 {item['Date']} - {item['Objet']} ({item['Montant']}€)"):
+                if st.button(f"🗑️ Supprimer cette ligne", key=f"del_m_{index}", use_container_width=True):
+                    df_m = df_m.drop(index).reset_index(drop=True)
+                    sauvegarder_data(df_m, file_path) # Sauvegarde après suppression
                     st.rerun()
-                except Exception as e:
-                    st.error(f"Erreur lors de la suppression : {e}")     
 
+    # --- 4. ZONE DE DANGER : VIDER TOUT ---
+    st.write("---")
+    with st.expander("⚠️ Zone de Danger"):
+        if st.checkbox("Confirmer la suppression de TOUS les frais"):
+            if st.button("🔴 VIDER TOUT LE FICHIER", type="primary", use_container_width=True):
+                df_vide = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut"])
+                sauvegarder_data(df_vide, file_path)
+                st.rerun()
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
