@@ -500,7 +500,8 @@ if st.session_state.page == "STATS":
 
     # --- 2. CALCULS ---
     # Encaisse Réelle = Tout ce qui est marqué "Payé"
-    df_paye = df_stats[df_stats['Paiement'].str.upper().contains("PAYÉ", na=False)]
+    # On s'assure que la colonne est bien du texte, on met en majuscules, puis on cherche "PAYÉ"
+    df_paye = df_stats[df_stats['Paiement'].astype(str).str.contains("PAYÉ", case=False, na=False)]
     total_encaisse = df_paye['PrixNum'].sum()
 
     # En Attente = Statut "OK" mais "Non payé"
