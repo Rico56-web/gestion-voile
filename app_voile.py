@@ -572,138 +572,53 @@ if st.session_state.page == "STATS":
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
 # =================================================================
-elif st.session_state.page == "MAINT":
-    st.subheader("🔧 Maintenance & Frais")
+if st.session_state.page == "MAINTENANCE":
+    st.title("🔧 Maintenance & technique")
+
+    # --- 1. NETTOYAGE DES MONTANTS ---
+    def clean_p(val):
+        try:
+            if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
+            s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
+            return float(s.replace(",", "."))
+        except: return 0.0
+
+    # On filtre pour ne garder que la catégorie Maintenance
+    # (Assure-toi que tes lignes de frais ont bien 'MAINTENANCE' dans la colonne Société)
+    df_maint = df_c[df_c['Société'].str.upper() == "MAINTENANCE"].copy()
+
+    # --- 2. RÉSUMÉ FINANCIER ---
+    total_maint = df_maint['Frais'].apply(clean_p).sum() if 'Frais' in df_maint.columns else 0.0
     
-    # Init du state de confirmation si inexistant
-    if 'm_confirm_del' not in st.session_state:
-        st.session_state.m_confirm_del = None
-
-    # 1. BOUTON NOUVEAU
-    if st.button("➕ AJOUTER UN NOUVEAU FRAIS", use_container_width=True):
-        new_m = {"Date": datetime.now().strftime("%d/%m/%Y"), "Travaux": "Nouvel achat", "Montant": 0.0}
-        df_m = pd.concat([pd.DataFrame([new_m]), df_m], ignore_index=True)
-        sauvegarder_data(df_m, "maintenance.json")
-        st.rerun()
-
-    st.divider()
-
-    # 2. ZONE D'ÉDITION
-    if st.session_state.get('m_edit_idx') is not None:
-        idx = st.session_state.m_edit_idx
-        if idx in df_m.index:
-            r = df_m.loc[idx]
-            with st.form("edit_maint_form"):
-                u_d = st.text_input("Date", str(r.get('Date', '')))
-                u_t = st.text_input("Travaux", str(r.get('Travaux', r.get('Cause', ''))))
-                u_m = st.text_input("Montant (€)", str(r.get('Montant', r.get('Prix', '0'))))
-                
-                c_b1, c_b2 = st.columns(2)
-                if c_b1.form_submit_button("💾 ENREGISTRER"):
-                    df_m.at[idx, 'Date'] = u_d
-                    df_m.at[idx, 'Travaux'] = u_t
-                    df_m.at[idx, 'Montant'] = float(u_m.replace('€','').replace(',','.').strip() or 0)
-                    sauvegarder_data(df_m, "maintenance.json")
-                    st.session_state.m_edit_idx = None
-                    st.rerun()
-                if c_b2.form_submit_button("❌ ANNULER"):
-                    st.session_state.m_edit_idx = None
-                    st.rerun()
+    c1, c2 = st.columns(2)
+    c1.metric("🛠️ TOTAL FRAIS", f"{total_maint:,.0f} €")
     
-    # 3. LISTE ET SUPPRESSION SÉCURISÉE
+    # Calcul du nombre d'interventions restant "Pas OK"
+    en_cours = len(df_maint[df_maint['Statut'] != "OK"])
+    if en_cours > 0:
+        c2.warning(f"⚠️ {en_cours} à finir")
     else:
-        for i, r in df_m.iterrows():
-            # Affichage de la fiche
-            st.markdown(f'''
-            <div style="border:1px solid #eee; padding:12px; border-radius:10px; background:white; color:black; margin-bottom:5px;">
-                <b>📅 {r.get("Date", "N/A")}</b> | 🛠️ {r.get("Travaux", r.get("Cause",""))} | 💰 {float(r.get("Montant", r.get("Prix",0))):.2f} €
-            </div>
-            ''', unsafe_allow_html=True)
-            
-            # Si on a cliqué sur supprimer pour CETTE fiche
-            if st.session_state.m_confirm_del == i:
-                st.error("❗ Confirmer la suppression ?")
-                col_c1, col_c2 = st.columns(2)
-                if col_c1.button("✅ OUI, SUPPRIMER", key=f"conf_yes_{i}", use_container_width=True):
-                    df_m = df_m.drop(i).reset_index(drop=True)
-                    sauvegarder_data(df_m, "maintenance.json")
-                    st.session_state.m_confirm_del = None
-                    st.rerun()
-                if col_c2.button("NON, ANNULER", key=f"conf_no_{i}", use_container_width=True):
-                    st.session_state.m_confirm_del = None
-                    st.rerun()
-            else:
-                # Affichage normal des boutons
-                c1, c2 = st.columns(2)
-                if c1.button("✏️ Modifier", key=f"edit_{i}", use_container_width=True):
-                    st.session_state.m_edit_idx = i
-                    st.rerun()
-                if c2.button("🗑️ Supprimer", key=f"del_req_{i}", use_container_width=True):
-                    st.session_state.m_confirm_del = i
-                    st.rerun()
-    # --- 4. TABLEAU RÉCAPITULATIF GLOBAL (TRIÉ PAR DATE) ---
+        c2.success("✅ Tout est OK")
+
     st.divider()
-    st.write("📊 **Historique de l'entretien (Du plus récent au plus ancien)**")
 
-    if not df_m.empty:
-        # 1. On crée une copie pour ne pas abîmer les données sources
-        df_tableau = df_m.copy()
-        
-        # 2. Conversion forcée en vraie date pour pouvoir TRIER
-        # On transforme le Timestamp 1774569600000 en objet date Python
-        df_tableau['Date_Tri'] = pd.to_datetime(df_tableau['Date'], errors='coerce')
-        
-        # 3. TRI : du plus récent au plus ancien
-        df_tableau = df_tableau.sort_values(by='Date_Tri', ascending=False)
+    # --- 3. TABLEAU D'INTERVENTION (SANS ASCENSEUR) ---
+    st.subheader("📋 Carnet de bord technique")
 
-        # 4. FORMATAGE de l'affichage (JJ/MM/AAAA)
-        df_tableau['Date'] = df_tableau['Date_Tri'].dt.strftime('%d/%m/%Y').fillna("Date inconnue")
+    if not df_maint.empty:
+        # On prépare les colonnes pour l'iPhone (ordre logique)
+        # 'Nom' sert ici de désignation de l'intervention
+        # 'Commentaires' pour les détails
+        df_maint_visu = df_maint[['DateNav', 'Nom', 'Statut', 'Frais', 'Commentaires']].copy()
+        df_maint_visu.columns = ['Date', 'Intervention', 'État', 'Coût', 'Notes']
 
-        # 5. Gestion des noms de colonnes (Compatibilité anciens fichiers)
-        if 'Cause' in df_tableau.columns and 'Travaux' not in df_tableau.columns:
-            df_tableau = df_tableau.rename(columns={'Cause': 'Travaux'})
-        if 'Prix' in df_tableau.columns and 'Montant' not in df_tableau.columns:
-            df_tableau = df_tableau.rename(columns={'Prix': 'Montant'})
-
-        # 6. AFFICHAGE DU TABLEAU
-        st.dataframe(
-            df_tableau[['Date', 'Travaux', 'Montant']], 
-            column_config={
-                "Date": st.column_config.TextColumn("Date 📅"),
-                "Travaux": st.column_config.TextColumn("Nature des travaux 🔧"),
-                "Montant": st.column_config.NumberColumn("Coût (€)", format="%.2f €"),
-            },
-            use_container_width=True,
-            hide_index=True
-        )
-
-        # Total en bas du tableau
-        total_m = pd.to_numeric(df_tableau['Montant'], errors='coerce').sum()
-        st.success(f"💰 **Total cumulé des frais de maintenance : {total_m:,.2f} €**")
+        # Affichage en tableau fixe pour éviter l'ascenseur sur mobile
+        st.table(df_maint_visu)
     else:
-        st.info("Aucun frais enregistré pour le moment.")  
-        # --- SYSTÈME D'ALERTE MAINTENANCE PRÉVENTIVE ---
-    # Remplace '2450' par une variable si tu saisis tes heures ailleurs
-    heures_actuelles = 2450  # Seuil que tu as fixé
-    seuil_vidange = 2450
-    
-    if heures_actuelles >= seuil_vidange:
-        st.error(f"⚠️ **ALERTE ENTRETIEN MOTEUR**")
-        st.markdown(f"""
-        **Heures moteur : {heures_actuelles} h** Il est temps d'effectuer la **vidange moteur** (Seuil : {seuil_vidange} h).
-        """)
-        if st.button("✅ MARQUER VIDANGE COMME FAITE"):
-            # Crée un frais automatique pour la vidange
-            new_v = {
-                "Date": datetime.now().strftime("%d/%m/%Y"), 
-                "Travaux": f"Vidange moteur faite à {heures_actuelles}h", 
-                "Montant": 0.0
-            }
-            df_m = pd.concat([pd.DataFrame([new_v]), df_m], ignore_index=True)
-            sauvegarder_data(df_m, "maintenance.json")
-            st.success("Entretien enregistré ! N'oublie pas de modifier le montant du forfait.")
-            st.rerun()
-    st.divider()
+        st.info("Aucune intervention enregistrée. Utilise l'onglet CONTACTS pour ajouter une ligne avec la société 'MAINTENANCE'.")
+
+    # --- 4. RAPPEL UTILE ---
+    st.info("💡 Pour que les frais apparaissent ici et dans les STATS, vérifie que la colonne 'Société' contient bien 'MAINTENANCE' et que le montant est dans 'Frais'.")
 
 # --- 10. PAGE NOTES ---
 elif st.session_state.page == "NOTES":
