@@ -140,158 +140,109 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta - Missions")
 
-    # --- 1. FONCTIONS DE SÉCURITÉ & NETTOYAGE ---
-    def protect(val):
+    # --- 1. FONCTION DE SÉCURITÉ (À NE PAS OUBLIER) ---
+    import html
+    def safe_txt(val):
         v = str(val).strip()
         if v.lower() in ["none", "nan", "", "null"]: return ""
-        return v.replace('"', "''").replace("\n", " ").replace("\r", "")
+        # On nettoie tout pour éviter le bug des DIV
+        return html.escape(v).replace("\n", " ").replace("\r", "")
 
-    # --- 2. LOGIQUE DE SUPPRESSION (CONFIRMATION) ---
-    if "confirm_del_idx" not in st.session_state:
-        st.session_state.confirm_del_idx = None
-
-    if st.session_state.confirm_del_idx is not None:
-        idx = st.session_state.confirm_del_idx
-        st.error(f"❗ Voulez-vous vraiment supprimer la fiche n°{idx + 1} ?")
-        c_yes, c_no = st.columns(2)
-        if c_yes.button("✅ OUI, SUPPRIMER", use_container_width=True):
-            df_c = df_c.drop(idx).reset_index(drop=True)
-            sauvegarder_data(df_c, "contacts.json")
-            st.session_state.confirm_del_idx = None
-            st.rerun()
-        if c_no.button("❌ NON, ANNULER", use_container_width=True):
-            st.session_state.confirm_del_idx = None
-            st.rerun()
-
-    # --- 3. FORMULAIRE DE MODIFICATION (L'ÉDITEUR) ---
-    if st.session_state.edit_idx is not None:
-        idx = st.session_state.edit_idx
-        if idx in df_c.index:
-            st.markdown(f"### ✏️ Modification Fiche n°{idx + 1}")
-            r = df_c.loc[idx]
-            with st.form("edit_contact_form"):
-                col1, col2 = st.columns(2)
-                u_prenom = col1.text_input("Prénom", value=str(r.get('Prénom', '')))
-                u_nom = col2.text_input("Nom", value=str(r.get('Nom', '')))
-                u_soc = col1.text_input("Société", value=str(r.get('Société', '')))
-                u_tel = col2.text_input("Téléphone", value=str(r.get('Téléphone', '')))
-                u_mail = col1.text_input("Email", value=str(r.get('Email', '')))
-                u_date = col2.text_input("Date (JJ/MM/AAAA)", value=str(r.get('DateNav', '')))
-                
-                col3, col4, col5 = st.columns(3)
-                u_statut = col3.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], 
-                                         index=["En attente", "OK", "Terminé", "Refusé"].index(r.get('Statut', 'En attente')) if r.get('Statut') in ["En attente", "OK", "Terminé", "Refusé"] else 0)
-                u_prix = col4.text_input("Prix (€)", value=str(r.get('Prix', '0')))
-                u_paiement = col5.selectbox("Paiement", ["Non payé", "Payé"], index=1 if "pay" in str(r.get('Paiement', '')).lower() else 0)
-                
-                u_notes = st.text_area("Notes", value=str(r.get('Notes', '')))
-                
-                btn_save, btn_cancel = st.columns(2)
-                if btn_save.form_submit_button("💾 ENREGISTRER"):
-                    df_c.at[idx, 'Prénom'] = u_prenom
-                    df_c.at[idx, 'Nom'] = u_nom
-                    df_c.at[idx, 'Société'] = u_soc
-                    df_c.at[idx, 'Téléphone'] = u_tel
-                    df_c.at[idx, 'Email'] = u_mail
-                    df_c.at[idx, 'DateNav'] = u_date
-                    df_c.at[idx, 'Statut'] = u_statut
-                    df_c.at[idx, 'Prix'] = u_prix
-                    df_c.at[idx, 'Paiement'] = u_paiement
-                    df_c.at[idx, 'Notes'] = u_notes
-                    sauvegarder_data(df_c, "contacts.json")
-                    st.session_state.edit_idx = None
-                    st.success("Modifications enregistrées !")
-                    st.rerun()
-                if btn_cancel.form_submit_button("❌ ANNULER"):
-                    st.session_state.edit_idx = None
-                    st.rerun()
-            st.divider()
-
-    # --- 4. BARRE DE NAVIGATION (EN COURS / ARCHIVES / AJOUTER) ---
-    n1, n2, n3 = st.columns(3)
+    # --- 2. BARRE D'ACTION (AJOUTER EN HAUT) ---
+    col_nav1, col_nav2, col_add = st.columns([1, 1, 2])
     view_arc = st.session_state.get('view_archive', False)
-    if n1.button("📂 En Cours", use_container_width=True, type="primary" if not view_arc else "secondary"):
+    
+    if col_nav1.button("📂 En Cours", use_container_width=True):
         st.session_state.view_archive = False
         st.rerun()
-    if n2.button("🗄️ Archives", use_container_width=True, type="primary" if view_arc else "secondary"):
+    if col_nav2.button("🗄️ Archives", use_container_width=True):
         st.session_state.view_archive = True
         st.rerun()
-    if n3.button("➕ Ajouter", use_container_width=True):
-        new = {"Prénom": "Nouveau", "Nom": "Contact", "Statut": "En attente", "Paiement": "Non payé"}
-        df_c = pd.concat([df_c, pd.DataFrame([new])], ignore_index=True)
-        sauvegarder_data(df_c, "contacts.json")
-        st.rerun()
         
-# ---  CRÉATION DE DF_DISP (L'étape qui manquait !) ---
-    # On définit df_disp AVANT de l'utiliser dans la boucle for
-    if view_arc:
-        # On affiche uniquement les fiches terminées ou refusées
-        df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])]
-    else:
-        # On affiche tout sauf ce qui est archivé
-        df_disp = df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
-  # --- 5. FILTRAGE ET AFFICHAGE DES FICHES ---
+    if col_add.button("➕ NOUVELLE MISSION", type="primary", use_container_width=True):
+        # On insère à l'index 0 pour que la fiche soit en haut !
+        new_row = pd.DataFrame([{"Prénom": "Nouveau", "Nom": "Contact", "Statut": "En attente", "Paiement": "Non payé", "DateNav": "01/01/2026"}])
+        df_c = pd.concat([new_row, df_c], ignore_index=True)
+        sauvegarder_data(df_c, "contacts.json")
+        st.session_state.edit_idx = 0 # On ouvre l'édition direct
+        st.rerun()
+
+    st.divider()
+
+    # --- 3. FILTRAGE ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
+    # --- 4. BOUCLE D'AFFICHAGE ---
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # Sécurité maximale contre les DIV et bugs iPhone
-        def safe(val):
-            v = str(val).strip()
-            if v.lower() in ["none", "nan", "", "null"]: return ""
-            return html.escape(v).replace("\n", " ").replace("\r", "")
-
-        nom = f"{safe(r.get('Prénom'))} {safe(r.get('Nom')).upper()}"
-        soc = safe(r.get('Société')).upper() or "PARTICULIER"
-        tel = safe(r.get('Téléphone')).replace(" ", "")
-        mail = safe(r.get('Email'))
-        note = safe(r.get('Notes'))
+        # Préparation des données sécurisées
+        nom = f"{safe_txt(r.get('Prénom'))} {safe_txt(r.get('Nom')).upper()}"
+        soc = safe_txt(r.get('Société')) or "PERSO"
+        tel = safe_txt(r.get('Téléphone')).replace(" ", "")
+        mail = safe_txt(r.get('Email'))
+        note = safe_txt(r.get('Notes'))
+        prix = safe_txt(r.get('Prix'))
         
-        s = safe(r.get('Statut')) or "En attente"
-        s_col = "#2ecc71" if "OK" in s.upper() else "#f1c40f" if "ATTENTE" in s.upper() else "#e74c3c"
-        pay = safe(r.get('Paiement')) or "Non payé"
-        p_col = "#3498db" if "PAYÉ" in pay.upper() else "#e67e22"
+        # Couleurs
+        s_val = safe_txt(r.get('Statut')) or "En attente"
+        s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
+        p_val = safe_txt(r.get('Paiement')) or "Non payé"
+        p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
 
-        # --- AFFICHAGE DE LA FICHE (Sans iframe pour éviter les coupures) ---
-        st.markdown(f"""
-        <div style="border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; margin-bottom: 5px; background: white; color: black;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                <b style="color: #1a2a6c; font-size: 1.05rem;">#{num_f} — {nom}</b>
-                <div style="display: flex; flex-direction: column; gap: 3px; align-items: flex-end;">
-                    <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:10px; font-size:0.65rem; font-weight:bold;">{s.upper()}</span>
-                    <span style="background:{p_col}; color:white; padding:2px 8px; border-radius:10px; font-size:0.65rem; font-weight:bold;">{pay.upper()}</span>
+        # --- LE DESIGN (On force le HTML propre) ---
+        html_card = f"""
+        <div style="border: 2px solid #1a2a6c; border-radius: 12px; padding: 15px; background: white; color: black; margin-bottom: 5px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <b style="color: #1a2a6c; font-size: 1.1rem;">#{num_f} — {nom}</b>
+                <div style="text-align: right;">
+                    <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:bold;">{s_val.upper()}</span><br>
+                    <span style="background:{p_col}; color:white; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:bold; margin-top:4px; display:inline-block;">{p_val.upper()}</span>
                 </div>
             </div>
-            <div style="color: #666; font-size: 0.8rem; margin-bottom: 10px;">🏢 {soc}</div>
-            <div style="font-size: 0.9rem; border-top: 1px solid #eee; padding-top: 8px; color: #333;">
-                📅 <b>{r.get('DateNav','--')}</b> | 💰 <b>{r.get('Prix', 0)}€</b>
+            <p style="color: #666; font-size: 0.9rem; margin: 5px 0;">🏢 {soc}</p>
+            <div style="font-size: 0.95rem; border-top: 1px solid #eee; padding-top: 8px; margin-top:5px;">
+                📅 <b>{r.get('DateNav','--')}</b> | 💰 <b>{prix}€</b>
             </div>
-            {f'<div style="margin-top:8px; padding:8px; background:#f9f9f9; border-left:3px solid #1a2a6c; font-size:0.8rem; color:#444;">📝 {note}</div>' if note else ""}
-            <div style="margin-top: 15px; display: flex; gap: 5px;">
-                <a href="tel:{tel}" style="flex:1; background:#34495e; color:white !important; padding:10px 2px; border-radius:6px; text-decoration:none; text-align:center; font-size:0.75rem; font-weight:bold;">📞 {tel if tel else "APPEL"}</a>
-                <a href="https://wa.me/{tel}" style="flex:1; background:#25D366; color:white !important; padding:10px 2px; border-radius:6px; text-decoration:none; text-align:center; font-size:0.75rem; font-weight:bold;">💬 WA</a>
-                <a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white !important; padding:10px 2px; border-radius:6px; text-decoration:none; text-align:center; font-size:0.75rem; font-weight:bold;">📧 MAIL</a>
+            {f'<div style="margin-top:10px; padding:8px; background:#f8f9fa; border-left:4px solid #1a2a6c; font-size:0.85rem;">📝 {note}</div>' if note else ""}
+            
+            <div style="margin-top: 15px; display: flex; gap: 8px;">
+                <a href="tel:{tel}" style="flex:1; background:#34495e; color:white !important; padding:12px 5px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">📞 APPEL</a>
+                <a href="https://wa.me/{tel}" style="flex:1; background:#25D366; color:white !important; padding:12px 5px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">💬 WA</a>
+                <a href="mailto:{mail}" style="flex:1; background:#e67e22; color:white !important; padding:12px 5px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.8rem; font-weight:bold;">📧 MAIL</a>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """
+        st.markdown(html_card, unsafe_allow_html=True)
 
-        # --- BOUTONS ET LOGIQUE DE GESTION SUR PLACE ---
-        c1, c2 = st.columns([1, 4])
+        # --- ACTIONS SUR PLACE (Juste sous la fiche) ---
+        c_ed, c_del = st.columns([1, 3])
         
-        # BOUTON MODIFIER
-        if c1.button(f"✏️ {num_f}", key=f"ed_btn_{i}", use_container_width=True):
+        if c_ed.button(f"✏️ Modifier {num_f}", key=f"ed_{i}", use_container_width=True):
             st.session_state.edit_idx = i
             st.rerun()
-            
-        # BOUTON SUPPRIMER (SANS REMONTER EN HAUT)
-        if c2.button(f"🗑️ Supprimer n°{num_f}", key=f"del_btn_{i}", use_container_width=True):
+
+        if c_del.button(f"🗑️ Supprimer {num_f}", key=f"del_{i}", use_container_width=True):
             st.session_state.confirm_del_idx = i
             st.rerun()
 
-        # LOGIQUE DE CONFIRMATION SOUS LE BOUTON
+        # FORMULAIRE DE MODIFICATION (S'OUVRE ICI)
+        if st.session_state.get('edit_idx') == i:
+            with st.expander("⚙️ Paramètres de la mission", expanded=True):
+                with st.form(f"f_{i}"):
+                    # Ici tu mets tous tes champs text_input habituels...
+                    new_statut = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"])
+                    new_pay = st.selectbox("Paiement", ["Non payé", "Payé"])
+                    if st.form_submit_button("Sauvegarder"):
+                        df_c.at[i, 'Statut'] = new_statut
+                        df_c.at[i, 'Paiement'] = new_pay
+                        sauvegarder_data(df_c, "contacts.json")
+                        st.session_state.edit_idx = None
+                        st.rerun()
+
+        # CONFIRMATION DE SUPPRESSION (S'OUVRE ICI)
         if st.session_state.get('confirm_del_idx') == i:
-            st.warning(f"⚠️ Supprimer la fiche {num_f} ?")
+            st.error(f"Supprimer définitivement la fiche #{num_f} ?")
             col_y, col_n = st.columns(2)
             if col_y.button("OUI ✅", key=f"y_{i}"):
                 df_c = df_c.drop(i).reset_index(drop=True)
@@ -301,23 +252,6 @@ if st.session_state.page == "CONTACTS":
             if col_n.button("NON ❌", key=f"n_{i}"):
                 st.session_state.confirm_del_idx = None
                 st.rerun()
-
-        # LOGIQUE D'ÉDITION SOUS LA FICHE
-        if st.session_state.get('edit_idx') == i:
-            with st.expander(f"⚙️ Modifier la mission #{num_f}", expanded=True):
-                with st.form(f"form_{i}"):
-                    u_statut = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=0)
-                    u_pay = st.selectbox("Paiement", ["Non payé", "Payé"], index=0)
-                    u_prix = st.text_input("Prix €", value=str(r.get('Prix', '0')))
-                    u_notes = st.text_area("Notes", value=str(r.get('Notes', '')))
-                    if st.form_submit_button("✅ Valider"):
-                        df_c.at[i, 'Statut'] = u_statut
-                        df_c.at[i, 'Paiement'] = u_pay
-                        df_c.at[i, 'Prix'] = u_prix
-                        df_c.at[i, 'Notes'] = u_notes
-                        sauvegarder_data(df_c, "contacts.json")
-                        st.session_state.edit_idx = None
-                        st.rerun()      
 
 # =================================================================
 # --- 6. PAGE PLANNING (DÉBUT DU BLOC) ---
