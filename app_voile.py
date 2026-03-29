@@ -567,10 +567,13 @@ if st.session_state.page == "STATS":
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION FINALE SÉCURISÉE) ---
 # =================================================================
+# =================================================================
+# --- 8. PAGE MAINTENANCE (SANS FORMULAIRE - ULTRA FIABLE) ---
+# =================================================================
 if st.session_state.page == "MAINT":
-    st.title("🔧 Maintenance & Frais Vesta")
+    st.title("🔧 Maintenance Vesta")
 
-    # 1. CHARGEMENT SÉCURISÉ DU FICHIER
+    # 1. CHARGEMENT
     if not os.path.exists('maintenance.json'):
         with open('maintenance.json', 'w', encoding='utf-8') as f:
             json.dump([], f)
@@ -581,70 +584,48 @@ if st.session_state.page == "MAINT":
     except:
         m_data = []
 
-    # 2. FORMULAIRE D'AJOUT (BOUTON BIEN À L'INTÉRIEUR)
-    with st.expander("➕ Ajouter une dépense / intervention", expanded=True):
-        with st.form("form_maintenance", clear_on_submit=True):
-            f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
-            f_obj = st.text_input("Objet (ex: Taxes 178€, Drisse, Antifouling)")
-            f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0)
-            
-            # CE BOUTON DOIT RESTER DÉCALÉ ICI (DANS LE WITH)
-            submitted = st.form_submit_button("ENREGISTRER MAINTENANT")
-
-            if submitted:
-                if f_obj:
-                    nouvelle_ligne = {
-                        "Date": f_date,
-                        "Objet": f_obj,
-                        "Montant": float(f_mt),
-                        "Statut": "OK"
-                    }
-                    m_data.append(nouvelle_ligne)
-                    # Écriture immédiate
-                    with open('maintenance.json', 'w', encoding='utf-8') as f:
-                        json.dump(m_data, f, indent=4, ensure_ascii=False)
-                    st.success(f"✅ Enregistré : {f_obj}")
-                    st.rerun()
-                else:
-                    st.error("Veuillez saisir un 'Objet' pour enregistrer.")
+    # 2. SAISIE DIRECTE (SANS ST.FORM)
+    st.subheader("➕ Ajouter un frais")
+    f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
+    f_obj = st.text_input("Objet (ex: Taxes 178€)")
+    f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0)
+    
+    # Bouton direct
+    if st.button("💾 ENREGISTRER DANS LE FICHIER"):
+        if f_obj:
+            try:
+                nouvelle_ligne = {"Date": f_date, "Objet": f_obj, "Montant": float(f_mt), "Statut": "OK"}
+                m_data.append(nouvelle_ligne)
+                
+                # Écriture forcée
+                with open('maintenance.json', 'w', encoding='utf-8') as f:
+                    json.dump(m_data, f, indent=4, ensure_ascii=False)
+                
+                st.success("✅ Enregistré avec succès !")
+                # On attend une seconde avant de recharger pour être sûr que l'iPhone a vu le message
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erreur d'écriture : {e}")
+        else:
+            st.warning("Indiquez l'objet (ex: Taxes).")
 
     st.divider()
 
-    # 3. AFFICHAGE ET GESTION (MODIFIER / SUPPRIMER)
+    # 3. AFFICHAGE
     if m_data:
-        # Calcul du Total
         total_m = sum(float(i.get('Montant', 0)) for i in m_data)
-        st.metric("TOTAL FRAIS 2026", f"{total_m:.2f} €")
-
-        st.subheader("📋 Historique des frais")
+        st.metric("TOTAL CUMULÉ", f"{total_m:.2f} €")
         
-        # On affiche du plus récent au plus ancien
         for index, item in enumerate(reversed(m_data)):
             real_index = len(m_data) - 1 - index
-            
             with st.expander(f"{item['Date']} - {item['Objet']} ({item['Montant']}€)"):
-                col1, col2 = st.columns([2, 1])
-                
-                with col1:
-                    # Modification du prix en direct
-                    new_val = st.number_input("Prix", value=float(item['Montant']), key=f"edit_val_{real_index}")
-                    if st.button("✅ Valider Modif", key=f"btn_v_{real_index}"):
-                        m_data[real_index]['Montant'] = new_val
-                        with open('maintenance.json', 'w', encoding='utf-8') as f:
-                            json.dump(m_data, f, indent=4)
-                        st.toast("Modifié !")
-                        st.rerun()
-                
-                with col2:
-                    # Suppression
-                    st.write("") # Petit espace
-                    if st.button("🗑️ Supprimer", key=f"btn_d_{real_index}"):
-                        m_data.pop(real_index)
-                        with open('maintenance.json', 'w', encoding='utf-8') as f:
-                            json.dump(m_data, f, indent=4)
-                        st.rerun()
+                if st.button("🗑️ Supprimer", key=f"del_{real_index}"):
+                    m_data.pop(real_index)
+                    with open('maintenance.json', 'w', encoding='utf-8') as f:
+                        json.dump(m_data, f, indent=4)
+                    st.rerun()
     else:
-        st.info("Le carnet est vide. Ajoutez vos premières dépenses ci-dessus.")
+        st.info("Le fichier maintenance.json est vide.")
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
