@@ -518,12 +518,12 @@ if st.session_state.page == "STATS":
             m_data = json.load(f)
             df_maint_stats = pd.DataFrame(m_data)
         
-        if not df_maint_stats.empty and 'Date' in df_maint_stats.columns:
+         if not df_maint_stats.empty and 'Date' in df_maint_stats.columns:
             df_maint_stats['M_Sort'], df_maint_stats['Mois'] = zip(*df_maint_stats['Date'].apply(get_month_info))
             # Sécurité : on vérifie si 'Montant' existe
             col_mt = 'Montant' if 'Montant' in df_maint_stats.columns else df_maint_stats.columns[0]
             df_maint_stats['FraisNum'] = df_maint_stats[col_mt].apply(clean_val)
-        else:
+         else:
             df_maint_stats = pd.DataFrame(columns=['M_Sort', 'Mois', 'FraisNum'])
     except:
         df_maint_stats = pd.DataFrame(columns=['M_Sort', 'Mois', 'FraisNum'])
