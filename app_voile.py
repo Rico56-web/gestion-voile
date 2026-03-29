@@ -484,58 +484,54 @@ elif st.session_state.page == "PLANNING":
 if st.session_state.page == "STATS":
     st.title("📊 Vesta - Statistiques 2026")
 
-    # --- 1. NETTOYAGE DES DONNÉES PRIX ---
-    # Cette fonction transforme "500 €" ou "500,00" en nombre 500.0
+    # --- 1. FONCTION DE NETTOYAGE ULTRA-PRÉCISE ---
     def clean_price(val):
         try:
-            if not val or str(val).lower() == "nan": return 0.0
-            s = str(val).replace("€", "").replace(" ", "").replace(",", ".").strip()
+            if val is None or str(val).lower() in ["nan", "none", ""]: return 0.0
+            # On enlève tout sauf les chiffres et le point/virgule
+            s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
+            s = s.replace(",", ".")
             return float(s)
         except:
             return 0.0
 
-    # Copie de travail pour ne pas abîmer le fichier original
-    df_stats = df_c.copy()
-    df_stats['PrixNum'] = df_stats['Prix'].apply(clean_price)
+    # Préparation des données
+    df_st = df_c.copy()
+    df_st['PrixNum'] = df_st['Prix'].apply(clean_price)
 
-  # --- 2. CALCULS RÉVISÉS ---
-    # On filtre les lignes payées de manière robuste
-    mask_paye = df_stats['Paiement'].astype(str).str.contains("PAYÉ", case=False, na=False)
-    df_paye = df_stats[mask_paye]
+    # --- 2. FILTRES DE CALCUL ---
+    # On cherche tout ce qui contient "PAYÉ" (insensible à la casse)
+    mask_paye = df_st['Paiement'].astype(str).str.contains("PAYÉ", case=False, na=False)
+    df_paye = df_st[mask_paye]
+    
     total_encaisse = df_paye['PrixNum'].sum()
 
-    # On fait pareil pour l'attente (Statut OK mais pas encore payé)
-    mask_ok = df_stats['Statut'].astype(str).str.contains("OK", case=False, na=False)
-    df_attente = df_stats[mask_ok & ~mask_paye]
-    total_attente = df_attente['PrixNum'].sum()
-
-    # --- 3. AFFICHAGE DES INDICATEURS ---
-    c1, c2, c3 = st.columns(3)
+    # --- 3. AFFICHAGE DES CHIFFRES ---
+    st.metric("💰 TOTAL ENCAISSÉ", f"{total_encaisse:,.2f} €".replace(",", " "))
     
-    with c1:
-        st.metric("💰 ENCAISSÉ", f"{total_encaisse:,.2f} €".replace(",", " "))
-    with c2:
-        st.metric("⏳ EN ATTENTE", f"{total_attente:,.2f} €".replace(",", " "))
-    with c3:
-        st.metric("📈 MISSIONS OK", len(df_stats[df_stats['Statut'] == "OK"]))
+    if total_encaisse != 1509:
+        st.error(f"⚠️ Écart détecté ! Tu attends 1509 €, l'app calcule {total_encaisse:,.2f} €.")
+    else:
+        st.success("✅ Le compte est bon : 1509 €.")
 
     st.divider()
 
-    # --- 4. DÉTAIL DES ENTRÉES (POUR CONTRÔLE) ---
-    st.subheader("🔍 Détail des paiements reçus")
+    # --- 4. LE TABLEAU DE CONTRÔLE (L'EXPLICATION) ---
+    st.subheader("🔍 Liste des lignes comptées dans l'encaisse")
     if not df_paye.empty:
-        # On affiche uniquement les colonnes utiles pour vérifier le calcul
-        df_verif = df_paye[['DateNav', 'Société', 'Nom', 'Prix']].copy()
-        st.dataframe(df_verif, use_container_width=True, hide_index=True)
+        # On affiche les colonnes pour identifier l'erreur
+        df_verif = df_paye[['DateNav', 'Société', 'Nom', 'Prix', 'PrixNum']].copy()
+        st.table(df_verif) # Utilisation de st.table pour une lecture plus claire sur mobile
         
-        st.info(f"Le total de **{total_encaisse:,.2f} €** est calculé sur ces {len(df_paye)} lignes.")
+        st.info("💡 Vérifie si une ligne est présente en double ou si une mission de 100 € est marquée 'Payé' par erreur.")
     else:
-        st.warning("Aucun paiement marqué comme 'Payé' pour le moment.")
+        st.warning("Aucune ligne marquée comme 'Payé'.")
 
-    # --- 5. RÉPARTITION PAR SOCIÉTÉ (OPTIONNEL) ---
-    if st.checkbox("Voir la répartition par Société"):
-        repart = df_paye.groupby('Société')['PrixNum'].sum().sort_values(ascending=False)
-        st.bar_chart(repart)
+    # --- 5. RAPPEL DES MISSIONS "OK" MAIS NON PAYÉES ---
+    st.subheader("⏳ Missions validées (Attente paiement)")
+    df_attente = df_st[(df_st['Statut'] == "OK") & (~mask_paye)]
+    if not df_attente.empty:
+        st.dataframe(df_attente[['DateNav', 'Nom', 'Prix']], use_container_width=True)
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
