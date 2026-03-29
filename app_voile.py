@@ -573,57 +573,70 @@ if st.session_state.page == "STATS":
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
 # =================================================================
-# --- IMPORTANT : L'orthographe doit être EXACTEMENT 'MAINT' ---
 if st.session_state.page == "MAINT":
-    st.title("🔧 Carnet d'Entretien Vesta")
-    
-    # 1. INITIALISATION DU FICHIER SI ABSENT
+    st.title("🔧 Maintenance Vesta")
+
+    # 1. CHARGEMENT
     if not os.path.exists('maintenance.json'):
         with open('maintenance.json', 'w') as f:
             json.dump([], f)
     
-    # 2. LECTURE DU FICHIER
-    try:
-        with open('maintenance.json', 'r') as f:
+    with open('maintenance.json', 'r') as f:
+        try:
             m_data = json.load(f)
-    except:
-        m_data = []
+        except:
+            m_data = []
 
-    # 3. FORMULAIRE D'AJOUT (Simple pour iPhone)
-    st.subheader("➕ Ajouter un Achat / Taxe")
-    with st.form("form_maint_simple"):
-        f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
-        f_obj = st.text_input("Objet (ex: Taxes 178€)")
-        f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0)
-        
-        if st.form_submit_button("ENREGISTRER MAINTENANT"):
-            nouvelle_ligne = {
-                "Date": f_date, 
-                "Objet": f_obj, 
-                "Montant": float(f_mt), 
-                "Statut": "OK"
-            }
-            m_data.append(nouvelle_ligne)
-            with open('maintenance.json', 'w') as f:
-                json.dump(m_data, f, indent=4)
-            st.success("Enregistré ! Vos frais apparaissent plus bas.")
-            st.rerun()
+    # 2. FORMULAIRE D'AJOUT (Toujours en haut pour l'iPhone)
+    with st.expander("➕ Nouvelle intervention"):
+        with st.form("add_maint"):
+            f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
+            f_obj = st.text_input("Objet")
+            f_mt = st.number_input("Montant (€)", min_value=0.0)
+            if st.form_submit_button("Enregistrer"):
+                m_data.append({"Date": f_date, "Objet": f_obj, "Montant": float(f_mt)})
+                with open('maintenance.json', 'w') as f:
+                    json.dump(m_data, f, indent=4)
+                st.rerun()
 
     st.divider()
 
-    # 4. AFFICHAGE DU TABLEAU ET TOTAL
+    # 3. AFFICHAGE ET GESTION (MODIFIER / SUPPRIMER)
     if m_data:
-        st.subheader("📋 Historique")
-        df_m = pd.DataFrame(m_data)
-        
-        # On affiche le tableau (Date, Objet, Montant)
-        st.table(df_m[['Date', 'Objet', 'Montant']])
-        
-        # Calcul du total
+        # Calcul du Total pour l'affichage en haut
         total = sum(float(i['Montant']) for i in m_data)
         st.metric("TOTAL CUMULÉ", f"{total:.2f} €")
+
+        st.subheader("📋 Historique & Gestion")
+        
+        # On parcourt la liste à l'envers pour voir le plus récent en haut
+        for index, item in enumerate(reversed(m_data)):
+            # On recalcule l'index réel (car on a inversé la liste)
+            real_index = len(m_data) - 1 - index
+            
+            with st.expander(f"{item['Date']} - {item['Objet']} ({item['Montant']}€)"):
+                # --- MODIFICATION ---
+                new_mt = st.number_input(f"Modifier Montant", value=float(item['Montant']), key=f"edit_{real_index}")
+                if st.button("Valider modification", key=f"btn_edit_{real_index}"):
+                    m_data[real_index]['Montant'] = new_mt
+                    with open('maintenance.json', 'w') as f:
+                        json.dump(m_data, f, indent=4)
+                    st.success("Modifié !")
+                    st.rerun()
+                
+                # --- SUPPRESSION ---
+                if st.button("❌ Supprimer cette ligne", key=f"del_{real_index}"):
+                    m_data.pop(real_index)
+                    with open('maintenance.json', 'w') as f:
+                        json.dump(m_data, f, indent=4)
+                    st.warning("Supprimé !")
+                    st.rerun()
     else:
-        st.info("Le carnet est vide. Utilisez le formulaire ci-dessus.")
+        st.info("Aucune donnée enregistrée.")
+
+# --- CONNECTION AUX STATS (À ajouter dans ton bloc STATS) ---
+# total_maint = sum(float(i['Montant']) for i in m_data)
+# benefice_net = CA_total - total_maint
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
