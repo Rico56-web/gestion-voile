@@ -710,33 +710,42 @@ if st.session_state.page == "FACTURES":
             
             st.metric("Total à facturer", f"{total_cmn:.2f} €")
             
-         # --- 3. PRÉPARATION DU TEXTE ALIGNÉ ---
+ # --- 3. PRÉPARATION DU TEXTE ALIGNÉ ---
             st.divider()
             st.subheader("✉️ Préparation de l'envoi")
             
-            # Création manuelle des lignes pour maîtriser l'espacement
-            # Date (10 car.) + 12 espaces + Nom + 3 espaces + Prix
+            # Construction des lignes avec tes espacements précis
             lignes_missions = []
             espaces_12 = " " * 12
             espaces_3  = " " * 3
             
             for _, row in df_cmn_mois.iterrows():
-                date_str = str(row['DateNav']).ljust(10) # Formate la date sur 10 caractères
+                date_str = str(row['DateNav']).ljust(10)
                 nom_str  = str(row['Nom'])
                 prix_str = f"{row['PrixNum']:.2f} €"
-                
-                # Assemblage de la ligne avec tes espacements précis
+                # Assemblage de la ligne
                 ligne = f"{date_str}{espaces_12}{nom_str}{espaces_3}{prix_str}"
                 lignes_missions.append(ligne)
             
             texte_missions = "\n".join(lignes_missions)
 
-            destinataire = "tresorier@cmn-asso.fr","aurelienfaucheux@gmail.com"
-            objet = f"Facturation Missions Vesta - {sel_mois} {sel_annee}"
+            corps_mail = f"""Bonjour,\n\nJ'espère que tu vas bien ! ⛵\n\nVoici le récapitulatif de mes missions pour la CMN concernant le mois de {sel_mois} {sel_annee} :\n\n{texte_missions}\n\nLe montant total s'élève à {total_cmn:.2f} €.\n\nMerci d'avance pour le règlement et à très vite sur l'eau !\n\nAmicalement,\nL'équipe Vesta Skipper"""
             
-            corps_mail = f"""Bonjour,  
+            # --- SOLUTION ANTI-BLOCAGE POUR GMAIL/IPHONE ---
+            
+            # 1. On affiche le texte dans une zone facile à copier
+            st.text_area("Texte prêt à être copié :", corps_mail, height=250)
+            
+            # 2. On affiche les infos de destination clairement
+            st.info(f"**Destinataire :** {destinataire}\n\n**Objet :** {objet}")
 
-J'espère que vous allez bien ! ⛵
+            # 3. Le bouton Mailto (on le garde mais on ajoute une alternative)
+            import urllib.parse
+            mail_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
+            
+            st.link_button("🚀 TENTER L'ENVOI DIRECT", mail_link, use_container_width=True)
+            
+            st.caption("Si la page bloque : copie le texte ci-dessus et colle-le dans un nouveau mail Gmail.")
 
 Voici le récapitulatif des navigations de la CMN concernant le mois de {sel_mois} {sel_annee} :
 
