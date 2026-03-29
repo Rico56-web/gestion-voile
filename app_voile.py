@@ -573,60 +573,52 @@ if st.session_state.page == "STATS":
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
 # =================================================================
+# --- DEBUT DU BLOC MAINTENANCE ---
 if st.session_state.page == "MAINTENANCE":
     st.title("🔧 Carnet d'Entretien")
 
-    # --- 1. CHARGEMENT SÉCURISÉ ---
-    # On vérifie si le fichier existe, sinon on crée une liste vide
+    # 1. CREATION DU FICHIER SI ABSENT (Force la présence)
     if not os.path.exists('maintenance.json'):
         with open('maintenance.json', 'w') as f:
             json.dump([], f)
     
-    with open('maintenance.json', 'r') as f:
-        try:
-            data_m = json.load(f)
-        except:
-            data_m = [] # En cas de fichier corrompu ou vide
+    # 2. LECTURE DIRECTE
+    try:
+        with open('maintenance.json', 'r') as f:
+            m_data = json.load(f)
+    except:
+        m_data = []
 
-    df_m = pd.DataFrame(data_m)
-
-    # --- 2. AFFICHAGE DES DONNÉES ---
-    if not df_m.empty:
-        # Calcul du total
-        total = pd.to_numeric(df_m['Montant'], errors='coerce').sum()
-        st.metric("🛠️ TOTAL DÉPENSES", f"{total:,.2f} €".replace(",", " "))
+    # 3. AFFICHAGE DU TABLEAU
+    if m_data:
+        st.subheader("📋 Historique des frais")
+        df_m = pd.DataFrame(m_data)
+        # On affiche les colonnes principales
+        st.table(df_m[['Date', 'Objet', 'Montant', 'Statut']])
         
-        st.subheader("📋 Historique")
-        # Sélection et renommage pour l'iPhone
-        df_visu = df_m[['Date', 'Type', 'Objet', 'Montant', 'Statut']].copy()
-        st.table(df_visu.iloc[::-1]) # Affiche le plus récent en haut
+        total = sum(float(str(i['Montant']).replace(',', '.')) for i in m_data)
+        st.metric("TOTAL", f"{total:.2f} €")
     else:
-        st.info("📭 Le carnet est vide. Ajoutez votre première intervention ci-dessous.")
+        st.info("Le carnet est vide. Ajoutez votre première ligne ci-dessous.")
 
     st.divider()
 
-    # --- 3. FORMULAIRE D'AJOUT ---
-    with st.expander("➕ Ajouter un Achat ou Travaux", expanded=df_m.empty):
-        with st.form("form_maint_new"):
-            c1, c2 = st.columns(2)
-            f_date = c1.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
-            f_type = c2.selectbox("Type", ["Achat", "Intervention", "Taxe", "Maintenance"])
-            
-            f_objet = st.text_input("Désignation (ex: 178€ Taxes)")
-            f_montant = st.number_input("Montant (€)", min_value=0.0)
-            f_statut = st.selectbox("État", ["OK", "À faire", "Commandé"])
-            f_notes = st.text_area("Commentaires")
-            
-            if st.form_submit_button("Enregistrer dans maintenance.json"):
-                nouveau = {
-                    "Date": f_date, "Type": f_type, "Objet": f_objet,
-                    "Montant": f_montant, "Statut": f_statut, "Notes": f_notes
-                }
-                data_m.append(nouveau)
-                with open('maintenance.json', 'w') as f:
-                    json.dump(data_m, f, indent=4)
-                st.success("C'est enregistré !")
-                st.rerun()
+    # 4. FORMULAIRE TOUJOURS VISIBLE
+    st.subheader("➕ Ajouter une ligne")
+    with st.form("form_simple_maint"):
+        f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
+        f_obj = st.text_input("Objet (ex: Taxes 178€)")
+        f_mt = st.number_input("Montant", min_value=0.0)
+        f_st = st.selectbox("Statut", ["OK", "A faire"])
+        
+        if st.form_submit_button("ENREGISTRER MAINTENANT"):
+            nouvelle_ligne = {"Date": f_date, "Objet": f_obj, "Montant": f_mt, "Statut": f_st}
+            m_data.append(nouvelle_ligne)
+            with open('maintenance.json', 'w') as f:
+                json.dump(m_data, f, indent=4)
+            st.success("Bien enregistré !")
+            st.rerun()
+# --- FIN DU BLOC MAINTENANCE ---
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
