@@ -740,7 +740,10 @@ J'espère que vous allez bien ! ⛵
 
 Voici le récapitulatif des navigations de la CMN concernant le mois de {sel_mois} {sel_annee} :
 
-{recap_tab.to_string(index=False)}
+Date            Espaces(12)      Client   Espaces(3)   Prix
+------------------------------------------------------------
+{texte_missions}
+------------------------------------------------------------
 
 Le montant total s'élève à {total_cmn:.2f} €.
 
