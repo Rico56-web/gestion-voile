@@ -511,15 +511,20 @@ if st.session_state.page == "STATS":
     mask_paye = df_st['Paiement'].astype(str).str.upper().str.strip() == "PAYÉ"
     mask_ok = df_st['Statut'].astype(str).str.upper() == "OK"
     df_st['CA_Calcul'] = df_st.where(mask_paye | mask_ok)['PrixNum'].fillna(0)
-
-    # --- 3. PRÉPARATION DES FRAIS (Maintenance.json) ---
+    
+     # --- 3. PRÉPARATION DES FRAIS (Maintenance.json) ---
     try:
         with open('maintenance.json', 'r') as f:
             m_data = json.load(f)
         df_maint_stats = pd.DataFrame(m_data)
-        # On extrait le mois des dates de maintenance (format JJ/MM/AAAA)
-        df_maint_stats['M_Sort'], df_maint_stats['Mois'] = zip(*df_maint_stats['Date'].apply(get_month_info))
-        df_maint_stats['FraisNum'] = df_maint_stats['Montant'].apply(clean_val)
+        
+        if not df_maint_stats.empty and 'Date' in df_maint_stats.columns:
+            df_maint_stats['M_Sort'], df_maint_stats['Mois'] = zip(*df_maint_stats['Date'].apply(get_month_info))
+            # Sécurité : on vérifie si 'Montant' existe
+            col_mt = 'Montant' if 'Montant' in df_maint_stats.columns else df_maint_stats.columns[0]
+            df_maint_stats['FraisNum'] = df_maint_stats[col_mt].apply(clean_val)
+        else:
+            df_maint_stats = pd.DataFrame(columns=['M_Sort', 'Mois', 'FraisNum'])
     except:
         df_maint_stats = pd.DataFrame(columns=['M_Sort', 'Mois', 'FraisNum'])
 
