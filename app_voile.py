@@ -587,56 +587,52 @@ if st.session_state.page == "MAINT":
         except:
             m_data = []
 
-    # 2. FORMULAIRE D'AJOUT (Toujours en haut pour l'iPhone)
+    # 2. FORMULAIRE D'AJOUT (Auto-nettoyant avec st.rerun)
     with st.expander("➕ Nouvelle intervention"):
-        with st.form("add_maint"):
+        with st.form("add_maint", clear_on_submit=True): # <--- Option pour vider les champs
             f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
             f_obj = st.text_input("Objet")
-            f_mt = st.number_input("Montant (€)", min_value=0.0)
+            f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0)
+            
             if st.form_submit_button("Enregistrer"):
-                m_data.append({"Date": f_date, "Objet": f_obj, "Montant": float(f_mt)})
-                with open('maintenance.json', 'w') as f:
-                    json.dump(m_data, f, indent=4)
-                st.rerun()
+                if f_obj: # Sécurité : ne pas enregistrer si vide
+                    m_data.append({"Date": f_date, "Objet": f_obj, "Montant": float(f_mt)})
+                    with open('maintenance.json', 'w') as f:
+                        json.dump(m_data, f, indent=4)
+                    st.success("Enregistré !")
+                    st.rerun() # <--- Force le rafraîchissement immédiat
 
     st.divider()
 
-    # 3. AFFICHAGE ET GESTION (MODIFIER / SUPPRIMER)
+    # 3. AFFICHAGE ET GESTION
     if m_data:
-        # Calcul du Total pour l'affichage en haut
         total = sum(float(i['Montant']) for i in m_data)
         st.metric("TOTAL CUMULÉ", f"{total:.2f} €")
 
-        st.subheader("📋 Historique & Gestion")
-        
-        # On parcourt la liste à l'envers pour voir le plus récent en haut
         for index, item in enumerate(reversed(m_data)):
-            # On recalcule l'index réel (car on a inversé la liste)
             real_index = len(m_data) - 1 - index
             
+            # On utilise un identifiant unique par ligne
             with st.expander(f"{item['Date']} - {item['Objet']} ({item['Montant']}€)"):
+                
                 # --- MODIFICATION ---
-                new_mt = st.number_input(f"Modifier Montant", value=float(item['Montant']), key=f"edit_{real_index}")
-                if st.button("Valider modification", key=f"btn_edit_{real_index}"):
+                new_mt = st.number_input(f"Prix", value=float(item['Montant']), key=f"v_{real_index}")
+                
+                if st.button("✅ Valider", key=f"save_{real_index}"):
                     m_data[real_index]['Montant'] = new_mt
                     with open('maintenance.json', 'w') as f:
                         json.dump(m_data, f, indent=4)
-                    st.success("Modifié !")
-                    st.rerun()
+                    st.toast("Modification enregistrée !") # Petit message discret
+                    st.rerun() # <--- Réinitialise l'état des boutons
                 
                 # --- SUPPRESSION ---
-                if st.button("❌ Supprimer cette ligne", key=f"del_{real_index}"):
+                if st.button("🗑️ Supprimer", key=f"del_{real_index}"):
                     m_data.pop(real_index)
                     with open('maintenance.json', 'w') as f:
                         json.dump(m_data, f, indent=4)
-                    st.warning("Supprimé !")
-                    st.rerun()
+                    st.rerun() # <--- Réinitialise tout
     else:
         st.info("Aucune donnée enregistrée.")
-
-# --- CONNECTION AUX STATS (À ajouter dans ton bloc STATS) ---
-# total_maint = sum(float(i['Montant']) for i in m_data)
-# benefice_net = CA_total - total_maint
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
