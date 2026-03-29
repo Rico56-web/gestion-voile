@@ -5,8 +5,6 @@ import os
 import html
 import streamlit.components.v1 as components
 from datetime import datetime, date
-st.sidebar.write(f"DEBUG: Page active = '{st.session_state.page}'")
-# Regarde bien si c'est écrit en MAJUSCULES ou minuscules dans la barre latérale.
 
 # --- 1. CONFIGURATION & STYLE ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
@@ -575,50 +573,57 @@ if st.session_state.page == "STATS":
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
 # =================================================================
-# --- IMPORTANT : Vérifie que l'orthographe ici est IDENTIQUE à ton menu ---
-if st.session_state.page == "MAINTENANCE":
+# --- IMPORTANT : L'orthographe doit être EXACTEMENT 'MAINT' ---
+if st.session_state.page == "MAINT":
     st.title("🔧 Carnet d'Entretien Vesta")
-    st.write("### 🟢 Le bloc est bien chargé")
-
-    # 1. INITIALISATION FORCEE
+    
+    # 1. INITIALISATION DU FICHIER SI ABSENT
     if not os.path.exists('maintenance.json'):
         with open('maintenance.json', 'w') as f:
             json.dump([], f)
     
-    # 2. LECTURE SÉCURISÉE
+    # 2. LECTURE DU FICHIER
     try:
         with open('maintenance.json', 'r') as f:
             m_data = json.load(f)
     except:
         m_data = []
 
-    # 3. FORMULAIRE D'AJOUT (Toujours visible pour débloquer)
-    st.subheader("➕ Ajouter un achat ou taxe")
+    # 3. FORMULAIRE D'AJOUT (Simple pour iPhone)
+    st.subheader("➕ Ajouter un Achat / Taxe")
     with st.form("form_maint_simple"):
         f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
         f_obj = st.text_input("Objet (ex: Taxes 178€)")
-        f_mt = st.number_input("Montant (€)", min_value=0.0)
+        f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0)
         
         if st.form_submit_button("ENREGISTRER MAINTENANT"):
-            nouvelle_ligne = {"Date": f_date, "Objet": f_obj, "Montant": f_mt, "Statut": "OK"}
+            nouvelle_ligne = {
+                "Date": f_date, 
+                "Objet": f_obj, 
+                "Montant": float(f_mt), 
+                "Statut": "OK"
+            }
             m_data.append(nouvelle_ligne)
             with open('maintenance.json', 'w') as f:
                 json.dump(m_data, f, indent=4)
-            st.success("Enregistré ! Vos 178€ vont apparaître.")
+            st.success("Enregistré ! Vos frais apparaissent plus bas.")
             st.rerun()
 
     st.divider()
 
-    # 4. TABLEAU DES FRAIS
+    # 4. AFFICHAGE DU TABLEAU ET TOTAL
     if m_data:
         st.subheader("📋 Historique")
         df_m = pd.DataFrame(m_data)
-        st.table(df_m)
         
-        total = sum(float(str(i['Montant'])) for i in m_data)
+        # On affiche le tableau (Date, Objet, Montant)
+        st.table(df_m[['Date', 'Objet', 'Montant']])
+        
+        # Calcul du total
+        total = sum(float(i['Montant']) for i in m_data)
         st.metric("TOTAL CUMULÉ", f"{total:.2f} €")
     else:
-        st.info("Le fichier maintenance.json est vide. Utilisez le formulaire ci-dessus.")
+        st.info("Le carnet est vide. Utilisez le formulaire ci-dessus.")
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
