@@ -498,14 +498,15 @@ if st.session_state.page == "STATS":
     df_stats = df_c.copy()
     df_stats['PrixNum'] = df_stats['Prix'].apply(clean_price)
 
-    # --- 2. CALCULS ---
-    # Encaisse Réelle = Tout ce qui est marqué "Payé"
-    # On s'assure que la colonne est bien du texte, on met en majuscules, puis on cherche "PAYÉ"
-    df_paye = df_stats[df_stats['Paiement'].astype(str).str.contains("PAYÉ", case=False, na=False)]
+  # --- 2. CALCULS RÉVISÉS ---
+    # On filtre les lignes payées de manière robuste
+    mask_paye = df_stats['Paiement'].astype(str).str.contains("PAYÉ", case=False, na=False)
+    df_paye = df_stats[mask_paye]
     total_encaisse = df_paye['PrixNum'].sum()
 
-    # En Attente = Statut "OK" mais "Non payé"
-    df_attente = df_stats[(df_stats['Statut'] == "OK") & (df_stats['Paiement'] != "Payé")]
+    # On fait pareil pour l'attente (Statut OK mais pas encore payé)
+    mask_ok = df_stats['Statut'].astype(str).str.contains("OK", case=False, na=False)
+    df_attente = df_stats[mask_ok & ~mask_paye]
     total_attente = df_attente['PrixNum'].sum()
 
     # --- 3. AFFICHAGE DES INDICATEURS ---
