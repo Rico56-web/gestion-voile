@@ -484,7 +484,7 @@ elif st.session_state.page == "PLANNING":
 if st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage")
 
-    # --- 1. NETTOYAGE PRÉCIS ---
+    # --- 1. FONCTIONS DE NETTOYAGE ---
     def clean_p(val):
         try:
             if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
@@ -492,19 +492,29 @@ if st.session_state.page == "STATS":
             return float(s.replace(",", "."))
         except: return 0.0
 
+    def get_month(date_str):
+        try:
+            parts = str(date_str).split('/')
+            if len(parts) >= 2:
+                m_num = int(parts[1])
+                months = ["Janv", "Févr", "Mars", "Avril", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"]
+                return f"{m_num:02d} - {months[m_num-1]}"
+        except: return "99 - Inconnu"
+        return "99 - Inconnu"
+
+    # Préparation
     df_st = df_c.copy()
     df_st['PrixNum'] = df_st['Prix'].apply(clean_p)
+    df_st['Mois'] = df_st['DateNav'].apply(get_month)
 
     # --- 2. FILTRES STRICTS ---
-    # Uniquement ce qui est marqué "PAYÉ" exactement
     mask_paye = df_st['Paiement'].astype(str).apply(lambda x: x.strip().upper() == "PAYÉ")
     df_encaisse = df_st[mask_paye]
     
-    # Futur : Statut "OK" mais Pas Payé
     mask_futur = (df_st['Statut'].astype(str).str.upper() == "OK") & (~mask_paye)
     df_futur = df_st[mask_futur]
 
-    # --- 3. RÉSUMÉ COMPACT (Metrics sur 2 colonnes pour iPhone) ---
+    # --- 3. RÉSUMÉ COMPACT (iPhone) ---
     tot_r = df_encaisse['PrixNum'].sum()
     tot_f = df_futur['PrixNum'].sum()
     
@@ -513,75 +523,25 @@ if st.session_state.page == "STATS":
     c2.metric("🕒 FUTUR", f"{tot_f:,.0f}€")
     st.write(f"**📈 TOTAL PRÉVU : {tot_r + tot_f:,.0f} €**")
 
+    st.divider() # <--- VERIFIEZ BIEN L'ALIGNEMENT ICI
+
+    # --- 4. VISION MENSUELLE ---
+    st.subheader("📅 Calendrier Mensuel")
+    df_plan = df_st[mask_paye | mask_futur]
+    if not df_plan.empty:
+        mensuel = df_plan.groupby('Mois').agg(CA=('PrixNum', 'sum'), Missions=('Nom', 'count')).sort_index()
+        st.table(mensuel.style.format({"CA": "{:.0f} €"}))
+    else:
+        st.info("Aucune donnée.")
+
     st.divider()
 
-    # --- 4. TABLEAU ENCAISSÉ (Colonnes réduites pour mobile) ---
+    # --- 5. DÉTAIL DES MOIS (RÉDUIT MOBILE) ---
     st.subheader("✅ PAYÉ")
-    if not df_encaisse.empty:
-        # On ne garde que Date, Nom et Prix pour gagner de la place
-        st.dataframe(
-            df_encaisse[['DateNav', 'Nom', 'Prix']], 
-            use_container_width=True, 
-            hide_index=True
-        )
-    else:
-        st.info("Rien d'encaissé.")
+    st.dataframe(df_encaisse[['DateNav', 'Nom', 'Prix']], use_container_width=True, hide_index=True)
 
-    # --- 5. TABLEAU FUTUR ---
     st.subheader("⏳ À VENIR (OK)")
-    if not df_futur.empty:
-        st.dataframe(
-            df_futur[['DateNav', 'Nom', 'Prix']], 
-            use_container_width=True, 
-            hide_index=True
-        )
-    else:
-        st.success("Tout est payé !")
-
-    # --- 6. MINI GRAPHIQUE ---
-    if not df_st[mask_paye | mask_futur].empty:
-        st.write("📂 Par Société :")
-        ca_soc = df_st[mask_paye | mask_futur].groupby('Société')['PrixNum'].sum()
-        st.bar_chart(ca_soc, height=200) # Hauteur réduite pour mobile
-      st.divider()
-    st.subheader("📅 Calendrier Mensuel (CA Prévu)")
-
-    # --- 1. PRÉPARATION DES MOIS ---
-    # On s'assure que 'DateNav' est exploitable pour le tri
-    def get_month(date_str):
-        try:
-            # On cherche le mois dans le format JJ/MM/AAAA
-            parts = str(date_str).split('/')
-            if len(parts) >= 2:
-                month_num = int(parts[1])
-                months = ["Janv", "Févr", "Mars", "Avril", "Mai", "Juin", 
-                          "Juil", "Août", "Sept", "Oct", "Nov", "Déc"]
-                return f"{month_num:02d} - {months[month_num-1]}"
-        except:
-            return "99 - Inconnu"
-        return "99 - Inconnu"
-
-    # On ne travaille que sur les missions validées (Payé ou OK)
-    df_plan = df_st[mask_paye | mask_futur].copy()
-    df_plan['Mois'] = df_plan['DateNav'].apply(get_month)
-
-    # --- 2. CALCUL PAR MOIS ---
-    if not df_plan.empty:
-        # Groupement par mois pour avoir le total € et le nombre de missions
-        mensuel = df_plan.groupby('Mois').agg(
-            CA=('PrixNum', 'sum'),
-            Missions=('Nom', 'count')
-        ).sort_index()
-
-        # --- 3. AFFICHAGE COMPACT ---
-        # On utilise st.table pour que ce soit très lisible sur iPhone sans scroll
-        st.table(mensuel.style.format({"CA": "{:.0f} €"}))
-
-        # --- 4. PETIT GRAPHIQUE DE TENDANCE ---
-        st.write("📊 Évolution de l'activité :")
-        st.line_chart(mensuel['CA'], height=150)
-    else:
-        st.info("Aucune mission prévue ou payée pour le moment.")  
+    st.dataframe(df_futur[['DateNav', 'Nom', 'Prix']], use_container_width=True, hide_index=True)
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CONFIRMATION DE SUPPRESSION) ---
