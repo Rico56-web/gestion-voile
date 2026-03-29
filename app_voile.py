@@ -565,59 +565,97 @@ if st.session_state.page == "STATS":
     st.table(df_st[mask_ok & (~mask_paye)][['DateNav', 'Nom', 'Prix']])
 
 # =================================================================
-# --- 8. PAGE MAINTENANCE (VERSION FINALE SÉCURISÉE) ---
+# --- 8. PAGE MAINTENANCE (VERSION FINALE VALIDÉE 2026) ---
 # =================================================================
 if st.session_state.page == "MAINT":
     st.title("🔧 Maintenance Vesta")
 
-# TEST DE LECTURE DIRECTE
-if os.path.exists('maintenance.json'):
-    with open('maintenance.json', 'r', encoding='utf-8') as f:
-        debug_content = f.read()
-    st.text(f"Contenu réel du fichier : {debug_content}") # <--- AFFICHE ÇA
-    # 1. CHARGEMENT
+    # 1. CHARGEMENT ET SYNC DU FICHIER
+    file_path = 'maintenance.json'
     m_data = []
-    if os.path.exists('maintenance.json'):
-        try:
-            with open('maintenance.json', 'r', encoding='utf-8') as f:
-                content = f.read()
-                if content:
-                    m_data = json.loads(content)
-        except Exception as e:
-            st.error(f"Erreur lecture : {e}")
 
-    # 2. SAISIE
-    st.subheader("➕ Ajouter un frais")
-    f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"), key="date_in")
-    f_obj = st.text_input("Objet (ex: Taxes)", key="obj_in")
-    f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0, key="mt_in")
-    
-    if st.button("💾 BOUTON FORCE : ENREGISTRER"):
-        if not f_obj:
-            st.warning("L'objet est vide !")
-        else:
-            try:
-                # Création de la ligne
-                nouvelle_ligne = {"Date": f_date, "Objet": f_obj, "Montant": float(f_mt), "Statut": "OK"}
-                m_data.append(nouvelle_ligne)
-                
-                # TEST D'ÉCRITURE
-                st.write("Tentative d'écriture en cours...")
-                
-                with open('maintenance.json', 'w', encoding='utf-8') as f:
-                    json.dump(m_data, f, indent=4, ensure_ascii=False)
-                
-                st.balloons() # Si tu vois les ballons, c'est que c'est passé !
-                st.success(f"BRAVO ! Enregistré : {f_obj}")
-                
-                # Pause forcée pour laisser l'iPhone respirer avant le rerun
-                import time
-                time.sleep(1)
-                st.rerun()
-                
-            except Exception as e:
-                st.error("❌ ERREUR CRITIQUE D'ÉCRITURE :")
-                st.code(str(e)) # Affiche l'erreur technique exacte
+    if not os.path.exists(file_path):
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump([], f)
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            m_data = json.load(f)
+    except Exception as e:
+        st.error(f"Erreur de lecture du fichier : {e}")
+        m_data = []
+
+    # 2. INTERFACE DE SAISIE (DIRECTE ET FIABLE)
+    with st.expander("➕ Ajouter une nouvelle dépense", expanded=True):
+        f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"), key="m_date")
+        f_obj = st.text_input("Objet (ex: Taxes DGAN, Drisse, Révision)", key="m_obj")
+        f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0, key="m_mt")
+        
+        if st.button("💾 ENREGISTRER MAINTENANT", type="primary"):
+            if f_obj:
+                try:
+                    # Création de l'entrée
+                    nouvelle_entree = {
+                        "Date": f_date,
+                        "Objet": f_obj,
+                        "Montant": float(f_mt),
+                        "Statut": "OK"
+                    }
+                    m_data.append(nouvelle_entree)
+                    
+                    # Écriture physique sur le disque
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        json.dump(m_data, f, indent=4, ensure_ascii=False)
+                    
+                    st.balloons()
+                    st.success(f"Enregistré : {f_obj} ({f_mt}€)")
+                    
+                    # Pause et rafraîchissement
+                    import time
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur lors de l'enregistrement : {e}")
+            else:
+                st.warning("Veuillez entrer un 'Objet' (ex: Taxes).")
+
+    st.divider()
+
+    # 3. AFFICHAGE DE L'HISTORIQUE ET DU TOTAL
+    if m_data:
+        # Calcul du total cumulé
+        total_frais = sum(float(item.get('Montant', 0)) for item in m_data)
+        st.metric("TOTAL CUMULÉ 2026", f"{total_frais:.2f} €")
+
+        st.subheader("📋 Historique des interventions")
+        
+        # On affiche du plus récent au plus ancien
+        for index, item in enumerate(reversed(m_data)):
+            # Calcul de l'index réel pour la suppression
+            real_index = len(m_data) - 1 - index
+            
+            # Affichage dans un bloc propre
+            with st.expander(f"📅 {item.get('Date')} - {item.get('Objet')} ({item.get('Montant')}€)"):
+                c1, c2 = st.columns([3, 1])
+                with c1:
+                    # Modification rapide du prix
+                    new_val = st.number_input("Modifier prix (€)", 
+                                             value=float(item.get('Montant', 0)), 
+                                             key=f"edit_{real_index}")
+                    if st.button("✅ Valider", key=f"v_{real_index}"):
+                        m_data[real_index]['Montant'] = new_val
+                        with open(file_path, 'w', encoding='utf-8') as f:
+                            json.dump(m_data, f, indent=4, ensure_ascii=False)
+                        st.rerun()
+                with c2:
+                    st.write("") # Espace
+                    if st.button("🗑️ Supprimer", key=f"del_{real_index}"):
+                        m_data.pop(real_index)
+                        with open(file_path, 'w', encoding='utf-8') as f:
+                            json.dump(m_data, f, indent=4, ensure_ascii=False)
+                        st.rerun()
+    else:
+        st.info("Aucune donnée enregistrée dans maintenance.json.")
 
 # --- 11. PAGE LIVRE DE BORD (LOG) ---
 elif st.session_state.page == "LOG":
