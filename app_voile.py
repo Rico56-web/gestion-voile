@@ -564,6 +564,40 @@ if st.session_state.page == "STATS":
     st.subheader("⏳ À VENIR (OK)")
     st.table(df_st[mask_ok & (~mask_paye)][['DateNav', 'Nom', 'Prix']])
 
+# --- 9. ZONE D'ARCHIVAGE ANNUEL (SÉCURISÉE) ---
+st.divider()
+with st.expander("📁 Archivage de la Saison"):
+    st.info("Cette option déplace les missions 'Terminées' ou 'Refusées' vers un fichier archive.")
+    
+    # 1. Préparation du nom de l'archive
+    annee_archive = datetime.now().year
+    nom_archive = f"archives_{annee_archive}.json"
+    
+    # 2. Bouton de transfert
+    if st.button(f"📦 ARCHIVER LES MISSIONS {annee_archive}", use_container_width=True):
+        # On sépare : ce qui reste en cours / ce qui part en archive
+        mask_archive = df_c['Statut'].isin(["Terminé", "Refusé"])
+        df_a_archiver = df_c[mask_archive]
+        df_qui_reste = df_c[~mask_archive]
+        
+        if not df_a_archiver.empty:
+            # Sauvegarde des archives (on ajoute à l'existant si le fichier existe déjà)
+            if os.path.exists(nom_archive):
+                old_arch = pd.read_json(nom_archive)
+                df_final_arch = pd.concat([old_arch, df_a_archiver], ignore_index=True)
+            else:
+                df_final_arch = df_a_archiver
+            
+            # Écriture des deux fichiers
+            df_final_arch.to_json(nom_archive, orient="records", indent=4)
+            sauvegarder_data(df_qui_reste, "contacts.json")
+            
+            st.success(f"{len(df_a_archiver)} missions déplacées vers {nom_archive} !")
+            time.sleep(1)
+            st.rerun()
+        else:
+            st.warning("Aucune mission terminée à archiver.")
+
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION FINALE VALIDÉE 2026) ---
 # =================================================================
