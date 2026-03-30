@@ -667,111 +667,82 @@ if st.session_state.page == "FACTURES":
     # --- 2. FILTRAGE ET CALCULS ---
     if not df_c.empty:
         df_fact = df_c.copy()
-        # Conversion forcée pour le filtrage par date
         df_fact['dt'] = pd.to_datetime(df_fact['DateNav'], format='%d/%m/%Y', errors='coerce')
         
-        # Filtre : Société CMN + Mois + Année
         mask_cmn = (df_fact['Société'].astype(str).str.upper() == "CMN") & \
                    (df_fact['dt'].dt.month == index_mois) & \
                    (df_fact['dt'].dt.year == sel_annee)
         
         df_cmn_mois = df_fact[mask_cmn].copy()
         
-    if not df_cmn_mois.empty:
-        st.subheader(f"Missions CMN - {sel_mois} {sel_annee}")
+        if not df_cmn_mois.empty:
+            st.subheader(f"Missions CMN - {sel_mois} {sel_annee}")
             
-            # Nettoyage des prix pour le calcul (réutilise la fonction clean_val si définie plus haut)
             df_cmn_mois['PrixNum'] = df_cmn_mois['Prix'].apply(clean_val)
             total_cmn = df_cmn_mois['PrixNum'].sum()
             
-            # Affichage du tableau de contrôle
             st.table(df_cmn_mois[['DateNav', 'Nom', 'Prix']].set_index('DateNav'))
             st.metric("Total à facturer", f"{total_cmn:.2f} €")
             
-            # --- 3. PRÉPARATION DU TEXTE ALIGNÉ (12 ET 3 ESPACES) ---
+            # --- 3. PRÉPARATION DU TEXTE ---
             st.divider()
             st.subheader("✉️ Rapport pour le Trésorier")
             
             lignes_missions = []
-            esp12 = " " * 12
-            esp3  = " " * 3
-            
             for _, row in df_cmn_mois.iterrows():
                 d_str = str(row['DateNav']).ljust(10)
                 n_str = str(row['Nom'])
                 p_str = f"{row['PrixNum']:.2f} €"
-                lignes_missions.append(f"{d_str}{esp12}{n_str}{esp3}{p_str}")
+                lignes_missions.append(f"{d_str}{' '*12}{n_str}{' '*3}{p_str}")
             
             texte_missions = "\n".join(lignes_missions)
             destinataire = "tresorier@cmn-asso.fr, aurelienfaucheux@gmail.com"
             objet = f"Facturation Missions Vesta - {sel_mois} {sel_annee}"
             
-            corps_mail = f"""Bonjour,\n\nJ'espère que vous allez bien ! ⛵\n\nVoici le récapitulatif des navigations de la CMN concernant le mois de {sel_mois} {sel_annee} :\n\n{texte_missions}\n\nLe montant total s'élève à {total_cmn:.2f} €.\n\nMerci d'avance pour le règlement et à très vite sur l'eau !\n\nAmicalement,\nEric (Vesta)"""
+            corps_mail = f"Bonjour,\n\nVoici le récapitulatif CMN de {sel_mois} {sel_annee} :\n\n{texte_missions}\n\nTotal : {total_cmn:.2f} €.\n\nMerci,\nEric (Vesta)"
 
-            # --- 4. ZONE D'ENVOI IPHONE ---
-            st.text_area("Texte prêt à copier :", corps_mail, height=250)
+            st.text_area("Texte prêt à copier :", corps_mail, height=200)
             
             import urllib.parse
-            # Lien standard Mailto
             mail_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
-            # Lien Deep Link GMAIL (iPhone)
             gmail_link = f"googlegmail:///co?to={destinataire}&subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
             
             c_b1, c_b2 = st.columns(2)
-            c_b1.link_button("🚀 OUVRIR GMAIL", gmail_link, use_container_width=True)
-            c_b2.link_button("✉️ MAIL IPHONE", mail_link, use_container_width=True)
+            c_b1.link_button("🚀 GMAIL", gmail_link, use_container_width=True)
+            c_b2.link_button("✉️ MAIL", mail_link, use_container_width=True)
             
-            st.caption("💡 Le bouton GMAIL fonctionne si l'application Gmail est installée sur ton iPhone.")
-            
-        else:
-            st.info(f"Aucune mission CMN trouvée pour {sel_mois} {sel_annee}.")
-    else:
-        st.warning("La base de données est vide.")
-        # --- 5. BOUTON DE VALIDATION D'ENVOI ---
+            # --- 4. SUIVI DES ENVOIS (Vesta Skipper 2026) ---
             st.divider()
-            
-            # Chargement de l'historique des envois
             df_suivi = charger_data('suivi_envois.json')
             if df_suivi.empty:
                 df_suivi = pd.DataFrame(columns=["Mois", "Annee", "DateEnvoi", "Total"])
 
-            # Vérifier si ce mois a déjà été envoyé
             deja_envoye = df_suivi[(df_suivi['Mois'] == sel_mois) & (df_suivi['Annee'] == sel_annee)]
 
             if not deja_envoye.empty:
                 dernier = deja_envoye.iloc[-1]
-                st.success(f"✅ Facture déjà validée le {dernier['DateEnvoi']}")
-                if st.button("♻️ RE-VALIDER L'ENVOI (MAJ)", use_container_width=True):
-                    # On ajoute une nouvelle ligne
-                    nouvelle_trace = pd.DataFrame([{
-                        "Mois": sel_mois,
-                        "Annee": sel_annee,
-                        "DateEnvoi": datetime.now().strftime("%d/%m/%Y à %H:%M"),
-                        "Total": f"{total_cmn:.2f} €"
-                    }])
-                    df_suivi = pd.concat([df_suivi, nouvelle_trace], ignore_index=True)
-                    sauvegarder_data(df_suivi, 'suivi_envois.json')
-                    st.rerun()
-            else:
-                if st.button("✔️ MARQUER COMME ENVOYÉ", type="primary", use_container_width=True):
-                    nouvelle_trace = pd.DataFrame([{
-                        "Mois": sel_mois,
-                        "Annee": sel_annee,
-                        "DateEnvoi": datetime.now().strftime("%d/%m/%Y à %H:%M"),
-                        "Total": f"{total_cmn:.2f} €"
-                    }])
-                    df_suivi = pd.concat([df_suivi, nouvelle_trace], ignore_index=True)
-                    sauvegarder_data(df_suivi, 'suivi_envois.json')
-                    st.success("Information enregistrée !")
-                    time.sleep(1)
-                    st.rerun()
+                st.success(f"✅ Envoyé le {dernier['DateEnvoi']}")
+            
+            if st.button("✔️ MARQUER COMME ENVOYÉ", type="primary", use_container_width=True):
+                nouvelle_trace = pd.DataFrame([{
+                    "Mois": sel_mois,
+                    "Annee": sel_annee,
+                    "DateEnvoi": datetime.now().strftime("%d/%m/%Y à %H:%M"),
+                    "Total": f"{total_cmn:.2f} €"
+                }])
+                df_suivi = pd.concat([df_suivi, nouvelle_trace], ignore_index=True)
+                sauvegarder_data(df_suivi, 'suivi_envois.json')
+                st.success("Enregistré !")
+                time.sleep(1)
+                st.rerun()
 
-            # Petit historique en bas de page (Expander)
-            with st.expander("🕒 Historique des derniers envois"):
+            with st.expander("🕒 Historique des envois"):
                 if not df_suivi.empty:
                     st.dataframe(df_suivi.iloc[::-1], use_container_width=True, hide_index=True)
-                else:
-                    st.write("Aucun envoi enregistré pour le moment.")
+        else:
+            st.info(f"Aucune mission CMN en {sel_mois}.")
+    else:
+        st.warning("Base de données vide.")
 # =================================================================
 # --- 10. PAGE LOG (CONSULTATION DES ARCHIVES) ---
 # =================================================================
