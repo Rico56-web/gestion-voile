@@ -251,7 +251,6 @@ if st.session_state.page == "CONTACTS":
             df_c = df_c.drop(i).reset_index(drop=True)
             sauvegarder_data(df_c, "contacts.json")
             st.rerun()
-
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION CORRIGÉE) ---
 # =================================================================
