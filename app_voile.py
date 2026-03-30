@@ -280,9 +280,8 @@ if not df_c.empty:
         df_c['DateNav'] = df_c['DateNav'].astype(str).str.strip()
         df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
         df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
-
 # =================================================================
-# --- 5. PAGE CONTACTS ---
+# --- 5. PAGE CONTACTS (VERSION OPTIMISÉE IPHONE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta - Missions")
@@ -298,26 +297,22 @@ if st.session_state.page == "CONTACTS":
         st.session_state.view_archive = True
         st.rerun()
     
-    if c_add.button("➕ NOUVELLE MISSION", type="primary", use_container_width=True, help="Style vert via CSS"):
-        new_row = pd.DataFrame([{"Prénom": "", "Nom": "NOUVEAU", "Société": "PARTICULIER", "Statut": "En attente", "Paiement": "Non payé", "DateNav": now.strftime("%d/%m/%Y"), "Prix": "0", "NbreJours": "1", "NbrePers": "1", "Notes": ""}])
+    if c_add.button("➕ NOUVELLE MISSION", type="primary", use_container_width=True):
+        new_row = pd.DataFrame([{"Prénom": "", "Nom": "NOUVEAU", "Société": "PARTICULIER", "Statut": "En attente", "Paiement": "Non payé", "DateNav": datetime.now().strftime("%d/%m/%Y"), "Prix": "0", "NbreJours": "1", "NbrePers": "1", "Notes": ""}])
         df_c = pd.concat([new_row, df_c], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
         st.rerun()
 
     st.divider()
-    # Filtrage Affichage
+
+    # --- FILTRAGE ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
 
-    # (La boucle d'affichage des fiches HTML continue ici...)
-
-    # --- 3. FILTRAGE ---
-    df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
-
-    # --- 4. BOUCLE D'AFFICHAGE DES FICHES ---
+    # --- BOUCLE D'AFFICHAGE DES FICHES ---
     for i, r in df_disp.iterrows():
         num_f = i + 1
         
-        # Extraction et nettoyage des données
+        # Données sécurisées via safe()
         p_nom = safe(r.get('Prénom', ''))
         n_nom = safe(r.get('Nom', '')).upper()
         nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche #{num_f}"
@@ -326,127 +321,71 @@ if st.session_state.page == "CONTACTS":
         mail  = safe(r.get('Email', ''))
         note  = safe(r.get('Notes', ''))
         prix  = safe(r.get('Prix', '0'))
-        date  = safe(r.get('DateNav', r.get('Date', '--/--/--')))
-        jours = safe(r.get('NbreJours', '1'))
-        pers  = safe(r.get('NbrePers', '1'))
+        date_n = safe(r.get('DateNav', r.get('Date', '--/--/--')))
         
-        # Logique de Statuts et Couleurs
+        # Couleurs dynamiques
         s_val = safe(r.get('Statut', 'En attente'))
         s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
-        if "CMN" in soc: s_col = "#3498db" # Spécificité CMN en Bleu
+        if "CMN" in soc: s_col = "#3498db"
         
         p_val = safe(r.get('Paiement', 'Non payé'))
         p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
 
-        # --- DESIGN DE LA FICHE (Optimisé iPhone) ---
-        card_html = (
-            f'<div style="border:2px solid #1a2a6c;border-radius:12px;padding:15px;margin-bottom:8px;background:white;color:black;">'
-            f'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'
-            f'<b style="color:#1a2a6c;font-size:1.1rem;">#{num_f} — {nom_c}</b>'
-            f'<div style="text-align:right;display:flex;flex-direction:column;gap:4px;">'
-            f'<span style="background:{s_col};color:white;padding:2px 10px;border-radius:12px;font-size:0.7rem;font-weight:bold;">{s_val.upper()}</span>'
-            f'<span style="background:{p_col};color:white;padding:2px 10px;border-radius:12px;font-size:0.7rem;font-weight:bold;">{p_val.upper()}</span>'
-            f'</div></div>'
-            f'<div style="color:#666;font-size:0.85rem;margin-bottom:4px;">🏢 {soc}</div>'
-            f'<div style="font-size:0.8rem; color:#2980b9; margin-bottom:8px;">📞 {tel if tel else "---"} &nbsp;|&nbsp; 📧 {mail if mail else "---"}</div>'
-            f'<div style="font-size:0.95rem;border-top:1px solid #eee;padding-top:8px;color:#333;display:flex;justify-content:space-between;">'
-            f'<span>📅 <b>{date}</b> ({jours}j)</span><span>👥 <b>{pers} pers.</b> | 💰 <b>{prix} €</b></span></div>'
-            f'{"<div style=\'margin-top:10px;padding:10px;background:#f8f9fa;border-left:4px solid #1a2a6c;font-size:0.85rem;border-radius:4px;\'>📝 " + note + "</div>" if note else ""}'
-            f'<div style="margin-top:15px;display:flex;gap:8px;">'
-            f'<a href="tel:{tel.replace(" ", "")}" style="flex:1;background:#34495e;color:white !important;padding:12px 5px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.8rem;font-weight:bold;">📞 APPEL</a>'
-            f'<a href="https://wa.me/{tel.replace(" ", "")}" style="flex:1;background:#25D366;color:white !important;padding:12px 5px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.8rem;font-weight:bold;">💬 WA</a>'
-            f'<a href="mailto:{mail}" style="flex:1;background:#e67e22;color:white !important;padding:12px 5px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.8rem;font-weight:bold;">📧 MAIL</a>'
-            f'</div></div>'
-        )
+        # Affichage HTML de la fiche
+        card_html = f"""
+        <div style="border:2px solid #1a2a6c;border-radius:12px;padding:15px;margin-bottom:8px;background:white;color:black;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <b style="color:#1a2a6c;font-size:1.1rem;">#{num_f} — {nom_c}</b>
+                <div style="text-align:right;">
+                    <span style="background:{s_col};color:white;padding:2px 8px;border-radius:12px;font-size:0.7rem;font-weight:bold;">{s_val.upper()}</span><br>
+                    <span style="background:{p_col};color:white;padding:2px 8px;border-radius:12px;font-size:0.7rem;font-weight:bold;margin-top:4px;display:inline-block;">{p_val.upper()}</span>
+                </div>
+            </div>
+            <div style="color:#666;font-size:0.85rem;margin-top:4px;">🏢 {soc} | 📅 <b>{date_n}</b></div>
+            <div style="margin-top:10px;display:flex;gap:5px;">
+                <a href="tel:{tel.replace(' ', '')}" style="flex:1;background:#34495e;color:white;padding:10px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.8rem;">📞 APPEL</a>
+                <a href="https://wa.me/{tel.replace(' ', '')}" style="flex:1;background:#25D366;color:white;padding:10px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.8rem;">💬 WA</a>
+            </div>
+        </div>
+        """
         st.markdown(card_html, unsafe_allow_html=True)
 
-        # --- ACTIONS ---
-        c_ed, c_del = st.columns([1, 3])
-        if c_ed.button(f"✏️ Modifier {num_f}", key=f"ed_{i}", use_container_width=True):
-            st.session_state.edit_idx = i
-            st.rerun()
-        if c_del.button(f"🗑️ Supprimer {num_f}", key=f"del_{i}", use_container_width=True):
-            st.session_state.confirm_del_idx = i
-            st.rerun()
+        # --- FORMULAIRE D'ÉDITION ---
+        with st.expander(f"✏️ MODIFIER LA FICHE #{num_f}"):
+            with st.form(key=f"edit_form_{i}"):
+                c1, c2 = st.columns(2)
+                u_nom = c1.text_input("Nom", value=safe(r.get('Nom', '')))
+                u_soc = c2.text_input("Société", value=safe(r.get('Société', '')))
+                
+                c3, c4 = st.columns(2)
+                u_date = c3.text_input("Date Nav", value=safe(r.get('DateNav', '')))
+                u_prix = c4.text_input("Prix (€)", value=str(r.get('Prix', '0')))
+                
+                # Paiement (Logique d'index fixe)
+                opts_p = ["Non payé", "Payé", "Attente"]
+                curr_p = str(r.get('Paiement', 'Non payé')).strip().capitalize()
+                idx_p = opts_p.index(curr_p) if curr_p in opts_p else 0
+                u_paye = st.selectbox("Paiement", opts_p, index=idx_p)
+                
+                u_note = st.text_area("Notes", value=safe(r.get('Notes', '')))
+                
+                if st.form_submit_button("💾 SAUVEGARDER"):
+                    df_c.at[i, 'Nom'] = u_nom
+                    df_c.at[i, 'Société'] = u_soc
+                    df_c.at[i, 'DateNav'] = u_date
+                    df_c.at[i, 'Prix'] = u_prix
+                    df_c.at[i, 'Paiement'] = u_paye
+                    df_c.at[i, 'Notes'] = u_note
+                    sauvegarder_data(df_c, 'contacts.json')
+                    st.success("Modifié !")
+                    time.sleep(0.5)
+                    st.rerun()
 
- # =================================================================
-# --- FORMULAIRE D'ÉDITION COMPLET (À PLACER DANS LA BOUCLE) ---
-# =================================================================
-with st.expander(f"👤 {r.get('Nom', 'Sans nom')} - {r.get('Société', 'Particulier')}"):
-    # On crée un formulaire pour éviter les rechargements intempestifs sur iPhone
-    with st.form(key=f"edit_form_{i}"):
-        st.write("### 📝 Modifier la mission")
-        
-        col1, col2 = st.columns(2)
-        u_nom = col1.text_input("Nom du Client", value=safe(r.get('Nom', '')))
-        u_soc = col2.text_input("Société", value=safe(r.get('Société', '')))
-        
-        col3, col4 = st.columns(2)
-        u_date = col3.text_input("Date (jj/mm/aaaa)", value=safe(r.get('DateNav', '')))
-        u_prix = col4.text_input("Prix (€)", value=str(r.get('Prix', '0')))
-        
-        # --- LOGIQUE DE PAIEMENT SÉCURISÉE ---
-        opts_pay = ["Non payé", "Payé", "Attente"]
-        # On récupère la valeur en base, on nettoie les espaces et on met la 1ère lettre en majuscule
-        val_actuelle = str(r.get('Paiement', 'Non payé')).strip().capitalize()
-        
-        # Si la valeur en base n'est pas dans la liste, on force l'index 0 (Non payé)
-        try:
-            idx_pay = opts_pay.index(val_actuelle)
-        except ValueError:
-            idx_pay = 0
-            
-        u_paye = st.selectbox("État du Paiement", opts_pay, index=idx_pay)
-        
-        # --- STATUT DE LA MISSION ---
-        opts_statut = ["OK", "En attente", "Annulé", "Terminé"]
-        val_statut = str(r.get('Statut', 'OK')).strip()
-        idx_statut = opts_statut.index(val_statut) if val_statut in opts_statut else 0
-        u_statut = st.selectbox("Statut Mission", opts_statut, index=idx_statut)
-        
-        # --- NOTES ET COMMENTAIRES ---
-        u_note = st.text_area("Notes particulières", value=safe(r.get('Notes', '')))
-        
-        # BOUTON DE SAUVEGARDE
-        submit_edit = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
-        
-        if submit_edit:
-            # Mise à jour du DataFrame original
-            df_c.at[i, 'Nom'] = u_nom
-            df_c.at[i, 'Société'] = u_soc
-            df_c.at[i, 'DateNav'] = u_date
-            df_c.at[i, 'Prix'] = u_prix
-            df_c.at[i, 'Paiement'] = u_paye
-            df_c.at[i, 'Statut'] = u_statut
-            df_c.at[i, 'Notes'] = u_note
-            
-            # Sauvegarde sur GitHub
-            sauvegarder_data(df_c, 'contacts.json')
-            
-            st.success(f"Fiche de {u_nom} mise à jour !")
-            time.sleep(0.5)
+        if st.button(f"🗑️ Supprimer #{num_f}", key=f"del_{i}", use_container_width=True):
+            df_c = df_c.drop(i).reset_index(drop=True)
+            sauvegarder_data(df_c, "contacts.json")
             st.rerun()
 
-    # Bouton de suppression en dehors du formulaire pour plus de sécurité
-    if st.button(f"🗑️ Supprimer définitivement", key=f"del_contact_{i}", use_container_width=True):
-        df_c = df_c.drop(i).reset_index(drop=True)
-        sauvegarder_data(df_c, 'contacts.json')
-        st.warning("Contact supprimé.")
-        time.sleep(0.5)
-        st.rerun()
-
-        # --- CONFIRMATION SUPPRESSION ---
-        if st.session_state.get('confirm_del_idx') == i:
-            st.error(f"Supprimer la mission #{num_f} ?")
-            cy, cn = st.columns(2)
-            if cy.button("OUI ✅", key=f"y_{i}", use_container_width=True):
-                df_c = df_c.drop(i).reset_index(drop=True)
-                sauvegarder_data(df_c, "contacts.json")
-                st.session_state.confirm_del_idx = None
-                st.rerun()
-            if cn.button("NON ❌", key=f"n_{i}", use_container_width=True):
-                st.session_state.confirm_del_idx = None
-                st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (DÉBUT DU BLOC) ---
 # =================================================================
