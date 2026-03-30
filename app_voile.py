@@ -641,36 +641,103 @@ if st.session_state.page == "STATS":
     
     col1.metric("💰 ENCAISSÉ", f"{tot_encaisse:,.0f}€")
     col2.metric("🕒 À VENIR", f"{tot_a_venir:,.0f}€")
-
+    
 # =================================================================
-# --- 8. PAGE MAINTENANCE ---
+# --- 8. PAGE MAINTENANCE (VERSION OPTIMISÉE IPHONE 2026) ---
 # =================================================================
 if st.session_state.page == "MAINT":
     st.title("🔧 Maintenance Vesta")
+
+    # 1. CHARGEMENT DES DONNÉES
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
     
-    with st.expander("➕ Ajouter une dépense", expanded=False):
-        f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
-        f_obj = st.text_input("Objet")
-        f_mt = st.number_input("Montant (€)", min_value=0.0)
-        if st.button("💾 ENREGISTRER"):
-            if f_obj:
-                new_l = pd.DataFrame([{"Date": f_date, "Objet": f_obj, "Montant": float(f_mt), "Statut": "OK"}])
-                df_m = pd.concat([df_m, new_l], ignore_index=True)
-                sauvegarder_data(df_m, file_path_m)
-                st.success("Enregistré !")
-                time.sleep(1)
-                st.rerun()
+    if df_m.empty:
+        df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut"])
 
+    # --- 2. INTERFACE DE SAISIE DYNAMIQUE ---
+    
+    # Initialisation de l'état du formulaire dans la mémoire de la session
+    if 'show_maint_form' not in st.session_state:
+        st.session_state.show_maint_form = False
+
+    # Barre d'outils supérieure
+    col_nav1, col_nav2 = st.columns([2, 1])
+    
+    if not st.session_state.show_maint_form:
+        if col_nav1.button("➕ AJOUTER UNE DÉPENSE", use_container_width=True, type="primary"):
+            st.session_state.show_maint_form = True
+            st.rerun()
+    else:
+        if col_nav2.button("❌ FERMER", use_container_width=True):
+            st.session_state.show_maint_form = False
+            st.rerun()
+
+    # Affichage du formulaire (uniquement si activé)
+    if st.session_state.show_maint_form:
+        with st.form("form_maint_new"):
+            st.write("### 📝 Nouvelle Saisie")
+            f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
+            f_obj = st.text_input("Objet (ex: Taxes, Révision, Accastillage)")
+            f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0)
+            
+            submit = st.form_submit_button("💾 ENREGISTRER SUR GITHUB", use_container_width=True)
+            
+            if submit:
+                if f_obj:
+                    # Création de la nouvelle ligne
+                    nouvelle_ligne = pd.DataFrame([{
+                        "Date": f_date,
+                        "Objet": f_obj,
+                        "Montant": float(f_mt),
+                        "Statut": "OK"
+                    }])
+                    df_m = pd.concat([df_m, nouvelle_ligne], ignore_index=True)
+                    
+                    # Sauvegarde sur GitHub
+                    sauvegarder_data(df_m, file_path_m)
+                    
+                    # Fermeture automatique du formulaire
+                    st.session_state.show_maint_form = False
+                    
+                    st.balloons()
+                    st.success(f"Enregistré : {f_obj}")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.warning("Veuillez entrer un 'Objet'.")
+
+    st.divider()
+
+    # 3. AFFICHAGE DE L'HISTORIQUE ET TOTAL
     if not df_m.empty:
-        st.metric("TOTAL CUMULÉ", f"{df_m['Montant'].sum():.2f} €")
-        for idx, item in df_m.iloc[::-1].iterrows():
+        # Calcul du total propre
+        df_m['Montant'] = pd.to_numeric(df_m['Montant'], errors='coerce').fillna(0)
+        total_frais = df_m['Montant'].sum()
+        
+        st.metric("TOTAL CUMULÉ 2026", f"{total_frais:,.2f} €")
+
+        st.write("### 📋 Historique des frais")
+        # Affichage du plus récent au plus ancien
+        for index, item in df_m.iloc[::-1].iterrows():
             with st.expander(f"📅 {item['Date']} - {item['Objet']} ({item['Montant']}€)"):
-                if st.button("🗑️ Supprimer", key=f"del_m_{idx}"):
-                    df_m = df_m.drop(idx).reset_index(drop=True)
+                if st.button(f"🗑️ Supprimer cette dépense", key=f"del_m_{index}", use_container_width=True):
+                    df_m = df_m.drop(index).reset_index(drop=True)
                     sauvegarder_data(df_m, file_path_m)
                     st.rerun()
+    else:
+        st.info("Aucune dépense enregistrée pour le moment.")
+
+    # 4. ZONE DE DANGER
+    st.write("---")
+    with st.expander("⚠️ Zone de Danger"):
+        st.write("Attention, cette action est irréversible.")
+        if st.checkbox("Confirmer la suppression totale de l'historique"):
+            if st.button("🔴 VIDER LE FICHIER MAINTENANCE", type="primary", use_container_width=True):
+                df_vide = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut"])
+                sauvegarder_data(df_vide, file_path_m)
+                st.rerun()
+
 # =================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ IPHONE) ---
 # =================================================================
