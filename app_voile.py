@@ -123,7 +123,7 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
 
 # =================================================================
-# --- 5. PAGE CONTACTS (FIX PAIEMENT ET COULEURS) ---
+# --- 5. PAGE CONTACTS (FIX ISOLATION PAIEMENT) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div class="main-header">👥 GESTION DES MISSIONS</div>', unsafe_allow_html=True)
@@ -147,18 +147,6 @@ if st.session_state.page == "CONTACTS":
         st.session_state.view_archive = True
         st.rerun()
     
-    if c_add.button("➕ NOUVELLE MISSION", type="primary", use_container_width=True):
-        new_row = pd.DataFrame([{
-            "Prénom": "", "Nom": "NOUVEAU", "Société": "PARTICULIER", 
-            "Statut": "En attente", "Paiement": "Non payé", 
-            "DateNav": now.strftime("%d/%m/%Y"), "Prix": "0", 
-            "NbreJours": "1", "NbrePers": "1", "Téléphone": "", "Email": "", "Notes": ""
-        }])
-        df_c = pd.concat([new_row, df_c], ignore_index=True)
-        sauvegarder_data(df_c, "contacts.json")
-        st.session_state.edit_idx = 0 
-        st.rerun()
-
     st.divider()
 
     # --- FILTRAGE ---
@@ -166,6 +154,7 @@ if st.session_state.page == "CONTACTS":
 
     # --- BOUCLE D'AFFICHAGE ---
     for i, r in df_disp.iterrows():
+        # RÉINITIALISATION LOCALE POUR CHAQUE FICHE
         num_f = i + 1
         p_nom = safe(r.get('Prénom', ''))
         n_nom = safe(r.get('Nom', '')).upper()
@@ -173,29 +162,34 @@ if st.session_state.page == "CONTACTS":
         soc   = safe(r.get('Société', 'PARTICULIER')).upper()
         tel   = safe(r.get('Téléphone', ''))
         mail  = safe(r.get('Email', ''))
-        note  = safe(r.get('Notes', ''))
         prix  = safe(r.get('Prix', '0'))
         date_v = safe(r.get('DateNav', '--/--/--'))
-        jours = safe(r.get('NbreJours', '1'))
-        pers  = safe(r.get('NbrePers', '1'))
         
-        # Logique Couleurs Statuts
+        # 1. LOGIQUE PAIEMENT SÉCURISÉE
+        # On récupère la valeur brute sans transformation pour le test
+        val_paye_brute = str(r.get('Paiement', 'Non payé')).upper()
+        
+        # Test strict : Si "PAY" est dans le texte ET que ce n'est pas "NON PAYÉ"
+        if "PAY" in val_paye_brute and "NON" not in val_paye_brute:
+            p_display = "PAYÉ"
+            p_col = "#3498db" # Bleu
+            idx_p = 1
+        else:
+            p_display = "NON PAYÉ"
+            p_col = "#e67e22" # Orange
+            idx_p = 0
+
+        # 2. LOGIQUE STATUT
         s_val = safe(r.get('Statut', 'En attente'))
         s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
         if "CMN" in soc: s_col = "#0056b3"
-        
-        # Logique Couleurs Paiement (Détection robuste)
-        p_val = safe(r.get('Paiement', 'Non payé'))
-        is_paid = "PAY" in p_val.upper()
-        p_display = "PAYÉ" if is_paid else "NON PAYÉ"
-        p_col = "#3498db" if is_paid else "#e67e22"
 
         clean_tel = "".join(filter(str.isdigit, tel))
         wa_link = f"33{clean_tel[1:]}" if clean_tel.startswith("0") else clean_tel
 
         # --- RENDU CARTE HTML ---
         card_html = (
-            f'<div style="border:2px solid #1a2a6c;border-radius:12px;padding:15px;margin-bottom:12px;background:white;color:black;box-shadow:2px 2px 8px rgba(0,0,0,0.1);">'
+            f'<div style="border:2px solid #1a2a6c;border-radius:12px;padding:15px;margin-bottom:12px;background:white;color:black;">'
             f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
             f'<b style="color:#1a2a6c;font-size:1.1rem;">#{num_f} — {nom_c}</b>'
             f'<div style="text-align:right;display:flex;flex-direction:column;gap:4px;">'
@@ -203,11 +197,7 @@ if st.session_state.page == "CONTACTS":
             f'<span style="background:{p_col};color:white;padding:2px 10px;border-radius:12px;font-size:0.7rem;font-weight:bold;">{p_display}</span>'
             f'</div></div>'
             f'<div style="color:#444;font-size:0.9rem;margin-top:8px;font-weight:bold;">🏢 {soc}</div>'
-            f'<div style="font-size:0.82rem;color:#2980b9;margin:8px 0;border-bottom:1px solid #eee;padding-bottom:8px;">'
-            f'📞 {tel if tel else "---"} &nbsp;|&nbsp; 📧 {mail if mail else "---"}</div>'
-            f'<div style="font-size:0.9rem;color:#333;display:flex;justify-content:space-between;">'
-            f'<span>📅 <b>{date_v}</b> ({jours}j)</span><span>👥 <b>{pers} pers.</b> | 💰 <b>{prix}€</b></span></div>'
-            f'{"<div style=\'margin-top:10px;padding:8px;background:#f8f9fa;border-left:4px solid #1a2a6c;font-size:0.8rem;border-radius:4px;\'>📝 " + note + "</div>" if note else ""}'
+            f'<div style="font-size:0.82rem;color:#2980b9;margin:8px 0;border-bottom:1px solid #eee;padding-bottom:8px;">📞 {tel if tel else "---"}</div>'
             f'<div style="margin-top:15px;display:flex;gap:8px;">'
             f'<a href="tel:{clean_tel}" style="flex:1;background:#5D6D7E;color:white !important;padding:12px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">📞 APPEL</a>'
             f'<a href="https://wa.me/{wa_link}" target="_blank" style="flex:1;background:#25D366;color:white !important;padding:12px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">💬 WA</a>'
@@ -229,50 +219,25 @@ if st.session_state.page == "CONTACTS":
         if st.session_state.get('edit_idx') == i:
             with st.expander(f"⚙️ ÉDITION #{num_f}", expanded=True):
                 with st.form(f"f_edit_{i}"):
-                    # Sécurité : Indexation basée sur le contenu réel
                     list_statut = ["En attente", "OK", "Terminé", "Refusé", "Annulé"]
                     list_paiement = ["Non payé", "Payé"]
                     
                     idx_s = list_statut.index(s_val) if s_val in list_statut else 0
-                    # Correction ici : détection PAY pour forcer l'index 1 (Payé)
-                    idx_p = 1 if "PAY" in p_val.upper() else 0
                     idx_soc = LISTE_SOC.index(soc) if soc in LISTE_SOC else 0
 
-                    c1, c2 = st.columns(2)
-                    u_pre = c1.text_input("Prénom", value=p_nom)
-                    u_nom = c2.text_input("Nom", value=n_nom)
-                    u_soc = c1.selectbox("Société", LISTE_SOC, index=idx_soc)
-                    u_tel = c2.text_input("Téléphone", value=tel)
-                    u_mai = c1.text_input("Email", value=mail)
-                    u_dat = c2.text_input("Date (JJ/MM/AAAA)", value=date_v)
+                    u_pre = st.text_input("Prénom", value=p_nom)
+                    u_nom = st.text_input("Nom", value=n_nom)
+                    u_soc = st.selectbox("Société", LISTE_SOC, index=idx_soc)
+                    u_tel = st.text_input("Téléphone", value=tel)
+                    u_paye = st.selectbox("Paiement", list_paiement, index=idx_p) # Utilise l'idx_p calculé plus haut
                     
-                    c3, c4, c5 = st.columns(3)
-                    u_jr = c3.text_input("Jours", value=jours)
-                    u_ps = c4.text_input("Pers.", value=pers)
-                    u_px = c5.text_input("Prix €", value=prix)
-                    
-                    u_stat = st.selectbox("Statut Mission", list_statut, index=idx_s)
-                    u_paye = st.selectbox("Paiement", list_paiement, index=idx_p)
-                    u_note = st.text_area("Notes", value=note)
-
-                    if st.form_submit_button("💾 SAUVEGARDER", use_container_width=True):
+                    if st.form_submit_button("💾 SAUVEGARDER"):
                         df_c.at[i, 'Prénom'] = u_pre
                         df_c.at[i, 'Nom'] = u_nom
                         df_c.at[i, 'Société'] = u_soc
                         df_c.at[i, 'Téléphone'] = u_tel
-                        df_c.at[i, 'Email'] = u_mai
-                        df_c.at[i, 'DateNav'] = u_dat
-                        df_c.at[i, 'NbreJours'] = u_jr
-                        df_c.at[i, 'NbrePers'] = u_ps
-                        df_c.at[i, 'Prix'] = u_px
-                        df_c.at[i, 'Statut'] = u_stat
-                        df_c.at[i, 'Paiement'] = u_paye # Sauvegardera "Payé" ou "Non payé"
-                        df_c.at[i, 'Notes'] = u_note
+                        df_c.at[i, 'Paiement'] = u_paye
                         sauvegarder_data(df_c, "contacts.json")
-                        st.session_state.edit_idx = None
-                        st.rerun()
-                    
-                    if st.button("❌ ANNULER"):
                         st.session_state.edit_idx = None
                         st.rerun()
 # =================================================================
