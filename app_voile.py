@@ -160,56 +160,52 @@ if st.session_state.page == "CONTACTS":
 
     # --- BOUCLE D'AFFICHAGE DES FICHES ---
     for i, r in df_disp.iterrows():
-        # 1. Préparation des variables (Nettoyage safe)
-        p_nom = safe(r.get('Prénom', ''))
-        n_nom = safe(r.get('Nom', '')).upper()
-        nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche #{i+1}"
-        soc   = safe(r.get('Société', 'PARTICULIER')).upper()
-        tel   = safe(r.get('Téléphone', ''))
-        mail  = safe(r.get('Email', ''))
-        note  = safe(r.get('Notes', ''))
-        prix  = safe(r.get('Prix', '0'))
-        date_n = safe(r.get('DateNav', '--/--/--'))
-        jours = safe(r.get('NbreJours', '1'))
-        pers  = safe(r.get('NbrePers', '1'))
-        
-        # 2. Gestion des couleurs
-        s_val = safe(r.get('Statut', 'En attente'))
-        s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
-        if "CMN" in soc: s_col = "#0056b3"
-        
-        p_val = safe(r.get('Paiement', 'Non payé'))
-        p_col = "#3498db" if "PAY" in p_val.upper() else "#e67e22"
+       # --- 1. PRÉPARATION DES VARIABLES (D'abord les données) ---
+    p_nom = safe(r.get('Prénom', ''))
+    n_nom = safe(r.get('Nom', '')).upper()
+    nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche #{i+1}"
+    soc   = safe(r.get('Société', 'PARTICULIER')).upper()
+    tel   = safe(r.get('Téléphone', ''))
+    note  = safe(r.get('Notes', ''))
+    # ... (récupère toutes tes variables ici)
 
-        # 3. Liens d'action (Nettoyage iPhone)
-        tel_digits = "".join(filter(str.isdigit, tel))
-        wa_link = f"33{tel_digits[1:]}" if tel_digits.startswith("0") else tel_digits
+    # --- 2. GESTION DES COULEURS (Ensuite les styles) ---
+    s_val = safe(r.get('Statut', 'En attente'))
+    s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
+    if "CMN" in soc: s_col = "#0056b3"
+    
+    p_val = safe(r.get('Paiement', 'Non payé'))
+    p_col = "#3498db" if "PAY" in p_val.upper() else "#e67e22"
 
-        # 4. CONSTRUCTION DU BLOC HTML (Une seule chaîne f-string)
-        fiche_html = f"""
-        <div style="border:2px solid #1a2a6c; border-radius:12px; padding:15px; margin-bottom:15px; background:white; color:black; box-shadow: 2px 4px 8px rgba(0,0,0,0.1);">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <b style="color:#1a2a6c; font-size:1.1rem;">#{i+1} — {nom_c}</b>
-                <div style="text-align:right;">
-                    <span style="background:{s_col}; color:white; padding:2px 10px; border-radius:10px; font-size:0.75rem; font-weight:bold;">{s_val.upper()}</span><br>
-                    <span style="background:{p_col}; color:white; padding:2px 10px; border-radius:10px; font-size:0.75rem; font-weight:bold; margin-top:5px; display:inline-block;">{p_val.upper()}</span>
-                </div>
-            </div>
-            <div style="color:#444; font-size:0.9rem; margin-top:8px; font-weight:bold;">🏢 {soc}</div>
-            <div style="color:#2980b9; font-size:0.85rem; margin:8px 0; border-bottom:1px solid #eee; padding-bottom:8px;">
-                📞 {tel if tel else "---"} &nbsp;|&nbsp; 📧 {mail if mail else "---"}
-            </div>
-            <div style="display:flex; justify-content:space-between; font-size:0.95rem; margin-top:10px;">
-                <span>📅 <b>{date_n}</b> ({jours}j)</span>
-                <span>👥 <b>{pers} pers.</b> | 💰 <b>{prix}€</b></span>
-            </div>
-            {f'<div style="margin-top:12px; padding:10px; background:#f8f9fa; border-left:4px solid #1a2a6c; font-size:0.85rem; border-radius:4px; color:#333;">📝 {html.escape(note)}</div>' if note else ''}
-            <div style="margin-top:15px; display:flex; gap:10px;">
-                <a href="tel:{tel_digits}" style="flex:1; background:#34495e; color:white !important; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.85rem; font-weight:bold;">📞 APPEL</a>
-                <a href="https://wa.me/{wa_link}" target="_blank" style="flex:1; background:#25D366; color:white !important; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.85rem; font-weight:bold;">💬 WHATSAPP</a>
+    # --- 3. PRÉPARATION DES LIENS (Nettoyage du téléphone) ---
+    tel_digits = "".join(filter(str.isdigit, tel))
+    wa_link = f"33{tel_digits[1:]}" if tel_digits.startswith("0") else tel_digits
+
+    # --- 4. AFFICHAGE HTML UNIQUE (Enfin le rendu) ---
+    # On met TOUT dans une seule variable pour éviter que Streamlit ne mélange tout
+    fiche_html = f"""
+    <div style="border:2px solid #1a2a6c; border-radius:12px; padding:15px; margin-bottom:15px; background:white; color:black;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <b style="color:#1a2a6c; font-size:1.1rem;">#{i+1} — {nom_c}</b>
+            <div style="text-align:right;">
+                <span style="background:{s_col}; color:white; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:bold;">{s_val.upper()}</span><br>
+                <span style="background:{p_col}; color:white; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:bold; margin-top:3px; display:inline-block;">{p_val.upper()}</span>
             </div>
         </div>
-        """
+        
+        <div style="color:#444; font-size:0.9rem; margin-top:8px; font-weight:bold;">🏢 {soc}</div>
+        <div style="color:#2980b9; font-size:0.85rem; margin:8px 0; border-bottom:1px solid #eee; padding-bottom:8px;">
+            📞 {tel if tel else "---"}
+        </div>
+
+        <div style="margin-top:15px; display:flex; gap:10px;">
+            <a href="tel:{tel_digits}" style="flex:1; background:#34495e; color:white !important; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.85rem; font-weight:bold;">📞 APPEL</a>
+            <a href="https://wa.me/{wa_link}" target="_blank" style="flex:1; background:#25D366; color:white !important; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.85rem; font-weight:bold;">💬 WA</a>
+        </div>
+    </div>
+    """
+    
+    st.markdown(fiche_html, unsafe_allow_html=True)
         st.markdown(fiche_html, unsafe_allow_html=True)
 
         # --- FORMULAIRE DE MODIFICATION ---
