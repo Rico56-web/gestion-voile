@@ -11,6 +11,24 @@ def safe(val):
     if val is None or str(val).lower() in ["nan", "none"]:
         return ""
     return str(val).strip()
+
+def clean_val(val):
+    """Nettoie une chaîne de caractères pour en faire un nombre (float)"""
+    try:
+        if val is None or str(val).lower() in ["nan", "none", ""]: 
+            return 0.0
+        # On ne garde que les chiffres, les points, les virgules et le signe moins
+        s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
+        return float(s.replace(",", "."))
+    except: 
+        return 0.0
+
+def safe(val):
+    """Nettoie les textes pour éviter les erreurs d'affichage"""
+    if val is None or str(val).lower() in ["nan", "none"]:
+        return ""
+    return str(val).strip()
+
 # --- 1. CONFIGURATION & STYLE ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
