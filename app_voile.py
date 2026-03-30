@@ -369,70 +369,71 @@ if st.session_state.page == "CONTACTS":
             st.session_state.confirm_del_idx = i
             st.rerun()
 
-        # --- FORMULAIRE D'ÉDITION COMPLET ---
-        if st.session_state.get('edit_idx') == i:
-            with st.expander(f"⚙️ ÉDITION #{num_f}", expanded=True):
-                with st.form(f"f_edit_{i}"):
-                    c1, c2 = st.columns(2)
-                    u_pre = c1.text_input("Prénom", value=r.get('Prénom', ''))
-                    u_nom = c2.text_input("Nom", value=r.get('Nom', ''))
-                    
-                    # Menu déroulant avec "AUTRES"
-                    idx_soc = LISTE_SOC.index(soc) if soc in LISTE_SOC else 0
-                    u_soc = c1.selectbox("Société", LISTE_SOC, index=idx_soc)
-                    u_tel = c2.text_input("Téléphone", value=r.get('Téléphone', ''))
-                    
-                    u_mai = c1.text_input("Email", value=r.get('Email', ''))
-                    u_dat = c2.text_input("Date (JJ/MM/AAAA)", value=date)
-                    
-                    c3, c4 = st.columns(2)
-                    u_jr  = c3.text_input("Nombre de jours", value=jours)
-                    u_ps  = c4.text_input("Nombre de personnes", value=pers)
-                    u_prix = c3.text_input("Prix Total (€)", value=prix)
-                    u_stat = c4.selectbox("Statut Mission", ["En attente", "OK", "Terminé", "Refusé"], 
-                              index=["En attente", "OK", "Terminé", "Refusé"].index(s_val) if s_val in ["En attente", "OK", "Terminé", "Refusé"] else 0)
-                  # --- 1. On définit les options possibles ---
-                       options_paiement = ["Non payé", "Payé", "Attente"]
+ # =================================================================
+# --- FORMULAIRE D'ÉDITION COMPLET (À PLACER DANS LA BOUCLE) ---
+# =================================================================
+with st.expander(f"👤 {r.get('Nom', 'Sans nom')} - {r.get('Société', 'Particulier')}"):
+    # On crée un formulaire pour éviter les rechargements intempestifs sur iPhone
+    with st.form(key=f"edit_form_{i}"):
+        st.write("### 📝 Modifier la mission")
+        
+        col1, col2 = st.columns(2)
+        u_nom = col1.text_input("Nom du Client", value=safe(r.get('Nom', '')))
+        u_soc = col2.text_input("Société", value=safe(r.get('Société', '')))
+        
+        col3, col4 = st.columns(2)
+        u_date = col3.text_input("Date (jj/mm/aaaa)", value=safe(r.get('DateNav', '')))
+        u_prix = col4.text_input("Prix (€)", value=str(r.get('Prix', '0')))
+        
+        # --- LOGIQUE DE PAIEMENT SÉCURISÉE ---
+        opts_pay = ["Non payé", "Payé", "Attente"]
+        # On récupère la valeur en base, on nettoie les espaces et on met la 1ère lettre en majuscule
+        val_actuelle = str(r.get('Paiement', 'Non payé')).strip().capitalize()
+        
+        # Si la valeur en base n'est pas dans la liste, on force l'index 0 (Non payé)
+        try:
+            idx_pay = opts_pay.index(val_actuelle)
+        except ValueError:
+            idx_pay = 0
+            
+        u_paye = st.selectbox("État du Paiement", opts_pay, index=idx_pay)
+        
+        # --- STATUT DE LA MISSION ---
+        opts_statut = ["OK", "En attente", "Annulé", "Terminé"]
+        val_statut = str(r.get('Statut', 'OK')).strip()
+        idx_statut = opts_statut.index(val_statut) if val_statut in opts_statut else 0
+        u_statut = st.selectbox("Statut Mission", opts_statut, index=idx_statut)
+        
+        # --- NOTES ET COMMENTAIRES ---
+        u_note = st.text_area("Notes particulières", value=safe(r.get('Notes', '')))
+        
+        # BOUTON DE SAUVEGARDE
+        submit_edit = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
+        
+        if submit_edit:
+            # Mise à jour du DataFrame original
+            df_c.at[i, 'Nom'] = u_nom
+            df_c.at[i, 'Société'] = u_soc
+            df_c.at[i, 'DateNav'] = u_date
+            df_c.at[i, 'Prix'] = u_prix
+            df_c.at[i, 'Paiement'] = u_paye
+            df_c.at[i, 'Statut'] = u_statut
+            df_c.at[i, 'Notes'] = u_note
+            
+            # Sauvegarde sur GitHub
+            sauvegarder_data(df_c, 'contacts.json')
+            
+            st.success(f"Fiche de {u_nom} mise à jour !")
+            time.sleep(0.5)
+            st.rerun()
 
-                  # --- 2. On récupère la valeur actuelle (en gérant les majuscules/espaces) ---
-                             valeur_actuelle = str(item.get('Paiement', 'Non payé')).strip().capitalize()
-
-                 # Si la valeur enregistrée n'est pas dans nos options, on met "Non payé" par défaut
-                   if valeur_actuelle not in options_paiement:
-                   index_defaut = 0
-                   else:
-                   index_defaut = options_paiement.index(valeur_actuelle)
-
-                 # --- 3. Le Widget avec l'index dynamique ---
-                    new_paiement = st.selectbox(
-                      "État du Paiement", 
-                       options_paiement, 
-                       index=index_defaut, 
-                       key=f"edit_pay_{index}"
-                            )
-                    
-                    u_note = st.text_area("Notes", value=r.get('Notes', ''))
-                    
-                    b_save, b_ann = st.columns(2)
-                    if b_save.form_submit_button("✅ SAUVEGARDER", use_container_width=True):
-                        df_c.at[i, 'Prénom'] = u_pre
-                        df_c.at[i, 'Nom'] = u_nom
-                        df_c.at[i, 'Société'] = u_soc
-                        df_c.at[i, 'Téléphone'] = u_tel
-                        df_c.at[i, 'Email'] = u_mai
-                        df_c.at[i, 'DateNav'] = u_dat
-                        df_c.at[i, 'NbreJours'] = u_jr
-                        df_c.at[i, 'NbrePers'] = u_ps
-                        df_c.at[i, 'Prix'] = u_prix
-                        df_c.at[i, 'Statut'] = u_stat
-                        df_c.at[i, 'Paiement'] = u_paye
-                        df_c.at[i, 'Notes'] = u_note
-                        sauvegarder_data(df_c, "contacts.json")
-                        st.session_state.edit_idx = None
-                        st.rerun()
-                    if b_ann.form_submit_button("❌ ANNULER", use_container_width=True):
-                        st.session_state.edit_idx = None
-                        st.rerun()
+    # Bouton de suppression en dehors du formulaire pour plus de sécurité
+    if st.button(f"🗑️ Supprimer définitivement", key=f"del_contact_{i}", use_container_width=True):
+        df_c = df_c.drop(i).reset_index(drop=True)
+        sauvegarder_data(df_c, 'contacts.json')
+        st.warning("Contact supprimé.")
+        time.sleep(0.5)
+        st.rerun()
 
         # --- CONFIRMATION SUPPRESSION ---
         if st.session_state.get('confirm_del_idx') == i:
