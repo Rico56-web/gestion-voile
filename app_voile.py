@@ -123,7 +123,7 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
 
 # =================================================================
-# --- 5. PAGE CONTACTS (VERSION FINALE AVEC MÉMOIRE ÉTAT) ---
+# --- 5. PAGE CONTACTS (VERSION COMPLÈTE : APPEL / WA / MAIL) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div class="main-header">👥 GESTION DES MISSIONS</div>', unsafe_allow_html=True)
@@ -136,7 +136,7 @@ if st.session_state.page == "CONTACTS":
 
     LISTE_SOC = ["PARTICULIER", "CLICK", "VOG", "CMN", "AUTRES"]
 
-    # --- BARRE D'OUTILS NAVIGATION ---
+    # --- BARRE D'OUTILS ---
     c_n1, c_n2, c_add = st.columns([1, 1, 2])
     view_arc = st.session_state.get('view_archive', False)
 
@@ -164,7 +164,7 @@ if st.session_state.page == "CONTACTS":
     # --- FILTRAGE ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé", "Annulé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé", "Annulé"])]
 
-    # --- BOUCLE D'AFFICHAGE DES FICHES ---
+    # --- BOUCLE D'AFFICHAGE ---
     for i, r in df_disp.iterrows():
         num_f = i + 1
         p_nom = safe(r.get('Prénom', ''))
@@ -179,21 +179,22 @@ if st.session_state.page == "CONTACTS":
         jours = safe(r.get('NbreJours', '1'))
         pers  = safe(r.get('NbrePers', '1'))
         
-        # Gestion des couleurs et statuts
+        # Couleurs Statuts
         s_val = safe(r.get('Statut', 'En attente'))
         s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
         if "CMN" in soc: s_col = "#0056b3"
         
+        # Couleurs Paiement
         p_val = safe(r.get('Paiement', 'Non payé'))
         p_col = "#3498db" if "PAY" in p_val.upper() else "#e67e22"
 
-        # Nettoyage Tel pour iPhone
+        # Nettoyage Tel pour liens (Appel & WA)
         clean_tel = "".join(filter(str.isdigit, tel))
         wa_link = f"33{clean_tel[1:]}" if clean_tel.startswith("0") else clean_tel
 
         # --- RENDU CARTE HTML ---
         card_html = (
-            f'<div style="border:2px solid #1a2a6c;border-radius:12px;padding:15px;margin-bottom:10px;background:white;color:black;box-shadow:2px 2px 5px rgba(0,0,0,0.1);">'
+            f'<div style="border:2px solid #1a2a6c;border-radius:12px;padding:15px;margin-bottom:12px;background:white;color:black;box-shadow:2px 2px 8px rgba(0,0,0,0.1);">'
             f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
             f'<b style="color:#1a2a6c;font-size:1.1rem;">#{num_f} — {nom_c}</b>'
             f'<div style="text-align:right;display:flex;flex-direction:column;gap:4px;">'
@@ -201,18 +202,20 @@ if st.session_state.page == "CONTACTS":
             f'<span style="background:{p_col};color:white;padding:2px 10px;border-radius:12px;font-size:0.7rem;font-weight:bold;">{p_val.upper()}</span>'
             f'</div></div>'
             f'<div style="color:#444;font-size:0.9rem;margin-top:8px;font-weight:bold;">🏢 {soc}</div>'
-            f'<div style="font-size:0.85rem;color:#2980b9;margin:8px 0;border-bottom:1px solid #eee;padding-bottom:8px;">📞 {tel if tel else "---"}</div>'
+            f'<div style="font-size:0.82rem;color:#2980b9;margin:8px 0;border-bottom:1px solid #eee;padding-bottom:8px;">'
+            f'📞 {tel if tel else "---"} &nbsp;|&nbsp; 📧 {mail if mail else "---"}</div>'
             f'<div style="font-size:0.9rem;color:#333;display:flex;justify-content:space-between;">'
             f'<span>📅 <b>{date_v}</b> ({jours}j)</span><span>👥 <b>{pers} pers.</b> | 💰 <b>{prix}€</b></span></div>'
             f'{"<div style=\'margin-top:10px;padding:8px;background:#f8f9fa;border-left:4px solid #1a2a6c;font-size:0.8rem;border-radius:4px;\'>📝 " + note + "</div>" if note else ""}'
-            f'<div style="margin-top:15px;display:flex;gap:10px;">'
-            f'<a href="tel:{clean_tel}" style="flex:1;background:#34495e;color:white !important;padding:12px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.85rem;font-weight:bold;">📞 APPEL</a>'
-            f'<a href="https://wa.me/{wa_link}" target="_blank" style="flex:1;background:#25D366;color:white !important;padding:12px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.85rem;font-weight:bold;">💬 WA</a>'
+            f'<div style="margin-top:15px;display:flex;gap:8px;">'
+            f'<a href="tel:{clean_tel}" style="flex:1;background:#5D6D7E;color:white !important;padding:12px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">📞 APPEL</a>'
+            f'<a href="https://wa.me/{wa_link}" target="_blank" style="flex:1;background:#25D366;color:white !important;padding:12px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">💬 WA</a>'
+            f'<a href="mailto:{mail}" style="flex:1;background:#E67E22;color:white !important;padding:12px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">📧 MAIL</a>'
             f'</div></div>'
         )
         st.markdown(card_html, unsafe_allow_html=True)
 
-        # --- BOUTONS ACTIONS ---
+        # --- ACTIONS ---
         c_ed, c_del = st.columns(2)
         if c_ed.button(f"✏️ MODIFIER #{num_f}", key=f"ed_{i}", use_container_width=True):
             st.session_state.edit_idx = i
@@ -221,11 +224,10 @@ if st.session_state.page == "CONTACTS":
             st.session_state.confirm_del_idx = i
             st.rerun()
 
-        # --- FORMULAIRE D'ÉDITION AVEC MÉMOIRE ---
+        # --- FORMULAIRE D'ÉDITION ---
         if st.session_state.get('edit_idx') == i:
-            with st.expander(f"⚙️ RÉGLAGES FICHE #{num_f}", expanded=True):
+            with st.expander(f"⚙️ ÉDITION #{num_f}", expanded=True):
                 with st.form(f"f_edit_{i}"):
-                    # Préparation des index pour garder l'état précédent
                     list_statut = ["En attente", "OK", "Terminé", "Refusé", "Annulé"]
                     list_paiement = ["Non payé", "Payé"]
                     
@@ -241,44 +243,35 @@ if st.session_state.page == "CONTACTS":
                     u_mai = c1.text_input("Email", value=mail)
                     u_dat = c2.text_input("Date (JJ/MM/AAAA)", value=date_v)
                     
-                    c3, c4 = st.columns(2)
-                    u_stat = c3.selectbox("Statut Mission", list_statut, index=idx_s)
-                    u_paye = c4.selectbox("Paiement", list_paiement, index=idx_p)
+                    c3, c4, c5 = st.columns(3)
+                    u_jr = c3.text_input("Jours", value=jours)
+                    u_ps = c4.text_input("Pers.", value=pers)
+                    u_px = c5.text_input("Prix €", value=prix)
                     
-                    u_note = st.text_area("Notes particulières", value=note)
+                    u_stat = st.selectbox("Statut Mission", list_statut, index=idx_s)
+                    u_paye = st.selectbox("Paiement", list_paiement, index=idx_p)
+                    u_note = st.text_area("Notes", value=note)
 
-                    if st.form_submit_button("💾 SAUVEGARDER LES CHANGEMENTS", use_container_width=True):
+                    if st.form_submit_button("💾 SAUVEGARDER", use_container_width=True):
                         df_c.at[i, 'Prénom'] = u_pre
                         df_c.at[i, 'Nom'] = u_nom
                         df_c.at[i, 'Société'] = u_soc
                         df_c.at[i, 'Téléphone'] = u_tel
                         df_c.at[i, 'Email'] = u_mai
                         df_c.at[i, 'DateNav'] = u_dat
+                        df_c.at[i, 'NbreJours'] = u_jr
+                        df_c.at[i, 'NbrePers'] = u_ps
+                        df_c.at[i, 'Prix'] = u_px
                         df_c.at[i, 'Statut'] = u_stat
                         df_c.at[i, 'Paiement'] = u_paye
                         df_c.at[i, 'Notes'] = u_note
                         sauvegarder_data(df_c, "contacts.json")
                         st.session_state.edit_idx = None
-                        st.success("Enregistré !")
-                        time.sleep(0.5)
                         st.rerun()
                     
-                    if st.button("❌ ANNULER", use_container_width=True):
+                    if st.button("❌ ANNULER"):
                         st.session_state.edit_idx = None
                         st.rerun()
-
-        # --- CONFIRMATION SUPPRESSION ---
-        if st.session_state.get('confirm_del_idx') == i:
-            st.warning(f"Confirmer la suppression définitive de #{num_f} ?")
-            cy, cn = st.columns(2)
-            if cy.button("OUI, Supprimer ✅", key=f"y_{i}", use_container_width=True):
-                df_c = df_c.drop(i).reset_index(drop=True)
-                sauvegarder_data(df_c, "contacts.json")
-                st.session_state.confirm_del_idx = None
-                st.rerun()
-            if cn.button("NON ❌", key=f"n_{i}", use_container_width=True):
-                st.session_state.confirm_del_idx = None
-                st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION CORRIGÉE) ---
 # =================================================================
