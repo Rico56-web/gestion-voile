@@ -123,12 +123,12 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
 
 # =================================================================
-# --- 5. PAGE CONTACTS (VERSION INTÉGRALE ET SÉCURISÉE) ---
+# --- 5. PAGE CONTACTS (VERSION FIXE & PROPRE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div class="main-header">👥 GESTION DES MISSIONS</div>', unsafe_allow_html=True)
     
-    # --- BARRE D'OUTILS (Navigation Interne) ---
+    # --- BARRE D'OUTILS ---
     c_n1, c_n2, c_add = st.columns([1, 1, 2])
     view_arc = st.session_state.get('view_archive', False)
 
@@ -152,7 +152,7 @@ if st.session_state.page == "CONTACTS":
 
     st.divider()
 
-    # --- FILTRAGE DES DONNÉES ---
+    # --- FILTRAGE ---
     if view_arc:
         df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé", "Annulé"])]
     else:
@@ -160,12 +160,10 @@ if st.session_state.page == "CONTACTS":
 
     # --- BOUCLE D'AFFICHAGE DES FICHES ---
     for i, r in df_disp.iterrows():
-        num_f = i + 1
-        
-        # Extraction et sécurisation des variables
+        # 1. Préparation des variables (Nettoyage safe)
         p_nom = safe(r.get('Prénom', ''))
         n_nom = safe(r.get('Nom', '')).upper()
-        nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche #{num_f}"
+        nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche #{i+1}"
         soc   = safe(r.get('Société', 'PARTICULIER')).upper()
         tel   = safe(r.get('Téléphone', ''))
         mail  = safe(r.get('Email', ''))
@@ -175,41 +173,37 @@ if st.session_state.page == "CONTACTS":
         jours = safe(r.get('NbreJours', '1'))
         pers  = safe(r.get('NbrePers', '1'))
         
-        # Logique des couleurs
+        # 2. Gestion des couleurs
         s_val = safe(r.get('Statut', 'En attente'))
         s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
-        if "CMN" in soc: s_col = "#0056b3" # Bleu spécifique CMN
+        if "CMN" in soc: s_col = "#0056b3"
         
         p_val = safe(r.get('Paiement', 'Non payé'))
         p_col = "#3498db" if "PAY" in p_val.upper() else "#e67e22"
 
-        # Préparation des liens Téléphone / WhatsApp (Nettoyage iPhone)
+        # 3. Liens d'action (Nettoyage iPhone)
         tel_digits = "".join(filter(str.isdigit, tel))
         wa_link = f"33{tel_digits[1:]}" if tel_digits.startswith("0") else tel_digits
 
-        # --- CONSTRUCTION DU BLOC HTML UNIQUE ---
+        # 4. CONSTRUCTION DU BLOC HTML (Une seule chaîne f-string)
         fiche_html = f"""
         <div style="border:2px solid #1a2a6c; border-radius:12px; padding:15px; margin-bottom:15px; background:white; color:black; box-shadow: 2px 4px 8px rgba(0,0,0,0.1);">
             <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <b style="color:#1a2a6c; font-size:1.15rem;">#{num_f} — {nom_c}</b>
+                <b style="color:#1a2a6c; font-size:1.1rem;">#{i+1} — {nom_c}</b>
                 <div style="text-align:right;">
-                    <span style="background:{s_col}; color:white; padding:3px 10px; border-radius:12px; font-size:0.75rem; font-weight:bold; display:inline-block;">{s_val.upper()}</span><br>
-                    <span style="background:{p_col}; color:white; padding:3px 10px; border-radius:12px; font-size:0.75rem; font-weight:bold; margin-top:5px; display:inline-block;">{p_val.upper()}</span>
+                    <span style="background:{s_col}; color:white; padding:2px 10px; border-radius:10px; font-size:0.75rem; font-weight:bold;">{s_val.upper()}</span><br>
+                    <span style="background:{p_col}; color:white; padding:2px 10px; border-radius:10px; font-size:0.75rem; font-weight:bold; margin-top:5px; display:inline-block;">{p_val.upper()}</span>
                 </div>
             </div>
-
             <div style="color:#444; font-size:0.9rem; margin-top:8px; font-weight:bold;">🏢 {soc}</div>
             <div style="color:#2980b9; font-size:0.85rem; margin:8px 0; border-bottom:1px solid #eee; padding-bottom:8px;">
-                📞 {tel if tel else "---"} &nbsp;&nbsp;|&nbsp;&nbsp; 📧 {mail if mail else "---"}
+                📞 {tel if tel else "---"} &nbsp;|&nbsp; 📧 {mail if mail else "---"}
             </div>
-            
             <div style="display:flex; justify-content:space-between; font-size:0.95rem; margin-top:10px;">
                 <span>📅 <b>{date_n}</b> ({jours}j)</span>
                 <span>👥 <b>{pers} pers.</b> | 💰 <b>{prix}€</b></span>
             </div>
-
-            {f'<div style="margin-top:12px; padding:10px; background:#f8f9fa; border-left:4px solid #1a2a6c; font-size:0.85rem; border-radius:4px; color:#333; line-height:1.4;">📝 {html.escape(note)}</div>' if note else ''}
-
+            {f'<div style="margin-top:12px; padding:10px; background:#f8f9fa; border-left:4px solid #1a2a6c; font-size:0.85rem; border-radius:4px; color:#333;">📝 {html.escape(note)}</div>' if note else ''}
             <div style="margin-top:15px; display:flex; gap:10px;">
                 <a href="tel:{tel_digits}" style="flex:1; background:#34495e; color:white !important; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.85rem; font-weight:bold;">📞 APPEL</a>
                 <a href="https://wa.me/{wa_link}" target="_blank" style="flex:1; background:#25D366; color:white !important; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.85rem; font-weight:bold;">💬 WHATSAPP</a>
@@ -219,36 +213,23 @@ if st.session_state.page == "CONTACTS":
         st.markdown(fiche_html, unsafe_allow_html=True)
 
         # --- FORMULAIRE DE MODIFICATION ---
-        with st.expander(f"✏️ MODIFIER LA FICHE"):
-            with st.form(key=f"edit_form_{i}"):
+        with st.expander(f"✏️ Modifier {n_nom}"):
+            with st.form(key=f"edit_f_{i}"):
                 c1, c2 = st.columns(2)
                 u_pre = c1.text_input("Prénom", value=p_nom)
                 u_nom = c2.text_input("Nom", value=n_nom)
-                
                 u_soc = st.selectbox("Société", ["PARTICULIER", "CLICK", "VOG", "CMN", "AUTRES"], 
                                      index=["PARTICULIER", "CLICK", "VOG", "CMN", "AUTRES"].index(soc) if soc in ["PARTICULIER", "CLICK", "VOG", "CMN", "AUTRES"] else 0)
+                u_tel = st.text_input("Téléphone", value=tel)
+                u_mail = st.text_input("Email", value=mail)
+                c3, c4, c5 = st.columns(3)
+                u_date = c3.text_input("Date (jj/mm/aaaa)", value=date_n)
+                u_jours = c4.text_input("Jours", value=jours)
+                u_pers = c5.text_input("Pers.", value=pers)
+                u_prix = st.text_input("Prix (€)", value=prix)
+                u_note = st.text_area("Notes", value=note)
                 
-                c3, c4 = st.columns(2)
-                u_tel = c3.text_input("Téléphone", value=tel)
-                u_mail = c4.text_input("Email", value=mail)
-                
-                c5, c6, c7 = st.columns(3)
-                u_date = c5.text_input("Date (jj/mm/aaaa)", value=date_n)
-                u_jours = c6.text_input("Jours", value=jours)
-                u_pers = c7.text_input("Pers.", value=pers)
-                
-                c8, c9 = st.columns(2)
-                u_prix = c8.text_input("Prix (€)", value=prix)
-                
-                opts_p = ["Non payé", "Payé", "Attente"]
-                u_paye = c9.selectbox("Paiement", opts_p, index=opts_p.index(p_val) if p_val in opts_p else 0)
-                
-                opts_s = ["En attente", "OK", "Terminé", "Annulé", "Refusé"]
-                u_statut = st.selectbox("Statut Mission", opts_s, index=opts_s.index(s_val) if s_val in opts_s else 0)
-                
-                u_note = st.text_area("Notes particulières", value=note)
-                
-                if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
+                if st.form_submit_button("💾 ENREGISTRER"):
                     df_c.at[i, 'Prénom'] = u_pre
                     df_c.at[i, 'Nom'] = u_nom
                     df_c.at[i, 'Société'] = u_soc
@@ -258,17 +239,13 @@ if st.session_state.page == "CONTACTS":
                     df_c.at[i, 'NbreJours'] = u_jours
                     df_c.at[i, 'NbrePers'] = u_pers
                     df_c.at[i, 'Prix'] = u_prix
-                    df_c.at[i, 'Paiement'] = u_paye
-                    df_c.at[i, 'Statut'] = u_statut
                     df_c.at[i, 'Notes'] = u_note
-                    
                     sauvegarder_data(df_c, "contacts.json")
-                    st.success("Modifications enregistrées !")
+                    st.success("Modifié !")
                     time.sleep(0.5)
                     st.rerun()
 
-        # BOUTON SUPPRIMER (Hors du formulaire)
-        if st.button(f"🗑️ Supprimer Mission #{num_f}", key=f"del_{i}", use_container_width=True):
+        if st.button(f"🗑️ Supprimer #{i+1}", key=f"del_{i}", use_container_width=True):
             df_c = df_c.drop(i).reset_index(drop=True)
             sauvegarder_data(df_c, "contacts.json")
             st.rerun()
