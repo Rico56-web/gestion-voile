@@ -4,5 +4,11 @@
         "Objet":"taxes DGN",
         "Montant":178.0,
         "Statut":"OK"
+    },
+    {
+        "Date":"22\/03\/2026",
+        "Objet":"4 gilets de sauvetage",
+        "Montant":246.8,
+        "Statut":"OK"
     }
 ]
