@@ -733,39 +733,45 @@ if st.session_state.page == "FACTURES":
             c_b1, c_b2 = st.columns(2)
             c_b1.link_button("🚀 GMAIL", gmail_link, use_container_width=True)
             c_b2.link_button("✉️ MAIL", mail_link, use_container_width=True)
-            
-            # --- 4. SUIVI DES ENVOIS (Vesta Skipper 2026) ---
+          # --- 4. SUIVI DES ENVOIS (LOGIQUE DYNAMIQUE) ---
             st.divider()
             df_suivi = charger_data('suivi_envois.json')
             if df_suivi.empty:
                 df_suivi = pd.DataFrame(columns=["Mois", "Annee", "DateEnvoi", "Total"])
 
+            # On vérifie si le mois sélectionné est déjà dans le fichier JSON
             deja_envoye = df_suivi[(df_suivi['Mois'] == sel_mois) & (df_suivi['Annee'] == sel_annee)]
 
             if not deja_envoye.empty:
+                # SI DÉJÀ ENVOYÉ : On affiche le message de succès (et pas le bouton)
                 dernier = deja_envoye.iloc[-1]
                 st.success(f"✅ Envoyé le {dernier['DateEnvoi']}")
+                
+                # Optionnel : un bouton discret pour corriger en cas d'erreur
+                if st.button("🔄 RE-VALIDER (Si erreur)", use_container_width=True):
+                    st.info("Le bouton d'envoi va réapparaître.")
+                    # Ici on pourrait supprimer la ligne, mais le plus simple est de laisser le rerun
+                    st.rerun()
             
-            if st.button("✔️ MARQUER COMME ENVOYÉ", type="primary", use_container_width=True):
-                nouvelle_trace = pd.DataFrame([{
-                    "Mois": sel_mois,
-                    "Annee": sel_annee,
-                    "DateEnvoi": datetime.now().strftime("%d/%m/%Y à %H:%M"),
-                    "Total": f"{total_cmn:.2f} €"
-                }])
-                df_suivi = pd.concat([df_suivi, nouvelle_trace], ignore_index=True)
-                sauvegarder_data(df_suivi, 'suivi_envois.json')
-                st.success("Enregistré !")
-                time.sleep(1)
-                st.rerun()
+            else:
+                # SI PAS ENCORE ENVOYÉ : On affiche le gros bouton rouge/bleu
+                if st.button("✔️ MARQUER COMME ENVOYÉ", type="primary", use_container_width=True):
+                    nouvelle_trace = pd.DataFrame([{
+                        "Mois": sel_mois,
+                        "Annee": sel_annee,
+                        "DateEnvoi": datetime.now().strftime("%d/%m/%Y à %H:%M"),
+                        "Total": f"{total_cmn:.2f} €"
+                    }])
+                    df_suivi = pd.concat([df_suivi, nouvelle_trace], ignore_index=True)
+                    sauvegarder_data(df_suivi, 'suivi_envois.json')
+                    st.success("Enregistré !")
+                    time.sleep(1)
+                    st.rerun()
 
+            # L'historique reste visible en bas dans tous les cas
             with st.expander("🕒 Historique des envois"):
                 if not df_suivi.empty:
-                    st.dataframe(df_suivi.iloc[::-1], use_container_width=True, hide_index=True)
-        else:
-            st.info(f"Aucune mission CMN en {sel_mois}.")
-    else:
-        st.warning("Base de données vide.")
+                    st.dataframe(df_suivi.iloc[::-1], use_container_width=True, hide_index=True)  
 # =================================================================
 # --- 10. PAGE LOG (CONSULTATION DES ARCHIVES) ---
 # =================================================================
