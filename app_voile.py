@@ -390,26 +390,26 @@ if st.session_state.page == "CONTACTS":
                     u_ps  = c4.text_input("Nombre de personnes", value=pers)
                     u_prix = c3.text_input("Prix Total (€)", value=prix)
                     u_stat = c4.selectbox("Statut Mission", ["En attente", "OK", "Terminé", "Refusé"], 
-                                          index=["En attente", "OK", "Terminé", "Refusé"].index(s_val) if s_val in ["En attente", "OK", "Terminé", "Refusé"] else 0)
+                              index=["En attente", "OK", "Terminé", "Refusé"].index(s_val) if s_val in ["En attente", "OK", "Terminé", "Refusé"] else 0)
                   # --- 1. On définit les options possibles ---
-options_paiement = ["Non payé", "Payé", "Attente"]
+                       options_paiement = ["Non payé", "Payé", "Attente"]
 
-# --- 2. On récupère la valeur actuelle (en gérant les majuscules/espaces) ---
-valeur_actuelle = str(item.get('Paiement', 'Non payé')).strip().capitalize()
+                  # --- 2. On récupère la valeur actuelle (en gérant les majuscules/espaces) ---
+                             valeur_actuelle = str(item.get('Paiement', 'Non payé')).strip().capitalize()
 
-# Si la valeur enregistrée n'est pas dans nos options, on met "Non payé" par défaut
-if valeur_actuelle not in options_paiement:
-    index_defaut = 0
-else:
-    index_defaut = options_paiement.index(valeur_actuelle)
+                 # Si la valeur enregistrée n'est pas dans nos options, on met "Non payé" par défaut
+                   if valeur_actuelle not in options_paiement:
+                   index_defaut = 0
+                   else:
+                   index_defaut = options_paiement.index(valeur_actuelle)
 
-# --- 3. Le Widget avec l'index dynamique ---
-new_paiement = st.selectbox(
-    "État du Paiement", 
-    options_paiement, 
-    index=index_defaut, 
-    key=f"edit_pay_{index}"
-)
+                 # --- 3. Le Widget avec l'index dynamique ---
+                    new_paiement = st.selectbox(
+                      "État du Paiement", 
+                       options_paiement, 
+                       index=index_defaut, 
+                       key=f"edit_pay_{index}"
+                            )
                     
                     u_note = st.text_area("Notes", value=r.get('Notes', ''))
                     
