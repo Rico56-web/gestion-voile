@@ -211,7 +211,7 @@ menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES", "LOG"]
 m = st.columns(len(menu))
 
 for i, name in enumerate(menu):
-    if m[i].button(name, key=f"nav_{name}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
+  if m[i].button(name, key=f"nav_btn_{name}_{i}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name
         st.rerun()
 
