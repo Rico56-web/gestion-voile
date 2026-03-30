@@ -709,24 +709,58 @@ if st.session_state.page == "MAINT":
 
     st.divider()
 
-    # 3. AFFICHAGE DE L'HISTORIQUE ET TOTAL
+ # 3. AFFICHAGE DE L'HISTORIQUE ET TOTAL
     if not df_m.empty:
-        # Calcul du total propre
         df_m['Montant'] = pd.to_numeric(df_m['Montant'], errors='coerce').fillna(0)
         total_frais = df_m['Montant'].sum()
-        
         st.metric("TOTAL CUMULÉ 2026", f"{total_frais:,.2f} €")
 
         st.write("### 📋 Historique des frais")
-        # Affichage du plus récent au plus ancien
+        
+        # On parcourt l'historique (du plus récent au plus ancien)
         for index, item in df_m.iloc[::-1].iterrows():
+            # Clé unique pour le mode édition de chaque ligne
+            edit_key = f"edit_mode_{index}"
+            if edit_key not in st.session_state:
+                st.session_state[edit_key] = False
+
             with st.expander(f"📅 {item['Date']} - {item['Objet']} ({item['Montant']}€)"):
-                if st.button(f"🗑️ Supprimer cette dépense", key=f"del_m_{index}", use_container_width=True):
-                    df_m = df_m.drop(index).reset_index(drop=True)
-                    sauvegarder_data(df_m, file_path_m)
-                    st.rerun()
+                
+                if not st.session_state[edit_key]:
+                    # --- AFFICHAGE CLASSIQUE ---
+                    col_a, col_b = st.columns(2)
+                    if col_a.button("✏️ Modifier", key=f"btn_edit_{index}", use_container_width=True):
+                        st.session_state[edit_key] = True
+                        st.rerun()
+                    
+                    if col_b.button("🗑️ Supprimer", key=f"btn_del_{index}", use_container_width=True):
+                        df_m = df_m.drop(index).reset_index(drop=True)
+                        sauvegarder_data(df_m, file_path_m)
+                        st.rerun()
+                else:
+                    # --- MODE ÉDITION (DANS L'EXPANDER) ---
+                    st.info("Mode modification activé")
+                    new_date = st.text_input("Date", item['Date'], key=f"in_date_{index}")
+                    new_obj = st.text_input("Objet", item['Objet'], key=f"in_obj_{index}")
+                    new_mt = st.number_input("Montant (€)", value=float(item['Montant']), key=f"in_mt_{index}")
+                    
+                    c1, c2 = st.columns(2)
+                    if c1.button("💾 Sauver", key=f"save_{index}", use_container_width=True, type="primary"):
+                        # Mise à jour des données
+                        df_m.at[index, 'Date'] = new_date
+                        df_m.at[index, 'Objet'] = new_obj
+                        df_m.at[index, 'Montant'] = new_mt
+                        sauvegarder_data(df_m, file_path_m)
+                        st.session_state[edit_key] = False # On ferme le mode édition
+                        st.success("Modifié !")
+                        time.sleep(0.5)
+                        st.rerun()
+                        
+                    if c2.button("🚫 Annuler", key=f"cancel_{index}", use_container_width=True):
+                        st.session_state[edit_key] = False
+                        st.rerun()
     else:
-        st.info("Aucune dépense enregistrée pour le moment.")
+        st.info("Aucune dépense enregistrée.")
 
     # 4. ZONE DE DANGER
     st.write("---")
