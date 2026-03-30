@@ -185,17 +185,18 @@ if st.session_state.page == "CONTACTS":
         tel_digits = "".join(filter(str.isdigit, tel))
         wa_link = f"33{tel_digits[1:]}" if tel_digits.startswith("0") else tel_digits
 
-        # --- CARTE HTML (SÉCURISÉE ANTI-DIV) ---
+# --- CARTE HTML SÉCURISÉE ---
         st.markdown(f"""
         <div style="border:2px solid #1a2a6c; border-radius:12px; padding:15px; margin-bottom:12px; background:white; color:black; box-shadow: 2px 2px 5px rgba(0,0,0,0.05);">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
                 <b style="color:#1a2a6c; font-size:1.1rem;">#{num_f} — {nom_c}</b>
                 <div style="text-align:right;">
                     <span style="background:{s_col}; color:white; padding:2px 10px; border-radius:12px; font-size:0.7rem; font-weight:bold;">{s_val.upper()}</span><br>
                     <span style="background:{p_col}; color:white; padding:2px 10px; border-radius:12px; font-size:0.7rem; font-weight:bold; margin-top:4px; display:inline-block;">{p_val.upper()}</span>
                 </div>
             </div>
-            <div style="color:#666; font-size:0.85rem; margin-top:5px; font-weight:bold;">🏢 {soc}</div>
+
+            <div style="color:#666; font-size:0.85rem; font-weight:bold;">🏢 {soc}</div>
             <div style="color:#2980b9; font-size:0.8rem; margin:8px 0;">📞 {tel if tel else "---"} &nbsp;|&nbsp; 📧 {mail if mail else "---"}</div>
             
             <div style="border-top:1px solid #eee; padding-top:8px; display:flex; justify-content:space-between; font-size:0.9rem;">
@@ -211,7 +212,6 @@ if st.session_state.page == "CONTACTS":
             </div>
         </div>
         """, unsafe_allow_html=True)
-
         # --- FORMULAIRE DE MODIFICATION ---
         with st.expander(f"✏️ Modifier {n_nom}"):
             with st.form(key=f"edit_form_{i}"):
