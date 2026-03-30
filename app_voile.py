@@ -875,7 +875,7 @@ if st.session_state.page == "FACTURES":
                     st.dataframe(df_suivi.iloc[::-1], use_container_width=True, hide_index=True)  
 
 # =================================================================
-# --- 11. PAGE NOTES (GESTION DE BORD & COMMENTAIRES) ---
+# --- 11. PAGE NOTES (VERSION SÉCURISÉE) ---
 # =================================================================
 if st.session_state.page == "NOTES":
     st.title("📝 Notes & Commentaires")
@@ -884,7 +884,8 @@ if st.session_state.page == "NOTES":
     file_path_notes = 'notes.json'
     df_n = charger_data(file_path_notes)
     
-    if df_n.empty:
+    # --- FORCE LA STRUCTURE SI LE FICHIER EST VIDE OU MAL FORMÉ ---
+    if df_n.empty or 'Date' not in df_n.columns:
         df_n = pd.DataFrame(columns=["Date", "Sujet", "Commentaires", "Statut"])
 
     # --- 2. INTERFACE D'AJOUT DYNAMIQUE ---
@@ -898,7 +899,8 @@ if st.session_state.page == "NOTES":
             st.session_state.show_notes_form = True
             st.rerun()
     else:
-        if col_nav2.button("❌ FERMER", key="close_notes", use_container_width=True):
+        # Correction de la variable col_n2 (au lieu de col_nav2 qui n'existait pas ici)
+        if col_n2.button("❌ FERMER", key="close_notes_btn", use_container_width=True):
             st.session_state.show_notes_form = False
             st.rerun()
 
