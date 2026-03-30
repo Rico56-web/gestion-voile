@@ -875,16 +875,16 @@ if st.session_state.page == "FACTURES":
                     st.dataframe(df_suivi.iloc[::-1], use_container_width=True, hide_index=True)  
 
 # =================================================================
-# --- 11. PAGE NOTES (VERSION SÉCURISÉE) ---
+# --- 11. PAGE NOTES (VERSION COMPLÈTE AVEC MODIFICATION) ---
 # =================================================================
 if st.session_state.page == "NOTES":
     st.title("📝 Notes & Commentaires")
 
-    # 1. CHARGEMENT DES DONNÉES
+    # 1. CHARGEMENT ET SÉCURISATION DES DONNÉES
     file_path_notes = 'notes.json'
     df_n = charger_data(file_path_notes)
     
-    # --- FORCE LA STRUCTURE SI LE FICHIER EST VIDE OU MAL FORMÉ ---
+    # Force la structure pour éviter les KeyError
     if df_n.empty or 'Date' not in df_n.columns:
         df_n = pd.DataFrame(columns=["Date", "Sujet", "Commentaires", "Statut"])
 
@@ -899,8 +899,7 @@ if st.session_state.page == "NOTES":
             st.session_state.show_notes_form = True
             st.rerun()
     else:
-        # Correction de la variable col_n2 (au lieu de col_nav2 qui n'existait pas ici)
-        if col_n2.button("❌ FERMER", key="close_notes_btn", use_container_width=True):
+        if col_n2.button("❌ FERMER", key="close_notes_form", use_container_width=True):
             st.session_state.show_notes_form = False
             st.rerun()
 
@@ -908,8 +907,8 @@ if st.session_state.page == "NOTES":
         with st.form("form_notes_new"):
             st.write("### ✍️ Rédiger une note")
             fn_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
-            fn_sujet = st.text_input("Sujet (ex: État moteur, Amarrage, Divers)")
-            fn_comm = st.text_area("Commentaires") # Zone de texte plus grande
+            fn_sujet = st.text_input("Sujet (ex: Moteur, Amarrage, Électricité)")
+            fn_comm = st.text_area("Commentaires")
             
             submit_n = st.form_submit_button("💾 ENREGISTRER LA NOTE", use_container_width=True)
             
@@ -928,58 +927,58 @@ if st.session_state.page == "NOTES":
                     time.sleep(1)
                     st.rerun()
                 else:
-                    st.warning("Veuillez entrer un 'Sujet'.")
+                    st.warning("Veuillez entrer un sujet.")
 
     st.divider()
 
-    # --- 3. AFFICHAGE DE L'HISTORIQUE DES NOTES ---
+    # --- 3. AFFICHAGE & MODIFICATION DE L'HISTORIQUE ---
     if not df_n.empty:
         st.write(f"### 📋 Carnet de bord ({len(df_n)} notes)")
         
         for index, item in df_n.iloc[::-1].iterrows():
-            # Clé unique pour l'édition
-            n_edit_key = f"note_edit_{index}"
+            # Clé d'édition unique pour cette note
+            n_edit_key = f"note_edit_mode_{index}"
             if n_edit_key not in st.session_state:
                 st.session_state[n_edit_key] = False
 
             with st.expander(f"📌 {item['Date']} - {item['Sujet']}"):
                 
                 if not st.session_state[n_edit_key]:
-                    # --- AFFICHAGE LECTURE ---
-                    st.write(f"**Note :** {item['Commentaires']}")
+                    # --- VUE LECTURE ---
+                    st.write(f"**Commentaire :**\n{item['Commentaires']}")
                     
-                    col_na, col_nb = st.columns(2)
-                    if col_na.button("✏️ Modifier", key=f"n_edit_btn_{index}", use_container_width=True):
+                    c_na, c_nb = st.columns(2)
+                    if c_na.button("✏️ Modifier", key=f"n_btn_edit_{index}", use_container_width=True):
                         st.session_state[n_edit_key] = True
                         st.rerun()
                     
-                    if col_nb.button("🗑️ Supprimer", key=f"n_del_btn_{index}", use_container_width=True):
+                    if c_nb.button("🗑️ Supprimer", key=f"n_btn_del_{index}", use_container_width=True):
                         df_n = df_n.drop(index).reset_index(drop=True)
                         sauvegarder_data(df_n, file_path_notes)
                         st.rerun()
                 else:
-                    # --- MODE ÉDITION ---
-                    st.info("Modification de la note")
-                    edit_n_date = st.text_input("Date", item['Date'], key=f"edit_n_date_{index}")
-                    edit_n_sujet = st.text_input("Sujet", item['Sujet'], key=f"edit_n_sujet_{index}")
-                    edit_n_comm = st.text_area("Commentaires", item['Commentaires'], key=f"edit_n_comm_{index}")
+                    # --- VUE ÉDITION ---
+                    st.info("Modification en cours...")
+                    ed_n_date = st.text_input("Date", item['Date'], key=f"ed_n_d_{index}")
+                    ed_n_sujet = st.text_input("Sujet", item['Sujet'], key=f"ed_n_s_{index}")
+                    ed_n_comm = st.text_area("Commentaires", item['Commentaires'], key=f"ed_n_c_{index}")
                     
                     cn1, cn2 = st.columns(2)
-                    if cn1.button("💾 Sauver", key=f"n_save_{index}", use_container_width=True, type="primary"):
-                        df_n.at[index, 'Date'] = edit_n_date
-                        df_n.at[index, 'Sujet'] = edit_n_sujet
-                        df_n.at[index, 'Commentaires'] = edit_n_comm
+                    if cn1.button("💾 Sauver", key=f"n_save_mod_{index}", use_container_width=True, type="primary"):
+                        df_n.at[index, 'Date'] = ed_n_date
+                        df_n.at[index, 'Sujet'] = ed_n_sujet
+                        df_n.at[index, 'Commentaires'] = ed_n_comm
                         sauvegarder_data(df_n, file_path_notes)
                         st.session_state[n_edit_key] = False
-                        st.success("Note mise à jour !")
+                        st.success("C'est fait !")
                         time.sleep(0.5)
                         st.rerun()
                         
-                    if cn2.button("🚫 Annuler", key=f"n_cancel_{index}", use_container_width=True):
+                    if cn2.button("🚫 Annuler", key=f"n_cancel_mod_{index}", use_container_width=True):
                         st.session_state[n_edit_key] = False
                         st.rerun()
     else:
-        st.info("Aucune note pour le moment.")
+        st.info("Aucune note enregistrée.")
 # =================================================================
 # --- 10. PAGE LOG (CONSULTATION DES ARCHIVES) ---
 # =================================================================
