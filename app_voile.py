@@ -123,7 +123,7 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
 
 # =================================================================
-# --- 5. PAGE CONTACTS (VERSION COMPLÈTE : APPEL / WA / MAIL) ---
+# --- 5. PAGE CONTACTS (FIX PAIEMENT ET COULEURS) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div class="main-header">👥 GESTION DES MISSIONS</div>', unsafe_allow_html=True)
@@ -179,16 +179,17 @@ if st.session_state.page == "CONTACTS":
         jours = safe(r.get('NbreJours', '1'))
         pers  = safe(r.get('NbrePers', '1'))
         
-        # Couleurs Statuts
+        # Logique Couleurs Statuts
         s_val = safe(r.get('Statut', 'En attente'))
         s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
         if "CMN" in soc: s_col = "#0056b3"
         
-        # Couleurs Paiement
+        # Logique Couleurs Paiement (Détection robuste)
         p_val = safe(r.get('Paiement', 'Non payé'))
-        p_col = "#3498db" if "PAY" in p_val.upper() else "#e67e22"
+        is_paid = "PAY" in p_val.upper()
+        p_display = "PAYÉ" if is_paid else "NON PAYÉ"
+        p_col = "#3498db" if is_paid else "#e67e22"
 
-        # Nettoyage Tel pour liens (Appel & WA)
         clean_tel = "".join(filter(str.isdigit, tel))
         wa_link = f"33{clean_tel[1:]}" if clean_tel.startswith("0") else clean_tel
 
@@ -199,7 +200,7 @@ if st.session_state.page == "CONTACTS":
             f'<b style="color:#1a2a6c;font-size:1.1rem;">#{num_f} — {nom_c}</b>'
             f'<div style="text-align:right;display:flex;flex-direction:column;gap:4px;">'
             f'<span style="background:{s_col};color:white;padding:2px 10px;border-radius:12px;font-size:0.7rem;font-weight:bold;">{s_val.upper()}</span>'
-            f'<span style="background:{p_col};color:white;padding:2px 10px;border-radius:12px;font-size:0.7rem;font-weight:bold;">{p_val.upper()}</span>'
+            f'<span style="background:{p_col};color:white;padding:2px 10px;border-radius:12px;font-size:0.7rem;font-weight:bold;">{p_display}</span>'
             f'</div></div>'
             f'<div style="color:#444;font-size:0.9rem;margin-top:8px;font-weight:bold;">🏢 {soc}</div>'
             f'<div style="font-size:0.82rem;color:#2980b9;margin:8px 0;border-bottom:1px solid #eee;padding-bottom:8px;">'
@@ -228,10 +229,12 @@ if st.session_state.page == "CONTACTS":
         if st.session_state.get('edit_idx') == i:
             with st.expander(f"⚙️ ÉDITION #{num_f}", expanded=True):
                 with st.form(f"f_edit_{i}"):
+                    # Sécurité : Indexation basée sur le contenu réel
                     list_statut = ["En attente", "OK", "Terminé", "Refusé", "Annulé"]
                     list_paiement = ["Non payé", "Payé"]
                     
                     idx_s = list_statut.index(s_val) if s_val in list_statut else 0
+                    # Correction ici : détection PAY pour forcer l'index 1 (Payé)
                     idx_p = 1 if "PAY" in p_val.upper() else 0
                     idx_soc = LISTE_SOC.index(soc) if soc in LISTE_SOC else 0
 
@@ -263,7 +266,7 @@ if st.session_state.page == "CONTACTS":
                         df_c.at[i, 'NbrePers'] = u_ps
                         df_c.at[i, 'Prix'] = u_px
                         df_c.at[i, 'Statut'] = u_stat
-                        df_c.at[i, 'Paiement'] = u_paye
+                        df_c.at[i, 'Paiement'] = u_paye # Sauvegardera "Payé" ou "Non payé"
                         df_c.at[i, 'Notes'] = u_note
                         sauvegarder_data(df_c, "contacts.json")
                         st.session_state.edit_idx = None
