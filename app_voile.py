@@ -5,7 +5,33 @@ import os
 import html
 import streamlit.components.v1 as components
 from datetime import datetime, date
+# --- FONCTIONS OUTILS (À METTRE EN HAUT DU FICHIER) ---
 
+def get_month_info(date_str):
+    """Extrait le numéro du mois et son nom pour le tri et l'affichage"""
+    try:
+        parts = str(date_str).split('/')
+        if len(parts) >= 2:
+            m_num = int(parts[1])
+            months = ["Janv", "Févr", "Mars", "Avril", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"]
+            # Retourne (1, "01-Janv") pour permettre un tri alphabétique correct
+            return m_num, f"{m_num:02d}-{months[m_num-1]}"
+    except: 
+        pass
+    return 99, "99-Inconnu"
+
+def clean_val(val):
+    """Nettoie les prix pour les calculs"""
+    try:
+        if val is None or str(val).lower() in ["nan", "none", ""]: return 0.0
+        s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
+        return float(s.replace(",", "."))
+    except: return 0.0
+
+def safe(val):
+    """Sécurise l'affichage des textes"""
+    if val is None or str(val).lower() in ["nan", "none"]: return ""
+    return str(val).strip()
 def safe(val):
     """Nettoie les valeurs pour l'affichage (évite les None ou NaN)"""
     if val is None or str(val).lower() in ["nan", "none"]:
