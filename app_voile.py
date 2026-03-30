@@ -6,6 +6,11 @@ import html
 import streamlit.components.v1 as components
 from datetime import datetime, date
 
+def safe(val):
+    """Nettoie les valeurs pour l'affichage (évite les None ou NaN)"""
+    if val is None or str(val).lower() in ["nan", "none"]:
+        return ""
+    return str(val).strip()
 # --- 1. CONFIGURATION & STYLE ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
