@@ -385,26 +385,21 @@ if st.session_state.page == "CONTACTS":
             df_c = df_c.drop(i).reset_index(drop=True)
             sauvegarder_data(df_c, "contacts.json")
             st.rerun()
-
 # =================================================================
-# --- 6. PAGE PLANNING (DÉBUT DU BLOC) ---
+# --- 6. PAGE PLANNING (VERSION CORRIGÉE) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Planning Vesta 2026")
+    st.title("🗓️ Planning Vesta 2026")
     
-    # RÉCUPÉRATION DE LA DATE DU JOUR
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
     
-    # 2. SÉLECTION MOIS/ANNÉE
     col_m, col_y = st.columns(2)
-    with col_m:
-        m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-        sel_m = m_noms.index(st.selectbox("Mois", m_noms, index=aujourdhui.month - 1)) + 1
-    with col_y:
-        sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
+    m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+    sel_m = m_noms.index(col_m.selectbox("Mois", m_noms, index=aujourdhui.month - 1)) + 1
+    sel_y = col_y.selectbox("Année", [2026, 2027, 2028], index=0)
 
-    # 3. LOGIQUE DE CALCUL DES COULEURS (HORS COLONNES)
+    # CALCUL DES OCCUPATIONS
     jours_occ = {}
     for _, r in df_c.iterrows():
         try:
@@ -416,148 +411,73 @@ elif st.session_state.page == "PLANNING":
             
             if mv == sel_m and yv == sel_y:
                 s_val = str(r.get('Statut', '')).strip().lower()
-                if s_val in ["", "archivé", "archive", "supprimé", "refusé"]: continue
+                if s_val in ["refusé", "archivé", "annulé"]: continue
                 
                 this_date = date(yv, mv, dv)
-                p_val = str(r.get('Paiement', '')).strip().lower()
-                is_paye = ("pay" in p_val or "paid" in p_val) and not any(x in p_val for x in ["un", "pas", "non"])
+                p_val = str(r.get('Paiement', '')).lower()
+                is_paye = "pay" in p_val and not any(x in p_val for x in ["non", "pas"])
                 
-                # Définition de la couleur du rond
+                # Couleur du rond
                 if this_date < aujourdhui:
-                    current_c = "#3498db" if is_paye else "#e74c3c" # Bleu si payé / Rouge si impayé
-                elif "ok" in s_val:
-                    current_c = "#2ecc71" # Vert
-                elif "attente" in s_val:
-                    current_c = "#f1c40f" # Jaune
+                    color = "#3498db" if is_paye else "#e74c3c"
                 else:
-                    current_c = "transparent"
+                    color = "#2ecc71" if "ok" in s_val else "#f1c40f"
                 
-                # Gestion de la durée (NbreJours)
                 n_j = int(r.get('NbreJours', 1))
                 for j in range(dv, dv + n_j):
-                    if j in jours_occ:
-                        # Priorité au rouge en cas de conflit
-                        old_c = jours_occ[j]["c"]
-                        if "#e74c3c" in [current_c, old_c]: final_c = "#e74c3c"
-                        else: final_c = current_c
-                        jours_occ[j] = {"c": final_c}
-                    else:
-                        jours_occ[j] = {"c": current_c}
-        except:
-            continue
+                    jours_occ[j] = {"c": color}
+        except: continue
 
-# 4. AFFICHAGE DU CALENDRIER HTML (AVEC JOURS DE LA SEMAINE)
+    # AFFICHAGE CALENDRIER
     jours_semaine = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
-    
-    h_cal = '<table style="width:100%; border-collapse: collapse; text-align: center; background: white; color: black;">'
-    
-    # --- AJOUT DE L'EN-TÊTE DES JOURS ---
-    h_cal += '<tr style="background: #f8f9fa; font-weight: bold; border-bottom: 2px solid #eee;">'
-    for js in jours_semaine:
-        h_cal += f'<td style="padding: 10px; border: 0.5px solid #eee; font-size: 12px; color: #666;">{js}</td>'
-    h_cal += '</tr>'
+    h_cal = '<table style="width:100%; border-collapse:collapse; text-align:center; background:white; color:black;">'
+    h_cal += '<tr style="background:#f8f9fa;">' + "".join([f'<td style="padding:10px; font-size:12px; border:1px solid #eee;">{js}</td>' for js in jours_semaine]) + '</tr>'
     
     cal_mat = calendar.monthcalendar(sel_y, sel_m)
     for sem in cal_mat:
         h_cal += '<tr>'
         for jour in sem:
             if jour == 0:
-                h_cal += '<td style="height:50px; border:0.5px solid #eee;"></td>'
+                h_cal += '<td style="height:50px; border:1px solid #eee;"></td>'
             else:
                 bg = jours_occ.get(jour, {}).get("c", "transparent")
-                # Texte blanc si le rond est coloré, sinon noir
-                txt_c = "white" if bg != "transparent" else "black"
-                
-                # Création du rond si occupé, sinon chiffre simple
-                if bg != "transparent":
-                    circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:32px; height:32px; line-height:32px; margin:auto; font-weight:bold; font-size:13px;">{jour}</div>'
-                else:
-                    circle = f'<span style="color:black;">{jour}</span>'
-                
-                h_cal += f'<td style="border:0.5px solid #eee; height:55px;">{circle}</td>'
+                txt = "white" if bg != "transparent" else "black"
+                content = f'<div style="background:{bg}; color:{txt}; border-radius:50%; width:30px; height:30px; line-height:30px; margin:auto; font-weight:bold;">{jour}</div>' if bg != "transparent" else f"{jour}"
+                h_cal += f'<td style="border:1px solid #eee; height:50px;">{content}</td>'
         h_cal += '</tr>'
     h_cal += '</table>'
-    
     st.markdown(h_cal, unsafe_allow_html=True)
-    st.caption("🔴 Passé Impayé | 🔵 Passé Payé | 🟢 Confirmé | 🟡 En attente")
+    st.caption("🔴 Passé Impayé | 🔵 Passé Payé | 🟢 OK | 🟡 Attente")
 
-    # 5. DÉTAILS DES RÉSERVATIONS DU MOIS
-    st.markdown(f"#### 📋 Liste des sorties - {m_noms[sel_m-1]}")
-    
+    # RÉCAPITULATIF FINANCIER
     res_list = []
-    ca_encaisse = 0.0
-    ca_attente = 0.0
-
+    ca_enc, ca_att = 0.0, 0.0
     for _, r in df_c.iterrows():
         try:
-            d_str = str(r.get('DateNav', '')).strip()
-            if '/' in d_str:
-                parts = d_str.split('/')
-                if int(parts[1]) == sel_m and (int(parts[2]) == sel_y or int(parts[2])+2000 == sel_y):
-                    if str(r.get('Statut','')).lower() not in ["refusé", "archivé"]:
-                        res_list.append(r)
-                        # Calcul CA
-                        prix = float(str(r.get('Prix', '0')).replace('€','').strip() or 0)
-                        p_val = str(r.get('Paiement', '')).lower()
-                        if ("pay" in p_val) and not any(x in p_val for x in ["un", "non"]):
-                            ca_encaisse += prix
-                        else:
-                            ca_attente += prix
-        except:
-            continue
+            d_parts = str(r.get('DateNav','')).split('/')
+            if int(d_parts[1]) == sel_m and (int(d_parts[2]) == sel_y or int(d_parts[2])+2000 == sel_y):
+                if str(r.get('Statut','')).lower() not in ["refusé", "annulé"]:
+                    res_list.append(r)
+                    p_val = clean_val(r.get('Prix', 0))
+                    if "pay" in str(r.get('Paiement','')).lower() and "non" not in str(r.get('Paiement','')).lower():
+                        ca_enc += p_val
+                    else: ca_att += p_val
+        except: continue
 
-    if not res_list:
-        st.info("Aucune navigation prévue.")
-    else:
-        # Tri par jour
-        res_list.sort(key=lambda x: int(str(x.get('DateNav')).split('/')[0]))
-        
-# --- BOUCLE DE LA LISTE DES RÉSERVATIONS (CORRIGÉE SANS NAMEERROR) ---
-        for res in res_list:
-            p_v = str(res.get('Paiement', '')).lower()
-            is_p = ("pay" in p_v) and not any(x in p_v for x in ["un", "non"])
-            p_color = "#27ae60" if is_p else "#e67e22"
-            
-            s_v = str(res.get('Statut', 'En attente'))
-            s_color = "#2ecc71" if s_v == "OK" else "#f1c40f" if s_v == "En attente" else "#e74c3c"
-            
-            nom_c = f"{res.get('Prénom')} {res.get('Nom','').upper()}"
-            nom_famille = res.get('Nom','')
-            # On crée une clé unique basée sur le nom et la date pour éviter le NameError
-            unique_key = f"btn_{nom_famille}_{str(res.get('DateNav')).replace('/','')}"
-
-            # AFFICHAGE HTML (Identique à ce qu'on voulait pour l'iPhone)
-            st.markdown(f"""
-            <div style="padding: 15px; border-left: 6px solid {p_color}; background: white; color: black; border-radius: 10px; margin-bottom: 10px; box-shadow: 0px 2px 5px rgba(0,0,0,0.1); border: 1px solid #eee;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div style="font-size: 1.1rem; font-weight: bold;">{nom_c}</div>
-                    <div style="text-align: right;">
-                        <span style="background:{s_color}; color:white; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:bold;">{s_v}</span><br>
-                        <span style="background:{p_color}; color:white; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:bold; margin-top:4px; display:inline-block;">{'PAYÉ' if is_p else 'À PAYER'}</span>
-                    </div>
-                </div>
-                <div style="margin-top: 8px; font-size: 0.9rem;">
-                    📅 <b>{res.get('DateNav')}</b> | ⛵ {res.get('NbreJours', 1)}j | 💰 <b>{res.get('Prix')} €</b><br>
-                    <small style="color: #555;">🏢 {res.get('Société','-')}</small>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # LE BOUTON AVEC LA CLÉ CORRIGÉE
-            if st.button(f"🔎 VOIR LA FICHE DE {nom_famille.upper()}", key=unique_key, use_container_width=True):
-                st.session_state.search_contact = nom_famille
-                st.session_state.page = "CONTACTS"
-                st.rerun()
-
-    # 6. RÉCAPITULATIF FINANCIER DU MOIS
     st.divider()
     c1, c2, c3 = st.columns(3)
-    c1.metric("Missions", len(res_list))
-    c2.metric("Encaissé", f"{ca_encaisse:.2f} €")
-    c3.metric("À percevoir", f"{ca_attente:.2f} €")
+    c1.metric("Sorties", len(res_list))
+    c2.metric("Encaissé", f"{ca_enc:.0f}€")
+    c3.metric("Attente", f"{ca_att:.0f}€")
 
-# --- FIN DU BLOC PLANNING ---
-
+    # LISTE DES MISSIONS DU MOIS
+    for res in sorted(res_list, key=lambda x: int(str(x.get('DateNav')).split('/')[0])):
+        with st.expander(f"📅 {res.get('DateNav')} - {res.get('Nom', '').upper()}"):
+            st.write(f"🏢 {res.get('Société')} | 💰 {res.get('Prix')} €")
+            if st.button("🔎 VOIR FICHE", key=f"go_{res.get('Nom')}_{res.get('DateNav')}"):
+                st.session_state.search_contact = res.get('Nom')
+                st.session_state.page = "CONTACTS"
+                st.rerun()
 # =================================================================
 # --- 7. PAGE STATS (VERSION RESTAURÉE & OPTIMISÉE) ---
 # =================================================================
