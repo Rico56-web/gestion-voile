@@ -3,25 +3,23 @@ import streamlit as st
 import pandas as pd
 import os
 import html
-import streamlit.components.v1 as components
 from datetime import datetime, date
-# --- FONCTIONS OUTILS (À METTRE EN HAUT DU FICHIER) ---
+
+# =================================================================
+# --- 1. FONCTIONS OUTILS (CENTRALISÉES) ---
+# =================================================================
 
 def get_month_info(date_str):
-    """Extrait le numéro du mois et son nom pour le tri et l'affichage"""
     try:
         parts = str(date_str).split('/')
         if len(parts) >= 2:
             m_num = int(parts[1])
             months = ["Janv", "Févr", "Mars", "Avril", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"]
-            # Retourne (1, "01-Janv") pour permettre un tri alphabétique correct
             return m_num, f"{m_num:02d}-{months[m_num-1]}"
-    except: 
-        pass
+    except: pass
     return 99, "99-Inconnu"
 
 def clean_val(val):
-    """Nettoie les prix pour les calculs"""
     try:
         if val is None or str(val).lower() in ["nan", "none", ""]: return 0.0
         s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
@@ -29,39 +27,17 @@ def clean_val(val):
     except: return 0.0
 
 def safe(val):
-    """Sécurise l'affichage des textes"""
     if val is None or str(val).lower() in ["nan", "none"]: return ""
     return str(val).strip()
-def safe(val):
-    """Nettoie les valeurs pour l'affichage (évite les None ou NaN)"""
-    if val is None or str(val).lower() in ["nan", "none"]:
-        return ""
-    return str(val).strip()
 
-def clean_val(val):
-    """Nettoie une chaîne de caractères pour en faire un nombre (float)"""
-    try:
-        if val is None or str(val).lower() in ["nan", "none", ""]: 
-            return 0.0
-        # On ne garde que les chiffres, les points, les virgules et le signe moins
-        s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
-        return float(s.replace(",", "."))
-    except: 
-        return 0.0
-
-def safe(val):
-    """Nettoie les textes pour éviter les erreurs d'affichage"""
-    if val is None or str(val).lower() in ["nan", "none"]:
-        return ""
-    return str(val).strip()
-
-# --- 1. CONFIGURATION & STYLE ---
+# =================================================================
+# --- 2. CONFIGURATION & STYLE ---
+# =================================================================
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
-# Date du jour en français
+now = datetime.now()
 jours_fr = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 mois_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-now = datetime.now()
 date_bandeau = f"📅 {jours_fr[now.weekday()]} {now.day} {mois_fr[now.month-1]} {now.year}"
 
 st.markdown(f"""<style>
@@ -69,22 +45,11 @@ st.markdown(f"""<style>
     .date-header {{ text-align: center; color: #7f8c8d; font-weight: bold; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; padding-bottom: 10px; }}
     button[data-testid="baseButton-primary"] {{ background-color: #ff4b4b !important; color: white !important; }}
     button[data-testid="baseButton-secondary"] {{ background-color: white !important; color: #1a2a6c !important; border: 1px solid #1a2a6c !important; }}
-    .fiche-globale {{ border-radius: 12px; background: white; margin-bottom: 15px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #ddd; }}
-    .border-cmn {{ border: 4px solid #0056b3 !important; background-color: #f0f7ff !important; }}
-    .prenom-style {{ font-size: 1.5rem; font-weight: bold; color: #1a2a6c; }}
-    .societe-style {{ color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #eee; }}
-    .statut-badge {{ padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; float: right; margin-left: 5px; }}
-    .container-boutons {{ display: flex; gap: 8px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 12px; }}
-    .btn-contact {{ flex: 1; text-align: center; padding: 10px 5px; border-radius: 8px; text-decoration: none !important; color: white !important; font-size: 0.85rem; font-weight: bold; }}
-    .notes-box {{ background-color: #f8f9fa; border-left: 5px solid #1a2a6c; padding: 10px; border-radius: 4px; margin: 10px 0; font-size: 0.95rem; }}
-    .calendar-table {{ width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 20px; }}
-    .calendar-table th {{ background-color: #1a2a6c; color: white; padding: 10px; border: 1px solid #ddd; }}
-    .calendar-table td {{ height: 50px; border: 1px solid #ddd; text-align: center; font-weight: bold; }}
-    .day-ok {{ background-color: #2ecc71 !important; color: white; }}
-    .day-attente {{ background-color: #f1c40f !important; color: black; }}
 </style>""", unsafe_allow_html=True)
 
-# --- 2. SÉCURITÉ ACCÈS ---
+# =================================================================
+# --- 3. SÉCURITÉ ACCÈS ---
+# =================================================================
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
@@ -95,149 +60,20 @@ if not st.session_state.authenticated:
         if password == "Skipper2026":
             st.session_state.authenticated = True
             st.rerun()
-        else:
-            st.error("Code incorrect.")
+        else: st.error("Code incorrect.")
     st.stop()
 
-# --- 3. FONCTIONS DONNÉES ---
+# =================================================================
+# --- 4. FONCTIONS GITHUB (DONNÉES) ---
+# =================================================================
 def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
         res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
         if res.status_code == 200:
-            return pd.DataFrame(json.loads(base64.b64decode(res.json()['content']).decode('utf-8')))
-        return pd.DataFrame()
-    except: return pd.DataFrame()
-
-def sauvegarder_data(df, file):
-    repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-    url = f"https://api.github.com/repos/{repo}/contents/{file}"
-    res = requests.get(url, headers={"Authorization": f"token {token}"})
-    sha = res.json().get('sha') if res.status_code == 200 else None
-    content = base64.b64encode(df.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
-    requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": f"Update {file}", "content": content, "sha": sha})
-
-def safe_get(r, key):
-    val = r.get(key)
-    return str(val).strip() if pd.notna(val) and val is not None else ""
-
-# --- 4. NAVIGATION & ENTÊTE ---
-st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
-st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=True)
-
-if "page" not in st.session_state: st.session_state.page = "CONTACTS"
-if "view_archive" not in st.session_state: st.session_state.view_archive = False
-if "edit_idx" not in st.session_state: st.session_state.edit_idx = None
-if "m_edit_idx" not in st.session_state: st.session_state.m_edit_idx = None
-if "maint_confirm_del" not in st.session_state: st.session_state.maint_confirm_del = None
-
-# PASSAGE À 7 COLONNES ET AJOUT DE "LOG"
-m = st.columns(7) 
-menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES", "LOG"]
-
-for i, name in enumerate(menu):
-    if m[i].button(name, key=f"nav_{name}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
-        st.session_state.page = name
-        st.session_state.edit_idx = None
-        st.session_state.m_edit_idx = None
-        st.rerun()
-        
-# --- CHARGEMENT DES DONNÉES ---
-df_c = charger_data("contacts.json")
-df_m = charger_data("maint.json")
-try:
-    df_m = pd.read_json("maintenance.json")
-except:
-    df_m = pd.DataFrame(columns=["Date", "Travaux", "Montant", "Etat", "Priorité", "Commentaires"])
-
-# --- NETTOYAGE AUTOMATIQUE DES DONNÉES ---
-def harmoniser_paiements(val):
-    v = str(val).strip().lower()
-    if not v or "un" in v or "non" in v or "pas" in v:
-        return "Non payé"
-    if "pay" in v:
-        return "Payé"
-    return "Non payé"
-
-# On applique le nettoyage sur toute la colonne d'un coup
-if 'Paiement' in df_c.columns:
-    df_c['Paiement'] = df_c['Paiement'].apply(harmoniser_paiements)
-
-# --- TRI CHRONOLOGIQUE SÉCURISÉ (Version Robuste) ---
-if not df_c.empty and 'DateNav' in df_c.columns:
-    try:
-        # On s'assure que DateNav est bien du texte et on nettoie les espaces
-        df_c['DateNav'] = df_c['DateNav'].astype(str).str.strip()
-        
-        # Création de la colonne de tri
-        df_c['temp_date'] = pd.to_datetime(
-            df_c['DateNav'], 
-            format='%d/%m/%Y', 
-            errors='coerce'
-        )
-        
-        # Tri : les dates valides d'abord, les erreurs à la fin
-        df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
-        
-        # On enlève la colonne technique
-        df_c = df_c.drop(columns=['temp_date'])
-    except Exception:
-        pass
-import requests, base64, json, time, calendar
-import streamlit as st
-import pandas as pd
-import os
-import html
-import streamlit.components.v1 as components
-from datetime import datetime, date
-
-# --- 1. CONFIGURATION & STYLE ---
-st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
-
-# Date du jour en français
-jours_fr = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
-mois_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-now = datetime.now()
-date_bandeau = f"📅 {jours_fr[now.weekday()]} {now.day} {mois_fr[now.month-1]} {now.year}"
-
-st.markdown(f"""<style>
-    .main-header {{ font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 5px; }}
-    .date-header {{ text-align: center; color: #7f8c8d; font-weight: bold; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; padding-bottom: 10px; }}
-    button[data-testid="baseButton-primary"] {{ background-color: #ff4b4b !important; color: white !important; }}
-    button[data-testid="baseButton-secondary"] {{ background-color: white !important; color: #1a2a6c !important; border: 1px solid #1a2a6c !important; }}
-    .fiche-globale {{ border-radius: 12px; background: white; margin-bottom: 15px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #ddd; }}
-    .border-cmn {{ border: 4px solid #0056b3 !important; background-color: #f0f7ff !important; }}
-    .prenom-style {{ font-size: 1.5rem; font-weight: bold; color: #1a2a6c; }}
-    .societe-style {{ color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #eee; }}
-    .statut-badge {{ padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; float: right; margin-left: 5px; }}
-    .container-boutons {{ display: flex; gap: 8px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 12px; }}
-    .btn-contact {{ flex: 1; text-align: center; padding: 10px 5px; border-radius: 8px; text-decoration: none !important; color: white !important; font-size: 0.85rem; font-weight: bold; }}
-</style>""", unsafe_allow_html=True)
-
-# --- 2. SÉCURITÉ ACCÈS ---
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-if not st.session_state.authenticated:
-    st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
-    password = st.text_input("Entrez le code d'accès :", type="password")
-    if st.button("ACCÉDER"):
-        if password == "Skipper2026":
-            st.session_state.authenticated = True
-            st.rerun()
-        else:
-            st.error("Code incorrect.")
-    st.stop()
-
-# --- 3. FONCTIONS DONNÉES ---
-def charger_data(file):
-    try:
-        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-        url = f"https://api.github.com/repos/{repo}/contents/{file}"
-        res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
-        if res.status_code == 200:
-            return pd.DataFrame(json.loads(base64.b64decode(res.json()['content']).decode('utf-8')))
+            content = base64.b64decode(res.json()['content']).decode('utf-8')
+            return pd.DataFrame(json.loads(content))
         return pd.DataFrame()
     except: return pd.DataFrame()
 
@@ -251,35 +87,40 @@ def sauvegarder_data(df, file):
         requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": f"Update {file}", "content": content, "sha": sha})
     except: st.error(f"Erreur de sauvegarde sur {file}")
 
-# --- 4. NAVIGATION & CHARGEMENT ---
+# =================================================================
+# --- 5. NAVIGATION & INITIALISATION ---
+# =================================================================
 st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=True)
 
 if "page" not in st.session_state: st.session_state.page = "CONTACTS"
+
 menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES", "LOG"]
-m = st.columns(len(menu))
+cols = st.columns(len(menu))
 
 for i, name in enumerate(menu):
-  if m[i].button(name, key=f"nav_btn_{name}_{i}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
+    if cols[i].button(name, key=f"nav_{name}", use_container_width=True, 
+                      type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name
         st.rerun()
 
-# Chargement centralisé
+# Chargement des bases
 df_c = charger_data("contacts.json")
-df_m = charger_data("maintenance.json") # Nom unique pour éviter les conflits
+df_m = charger_data("maintenance.json")
 
-# --- NETTOYAGE & TRI ---
+# Harmonisation auto des paiements (pour éviter le basculement "Payé")
 def harmoniser_paiements(val):
     v = str(val).strip().lower()
-    return "Payé" if "pay" in v and not any(x in v for x in ["un", "non", "pas"]) else "Non payé"
+    if "pay" in v and not any(x in v for x in ["un", "non", "pas"]): return "Payé"
+    return "Non payé"
 
-if not df_c.empty:
-    if 'Paiement' in df_c.columns:
-        df_c['Paiement'] = df_c['Paiement'].apply(harmoniser_paiements)
-    if 'DateNav' in df_c.columns:
-        df_c['DateNav'] = df_c['DateNav'].astype(str).str.strip()
-        df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
-        df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
+if not df_c.empty and 'Paiement' in df_c.columns:
+    df_c['Paiement'] = df_c['Paiement'].apply(harmoniser_paiements)
+
+# Tri chronologique des missions
+if not df_c.empty and 'DateNav' in df_c.columns:
+    df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
+    df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
 # =================================================================
 # --- 5. PAGE CONTACTS (VERSION OPTIMISÉE IPHONE) ---
 # =================================================================
