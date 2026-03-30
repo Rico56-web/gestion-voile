@@ -727,6 +727,51 @@ if st.session_state.page == "FACTURES":
             st.info(f"Aucune mission CMN trouvée pour {sel_mois} {sel_annee}.")
     else:
         st.warning("La base de données est vide.")
+        # --- 5. BOUTON DE VALIDATION D'ENVOI ---
+            st.divider()
+            
+            # Chargement de l'historique des envois
+            df_suivi = charger_data('suivi_envois.json')
+            if df_suivi.empty:
+                df_suivi = pd.DataFrame(columns=["Mois", "Annee", "DateEnvoi", "Total"])
+
+            # Vérifier si ce mois a déjà été envoyé
+            deja_envoye = df_suivi[(df_suivi['Mois'] == sel_mois) & (df_suivi['Annee'] == sel_annee)]
+
+            if not deja_envoye.empty:
+                dernier = deja_envoye.iloc[-1]
+                st.success(f"✅ Facture déjà validée le {dernier['DateEnvoi']}")
+                if st.button("♻️ RE-VALIDER L'ENVOI (MAJ)", use_container_width=True):
+                    # On ajoute une nouvelle ligne
+                    nouvelle_trace = pd.DataFrame([{
+                        "Mois": sel_mois,
+                        "Annee": sel_annee,
+                        "DateEnvoi": datetime.now().strftime("%d/%m/%Y à %H:%M"),
+                        "Total": f"{total_cmn:.2f} €"
+                    }])
+                    df_suivi = pd.concat([df_suivi, nouvelle_trace], ignore_index=True)
+                    sauvegarder_data(df_suivi, 'suivi_envois.json')
+                    st.rerun()
+            else:
+                if st.button("✔️ MARQUER COMME ENVOYÉ", type="primary", use_container_width=True):
+                    nouvelle_trace = pd.DataFrame([{
+                        "Mois": sel_mois,
+                        "Annee": sel_annee,
+                        "DateEnvoi": datetime.now().strftime("%d/%m/%Y à %H:%M"),
+                        "Total": f"{total_cmn:.2f} €"
+                    }])
+                    df_suivi = pd.concat([df_suivi, nouvelle_trace], ignore_index=True)
+                    sauvegarder_data(df_suivi, 'suivi_envois.json')
+                    st.success("Information enregistrée !")
+                    time.sleep(1)
+                    st.rerun()
+
+            # Petit historique en bas de page (Expander)
+            with st.expander("🕒 Historique des derniers envois"):
+                if not df_suivi.empty:
+                    st.dataframe(df_suivi.iloc[::-1], use_container_width=True, hide_index=True)
+                else:
+                    st.write("Aucun envoi enregistré pour le moment.")
 # =================================================================
 # --- 10. PAGE LOG (CONSULTATION DES ARCHIVES) ---
 # =================================================================
