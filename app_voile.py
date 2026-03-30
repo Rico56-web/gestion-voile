@@ -677,8 +677,8 @@ if st.session_state.page == "FACTURES":
         
         df_cmn_mois = df_fact[mask_cmn].copy()
         
-        if not df_cmn_mois.empty:
-            st.subheader(f"Missions CMN - {sel_mois} {sel_annee}")
+    if not df_cmn_mois.empty:
+        st.subheader(f"Missions CMN - {sel_mois} {sel_annee}")
             
             # Nettoyage des prix pour le calcul (réutilise la fonction clean_val si définie plus haut)
             df_cmn_mois['PrixNum'] = df_cmn_mois['Prix'].apply(clean_val)
