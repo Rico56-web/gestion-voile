@@ -135,34 +135,109 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except Exception:
         pass
+import requests, base64, json, time, calendar
+import streamlit as st
+import pandas as pd
+import os
+import html
+import streamlit.components.v1 as components
+from datetime import datetime, date
+
+# --- 1. CONFIGURATION & STYLE ---
+st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
+
+# Date du jour en français
+jours_fr = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+mois_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+now = datetime.now()
+date_bandeau = f"📅 {jours_fr[now.weekday()]} {now.day} {mois_fr[now.month-1]} {now.year}"
+
+st.markdown(f"""<style>
+    .main-header {{ font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 5px; }}
+    .date-header {{ text-align: center; color: #7f8c8d; font-weight: bold; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; padding-bottom: 10px; }}
+    button[data-testid="baseButton-primary"] {{ background-color: #ff4b4b !important; color: white !important; }}
+    button[data-testid="baseButton-secondary"] {{ background-color: white !important; color: #1a2a6c !important; border: 1px solid #1a2a6c !important; }}
+    .fiche-globale {{ border-radius: 12px; background: white; margin-bottom: 15px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #ddd; }}
+    .border-cmn {{ border: 4px solid #0056b3 !important; background-color: #f0f7ff !important; }}
+    .prenom-style {{ font-size: 1.5rem; font-weight: bold; color: #1a2a6c; }}
+    .societe-style {{ color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #eee; }}
+    .statut-badge {{ padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; float: right; margin-left: 5px; }}
+    .container-boutons {{ display: flex; gap: 8px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 12px; }}
+    .btn-contact {{ flex: 1; text-align: center; padding: 10px 5px; border-radius: 8px; text-decoration: none !important; color: white !important; font-size: 0.85rem; font-weight: bold; }}
+</style>""", unsafe_allow_html=True)
+
+# --- 2. SÉCURITÉ ACCÈS ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
+    password = st.text_input("Entrez le code d'accès :", type="password")
+    if st.button("ACCÉDER"):
+        if password == "Skipper2026":
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("Code incorrect.")
+    st.stop()
+
+# --- 3. FONCTIONS DONNÉES ---
+def charger_data(file):
+    try:
+        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
+        url = f"https://api.github.com/repos/{repo}/contents/{file}"
+        res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
+        if res.status_code == 200:
+            return pd.DataFrame(json.loads(base64.b64decode(res.json()['content']).decode('utf-8')))
+        return pd.DataFrame()
+    except: return pd.DataFrame()
+
+def sauvegarder_data(df, file):
+    try:
+        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
+        url = f"https://api.github.com/repos/{repo}/contents/{file}"
+        res = requests.get(url, headers={"Authorization": f"token {token}"})
+        sha = res.json().get('sha') if res.status_code == 200 else None
+        content = base64.b64encode(df.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
+        requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": f"Update {file}", "content": content, "sha": sha})
+    except: st.error(f"Erreur de sauvegarde sur {file}")
+
+# --- 4. NAVIGATION & CHARGEMENT ---
+st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=True)
+
+if "page" not in st.session_state: st.session_state.page = "CONTACTS"
+menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES", "LOG"]
+m = st.columns(len(menu))
+
+for i, name in enumerate(menu):
+    if m[i].button(name, key=f"nav_{name}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
+        st.session_state.page = name
+        st.rerun()
+
+# Chargement centralisé
+df_c = charger_data("contacts.json")
+df_m = charger_data("maintenance.json") # Nom unique pour éviter les conflits
+
+# --- NETTOYAGE & TRI ---
+def harmoniser_paiements(val):
+    v = str(val).strip().lower()
+    return "Payé" if "pay" in v and not any(x in v for x in ["un", "non", "pas"]) else "Non payé"
+
+if not df_c.empty:
+    if 'Paiement' in df_c.columns:
+        df_c['Paiement'] = df_c['Paiement'].apply(harmoniser_paiements)
+    if 'DateNav' in df_c.columns:
+        df_c['DateNav'] = df_c['DateNav'].astype(str).str.strip()
+        df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
+        df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
+
 # =================================================================
-# --- 5. PAGE CONTACTS (VERSION NETTOYÉE ET UNIQUE) ---
+# --- 5. PAGE CONTACTS ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👥 Vesta - Missions")
-    import html
-
-    # --- 1. FONCTIONS ET PARAMÈTRES ---
-    def safe(val):
-        v = str(val).strip()
-        if v.lower() in ["none", "nan", "", "null", "undefined"]: return ""
-        return html.escape(v).replace("\n", " ").replace("\r", "")
-
-    # Ajout de l'option "AUTRES" comme demandé
     LISTE_SOC = ["PARTICULIER", "CLICK", "VOG", "CMN", "AUTRES"]
-# --- 1. CONFIGURATION DES SOCIÉTÉS ---
-    LISTE_SOC = ["PARTICULIER", "CLICK", "VOG", "CMN", "AUTRES"]
-
-    # --- 2. CSS POUR LE BOUTON VERT ET NAVIGATION ---
-    st.markdown("""
-        <style>
-        div.stButton > button:first-child[kind="primary"] {
-            background-color: #27ae60 !important;
-            border-color: #27ae60 !important;
-            color: white !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
 
     c_n1, c_n2, c_add = st.columns([1, 1, 2])
     view_arc = st.session_state.get('view_archive', False)
@@ -174,21 +249,17 @@ if st.session_state.page == "CONTACTS":
         st.session_state.view_archive = True
         st.rerun()
     
-    # Ce bouton utilisera maintenant le style VERT défini au-dessus
-    if c_add.button("➕ NOUVELLE MISSION", type="primary", use_container_width=True):
-        new_row = pd.DataFrame([{
-            "Prénom": "", "Nom": "", "Société": "PARTICULIER", 
-            "Téléphone": "", "Email": "", "Statut": "En attente", 
-            "Paiement": "Non payé", "DateNav": "01/01/2026", 
-            "Prix": "0", "NbreJours": "1", "NbrePers": "1", "Notes": ""
-        }])
+    if c_add.button("➕ NOUVELLE MISSION", type="primary", use_container_width=True, help="Style vert via CSS"):
+        new_row = pd.DataFrame([{"Prénom": "", "Nom": "NOUVEAU", "Société": "PARTICULIER", "Statut": "En attente", "Paiement": "Non payé", "DateNav": now.strftime("%d/%m/%Y"), "Prix": "0", "NbreJours": "1", "NbrePers": "1", "Notes": ""}])
         df_c = pd.concat([new_row, df_c], ignore_index=True)
         sauvegarder_data(df_c, "contacts.json")
-        st.session_state.edit_idx = 0 
         st.rerun()
-  
 
     st.divider()
+    # Filtrage Affichage
+    df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
+
+    # (La boucle d'affichage des fiches HTML continue ici...)
 
     # --- 3. FILTRAGE ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
@@ -486,7 +557,6 @@ elif st.session_state.page == "PLANNING":
 if st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
 
-    # --- 1. FONCTIONS DE NETTOYAGE ---
     def clean_val(val):
         try:
             if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
@@ -504,27 +574,30 @@ if st.session_state.page == "STATS":
         except: pass
         return 99, "99-Inconnu"
 
-    # --- 2. PRÉPARATION DES DONNÉES ---
+    # --- PRÉPARATION DES DONNÉES ---
     df_st = df_c.copy()
     if not df_st.empty and 'Prix' in df_st.columns:
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
-        df_st['M_Sort'], df_st['Mois'] = zip(*df_st['DateNav'].apply(get_month_info))
+        # Correction : gestion des erreurs sur apply(zip)
+        month_data = df_st['DateNav'].apply(get_month_info)
+        df_st['M_Sort'] = [x[0] for x in month_data]
+        df_st['Mois'] = [x[1] for x in month_data]
         
-        mask_paye = df_st['Paiement'].astype(str).str.upper().str.strip() == "PAYÉ"
-        mask_ok = df_st['Statut'].astype(str).str.upper() == "OK"
-        df_st['CA_Calcul'] = df_st.apply(lambda x: x['PrixNum'] if (mask_paye[x.name] or mask_ok[x.name]) else 0.0, axis=1)
+        # Calcul CA : Payé OU OK
+        df_st['CA_Calcul'] = df_st.apply(lambda x: x['PrixNum'] if (str(x.get('Paiement','')).upper() == "PAYÉ" or str(x.get('Statut','')).upper() == "OK") else 0.0, axis=1)
     else:
-        df_st = pd.DataFrame(columns=['M_Sort', 'Mois', 'CA_Calcul', 'PrixNum', 'Paiement', 'Statut'])
+        df_st = pd.DataFrame(columns=['M_Sort', 'Mois', 'CA_Calcul', 'PrixNum', 'Société'])
 
-    # Récupération Frais Maintenance
     df_maint_stats = charger_data('maintenance.json')
-    if not df_maint_stats.empty and 'Date' in df_maint_stats.columns:
-        df_maint_stats['M_Sort'], df_maint_stats['Mois'] = zip(*df_maint_stats['Date'].apply(get_month_info))
+    if not df_maint_stats.empty:
+        m_data = df_maint_stats['Date'].apply(get_month_info)
+        df_maint_stats['M_Sort'] = [x[0] for x in m_data]
+        df_maint_stats['Mois'] = [x[1] for x in m_data]
         df_maint_stats['FraisNum'] = df_maint_stats['Montant'].apply(clean_val)
     else:
         df_maint_stats = pd.DataFrame(columns=['M_Sort', 'Mois', 'FraisNum'])
 
-    # --- 3. SYNTHÈSE MENSUELLE ---
+    # --- SYNTHÈSE ---
     st.subheader("📅 Synthèse Mensuelle 2026")
     stats_ca = df_st.groupby(['M_Sort', 'Mois'])['CA_Calcul'].sum().reset_index()
     stats_fr = df_maint_stats.groupby(['M_Sort', 'Mois'])['FraisNum'].sum().reset_index()
@@ -536,141 +609,47 @@ if st.session_state.page == "STATS":
     
     if not mensuel.empty:
         st.table(mensuel[['Mois', 'CA', 'Frais', 'Net']].set_index('Mois').style.format("{:.0f} €"))
-    
-    st.divider()
-    
-# --- 4.bis VISUALISATION GRAPHIQUE ---
-    st.subheader("📈 Analyse de l'Activité")
-    
-    if not mensuel.empty:
-        col_chart1, col_chart2 = st.columns([2, 1])
-        
-        with col_chart1:
-            # Courbe de l'évolution du CA vs Frais
-            st.write("**Évolution mensuelle (€)**")
-            # On prépare les données pour le graphique en ligne
-            chart_data = mensuel.set_index('Mois')[['CA', 'Frais']]
-            st.line_chart(chart_data, color=["#2ecc71", "#e74c3c"]) # Vert pour CA, Rouge pour Frais
-            
-        with col_chart2:
-            # Graphique en "fromage" pour les Sociétés
-            st.write("**Répartition Clients**")
-            if 'Société' in df_st.columns:
-                # On compte le nombre de missions par société
-                stats_soc = df_st['Société'].value_counts()
-                st.write("") # Petit espace pour centrer
-                # Streamlit n'a pas de st.pie_chart natif simple, on utilise donc une astuce efficace :
-                st.dataframe(stats_soc, use_container_width=True)
-                # Note : Si tu veux un vrai cercle, on pourrait utiliser Plotly, 
-                # mais le tableau de répartition est souvent plus lisible sur iPhone.
-    else:
-        st.info("Pas assez de données pour générer les graphiques.")
-        
-    # --- 4. INDICATEURS DE TRÉSORERIE ---
+
+    # --- INDICATEURS ---
     col1, col2 = st.columns(2)
-    tot_encaisse = df_st[df_st['Paiement'].astype(str).str.upper().str.strip() == "PAYÉ"]['PrixNum'].sum()
-    tot_a_venir = df_st[(df_st['Statut'].astype(str).str.upper() == "OK") & (df_st['Paiement'].astype(str).str.upper().str.strip() != "PAYÉ")]['PrixNum'].sum()
+    tot_encaisse = df_st[df_st['Paiement'].astype(str).str.upper() == "PAYÉ"]['PrixNum'].sum()
+    # À venir = Statut OK mais pas encore payé
+    tot_a_venir = df_st[(df_st['Statut'].astype(str).str.upper() == "OK") & (df_st['Paiement'].astype(str).str.upper() != "PAYÉ")]['PrixNum'].sum()
     
     col1.metric("💰 ENCAISSÉ", f"{tot_encaisse:,.0f}€")
     col2.metric("🕒 À VENIR", f"{tot_a_venir:,.0f}€")
 
-    # --- 5. DÉTAIL MISSIONS À VENIR (L'UNIQUE TABLEAU OPTIMISÉ) ---
-    st.subheader("⏳ Missions à venir (Détail)")
-    mask_avenir = (df_st['Statut'].astype(str).str.upper() == "OK") & (df_st['Paiement'].astype(str).str.upper().str.strip() != "PAYÉ")
-    df_avenir = df_st[mask_avenir].copy()
-
-    if not df_avenir.empty:
-        # On ne garde que Date, Nom et Prix pour l'iPhone
-        tableau_mobile = df_avenir[['DateNav', 'Nom', 'PrixNum']]
-        tableau_mobile.columns = ['📅 Date', '👤 Client', '💰 €']
-        
-        # Tri par date (on transforme temporairement en date pour trier correctement)
-        tableau_mobile['sort'] = pd.to_datetime(tableau_mobile['📅 Date'], format='%d/%m/%Y', errors='coerce')
-        tableau_mobile = tableau_mobile.sort_values('sort').drop(columns=['sort'])
-        
-        st.table(tableau_mobile.set_index('📅 Date'))
-    else:
-        st.info("Aucune mission 'OK' en attente de paiement.")
-
-    # --- 6. ARCHIVAGE ---
-    st.divider()
-    with st.expander("📁 Archivage de la Saison"):
-        annee_archive = datetime.now().year
-        if st.button(f"📦 ARCHIVER LES MISSIONS {annee_archive}", use_container_width=True):
-            mask_arch = df_c['Statut'].isin(["Terminé", "Refusé"])
-            df_a_archiver = df_c[mask_arch]
-            df_qui_reste = df_c[~mask_arch]
-            
-            if not df_a_archiver.empty:
-                sauvegarder_data(df_a_archiver, f"archives_{annee_archive}.json")
-                sauvegarder_data(df_qui_reste, "contacts.json")
-                st.success("Archive créée avec succès !")
-                time.sleep(1)
-                st.rerun()
-
 # =================================================================
-# --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
+# --- 8. PAGE MAINTENANCE ---
 # =================================================================
 if st.session_state.page == "MAINT":
     st.title("🔧 Maintenance Vesta")
-
-    # 1. CHARGEMENT VIA GITHUB
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
     
-    if df_m.empty:
-        df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut"])
-
-    # 2. INTERFACE DE SAISIE
-    with st.expander("➕ Ajouter une nouvelle dépense", expanded=True):
-        f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"), key="m_date")
-        f_obj = st.text_input("Objet (ex: Taxes DGAN, Révision)", key="m_obj")
-        f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0, key="m_mt")
-        
-        if st.button("💾 ENREGISTRER SUR GITHUB", type="primary", use_container_width=True):
+    with st.expander("➕ Ajouter une dépense", expanded=False):
+        f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"))
+        f_obj = st.text_input("Objet")
+        f_mt = st.number_input("Montant (€)", min_value=0.0)
+        if st.button("💾 ENREGISTRER"):
             if f_obj:
-                nouvelle_ligne = pd.DataFrame([{
-                    "Date": f_date,
-                    "Objet": f_obj,
-                    "Montant": float(f_mt),
-                    "Statut": "OK"
-                }])
-                df_m = pd.concat([df_m, nouvelle_ligne], ignore_index=True)
-                
-                # SAUVEGARDE SUR GITHUB
+                new_l = pd.DataFrame([{"Date": f_date, "Objet": f_obj, "Montant": float(f_mt), "Statut": "OK"}])
+                df_m = pd.concat([df_m, new_l], ignore_index=True)
                 sauvegarder_data(df_m, file_path_m)
-                
-                st.balloons()
-                st.success(f"Enregistré : {f_obj}")
+                st.success("Enregistré !")
                 time.sleep(1)
                 st.rerun()
-            else:
-                st.warning("Veuillez entrer un 'Objet'.")
 
-    st.divider()
-
-    # 3. AFFICHAGE DE L'HISTORIQUE
     if not df_m.empty:
-        total_frais = pd.to_numeric(df_m['Montant'], errors='coerce').sum()
-        st.metric("TOTAL CUMULÉ 2026", f"{total_frais:.2f} €")
-
-        for index, item in df_m.iloc[::-1].iterrows():
+        st.metric("TOTAL CUMULÉ", f"{df_m['Montant'].sum():.2f} €")
+        for idx, item in df_m.iloc[::-1].iterrows():
             with st.expander(f"📅 {item['Date']} - {item['Objet']} ({item['Montant']}€)"):
-                if st.button(f"🗑️ Supprimer", key=f"del_m_{index}", use_container_width=True):
-                    df_m = df_m.drop(index).reset_index(drop=True)
+                if st.button("🗑️ Supprimer", key=f"del_m_{idx}"):
+                    df_m = df_m.drop(idx).reset_index(drop=True)
                     sauvegarder_data(df_m, file_path_m)
                     st.rerun()
-
-    # 4. ZONE DE DANGER
-    st.write("---")
-    with st.expander("⚠️ Zone de Danger"):
-        if st.checkbox("Confirmer la suppression totale"):
-            if st.button("🔴 VIDER LE FICHIER", type="primary", use_container_width=True):
-                df_vide = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut"])
-                sauvegarder_data(df_vide, file_path_m)
-                st.rerun()
 # =================================================================
-# --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
+# --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ IPHONE) ---
 # =================================================================
 if st.session_state.page == "FACTURES":
     st.title("📑 Facturation & Rapports")
@@ -683,13 +662,12 @@ if st.session_state.page == "FACTURES":
     col_m, col_a = st.columns(2)
     sel_mois = col_m.selectbox("Choisir le mois", mois_noms, index=maintenant.month - 1)
     sel_annee = col_a.selectbox("Année", [2025, 2026, 2027], index=1)
-
     index_mois = mois_noms.index(sel_mois) + 1
 
     # --- 2. FILTRAGE ET CALCULS ---
     if not df_c.empty:
-        # Conversion temporaire pour le filtrage
         df_fact = df_c.copy()
+        # Conversion forcée pour le filtrage par date
         df_fact['dt'] = pd.to_datetime(df_fact['DateNav'], format='%d/%m/%Y', errors='coerce')
         
         # Filtre : Société CMN + Mois + Année
@@ -702,17 +680,11 @@ if st.session_state.page == "FACTURES":
         if not df_cmn_mois.empty:
             st.subheader(f"Missions CMN - {sel_mois} {sel_annee}")
             
-            # Nettoyage des prix pour le calcul
-            def clean_prix(x):
-                try:
-                    s = "".join(c for c in str(x) if c.isdigit() or c in ".,")
-                    return float(s.replace(",", "."))
-                except: return 0.0
-
-            df_cmn_mois['PrixNum'] = df_cmn_mois['Prix'].apply(clean_prix)
+            # Nettoyage des prix pour le calcul (réutilise la fonction clean_val si définie plus haut)
+            df_cmn_mois['PrixNum'] = df_cmn_mois['Prix'].apply(clean_val)
             total_cmn = df_cmn_mois['PrixNum'].sum()
             
-            # Affichage du tableau de contrôle sur l'iPhone
+            # Affichage du tableau de contrôle
             st.table(df_cmn_mois[['DateNav', 'Nom', 'Prix']].set_index('DateNav'))
             st.metric("Total à facturer", f"{total_cmn:.2f} €")
             
@@ -728,45 +700,33 @@ if st.session_state.page == "FACTURES":
                 d_str = str(row['DateNav']).ljust(10)
                 n_str = str(row['Nom'])
                 p_str = f"{row['PrixNum']:.2f} €"
-                # Assemblage de la ligne demandée
                 lignes_missions.append(f"{d_str}{esp12}{n_str}{esp3}{p_str}")
             
             texte_missions = "\n".join(lignes_missions)
-            
             destinataire = "tresorier@cmn-asso.fr, aurelienfaucheux@gmail.com"
             objet = f"Facturation Missions Vesta - {sel_mois} {sel_annee}"
             
-            # Utilisation des TRIPLES GUILLEMETS pour éviter la SyntaxError
-            corps_mail = f"""Bonjour,
+            corps_mail = f"""Bonjour,\n\nJ'espère que vous allez bien ! ⛵\n\nVoici le récapitulatif des navigations de la CMN concernant le mois de {sel_mois} {sel_annee} :\n\n{texte_missions}\n\nLe montant total s'élève à {total_cmn:.2f} €.\n\nMerci d'avance pour le règlement et à très vite sur l'eau !\n\nAmicalement,\nEric (Vesta)"""
 
-J'espère que vous allez bien ! ⛵
-
-Voici le récapitulatif des navigations de la CMN concernant le mois de {sel_mois} {sel_annee} :
-
-{texte_missions}
-
-Le montant total s'élève à {total_cmn:.2f} €.
-
-Merci d'avance pour le règlement et à très vite sur l'eau !
-
-Amicalement,
-Eric (vesta)"""
-
-            # --- 4. ZONE D'ENVOI ET COPIE ---
-            st.text_area("Copier ce texte pour Gmail :", corps_mail, height=300)
-            
-            st.info(f"**Destinataire :** {destinataire}\n\n**Objet :** {objet}")
+            # --- 4. ZONE D'ENVOI IPHONE ---
+            st.text_area("Texte prêt à copier :", corps_mail, height=250)
             
             import urllib.parse
+            # Lien standard Mailto
             mail_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
+            # Lien Deep Link GMAIL (iPhone)
+            gmail_link = f"googlegmail:///co?to={destinataire}&subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
             
-            st.link_button("🚀 TENTER L'ENVOI DIRECT (MAILTO)", mail_link, use_container_width=True)
-            st.caption("Note : Si le bouton bloque, utilise le copier-coller du texte ci-dessus dans ton appli Gmail.")
+            c_b1, c_b2 = st.columns(2)
+            c_b1.link_button("🚀 OUVRIR GMAIL", gmail_link, use_container_width=True)
+            c_b2.link_button("✉️ MAIL IPHONE", mail_link, use_container_width=True)
+            
+            st.caption("💡 Le bouton GMAIL fonctionne si l'application Gmail est installée sur ton iPhone.")
             
         else:
             st.info(f"Aucune mission CMN trouvée pour {sel_mois} {sel_annee}.")
     else:
-        st.warning("La base de données 'Contacts' est vide.")
+        st.warning("La base de données est vide.")
 # =================================================================
 # --- 10. PAGE LOG (CONSULTATION DES ARCHIVES) ---
 # =================================================================
