@@ -150,9 +150,9 @@ if st.session_state.page == "CONTACTS":
     # --- FILTRAGE ---
     df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé", "Annulé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé", "Annulé"])]
 
-    # --- BOUCLE D'AFFICHAGE ---
+   # --- BOUCLE D'AFFICHAGE DES FICHES ---
     for i, r in df_disp.iterrows():
-        # 1. Variables
+        # 1. Préparation propre des données
         p_nom = safe(r.get('Prénom', ''))
         n_nom = safe(r.get('Nom', '')).upper()
         nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche #{i+1}"
@@ -164,6 +164,56 @@ if st.session_state.page == "CONTACTS":
         date_n = safe(r.get('DateNav', '--/--/--'))
         jours = safe(r.get('NbreJours', '1'))
         pers  = safe(r.get('NbrePers', '1'))
+        
+        # 2. Gestion des couleurs
+        s_val = safe(r.get('Statut', 'En attente'))
+        s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
+        if "CMN" in soc: s_col = "#0056b3"
+        
+        p_val = safe(r.get('Paiement', 'Non payé'))
+        p_col = "#3498db" if "PAY" in p_val.upper() else "#e67e22"
+
+        # 3. Liens Téléphone / WA
+        tel_digits = "".join(filter(str.isdigit, tel))
+        wa_link = f"33{tel_digits[1:]}" if tel_digits.startswith("0") else tel_digits
+
+        # 4. LE BLOC HTML (SANS AUCUNE COUPURE)
+        # On crée TOUTE la carte dans une seule variable string
+        carte_html = f"""
+        <div style="border:2px solid #1a2a6c; border-radius:12px; padding:15px; margin-bottom:15px; background:white; color:black; box-shadow: 2px 4px 8px rgba(0,0,0,0.1);">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <b style="color:#1a2a6c; font-size:1.1rem;">#{i+1} — {nom_c}</b>
+                <div style="text-align:right;">
+                    <span style="background:{s_col}; color:white; padding:2px 10px; border-radius:10px; font-size:0.75rem; font-weight:bold; display:inline-block;">{s_val.upper()}</span><br>
+                    <span style="background:{p_col}; color:white; padding:2px 10px; border-radius:10px; font-size:0.75rem; font-weight:bold; margin-top:5px; display:inline-block;">{p_val.upper()}</span>
+                </div>
+            </div>
+            
+            <div style="color:#444; font-size:0.9rem; margin-top:8px; font-weight:bold;">🏢 {soc}</div>
+            <div style="color:#2980b9; font-size:0.85rem; margin:8px 0; border-bottom:1px solid #eee; padding-bottom:8px;">
+                📞 {tel if tel else "---"} &nbsp;|&nbsp; 📧 {mail if mail else "---"}
+            </div>
+
+            <div style="display:flex; justify-content:space-between; font-size:0.95rem; margin-top:10px;">
+                <span>📅 <b>{date_n}</b> ({jours}j)</span>
+                <span>👥 <b>{pers} pers.</b> | 💰 <b>{prix}€</b></span>
+            </div>
+
+            <div style="margin-top:15px; display:flex; gap:10px;">
+                <a href="tel:{tel_digits if tel_digits else '#'}" style="flex:1; background:#34495e; color:white !important; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.85rem; font-weight:bold;">📞 APPEL</a>
+                <a href="https://wa.me/{wa_link if tel_digits else '#'}" target="_blank" style="flex:1; background:#25D366; color:white !important; padding:12px; border-radius:8px; text-decoration:none; text-align:center; font-size:0.85rem; font-weight:bold;">💬 WA</a>
+            </div>
+        </div>
+        """
+        
+        # C'EST ICI QUE LA MAGIE OPÈRE : 
+        # On affiche le bloc d'un coup avec le paramètre CRITIQUE
+        st.markdown(carte_html, unsafe_allow_html=True)
+
+        # 5. Formulaire de modification (Hors du bloc HTML)
+        with st.expander(f"✏️ Modifier"):
+            # ... ton code de formulaire ici ...
+            st.write("Modifier les infos...")
         
         # 2. Couleurs
         s_val = safe(r.get('Statut', 'En attente'))
