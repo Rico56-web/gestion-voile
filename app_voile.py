@@ -204,9 +204,7 @@ if st.session_state.page == "CONTACTS":
         </div>
     </div>
     """
-    
-    st.markdown(fiche_html, unsafe_allow_html=True)
-        st.markdown(fiche_html, unsafe_allow_html=True)
+          st.markdown(fiche_html, unsafe_allow_html=True)
 
         # --- FORMULAIRE DE MODIFICATION ---
         with st.expander(f"✏️ Modifier {n_nom}"):
