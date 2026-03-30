@@ -161,12 +161,12 @@ if st.session_state.page == "CONTACTS":
     # --- BOUCLE D'AFFICHAGE DES FICHES ---
     for i, r in df_disp.iterrows():
        # --- 1. PRÉPARATION DES VARIABLES (D'abord les données) ---
-    p_nom = safe(r.get('Prénom', ''))
-    n_nom = safe(r.get('Nom', '')).upper()
-    nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche #{i+1}"
-    soc   = safe(r.get('Société', 'PARTICULIER')).upper()
-    tel   = safe(r.get('Téléphone', ''))
-    note  = safe(r.get('Notes', ''))
+            p_nom = safe(r.get('Prénom', ''))
+            n_nom = safe(r.get('Nom', '')).upper()
+            nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche #{i+1}"
+            soc   = safe(r.get('Société', 'PARTICULIER')).upper()
+            tel   = safe(r.get('Téléphone', ''))
+            note  = safe(r.get('Notes', ''))
     # ... (récupère toutes tes variables ici)
 
     # --- 2. GESTION DES COULEURS (Ensuite les styles) ---
