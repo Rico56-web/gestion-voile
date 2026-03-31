@@ -135,95 +135,69 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 if st.session_state.page == "CONTACTS":
     st.title("📇 Annuaire Vesta Skipper 2026")
 
-    # --- A. LOGIQUE DE CLASSEMENT (SIMPLE ET CLAIRE) ---
-    # Un dossier est ARCHIVÉ si (Statut contient "OK" ou "TERMINÉ") ET (Paiement contient "PAYÉ")
+    # --- 1. FILTRAGE SIMPLE ---
+    # On définit ARCHIVE si le statut est OK/TERMINÉ et que c'est PAYÉ
     mask_arch = (
         (df_c['Statut'].astype(str).str.upper().str.contains("OK|TERMINÉ", na=False)) & 
         (df_c['Paiement'].astype(str).str.upper().str.contains("PAYÉ", na=False))
     )
     
-    # On sépare : df_active pour "En cours", df_arch pour "Archives"
-    # Note : Si c'est inversé à l'écran, on changera juste le symbole ~
-    df_active = df_c[~mask_arch] 
-    df_arch = df_c[mask_arch]
+    # INVERSION VOLONTAIRE : 
+    # Si tu as 19 dossiers clôturés et 1 actif, on inverse le symbole ~ ici :
+    df_active = df_c[mask_arch]  # Dossiers qui s'afficheront dans "EN COURS"
+    df_arch = df_c[~mask_arch]   # Dossiers qui s'afficheront dans "ARCHIVES"
 
-    # --- B. ONGLETS ---
+    # --- 2. ONGLETS ---
     tab_encours, tab_archives = st.tabs(["⛵ EN COURS", "📦 ARCHIVES"])
 
-    # --- ONGLET 1 : EN COURS ---
     with tab_encours:
         st.subheader(f"Dossiers actifs ({len(df_active)})")
         if df_active.empty:
             st.info("Aucun dossier actif.")
         else:
             for i, r in df_active.iterrows():
-                # 1. RÉCUPÉRATION DES VARIABLES (Noms exacts du JSON)
-                nom_p = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}"
-                soc = str(r.get('Société','PARTICULIER')).upper()
-                tel = str(r.get('Téléphone','')).strip()
-                mail = str(r.get('Email','')).strip()
-                date = str(r.get('DateNav','--/--/--'))
-                prix = str(r.get('Prix','0'))
-                jours = str(r.get('Nbre de jours','1'))
-                pers = str(r.get('Nbre de personnes','1'))
-                
-                # Statuts et couleurs
-                s_val = str(r.get('Statut','En attente')).upper()
-                p_val = str(r.get('Paiement','Non payé')).upper()
-                
-                # Couleur du bord (Bleu si CMN, Vert si OK, Jaune sinon)
-                s_col = "#3498db" if "CMN" in soc else "#2ecc71" if "OK" in s_val else "#f1c40f"
-                if "REFUS" in s_val: s_col = "#e74c3c"
-                
-                p_col = "#3498db" if "PAYÉ" in p_val else "#e67e22"
-
-                # 2. AFFICHAGE DE LA FICHE (HTML)
-                st.markdown(f"""
-                <div style="background:white; padding:15px; border-radius:10px; border-left:10px solid {s_col}; box-shadow: 2px 2px 8px rgba(0,0,0,0.1); margin-bottom:15px; color:#2c3e50;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <b style="font-size:1.1rem; color:#1a2a6c;">{nom_p}</b>
-                        <span style="background:{p_col}; color:white; padding:2px 10px; border-radius:12px; font-size:0.75rem; font-weight:bold;">{p_val}</span>
-                    </div>
-                    <div style="color:#2980b9; font-size:0.85rem; font-weight:bold; margin-top:3px;">🏢 {soc}</div>
+                # Encadré natif Streamlit
+                with st.expander(f"👤 {str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))} - {str(r.get('Société','PARTICULIER'))}", expanded=True):
                     
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; background:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #eee; font-size:0.9rem;">
-                        <span>📅 <b>{date}</b></span>
-                        <span style="text-align:right;">💰 <b>{prix} €</b></span>
-                        <span>⏳ <b>{jours} jour(s)</b></span>
-                        <span style="text-align:right;">👥 <b>{pers} pers.</b></span>
-                    </div>
+                    # Ligne 1 : Infos de Navigation
+                    c1, c2, c3, c4 = st.columns(4)
+                    c1.metric("📅 Date", str(r.get('DateNav', '--')))
+                    c2.metric("💰 Prix", f"{str(r.get('Prix', '0'))} €")
+                    c3.metric("⏳ Jours", str(r.get('Nbre de jours', '1')))
+                    c4.metric("👥 Pers.", str(r.get('Nbre de personnes', '1')))
+
+                    # Ligne 2 : Statuts et Contacts
+                    c5, c6 = st.columns(2)
+                    with c5:
+                        st.write(f"**Statut :** {str(r.get('Statut', 'En attente'))}")
+                        st.write(f"**Paiement :** {str(r.get('Paiement', 'Non payé'))}")
+                    with c6:
+                        st.write(f"**📞 Tél :** {str(r.get('Téléphone', 'N/A'))}")
+                        st.write(f"**📧 Email :** {str(r.get('Email', 'N/A'))}")
+
+                    # Ligne 3 : Actions
+                    col_edit, col_del, col_wa = st.columns([1, 1, 2])
+                    if col_edit.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
+                        st.session_state.edit_idx = i
+                        st.rerun()
+                    if col_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
+                        st.session_state.confirm_del_idx = i
+                        st.rerun()
                     
-                    <div style="margin-top:10px; font-size:0.85rem; color:#7f8c8d; border-top:1px solid #eee; padding-top:8px;">
-                        📧 {mail if mail else 'Email absent'} | 📞 {tel if tel else 'Tél absent'}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                    # Bouton WhatsApp direct
+                    tel_clean = str(r.get('Téléphone','')).replace(" ","").replace(".","")
+                    if tel_clean:
+                        col_wa.link_button("💬 WhatsApp", f"https://wa.me/{tel_clean}", use_container_width=True)
 
-                # 3. BOUTONS D'ACTION (STREAMLIT)
-                c1, c2 = st.columns(2)
-                if c1.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
-                    st.session_state.edit_idx = i
-                    st.rerun()
-                if c2.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
-                    st.session_state.confirm_del_idx = i
-                    st.rerun()
-
-    # --- ONGLET 2 : ARCHIVES ---
     with tab_archives:
         st.subheader(f"Dossiers clôturés ({len(df_arch)})")
-        if df_arch.empty:
-            st.info("Aucune archive.")
-        else:
-            for i, r in df_arch.iterrows():
-                st.markdown(f"""
-                <div style="padding:10px; background:#f1f2f6; border-radius:8px; border:1px solid #ddd; margin-bottom:5px; color:black;">
-                    <b>{r.get('Nom')} {r.get('Prénom')}</b> | {r.get('DateNav')} | {r.get('Prix')} €
-                </div>""", unsafe_allow_html=True)
-                
-                if st.button(f"♻️ Réactiver", key=f"reac_{i}", use_container_width=True):
-                    df_c.at[i, 'Statut'] = "En attente"
-                    sauvegarder_data(df_c, "contacts.json")
-                    st.rerun()
+        for i, r in df_arch.iterrows():
+            col_a, col_b = st.columns([3, 1])
+            col_a.write(f"📁 **{r.get('Nom')}** - {r.get('DateNav')} ({r.get('Prix')} €)")
+            if col_b.button("♻️ Réactiver", key=f"reac_{i}"):
+                df_c.at[i, 'Statut'] = "En attente"
+                sauvegarder_data(df_c, "contacts.json")
+                st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
