@@ -204,6 +204,7 @@ for i, r in df_disp.iterrows():
     if c_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
         st.session_state.confirm_del_idx = i
         st.rerun()
+     
 # =================================================================
 # --- 6. PAGE PLANNING ---
 # =================================================================
