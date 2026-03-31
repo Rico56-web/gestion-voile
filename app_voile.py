@@ -249,79 +249,162 @@ if st.session_state.page == "CONTACTS":
             
             st.markdown('<br>', unsafe_allow_html=True)
 # =================================================================
-# --- 4. PAGE PLANNING (VERSION IDENTIQUE À HIER - LISTE SOUS CAL) ---
+# --- 6. PAGE PLANNING (VERSION OPTIMISÉE IPHONE) ---
 # =================================================================
-if st.session_state.page == "PLANNING":
-    st.markdown('<div class="main-header">📅 PLANNING VESTA 2026</div>', unsafe_allow_html=True)
-    import calendar as cal_logic
-    from datetime import datetime
-
-    # --- 1. SÉLECTEUR DE MOIS (COMPACT) ---
-    c1, c2 = st.columns(2)
-    sel_m = c1.selectbox("Mois", list(range(1, 13)), index=datetime.now().month - 1)
-    sel_y = c2.selectbox("Année", [2025, 2026, 2027], index=1)
-
-    # --- 2. AFFICHAGE DU CALENDRIER VISUEL (GRILLE VIDE) ---
-    cal_mat = cal_logic.monthcalendar(sel_y, sel_m)
-    month_name = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"][sel_m-1]
+elif st.session_state.page == "PLANNING":
+    st.markdown('<div class="main-header">🗓️ PLANNING VESTA 2026</div>', unsafe_allow_html=True)
     
-    cal_html = f'<div style="text-align:center; font-weight:bold; margin-bottom:5px; color:#1a2a6c;">{month_name} {sel_y}</div>'
-    cal_html += '<table style="width:100%; border-collapse:collapse; font-size:0.8rem; text-align:center; background:white; color:black;">'
-    cal_html += '<tr style="background:#f0f2f6;"><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
+    # RÉCUPÉRATION DE LA DATE DU JOUR
+    maintenant = datetime.now()
+    aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
     
-    # On récupère les jours occupés pour ce mois
-    jours_occupes = []
+    # 2. SÉLECTION MOIS/ANNÉE
+    col_m, col_y = st.columns(2)
+    with col_m:
+        m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+        sel_m = m_noms.index(st.selectbox("Mois", m_noms, index=aujourdhui.month - 1)) + 1
+    with col_y:
+        sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
+
+    # 3. LOGIQUE DE CALCUL DES COULEURS
+    jours_occ = {}
     for _, r in df_c.iterrows():
         try:
-            d_nav = pd.to_datetime(r.get('DateNav', ''), dayfirst=True)
-            if d_nav.month == sel_m and d_nav.year == sel_y:
-                jours_occupes.append(d_nav.day)
+            d_str = str(r.get('DateNav', '')).strip()
+            if '/' not in d_str: continue
+            parts = d_str.split('/')
+            dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
+            if yv < 100: yv += 2000
+            
+            if mv == sel_m and yv == sel_y:
+                s_val = str(r.get('Statut', '')).strip().lower()
+                if s_val in ["", "archivé", "archive", "supprimé", "refusé"]: continue
+                
+                this_date = date(yv, mv, dv)
+                p_val = str(r.get('Paiement', '')).strip().lower()
+                is_paye = ("pay" in p_val or "paid" in p_val) and not any(x in p_val for x in ["un", "pas", "non"])
+                
+                # Couleur du rond
+                if this_date < aujourdhui:
+                    current_c = "#3498db" if is_paye else "#e74c3c"
+                elif "ok" in s_val:
+                    current_c = "#2ecc71"
+                elif "attente" in s_val:
+                    current_c = "#f1c40f"
+                else:
+                    current_c = "transparent"
+                
+                n_j = int(r.get('NbreJours', 1))
+                for j in range(dv, dv + n_j):
+                    if j in jours_occ:
+                        old_c = jours_occ[j]["c"]
+                        final_c = "#e74c3c" if "#e74c3c" in [current_c, old_c] else current_c
+                        jours_occ[j] = {"c": final_c}
+                    else:
+                        jours_occ[j] = {"c": current_c}
         except: continue
 
-    for week in cal_mat:
-        cal_html += '<tr>'
-        for day in week:
-            if day == 0:
-                cal_html += '<td style="padding:8px; border:1px solid #eee;"></td>'
-            else:
-                bg = "#1a2a6c; color:white; font-weight:bold; border-radius:50%;" if day in jours_occupes else ""
-                cal_html += f'<td style="padding:8px; border:1px solid #eee;"><span style="display:inline-block; width:20px; height:20px; line-height:20px; {bg}">{day}</span></td>'
-        cal_html += '</tr>'
-    cal_html += '</table>'
-    st.markdown(cal_html, unsafe_allow_html=True)
-
-    st.write("---")
-
-    # --- 3. LISTE DES MISSIONS (LE MENU LISTE QUE TU AIMES) ---
-    st.subheader(f"📋 Missions de {month_name}")
+    # 4. AFFICHAGE DU CALENDRIER HTML (FORCÉ 100% LARGEUR)
+    jours_semaine = ["L", "M", "M", "J", "V", "S", "D"]
     
-    # Filtrage des données pour le mois sélectionné
-    df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
-    df_mois = df_c[(df_c['temp_date'].dt.month == sel_m) & (df_c['temp_date'].dt.year == sel_y)].sort_values('temp_date')
+    # CSS crucial : table-layout fixed pour iPhone
+    h_cal = '<table style="width:100%; table-layout:fixed; border-collapse: collapse; text-align: center; background: white; color: black; border: 1px solid #eee;">'
+    
+    h_cal += '<tr style="background: #f8f9fa; font-weight: bold;">'
+    for js in jours_semaine:
+        h_cal += f'<td style="padding: 8px 0; border: 0.5px solid #eee; font-size: 11px; color: #666;">{js}</td>'
+    h_cal += '</tr>'
+    
+    import calendar as cal_mod
+    cal_mat = cal_mod.monthcalendar(sel_y, sel_m)
+    for sem in cal_mat:
+        h_cal += '<tr>'
+        for jour in sem:
+            if jour == 0:
+                h_cal += '<td style="height:45px; border:0.5px solid #eee;"></td>'
+            else:
+                bg = jours_occ.get(jour, {}).get("c", "transparent")
+                txt_c = "white" if bg != "transparent" else "black"
+                
+                if bg != "transparent":
+                    # Rond légèrement plus petit (28px) pour tenir sur iPhone SE/12/13
+                    circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:28px; height:28px; line-height:28px; margin:auto; font-weight:bold; font-size:12px;">{jour}</div>'
+                else:
+                    circle = f'<span style="color:black; font-size:13px;">{jour}</span>'
+                
+                h_cal += f'<td style="border:0.5px solid #eee; height:45px;">{circle}</td>'
+        h_cal += '</tr>'
+    h_cal += '</table>'
+    
+    st.markdown(h_cal, unsafe_allow_html=True)
+    st.caption("🔴 Impayé | 🔵 Payé | 🟢 OK | 🟡 Attente")
 
-    if df_mois.empty:
-        st.info("Aucune mission prévue pour ce mois.")
+    # 5. DÉTAILS DES RÉSERVATIONS
+    st.markdown(f"#### 📋 Sorties - {m_noms[sel_m-1]}")
+    
+    res_list = []
+    ca_encaisse = 0.0
+    ca_attente = 0.0
+
+    for _, r in df_c.iterrows():
+        try:
+            d_str = str(r.get('DateNav', '')).strip()
+            if '/' in d_str:
+                parts = d_str.split('/')
+                if int(parts[1]) == sel_m and (int(parts[2]) == sel_y or int(parts[2])+2000 == sel_y):
+                    if str(r.get('Statut','')).lower() not in ["refusé", "archivé"]:
+                        res_list.append(r)
+                        prix = float(str(r.get('Prix', '0')).replace('€','').strip() or 0)
+                        p_val = str(r.get('Paiement', '')).lower()
+                        if ("pay" in p_val) and not any(x in p_val for x in ["un", "non"]):
+                            ca_encaisse += prix
+                        else:
+                            ca_attente += prix
+        except: continue
+
+    if not res_list:
+        st.info("Aucune navigation prévue.")
     else:
-        for _, r in df_mois.iterrows():
-            soc = str(r.get('Société', 'PARTICULIER')).upper()
-            nom = f"{r.get('Prénom', '')} {r.get('Nom', '')}".upper()
-            date_v = r.get('DateNav', '')
-            statut = r.get('Statut', 'En attente')
+        res_list.sort(key=lambda x: int(str(x.get('DateNav')).split('/')[0]))
+        
+        for res in res_list:
+            p_v = str(res.get('Paiement', '')).lower()
+            is_p = ("pay" in p_v) and not any(x in p_v for x in ["un", "non"])
+            p_color = "#27ae60" if is_p else "#e67e22"
             
-            # CODE COULEUR : Bleu si CMN, sinon Marine
-            couleur_bandeau = "#0056b3" if "CMN" in soc else "#1a2a6c"
+            s_v = str(res.get('Statut', 'En attente'))
+            s_color = "#2ecc71" if s_v == "OK" else "#f1c40f" if s_v == "En attente" else "#e74c3c"
             
-            mission_html = f"""
-            <div style="border-left:5px solid {couleur_bandeau}; padding:10px; margin-bottom:10px; background:#f8f9fa; border-radius:4px; color:black;">
-                <div style="display:flex; justify-content:space-between;">
-                    <b style="color:{couleur_bandeau};">{date_v}</b>
-                    <span style="font-size:0.8rem; font-weight:bold; color:#555;">{soc}</span>
+            nom_c = f"{res.get('Prénom')} {res.get('Nom','').upper()}"
+            nom_famille = res.get('Nom','')
+            unique_key = f"btn_{nom_famille}_{str(res.get('DateNav')).replace('/','')}"
+
+            st.markdown(f"""
+            <div style="padding: 12px; border-left: 6px solid {p_color}; background: white; color: black; border-radius: 8px; margin-bottom: 8px; box-shadow: 0px 1px 3px rgba(0,0,0,0.1); border: 1px solid #eee;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="font-size: 0.95rem; font-weight: bold;">{nom_c}</div>
+                    <div style="text-align: right;">
+                        <span style="background:{s_color}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold;">{s_v}</span>
+                    </div>
                 </div>
-                <div style="font-size:1rem; margin-top:3px;">{nom}</div>
-                <div style="font-size:0.75rem; color:#666;">Statut: {statut}</div>
+                <div style="margin-top: 5px; font-size: 0.85rem;">
+                    📅 <b>{res.get('DateNav')}</b> | 💰 <b>{res.get('Prix')} €</b><br>
+                    <small style="color: #666;">🏢 {res.get('Société','-')}</small>
+                </div>
             </div>
-            """
-            st.markdown(mission_html, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+            
+            if st.button(f"🔎 FICHE {nom_famille.upper()}", key=unique_key, use_container_width=True):
+                st.session_state.search_contact = nom_famille
+                st.session_state.page = "CONTACTS"
+                st.rerun()
+
+    # 6. RÉCAPITULATIF FINANCIER
+    st.divider()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Missions", len(res_list))
+    c2.metric("Payé", f"{ca_encaisse:.0f}€")
+    c3.metric("Dû", f"{ca_attente:.0f}€")
 # =================================================================
 # --- 7. PAGE STATS (VERSION RESTAURÉE & OPTIMISÉE) ---
 # =================================================================
