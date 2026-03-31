@@ -208,12 +208,12 @@ for i, r in df_disp.iterrows():
 # =================================================================
 
     elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Planning Vesta 2026")
+       st.subheader("🗓️ Planning Vesta 2026")
     
-    maintenant = datetime.now()
-    aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
+       maintenant = datetime.now()
+       aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
     
-    col_m, col_y = st.columns(2)
+       col_m, col_y = st.columns(2)
     with col_m:
         m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
         sel_m = m_noms.index(st.selectbox("Mois", m_noms, index=aujourdhui.month - 1)) + 1
