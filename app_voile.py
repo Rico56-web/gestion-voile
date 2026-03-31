@@ -194,7 +194,6 @@ for i, r in df_disp.iterrows():
             {btn_html}
         </div>"""
 
-# --- DERNIÈRES LIGNES DU BLOC CONTACTS ---
         st.markdown(card_html, unsafe_allow_html=True)
 
         c_ed, c_del = st.columns(2)
