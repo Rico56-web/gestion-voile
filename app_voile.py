@@ -135,58 +135,69 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 if st.session_state.page == "CONTACTS":
     st.title("📇 Vesta Skipper 2026")
 
-    # --- 1. NOUVELLE RÈGLE DE CLASSEMENT ---
-    # ARCHIVE = Statut est strictement "TERMINÉ" ET Paiement est "PAYÉ"
-    # Tout le reste (y compris les statuts "OK") reste dans "EN COURS"
+    # --- 1. FILTRAGE (Règle : Seul 'TERMINÉ' + 'PAYÉ' va en archive) ---
     mask_est_termine = (
         (df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|TERMINE", na=False)) & 
         (df_c['Paiement'].astype(str).str.upper().str.contains("PAYÉ|PAYE", na=False))
     )
     
-    # Répartition des dossiers
-    df_active = df_c[~mask_est_termine]  # Tes 16-19 fiches vont revenir ici
-    df_arch = df_c[mask_est_termine]     # Seuls les dossiers clos vont ici
+    df_active = df_c[~mask_est_termine]  
+    df_arch = df_c[mask_est_termine]     
 
     tab_encours, tab_archives = st.tabs([f"⛵ EN COURS ({len(df_active)})", f"📦 ARCHIVES ({len(df_arch)})"])
 
-    # --- ONGLET EN COURS ---
     with tab_encours:
         if df_active.empty:
             st.info("Aucun dossier actif.")
         else:
             for i, r in df_active.iterrows():
-                # Données
+                # --- DONNÉES ---
                 nom = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}"
                 soc = str(r.get('Société','PARTICULIER')).upper()
                 s_val = str(r.get('Statut','En attente')).upper()
                 p_val = str(r.get('Paiement','Non payé')).upper()
                 coms = str(r.get('Commentaires','')).strip()
                 
-                # Couleurs des Badges
-                s_col = "green" if "OK" in s_val else "blue" if "TERM" in s_val else "orange"
-                p_col = "blue" if "PAYÉ" in p_val else "orange"
+                # --- LOGIQUE VISUELLE FORTE ---
+                is_cmn = "CMN" in soc
+                # Bordure épaisse : Bleu pour CMN, Vert pour OK, Orange pour le reste
+                b_color = "#0047AB" if is_cmn else ("#27ae60" if "OK" in s_val else "#f39c12")
+                # Titre : Bleu pour CMN, Noir pour les autres
+                t_color = "#0047AB" if is_cmn else "#1e272e"
+                
+                # Couleurs des badges Streamlit
+                s_badge = "blue" if is_cmn else ("green" if "OK" in s_val else "orange")
+                p_badge = "blue" if "PAYÉ" in p_val else "orange"
+
+                # --- AFFICHAGE DE LA FICHE ---
+                # On utilise une astuce Markdown pour une bordure très visible
+                st.markdown(f"""
+                <div style="border: 3px solid {b_color}; padding: 15px; border-radius: 15px; background-color: white; margin-bottom: 5px;">
+                    <h2 style="color: {t_color}; margin: 0; font-size: 1.4rem;">{'🚢 ' if is_cmn else '👤 '}{nom}</h2>
+                    <p style="color: {b_color}; font-weight: bold; margin-bottom: 10px;">🏢 {soc}</p>
+                </div>
+                """, unsafe_allow_html=True)
 
                 with st.container(border=True):
-                    st.markdown(f"### {nom}")
                     c_status, c_pay = st.columns(2)
-                    c_status.markdown(f":{s_col}[**● {s_val}**]")
-                    c_pay.markdown(f":{p_col}[**● {p_val}**]")
+                    c_status.markdown(f":{s_badge}[**● STATUT : {s_val}**]")
+                    c_pay.markdown(f":{p_badge}[**● PAIEMENT : {p_val}**]")
                     
-                    st.caption(f"🏢 {soc}")
                     st.divider()
                     
-                    # Grille Infos
+                    # Grille d'infos avec fond grisé pour ressortir
                     col1, col2, col3 = st.columns(3)
-                    col1.write(f"📅 **{r.get('DateNav','--')}**")
-                    col2.write(f"💰 **{r.get('Prix','0')}€**")
-                    col3.write(f"👥 **{r.get('Nbre de personnes','1')}p**")
+                    col1.metric("📅 Date", r.get('DateNav','--'))
+                    col2.metric("💰 Prix", f"{r.get('Prix','0')}€")
+                    col3.metric("👥 Pers.", f"{r.get('Nbre de personnes','1')}")
                     
-                    st.write(f"⏳ **Durée :** {r.get('Nbre de jours','1')} j.")
+                    st.write(f"⏳ **Durée :** {r.get('Nbre de jours','1')} jour(s)")
+                    st.write(f"📞 {r.get('Téléphone','---')} | ✉️ {r.get('Email','---')}")
                     
                     if coms and coms.lower() != "nan":
-                        st.info(f"💬 {coms}")
+                        st.warning(f"💬 **NOTE :** {coms}")
 
-                    # Boutons
+                    # Boutons d'actions
                     b1, b2, b3 = st.columns([1,1,2])
                     if b1.button("✏️", key=f"ed_{i}", use_container_width=True):
                         st.session_state.edit_idx = i
@@ -198,24 +209,18 @@ if st.session_state.page == "CONTACTS":
                     tel = str(r.get('Téléphone','')).replace(" ","").replace(".","")
                     if tel:
                         b3.link_button("💬 WhatsApp", f"https://wa.me/{tel}", use_container_width=True)
+                
+                st.write("") # Espace entre les fiches
 
     # --- ONGLET ARCHIVES ---
     with tab_archives:
-        if df_arch.empty:
-            st.info("Les archives sont vides.")
-        else:
-            for i, r in df_arch.iterrows():
-                with st.container(border=True):
-                    col_a, col_b = st.columns([3, 1])
-                    with col_a:
-                        st.write(f"✅ **{r.get('Nom')}** - {r.get('DateNav')}")
-                        st.caption(f"Archivé ({r.get('Prix')}€)")
-                    
-                    if col_b.button("♻️", key=f"reac_{i}", use_container_width=True):
-                        # On change le statut pour le sortir de l'archive
-                        df_c.at[i, 'Statut'] = "En attente"
-                        sauvegarder_data(df_c, "contacts.json")
-                        st.rerun()
+        for i, r in df_arch.iterrows():
+            with st.container(border=True):
+                st.write(f"📁 **{r.get('Nom')}** - {r.get('DateNav')}")
+                if st.button("♻️ Réactiver", key=f"reac_{i}"):
+                    df_c.at[i, 'Statut'] = "En attente"
+                    sauvegarder_data(df_c, "contacts.json")
+                    st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
