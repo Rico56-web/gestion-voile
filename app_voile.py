@@ -166,43 +166,44 @@ for i, r in df_disp.iterrows():
         btn_html += f'<a href="mailto:{mail}" style="flex:1;background:#e67e22;color:white!important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">📧 MAIL</a>'
     btn_html += '</div>'
 
-    # CARTE HTML
+# --- CARTE HTML (Aligné avec 4 ou 8 espaces selon ton code) ---
     card_html = f"""
-    <div style="border:2px solid #1a2a6c;border-radius:12px;padding:12px;margin-bottom:10px;background:white;color:black;box-shadow: 2px 2px 5px rgba(0,0,0,0.05);">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
-            <b style="color:#1a2a6c;font-size:1.05rem;">{nom_c}</b>
-            <div style="text-align:right;display:flex;flex-direction:column;gap:3px;">
-                <span style="background:{s_col};color:white;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:bold;">{s_val.upper()}</span>
-                <span style="background:{p_col};color:white;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:bold;">{p_val.upper()}</span>
-            </div>
+<div style="border:2px solid #1a2a6c;border-radius:12px;padding:12px;margin-bottom:10px;background:white;color:black;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+        <b style="color:#1a2a6c;font-size:1.05rem;">{nom_c}</b>
+        <div style="text-align:right;display:flex;flex-direction:column;gap:3px;">
+            <span style="background:{s_col};color:white;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:bold;">{s_val.upper()}</span>
+            <span style="background:{p_col};color:white;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:bold;">{p_val.upper()}</span>
         </div>
-        <div style="color:#666;font-size:0.8rem;margin-bottom:8px;">🏢 {soc}</div>
-        <div style="background:#f8f9fa; border-radius:8px; padding:8px; border:1px solid #eee; margin-bottom:8px;">
-            <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#333;">
-                <span>📅 <b>{d_nav}</b></span>
-                <span>💰 <b>{prix} €</b></span>
-            </div>
-            <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#666; margin-top:4px; border-top: 1px dashed #ccc; padding-top:4px;">
-                <span>⏳ Durée: <b>{n_jrs} jour(s)</b></span>
-                <span>👥 Pers: <b>{n_per}</b></span>
-            </div>
+    </div>
+    <div style="color:#666;font-size:0.8rem;margin-bottom:8px;">🏢 {soc}</div>
+    <div style="background:#f8f9fa; border-radius:8px; padding:8px; border:1px solid #eee; margin-bottom:8px;">
+        <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#333;">
+            <span>📅 <b>{d_nav}</b></span>
+            <span>💰 <b>{prix} €</b></span>
         </div>
-        <div style="font-size:0.75rem; color:#2980b9;">📞 {tel if tel else "Non renseigné"}</div>
-        {btn_html}
-    </div>"""
-# --- DERNIÈRES LIGNES DE LA BOUCLE FOR DES CONTACTS ---
-        st.markdown(card_html, unsafe_allow_html=True)
+        <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#666; margin-top:4px; border-top: 1px dashed #ccc; padding-top:4px;">
+            <span>⏳ Durée: <b>{n_jrs} jour(s)</b></span>
+            <span>👥 Pers: <b>{n_per}</b></span>
+        </div>
+    </div>
+    <div style="font-size:0.75rem; color:#2980b9;">📞 {tel if tel else "Non renseigné"}</div>
+    {btn_html}
+</div>"""
 
-        c_ed, c_del = st.columns(2)
-        if c_ed.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
-            st.session_state.edit_idx = i
-            st.rerun()
+    # --- LIGNE 197 : AFFICHAGE (Doit être au même niveau que le card_html = f"...) ---
+    st.markdown(card_html, unsafe_allow_html=True)
+
+    c_ed, c_del = st.columns(2)
+    if c_ed.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
+        st.session_state.edit_idx = i
+        st.rerun()
             
-        if c_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
-            st.session_state.confirm_del_idx = i
-            st.rerun()
+    if c_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
+        st.session_state.confirm_del_idx = i
+        st.rerun()
 
-# <--- ICI : VÉRIFIE QU'IL N'Y A AUCUN ESPACE DEVANT LE ELIF CI-DESSOUS
+# --- ICI ON SORT DU BLOC (ZÉRO ESPACE AU DÉBUT) ---
 # =================================================================
 # --- 6. PAGE PLANNING ---
 # =================================================================
