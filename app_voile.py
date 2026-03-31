@@ -138,44 +138,38 @@ if st.session_state.page == "CONTACTS":
     # On harmonise pour que "ok" ou "OK" ou "Payé" ou "payé" fonctionnent
     mask_termine_paye = (df_c['Statut'].astype(str).str.upper().str.contains("OK", na=False)) & \
                         (df_c['Paiement'].astype(str).str.upper().str.contains("PAYÉ", na=False))
-
-    # 2. CRÉATION DES ONGLETS
+# --- B. AFFICHAGE DES ONGLETS ---
     tab_encours, tab_archives = st.tabs(["📑 EN COURS", "🗄️ ARCHIVES"])
+
+    # 1. ON DÉFINIT LES DEUX GROUPES SÉPARÉMENT
+    # Groupe ARCHIVES : Uniquement si c'est OK ET PAYÉ
+    df_arch = df_c[
+        (df_c['Statut'].astype(str).str.upper().str.contains("OK", na=False)) & 
+        (df_c['Paiement'].astype(str).str.upper().str.contains("PAYÉ", na=False))
+    ]
+
+    # Groupe EN COURS : Tout ce qui n'est PAS dans les archives
+    # On utilise .index.isin pour être certain de prendre le reste
+    df_active = df_c[~df_c.index.isin(df_arch.index)]
 
     # --- ONGLET 1 : EN COURS ---
     with tab_encours:
-        # LOGIQUE : On affiche tout ce qui n'est PAS (~) dans le masque (donc pas encore fini/payé)
-        df_active = df_c[~mask_termine_paye]
-        
         st.subheader(f"⛵ Suivi des dossiers ({len(df_active)})")
         
-        search = st.text_input("🔍 Filtrer...", "", key="search_active").upper()
-        if search:
-            df_active = df_active[df_active['Nom'].str.contains(search, na=False) | df_active['Société'].str.contains(search, na=False)]
-
         if df_active.empty:
             st.info("Aucun dossier actif.")
         else:
             for i, r in df_active.iterrows():
-                # --- AFFICHAGE CARTE (Indentation : 4 espaces ici) ---
+                # --- TON CODE D'AFFICHAGE HABITUEL (CARTE HTML) ---
                 p_nom = str(r.get('Prénom', '')).strip()
                 n_nom = str(r.get('Nom', '')).strip().upper()
                 nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Client #{i+1}"
-                soc = str(r.get('Société', 'PARTICULIER')).upper()
-                d_nav = str(r.get('DateNav', '--/--/--'))
-                prix = str(r.get('Prix', '0'))
-                
-                # Couleurs
                 s_val = str(r.get('Statut', 'En attente'))
-                s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
                 p_val = str(r.get('Paiement', 'Non payé'))
-                p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
-
+                
                 st.markdown(f"""
                 <div class="fiche-globale">
-                    <b>{nom_c}</b> <span class="statut-badge" style="background:{s_col};">{s_val}</span>
-                    <div style="font-size:0.8rem; color:gray;">🏢 {soc} | 📅 {d_nav}</div>
-                    <div style="font-weight:bold; color:{p_col};">💰 {prix} € ({p_val})</div>
+                    <b>{nom_c}</b> | <small>{s_val} / {p_val}</small>
                 </div>""", unsafe_allow_html=True)
 
                 c1, c2 = st.columns(2)
@@ -186,21 +180,17 @@ if st.session_state.page == "CONTACTS":
                     st.session_state.confirm_del_idx = i
                     st.rerun()
 
-    # --- ONGLET 2 : ARCHIVES (Attention : aligné avec le "with" du dessus) ---
+    # --- ONGLET 2 : ARCHIVES ---
     with tab_archives:
-        # LOGIQUE : On affiche uniquement ceux qui sont VRAIMENT finis et payés
-        df_arch = df_c[mask_termine_paye]
-        
         st.subheader(f"✅ Dossiers clôturés ({len(df_arch)})")
-
+        
         if df_arch.empty:
-            st.info("Aucune archive (Dossier OK + PAYÉ).")
+            st.info("Aucun dossier archivé (OK + PAYÉ).")
         else:
             for i, r in df_arch.iterrows():
                 st.markdown(f"""
-                <div style="padding:10px; border-radius:8px; background:#f1f2f6; margin-bottom:5px; border:1px solid #ddd; color:black;">
-                    <b>{r.get('Nom')} {r.get('Prénom')}</b><br>
-                    <small>📅 {r.get('DateNav')} | ✅ Payé {r.get('Prix')} €</small>
+                <div style="padding:10px; background:#f1f2f6; border-radius:8px; margin-bottom:5px; color:black;">
+                    <b>{r.get('Nom')} {r.get('Prénom')}</b> (Payé)
                 </div>""", unsafe_allow_html=True)
                 
                 if st.button(f"♻️ Réactiver", key=f"reac_{i}"):
