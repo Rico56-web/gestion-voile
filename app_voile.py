@@ -128,68 +128,23 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
-# =================================================================
-# --- 5. PAGE CONTACTS (VERSION CORRIGÉE) ---
-# =================================================================
 if st.session_state.page == "CONTACTS":
+    # 1. ON DÉFINIT LE FILTRE (OK + PAYÉ)
+    # On harmonise pour que "ok" ou "OK" ou "Payé" ou "payé" fonctionnent
+    mask_termine_paye = (df_c['Statut'].astype(str).str.upper().str.contains("OK", na=False)) & \
+                        (df_c['Paiement'].astype(str).str.upper().str.contains("PAYÉ", na=False))
 
-    # --- A. LOGIQUE D'INTERCEPTION (MODIFIER / SUPPRIMER) ---
-    if st.session_state.edit_idx is not None:
-        idx = st.session_state.edit_idx
-        r = df_c.iloc[idx]
-        st.markdown(f"### ✏️ Modifier : {r.get('Nom')}")
-        with st.form("edit_form_client"):
-            col1, col2 = st.columns(2)
-            new_statut = col1.selectbox("Statut", ["En attente", "OK", "Refusé"], 
-                                       index=1 if "OK" in str(r.get('Statut')).upper() else 0)
-            new_paye = col2.selectbox("Paiement", ["Non payé", "Payé"], 
-                                     index=1 if "PAYÉ" in str(r.get('Paiement')).upper() else 0)
-            new_prix = st.text_input("Prix (€)", value=str(r.get('Prix', '0')))
-            
-            c_btn1, c_btn2 = st.columns(2)
-            if c_btn1.form_submit_button("💾 ENREGISTRER"):
-                df_c.at[idx, 'Statut'] = new_statut
-                df_c.at[idx, 'Paiement'] = new_paye
-                df_c.at[idx, 'Prix'] = new_prix
-                sauvegarder_data(df_c, "contacts.json")
-                st.session_state.edit_idx = None
-                st.rerun()
-            if c_btn2.form_submit_button("❌ ANNULER"):
-                st.session_state.edit_idx = None
-                st.rerun()
-        st.stop()
-
-    if st.session_state.confirm_del_idx is not None:
-        idx = st.session_state.confirm_del_idx
-        st.error(f"⚠️ Supprimer définitivement {df_c.iloc[idx].get('Nom')} ?")
-        ca1, ca2 = st.columns(2)
-        if ca1.button("✅ OUI, SUPPRIMER"):
-            df_c = df_c.drop(df_c.index[idx]).reset_index(drop=True)
-            sauvegarder_data(df_c, "contacts.json")
-            st.session_state.confirm_del_idx = None
-            st.rerun()
-        if ca2.button("❌ NON, ANNULER"):
-            st.session_state.confirm_del_idx = None
-            st.rerun()
-        st.stop()
-# --- B. AFFICHAGE DES ONGLETS ---
+    # 2. CRÉATION DES ONGLETS
     tab_encours, tab_archives = st.tabs(["📑 EN COURS", "🗄️ ARCHIVES"])
 
-    # 1. ON DÉFINIT LE FILTRE ICI (En dehors des onglets pour éviter le NameError)
-    # On harmonise tout en majuscules pour éviter les problèmes d'accents ou de casse
-    mask_termine_paye = (df_c['Statut'].str.upper().str.contains("OK", na=False)) & \
-                        (df_c['Paiement'].str.upper().str.contains("PAYÉ", na=False))
-# --- ONGLET EN COURS ---
+    # --- ONGLET 1 : EN COURS ---
     with tab_encours:
-        # AVANT il y avait ~, on l'enlève pour que le "Vrai" (OK+PAYÉ) n'aille PAS ici
-        df_active = df_c[mask_termine_paye] 
-        
-        # NOTE : Si c'est encore l'inverse à l'écran, remets le ~ devant mask_termine_paye
-        # Mais d'après ton message, c'est cette version qui va ranger tes 16 contacts au bon endroit.
+        # LOGIQUE : On affiche tout ce qui n'est PAS (~) dans le masque (donc pas encore fini/payé)
+        df_active = df_c[~mask_termine_paye]
         
         st.subheader(f"⛵ Suivi des dossiers ({len(df_active)})")
         
-        search = st.text_input("🔍 Filtrer la liste...", "", key="search_active").upper()
+        search = st.text_input("🔍 Filtrer...", "", key="search_active").upper()
         if search:
             df_active = df_active[df_active['Nom'].str.contains(search, na=False) | df_active['Société'].str.contains(search, na=False)]
 
@@ -197,32 +152,25 @@ if st.session_state.page == "CONTACTS":
             st.info("Aucun dossier actif.")
         else:
             for i, r in df_active.iterrows():
-                # --- RÉCUPÉRATION DES DONNÉES ---
+                # --- AFFICHAGE CARTE (Indentation : 4 espaces ici) ---
                 p_nom = str(r.get('Prénom', '')).strip()
                 n_nom = str(r.get('Nom', '')).strip().upper()
                 nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Client #{i+1}"
                 soc = str(r.get('Société', 'PARTICULIER')).upper()
-                tel = str(r.get('Téléphone', '')).strip()
                 d_nav = str(r.get('DateNav', '--/--/--'))
                 prix = str(r.get('Prix', '0'))
                 
+                # Couleurs
                 s_val = str(r.get('Statut', 'En attente'))
                 s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
                 p_val = str(r.get('Paiement', 'Non payé'))
                 p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
 
-                # Carte HTML (Ta version habituelle)
                 st.markdown(f"""
                 <div class="fiche-globale">
-                    <div style="display:flex;justify-content:space-between;">
-                        <span class="prenom-style">{nom_c}</span>
-                        <div>
-                            <span class="statut-badge" style="background:{s_col};">{s_val.upper()}</span>
-                            <span class="statut-badge" style="background:{p_col};">{p_val.upper()}</span>
-                        </div>
-                    </div>
-                    <div class="societe-style">🏢 {soc} | 📅 {d_nav}</div>
-                    <div style="font-weight:bold; margin-top:5px;">💰 {prix} €</div>
+                    <b>{nom_c}</b> <span class="statut-badge" style="background:{s_col};">{s_val}</span>
+                    <div style="font-size:0.8rem; color:gray;">🏢 {soc} | 📅 {d_nav}</div>
+                    <div style="font-weight:bold; color:{p_col};">💰 {prix} € ({p_val})</div>
                 </div>""", unsafe_allow_html=True)
 
                 c1, c2 = st.columns(2)
@@ -233,30 +181,27 @@ if st.session_state.page == "CONTACTS":
                     st.session_state.confirm_del_idx = i
                     st.rerun()
 
- 
-   # --- ONGLET ARCHIVES ---
-      with tab_archives:
-        # ICI on ajoute le ~ pour dire "Affiche tout ce qui n'est PAS encore archivé"
-        df_arch = df_c[~mask_termine_paye]
+    # --- ONGLET 2 : ARCHIVES (Attention : aligné avec le "with" du dessus) ---
+    with tab_archives:
+        # LOGIQUE : On affiche uniquement ceux qui sont VRAIMENT finis et payés
+        df_arch = df_c[mask_termine_paye]
         
         st.subheader(f"✅ Dossiers clôturés ({len(df_arch)})")
-        # ... (ton code d'affichage des archives) ...
 
         if df_arch.empty:
-            st.write("Aucune archive.")
+            st.info("Aucune archive (Dossier OK + PAYÉ).")
         else:
             for i, r in df_arch.iterrows():
                 st.markdown(f"""
                 <div style="padding:10px; border-radius:8px; background:#f1f2f6; margin-bottom:5px; border:1px solid #ddd; color:black;">
                     <b>{r.get('Nom')} {r.get('Prénom')}</b><br>
-                    <small>📅 {r.get('DateNav')} | 💰 {r.get('Prix')} €</small>
+                    <small>📅 {r.get('DateNav')} | ✅ Payé {r.get('Prix')} €</small>
                 </div>""", unsafe_allow_html=True)
                 
                 if st.button(f"♻️ Réactiver", key=f"reac_{i}"):
                     df_c.at[i, 'Statut'] = "En attente"
                     sauvegarder_data(df_c, "contacts.json")
                     st.rerun()
-
 
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
