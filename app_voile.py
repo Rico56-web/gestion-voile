@@ -88,100 +88,95 @@ if st.session_state.page == "MODIFIER_CONTACT":
             st.session_state.page = "CONTACTS"
             st.rerun()
 
-# --- PAGE : CONTACTS (LISTE & RECHERCHE) ---
-elif st.session_state.page == "CONTACTS":
-    st.markdown('<div class="main-header">📇 RÉPERTOIRE & PLANNING</div>', unsafe_allow_html=True)
+# =================================================================
+# --- PAGE : MODIFIER_CONTACT (CORRIGÉE) ---
+# =================================================================
+if st.session_state.page == "MODIFIER_CONTACT":
+    idx = st.session_state.get('id_a_modifier')
+    
+    # Sécurité si l'index est perdu
+    if idx is None or idx not in df_c.index:
+        st.session_state.page = "CONTACTS"
+        st.rerun()
+        
+    ligne = df_c.loc[idx]
+    st.markdown(f"### 📝 Modifier : {ligne.get('Prénom','')} {ligne.get('Nom','')}")
+    
+    with st.form("form_edit_unique"): # Nom de formulaire unique
+        c1, c2 = st.columns(2)
+        new_nom = c1.text_input("Nom", value=str(ligne.get('Nom', '')))
+        new_pre = c2.text_input("Prénom", value=str(ligne.get('Prénom', '')))
+        
+        # Liste des sociétés (on s'assure que l'index existe)
+        liste_soc = ["CMN", "PARTICULIER", "CLICK", "VOG", "AUTRE"]
+        current_soc = str(ligne.get('Société', 'PARTICULIER')).upper()
+        idx_soc = liste_soc.index(current_soc) if current_soc in liste_soc else 1
+        new_soc = st.selectbox("Société", liste_soc, index=idx_soc)
+        
+        c3, c4 = st.columns(2)
+        new_tel = c3.text_input("Téléphone", value=str(ligne.get('Téléphone', '')))
+        new_mai = c4.text_input("Email", value=str(ligne.get('Email', '')))
+        
+        c5, c6 = st.columns(2)
+        new_dat = c5.text_input("Date (JJ/MM/AAAA)", value=str(ligne.get('DateNav', '')))
+        
+        # Sécurité pour le prix (conversion en float)
+        try:
+            val_prix = float(ligne.get('Prix', 0))
+        except:
+            val_prix = 0.0
+        new_pri = c6.number_input("Prix (€)", value=val_prix)
+        
+        c7, c8, c9 = st.columns(3)
+        # Liste des statuts
+        liste_statut = ["OK", "En attente", "Refusé", "Terminé"]
+        curr_statut = str(ligne.get('Statut', 'En attente'))
+        idx_statut = 0
+        for i, s in enumerate(liste_statut):
+            if s.lower() in curr_statut.lower(): idx_statut = i
+            
+        new_sta = c7.selectbox("Statut", liste_statut, index=idx_statut)
+        
+        new_pay = c8.selectbox("Paiement", ["À payer", "Payé"], 
+                               index=1 if "PAY" in str(ligne.get('Paiement', '')).upper() and "NON" not in str(ligne.get('Paiement', '')).upper() else 0)
+        
+        # Sécurité pour le nombre de personnes (le point critique du bug)
+        try:
+            raw_pers = ligne.get('NbrePers', 1)
+            if pd.isna(raw_pers) or raw_pers == "" or raw_pers == "None":
+                val_pers = 1
+            else:
+                val_pers = int(float(raw_pers))
+        except:
+            val_pers = 1
+            
+        new_per = c9.number_input("Nb Pers", value=val_pers, step=1)
 
-    # --- RECHERCHE ---
-    with st.expander("🔍 FILTRER LES CONTACTS", expanded=False):
-        cs1, cs2 = st.columns(2)
-        search_nom = cs1.text_input("👤 Nom", value="")
-        search_soc = cs2.text_input("🏢 Société", value="")
-        if st.button("🔄 RÉINITIALISER", use_container_width=True):
+        # LE BOUTON DOIT ÊTRE SEUL (PAS DANS UNE COLONNE) POUR ÊTRE BIEN DÉTECTÉ
+        submit = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
+        
+        if submit:
+            # Mise à jour du DataFrame original
+            df_c.at[idx, 'Nom'] = new_nom
+            df_c.at[idx, 'Prénom'] = new_pre
+            df_c.at[idx, 'Société'] = new_soc
+            df_c.at[idx, 'Téléphone'] = new_tel
+            df_c.at[idx, 'Email'] = new_mai
+            df_c.at[idx, 'DateNav'] = new_dat
+            df_c.at[idx, 'Prix'] = new_pri
+            df_c.at[idx, 'Statut'] = new_sta
+            df_c.at[idx, 'Paiement'] = new_pay
+            df_c.at[idx, 'NbrePers'] = new_per
+            
+            sauvegarder_data(df_c, "contacts.json")
+            st.success("✅ Modifications enregistrées !")
+            time.sleep(1)
+            st.session_state.page = "CONTACTS"
             st.rerun()
 
-    # --- PRÉPARATION & TRI CHRONOLOGIQUE ---
-    df_view = df_c.copy()
-    # Conversion date pour le tri (format JJ/MM/AAAA)
-    df_view['DateSort'] = pd.to_datetime(df_view['DateNav'], dayfirst=True, errors='coerce')
-    df_view = df_view.sort_values(by='DateSort', ascending=True)
-
-    # Filtrage
-    if search_nom:
-        df_view = df_view[df_view['Nom'].str.contains(search_nom, case=False, na=False) | 
-                         df_view['Prénom'].str.contains(search_nom, case=False, na=False)]
-    if search_soc:
-        df_view = df_view[df_view['Société'].str.contains(search_soc, case=False, na=False)]
-
-    # --- AFFICHAGE ---
-    for i, r in df_view.iterrows():
-        # Variables propres
-        nom_complet = f"{str(r.get('Prénom','')).capitalize()} {str(r.get('Nom','')).upper()}"
-        soc = str(r.get('Société','PARTICULIER')).upper()
-        tel = str(r.get('Téléphone','')).strip().replace(' ', '').replace('.','')
-        mail = str(r.get('Email','')).strip()
-        
-        # Statut & Couleurs
-        statut = str(r.get('Statut','En attente')).upper()
-        st_col = "#2ecc71" if ("OK" in statut or "TERM" in statut) else "#f1c40f" if "ATTENTE" in statut else "#e74c3c" if "REFUS" in statut else "#95a5a6"
-        
-        paiement = str(r.get('Paiement','À PAYER')).upper()
-        pay_col = "#2ecc71" if "PAY" in paiement and "NON" not in paiement else "#e67e22"
-        pay_lab = "✅ PAYÉ" if "PAY" in paiement and "NON" not in paiement else "⏳ À PAYER"
-
-        # --- FICHE HTML ---
-        card_html = f"""
-        <div style="border: 1px solid #ddd; border-left: 12px solid {'#0056b3' if 'CMN' in soc else '#1a2a6c'}; 
-                    padding: 15px; border-radius: 15px; background: white; margin-bottom: 5px; box-shadow: 0px 4px 8px rgba(0,0,0,0.1); color: black;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div style="color: #666; font-weight: bold; font-size: 0.75rem;">🏢 {soc}</div>
-                <div style="text-align: right;">
-                    <div style="background: {pay_col}; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.6rem; font-weight: bold; margin-bottom: 4px;">{pay_lab}</div>
-                    <div style="background: {st_col}; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.6rem; font-weight: bold;">{statut}</div>
-                </div>
-            </div>
-            <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 12px; color: #1a2a6c;">{nom_complet}</div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f8f9fa; padding: 10px; border-radius: 10px; font-size: 0.85rem;">
-                <div>📅 <b>{r.get('DateNav','-')}</b></div>
-                <div>💰 <b>{r.get('Prix','0')} €</b></div>
-                <div>⛵ <b>{int(float(r.get('NbreJours',1)))} j.</b></div>
-                <div>👥 <b>{r.get('NbrePers','-')} pers.</b></div>
-            </div>
-            <div style="margin-top: 10px; font-size: 0.85rem; color: #444;">
-                📞 {r.get('Téléphone','-')} | ✉️ {mail if mail not in ['nan','','None'] else '-'}
-            </div>
-        </div>
-        """
-        st.markdown(card_html, unsafe_allow_html=True)
-
-        # --- ACTIONS ---
-        c1, c2, c3 = st.columns(3)
-        if len(tel) > 5:
-            c1.markdown(f'<a href="tel:{tel}" style="text-decoration:none;"><div style="background:#2ecc71; color:white; padding:10px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.65rem;">📞 APPEL</div></a>', unsafe_allow_html=True)
-            wa_n = tel if not tel.startswith('0') else "33" + tel[1:]
-            c2.markdown(f'<a href="https://wa.me/{wa_n}" style="text-decoration:none;"><div style="background:#25D366; color:white; padding:10px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.65rem;">💬 WA</div></a>', unsafe_allow_html=True)
-        if mail not in ['nan','','None']:
-            c3.markdown(f'<a href="mailto:{mail}" style="text-decoration:none;"><div style="background:#3498db; color:white; padding:10px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.65rem;">✉️ EMAIL</div></a>', unsafe_allow_html=True)
-
-        g1, g2 = st.columns(2)
-        if g1.button(f"📝 Modifier", key=f"ed_{i}", use_container_width=True):
-            st.session_state.id_a_modifier = i
-            st.session_state.page = "MODIFIER_CONTACT"
-            st.rerun()
-        if g2.button(f"🗑️ Supprimer", key=f"dl_{i}", use_container_width=True):
-            st.session_state[f"confirm_{i}"] = True
-
-        if st.session_state.get(f"confirm_{i}"):
-            st.error("Confirmer ?")
-            cf1, cf2 = st.columns(2)
-            if cf1.button("OUI", key=f"y_{i}", use_container_width=True):
-                df_c = df_c.drop(i)
-                sauvegarder_data(df_c, 'contacts.json')
-                st.rerun()
-            if cf2.button("NON", key=f"n_{i}", use_container_width=True):
-                del st.session_state[f"confirm_{i}"]
-                st.rerun()
-        st.write("---")
+    if st.button("⬅️ ANNULER ET RETOUR"):
+        st.session_state.page = "CONTACTS"
+        st.rerun()
 
 
 # =================================================================
