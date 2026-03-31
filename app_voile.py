@@ -128,89 +128,91 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
-
 # =================================================================
-# --- 5. PAGE CONTACTS (VERSION COMPLÈTE) ---
+# --- 5. PAGE CONTACTS ---
 # =================================================================
-for i, r in df_disp.iterrows():
-    num_f = i + 1
-    # Récupération des données
-    p_nom = str(r.get('Prénom', '')).strip()
-    n_nom = str(r.get('Nom', '')).strip().upper()
-    nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Client #{num_f}"
-    soc = str(r.get('Société', 'PARTICULIER')).upper()
-    tel = str(r.get('Téléphone', '')).strip()
-    mail = str(r.get('Email', '')).strip()
+if st.session_state.page == "CONTACTS":
+    st.title("📇 Annuaire Clients")
     
-    # Données de Navigation
-    d_nav = str(r.get('DateNav', '--/--/--'))
-    n_jrs = str(r.get('NbreJours', '1'))
-    n_per = str(r.get('NbrePers', '1'))
-    prix = str(r.get('Prix', '0'))
+    # Barre de recherche
+    search = st.text_input("🔍 Rechercher un nom ou une société...", "").upper()
+    df_disp = df_c[df_c['Nom'].str.contains(search, na=False) | df_c['Société'].str.contains(search, na=False)] if search else df_c
 
-    # Couleurs Statuts & Paiement
-    s_val = str(r.get('Statut', 'En attente'))
-    s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
-    if "CMN" in soc: s_col = "#3498db"
-    
-    p_val = str(r.get('Paiement', 'Non payé'))
-    p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
+    # Initialisation de la variable pour cumuler le HTML si besoin (ou par fiche)
+    for i, r in df_disp.iterrows():
+        num_f = i + 1
+        p_nom = str(r.get('Prénom', '')).strip()
+        n_nom = str(r.get('Nom', '')).strip().upper()
+        nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Client #{num_f}"
+        soc = str(r.get('Société', 'PARTICULIER')).upper()
+        tel = str(r.get('Téléphone', '')).strip()
+        mail = str(r.get('Email', '')).strip()
+        
+        d_nav = str(r.get('DateNav', '--/--/--'))
+        n_jrs = str(r.get('NbreJours', '1'))
+        n_per = str(r.get('NbrePers', '1'))
+        prix = str(r.get('Prix', '0'))
 
-    # Construction des boutons d'action
-    btn_html = '<div style="margin-top:12px;display:flex;gap:8px;">'
-    if tel and len(tel) > 5:
-        t_cl = tel.replace(" ", "").replace(".", "")
-        btn_html += f'<a href="tel:{t_cl}" style="flex:1;background:#34495e;color:white!important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">📞 APPEL</a>'
-        btn_html += f'<a href="https://wa.me/{t_cl}" style="flex:1;background:#25D366;color:white!important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">💬 WA</a>'
-    if mail and "@" in mail:
-        btn_html += f'<a href="mailto:{mail}" style="flex:1;background:#e67e22;color:white!important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">📧 MAIL</a>'
-    btn_html += '</div>'
+        # Couleurs
+        s_val = str(r.get('Statut', 'En attente'))
+        s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
+        if "CMN" in soc: s_col = "#3498db"
+        
+        p_val = str(r.get('Paiement', 'Non payé'))
+        p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
 
-# --- CARTE HTML (Aligné avec 4 ou 8 espaces selon ton code) ---
-    card_html = f"""
-<div style="border:2px solid #1a2a6c;border-radius:12px;padding:12px;margin-bottom:10px;background:white;color:black;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
-        <b style="color:#1a2a6c;font-size:1.05rem;">{nom_c}</b>
-        <div style="text-align:right;display:flex;flex-direction:column;gap:3px;">
-            <span style="background:{s_col};color:white;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:bold;">{s_val.upper()}</span>
-            <span style="background:{p_col};color:white;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:bold;">{p_val.upper()}</span>
-        </div>
-    </div>
-    <div style="color:#666;font-size:0.8rem;margin-bottom:8px;">🏢 {soc}</div>
-    <div style="background:#f8f9fa; border-radius:8px; padding:8px; border:1px solid #eee; margin-bottom:8px;">
-        <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#333;">
-            <span>📅 <b>{d_nav}</b></span>
-            <span>💰 <b>{prix} €</b></span>
-        </div>
-        <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#666; margin-top:4px; border-top: 1px dashed #ccc; padding-top:4px;">
-            <span>⏳ Durée: <b>{n_jrs} jour(s)</b></span>
-            <span>👥 Pers: <b>{n_per}</b></span>
-        </div>
-    </div>
-    <div style="font-size:0.75rem; color:#2980b9;">📞 {tel if tel else "Non renseigné"}</div>
-    {btn_html}
-</div>"""
+        # Boutons de contact rapides
+        btn_html = '<div style="margin-top:12px;display:flex;gap:8px;">'
+        if tel and len(tel) > 5:
+            t_cl = tel.replace(" ", "").replace(".", "")
+            btn_html += f'<a href="tel:{t_cl}" style="flex:1;background:#34495e;color:white!important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">📞 APPEL</a>'
+            btn_html += f'<a href="https://wa.me/{t_cl}" style="flex:1;background:#25D366;color:white!important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">💬 WA</a>'
+        if mail and "@" in mail:
+            btn_html += f'<a href="mailto:{mail}" style="flex:1;background:#e67e22;color:white!important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">📧 MAIL</a>'
+        btn_html += '</div>'
 
-    # --- LIGNE 197 : AFFICHAGE (Doit être au même niveau que le card_html = f"...) ---
-    st.markdown(card_html, unsafe_allow_html=True)
+        # Construction de la carte (Variable réinitialisée à chaque itération)
+        card_html = f"""
+        <div style="border:2px solid #1a2a6c;border-radius:12px;padding:15px;margin-bottom:10px;background:white;color:black;box-shadow: 2px 2px 5px rgba(0,0,0,0.05);">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <b style="color:#1a2a6c;font-size:1.1rem;">{nom_c}</b>
+                <div style="text-align:right;display:flex;flex-direction:column;gap:3px;">
+                    <span style="background:{s_col};color:white;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:bold;">{s_val.upper()}</span>
+                    <span style="background:{p_col};color:white;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:bold;">{p_val.upper()}</span>
+                </div>
+            </div>
+            <div style="color:#666;font-size:0.85rem;margin: 5px 0;">🏢 {soc}</div>
+            <div style="background:#f8f9fa; border-radius:8px; padding:10px; border:1px solid #eee; margin:10px 0;">
+                <div style="display:flex; justify-content:space-between; font-size:0.9rem; color:#333;">
+                    <span>📅 <b>{d_nav}</b></span>
+                    <span>💰 <b>{prix} €</b></span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#666; margin-top:5px; border-top:1px dashed #ccc; padding-top:5px;">
+                    <span>⏳ {n_jrs} jr(s)</span>
+                    <span>👥 {n_per} pers.</span>
+                </div>
+            </div>
+            <div style="font-size:0.8rem; color:#2980b9; margin-bottom:10px;">📞 {tel if tel else "Non renseigné"}</div>
+            {btn_html}
+        </div>"""
 
-    c_ed, c_del = st.columns(2)
-    if c_ed.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
-        st.session_state.edit_idx = i
-        st.rerun()
-            
-    if c_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
-        st.session_state.confirm_del_idx = i
-        st.rerun()
+        # Affichage (Ligne 197 environ - bien indentée sous le 'for')
+        st.markdown(card_html, unsafe_allow_html=True)
 
-# --- ICI ON SORT DU BLOC (ZÉRO ESPACE AU DÉBUT) ---
+        # Boutons d'édition (sous la carte)
+        c1, c2 = st.columns(2)
+        if c1.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
+            st.session_state.edit_idx = i
+            st.rerun()
+        if c2.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
+            st.session_state.confirm_del_idx = i
+            st.rerun()
+
 # =================================================================
-# --- 6. PAGE PLANNING ---
+# --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Vesta 2026")
-
-
     
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
@@ -222,6 +224,7 @@ elif st.session_state.page == "PLANNING":
     with col_y:
         sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
 
+    # Logique du calendrier
     jours_occ = {}
     for _, r in df_c.iterrows():
         try:
@@ -251,13 +254,16 @@ elif st.session_state.page == "PLANNING":
                 n_j = int(r.get('NbreJours', 1))
                 for j in range(dv, dv + n_j):
                     if j in jours_occ:
-                        old_c = jours_occ[j]["c"]
-                        final_c = "#e74c3c" if "#e74c3c" in [current_c, old_c] else current_c
-                        jours_occ[j] = {"c": final_c}
+                        # Priorité au rouge (impayé) sur le reste
+                        if jours_occ[j]["c"] == "#e74c3c" or current_c == "#e74c3c":
+                            jours_occ[j] = {"c": "#e74c3c"}
+                        else:
+                            jours_occ[j] = {"c": current_c}
                     else:
                         jours_occ[j] = {"c": current_c}
         except: continue
 
+    # Dessin du calendrier HTML
     jours_semaine = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
     h_cal = '<table style="width:100%; border-collapse: collapse; text-align: center; background: white; color: black;">'
     h_cal += '<tr style="background: #f8f9fa; font-weight: bold; border-bottom: 2px solid #eee;">'
@@ -270,14 +276,11 @@ elif st.session_state.page == "PLANNING":
         h_cal += '<tr>'
         for jour in sem:
             if jour == 0:
-                h_cal += '<td style="height:50px; border:0.5px solid #eee;"></td>'
+                h_cal += '<td style="height:55px; border:0.5px solid #eee;"></td>'
             else:
                 bg = jours_occ.get(jour, {}).get("c", "transparent")
                 txt_c = "white" if bg != "transparent" else "black"
-                if bg != "transparent":
-                    circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:32px; height:32px; line-height:32px; margin:auto; font-weight:bold; font-size:13px;">{jour}</div>'
-                else:
-                    circle = f'<span style="color:black;">{jour}</span>'
+                circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:32px; height:32px; line-height:32px; margin:auto; font-weight:bold; font-size:13px;">{jour}</div>' if bg != "transparent" else f'<span>{jour}</span>'
                 h_cal += f'<td style="border:0.5px solid #eee; height:55px;">{circle}</td>'
         h_cal += '</tr>'
     h_cal += '</table>'
@@ -285,41 +288,6 @@ elif st.session_state.page == "PLANNING":
     st.markdown(h_cal, unsafe_allow_html=True)
     st.caption("🔴 Passé Impayé | 🔵 Passé Payé | 🟢 Confirmé | 🟡 En attente")
 
-    st.markdown(f"#### 📋 Liste des sorties - {m_noms[sel_m-1]}")
-    res_list = []
-    for _, r in df_c.iterrows():
-        try:
-            d_str = str(r.get('DateNav', '')).strip()
-            if '/' in d_str:
-                p = d_str.split('/')
-                if int(p[1]) == sel_m and (int(p[2]) == sel_y or int(p[2])+2000 == sel_y):
-                    if str(r.get('Statut','')).lower() not in ["refusé", "archivé"]:
-                        res_list.append(r)
-        except: continue
-
-    if not res_list:
-        st.info("Aucune navigation prévue.")
-    else:
-        res_list.sort(key=lambda x: int(str(x.get('DateNav')).split('/')[0]))
-        for res in res_list:
-            pv = str(res.get('Paiement', '')).lower()
-            isp = ("pay" in pv) and not any(x in pv for x in ["un", "non"])
-            p_col = "#27ae60" if isp else "#e67e22"
-            sv = str(res.get('Statut', 'En attente'))
-            s_col = "#2ecc71" if sv == "OK" else "#f1c40f" if sv == "En attente" else "#e74c3c"
-            
-            st.markdown(f"""
-            <div style="padding: 15px; border-left: 6px solid {p_col}; background: white; color: black; border-radius: 10px; margin-bottom: 10px; border: 1px solid #eee;">
-                <div style="display: flex; justify-content: space-between;">
-                    <b>{res.get('Prénom')} {res.get('Nom','').upper()}</b>
-                    <span style="background:{s_col}; color:white; padding:3px 8px; border-radius:6px; font-size:11px;">{sv}</span>
-                </div>
-                <div style="font-size: 0.9rem; margin-top: 5px;">
-                    📅 {res.get('DateNav')} | 💰 <b>{res.get('Prix')} €</b><br>
-                    <small>{'PAYÉ' if isp else 'À PAYER'}</small>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
 # =================================================================
 # --- 7. PAGE STATS ---
 # =================================================================
