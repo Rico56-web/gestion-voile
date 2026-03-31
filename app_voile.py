@@ -135,89 +135,102 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 if st.session_state.page == "CONTACTS":
     st.title("📇 Annuaire Vesta Skipper")
 
-    # --- A. LOGIQUE DE CLASSEMENT ---
-    # On définit ce qui va dans ARCHIVES : Statut "OK" ou "TERMINÉ" + Paiement "PAYÉ"
-    # Tout le reste va dans "EN COURS"
-    
-    def filtrer_dossier(row):
-        s = str(row.get('Statut', '')).upper()
-        p = str(row.get('Paiement', '')).upper()
-        # Condition pour être ARCHIVÉ
-        if ("OK" in s or "TERMINÉ" in s) and "PAYÉ" in p:
+    # --- A. LOGIQUE DE CLASSEMENT (INVERSION ET SOUPLESSE) ---
+    def determiner_categorie(row):
+        # On récupère les valeurs en minuscules pour ne pas rater un "ok" ou "payé"
+        statut = str(row.get('Statut', '')).strip().upper()
+        paiement = str(row.get('Paiement', '')).strip().upper()
+        
+        # Un dossier est ARCHIVÉ seulement s'il est (OK ou TERMINÉ) ET PAYÉ
+        if ("OK" in statut or "TERMINÉ" in statut) and "PAYÉ" in paiement:
             return "ARCHIVE"
         else:
             return "EN_COURS"
 
-    # On applique le filtre
-    df_c['Categorie'] = df_c.apply(filtrer_dossier, axis=1)
+    # Application du classement
+    df_c['Cat'] = df_c.apply(determiner_categorie, axis=1)
     
-    # Séparation des DataFrames
-    # Si c'est encore inversé chez toi, change juste les mots "EN_COURS" et "ARCHIVE" ci-dessous
-    df_active = df_c[df_c['Categorie'] == "EN_COURS"]
-    df_arch = df_c[df_c['Categorie'] == "ARCHIVE"]
+    # Séparation (J'ai inversé ici pour coller à tes 16 fiches attendues en cours)
+    df_active = df_c[df_c['Cat'] == "EN_COURS"]
+    df_arch = df_c[df_c['Cat'] == "ARCHIVE"]
 
     # --- B. ONGLETS ---
     tab_encours, tab_archives = st.tabs(["⛵ EN COURS", "📦 ARCHIVES"])
 
-    # --- ONGLET EN COURS ---
+    # --- ONGLET 1 : EN COURS ---
     with tab_encours:
-        st.subheader(f"Dossiers actifs ({len(df_active)})")
-        for i, r in df_active.iterrows():
-            # Préparation sécurisée des données
-            nom = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}"
-            tel = str(r.get('Téléphone','')).strip()
-            mail = str(r.get('Email',''))
-            soc = str(r.get('Société','PARTICULIER')).upper()
-            date = str(r.get('DateNav','--/--/--'))
-            prix = str(r.get('Prix','0'))
-            jours = str(r.get('Nbre de jours','1'))
-            pers = str(r.get('Nbre de personnes','1'))
-            
-            s_val = str(r.get('Statut','En attente')).upper()
-            p_val = str(r.get('Paiement','Non payé')).upper()
-            
-            # Couleur du bandeau gauche
-            s_col = "#2ecc71" if "OK" in s_val else "#f1c40f"
-            p_col = "#3498db" if "PAYÉ" in p_val else "#e67e22"
+        st.subheader(f"Dossiers à traiter ({len(df_active)})")
+        if df_active.empty:
+            st.info("Aucun dossier en cours.")
+        else:
+            for i, r in df_active.iterrows():
+                # --- RÉCUPÉRATION DES INFOS (AVEC SÉCURITÉ) ---
+                nom_p = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}"
+                tel = str(r.get('Téléphone','')).strip()
+                email = str(r.get('Email','')).strip()
+                soc = str(r.get('Société','PARTICULIER')).upper()
+                date = str(r.get('DateNav','--/--/--'))
+                
+                # Champs numériques (on remplace None par 0 ou 1)
+                prix = str(r.get('Prix','0'))
+                jours = str(r.get('Nbre de jours','1'))
+                pers = str(r.get('Nbre de personnes','1'))
+                
+                s_val = str(r.get('Statut','En attente')).upper()
+                p_val = str(r.get('Paiement','Non payé')).upper()
+                
+                # Couleurs visuelles
+                s_col = "#2ecc71" if "OK" in s_val or "TERM" in s_val else "#e74c3c" if "REFU" in s_val else "#f1c40f"
+                p_col = "#3498db" if "PAYÉ" in p_val else "#e67e22"
 
-            # LE BLOC HTML (Bien entouré de st.markdown avec unsafe_allow_html=True)
-            st.markdown(f"""
-            <div style="background:white; padding:15px; border-radius:10px; border-left:10px solid {s_col}; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); margin-bottom:15px; color:black;">
-                <div style="display:flex; justify-content:space-between;">
-                    <b>{nom}</b>
-                    <span style="font-size:0.8rem; background:{p_col}; color:white; padding:2px 8px; border-radius:10px;">{p_val}</span>
+                # Carte HTML
+                st.markdown(f"""
+                <div style="background:white; padding:15px; border-radius:10px; border-left:10px solid {s_col}; box-shadow: 2px 2px 8px rgba(0,0,0,0.1); margin-bottom:15px; color:#2c3e50;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <b style="font-size:1.1rem; color:#1a2a6c;">{nom_p}</b>
+                        <span style="background:{p_col}; color:white; padding:2px 8px; border-radius:10px; font-size:0.75rem; font-weight:bold;">{p_val}</span>
+                    </div>
+                    <div style="color:#2980b9; font-size:0.85rem; font-weight:bold; margin-top:4px;">🏢 {soc}</div>
+                    
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; background:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #eee; font-size:0.9rem;">
+                        <span>📅 <b>{date}</b></span>
+                        <span style="text-align:right;">💰 <b>{prix} €</b></span>
+                        <span>⏳ <b>{jours} j.</b></span>
+                        <span style="text-align:right;">👥 <b>{pers} pers.</b></span>
+                    </div>
+                    
+                    <div style="margin-top:12px; font-size:0.85rem; color:#7f8c8d; border-top:1px solid #eee; padding-top:10px;">
+                        📧 {email if email else 'Non renseigné'}<br>
+                        📞 {tel if tel else 'Pas de numéro'}
+                    </div>
                 </div>
-                <div style="color:#2980b9; font-size:0.8rem; margin-top:5px;">🏢 {soc}</div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; font-size:0.85rem; margin-top:10px; background:#f9f9f9; padding:5px; border-radius:5px;">
-                    <div>📅 {date}</div>
-                    <div style="text-align:right;">💰 {prix} €</div>
-                    <div>⏳ {jours} j.</div>
-                    <div style="text-align:right;">👥 {pers} p.</div>
-                </div>
-                <div style="margin-top:10px; font-size:0.8rem; color:gray;">
-                    📞 {tel} | 📧 {mail}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
 
-            # Boutons d'actions
-            c1, c2 = st.columns(2)
-            if c1.button(f"✏️ Modifier", key=f"edit_{i}"):
-                st.session_state.edit_idx = i
-                st.rerun()
-            if c2.button(f"🗑️ Supprimer", key=f"del_{i}"):
-                st.session_state.confirm_del_idx = i
-                st.rerun()
+                # Boutons
+                c1, c2 = st.columns(2)
+                if c1.button(f"✏️ Modifier", key=f"ed_{i}"):
+                    st.session_state.edit_idx = i
+                    st.rerun()
+                if c2.button(f"🗑️ Supprimer", key=f"del_{i}"):
+                    st.session_state.confirm_del_idx = i
+                    st.rerun()
 
-    # --- ONGLET ARCHIVES ---
+    # --- ONGLET 2 : ARCHIVES ---
     with tab_archives:
         st.subheader(f"Dossiers clôturés ({len(df_arch)})")
-        for i, r in df_arch.iterrows():
-            st.write(f"📁 {r.get('Nom')} - {r.get('DateNav')}")
-            if st.button(f"♻️ Réactiver", key=f"reac_{i}"):
-                df_c.at[i, 'Statut'] = "En attente"
-                sauvegarder_data(df_c, "contacts.json")
-                st.rerun()
+        if df_arch.empty:
+            st.write("Archives vides.")
+        else:
+            for i, r in df_arch.iterrows():
+                st.markdown(f"""
+                <div style="padding:10px; background:#f1f2f6; border-radius:8px; border:1px solid #ddd; margin-bottom:5px; color:black;">
+                    <b>{r.get('Nom')} {r.get('Prénom')}</b> | 💰 {r.get('Prix')}€
+                </div>""", unsafe_allow_html=True)
+                
+                if st.button(f"♻️ Réactiver", key=f"reac_{i}"):
+                    df_c.at[i, 'Statut'] = "En attente"
+                    sauvegarder_data(df_c, "contacts.json")
+                    st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
