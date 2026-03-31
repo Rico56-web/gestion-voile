@@ -122,132 +122,102 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
     df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
 # =================================================================
-# --- 5. PAGE CONTACTS (VERSION ROBUSTE ANTI-DIV) ---
+# --- 3. PAGE CONTACTS (VERSION COMPLÈTE AVEC RECHERCHE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    st.markdown('<div class="main-header">👥 GESTION DES MISSIONS</div>', unsafe_allow_html=True)
-    import html
-    from datetime import datetime
+    st.markdown('<div class="main-header">📇 RÉPERTOIRE VESTA 2026</div>', unsafe_allow_html=True)
 
-    def safe(val):
-        if val is None or str(val).lower() in ["none", "nan", "", "null"]: return ""
-        return html.escape(str(val)).replace("\n", " ").replace("\r", "")
+    # --- ZONE DE RECHERCHE (OPTIMISÉE IPHONE) ---
+    with st.expander("🔍 RECHERCHER UN CONTACT", expanded=True):
+        col_search1, col_search2 = st.columns(2)
+        search_nom = col_search1.text_input("👤 Par Nom", value="", placeholder="ex: DURAND")
+        search_soc = col_search2.text_input("🏢 Par Société", value="", placeholder="ex: CMN")
+        
+        if st.button("🔄 VOIR TOUTE LA LISTE", use_container_width=True):
+            # Cette commande vide les champs et rafraîchit la vue
+            st.rerun()
 
-    LISTE_SOC = ["PARTICULIER", "CLICK", "VOG", "CMN", "AUTRES"]
+    st.write("---")
 
-    # --- BARRE D'OUTILS ---
-    c_n1, c_n2, c_add = st.columns([1, 1, 2])
-    view_arc = st.session_state.get('view_archive', False)
-
-    if c_n1.button("📂 EN COURS", use_container_width=True, type="secondary" if view_arc else "primary"):
-        st.session_state.view_archive = False
-        st.rerun()
-    if c_n2.button("🗄️ ARCHIVES", use_container_width=True, type="primary" if view_arc else "secondary"):
-        st.session_state.view_archive = True
-        st.rerun()
+    # --- LOGIQUE DE FILTRAGE ---
+    # On crée une copie pour filtrer sans toucher à la base originale
+    df_look = df_c.copy()
     
-    if c_add.button("➕ NOUVEAU CONTACT", type="primary", use_container_width=True):
-        new_row = pd.DataFrame([{"Prénom": "", "Nom": "Nouveau", "Société": "PARTICULIER", "Statut": "En attente", "Paiement": "Non payé", "DateNav": datetime.now().strftime("%d/%m/%Y"), "Prix": "0", "NbreJours": "1", "NbrePers": "1", "Téléphone": "", "Email": "", "Notes": ""}])
-        df_c = pd.concat([new_row, df_c], ignore_index=True)
-        sauvegarder_data(df_c, "contacts.json")
-        st.session_state.edit_idx = 0 
-        st.rerun()
+    # Nettoyage pour la recherche (insensible à la casse)
+    if search_nom:
+        df_look = df_look[df_look['Nom'].str.contains(search_nom, case=False, na=False) | 
+                         df_look['Prénom'].str.contains(search_nom, case=False, na=False)]
+    
+    if search_soc:
+        df_look = df_look[df_look['Société'].str.contains(search_soc, case=False, na=False)]
 
-    st.divider()
+    # --- AFFICHAGE DES RÉSULTATS ---
+    if df_look.empty:
+        st.info("⚠️ Aucun contact trouvé pour cette recherche.")
+    else:
+        # Tri alphabétique par Nom
+        df_look = df_look.sort_values('Nom')
+        
+        # Compteur de résultats
+        st.caption(f"📍 {len(df_look)} contact(s) affiché(s)")
 
-    # --- FILTRAGE ---
-    statuts_arc = ["Terminé", "Refusé", "Annulé"]
-    df_disp = df_c[df_c['Statut'].isin(statuts_arc)] if view_arc else df_c[~df_c['Statut'].isin(statuts_arc)]
-
-    # --- BOUCLE D'AFFICHAGE ---
-    for i, r in df_disp.iterrows():
-        with st.container():
-            num_f = i + 1
-            p_nom = safe(r.get('Prénom', ''))
-            n_nom = safe(r.get('Nom', '')).upper()
-            nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Fiche #{num_f}"
-            soc   = safe(r.get('Société', 'PARTICULIER')).upper()
-            tel   = safe(r.get('Téléphone', ''))
-            mail  = safe(r.get('Email', ''))
-            note  = safe(r.get('Notes', ''))
-            prix  = safe(r.get('Prix', '0'))
-            date_v = safe(r.get('DateNav', '--/--/--'))
-            jours = safe(r.get('NbreJours', '1'))
-            pers  = safe(r.get('NbrePers', '1'))
+        for i, r in df_look.iterrows():
+            # Préparation des données
+            nom_brut = str(r.get('Nom', '')).upper()
+            prenom_brut = str(r.get('Prénom', '')).capitalize()
+            nom_complet = f"{prenom_brut} {nom_brut}"
             
-            s_val = safe(r.get('Statut', 'En attente'))
-            s_col = "#0056b3" if "CMN" in soc else ("#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c")
+            soc_brut = str(r.get('Société', 'PARTICULIER')).upper()
+            # On enlève les espaces et caractères spéciaux du téléphone pour les liens HTML
+            tel_brut = str(r.get('Téléphone', '')).strip().replace(' ', '').replace('.', '').replace('-', '')
             
-            v_paye_brute = str(r.get('Paiement', 'Non payé')).upper()
-            is_paid = "PAY" in v_paye_brute and "NON" not in v_paye_brute
-            p_col = "#3498db" if is_paid else "#e67e22"
+            # Code couleur par société
+            color_bandeau = "#0056b3" if "CMN" in soc_brut else "#1a2a6c"
 
-            clean_tel = "".join(filter(str.isdigit, tel)) if tel else ""
-            wa_link = f"33{clean_tel[1:]}" if clean_tel.startswith("0") else clean_tel
+            # --- CARTE CONTACT HTML ---
+            st.markdown(f"""
+            <div style="border: 1px solid #eee; border-left: 8px solid {color_bandeau}; padding: 15px; border-radius: 12px; background: white; margin-bottom: 10px; box-shadow: 0px 2px 5px rgba(0,0,0,0.05);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <span style="color: {color_bandeau}; font-weight: bold; font-size: 0.75rem; letter-spacing: 1px;">{soc_brut}</span>
+                </div>
+                <div style="font-size: 1.15rem; font-weight: bold; color: #222; margin-bottom: 8px;">{nom_complet}</div>
+                <div style="font-size: 1rem; color: #444; font-weight: 500;">📱 {r.get('Téléphone', 'Non renseigné')}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-            # --- GÉNÉRATION DU HTML SANS SAUTS DE LIGNE INTERNES (PLUS FIABLE) ---
-            card = f'<div style="border:2px solid #1a2a6c;border-radius:12px;padding:15px;margin-bottom:10px;background:white;color:black;box-shadow:2px 2px 8px rgba(0,0,0,0.1);">'
-            card += f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
-            card += f'<b style="color:#1a2a6c;font-size:1.1rem;">#{num_f} — {nom_c}</b>'
-            card += f'<div style="text-align:right;display:flex;flex-direction:column;gap:4px;">'
-            card += f'<span style="background:{s_col};color:white;padding:2px 10px;border-radius:12px;font-size:0.7rem;font-weight:bold;">{s_val.upper()}</span>'
-            card += f'<span style="background:{p_col};color:white;padding:2px 10px;border-radius:12px;font-size:0.7rem;font-weight:bold;">{"PAYÉ" if is_paid else "NON PAYÉ"}</span></div></div>'
-            card += f'<div style="color:#444;font-size:0.9rem;margin-top:8px;font-weight:bold;">🏢 {soc}</div>'
-            card += f'<div style="font-size:0.82rem;color:#2980b9;margin:8px 0;border-bottom:1px solid #eee;padding-bottom:8px;">📞 {tel if tel else "---"} | 📧 {mail if mail else "---"}</div>'
-            card += f'<div style="font-size:0.9rem;color:#333;display:flex;justify-content:space-between;margin-top:5px;"><span>📅 <b>{date_v}</b> ({jours}j)</span><span>👥 <b>{pers} pers.</b> | 💰 <b>{prix}€</b></span></div>'
-            if note: card += f'<div style="margin-top:10px;padding:8px;background:#f8f9fa;border-left:4px solid #1a2a6c;font-size:0.8rem;border-radius:4px;">📝 {note}</div>'
+            # --- BOUTONS D'ACTION (LARGES POUR LE POUCE) ---
+            if len(tel_brut) > 5:
+                # On prépare le numéro international pour WhatsApp (ajoute 33 si ça commence par 0)
+                wa_tel = tel_brut
+                if wa_tel.startswith('0'):
+                    wa_tel = '33' + wa_tel[1:]
+                
+                c1, c2 = st.columns(2)
+                
+                # Bouton Appel
+                btn_call = f"""
+                <a href="tel:{tel_brut}" style="text-decoration: none;">
+                    <div style="background-color: #2ecc71; color: white; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 0.9rem; margin-bottom: 20px;">
+                        📞 APPELER
+                    </div>
+                </a>
+                """
+                c1.markdown(btn_call, unsafe_allow_html=True)
+                
+                # Bouton WhatsApp
+                btn_wa = f"""
+                <a href="https://wa.me/{wa_tel}" style="text-decoration: none;">
+                    <div style="background-color: #25D366; color: white; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 0.9rem; margin-bottom: 20px;">
+                        💬 WHATSAPP
+                    </div>
+                </a>
+                """
+                c2.markdown(btn_wa, unsafe_allow_html=True)
             
-            # Liens de contact
-            card += f'<div style="margin-top:15px;display:flex;gap:8px;">'
-            if clean_tel:
-                card += f'<a href="tel:{clean_tel}" style="flex:1;background:#5D6D7E;color:white !important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">📞 APPEL</a>'
-                card += f'<a href="https://wa.me/{wa_link}" target="_blank" style="flex:1;background:#25D366;color:white !important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">💬 WA</a>'
-            if mail:
-                card += f'<a href="mailto:{mail}" style="flex:1;background:#E67E22;color:white !important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">📧 MAIL</a>'
-            card += '</div></div>'
-
-            # Affichage de la carte
-            st.write(card, unsafe_allow_html=True)
-
-            # --- ACTIONS (BOUTONS STREAMLIT NATIFS) ---
-            c_ed, c_del = st.columns(2)
-            if c_ed.button(f"✏️ MODIFIER #{num_f}", key=f"ed_{i}", use_container_width=True):
-                st.session_state.edit_idx = i
-                st.rerun()
-            if c_del.button(f"🗑️ SUPPRIMER", key=f"del_{i}", use_container_width=True):
-                df_c = df_c.drop(i).reset_index(drop=True)
-                sauvegarder_data(df_c, "contacts.json")
-                st.rerun()
-
-            # --- FORMULAIRE D'ÉDITION ---
-            if st.session_state.get('edit_idx') == i:
-                with st.expander(f"⚙️ ÉDITION #{num_f}", expanded=True):
-                    with st.form(f"form_edit_{i}"):
-                        c1, c2 = st.columns(2)
-                        u_pre = c1.text_input("Prénom", value=p_nom)
-                        u_nom = c2.text_input("Nom", value=n_nom)
-                        u_soc = c1.selectbox("Société", LISTE_SOC, index=LISTE_SOC.index(soc) if soc in LISTE_SOC else 0)
-                        u_tel = c2.text_input("Téléphone", value=tel)
-                        u_mai = c1.text_input("Email", value=mail)
-                        u_dat = c2.text_input("Date", value=date_v)
-                        c3, c4, c5 = st.columns(3)
-                        u_jr = c3.text_input("Jours", value=jours)
-                        u_ps = c4.text_input("Pers.", value=pers)
-                        u_px = c5.text_input("Prix €", value=prix)
-                        u_stat = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé", "Annulé"], index=["En attente", "OK", "Terminé", "Refusé", "Annulé"].index(s_val) if s_val in ["En attente", "OK", "Terminé", "Refusé", "Annulé"] else 0)
-                        u_paye = st.selectbox("Paiement", ["Non payé", "Payé"], index=1 if is_paid else 0)
-                        u_note = st.text_area("Notes", value=note)
-
-                        if st.form_submit_button("💾 ENREGISTRER"):
-                            df_c.at[i, 'Prénom'], df_c.at[i, 'Nom'], df_c.at[i, 'Société'] = u_pre, u_nom, u_soc
-                            df_c.at[i, 'Téléphone'], df_c.at[i, 'Email'], df_c.at[i, 'DateNav'] = u_tel, u_mai, u_dat
-                            df_c.at[i, 'NbreJours'], df_c.at[i, 'NbrePers'], df_c.at[i, 'Prix'] = u_jr, u_ps, u_px
-                            df_c.at[i, 'Statut'], df_c.at[i, 'Paiement'], df_c.at[i, 'Notes'] = u_stat, u_paye, u_note
-                            sauvegarder_data(df_c, "contacts.json")
-                            st.session_state.edit_idx = None
-                            st.rerun()
+            else:
+                st.warning("⚠️ Numéro de téléphone manquant ou invalide pour les actions rapides.")
             
-            st.markdown('<br>', unsafe_allow_html=True)
+            st.write("") # Petit espace entre chaque fiche
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION OPTIMISÉE IPHONE) ---
 # =================================================================
