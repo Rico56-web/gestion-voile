@@ -128,112 +128,96 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
+
 # =================================================================
-# --- 5. PAGE CONTACTS (FIX DATA & DISPLAY) ---
+# --- 5. PAGE CONTACTS (FIX FINAL) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("📇 Annuaire Vesta Skipper")
 
-    # --- A. NETTOYAGE DES DONNÉES (POUR ÉVITER LES 'NONE') ---
-    # On crée une copie locale pour l'affichage sans modifier le JSON original de force
-    df_display = df_c.copy()
+    # --- A. LOGIQUE DE CLASSEMENT ---
+    # On définit ce qui va dans ARCHIVES : Statut "OK" ou "TERMINÉ" + Paiement "PAYÉ"
+    # Tout le reste va dans "EN COURS"
     
-    # On s'assure que les colonnes critiques existent, sinon on les crée vides
-    for col in ['Email', 'Téléphone', 'Société', 'Nbre de jours', 'Nbre de personnes', 'Prix', 'Statut', 'Paiement']:
-        if col not in df_display.columns:
-            df_display[col] = ""
+    def filtrer_dossier(row):
+        s = str(row.get('Statut', '')).upper()
+        p = str(row.get('Paiement', '')).upper()
+        # Condition pour être ARCHIVÉ
+        if ("OK" in s or "TERMINÉ" in s) and "PAYÉ" in p:
+            return "ARCHIVE"
+        else:
+            return "EN_COURS"
 
-    # --- B. LOGIQUE DE FILTRAGE ---
-    mask_archives = (
-        (df_display['Statut'].astype(str).str.upper().str.contains("OK|TERMINÉ", na=False)) & 
-        (df_display['Paiement'].astype(str).str.upper().str.contains("PAYÉ", na=False))
-    )
+    # On applique le filtre
+    df_c['Categorie'] = df_c.apply(filtrer_dossier, axis=1)
     
-    # Inversion pour tes 16 fiches en cours
-    df_active = df_display[mask_archives]    
-    df_arch = df_display[~mask_archives]     
+    # Séparation des DataFrames
+    # Si c'est encore inversé chez toi, change juste les mots "EN_COURS" et "ARCHIVE" ci-dessous
+    df_active = df_c[df_c['Categorie'] == "EN_COURS"]
+    df_arch = df_c[df_c['Categorie'] == "ARCHIVE"]
 
-    # --- C. ONGLETS ---
+    # --- B. ONGLETS ---
     tab_encours, tab_archives = st.tabs(["⛵ EN COURS", "📦 ARCHIVES"])
 
+    # --- ONGLET EN COURS ---
     with tab_encours:
         st.subheader(f"Dossiers actifs ({len(df_active)})")
-        if df_active.empty:
-            st.info("Aucun dossier actif.")
-        else:
-            for i, r in df_active.iterrows():
-                # --- PRÉPARATION DES VARIABLES (SÉCURITÉ ANTI-NONE) ---
-                nom = f"{str(r.get('Nom', '')).upper()} {str(r.get('Prénom', ''))}".strip()
-                soc = str(r.get('Société', 'PARTICULIER')).upper()
-                tel = str(r.get('Téléphone', '')).strip()
-                mail = str(r.get('Email', '')).strip()
-                date = str(r.get('DateNav', '--/--/--'))
-                
-                # Gestion des nombres (évite le "None")
-                jours = str(r.get('Nbre de jours', '1'))
-                if jours == "None" or jours == "": jours = "1"
-                
-                pers = str(r.get('Nbre de personnes', '1'))
-                if pers == "None" or pers == "": pers = "1"
-                
-                prix = str(r.get('Prix', '0'))
-                
-                # Couleurs
-                s_val = str(r.get('Statut', 'En attente')).upper()
-                p_val = str(r.get('Paiement', 'Non payé')).upper()
-                s_col = "#2ecc71" if "OK" in s_val or "TERM" in s_val else "#f1c40f"
-                p_col = "#3498db" if "PAYÉ" in p_val else "#e67e22"
+        for i, r in df_active.iterrows():
+            # Préparation sécurisée des données
+            nom = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}"
+            tel = str(r.get('Téléphone','')).strip()
+            mail = str(r.get('Email',''))
+            soc = str(r.get('Société','PARTICULIER')).upper()
+            date = str(r.get('DateNav','--/--/--'))
+            prix = str(r.get('Prix','0'))
+            jours = str(r.get('Nbre de jours','1'))
+            pers = str(r.get('Nbre de personnes','1'))
+            
+            s_val = str(r.get('Statut','En attente')).upper()
+            p_val = str(r.get('Paiement','Non payé')).upper()
+            
+            # Couleur du bandeau gauche
+            s_col = "#2ecc71" if "OK" in s_val else "#f1c40f"
+            p_col = "#3498db" if "PAYÉ" in p_val else "#e67e22"
 
-                # Lien tel
-                t_link = tel.replace(" ", "").replace(".", "")
-
-                # --- CARTE VISUELLE ---
-                st.markdown(f"""
-                <div style="background:white; padding:15px; border-radius:12px; border-left:10px solid {s_col}; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom:20px; color:#2c3e50;">
-                    <div style="display:flex; justify-content:space-between;">
-                        <div>
-                            <div style="font-size:1.1rem; font-weight:bold; color:#1a2a6c;">{nom}</div>
-                            <div style="color:#2980b9; font-size:0.85rem; font-weight:bold;">🏢 {soc}</div>
-                        </div>
-                        <div style="text-align:right;">
-                            <span style="background:{s_col}; color:white; padding:2px 10px; border-radius:15px; font-size:0.7rem; font-weight:bold;">{s_val}</span><br>
-                            <span style="background:{p_col}; color:white; padding:2px 10px; border-radius:15px; font-size:0.7rem; font-weight:bold; display:inline-block; margin-top:5px;">{p_val}</span>
-                        </div>
-                    </div>
-                    
-                    <div style="margin-top:12px; padding:10px; background:#f8f9fa; border-radius:8px; border:1px solid #eee;">
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:0.9rem;">
-                            <div>📅 <b>{date}</b></div>
-                            <div style="text-align:right;">💰 <b>{prix} €</b></div>
-                            <div>⏳ <b>{jours} jour(s)</b></div>
-                            <div style="text-align:right;">👥 <b>{pers} pers.</b></div>
-                        </div>
-                    </div>
-
-                    <div style="margin-top:10px; font-size:0.85rem; color:#7f8c8d; border-top:1px solid #eee; padding-top:10px;">
-                        📧 {mail if mail else 'Non renseigné'} | 📞 {tel if tel else 'Non renseigné'}
-                    </div>
-
-                    <div style="display:flex; gap:8px; margin-top:15px;">
-                        <a href="tel:{t_link}" style="flex:1; background:#34495e; color:white!important; text-align:center; padding:10px; border-radius:8px; text-decoration:none; font-size:0.8rem; font-weight:bold;">📞 APPEL</a>
-                        <a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white!important; text-align:center; padding:10px; border-radius:8px; text-decoration:none; font-size:0.8rem; font-weight:bold;">💬 WHATSAPP</a>
-                    </div>
+            # LE BLOC HTML (Bien entouré de st.markdown avec unsafe_allow_html=True)
+            st.markdown(f"""
+            <div style="background:white; padding:15px; border-radius:10px; border-left:10px solid {s_col}; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); margin-bottom:15px; color:black;">
+                <div style="display:flex; justify-content:space-between;">
+                    <b>{nom}</b>
+                    <span style="font-size:0.8rem; background:{p_col}; color:white; padding:2px 8px; border-radius:10px;">{p_val}</span>
                 </div>
-                """, unsafe_allow_html=True)
+                <div style="color:#2980b9; font-size:0.8rem; margin-top:5px;">🏢 {soc}</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; font-size:0.85rem; margin-top:10px; background:#f9f9f9; padding:5px; border-radius:5px;">
+                    <div>📅 {date}</div>
+                    <div style="text-align:right;">💰 {prix} €</div>
+                    <div>⏳ {jours} j.</div>
+                    <div style="text-align:right;">👥 {pers} p.</div>
+                </div>
+                <div style="margin-top:10px; font-size:0.8rem; color:gray;">
+                    📞 {tel} | 📧 {mail}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-                # Boutons Modifier/Supprimer
-                c1, c2 = st.columns(2)
-                if c1.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
-                    st.session_state.edit_idx = i
-                    st.rerun()
-                if c2.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
-                    st.session_state.confirm_del_idx = i
-                    st.rerun()
+            # Boutons d'actions
+            c1, c2 = st.columns(2)
+            if c1.button(f"✏️ Modifier", key=f"edit_{i}"):
+                st.session_state.edit_idx = i
+                st.rerun()
+            if c2.button(f"🗑️ Supprimer", key=f"del_{i}"):
+                st.session_state.confirm_del_idx = i
+                st.rerun()
 
+    # --- ONGLET ARCHIVES ---
     with tab_archives:
         st.subheader(f"Dossiers clôturés ({len(df_arch)})")
-        # Logique identique simplifiée pour l'affichage des archives...
-
+        for i, r in df_arch.iterrows():
+            st.write(f"📁 {r.get('Nom')} - {r.get('DateNav')}")
+            if st.button(f"♻️ Réactiver", key=f"reac_{i}"):
+                df_c.at[i, 'Statut'] = "En attente"
+                sauvegarder_data(df_c, "contacts.json")
+                st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
