@@ -140,8 +140,8 @@ if st.session_state.page == "CONTACTS":
     mask_archives = (df_c['Statut'].str.contains("OK", case=False, na=False)) & \
                     (df_c['Paiement'].str.contains("Payé", case=False, na=False))
     
-    df_arch = df_c[mask_archives]      # Les dossiers finis
-    df_active = df_c[~mask_archives]   # Tout le reste (En cours)
+     df_active = df_c[mask_archives]    # <--- Enlever le ~ ici
+     df_arch = df_c[~mask_archives]      # <--- Ajouter le ~ ici
 
     # --- B. BARRE DE RECHERCHE (S'applique à l'onglet actif) ---
     search = st.text_input("🔍 Rechercher un nom ou une société...", "").upper()
