@@ -195,13 +195,12 @@ for i, r in df_disp.iterrows():
         </div>"""
     
     st.markdown(card_html, unsafe_allow_html=True)
-
     # Actions Modifier / Supprimer
-      c_ed, c_del = st.columns(2)
-      if c_ed.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
+    c_ed, c_del = st.columns(2)
+    if c_ed.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
         st.session_state.edit_idx = i
         st.rerun()
-      if c_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
+    if c_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
         st.session_state.confirm_del_idx = i
         st.rerun()
      
