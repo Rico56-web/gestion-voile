@@ -158,40 +158,45 @@ if st.session_state.page == "CONTACTS":
                 p_val = str(r.get('Paiement','Non payé')).upper()
                 tel = str(r.get('Téléphone','')).strip()
                 mail = str(r.get('Email','')).strip()
+                coms = str(r.get('Commentaires','')).strip()
                 
                 is_cmn = "CMN" in soc
-                # Couleur de bordure selon société ou statut
+                # Couleur de bordure dynamique
                 b_color = "#0047AB" if is_cmn else ("#27ae60" if "OK" in s_val else "#f39c12")
                 
-                # Couleurs de texte pour les statuts
-                s_txt_col = "green" if "OK" in s_val else "orange"
-                p_txt_col = "blue" if "PAYÉ" in p_val else "orange"
-
-                # --- FICHE CONTACT (NOM + SOCIÉTÉ) ---
-                st.markdown(f"""
-                <div style="border: 3px solid {b_color}; padding: 10px; border-radius: 12px; background-color: white; margin-bottom: 5px;">
-                    <b style="color: {b_color}; font-size: 1.1rem;">{'🚢 ' if is_cmn else '👤 '}{nom}</b><br>
-                    <span style="font-size: 0.85rem; color: gray;">🏢 {soc}</span>
-                </div>
-                """, unsafe_allow_html=True)
-
+                # --- BLOC UNIQUE INTÉGRÉ ---
                 with st.container(border=True):
-                    # --- RETOUR DES STATUTS VISIBLES ---
+                    # En-tête de la fiche (Nom + Société) dans le même cadre
+                    icon = '🚢' if is_cmn else '👤'
+                    st.markdown(f"""
+                        <div style="margin-bottom: 10px;">
+                            <b style="color: {b_color}; font-size: 1.2rem;">{icon} {nom}</b><br>
+                            <span style="font-size: 0.9rem; font-weight: bold; color: #555;">🏢 {soc}</span>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                    # Statuts colorés
                     c_stat, c_paye = st.columns(2)
+                    s_txt_col = "green" if "OK" in s_val else "orange"
+                    p_txt_col = "blue" if "PAYÉ" in p_val else "orange"
+                    
                     c_stat.markdown(f":{s_txt_col}[**● STATUT : {s_val}**]")
                     c_paye.markdown(f":{p_txt_col}[**● PAIEMENT : {p_val}**]")
                     
-                    # Infos compactes
                     st.divider()
+                    
+                    # Grille d'infos compacte
                     c1, c2, c3 = st.columns(3)
                     c1.write(f"📅 **{r.get('DateNav','--')}**")
                     c2.write(f"💰 **{r.get('Prix','0')}€**")
                     c3.write(f"👥 **{r.get('Nbre de personnes','1')}p**")
                     
-                    # Contact direct
-                    st.markdown(f"<p style='font-size:0.85rem;'>📞 {tel}<br>📧 {mail}</p>", unsafe_allow_html=True)
+                    # Contact et Commentaires
+                    st.write(f"📞 {tel} | 📧 {mail}")
+                    if coms and coms.lower() != "nan":
+                        st.info(f"💬 {coms}")
 
-                    # --- BOUTONS APPEL / WA / MAIL ---
+                    # --- BOUTONS CONTACTS ---
                     t_link = tel.replace(" ","").replace(".","")
                     col_t, col_w, col_m = st.columns(3)
                     if t_link:
@@ -200,26 +205,22 @@ if st.session_state.page == "CONTACTS":
                     if mail:
                         col_m.link_button("📧 Mail", f"mailto:{mail}", use_container_width=True)
 
-                    # --- BOUTONS MODIFIER / SUPPRIMER (FIXÉS) ---
+                    # --- BOUTONS GESTION ---
                     st.write("") 
                     col_edit, col_del = st.columns(2)
-                    
-                    if col_edit.button("✏️ Modifier", key=f"edit_v2_{i}", use_container_width=True):
+                    if col_edit.button("✏️ Modifier", key=f"edit_v3_{i}", use_container_width=True):
                         st.session_state.edit_idx = i
-                        # S'ASSURER QUE LE NOM DE LA PAGE CI-DESSOUS EST LE BON DANS TON CODE
                         st.session_state.page = "MODIFICATION" 
                         st.rerun()
-                    
-                    if col_del.button("🗑️ Supprimer", key=f"del_v2_{i}", use_container_width=True):
+                    if col_del.button("🗑️ Supprimer", key=f"del_v3_{i}", use_container_width=True):
                         st.session_state.confirm_del_idx = i
-                        # Logique de suppression à placer ici ou via une confirmation
                         st.rerun()
 
     with tab_archives:
         for i, r in df_arch.iterrows():
             with st.container(border=True):
                 st.write(f"📁 **{r.get('Nom')}** - {r.get('DateNav')}")
-                if st.button("♻️ Réactiver", key=f"reac_v2_{i}", use_container_width=True):
+                if st.button("♻️ Réactiver", key=f"reac_v3_{i}", use_container_width=True):
                     df_c.at[i, 'Statut'] = "En attente"
                     df_c.at[i, 'Paiement'] = "Non payé"
                     sauvegarder_data(df_c, "contacts.json")
