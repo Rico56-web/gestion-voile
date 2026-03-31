@@ -330,17 +330,17 @@ for i, r in df_disp.iterrows():
 # =================================================================
 # --- 7. PAGE STATS ---
 # =================================================================
-elif st.session_state.page == "STATS":
-    st.title("📊 Vesta - Pilotage & Frais")
+    elif st.session_state.page == "STATS":
+       st.title("📊 Vesta - Pilotage & Frais")
 
-    def clean_val(val):
+       def clean_val(val):
         try:
             if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
             s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
             return float(s.replace(",", "."))
         except: return 0.0
 
-    def get_month_info(date_str):
+       def get_month_info(date_str):
         try:
             parts = str(date_str).split('/')
             if len(parts) >= 2:
