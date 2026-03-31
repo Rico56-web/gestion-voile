@@ -249,10 +249,74 @@ if st.session_state.page == "CONTACTS":
             
             st.markdown('<br>', unsafe_allow_html=True)
 # =================================================================
-# --- 6. PAGE PLANNING (VERSION CORRIGÉE) ---
+# --- 4. PAGE PLANNING (VUE COMPACTE SMARTPHONE) ---
 # =================================================================
-elif st.session_state.page == "PLANNING":
-    st.title("🗓️ Planning Vesta 2026")
+if st.session_state.page == "PLANNING":
+    st.markdown('<div class="main-header">📅 PLANNING VESTA 2026</div>', unsafe_allow_html=True)
+
+    # --- CSS POUR FORCER LE CALENDRIER À TENIR DANS LA LARGEUR ---
+    st.markdown("""
+        <style>
+            /* Réduit la taille globale du calendrier */
+            .fc { max-width: 100% !important; font-size: 0.75rem !important; }
+            /* Réduit la hauteur des cases de jour */
+            .fc .fc-daygrid-day-frame { min-height: 40px !important; }
+            /* Cache les en-têtes inutiles sur mobile si besoin */
+            .fc .fc-toolbar-title { font-size: 1rem !important; }
+            .fc .fc-button { padding: 0.2rem 0.4rem !important; font-size: 0.7rem !important; }
+            /* Supprime les marges latérales de Streamlit pour gagner de la place */
+            .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    from streamlit_calendar import calendar
+
+    # --- PRÉPARATION DES ÉVÉNEMENTS ---
+    calendar_events = []
+    for i, r in df_c.iterrows():
+        try:
+            # On récupère la date, si vide on ignore
+            d_str = str(r.get('DateNav', '')).strip()
+            if len(d_str) >= 8:
+                # Conversion DD/MM/YYYY vers YYYY-MM-DD pour le calendrier
+                date_obj = pd.to_datetime(d_str, dayfirst=True)
+                date_iso = date_obj.strftime('%Y-%m-%d')
+                
+                soc = str(r.get('Société', 'PARTICULIER')).upper()
+                nom = str(r.get('Nom', '')).upper()
+                
+                # Couleur : Bleu si CMN, sinon Marine
+                bg_color = "#0056b3" if "CMN" in soc else "#1a2a6c"
+                
+                calendar_events.append({
+                    "title": f"{soc} - {nom}",
+                    "start": date_iso,
+                    "end": date_iso,
+                    "color": bg_color,
+                    "allDay": True
+                })
+        except:
+            continue
+
+    # --- CONFIGURATION DU CALENDRIER COMPACT ---
+    calendar_options = {
+        "headerToolbar": {
+            "left": "prev,next",
+            "center": "title",
+            "right": "today"
+        },
+        "initialView": "dayGridMonth",
+        "editable": False,
+        "selectable": True,
+        "locale": "fr",
+        "firstDay": 1, # Lundi
+        "height": "auto", # S'adapte au contenu pour éviter le scroll interne
+        "contentHeight": "auto"
+    }
+
+    calendar(events=calendar_events, options=calendar_options, key="vesta_calendar")
+
+    st.info("💡 Tapote une date pour voir les détails dans l'onglet CONTACTS.")
     
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
