@@ -129,13 +129,11 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
 # =================================================================
-# --- 5. PAGE CONTACTS (VERSION COMPLÈTE AVEC ARCHIVES) ---
+# --- 5. PAGE CONTACTS (VERSION CORRIGÉE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
 
     # --- A. LOGIQUE D'INTERCEPTION (MODIFIER / SUPPRIMER) ---
-    
-    # Formulaire de modification
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         r = df_c.iloc[idx]
@@ -161,7 +159,6 @@ if st.session_state.page == "CONTACTS":
                 st.rerun()
         st.stop()
 
-    # Confirmation de suppression
     if st.session_state.confirm_del_idx is not None:
         idx = st.session_state.confirm_del_idx
         st.error(f"⚠️ Supprimer définitivement {df_c.iloc[idx].get('Nom')} ?")
@@ -175,20 +172,16 @@ if st.session_state.page == "CONTACTS":
             st.session_state.confirm_del_idx = None
             st.rerun()
         st.stop()
-  # --- B. AFFICHAGE DES ONGLETS ---
+
+    # --- B. AFFICHAGE DES ONGLETS ---
     tab_encours, tab_archives = st.tabs(["📑 EN COURS", "🗄️ ARCHIVES"])
 
+    # Définition commune du filtre archive (OK + PAYÉ)
+    est_archive = (df_c['Statut'].str.upper().str.contains("OK", na=False)) & \
+                  (df_c['Paiement'].str.upper().str.contains("PAYÉ", na=False))
+
     with tab_encours:
-        # LOGIQUE : On garde TOUT SAUF ceux qui sont à la fois "OK" ET "Payé"
-        # On définit ce qui doit aller en ARCHIVE
-        est_archive = (df_c['Statut'].str.upper().str.contains("OK", na=False)) & \
-                      (df_c['Paiement'].str.upper().str.contains("PAYÉ", na=False))
-        
-        # Pour le "EN COURS", on prend l'inverse (~)
         df_active = df_c[~est_archive]
-
-        st.subheader(f"⛵ Suivi des dossiers ({len(df_active)})")
-
         st.subheader(f"⛵ Suivi des dossiers ({len(df_active)})")
         
         search = st.text_input("🔍 Filtrer la liste...", "", key="search_active").upper()
@@ -199,7 +192,7 @@ if st.session_state.page == "CONTACTS":
             st.info("Aucun dossier actif pour le moment.")
         else:
             for i, r in df_active.iterrows():
-                # --- RÉCUPÉRATION DES DONNÉES ---
+                # Données
                 p_nom = str(r.get('Prénom', '')).strip()
                 n_nom = str(r.get('Nom', '')).strip().upper()
                 nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Client #{i+1}"
@@ -213,7 +206,7 @@ if st.session_state.page == "CONTACTS":
                 p_val = str(r.get('Paiement', 'Non payé'))
                 p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
 
-                # Boutons HTML
+                # HTML Carte
                 t_cl = tel.replace(" ", "").replace(".", "")
                 btn_html = f'<div style="margin-top:12px;display:flex;gap:8px;">'
                 if len(t_cl) > 5:
@@ -221,7 +214,6 @@ if st.session_state.page == "CONTACTS":
                     btn_html += f'<a href="https://wa.me/{t_cl}" style="flex:1;background:#25D366;color:white;padding:10px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;">💬 WA</a>'
                 btn_html += '</div>'
 
-                # Carte HTML
                 st.markdown(f"""
                 <div class="fiche-globale {'border-cmn' if 'CMN' in soc else ''}">
                     <div style="display:flex;justify-content:space-between;align-items:flex-start;">
@@ -239,7 +231,6 @@ if st.session_state.page == "CONTACTS":
                     {btn_html}
                 </div>""", unsafe_allow_html=True)
 
-                # Boutons Streamlit
                 c1, c2 = st.columns(2)
                 if c1.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
                     st.session_state.edit_idx = i
@@ -248,20 +239,12 @@ if st.session_state.page == "CONTACTS":
                     st.session_state.confirm_del_idx = i
                     st.rerun()
 
-    # --- ICI ON SORT BIEN DU BLOC "FOR" ET DU "ELSE" ---
-with tab_encours:
-        # LOGIQUE : On garde TOUT SAUF ceux qui sont à la fois "OK" ET "Payé"
-        # On définit ce qui doit aller en ARCHIVE
-        est_archive = (df_c['Statut'].str.upper().str.contains("OK", na=False)) & \
-                      (df_c['Paiement'].str.upper().str.contains("PAYÉ", na=False))
-        
-        # Pour le "EN COURS", on prend l'inverse (~)
-        df_active = df_c[~est_archive]
-
-        st.subheader(f"⛵ Suivi des dossiers ({len(df_active)})")
+    with tab_archives:
+        df_arch = df_c[est_archive]
+        st.subheader(f"✅ Dossiers clôturés ({len(df_arch)})")
 
         if df_arch.empty:
-            st.write("Aucune archive disponible.")
+            st.info("Aucune archive disponible.")
         else:
             for i, r in df_arch.iterrows():
                 st.markdown(f"""
@@ -279,7 +262,7 @@ with tab_encours:
                 if st.button(f"♻️ Réactiver", key=f"reac_{i}", use_container_width=True):
                     df_c.at[i, 'Statut'] = "En attente"
                     sauvegarder_data(df_c, "contacts.json")
-                    st.rerun()   
+                    st.rerun()
 
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
