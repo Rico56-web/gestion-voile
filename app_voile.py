@@ -173,16 +173,24 @@ if st.session_state.page == "CONTACTS":
             st.rerun()
         st.stop()
 
-    # --- B. AFFICHAGE DES ONGLETS ---
+# --- B. AFFICHAGE DES ONGLETS ---
     tab_encours, tab_archives = st.tabs(["📑 EN COURS", "🗄️ ARCHIVES"])
 
-    # Définition commune du filtre archive (OK + PAYÉ)
-    est_archive = (df_c['Statut'].str.upper().str.contains("OK", na=False)) & \
-                  (df_c['Paiement'].str.upper().str.contains("PAYÉ", na=False))
+    # On définit PRECISEMENT ce qui est un dossier "En Cours"
+    # C'est un dossier qui n'est PAS ENCORE "OK" OU pas encore "PAYÉ"
+    mask_archives = (df_c['Statut'].str.upper().str.contains("OK", na=False)) & \
+                    (df_c['Paiement'].str.upper().str.contains("PAYÉ", na=False))
 
     with tab_encours:
-        df_active = df_c[~est_archive]
+        # SI C'EST L'INVERSE : On enlève le "~" ici pour tester
+        df_active = df_c[~mask_archives] 
+        
+        # NOTE : Si après ce changement c'est TOUJOURS l'inverse, 
+        # remplace la ligne ci-dessus par : df_active = df_c[mask_archives]
+        
         st.subheader(f"⛵ Suivi des dossiers ({len(df_active)})")
+        
+        # ... (Reste du code pour afficher les cartes) ...
         
         search = st.text_input("🔍 Filtrer la liste...", "", key="search_active").upper()
         if search:
