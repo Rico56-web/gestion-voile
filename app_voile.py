@@ -175,20 +175,17 @@ if st.session_state.page == "CONTACTS":
             st.session_state.confirm_del_idx = None
             st.rerun()
         st.stop()
-     
-# --- B. AFFICHAGE DES ONGLETS (NETTOYÉS) ---
-    # On crée deux onglets simples et larges
+  # --- B. AFFICHAGE DES ONGLETS ---
     tab_encours, tab_archives = st.tabs(["📑 EN COURS", "🗄️ ARCHIVES"])
 
     with tab_encours:
-        # LOGIQUE : On affiche tout SAUF ceux qui sont à la fois "OK" et "Payé"
+        # LOGIQUE : On exclut ceux qui sont à la fois "OK" et "Payé"
         mask_arch = (df_c['Statut'].str.contains("OK", case=False, na=False)) & \
                     (df_c['Paiement'].str.contains("Payé", case=False, na=False))
         df_active = df_c[~mask_arch]
 
         st.subheader(f"⛵ Suivi des dossiers ({len(df_active)})")
         
-        # Barre de recherche intégrée à l'onglet
         search = st.text_input("🔍 Filtrer la liste...", "", key="search_active").upper()
         if search:
             df_active = df_active[df_active['Nom'].str.contains(search, na=False) | df_active['Société'].str.contains(search, na=False)]
@@ -197,12 +194,58 @@ if st.session_state.page == "CONTACTS":
             st.info("Aucun dossier actif pour le moment.")
         else:
             for i, r in df_active.iterrows():
-                # --- (Ici tu gardes ton code de CARTE HTML et BOUTONS inchangé) ---
-                # ... 
-                # (Le code de la carte html que tu as déjà)
+                # --- RÉCUPÉRATION DES DONNÉES ---
+                p_nom = str(r.get('Prénom', '')).strip()
+                n_nom = str(r.get('Nom', '')).strip().upper()
+                nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Client #{i+1}"
+                soc = str(r.get('Société', 'PARTICULIER')).upper()
+                tel = str(r.get('Téléphone', '')).strip()
+                d_nav = str(r.get('DateNav', '--/--/--'))
+                prix = str(r.get('Prix', '0'))
+                
+                s_val = str(r.get('Statut', 'En attente'))
+                s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
+                p_val = str(r.get('Paiement', 'Non payé'))
+                p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
 
+                # Boutons HTML
+                t_cl = tel.replace(" ", "").replace(".", "")
+                btn_html = f'<div style="margin-top:12px;display:flex;gap:8px;">'
+                if len(t_cl) > 5:
+                    btn_html += f'<a href="tel:{t_cl}" style="flex:1;background:#34495e;color:white;padding:10px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;">📞 APPEL</a>'
+                    btn_html += f'<a href="https://wa.me/{t_cl}" style="flex:1;background:#25D366;color:white;padding:10px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;">💬 WA</a>'
+                btn_html += '</div>'
+
+                # Carte HTML
+                st.markdown(f"""
+                <div class="fiche-globale {'border-cmn' if 'CMN' in soc else ''}">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <span class="prenom-style">{nom_c}</span>
+                        <div>
+                            <span class="statut-badge" style="background:{s_col};">{s_val.upper()}</span>
+                            <span class="statut-badge" style="background:{p_col};">{p_val.upper()}</span>
+                        </div>
+                    </div>
+                    <div class="societe-style">🏢 {soc}</div>
+                    <div style="display:flex; justify-content:space-between; font-size:1rem; margin:10px 0;">
+                        <span>📅 <b>{d_nav}</b></span>
+                        <span>💰 <b>{prix} €</b></span>
+                    </div>
+                    {btn_html}
+                </div>""", unsafe_allow_html=True)
+
+                # Boutons Streamlit
+                c1, c2 = st.columns(2)
+                if c1.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
+                    st.session_state.edit_idx = i
+                    st.rerun()
+                if c2.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
+                    st.session_state.confirm_del_idx = i
+                    st.rerun()
+
+    # --- ICI ON SORT BIEN DU BLOC "FOR" ET DU "ELSE" ---
     with tab_archives:
-        # LOGIQUE : Uniquement ceux qui ont fini le cycle (OK + PAYÉ)
+        # LOGIQUE : Uniquement OK + PAYÉ
         df_arch = df_c[(df_c['Statut'].str.contains("OK", case=False, na=False)) & 
                        (df_c['Paiement'].str.contains("Payé", case=False, na=False))]
         
@@ -212,7 +255,6 @@ if st.session_state.page == "CONTACTS":
             st.write("Aucune archive disponible.")
         else:
             for i, r in df_arch.iterrows():
-                # Affichage plus compact pour les archives
                 st.markdown(f"""
                 <div style="padding:12px; border-radius:10px; background:#f1f2f6; margin-bottom:8px; border:1px solid #dfe4ea; color:#2f3542;">
                     <div style="display:flex; justify-content:space-between; font-weight:bold;">
@@ -225,11 +267,11 @@ if st.session_state.page == "CONTACTS":
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Option pour corriger une erreur d'archivage
-                if st.button(f"♻️ Sortir de l'archive", key=f"reac_{i}", use_container_width=True):
+                if st.button(f"♻️ Réactiver", key=f"reac_{i}", use_container_width=True):
                     df_c.at[i, 'Statut'] = "En attente"
                     sauvegarder_data(df_c, "contacts.json")
-                    st.rerun()
+                    st.rerun()   
+
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
