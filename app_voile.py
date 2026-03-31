@@ -124,18 +124,45 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 # =================================================================
 # --- 3. PAGE CONTACTS (VERSION FINALE - PILOTAGE COMPLET) ---
 # =================================================================
+
 if st.session_state.page == "CONTACTS":
-    st.markdown('<div class="main-header">📇 RÉPERTOIRE & MISSIONS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">📅 PLANNING CHRONOLOGIQUE</div>', unsafe_allow_html=True)
 
     # --- ZONE DE RECHERCHE ---
-    with st.expander("🔍 RECHERCHER UN CONTACT", expanded=True):
+    with st.expander("🔍 FILTRER LES MISSIONS", expanded=False):
         c_s1, c_s2 = st.columns(2)
-        search_nom = c_s1.text_input("👤 Nom / Prénom", value="", placeholder="ex: DURAND")
-        search_soc = c_s2.text_input("🏢 Société", value="", placeholder="ex: CMN")
-        if st.button("🔄 VOIR TOUTE LA LISTE", use_container_width=True):
-            st.rerun()
+        search_nom = c_s1.text_input("👤 Nom", value="")
+        search_soc = c_s2.text_input("🏢 Société", value="")
 
-    st.write("---")
+    # --- PRÉPARATION DU TRI CHRONOLOGIQUE ---
+    df_view = df_c.copy()
+    
+    # On convertit temporairement en date pour trier (Format attendu: JJ/MM/AAAA)
+    df_view['Date_Temp'] = pd.to_datetime(df_view['DateNav'], dayfirst=True, errors='coerce')
+    # On trie : les dates les plus proches en premier
+    df_view = df_view.sort_values(by='Date_Temp', ascending=True)
+
+    # Filtrage après le tri
+    if search_nom:
+        df_view = df_view[df_view['Nom'].str.contains(search_nom, case=False, na=False)]
+    if search_soc:
+        df_view = df_view[df_view['Société'].str.contains(search_soc, case=False, na=False)]
+
+    # --- AFFICHAGE DES FICHES ---
+    for i, r in df_view.iterrows():
+        # (Ici vous gardez tout votre bloc HTML précédent avec les couleurs Statut et Payé)
+        # ... [Insérer ici le bloc card_html et boutons APPEL/WA/EMAIL de l'étape précédente] ...
+        
+        # --- BOUTONS DE GESTION ---
+        g1, g2 = st.columns(2)
+        if g1.button(f"📝 Modifier", key=f"edit_{i}", use_container_width=True):
+            st.session_state.id_a_modifier = i
+            st.session_state.page = "MODIFIER_CONTACT"
+            st.rerun()
+            
+        if g2.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
+            # ... [Bloc de confirmation de suppression précédent] ...
+
 
     # --- FILTRAGE ---
     df_view = df_c.copy()
