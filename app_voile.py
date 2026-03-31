@@ -121,7 +121,6 @@ if not df_c.empty and 'Paiement' in df_c.columns:
 if not df_c.empty and 'DateNav' in df_c.columns:
     df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
     df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
-
 # =================================================================
 # --- 5. PAGE CONTACTS (VERSION ANTI-BUG / CHAMPS VIDES) ---
 # =================================================================
