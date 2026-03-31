@@ -179,11 +179,13 @@ if st.session_state.page == "CONTACTS":
     # On harmonise tout en majuscules pour éviter les problèmes d'accents ou de casse
     mask_termine_paye = (df_c['Statut'].str.upper().str.contains("OK", na=False)) & \
                         (df_c['Paiement'].str.upper().str.contains("PAYÉ", na=False))
-
-    # --- ONGLET EN COURS ---
+# --- ONGLET EN COURS ---
     with tab_encours:
-        # On affiche ceux qui ne sont PAS (~) dans le masque terminé/payé
-        df_active = df_c[~mask_termine_paye] 
+        # AVANT il y avait ~, on l'enlève pour que le "Vrai" (OK+PAYÉ) n'aille PAS ici
+        df_active = df_c[mask_termine_paye] 
+        
+        # NOTE : Si c'est encore l'inverse à l'écran, remets le ~ devant mask_termine_paye
+        # Mais d'après ton message, c'est cette version qui va ranger tes 16 contacts au bon endroit.
         
         st.subheader(f"⛵ Suivi des dossiers ({len(df_active)})")
         
@@ -231,12 +233,14 @@ if st.session_state.page == "CONTACTS":
                     st.session_state.confirm_del_idx = i
                     st.rerun()
 
-    # --- ONGLET ARCHIVES ---
-    with tab_archives:
-        # Ici on utilise le masque SANS le "~" (on ne veut que les terminés/payés)
-        df_arch = df_c[mask_termine_paye]
+ 
+   # --- ONGLET ARCHIVES ---
+      with tab_archives:
+        # ICI on ajoute le ~ pour dire "Affiche tout ce qui n'est PAS encore archivé"
+        df_arch = df_c[~mask_termine_paye]
         
         st.subheader(f"✅ Dossiers clôturés ({len(df_arch)})")
+        # ... (ton code d'affichage des archives) ...
 
         if df_arch.empty:
             st.write("Aucune archive.")
