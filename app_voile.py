@@ -128,50 +128,83 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
-
 # =================================================================
-# --- 5. PAGE contacts (BIEN COLLÉ À GAUCHE) ---
+# --- 5. PAGE CONTACTS (REPRISE DU CODE FONCTIONNEL) ---
 # =================================================================
-
 if st.session_state.page == "CONTACTS":
-    # 1. ON DÉFINIT LE FILTRE (OK + PAYÉ)
-    # On harmonise pour que "ok" ou "OK" ou "Payé" ou "payé" fonctionnent
-    mask_termine_paye = (df_c['Statut'].astype(str).str.upper().str.contains("OK", na=False)) & \
-                        (df_c['Paiement'].astype(str).str.upper().str.contains("PAYÉ", na=False))
-# --- B. AFFICHAGE DES ONGLETS ---
-    tab_encours, tab_archives = st.tabs(["📑 EN COURS", "🗄️ ARCHIVES"])
+    st.title("📇 Annuaire Clients")
 
-    # 1. ON DÉFINIT LES DEUX GROUPES SÉPARÉMENT
-    # Groupe ARCHIVES : Uniquement si c'est OK ET PAYÉ
-    df_arch = df_c[
-        (df_c['Statut'].astype(str).str.upper().str.contains("OK", na=False)) & 
-        (df_c['Paiement'].astype(str).str.upper().str.contains("PAYÉ", na=False))
-    ]
+    # --- A. LOGIQUE DE FILTRAGE (AVANT LES ONGLETS) ---
+    # Un dossier est archivé UNIQUEMENT s'il est "OK" ET "PAYÉ"
+    # On utilise .str.contains avec case=False pour être souple sur la casse
+    mask_archives = (df_c['Statut'].str.contains("OK", case=False, na=False)) & \
+                    (df_c['Paiement'].str.contains("Payé", case=False, na=False))
+    
+    df_arch = df_c[mask_archives]      # Les dossiers finis
+    df_active = df_c[~mask_archives]   # Tout le reste (En cours)
 
-    # Groupe EN COURS : Tout ce qui n'est PAS dans les archives
-    # On utilise .index.isin pour être certain de prendre le reste
-    df_active = df_c[~df_c.index.isin(df_arch.index)]
+    # --- B. BARRE DE RECHERCHE (S'applique à l'onglet actif) ---
+    search = st.text_input("🔍 Rechercher un nom ou une société...", "").upper()
+    if search:
+        df_active = df_active[df_active['Nom'].str.contains(search, na=False) | df_active['Société'].str.contains(search, na=False)]
+        df_arch = df_arch[df_arch['Nom'].str.contains(search, na=False) | df_arch['Société'].str.contains(search, na=False)]
 
-    # --- ONGLET 1 : EN COURS ---
+    # --- C. AFFICHAGE DES ONGLETS ---
+    tab_encours, tab_archives = st.tabs(["⛵ EN COURS", "📦 ARCHIVES"])
+
+    # --- ONGLET : EN COURS ---
     with tab_encours:
-        st.subheader(f"⛵ Suivi des dossiers ({len(df_active)})")
-        
         if df_active.empty:
-            st.info("Aucun dossier actif.")
+            st.info("Aucun dossier en cours.")
         else:
             for i, r in df_active.iterrows():
-                # --- TON CODE D'AFFICHAGE HABITUEL (CARTE HTML) ---
+                # --- PRÉPARATION DES DONNÉES ---
                 p_nom = str(r.get('Prénom', '')).strip()
                 n_nom = str(r.get('Nom', '')).strip().upper()
                 nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Client #{i+1}"
+                soc = str(r.get('Société', 'PARTICULIER')).upper()
+                tel = str(r.get('Téléphone', '')).strip()
+                mail = str(r.get('Email', '')).strip()
+                d_nav = str(r.get('DateNav', '--/--/--'))
+                prix = str(r.get('Prix', '0'))
+
+                # Couleurs Statut & Paiement
                 s_val = str(r.get('Statut', 'En attente'))
-                p_val = str(r.get('Paiement', 'Non payé'))
+                s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
+                if "CMN" in soc: s_col = "#3498db" # Bleu spécifique pour CMN
                 
+                p_val = str(r.get('Paiement', 'Non payé'))
+                p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
+
+                # Boutons de contact (Appel / WhatsApp)
+                t_cl = tel.replace(" ", "").replace(".", "")
+                btn_html = f'<div style="margin-top:12px;display:flex;gap:8px;">'
+                if len(t_cl) > 5:
+                    btn_html += f'<a href="tel:{t_cl}" style="flex:1;background:#34495e;color:white!important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">📞 APPEL</a>'
+                    btn_html += f'<a href="https://wa.me/{t_cl}" style="flex:1;background:#25D366;color:white!important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">💬 WA</a>'
+                btn_html += '</div>'
+
+                # Affichage de la Carte
                 st.markdown(f"""
-                <div class="fiche-globale">
-                    <b>{nom_c}</b> | <small>{s_val} / {p_val}</small>
+                <div class="fiche-globale {'border-cmn' if 'CMN' in soc else ''}">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <b style="color:#1a2a6c;font-size:1.1rem;">{nom_c}</b>
+                        <div style="text-align:right;display:flex;flex-direction:column;gap:3px;">
+                            <span style="background:{s_col};color:white;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:bold;">{s_val.upper()}</span>
+                            <span style="background:{p_col};color:white;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:bold;">{p_val.upper()}</span>
+                        </div>
+                    </div>
+                    <div style="color:#666;font-size:0.85rem;margin: 5px 0;">🏢 {soc}</div>
+                    <div style="background:#f8f9fa; border-radius:8px; padding:10px; border:1px solid #eee; margin:10px 0;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.9rem; color:#333;">
+                            <span>📅 <b>{d_nav}</b></span>
+                            <span>💰 <b>{prix} €</b></span>
+                        </div>
+                    </div>
+                    {btn_html}
                 </div>""", unsafe_allow_html=True)
 
+                # Boutons Modifier / Supprimer
                 c1, c2 = st.columns(2)
                 if c1.button(f"✏️ Modifier", key=f"ed_{i}"):
                     st.session_state.edit_idx = i
@@ -180,23 +213,23 @@ if st.session_state.page == "CONTACTS":
                     st.session_state.confirm_del_idx = i
                     st.rerun()
 
-    # --- ONGLET 2 : ARCHIVES ---
+    # --- ONGLET : ARCHIVES ---
     with tab_archives:
-        st.subheader(f"✅ Dossiers clôturés ({len(df_arch)})")
-        
         if df_arch.empty:
             st.info("Aucun dossier archivé (OK + PAYÉ).")
         else:
             for i, r in df_arch.iterrows():
                 st.markdown(f"""
-                <div style="padding:10px; background:#f1f2f6; border-radius:8px; margin-bottom:5px; color:black;">
-                    <b>{r.get('Nom')} {r.get('Prénom')}</b> (Payé)
+                <div style="padding:10px; border-radius:8px; background:#f1f2f6; margin-bottom:5px; border-left:5px solid #2ecc71; color:black;">
+                    <b>{r.get('Nom')} {r.get('Prénom')}</b><br>
+                    <small>📅 {r.get('DateNav')} | 💰 {r.get('Prix')} € | {r.get('Société')}</small>
                 </div>""", unsafe_allow_html=True)
                 
                 if st.button(f"♻️ Réactiver", key=f"reac_{i}"):
                     df_c.at[i, 'Statut'] = "En attente"
                     sauvegarder_data(df_c, "contacts.json")
                     st.rerun()
+
 
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
