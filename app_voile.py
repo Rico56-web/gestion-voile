@@ -135,63 +135,76 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 if st.session_state.page == "CONTACTS":
     st.title("📇 Vesta Skipper 2026")
 
-    # --- 1. FILTRAGE ---
+    # --- 1. FILTRAGE (Ajusté pour tes 16 fiches actives) ---
     mask_arch = (
         (df_c['Statut'].astype(str).str.upper().str.contains("OK|TERMINÉ", na=False)) & 
         (df_c['Paiement'].astype(str).str.upper().str.contains("PAYÉ", na=False))
     )
     
-    # On ajuste pour tes 16 fiches en cours
+    # On bascule l'affichage pour que tes dossiers en cours soient dans le premier onglet
     df_active = df_c[mask_arch]  
     df_arch = df_c[~mask_arch]   
 
     tab_encours, tab_archives = st.tabs(["⛵ EN COURS", "📦 ARCHIVES"])
 
     with tab_encours:
-        for i, r in df_active.iterrows():
-            # --- DONNÉES ---
-            nom = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}"
-            soc = str(r.get('Société','PARTICULIER')).upper()
-            date = str(r.get('DateNav','--/--/--'))
-            prix = str(r.get('Prix','0'))
-            tel = str(r.get('Téléphone','')).strip()
-            mail = str(r.get('Email','')).strip()
-            
-            # --- STYLE VISUEL (COULEURS) ---
-            s_val = str(r.get('Statut','En attente')).upper()
-            p_val = str(r.get('Paiement','Non payé')).upper()
-            
-            # On utilise une barre de couleur simple en haut de chaque fiche
-            color = "🟢" if "OK" in s_val else "🔵" if "CMN" in soc else "🟡"
-            
-            # --- AFFICHAGE NATIF (SANS RISQUE DE BUG DIV) ---
-            with st.container(border=True):
-                st.markdown(f"### {color} {nom}")
-                st.caption(f"🏢 {soc} | 🏷️ {s_val} | 💳 {p_val}")
+        if df_active.empty:
+            st.info("Aucun dossier actif.")
+        else:
+            for i, r in df_active.iterrows():
+                # --- RÉCUPÉRATION DES DONNÉES ---
+                nom = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}"
+                soc = str(r.get('Société','PARTICULIER')).upper()
+                date = str(r.get('DateNav','--/--/--'))
+                prix = str(r.get('Prix','0'))
+                tel = str(r.get('Téléphone','')).strip()
+                mail = str(r.get('Email','')).strip()
+                jours = str(r.get('Nbre de jours','1'))
+                pers = str(r.get('Nbre de personnes','1'))
+                coms = str(r.get('Commentaires','')).strip()
                 
-                # Grille d'infos
-                col1, col2, col3 = st.columns(3)
-                col1.write(f"📅 **{date}**")
-                col2.write(f"💰 **{prix}€**")
-                col3.write(f"👥 **{r.get('Nbre de personnes','1')}p**")
-                
-                st.write(f"📞 {tel} | ✉️ {mail}")
+                # --- COULEURS ET SYMBOLES ---
+                s_val = str(r.get('Statut','En attente')).upper()
+                p_val = str(r.get('Paiement','Non payé')).upper()
+                color = "🟢" if "OK" in s_val else "🔵" if "CMN" in soc else "🟡"
 
-                # Boutons compacts
-                b1, b2, b3 = st.columns([1,1,2])
-                if b1.button("✏️", key=f"ed_{i}", use_container_width=True):
-                    st.session_state.edit_idx = i
-                    st.rerun()
-                if b2.button("🗑️", key=f"del_{i}", use_container_width=True):
-                    st.session_state.confirm_del_idx = i
-                    st.rerun()
-                if tel:
-                    b3.link_button("💬 WhatsApp", f"https://wa.me/{tel.replace(' ','')}", use_container_width=True)
+                # --- AFFICHAGE NATIF (SANS RISQUE DE BUG DIV) ---
+                with st.container(border=True):
+                    st.markdown(f"### {color} {nom}")
+                    st.caption(f"🏢 {soc} | 🏷️ {s_val} | 💳 {p_val}")
+                    
+                    # Grille d'infos principales
+                    c1, c2, c3 = st.columns(3)
+                    c1.write(f"📅 **{date}**")
+                    c2.write(f"💰 **{prix}€**")
+                    c3.write(f"👥 **{pers} p.**")
+                    
+                    st.write(f"⏳ **Durée :** {jours} jour(s)")
+                    st.write(f"📞 {tel} | ✉️ {mail}")
+
+                    # --- SECTION COMMENTAIRES ---
+                    if coms and coms.lower() != "nan":
+                        st.info(f"💬 **Note :** {coms}")
+
+                    # Boutons d'actions
+                    b1, b2, b3 = st.columns([1,1,2])
+                    if b1.button("✏️", key=f"ed_{i}", use_container_width=True):
+                        st.session_state.edit_idx = i
+                        st.rerun()
+                    if b2.button("🗑️", key=f"del_{i}", use_container_width=True):
+                        st.session_state.confirm_del_idx = i
+                        st.rerun()
+                    
+                    # Lien WhatsApp
+                    t_clean = tel.replace(" ","").replace(".","")
+                    if t_clean:
+                        b3.link_button("💬 WhatsApp", f"https://wa.me/{t_clean}", use_container_width=True)
 
     with tab_archives:
+        st.subheader(f"Dossiers clôturés ({len(df_arch)})")
         for i, r in df_arch.iterrows():
             st.text(f"📁 {r.get('Nom')} - {r.get('DateNav')}")
-            if st.button("♻️ Réactiver", key=f"reac_{i}"):
+            if st.button("♻️ Réactiver", key=f"reac_{i}", use_container_width=True):
                 df_c.at[i, 'Statut'] = "En attente"
                 sauvegarder_data(df_c, "contacts.json")
                 st.rerun()
