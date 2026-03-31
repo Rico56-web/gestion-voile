@@ -193,9 +193,10 @@ for i, r in df_disp.iterrows():
             <div style="font-size:0.75rem; color:#2980b9;">📞 {tel if tel else "Non renseigné"}</div>
             {btn_html}
          </div>"""
-        # --- BLOC DANS LA BOUCLE FOR (8 espaces au début) ---
+        # --- LIGNE 197 : AFFICHAGE DE LA CARTE ---
         st.markdown(card_html, unsafe_allow_html=True)
 
+        # --- BOUTONS ACTIONS (Bien alignés sous le markdown) ---
         c_ed, c_del = st.columns(2)
         if c_ed.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
             st.session_state.edit_idx = i
@@ -203,14 +204,15 @@ for i, r in df_disp.iterrows():
             
         if c_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
             st.session_state.confirm_del_idx = i
-            st.rerun() 
+            st.rerun()
+
+# --- ICI ON SORT DU BLOC (ZÉRO ESPACE AU DÉBUT) ---
 
 # =================================================================
 # --- 6. PAGE PLANNING ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Vesta 2026")
-       
     
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
