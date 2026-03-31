@@ -122,7 +122,7 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
     df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
 # =================================================================
-# --- 3. PAGE CONTACTS (FIX AFFICHAGE HTML) ---
+# --- 3. PAGE CONTACTS (VERSION FINALE - PILOTAGE COMPLET) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div class="main-header">📇 RÉPERTOIRE & MISSIONS</div>', unsafe_allow_html=True)
@@ -132,7 +132,6 @@ if st.session_state.page == "CONTACTS":
         c_s1, c_s2 = st.columns(2)
         search_nom = c_s1.text_input("👤 Nom / Prénom", value="", placeholder="ex: DURAND")
         search_soc = c_s2.text_input("🏢 Société", value="", placeholder="ex: CMN")
-        
         if st.button("🔄 VOIR TOUTE LA LISTE", use_container_width=True):
             st.rerun()
 
@@ -152,65 +151,88 @@ if st.session_state.page == "CONTACTS":
         df_view = df_view.sort_values('Nom')
         
         for i, r in df_view.iterrows():
-            # Nettoyage des données
+            # Données de base
+            id_contact = r.name  # Utilisation de l'index pour les actions
             nom_f = f"{str(r.get('Prénom', '')).capitalize()} {str(r.get('Nom', '')).upper()}"
             soc = str(r.get('Société', 'PARTICULIER')).upper()
             tel = str(r.get('Téléphone', '')).strip().replace(' ', '').replace('.', '')
             mail_val = str(r.get('Email', '')).strip()
-            mail_display = mail_val if mail_val not in ['nan', '', 'None'] else "Non renseigné"
             
-            # Formattage Nombres (pour éviter le .0)
+            # Formattage nombres
             try:
                 nb_p = int(float(r.get('NbrePers', 0))) if pd.notnull(r.get('NbrePers')) else "-"
                 nb_j = int(float(r.get('NbreJours', 1))) if pd.notnull(r.get('NbreJours')) else "1"
-            except:
-                nb_p, nb_j = "-", "1"
+            except: nb_p, nb_j = "-", "1"
 
-            # Statut & Couleurs
+            # --- COULEURS STATUTS & PAIEMENT ---
             statut_raw = str(r.get('Statut', 'En attente')).strip().upper()
             s_low = statut_raw.lower()
-            st_col = "#2ecc71" if "OK" in s_low or "TERM" in s_low else "#f1c40f" if "ATTENTE" in s_low else "#e74c3c" if "REFUS" in s_low else "#95a5a6"
+            # Rouge = Refusé, Jaune = Attente, Vert = OK/Terminé
+            st_col = "#2ecc71" if ("OK" in s_low or "TERM" in s_low) else "#f1c40f" if "ATTENTE" in s_low else "#e74c3c" if "REFUS" in s_low else "#95a5a6"
 
             paiement = str(r.get('Paiement', 'À payer')).upper()
             pay_col = "#2ecc71" if "PAY" in paiement and "NON" not in paiement else "#e67e22"
             pay_lab = "PAYÉ" if "PAY" in paiement and "NON" not in paiement else "À PAYER"
 
-            # --- LA CARTE HTML (CORRIGÉE) ---
+            # --- CARTE HTML ---
             card_html = f"""
             <div style="border: 1px solid #ddd; border-left: 12px solid {'#0056b3' if 'CMN' in soc else '#1a2a6c'}; 
-                        padding: 15px; border-radius: 15px; background: white; margin-bottom: 12px; 
+                        padding: 15px; border-radius: 15px; background: white; margin-bottom: 5px; 
                         box-shadow: 0px 4px 8px rgba(0,0,0,0.1); color: black;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <span style="color: #666; font-weight: bold; font-size: 0.75rem;">🏢 {soc}</span>
-                    <span style="background: {pay_col}; color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.65rem; font-weight: bold;">{pay_lab}</span>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                    <div style="color: #666; font-weight: bold; font-size: 0.75rem;">🏢 {soc}</div>
+                    <div style="text-align: right;">
+                        <div style="background: {pay_col}; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.6rem; font-weight: bold; margin-bottom: 4px;">{pay_lab}</div>
+                        <div style="background: {st_col}; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.6rem; font-weight: bold;">{statut_raw}</div>
+                    </div>
                 </div>
                 <div style="font-size: 1.3rem; font-weight: bold; margin-bottom: 12px; color: #1a2a6c;">{nom_f}</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f8f9fa; padding: 10px; border-radius: 10px; font-size: 0.9rem;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f8f9fa; padding: 10px; border-radius: 10px; font-size: 0.85rem;">
                     <div>📅 <b>{r.get('DateNav', 'N/A')}</b></div>
                     <div>💰 <b>{r.get('Prix', '0')} €</b></div>
-                    <div>⛵ <b>{nb_j} jour(s)</b></div>
+                    <div>⛵ <b>{nb_j} j.</b></div>
                     <div>👥 <b>{nb_p} pers.</b></div>
                 </div>
-                <div style="margin-top: 12px; font-size: 0.95rem;">
-                    Statut : <b style="color: {st_col};">{statut_raw}</b>
-                </div>
-                <div style="margin-top: 10px; font-size: 0.9rem; color: #444; border-top: 1px solid #eee; padding-top: 10px;">
-                    📱 {r.get('Téléphone', 'N/A')}<br>
-                    📧 <span style="font-size: 0.8rem;">{mail_display}</span>
+                <div style="margin-top: 10px; font-size: 0.85rem; color: #444;">
+                    📞 {r.get('Téléphone', 'N/A')} | 📧 {mail_val if mail_val not in ['nan',''] else '-'}
                 </div>
             </div>
             """
             st.markdown(card_html, unsafe_allow_html=True)
 
-            # --- BOUTONS D'ACTION ---
+            # --- BOUTONS D'ACTION (LIGNE 1 : CONTACT) ---
             c1, c2, c3 = st.columns(3)
             if len(tel) > 5:
-                c1.markdown(f'<a href="tel:{tel}" style="text-decoration:none;"><div style="background:#2ecc71; color:white; padding:12px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.7rem;">📞 APPEL</div></a>', unsafe_allow_html=True)
+                c1.markdown(f'<a href="tel:{tel}" style="text-decoration:none;"><div style="background:#2ecc71; color:white; padding:10px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.65rem;">📞 APPEL</div></a>', unsafe_allow_html=True)
                 wa_n = tel if not tel.startswith('0') else "33" + tel[1:]
-                c2.markdown(f'<a href="https://wa.me/{wa_n}" style="text-decoration:none;"><div style="background:#25D366; color:white; padding:12px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.7rem;">💬 WA</div></a>', unsafe_allow_html=True)
+                c2.markdown(f'<a href="https://wa.me/{wa_n}" style="text-decoration:none;"><div style="background:#25D366; color:white; padding:10px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.65rem;">💬 WA</div></a>', unsafe_allow_html=True)
             if mail_val not in ['nan', '', 'None']:
-                c3.markdown(f'<a href="mailto:{mail_val}" style="text-decoration:none;"><div style="background:#3498db; color:white; padding:12px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.7rem;">✉️ EMAIL</div></a>', unsafe_allow_html=True)
+                c3.markdown(f'<a href="mailto:{mail_val}" style="text-decoration:none;"><div style="background:#3498db; color:white; padding:10px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.65rem;">✉️ EMAIL</div></a>', unsafe_allow_html=True)
+
+            # --- BOUTONS D'ACTION (LIGNE 2 : GESTION) ---
+            g1, g2 = st.columns(2)
+            if g1.button(f"📝 Modifier {r.get('Nom','')[:5]}...", key=f"edit_{i}", use_container_width=True):
+                st.session_state.contact_a_modifier = i
+                st.session_state.page = "MODIFIER_CONTACT" # Prévoir une page de modif
+                st.rerun()
             
+            # Suppression avec confirmation directe
+            if g2.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
+                st.session_state[f"confirm_del_{i}"] = True
+
+            if st.session_state.get(f"confirm_del_{i}"):
+                st.warning("Confirmer la suppression ?")
+                conf1, conf2 = st.columns(2)
+                if conf1.button("✅ OUI", key=f"yes_{i}", use_container_width=True):
+                    df_c = df_c.drop(i)
+                    sauvegarder_data(df_c, "contacts.json")
+                    st.success("Supprimé !")
+                    time.sleep(1)
+                    st.rerun()
+                if conf2.button("❌ NON", key=f"no_{i}", use_container_width=True):
+                    del st.session_state[f"confirm_del_{i}"]
+                    st.rerun()
+
             st.write("---")
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION OPTIMISÉE IPHONE) ---
