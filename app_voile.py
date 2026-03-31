@@ -175,93 +175,58 @@ if st.session_state.page == "CONTACTS":
             st.session_state.confirm_del_idx = None
             st.rerun()
         st.stop()
-
-    # --- B. AFFICHAGE DES ONGLETS ---
-    tab_encours, tab_archives = st.tabs(["⛵ EN COURS", "📦 ARCHIVES (Payés & OK)"])
+     
+# --- B. AFFICHAGE DES ONGLETS (NETTOYÉS) ---
+    # On crée deux onglets simples et larges
+    tab_encours, tab_archives = st.tabs(["📑 EN COURS", "🗄️ ARCHIVES"])
 
     with tab_encours:
-        # Filtre : On cache ceux qui sont à la fois "OK" et "Payé"
+        # LOGIQUE : On affiche tout SAUF ceux qui sont à la fois "OK" et "Payé"
         mask_arch = (df_c['Statut'].str.contains("OK", case=False, na=False)) & \
                     (df_c['Paiement'].str.contains("Payé", case=False, na=False))
         df_active = df_c[~mask_arch]
 
-        search = st.text_input("🔍 Rechercher un nom ou une société...", "", key="search_active").upper()
+        st.subheader(f"⛵ Suivi des dossiers ({len(df_active)})")
+        
+        # Barre de recherche intégrée à l'onglet
+        search = st.text_input("🔍 Filtrer la liste...", "", key="search_active").upper()
         if search:
             df_active = df_active[df_active['Nom'].str.contains(search, na=False) | df_active['Société'].str.contains(search, na=False)]
 
         if df_active.empty:
-            st.info("Aucun dossier en cours.")
+            st.info("Aucun dossier actif pour le moment.")
         else:
             for i, r in df_active.iterrows():
-                # --- RÉCUPÉRATION ET CARTE HTML ---
-                p_nom = str(r.get('Prénom', '')).strip()
-                n_nom = str(r.get('Nom', '')).strip().upper()
-                nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Client #{i+1}"
-                soc = str(r.get('Société', 'PARTICULIER')).upper()
-                tel = str(r.get('Téléphone', '')).strip()
-                mail = str(r.get('Email', '')).strip()
-                d_nav = str(r.get('DateNav', '--/--/--'))
-                prix = str(r.get('Prix', '0'))
-                
-                s_val = str(r.get('Statut', 'En attente'))
-                s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
-                if "CMN" in soc: s_col = "#3498db"
-                p_val = str(r.get('Paiement', 'Non payé'))
-                p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
+                # --- (Ici tu gardes ton code de CARTE HTML et BOUTONS inchangé) ---
+                # ... 
+                # (Le code de la carte html que tu as déjà)
 
-                btn_html = f'<div style="margin-top:12px;display:flex;gap:8px;">'
-                if tel and len(tel) > 5:
-                    t_cl = tel.replace(" ", "").replace(".", "")
-                    btn_html += f'<a href="tel:{t_cl}" class="btn-contact" style="background:#34495e; flex:1; padding:10px; border-radius:8px; text-decoration:none; color:white; text-align:center; font-size:0.75rem;">📞 APPEL</a>'
-                    btn_html += f'<a href="https://wa.me/{t_cl}" class="btn-contact" style="background:#25D366; flex:1; padding:10px; border-radius:8px; text-decoration:none; color:white; text-align:center; font-size:0.75rem;">💬 WA</a>'
-                btn_html += '</div>'
-
-                card_html = f"""
-                <div class="fiche-globale {'border-cmn' if 'CMN' in soc else ''}">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <span class="prenom-style">{nom_c}</span>
-                        <div>
-                            <span class="statut-badge" style="background:{s_col};">{s_val.upper()}</span>
-                            <span class="statut-badge" style="background:{p_col};">{p_val.upper()}</span>
-                        </div>
-                    </div>
-                    <div class="societe-style">🏢 {soc}</div>
-                    <div style="display:flex; justify-content:space-between; font-size:1rem; margin:10px 0;">
-                        <span>📅 <b>{d_nav}</b></span>
-                        <span>💰 <b>{prix} €</b></span>
-                    </div>
-                    {btn_html}
-                </div>"""
-                st.markdown(card_html, unsafe_allow_html=True)
-
-                c1, c2 = st.columns(2)
-                if c1.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
-                    st.session_state.edit_idx = i
-                    st.rerun()
-                if c2.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
-                    st.session_state.confirm_del_idx = i
-                    st.rerun()
-
-    with tab_archives:
-        # Filtre : Uniquement OK + PAYÉ
+with tab_archives:
+        # LOGIQUE : Uniquement ceux qui ont fini le cycle (OK + PAYÉ)
         df_arch = df_c[(df_c['Statut'].str.contains("OK", case=False, na=False)) & 
                        (df_c['Paiement'].str.contains("Payé", case=False, na=False))]
         
+        st.subheader(f"✅ Dossiers clôturés ({len(df_arch)})")
+
         if df_arch.empty:
-            st.info("Aucun dossier archivé.")
+            st.write("Aucune archive disponible.")
         else:
             for i, r in df_arch.iterrows():
+                # Affichage plus compact pour les archives
                 st.markdown(f"""
-                <div style="padding:15px; border-left:6px solid #2ecc71; background:white; border-radius:8px; margin-bottom:10px; border:1px solid #eee;">
-                    <div style="display:flex; justify-content:space-between;">
-                        <b>{r.get('Nom')} {r.get('Prénom')}</b>
-                        <span style="color:#2ecc71; font-weight:bold;">✅ ARCHIVÉ</span>
+                <div style="padding:12px; border-radius:10px; background:#f1f2f6; margin-bottom:8px; border:1px solid #dfe4ea; color:#2f3542;">
+                    <div style="display:flex; justify-content:space-between; font-weight:bold;">
+                        <span>{r.get('Nom')} {r.get('Prénom')}</span>
+                        <span style="color:#2ed573;">✔ TERMINÉ</span>
                     </div>
-                    <div style="font-size:0.85rem; color:#666;">📅 {r.get('DateNav')} | 💰 {r.get('Prix')} € | 🏢 {r.get('Société')}</div>
+                    <div style="font-size:0.8rem; color:#57606f;">
+                        📅 {r.get('DateNav')} | 🏢 {r.get('Société')} | 💰 {r.get('Prix')} €
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                if st.button(f"♻️ Désarchiver (Remettre en attente)", key=f"reac_{i}"):
+                # Option pour corriger une erreur d'archivage
+                if st.button(f"♻️ Sortir de l'archive", key=f"reac_{i}", use_container_width=True):
                     df_c.at[i, 'Statut'] = "En attente"
                     sauvegarder_data(df_c, "contacts.json")
                     st.rerun()
