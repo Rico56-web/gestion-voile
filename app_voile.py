@@ -206,14 +206,13 @@ for i, r in df_disp.iterrows():
 # =================================================================
 # --- 6. PAGE PLANNING ---
 # =================================================================
-
-    elif st.session_state.page == "PLANNING":
-       st.subheader("🗓️ Planning Vesta 2026")
+elif st.session_state.page == "PLANNING":
+    st.subheader("🗓️ Planning Vesta 2026")
     
-       maintenant = datetime.now()
-       aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
+    maintenant = datetime.now()
+    aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
     
-       col_m, col_y = st.columns(2)
+    col_m, col_y = st.columns(2)
     with col_m:
         m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
         sel_m = m_noms.index(st.selectbox("Mois", m_noms, index=aujourdhui.month - 1)) + 1
@@ -286,9 +285,6 @@ for i, r in df_disp.iterrows():
 
     st.markdown(f"#### 📋 Liste des sorties - {m_noms[sel_m-1]}")
     res_list = []
-    ca_enc = 0.0
-    ca_att = 0.0
-
     for _, r in df_c.iterrows():
         try:
             d_str = str(r.get('DateNav', '')).strip()
@@ -297,10 +293,6 @@ for i, r in df_disp.iterrows():
                 if int(p[1]) == sel_m and (int(p[2]) == sel_y or int(p[2])+2000 == sel_y):
                     if str(r.get('Statut','')).lower() not in ["refusé", "archivé"]:
                         res_list.append(r)
-                        px = float(str(r.get('Prix', '0')).replace('€','').strip() or 0)
-                        pv = str(r.get('Paiement', '')).lower()
-                        if ("pay" in pv) and not any(x in pv for x in ["un", "non"]): ca_enc += px
-                        else: ca_att += px
         except: continue
 
     if not res_list:
