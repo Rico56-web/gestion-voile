@@ -180,9 +180,16 @@ if st.session_state.page == "CONTACTS":
 
     with tab_encours:
         # LOGIQUE : On exclut ceux qui sont à la fois "OK" et "Payé"
-        mask_arch = (df_c['Statut'].str.contains("OK", case=False, na=False)) & \
-                    (df_c['Paiement'].str.contains("Payé", case=False, na=False))
-        df_active = df_c[~mask_arch]
+    with tab_encours:
+        # LOGIQUE : On garde TOUT SAUF ceux qui sont à la fois "OK" ET "Payé"
+        # On définit ce qui doit aller en ARCHIVE
+        est_archive = (df_c['Statut'].str.upper().str.contains("OK", na=False)) & \
+                      (df_c['Paiement'].str.upper().str.contains("PAYÉ", na=False))
+        
+        # Pour le "EN COURS", on prend l'inverse (~)
+        df_active = df_c[~est_archive]
+
+        st.subheader(f"⛵ Suivi des dossiers ({len(df_active)})")
 
         st.subheader(f"⛵ Suivi des dossiers ({len(df_active)})")
         
