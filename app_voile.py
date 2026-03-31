@@ -9,6 +9,10 @@ from datetime import datetime, date
  
 # --- 1. CONFIGURATION & STYLE ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
+
+ # --- AJOUTER CE BLOC AU TOUT DÉBUT DE TON SCRIPT (HORS DU IF PAGE) ---
+if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
+if 'confirm_del_idx' not in st.session_state: st.session_state.confirm_del_idx = None
  
 # Date du jour en français
 jours_fr = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
@@ -209,7 +213,68 @@ if st.session_state.page == "CONTACTS":
         if c_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
             st.session_state.confirm_del_idx = i
             st.rerun()
+        # --- LOGIQUE DE SUPPRESSION (FENÊTRE DE CONFIRMATION) ---
+    if st.session_state.confirm_del_idx is not None:
+        idx = st.session_state.confirm_del_idx
+        client_nom = df_c.iloc[idx].get('Prénom', 'Client')
+        st.warning(f"⚠️ Supprimer définitivement la fiche de **{client_nom}** ?")
+        c1, c2 = st.columns(2)
+        if c1.button("✅ OUI, SUPPRIMER", use_container_width=True):
+            df_c = df_c.drop(idx).reset_index(drop=True)
+            sauvegarder_data(df_c, "contacts.json")
+            st.session_state.confirm_del_idx = None
+            st.success("Fiche supprimée.")
+            st.rerun()
+        if c2.button("❌ ANNULER", use_container_width=True):
+            st.session_state.confirm_del_idx = None
+            st.rerun()
+        st.divider()
+
+    # --- AFFICHAGE DES FICHES ---
+    df_disp = df_c[df_c['Statut'].isin(["Terminé", "Refusé"])] if view_arc else df_c[~df_c['Statut'].isin(["Terminé", "Refusé"])]
+
+    for i, r in df_disp.iterrows():
+        # ... (Garde ton bloc HTML card_html et btn_html ici) ...
+        st.markdown(card_html, unsafe_allow_html=True)
+
+        # BOUTONS ACTIONS (Corrigés avec clés uniques)
+        c_ed, c_del = st.columns(2)
         
+        # Action Modifier
+        if c_ed.button(f"✏️ Modifier", key=f"btn_edit_{i}", use_container_width=True):
+            st.session_state.edit_idx = i
+            st.rerun()
+            
+        # Action Supprimer (Déclenche la confirmation en haut de page)
+        if c_del.button(f"🗑️ Supprimer", key=f"btn_del_{i}", use_container_width=True):
+            st.session_state.confirm_del_idx = i
+            st.rerun()
+
+    # --- FORMULAIRE D'ÉDITION (S'affiche si edit_idx n'est pas None) ---
+    if st.session_state.edit_idx is not None:
+        st.divider()
+        idx = st.session_state.edit_idx
+        st.subheader(f"📝 Modification : {df_c.iloc[idx]['Prénom']}")
+        
+        with st.form(f"form_edit_{idx}"):
+            f_pre = st.text_input("Prénom", value=df_c.iloc[idx]['Prénom'])
+            f_nom = st.text_input("Nom", value=df_c.iloc[idx]['Nom'])
+            f_soc = st.selectbox("Société", ["PARTICULIER", "CLICK", "VOG", "CMN", "AUTRES"], index=["PARTICULIER", "CLICK", "VOG", "CMN", "AUTRES"].index(df_c.iloc[idx]['Société']))
+            f_stat = st.selectbox("Statut", ["En attente", "OK", "Terminé", "Refusé"], index=["En attente", "OK", "Terminé", "Refusé"].index(df_c.iloc[idx]['Statut']))
+            
+            col_save, col_cancel = st.columns(2)
+            if col_save.form_submit_button("💾 ENREGISTRER"):
+                df_c.at[idx, 'Prénom'] = f_pre
+                df_c.at[idx, 'Nom'] = f_nom
+                df_c.at[idx, 'Société'] = f_soc
+                df_c.at[idx, 'Statut'] = f_stat
+                sauvegarder_data(df_c, "contacts.json")
+                st.session_state.edit_idx = None
+                st.success("Modification enregistrée !")
+                st.rerun()
+            if col_cancel.form_submit_button("❌ FERMER"):
+                st.session_state.edit_idx = None
+                st.rerun()
         # Le formulaire d'édition reste identique à ton modèle précédent...
 # =================================================================
 # --- 6. PAGE PLANNING ---
