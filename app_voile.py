@@ -128,6 +128,11 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
+
+# =================================================================
+# --- 5. PAGE contacts (BIEN COLLÉ À GAUCHE) ---
+# =================================================================
+
 if st.session_state.page == "CONTACTS":
     # 1. ON DÉFINIT LE FILTRE (OK + PAYÉ)
     # On harmonise pour que "ok" ou "OK" ou "Payé" ou "payé" fonctionnent
