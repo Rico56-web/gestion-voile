@@ -190,24 +190,26 @@ for i, r in df_disp.iterrows():
         <div style="font-size:0.75rem; color:#2980b9;">📞 {tel if tel else "Non renseigné"}</div>
         {btn_html}
     </div>"""
+# --- DERNIÈRES LIGNES DE LA BOUCLE FOR DES CONTACTS ---
+        st.markdown(card_html, unsafe_allow_html=True)
 
-    # --- AFFICHAGE ET BOUTONS ---
-    st.markdown(card_html, unsafe_allow_html=True)
+        c_ed, c_del = st.columns(2)
+        if c_ed.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
+            st.session_state.edit_idx = i
+            st.rerun()
+            
+        if c_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
+            st.session_state.confirm_del_idx = i
+            st.rerun()
 
-    c_ed, c_del = st.columns(2)
-    if c_ed.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
-        st.session_state.edit_idx = i
-        st.rerun()
-        
-    if c_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
-        st.session_state.confirm_del_idx = i
-        st.rerun()
-
+# <--- ICI : VÉRIFIE QU'IL N'Y A AUCUN ESPACE DEVANT LE ELIF CI-DESSOUS
 # =================================================================
 # --- 6. PAGE PLANNING ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Vesta 2026")
+
+
     
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
