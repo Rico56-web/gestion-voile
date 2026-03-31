@@ -192,8 +192,8 @@ for i, r in df_disp.iterrows():
 
             <div style="font-size:0.75rem; color:#2980b9;">📞 {tel if tel else "Non renseigné"}</div>
             {btn_html}
-            </div>"""
-# --- BLOC DANS LA BOUCLE FOR (8 espaces au début) ---
+         </div>"""
+        # --- BLOC DANS LA BOUCLE FOR (8 espaces au début) ---
         st.markdown(card_html, unsafe_allow_html=True)
 
         c_ed, c_del = st.columns(2)
@@ -203,9 +203,7 @@ for i, r in df_disp.iterrows():
             
         if c_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
             st.session_state.confirm_del_idx = i
-            st.rerun()
-
-# --- FIN DU BLOC CONTACTS (On revient tout à gauche, 0 espace) ---
+            st.rerun() 
 
 # =================================================================
 # --- 6. PAGE PLANNING ---
