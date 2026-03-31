@@ -154,13 +154,20 @@ if st.session_state.page == "CONTACTS":
                 # Données
                 nom = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}"
                 soc = str(r.get('Société','PARTICULIER')).upper()
+                s_val = str(r.get('Statut','En attente')).upper()
+                p_val = str(r.get('Paiement','Non payé')).upper()
                 tel = str(r.get('Téléphone','')).strip()
                 mail = str(r.get('Email','')).strip()
                 
                 is_cmn = "CMN" in soc
-                b_color = "#0047AB" if is_cmn else ("#27ae60" if "OK" in str(r.get('Statut','')).upper() else "#f39c12")
+                # Couleur de bordure selon société ou statut
+                b_color = "#0047AB" if is_cmn else ("#27ae60" if "OK" in s_val else "#f39c12")
+                
+                # Couleurs de texte pour les statuts
+                s_txt_col = "green" if "OK" in s_val else "orange"
+                p_txt_col = "blue" if "PAYÉ" in p_val else "orange"
 
-                # --- FICHE CONTACT (TEXTE RÉDUIT) ---
+                # --- FICHE CONTACT (NOM + SOCIÉTÉ) ---
                 st.markdown(f"""
                 <div style="border: 3px solid {b_color}; padding: 10px; border-radius: 12px; background-color: white; margin-bottom: 5px;">
                     <b style="color: {b_color}; font-size: 1.1rem;">{'🚢 ' if is_cmn else '👤 '}{nom}</b><br>
@@ -169,46 +176,50 @@ if st.session_state.page == "CONTACTS":
                 """, unsafe_allow_html=True)
 
                 with st.container(border=True):
-                    # Infos compactes (Date, Prix, Pers)
+                    # --- RETOUR DES STATUTS VISIBLES ---
+                    c_stat, c_paye = st.columns(2)
+                    c_stat.markdown(f":{s_txt_col}[**● STATUT : {s_val}**]")
+                    c_paye.markdown(f":{p_txt_col}[**● PAIEMENT : {p_val}**]")
+                    
+                    # Infos compactes
+                    st.divider()
                     c1, c2, c3 = st.columns(3)
                     c1.write(f"📅 **{r.get('DateNav','--')}**")
                     c2.write(f"💰 **{r.get('Prix','0')}€**")
                     c3.write(f"👥 **{r.get('Nbre de personnes','1')}p**")
                     
-                    # Contacts en petit
-                    st.markdown(f"<p style='font-size:0.8rem; margin:0;'>📞 {tel} | ✉️ {mail}</p>", unsafe_allow_html=True)
+                    # Contact direct
+                    st.markdown(f"<p style='font-size:0.85rem;'>📞 {tel}<br>📧 {mail}</p>", unsafe_allow_html=True)
 
-                    # --- ACTIONS RAPIDES (CONTACT) ---
+                    # --- BOUTONS APPEL / WA / MAIL ---
                     t_link = tel.replace(" ","").replace(".","")
-                    col_tel, col_wa, col_mail = st.columns(3)
+                    col_t, col_w, col_m = st.columns(3)
                     if t_link:
-                        col_tel.link_button("📞 Tél", f"tel:{t_link}", use_container_width=True)
-                        col_wa.link_button("💬 WA", f"https://wa.me/{t_link}", use_container_width=True)
+                        col_t.link_button("📞 Tél", f"tel:{t_link}", use_container_width=True)
+                        col_w.link_button("💬 WA", f"https://wa.me/{t_link}", use_container_width=True)
                     if mail:
-                        col_mail.link_button("📧 Mail", f"mailto:{mail}", use_container_width=True)
+                        col_m.link_button("📧 Mail", f"mailto:{mail}", use_container_width=True)
 
-                    # --- GESTION (MODIFIER / SUPPRIMER) ---
-                    # Correction : On utilise st.session_state pour déclencher l'action
-                    st.divider()
+                    # --- BOUTONS MODIFIER / SUPPRIMER (FIXÉS) ---
+                    st.write("") 
                     col_edit, col_del = st.columns(2)
                     
-                    # Bouton Modifier
-                    if col_edit.button("✏️ Modifier", key=f"btn_edit_{i}", use_container_width=True):
+                    if col_edit.button("✏️ Modifier", key=f"edit_v2_{i}", use_container_width=True):
                         st.session_state.edit_idx = i
-                        st.session_state.page = "MODIFIER_CONTACT" # Vérifie que ce nom de page existe dans ton code
+                        # S'ASSURER QUE LE NOM DE LA PAGE CI-DESSOUS EST LE BON DANS TON CODE
+                        st.session_state.page = "MODIFICATION" 
                         st.rerun()
                     
-                    # Bouton Supprimer
-                    if col_del.button("🗑️ Supprimer", key=f"btn_del_{i}", use_container_width=True):
+                    if col_del.button("🗑️ Supprimer", key=f"del_v2_{i}", use_container_width=True):
                         st.session_state.confirm_del_idx = i
-                        # Ici tu peux ajouter une logique de confirmation si besoin
+                        # Logique de suppression à placer ici ou via une confirmation
                         st.rerun()
 
     with tab_archives:
         for i, r in df_arch.iterrows():
             with st.container(border=True):
                 st.write(f"📁 **{r.get('Nom')}** - {r.get('DateNav')}")
-                if st.button("♻️ Réactiver", key=f"reac_{i}", use_container_width=True):
+                if st.button("♻️ Réactiver", key=f"reac_v2_{i}", use_container_width=True):
                     df_c.at[i, 'Statut'] = "En attente"
                     df_c.at[i, 'Paiement'] = "Non payé"
                     sauvegarder_data(df_c, "contacts.json")
