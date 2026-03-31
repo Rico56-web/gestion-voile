@@ -327,8 +327,6 @@ for i, r in df_disp.iterrows():
             </div>
             """, unsafe_allow_html=True)
 
-# --- ON REVIENT TOUT À GAUCHE ICI ---
-
 # =================================================================
 # --- 7. PAGE STATS ---
 # =================================================================
@@ -352,19 +350,32 @@ elif st.session_state.page == "STATS":
         except: pass
         return 99, "99-Inconnu"
 
+    # --- Initialisation des données ---
     df_st = df_c.copy()
+    
     if not df_st.empty and 'Prix' in df_st.columns:
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
         df_st['M_Sort'], df_st['Mois'] = zip(*df_st['DateNav'].apply(get_month_info))
-     
+        
+        # Calcul du CA
+        def calc_ca(x):
+            p_val = str(x.get('Paiement', '')).upper()
+            s_val = str(x.get('Statut', '')).upper()
+            if "PAYÉ" in p_val or s_val == "OK":
+                return x['PrixNum']
+            return 0.0
+            
+        df_st['CA_Calcul'] = df_st.apply(calc_ca, axis=1)
+
+    # --- Affichage des résultats ---
     st.subheader("📅 Synthèse Mensuelle 2026")
     if not df_st.empty:
         mensuel = df_st.groupby(['M_Sort', 'Mois'])['CA_Calcul'].sum().reset_index()
         st.table(mensuel[['Mois', 'CA_Calcul']].set_index('Mois').style.format("{:.0f} €"))
 
     col1, col2 = st.columns(2)
-    tot_enc = df_st[df_st['Paiement'].astype(str).str.upper() == "PAYÉ"]['PrixNum'].sum()
-    tot_avr = df_st[(df_st['Statut'].astype(str).str.upper() == "OK") & (df_st['Paiement'].astype(str).str.upper() != "PAYÉ")]['PrixNum'].sum()
+    tot_enc = df_st[df_st['Paiement'].astype(str).str.contains("PAYÉ", case=False, na=False)]['PrixNum'].sum()
+    tot_avr = df_st[(df_st['Statut'].astype(str) == "OK") & (~df_st['Paiement'].astype(str).str.contains("PAYÉ", case=False, na=False))]['PrixNum'].sum()
     
     col1.metric("💰 ENCAISSÉ", f"{tot_enc:,.0f}€")
     col2.metric("🕒 À VENIR", f"{tot_avr:,.0f}€")
