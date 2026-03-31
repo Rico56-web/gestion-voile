@@ -269,10 +269,10 @@ if st.session_state.page == "PLANNING":
         </style>
     """, unsafe_allow_html=True)
 
-    from streamlit_calendar import calendar
+    from streamlit_calendar import calendar as st_calendar
 
     # --- PRÉPARATION DES ÉVÉNEMENTS ---
-    calendar_events = []
+  st_calendar(events=calendar_events, options=calendar_options, key="vesta_calendar")
     for i, r in df_c.iterrows():
         try:
             # On récupère la date, si vide on ignore
