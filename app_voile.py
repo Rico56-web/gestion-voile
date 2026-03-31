@@ -121,13 +121,14 @@ if not df_c.empty and 'Paiement' in df_c.columns:
 if not df_c.empty and 'DateNav' in df_c.columns:
     df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
     df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
-
 # =================================================================
-# --- 5. PAGE CONTACTS (FIX ISOLATION PAIEMENT) ---
+# --- 5. PAGE CONTACTS (AVEC BOUTON AJOUT) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div class="main-header">👥 GESTION DES MISSIONS</div>', unsafe_allow_html=True)
     import html
+    import pandas as pd
+    from datetime import datetime
 
     def safe(val):
         v = str(val).strip()
@@ -136,7 +137,7 @@ if st.session_state.page == "CONTACTS":
 
     LISTE_SOC = ["PARTICULIER", "CLICK", "VOG", "CMN", "AUTRES"]
 
-    # --- BARRE D'OUTILS ---
+    # --- BARRE D'OUTILS & AJOUT ---
     c_n1, c_n2, c_add = st.columns([1, 1, 2])
     view_arc = st.session_state.get('view_archive', False)
 
@@ -147,6 +148,25 @@ if st.session_state.page == "CONTACTS":
         st.session_state.view_archive = True
         st.rerun()
     
+    # LE BOUTON MANQUANT :
+    if c_add.button("➕ NOUVEAU CONTACT", type="primary", use_container_width=True):
+        new_row = pd.DataFrame([{
+            "Prénom": "", 
+            "Nom": "NOUVEAU", 
+            "Société": "PARTICULIER", 
+            "Statut": "En attente", 
+            "Paiement": "Non payé", 
+            "DateNav": datetime.now().strftime("%d/%m/%Y"), 
+            "Prix": "0", "NbreJours": "1", "NbrePers": "1", 
+            "Téléphone": "", "Email": "", "Notes": ""
+        }])
+        # On place le nouveau contact en haut de la liste (index 0)
+        df_c = pd.concat([new_row, df_c], ignore_index=True)
+        sauvegarder_data(df_c, "contacts.json")
+        # On active le mode édition pour ce nouveau contact immédiatement
+        st.session_state.edit_idx = 0 
+        st.rerun()
+
     st.divider()
 
     # --- FILTRAGE ---
@@ -154,7 +174,6 @@ if st.session_state.page == "CONTACTS":
 
     # --- BOUCLE D'AFFICHAGE ---
     for i, r in df_disp.iterrows():
-        # RÉINITIALISATION LOCALE POUR CHAQUE FICHE
         num_f = i + 1
         p_nom = safe(r.get('Prénom', ''))
         n_nom = safe(r.get('Nom', '')).upper()
@@ -162,24 +181,15 @@ if st.session_state.page == "CONTACTS":
         soc   = safe(r.get('Société', 'PARTICULIER')).upper()
         tel   = safe(r.get('Téléphone', ''))
         mail  = safe(r.get('Email', ''))
-        prix  = safe(r.get('Prix', '0'))
-        date_v = safe(r.get('DateNav', '--/--/--'))
         
-        # 1. LOGIQUE PAIEMENT SÉCURISÉE
-        # On récupère la valeur brute sans transformation pour le test
+        # Logique Paiement
         val_paye_brute = str(r.get('Paiement', 'Non payé')).upper()
-        
-        # Test strict : Si "PAY" est dans le texte ET que ce n'est pas "NON PAYÉ"
-        if "PAY" in val_paye_brute and "NON" not in val_paye_brute:
-            p_display = "PAYÉ"
-            p_col = "#3498db" # Bleu
-            idx_p = 1
-        else:
-            p_display = "NON PAYÉ"
-            p_col = "#e67e22" # Orange
-            idx_p = 0
+        is_paid = "PAY" in val_paye_brute and "NON" not in val_paye_brute
+        p_display = "PAYÉ" if is_paid else "NON PAYÉ"
+        p_col = "#3498db" if is_paid else "#e67e22"
+        idx_p = 1 if is_paid else 0
 
-        # 2. LOGIQUE STATUT
+        # Logique Statut
         s_val = safe(r.get('Statut', 'En attente'))
         s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
         if "CMN" in soc: s_col = "#0056b3"
@@ -187,7 +197,7 @@ if st.session_state.page == "CONTACTS":
         clean_tel = "".join(filter(str.isdigit, tel))
         wa_link = f"33{clean_tel[1:]}" if clean_tel.startswith("0") else clean_tel
 
-        # --- RENDU CARTE HTML ---
+        # --- RENDU CARTE ---
         card_html = (
             f'<div style="border:2px solid #1a2a6c;border-radius:12px;padding:15px;margin-bottom:12px;background:white;color:black;">'
             f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
@@ -206,40 +216,27 @@ if st.session_state.page == "CONTACTS":
         )
         st.markdown(card_html, unsafe_allow_html=True)
 
-        # --- ACTIONS ---
-        c_ed, c_del = st.columns(2)
-        if c_ed.button(f"✏️ MODIFIER #{num_f}", key=f"ed_{i}", use_container_width=True):
+        # --- ÉDITION ---
+        if st.button(f"✏️ MODIFIER #{num_f}", key=f"ed_{i}", use_container_width=True):
             st.session_state.edit_idx = i
             st.rerun()
-        if c_del.button(f"🗑️ SUPPRIMER #{num_f}", key=f"del_{i}", use_container_width=True):
-            st.session_state.confirm_del_idx = i
-            st.rerun()
 
-        # --- FORMULAIRE D'ÉDITION ---
         if st.session_state.get('edit_idx') == i:
-            with st.expander(f"⚙️ ÉDITION #{num_f}", expanded=True):
-                with st.form(f"f_edit_{i}"):
-                    list_statut = ["En attente", "OK", "Terminé", "Refusé", "Annulé"]
-                    list_paiement = ["Non payé", "Payé"]
-                    
-                    idx_s = list_statut.index(s_val) if s_val in list_statut else 0
-                    idx_soc = LISTE_SOC.index(soc) if soc in LISTE_SOC else 0
+            with st.form(f"f_edit_{i}"):
+                u_pre = st.text_input("Prénom", value=p_nom)
+                u_nom = st.text_input("Nom", value=n_nom)
+                u_tel = st.text_input("Téléphone", value=tel)
+                u_paye = st.selectbox("Paiement", ["Non payé", "Payé"], index=idx_p)
+                
+                if st.form_submit_button("💾 SAUVEGARDER"):
+                    df_c.at[i, 'Prénom'] = u_pre
+                    df_c.at[i, 'Nom'] = u_nom
+                    df_c.at[i, 'Téléphone'] = u_tel
+                    df_c.at[i, 'Paiement'] = u_paye
+                    sauvegarder_data(df_c, "contacts.json")
+                    st.session_state.edit_idx = None
+                    st.rerun()
 
-                    u_pre = st.text_input("Prénom", value=p_nom)
-                    u_nom = st.text_input("Nom", value=n_nom)
-                    u_soc = st.selectbox("Société", LISTE_SOC, index=idx_soc)
-                    u_tel = st.text_input("Téléphone", value=tel)
-                    u_paye = st.selectbox("Paiement", list_paiement, index=idx_p) # Utilise l'idx_p calculé plus haut
-                    
-                    if st.form_submit_button("💾 SAUVEGARDER"):
-                        df_c.at[i, 'Prénom'] = u_pre
-                        df_c.at[i, 'Nom'] = u_nom
-                        df_c.at[i, 'Société'] = u_soc
-                        df_c.at[i, 'Téléphone'] = u_tel
-                        df_c.at[i, 'Paiement'] = u_paye
-                        sauvegarder_data(df_c, "contacts.json")
-                        st.session_state.edit_idx = None
-                        st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION CORRIGÉE) ---
 # =================================================================
