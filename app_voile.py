@@ -135,94 +135,62 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 if st.session_state.page == "CONTACTS":
     st.title("📇 Vesta Skipper 2026")
 
-    # --- 1. FILTRAGE (Inversé pour retrouver tes 16 fiches en cours) ---
+    # --- 1. FILTRAGE ---
     mask_arch = (
         (df_c['Statut'].astype(str).str.upper().str.contains("OK|TERMINÉ", na=False)) & 
         (df_c['Paiement'].astype(str).str.upper().str.contains("PAYÉ", na=False))
     )
     
-    # On bascule les 19 dossiers dans "En cours" pour corriger ton inversion
+    # On ajuste pour tes 16 fiches en cours
     df_active = df_c[mask_arch]  
     df_arch = df_c[~mask_arch]   
 
     tab_encours, tab_archives = st.tabs(["⛵ EN COURS", "📦 ARCHIVES"])
 
     with tab_encours:
-        if df_active.empty:
-            st.info("Aucun dossier actif.")
-        else:
-            for i, r in df_active.iterrows():
-                # --- PRÉPARATION DES DONNÉES ---
-                nom_p = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}"
-                soc = str(r.get('Société','PARTICULIER')).upper()
-                date = str(r.get('DateNav','--/--/--'))
-                prix = str(r.get('Prix','0'))
-                tel = str(r.get('Téléphone','')).strip()
-                mail = str(r.get('Email','')).strip()
-                jours = str(r.get('Nbre de jours','1'))
-                pers = str(r.get('Nbre de personnes','1'))
+        for i, r in df_active.iterrows():
+            # --- DONNÉES ---
+            nom = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}"
+            soc = str(r.get('Société','PARTICULIER')).upper()
+            date = str(r.get('DateNav','--/--/--'))
+            prix = str(r.get('Prix','0'))
+            tel = str(r.get('Téléphone','')).strip()
+            mail = str(r.get('Email','')).strip()
+            
+            # --- STYLE VISUEL (COULEURS) ---
+            s_val = str(r.get('Statut','En attente')).upper()
+            p_val = str(r.get('Paiement','Non payé')).upper()
+            
+            # On utilise une barre de couleur simple en haut de chaque fiche
+            color = "🟢" if "OK" in s_val else "🔵" if "CMN" in soc else "🟡"
+            
+            # --- AFFICHAGE NATIF (SANS RISQUE DE BUG DIV) ---
+            with st.container(border=True):
+                st.markdown(f"### {color} {nom}")
+                st.caption(f"🏢 {soc} | 🏷️ {s_val} | 💳 {p_val}")
                 
-                # Couleurs selon Statut
-                s_val = str(r.get('Statut','En attente')).upper()
-                p_val = str(r.get('Paiement','Non payé')).upper()
+                # Grille d'infos
+                col1, col2, col3 = st.columns(3)
+                col1.write(f"📅 **{date}**")
+                col2.write(f"💰 **{prix}€**")
+                col3.write(f"👥 **{r.get('Nbre de personnes','1')}p**")
                 
-                # Code couleur iPhone Style
-                s_bg = "#2ecc71" if "OK" in s_val or "TERM" in s_val else "#f1c40f"
-                if "REFUS" in s_val: s_bg = "#e74c3c"
-                p_bg = "#3498db" if "PAYÉ" in p_val else "#e67e22"
+                st.write(f"📞 {tel} | ✉️ {mail}")
 
-                # --- RENDU VISUEL IPHONE ---
-                st.markdown(f"""
-                <div style="background-color: #ffffff; padding: 12px; border-radius: 15px; border-left: 8px solid {s_bg}; box-shadow: 0px 4px 10px rgba(0,0,0,0.08); margin-bottom: 15px; font-family: sans-serif;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div style="width: 70%;">
-                            <div style="font-size: 1.1rem; font-weight: 800; color: #1e272e; margin-bottom: 2px;">{nom_p}</div>
-                            <div style="font-size: 0.8rem; font-weight: 600; color: #7f8c8d;">🏢 {soc}</div>
-                        </div>
-                        <div style="width: 30%; text-align: right;">
-                            <div style="background: {p_bg}; color: white; font-size: 0.65rem; padding: 3px 8px; border-radius: 20px; font-weight: bold; display: inline-block;">{p_val}</div>
-                        </div>
-                    </div>
-                    
-                    <div style="background: #f1f2f6; border-radius: 10px; padding: 10px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
-                        <div style="text-align: center; flex: 1;">
-                            <div style="font-size: 0.65rem; color: #747d8c; text-transform: uppercase;">Date</div>
-                            <div style="font-size: 0.85rem; font-weight: bold; color: #2f3542;">{date}</div>
-                        </div>
-                        <div style="text-align: center; flex: 1; border-left: 1px solid #dfe4ea; border-right: 1px solid #dfe4ea;">
-                            <div style="font-size: 0.65rem; color: #747d8c; text-transform: uppercase;">Prix</div>
-                            <div style="font-size: 0.85rem; font-weight: bold; color: #2f3542;">{prix}€</div>
-                        </div>
-                        <div style="text-align: center; flex: 1;">
-                            <div style="font-size: 0.65rem; color: #747d8c; text-transform: uppercase;">Infos</div>
-                            <div style="font-size: 0.85rem; font-weight: bold; color: #2f3542;">{jours}j / {pers}p</div>
-                        </div>
-                    </div>
-
-                    <div style="margin-top: 10px; font-size: 0.75rem; color: #57604f; display: flex; justify-content: space-between;">
-                        <span>📞 {tel if tel else '---'}</span>
-                        <span>✉️ {mail if mail else '---'}</span>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-                # Boutons d'actions compacts
-                btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 1])
-                if btn_col1.button("✏️", key=f"ed_{i}", use_container_width=True):
+                # Boutons compacts
+                b1, b2, b3 = st.columns([1,1,2])
+                if b1.button("✏️", key=f"ed_{i}", use_container_width=True):
                     st.session_state.edit_idx = i
                     st.rerun()
-                if btn_col2.button("🗑️", key=f"del_{i}", use_container_width=True):
+                if b2.button("🗑️", key=f"del_{i}", use_container_width=True):
                     st.session_state.confirm_del_idx = i
                     st.rerun()
-                
-                t_link = tel.replace(" ", "").replace(".", "")
-                if t_link:
-                    btn_col3.link_button("💬", f"https://wa.me/{t_link}", use_container_width=True)
+                if tel:
+                    b3.link_button("💬 WhatsApp", f"https://wa.me/{tel.replace(' ','')}", use_container_width=True)
 
     with tab_archives:
-        st.subheader(f"Dossiers clôturés ({len(df_arch)})")
         for i, r in df_arch.iterrows():
-            st.markdown(f"**{r.get('Nom')}** - {r.get('DateNav')}")
+            st.text(f"📁 {r.get('Nom')} - {r.get('DateNav')}")
             if st.button("♻️ Réactiver", key=f"reac_{i}"):
                 df_c.at[i, 'Statut'] = "En attente"
                 sauvegarder_data(df_c, "contacts.json")
