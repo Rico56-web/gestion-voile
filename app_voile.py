@@ -122,10 +122,10 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
     df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
 # =================================================================
-# --- 3. PAGE CONTACTS (VERSION FINALE ULTRA-DÉTAILLÉE) ---
+# --- 3. PAGE CONTACTS (FIX AFFICHAGE HTML) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    st.markdown('<div class="main-header">📇 RÉPERTOIRE & MISSIONS VESTA</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">📇 RÉPERTOIRE & MISSIONS</div>', unsafe_allow_html=True)
 
     # --- ZONE DE RECHERCHE ---
     with st.expander("🔍 RECHERCHER UN CONTACT", expanded=True):
@@ -146,83 +146,68 @@ if st.session_state.page == "CONTACTS":
     if search_soc:
         df_view = df_view[df_view['Société'].str.contains(search_soc, case=False, na=False)]
 
-    # --- AFFICHAGE DES FICHES ---
     if df_view.empty:
         st.info("⚠️ Aucun résultat.")
     else:
         df_view = df_view.sort_values('Nom')
         
         for i, r in df_view.iterrows():
-            # 1. Extraction et Nettoyage des données
+            # Nettoyage des données
             nom_f = f"{str(r.get('Prénom', '')).capitalize()} {str(r.get('Nom', '')).upper()}"
             soc = str(r.get('Société', 'PARTICULIER')).upper()
             tel = str(r.get('Téléphone', '')).strip().replace(' ', '').replace('.', '')
             mail_val = str(r.get('Email', '')).strip()
             mail_display = mail_val if mail_val not in ['nan', '', 'None'] else "Non renseigné"
             
-            # Détails Mission
-            date_v = r.get('DateNav', 'N/A')
-            prix = r.get('Prix', '0')
-            nb_j = r.get('NbreJours', '1')
-            nb_p = r.get('NbrePers', '-')
-            if str(nb_p).lower() == 'none': nb_p = '-'
-            
-            # Gestion du Statut (Couleurs & Texte)
-            statut_raw = str(r.get('Statut', 'En attente')).strip()
+            # Formattage Nombres (pour éviter le .0)
+            try:
+                nb_p = int(float(r.get('NbrePers', 0))) if pd.notnull(r.get('NbrePers')) else "-"
+                nb_j = int(float(r.get('NbreJours', 1))) if pd.notnull(r.get('NbreJours')) else "1"
+            except:
+                nb_p, nb_j = "-", "1"
+
+            # Statut & Couleurs
+            statut_raw = str(r.get('Statut', 'En attente')).strip().upper()
             s_low = statut_raw.lower()
-            if "ok" in s_low:
-                statut_color, statut_label = "#2ecc71", "✅ OK"
-            elif "attente" in s_low:
-                statut_color, statut_label = "#f1c40f", "⏳ EN ATTENTE"
-            elif "refus" in s_low:
-                statut_color, statut_label = "#e74c3c", "❌ REFUSÉ"
-            else:
-                statut_color, statut_label = "#95a5a6", statut_raw.upper()
+            st_col = "#2ecc71" if "OK" in s_low or "TERM" in s_low else "#f1c40f" if "ATTENTE" in s_low else "#e74c3c" if "REFUS" in s_low else "#95a5a6"
 
-            # Gestion du Paiement
             paiement = str(r.get('Paiement', 'À payer')).upper()
-            is_paye = "PAY" in paiement and "NON" not in paiement
-            color_paye = "#2ecc71" if is_paye else "#e67e22"
-            label_paye = "PAYÉ" if is_paye else "À PAYER"
+            pay_col = "#2ecc71" if "PAY" in paiement and "NON" not in paiement else "#e67e22"
+            pay_lab = "PAYÉ" if "PAY" in paiement and "NON" not in paiement else "À PAYER"
 
-            # 2. CARTE DESIGN IPHONE
-            st.markdown(f"""
-            <div style="border: 1px solid #ddd; border-left: 12px solid {'#0056b3' if 'CMN' in soc else '#1a2a6c'}; padding: 15px; border-radius: 15px; background: white; margin-bottom: 12px; box-shadow: 0px 4px 8px rgba(0,0,0,0.1); color: black;">
+            # --- LA CARTE HTML (CORRIGÉE) ---
+            card_html = f"""
+            <div style="border: 1px solid #ddd; border-left: 12px solid {'#0056b3' if 'CMN' in soc else '#1a2a6c'}; 
+                        padding: 15px; border-radius: 15px; background: white; margin-bottom: 12px; 
+                        box-shadow: 0px 4px 8px rgba(0,0,0,0.1); color: black;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <span style="color: #666; font-weight: bold; font-size: 0.75rem;">🏢 {soc}</span>
-                    <span style="background: {color_paye}; color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.65rem; font-weight: bold;">{label_paye}</span>
+                    <span style="background: {pay_col}; color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.65rem; font-weight: bold;">{pay_lab}</span>
                 </div>
-                
                 <div style="font-size: 1.3rem; font-weight: bold; margin-bottom: 12px; color: #1a2a6c;">{nom_f}</div>
-                
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f8f9fa; padding: 10px; border-radius: 10px; font-size: 0.9rem;">
-                    <div>📅 <b>{date_v}</b></div>
-                    <div>💰 <b>{prix} €</b></div>
+                    <div>📅 <b>{r.get('DateNav', 'N/A')}</b></div>
+                    <div>💰 <b>{r.get('Prix', '0')} €</b></div>
                     <div>⛵ <b>{nb_j} jour(s)</b></div>
                     <div>👥 <b>{nb_p} pers.</b></div>
                 </div>
-                
-                <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 0.95rem;">Statut : <b style="color: {statut_color};">{statut_label}</b></div>
+                <div style="margin-top: 12px; font-size: 0.95rem;">
+                    Statut : <b style="color: {st_col};">{statut_raw}</b>
                 </div>
-                
                 <div style="margin-top: 10px; font-size: 0.9rem; color: #444; border-top: 1px solid #eee; padding-top: 10px;">
                     📱 {r.get('Téléphone', 'N/A')}<br>
                     📧 <span style="font-size: 0.8rem;">{mail_display}</span>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """
+            st.markdown(card_html, unsafe_allow_html=True)
 
-            # 3. BOUTONS D'ACTION (3 COLONNES)
+            # --- BOUTONS D'ACTION ---
             c1, c2, c3 = st.columns(3)
             if len(tel) > 5:
-                # Appel
                 c1.markdown(f'<a href="tel:{tel}" style="text-decoration:none;"><div style="background:#2ecc71; color:white; padding:12px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.7rem;">📞 APPEL</div></a>', unsafe_allow_html=True)
-                # WhatsApp
-                wa_num = tel if not tel.startswith('0') else "33" + tel[1:]
-                c2.markdown(f'<a href="https://wa.me/{wa_num}" style="text-decoration:none;"><div style="background:#25D366; color:white; padding:12px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.7rem;">💬 WA</div></a>', unsafe_allow_html=True)
-            
-            # Email
+                wa_n = tel if not tel.startswith('0') else "33" + tel[1:]
+                c2.markdown(f'<a href="https://wa.me/{wa_n}" style="text-decoration:none;"><div style="background:#25D366; color:white; padding:12px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.7rem;">💬 WA</div></a>', unsafe_allow_html=True)
             if mail_val not in ['nan', '', 'None']:
                 c3.markdown(f'<a href="mailto:{mail_val}" style="text-decoration:none;"><div style="background:#3498db; color:white; padding:12px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.7rem;">✉️ EMAIL</div></a>', unsafe_allow_html=True)
             
