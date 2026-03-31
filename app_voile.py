@@ -193,24 +193,26 @@ for i, r in df_disp.iterrows():
             <div style="font-size:0.75rem; color:#2980b9;">📞 {tel if tel else "Non renseigné"}</div>
             {btn_html}
             </div>"""
-
+# --- BLOC DANS LA BOUCLE FOR (8 espaces au début) ---
         st.markdown(card_html, unsafe_allow_html=True)
 
         c_ed, c_del = st.columns(2)
         if c_ed.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
             st.session_state.edit_idx = i
             st.rerun()
+            
         if c_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
             st.session_state.confirm_del_idx = i
             st.rerun()
 
-# <--- REVIENS TOUT À GAUCHE ICI (ZÉRO ESPACE)
+# --- FIN DU BLOC CONTACTS (On revient tout à gauche, 0 espace) ---
 
 # =================================================================
 # --- 6. PAGE PLANNING ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Vesta 2026")
+       
     
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
