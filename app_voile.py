@@ -206,7 +206,8 @@ for i, r in df_disp.iterrows():
 # =================================================================
 # --- 6. PAGE PLANNING ---
 # =================================================================
-elif st.session_state.page == "PLANNING":
+
+   elif st.session_state.page == "PLANNING":
     st.subheader("🗓️ Planning Vesta 2026")
     
     maintenant = datetime.now()
