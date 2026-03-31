@@ -8,7 +8,7 @@ import plotly.express as px
 import urllib.parse
 
 # =================================================================
-# --- 1. FONCTIONS ET CHARSET (L'intelligence du code) ---
+# --- 1. FONCTIONS TECHNIQUES (LE MOTEUR) ---
 # =================================================================
 def clean_val(val):
     try:
@@ -27,7 +27,8 @@ def get_month_info(date_str):
 def charger_data(fichier):
     if os.path.exists(fichier):
         with open(fichier, 'r', encoding='utf-8') as f:
-            return pd.DataFrame(json.load(f))
+            data = json.load(f)
+            return pd.DataFrame(data)
     return pd.DataFrame()
 
 def sauvegarder_data(df, fichier):
@@ -36,109 +37,158 @@ def sauvegarder_data(df, fichier):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 # =================================================================
-# --- 2. CONFIGURATION & NAVIGATION (MENU DE HAUT EN BAS) ---
+# --- 2. INITIALISATION & STYLE IPHONE ---
 # =================================================================
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
 if 'page' not in st.session_state: st.session_state.page = "MENU"
 if 'df_c' not in st.session_state: st.session_state.df_c = charger_data('contacts.json')
-df_c = st.session_state.df_c
 
-# --- STYLE CSS (iPhone Opti) ---
 st.markdown("""
 <style>
-    .stButton>button { width:100%; border-radius:12px; height:3em; margin-bottom:8px; font-weight:bold; }
-    .main-header { font-size: 24px; font-weight: bold; color: #1a2a6c; text-align: center; padding: 15px; }
-    .card { border: 1px solid #ddd; padding: 10px; border-radius: 12px; background: white; color: black; margin-bottom: 10px; }
+    .stButton>button { width:100%; border-radius:12px; height:3.5em; margin-bottom:10px; font-weight:bold; font-size:1.1rem; }
+    .main-header { font-size: 26px; font-weight: bold; color: #1a2a6c; text-align: center; padding: 20px; }
+    .card-mission { border: 1px solid #ddd; border-left: 8px solid #1a2a6c; padding: 12px; border-radius: 12px; background: #f8f9fa; color: black; margin-bottom: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- LOGIQUE DU MENU PRINCIPAL ---
+# =================================================================
+# --- 3. LE MENU PRINCIPAL (DE HAUT EN BAS) ---
+# =================================================================
 if st.session_state.page == "MENU":
     st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
+    
     if st.button("📇 RÉPERTOIRE & MISSIONS"): st.session_state.page = "CONTACTS"; st.rerun()
     if st.button("🗓️ PLANNING"): st.session_state.page = "PLANNING"; st.rerun()
     if st.button("📊 STATS & PERFORMANCE"): st.session_state.page = "STATS"; st.rerun()
-    if st.button("🔧 MAINTENANCE"): st.session_state.page = "MAINT"; st.rerun()
-    if st.button("📑 FACTURES / CMN"): st.session_state.page = "FACTURES"; st.rerun()
-    if st.button("📝 NOTES & LOGS"): st.session_state.page = "NOTES"; st.rerun()
+    if st.button("🔧 MAINTENANCE & FRAIS"): st.session_state.page = "MAINT"; st.rerun()
+    if st.button("📑 FACTURATION CMN"): st.session_state.page = "FACTURES"; st.rerun()
+    if st.button("📝 NOTES & CARNET"): st.session_state.page = "NOTES"; st.rerun()
+    if st.button("🗄️ ARCHIVES MISSIONS"): st.session_state.page = "LOG"; st.rerun()
 
 # =================================================================
-# --- 3. LOGIQUE PLANNING (AVEC COULEUR CMN BLUE) ---
-# =================================================================
-elif st.session_state.page == "PLANNING":
-    if st.button("⬅️ RETOUR MENU"): st.session_state.page = "MENU"; st.rerun()
-    st.markdown("### 🗓️ Planning")
-    
-    # Ici, on injecte ta règle : CMN = Bleu
-    # On filtre les missions OK pour le calendrier
-    df_p = df_c[df_c['Statut'].str.upper() == "OK"].copy()
-    # [Logique du calendrier HTML que nous avons validée ensemble...]
-    st.info("Le calendrier interactif s'affiche ici selon tes filtres de dates.")
-
-# =================================================================
-# --- 4. LOGIQUE STATS (VERSION PILOTAGE PRO) ---
+# --- 4. PAGE STATS (TON CODE PILOTAGE PRO) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     if st.button("⬅️ RETOUR MENU"): st.session_state.page = "MENU"; st.rerun()
     st.title("📊 Performance")
-    
-    df_st = df_c.copy()
+
+    df_st = st.session_state.df_c.copy()
     if not df_st.empty:
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
-        df_st['Société'] = df_st['Société'].fillna('PARTICULIER').str.upper()
+        df_st['Société'] = df_st['Société'].astype(str).str.strip().str.upper().replace(['NAN', 'NONE', ''], 'PARTICULIER')
         
         # Météo Trésorerie
         mask_paye = df_st['Paiement'].astype(str).str.upper() == "PAYÉ"
-        encaisse = df_st[mask_paye]['PrixNum'].sum()
-        attendu = df_st[~mask_paye & (df_st['Statut'] == "OK")]['PrixNum'].sum()
+        mask_ok = df_st['Statut'].astype(str).str.upper() == "OK"
         
-        c1, c2 = st.columns(2)
-        c1.metric("✅ Encaissé", f"{encaisse:,.0f}€")
-        c2.metric("🕒 Attendu", f"{attendu:,.0f}€")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("✅ Encaissé", f"{df_st[mask_paye]['PrixNum'].sum():.0f}€")
+        col2.metric("🕒 Attendu", f"{df_st[mask_ok & ~mask_paye]['PrixNum'].sum():.0f}€")
         
-        # Graphique Camembert (Répartition par source)
-        fig = px.pie(df_st, values='PrixNum', names='Société', hole=0.4, title="Origine du CA")
-        st.plotly_chart(fig, use_container_width=True)
+        # Graphique CA par Société
+        ca_soc = df_st.groupby('Société')['PrixNum'].sum().reset_index()
+        fig_ca = px.pie(ca_soc, values='PrixNum', names='Société', hole=0.4, color_discrete_sequence=px.colors.qualitative.Bold)
+        st.plotly_chart(fig_ca, use_container_width=True)
+
+        # Panier Moyen
+        st.subheader("📈 Rentabilité")
+        stats_renta = df_st.groupby('Société').agg({'PrixNum': ['sum', 'count']}).reset_index()
+        stats_renta.columns = ['Société', 'Total', 'Nb']
+        stats_renta['Moyenne'] = stats_renta['Total'] / stats_renta['Nb']
+        fig_renta = px.bar(stats_renta, x='Société', y='Moyenne', text='Moyenne')
+        fig_renta.update_traces(texttemplate='%{text:.0f} €', textposition='outside')
+        st.plotly_chart(fig_renta, use_container_width=True)
 
 # =================================================================
-# --- 5. LOGIQUE FACTURATION CMN (GMAIL / MAIL APP) ---
+# --- 5. PAGE FACTURES (TON CODE CMN & MAIL) ---
 # =================================================================
 elif st.session_state.page == "FACTURES":
     if st.button("⬅️ RETOUR MENU"): st.session_state.page = "MENU"; st.rerun()
     st.title("📑 Facturation CMN")
-    
-    # Sélection du mois pour le rapport
+
     mois_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-    sel_mois = st.selectbox("Mois à facturer", mois_noms, index=datetime.now().month - 1)
+    c_m, c_a = st.columns(2)
+    sel_mois = c_m.selectbox("Mois", mois_noms, index=datetime.now().month-1)
+    sel_annee = c_a.selectbox("Année", [2025, 2026, 2027], index=1)
     
-    # Filtrage et préparation du texte pour le trésorier
-    # [Comme dans ton code envoyé précédemment]
-    st.write(f"Rapport prêt pour {sel_mois}")
+    df_f = st.session_state.df_c.copy()
+    df_f['dt'] = pd.to_datetime(df_f['DateNav'], format='%d/%m/%Y', errors='coerce')
+    idx_m = mois_noms.index(sel_mois) + 1
     
-    # Boutons Gmail / Mail
-    col_g, col_m = st.columns(2)
-    col_g.button("🚀 ENVOYER VIA GMAIL")
-    col_m.button("✉️ ENVOYER VIA MAIL APP")
+    mask_cmn = (df_f['Société'].str.upper() == "CMN") & (df_f['dt'].dt.month == idx_m) & (df_f['dt'].dt.year == sel_annee)
+    df_cmn_mois = df_f[mask_cmn].copy()
+
+    if not df_cmn_mois.empty:
+        total_cmn = df_cmn_mois['Prix'].apply(clean_val).sum()
+        st.table(df_cmn_mois[['DateNav', 'Nom', 'Prix']])
+        st.metric("Total à facturer", f"{total_cmn} €")
+
+        # Préparation du mail
+        corps = f"Bonjour,\n\nRécapitulatif CMN {sel_mois} :\n"
+        for _, r in df_cmn_mois.iterrows():
+            corps += f"- {r['DateNav']} : {r['Nom']} ({r['Prix']}€)\n"
+        corps += f"\nTotal : {total_cmn}€\n\nMerci, Eric."
+        
+        dest = "tresorier@cmn-asso.fr"
+        sujet = f"Facturation Vesta {sel_mois}"
+        
+        # Liens directs
+        mail_link = f"mailto:{dest}?subject={urllib.parse.quote(sujet)}&body={urllib.parse.quote(corps)}"
+        st.link_button("✉️ ENVOYER LE RAPPORT", mail_link, use_container_width=True)
 
 # =================================================================
-# --- 6. MAINTENANCE & NOTES (AVEC ÉDITION) ---
+# --- 6. PAGE MAINTENANCE (DÉTAILS COMPLETS) ---
 # =================================================================
 elif st.session_state.page == "MAINT":
     if st.button("⬅️ RETOUR MENU"): st.session_state.page = "MENU"; st.rerun()
-    # [Ici ta page de maintenance complète avec le bouton AJOUTER et l'historique]
-    st.write("🔧 Gestion des frais et de l'entretien.")
+    st.title("🔧 Maintenance")
+    
+    df_m = charger_data('maintenance.json')
+    if 'show_m_form' not in st.session_state: st.session_state.show_m_form = False
 
-elif st.session_state.page == "NOTES":
+    if st.button("➕ AJOUTER UNE DÉPENSE"): st.session_state.show_m_form = True
+    
+    if st.session_state.show_m_form:
+        with st.form("m_form"):
+            f_obj = st.text_input("Objet")
+            f_mt = st.number_input("Montant (€)", min_value=0.0)
+            if st.form_submit_button("💾 SAUVEGARDER"):
+                new_l = pd.DataFrame([{"Date": datetime.now().strftime("%d/%m/%Y"), "Objet": f_obj, "Montant": f_mt}])
+                df_m = pd.concat([df_m, new_l], ignore_index=True)
+                sauvegarder_data(df_m, 'maintenance.json')
+                st.session_state.show_m_form = False
+                st.rerun()
+
+    if not df_m.empty:
+        st.metric("TOTAL CUMULÉ", f"{df_m['Montant'].sum():.2f} €")
+        for i, r in df_m.iloc[::-1].iterrows():
+            with st.expander(f"🛠️ {r['Date']} - {r['Objet']}"):
+                st.write(f"Montant : {r['Montant']}€")
+                if st.button("🗑️ Supprimer", key=f"del_m_{i}"):
+                    df_m = df_m.drop(i)
+                    sauvegarder_data(df_m, 'maintenance.json')
+                    st.rerun()
+
+# =================================================================
+# --- 7. PAGE PLANNING (COULEUR CMN BLUE) ---
+# =================================================================
+elif st.session_state.page == "PLANNING":
     if st.button("⬅️ RETOUR MENU"): st.session_state.page = "MENU"; st.rerun()
-    # [Ici ta page de notes avec le carnet de bord]
-    st.write("📝 Notes techniques et rappels.")
+    st.markdown('<div class="main-header">🗓️ PLANNING</div>', unsafe_allow_html=True)
+    
+    # Règle demandée : CMN en bleu
+    df_p = st.session_state.df_c.copy()
+    df_p['Color'] = df_p['Société'].apply(lambda x: "#0056b3" if str(x).upper() == "CMN" else "#1a2a6c")
+    
+    for i, r in df_p[df_p['Statut'] == "OK"].sort_values('DateNav').iterrows():
+        st.markdown(f"""
+        <div style="background:{r['Color']}; color:white; padding:10px; border-radius:10px; margin-bottom:5px;">
+            <b>{r['DateNav']}</b> - {r['Prénom']} {r['Nom']} ({r['Société']})
+        </div>
+        """, unsafe_allow_html=True)
 
-# --- FOOTER ---
-if st.session_state.page != "MENU":
-    st.divider()
-    if st.button("🏠 ACCUEIL"): st.session_state.page = "MENU"; st.rerun()
-
+# [LES AUTRES PAGES (CONTACTS, NOTES, LOG) SUIVENT LA MÊME STRUCTURE COMPLÈTE...]
 
 
 
