@@ -201,7 +201,7 @@ if st.session_state.page == "CONTACTS":
                 # ... 
                 # (Le code de la carte html que tu as déjà)
 
-with tab_archives:
+    with tab_archives:
         # LOGIQUE : Uniquement ceux qui ont fini le cycle (OK + PAYÉ)
         df_arch = df_c[(df_c['Statut'].str.contains("OK", case=False, na=False)) & 
                        (df_c['Paiement'].str.contains("Payé", case=False, na=False))]
