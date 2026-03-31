@@ -406,40 +406,30 @@ elif st.session_state.page == "PLANNING":
     c2.metric("Payé", f"{ca_encaisse:.0f}€")
     c3.metric("Dû", f"{ca_attente:.0f}€")
 
-  # =================================================================
-# --- 7. PAGE STATS (VERSION NETTOYÉE & OPTIMISÉE) ---
+# =================================================================
+# --- 7. PAGE STATS (VERSION PILOTAGE PRO) ---
 # =================================================================
 if st.session_state.page == "STATS":
-    st.title("📊 Vesta - Pilotage & Frais")
+    st.title("📊 Vesta - Pilotage & Performance")
 
-    # --- 1. PRÉPARATION DES DONNÉES ---
+    # --- 1. PRÉPARATION ET NETTOYAGE ---
     df_st = df_c.copy()
-    
-    # --- NETTOYAGE DES DOUBLONS SOCIÉTÉ ---
     if 'Société' in df_st.columns:
-        # 1. En Majuscules + suppression des espaces (Gère CMN/Cmn, Vog/vog, etc.)
         df_st['Société'] = df_st['Société'].astype(str).str.strip().str.upper()
-        # 2. Remplacement des valeurs vides ou 'NAN' par 'PARTICULIER'
-        df_st['Société'] = df_st['Société'].replace(['NAN', '', 'NONE'], 'PARTICULIER')
-        # 3. Fusion PERSO et PARTICULIER (Optionnel : enlève cette ligne si tu veux les séparer)
-        df_st['Société'] = df_st['Société'].replace('PERSO', 'PARTICULIER')
+        df_st['Société'] = df_st['Société'].replace(['NAN', '', 'NONE', 'PERSO'], 'PARTICULIER')
 
     if not df_st.empty and 'Prix' in df_st.columns:
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
-        
-        # Extraction mois/année pour le tri
         month_data = df_st['DateNav'].apply(get_month_info)
         df_st['M_Sort'] = [x[0] for x in month_data]
         df_st['Mois'] = [x[1] for x in month_data]
         
-        # Calcul CA : Basé sur Paiement PAYÉ ou Statut OK
+        # Filtres de paiement
         mask_paye = df_st['Paiement'].astype(str).str.upper().str.strip() == "PAYÉ"
         mask_ok = df_st['Statut'].astype(str).str.upper() == "OK"
         df_st['CA_Calcul'] = df_st.apply(lambda x: x['PrixNum'] if (mask_paye[x.name] or mask_ok[x.name]) else 0.0, axis=1)
-    else:
-        df_st = pd.DataFrame(columns=['M_Sort', 'Mois', 'CA_Calcul', 'PrixNum', 'Paiement', 'Statut', 'Société'])
-
-    # Récupération Frais Maintenance
+    
+    # Récupération Frais
     df_maint_stats = charger_data('maintenance.json')
     if not df_maint_stats.empty and 'Date' in df_maint_stats.columns:
         m_data_f = df_maint_stats['Date'].apply(get_month_info)
@@ -449,74 +439,78 @@ if st.session_state.page == "STATS":
     else:
         df_maint_stats = pd.DataFrame(columns=['M_Sort', 'Mois', 'FraisNum'])
 
-    # --- 2. SYNTHÈSE MENSUELLE ---
-    st.subheader("📅 Synthèse Mensuelle 2026")
+    # --- 2. RÉPARTITION DU CA (SUGGESTION PRIORITAIRE) ---
+    st.subheader("🎯 Origine des Revenus (CA)")
+    if not df_st.empty:
+        ca_par_soc = df_st.groupby('Société')['CA_Calcul'].sum().reset_index()
+        import plotly.express as px
+        fig_ca = px.pie(ca_par_soc, values='CA_Calcul', names='Société', 
+                         hole=0.4, color_discrete_sequence=px.colors.qualitative.Bold)
+        st.plotly_chart(fig_ca, use_container_width=True)
+    
+    st.divider()
+
+    # --- 3. PANIER MOYEN PAR CLIENT ---
+    st.subheader("📈 Rentabilité par Client")
+    if not df_st.empty:
+        # Calcul : Somme des prix / Nombre de missions
+        stats_renta = df_st.groupby('Société').agg({'PrixNum': ['sum', 'count']}).reset_index()
+        stats_renta.columns = ['Société', 'Total_CA', 'Nb_Missions']
+        stats_renta['Panier_Moyen'] = stats_renta['Total_CA'] / stats_renta['Nb_Missions']
+        
+        fig_renta = px.bar(stats_renta.sort_values('Panier_Moyen', ascending=False), 
+                           x='Société', y='Panier_Moyen', text='Panier_Moyen',
+                           labels={'Panier_Moyen': '€ / Mission'}, color='Société')
+        fig_renta.update_traces(texttemplate='%{text:.0f} €', textposition='outside')
+        st.plotly_chart(fig_renta, use_container_width=True)
+
+    st.divider()
+
+    # --- 4. MÉTÉO DE TRÉSORERIE ---
+    st.subheader("🌤️ Météo de Trésorerie")
+    col1, col2, col3 = st.columns(3)
+    
+    # Calculs Tréso
+    tot_encaisse = df_st[mask_paye]['PrixNum'].sum()
+    tot_attendu = df_st[mask_ok & ~mask_paye]['PrixNum'].sum()
+    tot_frais = df_maint_stats['FraisNum'].sum() if not df_maint_stats.empty else 0
+    
+    col1.metric("✅ Encaissé", f"{tot_encaisse:,.0f}€")
+    col2.metric("🕒 Attendu", f"{tot_attendu:,.0f}€")
+    col3.metric("📉 Frais", f"{tot_frais:,.0f}€", delta=f"-{tot_frais:,.0f}€", delta_color="inverse")
+
+    # Graphique Météo (Cascade/Barres)
+    treso_data = pd.DataFrame({
+        'Type': ['Déjà Encaissé', 'À Recevoir', 'Frais Engagés'],
+        'Montant': [tot_encaisse, tot_attendu, tot_frais],
+        'Couleur': ['#2ecc71', '#f1c40f', '#e74c3c']
+    })
+    fig_treso = px.bar(treso_data, x='Type', y='Montant', color='Type',
+                       color_discrete_map={'Déjà Encaissé':'#2ecc71', 'À Recevoir':'#f1c40f', 'Frais Engagés':'#e74c3c'})
+    st.plotly_chart(fig_treso, use_container_width=True)
+
+    # --- 5. SYNTHÈSE MENSUELLE (TABLEAU) ---
+    st.divider()
+    st.subheader("📅 Synthèse Mensuelle")
     stats_ca = df_st.groupby(['M_Sort', 'Mois'])['CA_Calcul'].sum().reset_index()
     stats_fr = df_maint_stats.groupby(['M_Sort', 'Mois'])['FraisNum'].sum().reset_index()
-    
     mensuel = pd.merge(stats_ca, stats_fr, on=['M_Sort', 'Mois'], how='outer').fillna(0)
     mensuel.columns = ['M_Sort', 'Mois', 'CA', 'Frais']
     mensuel = mensuel.sort_values('M_Sort')
-    mensuel['Net'] = mensuel['CA'] - mensuel['Frais']
+    mensuel['Bénéfice'] = mensuel['CA'] - mensuel['Frais']
     
     if not mensuel.empty:
-        st.table(mensuel[['Mois', 'CA', 'Frais', 'Net']].set_index('Mois').style.format("{:.0f} €"))
-    
-    st.divider()
-    
-    # --- 3. VISUALISATION GRAPHIQUE ---
-    st.subheader("📈 Analyse de l'Activité")
-    if not mensuel.empty:
-        st.write("**Évolution mensuelle (€)**")
-        chart_data = mensuel.set_index('Mois')[['CA', 'Frais']]
-        st.line_chart(chart_data, color=["#2ecc71", "#e74c3c"])
-        
-        # Répartition par Société (Désormais sans doublons)
-        if 'Société' in df_st.columns:
-            st.write("**Répartition Clients (Nombre de missions)**")
-            stats_soc = df_st['Société'].value_counts().rename_axis('Client').reset_index(name='Nombre')
-            st.dataframe(stats_soc.set_index('Client'), use_container_width=True)
-    else:
-        st.info("Données insuffisantes pour les graphiques.")
+        st.table(mensuel[['Mois', 'CA', 'Frais', 'Bénéfice']].set_index('Mois').style.format("{:.0f} €"))
 
-    # --- 4. INDICATEURS DE TRÉSORERIE ---
-    st.divider()
-    col1, col2 = st.columns(2)
-    tot_encaisse = df_st[df_st['Paiement'].astype(str).str.upper().str.strip() == "PAYÉ"]['PrixNum'].sum()
-    mask_a_venir = (df_st['Statut'].astype(str).str.upper() == "OK") & (df_st['Paiement'].astype(str).str.upper().str.strip() != "PAYÉ")
-    tot_a_venir = df_st[mask_a_venir]['PrixNum'].sum()
-    
-    col1.metric("💰 ENCAISSÉ", f"{tot_encaisse:,.0f}€")
-    col2.metric("🕒 À VENIR", f"{tot_a_venir:,.0f}€")
-
-    # --- 5. DÉTAIL MISSIONS À VENIR ---
-    st.subheader("⏳ Missions à venir (Détail)")
-    df_avenir = df_st[mask_a_venir].copy()
-
+    # --- 6. MISSIONS À VENIR ---
+    st.subheader("⏳ Détail des paiements attendus")
+    df_avenir = df_st[mask_ok & ~mask_paye].copy()
     if not df_avenir.empty:
-        tableau_mobile = df_avenir[['DateNav', 'Nom', 'PrixNum']]
-        tableau_mobile.columns = ['📅 Date', '👤 Client', '💰 €']
-        tableau_mobile['sort'] = pd.to_datetime(tableau_mobile['📅 Date'], format='%d/%m/%Y', errors='coerce')
-        tableau_mobile = tableau_mobile.sort_values('sort').drop(columns=['sort'])
-        st.table(tableau_mobile.set_index('📅 Date'))
+        tab_avenir = df_avenir[['DateNav', 'Nom', 'PrixNum']]
+        tab_avenir.columns = ['Date', 'Client', 'Prix €']
+        st.dataframe(tab_avenir.set_index('Date'), use_container_width=True)
     else:
-        st.info("Aucune mission en attente de paiement.")
-
-    # --- 6. ARCHIVAGE ---
-    st.divider()
-    with st.expander("📁 Archivage de la Saison"):
-        annee_archive = datetime.now().year
-        if st.button(f"📦 ARCHIVER LES MISSIONS {annee_archive}", use_container_width=True):
-            mask_arch = df_c['Statut'].isin(["Terminé", "Refusé"])
-            df_a_archiver = df_c[mask_arch]
-            df_qui_reste = df_c[~mask_arch]
-            
-            if not df_a_archiver.empty:
-                sauvegarder_data(df_a_archiver, f"archives_{annee_archive}.json")
-                sauvegarder_data(df_qui_reste, "contacts.json")
-                st.success("Archive créée avec succès !")
-                time.sleep(1)
-                st.rerun()  
+        st.info("Tout est à jour !")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION OPTIMISÉE IPHONE 2026) ---
 # =================================================================
