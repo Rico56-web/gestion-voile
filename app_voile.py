@@ -134,23 +134,24 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 if st.session_state.page == "CONTACTS":
     st.title("📇 Annuaire Clients")
 
-    # --- A. LOGIQUE DE FILTRAGE (AVANT LES ONGLETS) ---
-    # Un dossier est archivé UNIQUEMENT s'il est "OK" ET "PAYÉ"
-    # On utilise .str.contains avec case=False pour être souple sur la casse
-    mask_archives = (df_c['Statut'].str.contains("OK", case=False, na=False)) & \
-                    (df_c['Paiement'].str.contains("Payé", case=False, na=False))
-    
-        df_active = df_c[mask_archives]    # <--- Enlever le ~ ici
-        df_arch = df_c[~mask_archives]      # <--- Ajouter le ~ ici
+ # --- A. LOGIQUE DE FILTRAGE (AVANT LES ONGLETS) ---
+# Tout ce bloc doit être aligné au même niveau (tout à gauche)
+mask_archives = (df_c['Statut'].str.contains("OK", case=False, na=False)) & \
+                (df_c['Paiement'].str.contains("Payé", case=False, na=False))
 
-    # --- B. BARRE DE RECHERCHE (S'applique à l'onglet actif) ---
-    search = st.text_input("🔍 Rechercher un nom ou une société...", "").upper()
-    if search:
-        df_active = df_active[df_active['Nom'].str.contains(search, na=False) | df_active['Société'].str.contains(search, na=False)]
-        df_arch = df_arch[df_arch['Nom'].str.contains(search, na=False) | df_arch['Société'].str.contains(search, na=False)]
+# ICI : PAS D'ESPACES AU DÉBUT DE LA LIGNE
+df_active = df_c[mask_archives]    
+df_arch = df_c[~mask_archives]     
 
-    # --- C. AFFICHAGE DES ONGLETS ---
-    tab_encours, tab_archives = st.tabs(["⛵ EN COURS", "📦 ARCHIVES"])
+# --- B. BARRE DE RECHERCHE ---
+# Aligné aussi tout à gauche
+search = st.text_input("🔍 Rechercher un nom ou une société...", "").upper()
+if search:
+    df_active = df_active[df_active['Nom'].str.contains(search, na=False) | df_active['Société'].str.contains(search, na=False)]
+    df_arch = df_arch[df_arch['Nom'].str.contains(search, na=False) | df_arch['Société'].str.contains(search, na=False)]
+
+# --- C. AFFICHAGE DES ONGLETS ---
+tab_encours, tab_archives = st.tabs(["⛵ EN COURS", "📦 ARCHIVES"])
 
     # --- ONGLET : EN COURS ---
     with tab_encours:
