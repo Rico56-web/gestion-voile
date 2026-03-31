@@ -1,131 +1,194 @@
-import requests, base64, json, time, calendar
 import streamlit as st
 import pandas as pd
+import pandas.io.json as pdjson
 import os
-import html
-from datetime import datetime, date
+import json
+from datetime import datetime
+import time
 
 # =================================================================
-# --- 1. FONCTIONS OUTILS (CENTRALISÉES) ---
-# =================================================================
-
-def get_month_info(date_str):
-    try:
-        parts = str(date_str).split('/')
-        if len(parts) >= 2:
-            m_num = int(parts[1])
-            months = ["Janv", "Févr", "Mars", "Avril", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"]
-            return m_num, f"{m_num:02d}-{months[m_num-1]}"
-    except: pass
-    return 99, "99-Inconnu"
-
-def clean_val(val):
-    try:
-        if val is None or str(val).lower() in ["nan", "none", ""]: return 0.0
-        s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
-        return float(s.replace(",", "."))
-    except: return 0.0
-
-def safe(val):
-    if val is None or str(val).lower() in ["nan", "none"]: return ""
-    return str(val).strip()
-
-# =================================================================
-# --- 2. CONFIGURATION & STYLE ---
+# --- 1. CONFIGURATION & CHARGEMENT ---
 # =================================================================
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
-now = datetime.now()
-jours_fr = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
-mois_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-date_bandeau = f"📅 {jours_fr[now.weekday()]} {now.day} {mois_fr[now.month-1]} {now.year}"
+def charger_data(fichier):
+    if os.path.exists(fichier):
+        with open(fichier, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return pd.DataFrame(data)
+    return pd.DataFrame()
 
-st.markdown(f"""<style>
-    .main-header {{ font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 5px; }}
-    .date-header {{ text-align: center; color: #7f8c8d; font-weight: bold; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; padding-bottom: 10px; }}
-    button[data-testid="baseButton-primary"] {{ background-color: #ff4b4b !important; color: white !important; }}
-    button[data-testid="baseButton-secondary"] {{ background-color: white !important; color: #1a2a6c !important; border: 1px solid #1a2a6c !important; }}
-</style>""", unsafe_allow_html=True)
+def sauvegarder_data(df, fichier):
+    df.to_json(fichier, orient='records', force_ascii=False, indent=4)
+
+# Initialisation des données
+df_c = charger_data('contacts.json')
+
+if 'page' not in st.session_state:
+    st.session_state.page = "CONTACTS"
+
+# Style Global pour mobile
+st.markdown("""
+    <style>
+    .main-header { font-size: 24px; font-weight: bold; color: #1a2a6c; margin-bottom: 20px; text-align: center; }
+    .stButton>button { border-radius: 10px; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # =================================================================
-# --- 3. SÉCURITÉ ACCÈS ---
+# --- 2. LOGIQUE DE NAVIGATION ---
 # =================================================================
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
 
-if not st.session_state.authenticated:
-    st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
-    password = st.text_input("Entrez le code d'accès :", type="password")
-    if st.button("ACCÉDER"):
-        if password == "Skipper2026":
-            st.session_state.authenticated = True
+# --- PAGE : MODIFIER_CONTACT (Formulaire) ---
+if st.session_state.page == "MODIFIER_CONTACT":
+    idx = st.session_state.get('id_a_modifier')
+    if idx is not None:
+        ligne = df_c.loc[idx]
+        st.markdown(f"### 📝 Modifier : {ligne['Prénom']} {ligne['Nom']}")
+        
+        with st.form("form_edit"):
+            c1, c2 = st.columns(2)
+            new_nom = c1.text_input("Nom", value=ligne['Nom'])
+            new_pre = c2.text_input("Prénom", value=ligne['Prénom'])
+            
+            new_soc = st.selectbox("Société", ["CMN", "PARTICULIER", "CLICK", "VOG", "AUTRE"], 
+                                   index=0 if "CMN" in str(ligne['Société']).upper() else 1)
+            
+            c3, c4 = st.columns(2)
+            new_tel = c3.text_input("Téléphone", value=ligne['Téléphone'])
+            new_mai = c4.text_input("Email", value=ligne['Email'])
+            
+            c5, c6 = st.columns(2)
+            new_dat = c5.text_input("Date (JJ/MM/AAAA)", value=ligne['DateNav'])
+            new_pri = c6.number_input("Prix (€)", value=float(ligne['Prix']))
+            
+            c7, c8, c9 = st.columns(3)
+            new_sta = c7.selectbox("Statut", ["OK", "En attente", "Refusé", "Terminé"], 
+                                   index=0 if "OK" in str(ligne['Statut']).upper() else 1)
+            new_pay = c8.selectbox("Paiement", ["À payer", "Payé"], 
+                                   index=1 if "PAY" in str(ligne['Paiement']).upper() else 0)
+            new_per = c9.number_input("Nb Pers", value=int(float(ligne.get('NbrePers', 1))))
+
+            if st.form_submit_button("💾 ENREGISTRER"):
+                df_c.at[idx, 'Nom'] = new_nom
+                df_c.at[idx, 'Prénom'] = new_pre
+                df_c.at[idx, 'Société'] = new_soc
+                df_c.at[idx, 'Téléphone'] = new_tel
+                df_c.at[idx, 'Email'] = new_mai
+                df_c.at[idx, 'DateNav'] = new_dat
+                df_c.at[idx, 'Prix'] = new_pri
+                df_c.at[idx, 'Statut'] = new_sta
+                df_c.at[idx, 'Paiement'] = new_pay
+                df_c.at[idx, 'NbrePers'] = new_per
+                sauvegarder_data(df_c, "contacts.json")
+                st.success("Modifié !")
+                st.session_state.page = "CONTACTS"
+                st.rerun()
+        if st.button("⬅️ Retour"):
+            st.session_state.page = "CONTACTS"
             st.rerun()
-        else: st.error("Code incorrect.")
-    st.stop()
+
+# --- PAGE : CONTACTS (LISTE & RECHERCHE) ---
+elif st.session_state.page == "CONTACTS":
+    st.markdown('<div class="main-header">📇 RÉPERTOIRE & PLANNING</div>', unsafe_allow_html=True)
+
+    # --- RECHERCHE ---
+    with st.expander("🔍 FILTRER LES CONTACTS", expanded=False):
+        cs1, cs2 = st.columns(2)
+        search_nom = cs1.text_input("👤 Nom", value="")
+        search_soc = cs2.text_input("🏢 Société", value="")
+        if st.button("🔄 RÉINITIALISER", use_container_width=True):
+            st.rerun()
+
+    # --- PRÉPARATION & TRI CHRONOLOGIQUE ---
+    df_view = df_c.copy()
+    # Conversion date pour le tri (format JJ/MM/AAAA)
+    df_view['DateSort'] = pd.to_datetime(df_view['DateNav'], dayfirst=True, errors='coerce')
+    df_view = df_view.sort_values(by='DateSort', ascending=True)
+
+    # Filtrage
+    if search_nom:
+        df_view = df_view[df_view['Nom'].str.contains(search_nom, case=False, na=False) | 
+                         df_view['Prénom'].str.contains(search_nom, case=False, na=False)]
+    if search_soc:
+        df_view = df_view[df_view['Société'].str.contains(search_soc, case=False, na=False)]
+
+    # --- AFFICHAGE ---
+    for i, r in df_view.iterrows():
+        # Variables propres
+        nom_complet = f"{str(r.get('Prénom','')).capitalize()} {str(r.get('Nom','')).upper()}"
+        soc = str(r.get('Société','PARTICULIER')).upper()
+        tel = str(r.get('Téléphone','')).strip().replace(' ', '').replace('.','')
+        mail = str(r.get('Email','')).strip()
+        
+        # Statut & Couleurs
+        statut = str(r.get('Statut','En attente')).upper()
+        st_col = "#2ecc71" if ("OK" in statut or "TERM" in statut) else "#f1c40f" if "ATTENTE" in statut else "#e74c3c" if "REFUS" in statut else "#95a5a6"
+        
+        paiement = str(r.get('Paiement','À PAYER')).upper()
+        pay_col = "#2ecc71" if "PAY" in paiement and "NON" not in paiement else "#e67e22"
+        pay_lab = "✅ PAYÉ" if "PAY" in paiement and "NON" not in paiement else "⏳ À PAYER"
+
+        # --- FICHE HTML ---
+        card_html = f"""
+        <div style="border: 1px solid #ddd; border-left: 12px solid {'#0056b3' if 'CMN' in soc else '#1a2a6c'}; 
+                    padding: 15px; border-radius: 15px; background: white; margin-bottom: 5px; box-shadow: 0px 4px 8px rgba(0,0,0,0.1); color: black;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div style="color: #666; font-weight: bold; font-size: 0.75rem;">🏢 {soc}</div>
+                <div style="text-align: right;">
+                    <div style="background: {pay_col}; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.6rem; font-weight: bold; margin-bottom: 4px;">{pay_lab}</div>
+                    <div style="background: {st_col}; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.6rem; font-weight: bold;">{statut}</div>
+                </div>
+            </div>
+            <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 12px; color: #1a2a6c;">{nom_complet}</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f8f9fa; padding: 10px; border-radius: 10px; font-size: 0.85rem;">
+                <div>📅 <b>{r.get('DateNav','-')}</b></div>
+                <div>💰 <b>{r.get('Prix','0')} €</b></div>
+                <div>⛵ <b>{int(float(r.get('NbreJours',1)))} j.</b></div>
+                <div>👥 <b>{r.get('NbrePers','-')} pers.</b></div>
+            </div>
+            <div style="margin-top: 10px; font-size: 0.85rem; color: #444;">
+                📞 {r.get('Téléphone','-')} | ✉️ {mail if mail not in ['nan','','None'] else '-'}
+            </div>
+        </div>
+        """
+        st.markdown(card_html, unsafe_allow_html=True)
+
+        # --- ACTIONS ---
+        c1, c2, c3 = st.columns(3)
+        if len(tel) > 5:
+            c1.markdown(f'<a href="tel:{tel}" style="text-decoration:none;"><div style="background:#2ecc71; color:white; padding:10px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.65rem;">📞 APPEL</div></a>', unsafe_allow_html=True)
+            wa_n = tel if not tel.startswith('0') else "33" + tel[1:]
+            c2.markdown(f'<a href="https://wa.me/{wa_n}" style="text-decoration:none;"><div style="background:#25D366; color:white; padding:10px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.65rem;">💬 WA</div></a>', unsafe_allow_html=True)
+        if mail not in ['nan','','None']:
+            c3.markdown(f'<a href="mailto:{mail}" style="text-decoration:none;"><div style="background:#3498db; color:white; padding:10px 2px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.65rem;">✉️ EMAIL</div></a>', unsafe_allow_html=True)
+
+        g1, g2 = st.columns(2)
+        if g1.button(f"📝 Modifier", key=f"ed_{i}", use_container_width=True):
+            st.session_state.id_a_modifier = i
+            st.session_state.page = "MODIFIER_CONTACT"
+            st.rerun()
+        if g2.button(f"🗑️ Supprimer", key=f"dl_{i}", use_container_width=True):
+            st.session_state[f"confirm_{i}"] = True
+
+        if st.session_state.get(f"confirm_{i}"):
+            st.error("Confirmer ?")
+            cf1, cf2 = st.columns(2)
+            if cf1.button("OUI", key=f"y_{i}", use_container_width=True):
+                df_c = df_c.drop(i)
+                sauvegarder_data(df_c, 'contacts.json')
+                st.rerun()
+            if cf2.button("NON", key=f"n_{i}", use_container_width=True):
+                del st.session_state[f"confirm_{i}"]
+                st.rerun()
+        st.write("---")
 
 # =================================================================
-# --- 4. FONCTIONS GITHUB (DONNÉES) ---
+# --- BLOC PLANNING (À SUIVRE...) ---
 # =================================================================
-def charger_data(file):
-    try:
-        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-        url = f"https://api.github.com/repos/{repo}/contents/{file}"
-        res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
-        if res.status_code == 200:
-            content = base64.b64decode(res.json()['content']).decode('utf-8')
-            return pd.DataFrame(json.loads(content))
-        return pd.DataFrame()
-    except: return pd.DataFrame()
-
-def sauvegarder_data(df, file):
-    try:
-        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-        url = f"https://api.github.com/repos/{repo}/contents/{file}"
-        res = requests.get(url, headers={"Authorization": f"token {token}"})
-        sha = res.json().get('sha') if res.status_code == 200 else None
-        content = base64.b64encode(df.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
-        requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": f"Update {file}", "content": content, "sha": sha})
-    except: st.error(f"Erreur de sauvegarde sur {file}")
-
-# =================================================================
-# --- 5. NAVIGATION & INITIALISATION ---
-# =================================================================
-st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
-st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=True)
-
-if "page" not in st.session_state: st.session_state.page = "CONTACTS"
-
-menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES", "LOG"]
-cols = st.columns(len(menu))
-
-for i, name in enumerate(menu):
-    if cols[i].button(name, key=f"nav_{name}", use_container_width=True, 
-                      type="primary" if st.session_state.page == name else "secondary"):
-        st.session_state.page = name
-        st.rerun()
-
-# Chargement des bases
-df_c = charger_data("contacts.json")
-df_m = charger_data("maintenance.json")
-
-# Harmonisation auto des paiements (pour éviter le basculement "Payé")
-def harmoniser_paiements(val):
-    v = str(val).strip().lower()
-    if "pay" in v and not any(x in v for x in ["un", "non", "pas"]): return "Payé"
-    return "Non payé"
-
-if not df_c.empty and 'Paiement' in df_c.columns:
-    df_c['Paiement'] = df_c['Paiement'].apply(harmoniser_paiements)
-
-# Tri chronologique des missions
-if not df_c.empty and 'DateNav' in df_c.columns:
-    df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
-    df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
-# --- LOGIQUE DE NAVIGATION PRINCIPALE ---
-if st.session_state.page == "CONTACTS":
-    afficher_page_contacts()  # Appelle la fonction ci-dessous
-elif st.session_state.page == "MODIFIER_CONTACT":
-    afficher_page_modifier()   # Appelle la fonction de modification ci-dessous
+elif st.session_state.page == "PLANNING":
+    st.title("⚓ Planning des Sorties")
+    # Insérer ici la logique planning...
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION OPTIMISÉE IPHONE) ---
 # =================================================================
