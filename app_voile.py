@@ -133,9 +133,10 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 # --- 5. PAGE CONTACTS (REPRISE ET CORRECTION FINALE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    st.title("📇 Vesta Skipper 2026")
+    # Titre principal plus grand
+    st.markdown("# 📇 VESTA SKIPPER 2026")
 
-    # --- 1. FILTRAGE (Règle : Seul 'TERMINÉ' + 'PAYÉ' va en archive) ---
+    # --- 1. FILTRAGE ---
     mask_est_termine = (
         (df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|TERMINE", na=False)) & 
         (df_c['Paiement'].astype(str).str.upper().str.contains("PAYÉ|PAYE", na=False))
@@ -144,6 +145,8 @@ if st.session_state.page == "CONTACTS":
     df_active = df_c[~mask_est_termine]  
     df_arch = df_c[mask_est_termine]     
 
+    # --- 2. ONGLETS GÉANTS (Via Markdown + Tabs) ---
+    # On utilise des Emojis et du texte en gras pour que ce soit très gros sur mobile
     tab_encours, tab_archives = st.tabs([f"⛵ EN COURS ({len(df_active)})", f"📦 ARCHIVES ({len(df_arch)})"])
 
     with tab_encours:
@@ -151,73 +154,74 @@ if st.session_state.page == "CONTACTS":
             st.info("Aucun dossier actif.")
         else:
             for i, r in df_active.iterrows():
-                # --- DONNÉES ---
+                # --- RÉCUPÉRATION DONNÉES ---
                 nom = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}"
                 soc = str(r.get('Société','PARTICULIER')).upper()
                 s_val = str(r.get('Statut','En attente')).upper()
                 p_val = str(r.get('Paiement','Non payé')).upper()
+                tel = str(r.get('Téléphone','')).strip()
+                mail = str(r.get('Email','')).strip()
                 coms = str(r.get('Commentaires','')).strip()
                 
-                # --- LOGIQUE VISUELLE FORTE ---
                 is_cmn = "CMN" in soc
-                # Bordure épaisse : Bleu pour CMN, Vert pour OK, Orange pour le reste
                 b_color = "#0047AB" if is_cmn else ("#27ae60" if "OK" in s_val else "#f39c12")
-                # Titre : Bleu pour CMN, Noir pour les autres
-                t_color = "#0047AB" if is_cmn else "#1e272e"
                 
-                # Couleurs des badges Streamlit
-                s_badge = "blue" if is_cmn else ("green" if "OK" in s_val else "orange")
-                p_badge = "blue" if "PAYÉ" in p_val else "orange"
-
-                # --- AFFICHAGE DE LA FICHE ---
-                # On utilise une astuce Markdown pour une bordure très visible
+                # --- FICHE VISUELLE ---
+                # Bordure épaisse et titre coloré
                 st.markdown(f"""
-                <div style="border: 3px solid {b_color}; padding: 15px; border-radius: 15px; background-color: white; margin-bottom: 5px;">
-                    <h2 style="color: {t_color}; margin: 0; font-size: 1.4rem;">{'🚢 ' if is_cmn else '👤 '}{nom}</h2>
-                    <p style="color: {b_color}; font-weight: bold; margin-bottom: 10px;">🏢 {soc}</p>
+                <div style="border: 4px solid {b_color}; padding: 15px; border-radius: 15px; background-color: white; margin-bottom: 5px;">
+                    <h2 style="color: {b_color}; margin: 0; font-size: 1.5rem;">{'🚢 ' if is_cmn else '👤 '}{nom}</h2>
+                    <p style="font-size: 1rem; font-weight: bold; margin: 5px 0;">🏢 {soc}</p>
+                    <hr style="border: 1px solid #eee; margin: 10px 0;">
+                    <p style="font-size: 0.9rem; margin: 5px 0;">📞 <b>{tel if tel else '---'}</b></p>
+                    <p style="font-size: 0.9rem; margin: 5px 0;">📧 <b>{mail if mail else '---'}</b></p>
                 </div>
                 """, unsafe_allow_html=True)
 
                 with st.container(border=True):
+                    # Statuts en couleur
                     c_status, c_pay = st.columns(2)
-                    c_status.markdown(f":{s_badge}[**● STATUT : {s_val}**]")
-                    c_pay.markdown(f":{p_badge}[**● PAIEMENT : {p_val}**]")
+                    c_status.markdown(f":blue[**● STATUT : {s_val}**]" if is_cmn else f":green[**● STATUT : {s_val}**]")
+                    c_pay.markdown(f":blue[**● PAIEMENT : {p_val}**]" if "PAYÉ" in p_val else f":orange[**● PAIEMENT : {p_val}**]")
                     
-                    st.divider()
-                    
-                    # Grille d'infos avec fond grisé pour ressortir
+                    # Grille d'infos (Metrics)
                     col1, col2, col3 = st.columns(3)
                     col1.metric("📅 Date", r.get('DateNav','--'))
                     col2.metric("💰 Prix", f"{r.get('Prix','0')}€")
                     col3.metric("👥 Pers.", f"{r.get('Nbre de personnes','1')}")
                     
-                    st.write(f"⏳ **Durée :** {r.get('Nbre de jours','1')} jour(s)")
-                    st.write(f"📞 {r.get('Téléphone','---')} | ✉️ {r.get('Email','---')}")
-                    
                     if coms and coms.lower() != "nan":
                         st.warning(f"💬 **NOTE :** {coms}")
 
-                    # Boutons d'actions
-                    b1, b2, b3 = st.columns([1,1,2])
-                    if b1.button("✏️", key=f"ed_{i}", use_container_width=True):
+                    # --- LES 3 BOUTONS DE CONTACT + ACTIONS ---
+                    st.write("**📱 ACTIONS RAPIDES**")
+                    t_link = tel.replace(" ","").replace(".","")
+                    
+                    row1_col1, row1_col2, row1_col3 = st.columns(3)
+                    if t_link:
+                        row1_col1.link_button("📞 APPEL", f"tel:{t_link}", use_container_width=True)
+                        row1_col2.link_button("💬 WA", f"https://wa.me/{t_link}", use_container_width=True)
+                    if mail:
+                        row1_col3.link_button("📧 MAIL", f"mailto:{mail}", use_container_width=True)
+
+                    st.write("**⚙️ GESTION**")
+                    row2_col1, row2_col2 = st.columns(2)
+                    if row2_col1.button("✏️ Modifier", key=f"ed_{i}", use_container_width=True):
                         st.session_state.edit_idx = i
                         st.rerun()
-                    if b2.button("🗑️", key=f"del_{i}", use_container_width=True):
+                    if row2_col2.button("🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
                         st.session_state.confirm_del_idx = i
                         st.rerun()
-                    
-                    tel = str(r.get('Téléphone','')).replace(" ","").replace(".","")
-                    if tel:
-                        b3.link_button("💬 WhatsApp", f"https://wa.me/{tel}", use_container_width=True)
                 
-                st.write("") # Espace entre les fiches
+                st.write("---") # Séparateur entre les fiches
 
     # --- ONGLET ARCHIVES ---
     with tab_archives:
+        st.subheader("Dossiers clôturés")
         for i, r in df_arch.iterrows():
             with st.container(border=True):
                 st.write(f"📁 **{r.get('Nom')}** - {r.get('DateNav')}")
-                if st.button("♻️ Réactiver", key=f"reac_{i}"):
+                if st.button("♻️ Réactiver", key=f"reac_{i}", use_container_width=True):
                     df_c.at[i, 'Statut'] = "En attente"
                     sauvegarder_data(df_c, "contacts.json")
                     st.rerun()
