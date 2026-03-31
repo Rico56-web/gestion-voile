@@ -350,7 +350,7 @@ for i, r in df_disp.iterrows():
         except: pass
         return 99, "99-Inconnu"
 
-    df_st = df_c.copy()
+       df_st = df_c.copy()
     if not df_st.empty and 'Prix' in df_st.columns:
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
         df_st['M_Sort'], df_st['Mois'] = zip(*df_st['DateNav'].apply(get_month_info))
