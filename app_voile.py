@@ -122,102 +122,80 @@ if not df_c.empty and 'DateNav' in df_c.columns:
     df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
     df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last').drop(columns=['temp_date'])
 # =================================================================
-# --- 3. PAGE CONTACTS (VERSION COMPLÈTE AVEC RECHERCHE) ---
+# --- 3. PAGE CONTACTS (VERSION ULTRA-COMPLÈTE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    st.markdown('<div class="main-header">📇 RÉPERTOIRE VESTA 2026</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">📇 RÉPERTOIRE & MISSIONS</div>', unsafe_allow_html=True)
 
-    # --- ZONE DE RECHERCHE (OPTIMISÉE IPHONE) ---
-    with st.expander("🔍 RECHERCHER UN CONTACT", expanded=True):
-        col_search1, col_search2 = st.columns(2)
-        search_nom = col_search1.text_input("👤 Par Nom", value="", placeholder="ex: DURAND")
-        search_soc = col_search2.text_input("🏢 Par Société", value="", placeholder="ex: CMN")
+    # --- ZONE DE RECHERCHE ---
+    with st.expander("🔍 RECHERCHER UN NOM OU UNE SOCIÉTÉ", expanded=True):
+        c_s1, c_s2 = st.columns(2)
+        search_nom = c_search1.text_input("👤 Nom / Prénom", value="", placeholder="ex: DURAND")
+        search_soc = c_search2.text_input("🏢 Société", value="", placeholder="ex: CMN")
         
         if st.button("🔄 VOIR TOUTE LA LISTE", use_container_width=True):
-            # Cette commande vide les champs et rafraîchit la vue
             st.rerun()
 
     st.write("---")
 
-    # --- LOGIQUE DE FILTRAGE ---
-    # On crée une copie pour filtrer sans toucher à la base originale
-    df_look = df_c.copy()
-    
-    # Nettoyage pour la recherche (insensible à la casse)
+    # --- FILTRAGE ---
+    df_view = df_c.copy()
     if search_nom:
-        df_look = df_look[df_look['Nom'].str.contains(search_nom, case=False, na=False) | 
-                         df_look['Prénom'].str.contains(search_nom, case=False, na=False)]
-    
+        df_view = df_view[df_view['Nom'].str.contains(search_nom, case=False, na=False) | 
+                         df_view['Prénom'].str.contains(search_nom, case=False, na=False)]
     if search_soc:
-        df_look = df_look[df_look['Société'].str.contains(search_soc, case=False, na=False)]
+        df_view = df_view[df_view['Société'].str.contains(search_soc, case=False, na=False)]
 
-    # --- AFFICHAGE DES RÉSULTATS ---
-    if df_look.empty:
-        st.info("⚠️ Aucun contact trouvé pour cette recherche.")
+    # --- AFFICHAGE DES FICHES DÉTAILLÉES ---
+    if df_view.empty:
+        st.info("⚠️ Aucun résultat.")
     else:
-        # Tri alphabétique par Nom
-        df_look = df_look.sort_values('Nom')
+        df_view = df_view.sort_values('Nom')
         
-        # Compteur de résultats
-        st.caption(f"📍 {len(df_look)} contact(s) affiché(s)")
-
-        for i, r in df_look.iterrows():
-            # Préparation des données
-            nom_brut = str(r.get('Nom', '')).upper()
-            prenom_brut = str(r.get('Prénom', '')).capitalize()
-            nom_complet = f"{prenom_brut} {nom_brut}"
+        for i, r in df_view.iterrows():
+            # Extraction des données
+            nom_f = f"{r.get('Prénom', '')} {str(r.get('Nom', '')).upper()}"
+            soc = str(r.get('Société', 'PARTICULIER')).upper()
+            tel = str(r.get('Téléphone', '')).strip().replace(' ', '').replace('.', '')
+            date_v = r.get('DateNav', 'Non fixée')
+            prix = r.get('Prix', '0')
+            statut = r.get('Statut', 'En attente')
+            paiement = str(r.get('Paiement', 'Non payé')).upper()
             
-            soc_brut = str(r.get('Société', 'PARTICULIER')).upper()
-            # On enlève les espaces et caractères spéciaux du téléphone pour les liens HTML
-            tel_brut = str(r.get('Téléphone', '')).strip().replace(' ', '').replace('.', '').replace('-', '')
-            
-            # Code couleur par société
-            color_bandeau = "#0056b3" if "CMN" in soc_brut else "#1a2a6c"
+            # Couleurs dynamiques
+            color_soc = "#0056b3" if "CMN" in soc else "#1a2a6c"
+            color_paye = "#2ecc71" if "PAY" in paiement and "NON" not in paiement else "#e67e22"
 
-            # --- CARTE CONTACT HTML ---
+            # --- CARTE DESIGN ---
             st.markdown(f"""
-            <div style="border: 1px solid #eee; border-left: 8px solid {color_bandeau}; padding: 15px; border-radius: 12px; background: white; margin-bottom: 10px; box-shadow: 0px 2px 5px rgba(0,0,0,0.05);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                    <span style="color: {color_bandeau}; font-weight: bold; font-size: 0.75rem; letter-spacing: 1px;">{soc_brut}</span>
+            <div style="border: 1px solid #ddd; border-left: 10px solid {color_soc}; padding: 15px; border-radius: 12px; background: white; margin-bottom: 10px; box-shadow: 0px 2px 4px rgba(0,0,0,0.05); color: black;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: {color_soc}; font-weight: bold; font-size: 0.8rem;">🏢 {soc}</span>
+                    <span style="background: {color_paye}; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: bold;">{paiement}</span>
                 </div>
-                <div style="font-size: 1.15rem; font-weight: bold; color: #222; margin-bottom: 8px;">{nom_complet}</div>
-                <div style="font-size: 1rem; color: #444; font-weight: 500;">📱 {r.get('Téléphone', 'Non renseigné')}</div>
+                <div style="font-size: 1.2rem; font-weight: bold; margin-top: 5px;">{nom_f}</div>
+                <div style="margin: 10px 0; font-size: 0.95rem; border-top: 1px solid #eee; padding-top: 10px;">
+                    📅 <b>{date_v}</b> | 💰 <b>{prix} €</b><br>
+                    📍 Statut : <i>{statut}</i>
+                </div>
+                <div style="font-size: 1rem; color: #444;">📱 {r.get('Téléphone', '')}</div>
             </div>
             """, unsafe_allow_html=True)
 
-            # --- BOUTONS D'ACTION (LARGES POUR LE POUCE) ---
-            if len(tel_brut) > 5:
-                # On prépare le numéro international pour WhatsApp (ajoute 33 si ça commence par 0)
-                wa_tel = tel_brut
-                if wa_tel.startswith('0'):
-                    wa_tel = '33' + wa_tel[1:]
-                
-                c1, c2 = st.columns(2)
-                
-                # Bouton Appel
-                btn_call = f"""
-                <a href="tel:{tel_brut}" style="text-decoration: none;">
-                    <div style="background-color: #2ecc71; color: white; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 0.9rem; margin-bottom: 20px;">
-                        📞 APPELER
-                    </div>
-                </a>
-                """
-                c1.markdown(btn_call, unsafe_allow_html=True)
-                
-                # Bouton WhatsApp
-                btn_wa = f"""
-                <a href="https://wa.me/{wa_tel}" style="text-decoration: none;">
-                    <div style="background-color: #25D366; color: white; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 0.9rem; margin-bottom: 20px;">
-                        💬 WHATSAPP
-                    </div>
-                </a>
-                """
-                c2.markdown(btn_wa, unsafe_allow_html=True)
+            # --- BOUTONS D'ACTION ---
+            if len(tel) > 5:
+                # Formatage WhatsApp (33 pour la France)
+                wa_num = tel[1:] if tel.startswith('0') else tel
+                if not wa_num.startswith('33') and len(wa_num) == 9:
+                    wa_num = "33" + wa_num
+
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    st.markdown(f'<a href="tel:{tel}" style="text-decoration:none;"><div style="background:#2ecc71; color:white; padding:12px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.9rem;">📞 APPELER</div></a>', unsafe_allow_html=True)
+                with col_btn2:
+                    st.markdown(f'<a href="https://wa.me/{wa_num}" style="text-decoration:none;"><div style="background:#25D366; color:white; padding:12px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.9rem;">💬 WHATSAPP</div></a>', unsafe_allow_html=True)
             
-            else:
-                st.warning("⚠️ Numéro de téléphone manquant ou invalide pour les actions rapides.")
-            
-            st.write("") # Petit espace entre chaque fiche
+            st.write("") # Espace entre fiches
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION OPTIMISÉE IPHONE) ---
 # =================================================================
