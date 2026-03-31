@@ -248,62 +248,80 @@ if st.session_state.page == "CONTACTS":
                             st.rerun()
             
             st.markdown('<br>', unsafe_allow_html=True)
-
 # =================================================================
-# --- 6. PAGE PLANNING (VERSION FIXÉE SANS CONFLIT) ---
+# --- 4. PAGE PLANNING (VERSION IDENTIQUE À HIER - LISTE SOUS CAL) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
     st.markdown('<div class="main-header">📅 PLANNING VESTA 2026</div>', unsafe_allow_html=True)
+    import calendar as cal_logic
+    from datetime import datetime
+
+    # --- 1. SÉLECTEUR DE MOIS (COMPACT) ---
+    c1, c2 = st.columns(2)
+    sel_m = c1.selectbox("Mois", list(range(1, 13)), index=datetime.now().month - 1)
+    sel_y = c2.selectbox("Année", [2025, 2026, 2027], index=1)
+
+    # --- 2. AFFICHAGE DU CALENDRIER VISUEL (GRILLE VIDE) ---
+    cal_mat = cal_logic.monthcalendar(sel_y, sel_m)
+    month_name = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"][sel_m-1]
     
-    # 1. On donne un nom unique au dessinateur (affiche_cal)
-    from streamlit_calendar import calendar as affiche_cal
-    import calendar as cal_logic # Et un nom unique aux calculs
-
-    # --- CSS COMPACT POUR IPHONE ---
-    st.markdown("""
-        <style>
-            .fc { max-width: 100% !important; font-size: 0.70rem !important; }
-            .fc .fc-daygrid-day-frame { min-height: 35px !important; }
-            .fc .fc-toolbar-title { font-size: 0.9rem !important; }
-            .block-container { padding: 0.5rem !important; }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # --- PRÉPARATION DES ÉVÉNEMENTS ---
-    calendar_events = []
-    for i, r in df_c.iterrows():
+    cal_html = f'<div style="text-align:center; font-weight:bold; margin-bottom:5px; color:#1a2a6c;">{month_name} {sel_y}</div>'
+    cal_html += '<table style="width:100%; border-collapse:collapse; font-size:0.8rem; text-align:center; background:white; color:black;">'
+    cal_html += '<tr style="background:#f0f2f6;"><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr>'
+    
+    # On récupère les jours occupés pour ce mois
+    jours_occupes = []
+    for _, r in df_c.iterrows():
         try:
-            d_str = str(r.get('DateNav', '')).strip()
-            if len(d_str) >= 8:
-                date_obj = pd.to_datetime(d_str, dayfirst=True)
-                date_iso = date_obj.strftime('%Y-%m-%d')
-                soc = str(r.get('Société', 'PARTICULIER')).upper()
-                nom = str(r.get('Nom', '')).upper()
-                bg_color = "#0056b3" if "CMN" in soc else "#1a2a6c"
-                
-                calendar_events.append({
-                    "title": f"{soc}-{nom}",
-                    "start": date_iso,
-                    "end": date_iso,
-                    "color": bg_color,
-                    "allDay": True
-                })
+            d_nav = pd.to_datetime(r.get('DateNav', ''), dayfirst=True)
+            if d_nav.month == sel_m and d_nav.year == sel_y:
+                jours_occupes.append(d_nav.day)
         except: continue
 
-    # --- CONFIGURATION DU CALENDRIER ---
-    calendar_options = {
-        "headerToolbar": {"left": "prev,next", "center": "title", "right": "today"},
-        "initialView": "dayGridMonth",
-        "locale": "fr",
-        "firstDay": 1,
-        "height": "auto",
-        "contentHeight": "auto"
-    }
-
-    # --- AFFICHAGE (On utilise le nouveau nom unique) ---
-    affiche_cal(events=calendar_events, options=calendar_options, key="vesta_calendar_v2")
+    for week in cal_mat:
+        cal_html += '<tr>'
+        for day in week:
+            if day == 0:
+                cal_html += '<td style="padding:8px; border:1px solid #eee;"></td>'
+            else:
+                bg = "#1a2a6c; color:white; font-weight:bold; border-radius:50%;" if day in jours_occupes else ""
+                cal_html += f'<td style="padding:8px; border:1px solid #eee;"><span style="display:inline-block; width:20px; height:20px; line-height:20px; {bg}">{day}</span></td>'
+        cal_html += '</tr>'
+    cal_html += '</table>'
+    st.markdown(cal_html, unsafe_allow_html=True)
 
     st.write("---")
+
+    # --- 3. LISTE DES MISSIONS (LE MENU LISTE QUE TU AIMES) ---
+    st.subheader(f"📋 Missions de {month_name}")
+    
+    # Filtrage des données pour le mois sélectionné
+    df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+    df_mois = df_c[(df_c['temp_date'].dt.month == sel_m) & (df_c['temp_date'].dt.year == sel_y)].sort_values('temp_date')
+
+    if df_mois.empty:
+        st.info("Aucune mission prévue pour ce mois.")
+    else:
+        for _, r in df_mois.iterrows():
+            soc = str(r.get('Société', 'PARTICULIER')).upper()
+            nom = f"{r.get('Prénom', '')} {r.get('Nom', '')}".upper()
+            date_v = r.get('DateNav', '')
+            statut = r.get('Statut', 'En attente')
+            
+            # CODE COULEUR : Bleu si CMN, sinon Marine
+            couleur_bandeau = "#0056b3" if "CMN" in soc else "#1a2a6c"
+            
+            mission_html = f"""
+            <div style="border-left:5px solid {couleur_bandeau}; padding:10px; margin-bottom:10px; background:#f8f9fa; border-radius:4px; color:black;">
+                <div style="display:flex; justify-content:space-between;">
+                    <b style="color:{couleur_bandeau};">{date_v}</b>
+                    <span style="font-size:0.8rem; font-weight:bold; color:#555;">{soc}</span>
+                </div>
+                <div style="font-size:1rem; margin-top:3px;">{nom}</div>
+                <div style="font-size:0.75rem; color:#666;">Statut: {statut}</div>
+            </div>
+            """
+            st.markdown(mission_html, unsafe_allow_html=True)
 # =================================================================
 # --- 7. PAGE STATS (VERSION RESTAURÉE & OPTIMISÉE) ---
 # =================================================================
