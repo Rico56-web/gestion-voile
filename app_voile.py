@@ -129,85 +129,142 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
 # =================================================================
-# --- 5. PAGE CONTACTS ---
+# --- 5. PAGE CONTACTS (VERSION COMPLÈTE AVEC ARCHIVES) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    st.title("📇 Annuaire Clients")
+
+    # --- A. LOGIQUE D'INTERCEPTION (MODIFIER / SUPPRIMER) ---
     
-    # Barre de recherche
-    search = st.text_input("🔍 Rechercher un nom ou une société...", "").upper()
-    df_disp = df_c[df_c['Nom'].str.contains(search, na=False) | df_c['Société'].str.contains(search, na=False)] if search else df_c
+    # Formulaire de modification
+    if st.session_state.edit_idx is not None:
+        idx = st.session_state.edit_idx
+        r = df_c.iloc[idx]
+        st.markdown(f"### ✏️ Modifier : {r.get('Nom')}")
+        with st.form("edit_form_client"):
+            col1, col2 = st.columns(2)
+            new_statut = col1.selectbox("Statut", ["En attente", "OK", "Refusé"], 
+                                       index=1 if "OK" in str(r.get('Statut')).upper() else 0)
+            new_paye = col2.selectbox("Paiement", ["Non payé", "Payé"], 
+                                     index=1 if "PAYÉ" in str(r.get('Paiement')).upper() else 0)
+            new_prix = st.text_input("Prix (€)", value=str(r.get('Prix', '0')))
+            
+            c_btn1, c_btn2 = st.columns(2)
+            if c_btn1.form_submit_button("💾 ENREGISTRER"):
+                df_c.at[idx, 'Statut'] = new_statut
+                df_c.at[idx, 'Paiement'] = new_paye
+                df_c.at[idx, 'Prix'] = new_prix
+                sauvegarder_data(df_c, "contacts.json")
+                st.session_state.edit_idx = None
+                st.rerun()
+            if c_btn2.form_submit_button("❌ ANNULER"):
+                st.session_state.edit_idx = None
+                st.rerun()
+        st.stop()
 
-    # Initialisation de la variable pour cumuler le HTML si besoin (ou par fiche)
-    for i, r in df_disp.iterrows():
-        num_f = i + 1
-        p_nom = str(r.get('Prénom', '')).strip()
-        n_nom = str(r.get('Nom', '')).strip().upper()
-        nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Client #{num_f}"
-        soc = str(r.get('Société', 'PARTICULIER')).upper()
-        tel = str(r.get('Téléphone', '')).strip()
-        mail = str(r.get('Email', '')).strip()
-        
-        d_nav = str(r.get('DateNav', '--/--/--'))
-        n_jrs = str(r.get('NbreJours', '1'))
-        n_per = str(r.get('NbrePers', '1'))
-        prix = str(r.get('Prix', '0'))
-
-        # Couleurs
-        s_val = str(r.get('Statut', 'En attente'))
-        s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
-        if "CMN" in soc: s_col = "#3498db"
-        
-        p_val = str(r.get('Paiement', 'Non payé'))
-        p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
-
-        # Boutons de contact rapides
-        btn_html = '<div style="margin-top:12px;display:flex;gap:8px;">'
-        if tel and len(tel) > 5:
-            t_cl = tel.replace(" ", "").replace(".", "")
-            btn_html += f'<a href="tel:{t_cl}" style="flex:1;background:#34495e;color:white!important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">📞 APPEL</a>'
-            btn_html += f'<a href="https://wa.me/{t_cl}" style="flex:1;background:#25D366;color:white!important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">💬 WA</a>'
-        if mail and "@" in mail:
-            btn_html += f'<a href="mailto:{mail}" style="flex:1;background:#e67e22;color:white!important;padding:10px 2px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;font-weight:bold;">📧 MAIL</a>'
-        btn_html += '</div>'
-
-        # Construction de la carte (Variable réinitialisée à chaque itération)
-        card_html = f"""
-        <div style="border:2px solid #1a2a6c;border-radius:12px;padding:15px;margin-bottom:10px;background:white;color:black;box-shadow: 2px 2px 5px rgba(0,0,0,0.05);">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                <b style="color:#1a2a6c;font-size:1.1rem;">{nom_c}</b>
-                <div style="text-align:right;display:flex;flex-direction:column;gap:3px;">
-                    <span style="background:{s_col};color:white;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:bold;">{s_val.upper()}</span>
-                    <span style="background:{p_col};color:white;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:bold;">{p_val.upper()}</span>
-                </div>
-            </div>
-            <div style="color:#666;font-size:0.85rem;margin: 5px 0;">🏢 {soc}</div>
-            <div style="background:#f8f9fa; border-radius:8px; padding:10px; border:1px solid #eee; margin:10px 0;">
-                <div style="display:flex; justify-content:space-between; font-size:0.9rem; color:#333;">
-                    <span>📅 <b>{d_nav}</b></span>
-                    <span>💰 <b>{prix} €</b></span>
-                </div>
-                <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#666; margin-top:5px; border-top:1px dashed #ccc; padding-top:5px;">
-                    <span>⏳ {n_jrs} jr(s)</span>
-                    <span>👥 {n_per} pers.</span>
-                </div>
-            </div>
-            <div style="font-size:0.8rem; color:#2980b9; margin-bottom:10px;">📞 {tel if tel else "Non renseigné"}</div>
-            {btn_html}
-        </div>"""
-
-        # Affichage (Ligne 197 environ - bien indentée sous le 'for')
-        st.markdown(card_html, unsafe_allow_html=True)
-
-        # Boutons d'édition (sous la carte)
-        c1, c2 = st.columns(2)
-        if c1.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
-            st.session_state.edit_idx = i
+    # Confirmation de suppression
+    if st.session_state.confirm_del_idx is not None:
+        idx = st.session_state.confirm_del_idx
+        st.error(f"⚠️ Supprimer définitivement {df_c.iloc[idx].get('Nom')} ?")
+        ca1, ca2 = st.columns(2)
+        if ca1.button("✅ OUI, SUPPRIMER"):
+            df_c = df_c.drop(df_c.index[idx]).reset_index(drop=True)
+            sauvegarder_data(df_c, "contacts.json")
+            st.session_state.confirm_del_idx = None
             st.rerun()
-        if c2.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
-            st.session_state.confirm_del_idx = i
+        if ca2.button("❌ NON, ANNULER"):
+            st.session_state.confirm_del_idx = None
             st.rerun()
+        st.stop()
 
+    # --- B. AFFICHAGE DES ONGLETS ---
+    tab_encours, tab_archives = st.tabs(["⛵ EN COURS", "📦 ARCHIVES (Payés & OK)"])
+
+    with tab_encours:
+        # Filtre : On cache ceux qui sont à la fois "OK" et "Payé"
+        mask_arch = (df_c['Statut'].str.contains("OK", case=False, na=False)) & \
+                    (df_c['Paiement'].str.contains("Payé", case=False, na=False))
+        df_active = df_c[~mask_arch]
+
+        search = st.text_input("🔍 Rechercher un nom ou une société...", "", key="search_active").upper()
+        if search:
+            df_active = df_active[df_active['Nom'].str.contains(search, na=False) | df_active['Société'].str.contains(search, na=False)]
+
+        if df_active.empty:
+            st.info("Aucun dossier en cours.")
+        else:
+            for i, r in df_active.iterrows():
+                # --- RÉCUPÉRATION ET CARTE HTML ---
+                p_nom = str(r.get('Prénom', '')).strip()
+                n_nom = str(r.get('Nom', '')).strip().upper()
+                nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Client #{i+1}"
+                soc = str(r.get('Société', 'PARTICULIER')).upper()
+                tel = str(r.get('Téléphone', '')).strip()
+                mail = str(r.get('Email', '')).strip()
+                d_nav = str(r.get('DateNav', '--/--/--'))
+                prix = str(r.get('Prix', '0'))
+                
+                s_val = str(r.get('Statut', 'En attente'))
+                s_col = "#2ecc71" if "OK" in s_val.upper() else "#f1c40f" if "ATTENTE" in s_val.upper() else "#e74c3c"
+                if "CMN" in soc: s_col = "#3498db"
+                p_val = str(r.get('Paiement', 'Non payé'))
+                p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
+
+                btn_html = f'<div style="margin-top:12px;display:flex;gap:8px;">'
+                if tel and len(tel) > 5:
+                    t_cl = tel.replace(" ", "").replace(".", "")
+                    btn_html += f'<a href="tel:{t_cl}" class="btn-contact" style="background:#34495e; flex:1; padding:10px; border-radius:8px; text-decoration:none; color:white; text-align:center; font-size:0.75rem;">📞 APPEL</a>'
+                    btn_html += f'<a href="https://wa.me/{t_cl}" class="btn-contact" style="background:#25D366; flex:1; padding:10px; border-radius:8px; text-decoration:none; color:white; text-align:center; font-size:0.75rem;">💬 WA</a>'
+                btn_html += '</div>'
+
+                card_html = f"""
+                <div class="fiche-globale {'border-cmn' if 'CMN' in soc else ''}">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <span class="prenom-style">{nom_c}</span>
+                        <div>
+                            <span class="statut-badge" style="background:{s_col};">{s_val.upper()}</span>
+                            <span class="statut-badge" style="background:{p_col};">{p_val.upper()}</span>
+                        </div>
+                    </div>
+                    <div class="societe-style">🏢 {soc}</div>
+                    <div style="display:flex; justify-content:space-between; font-size:1rem; margin:10px 0;">
+                        <span>📅 <b>{d_nav}</b></span>
+                        <span>💰 <b>{prix} €</b></span>
+                    </div>
+                    {btn_html}
+                </div>"""
+                st.markdown(card_html, unsafe_allow_html=True)
+
+                c1, c2 = st.columns(2)
+                if c1.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
+                    st.session_state.edit_idx = i
+                    st.rerun()
+                if c2.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
+                    st.session_state.confirm_del_idx = i
+                    st.rerun()
+
+    with tab_archives:
+        # Filtre : Uniquement OK + PAYÉ
+        df_arch = df_c[(df_c['Statut'].str.contains("OK", case=False, na=False)) & 
+                       (df_c['Paiement'].str.contains("Payé", case=False, na=False))]
+        
+        if df_arch.empty:
+            st.info("Aucun dossier archivé.")
+        else:
+            for i, r in df_arch.iterrows():
+                st.markdown(f"""
+                <div style="padding:15px; border-left:6px solid #2ecc71; background:white; border-radius:8px; margin-bottom:10px; border:1px solid #eee;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <b>{r.get('Nom')} {r.get('Prénom')}</b>
+                        <span style="color:#2ecc71; font-weight:bold;">✅ ARCHIVÉ</span>
+                    </div>
+                    <div style="font-size:0.85rem; color:#666;">📅 {r.get('DateNav')} | 💰 {r.get('Prix')} € | 🏢 {r.get('Société')}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button(f"♻️ Désarchiver (Remettre en attente)", key=f"reac_{i}"):
+                    df_c.at[i, 'Statut'] = "En attente"
+                    sauvegarder_data(df_c, "contacts.json")
+                    st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
