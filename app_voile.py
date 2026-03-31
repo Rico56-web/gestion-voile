@@ -327,20 +327,22 @@ for i, r in df_disp.iterrows():
             </div>
             """, unsafe_allow_html=True)
 
+# --- ON REVIENT TOUT À GAUCHE ICI ---
+
 # =================================================================
 # --- 7. PAGE STATS ---
 # =================================================================
-    elif st.session_state.page == "STATS":
-       st.title("📊 Vesta - Pilotage & Frais")
+elif st.session_state.page == "STATS":
+    st.title("📊 Vesta - Pilotage & Frais")
 
-       def clean_val(val):
+    def clean_val(val):
         try:
             if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
             s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
             return float(s.replace(",", "."))
         except: return 0.0
 
-       def get_month_info(date_str):
+    def get_month_info(date_str):
         try:
             parts = str(date_str).split('/')
             if len(parts) >= 2:
@@ -350,12 +352,11 @@ for i, r in df_disp.iterrows():
         except: pass
         return 99, "99-Inconnu"
 
-       df_st = df_c.copy()
+    df_st = df_c.copy()
     if not df_st.empty and 'Prix' in df_st.columns:
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
         df_st['M_Sort'], df_st['Mois'] = zip(*df_st['DateNav'].apply(get_month_info))
-        df_st['CA_Calcul'] = df_st.apply(lambda x: x['PrixNum'] if (str(x['Paiement']).upper() == "PAYÉ" or str(x['Statut']).upper() == "OK") else 0.0, axis=1)
-    
+     
     st.subheader("📅 Synthèse Mensuelle 2026")
     if not df_st.empty:
         mensuel = df_st.groupby(['M_Sort', 'Mois'])['CA_Calcul'].sum().reset_index()
