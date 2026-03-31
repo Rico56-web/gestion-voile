@@ -330,7 +330,7 @@ for i, r in df_disp.iterrows():
 # =================================================================
 # --- 7. PAGE STATS ---
 # =================================================================
-     elif st.session_state.page == "STATS":
+    elif st.session_state.page == "STATS":
        st.title("📊 Vesta - Pilotage & Frais")
 
        def clean_val(val):
