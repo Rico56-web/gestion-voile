@@ -128,134 +128,114 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
-
 # =================================================================
-# --- 5. PAGE CONTACTS (VERSION ULTRA-COMPLÈTE) ---
+# --- 5. PAGE CONTACTS (VERSION AUTO-DÉTECTIVE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    st.title("📇 Annuaire Clients")
+    st.title("📇 Annuaire Vesta Skipper")
 
     # --- A. LOGIQUE DE FILTRAGE ---
-    # Filtre Archives : OK ou TERMINÉ + PAYÉ
-    mask_archives = (
-        (df_c['Statut'].str.contains("OK|TERMINÉ", case=False, na=False)) & 
-        (df_c['Paiement'].str.contains("Payé", case=False, na=False))
-    )
+    # Détection souple pour l'archivage (OK ou TERMINÉ + PAYÉ)
+    def is_archived(row):
+        statut = str(row.get('Statut', '')).upper()
+        paie = str(row.get('Paiement', '')).upper()
+        return ("OK" in statut or "TERMINÉ" in statut) and "PAYÉ" in paie
+
+    # Application du filtre
+    mask_arch = df_c.apply(is_archived, axis=1)
     
-    # Inversion pour que tes 16 fiches actuelles soient dans "EN COURS"
-    df_active = df_c[mask_archives]    
-    df_arch = df_c[~mask_archives]     
+    # Inversion demandée : tes 16 fiches dans "EN COURS"
+    df_active = df_c[mask_arch]    
+    df_arch = df_c[~mask_arch]     
 
-    # --- B. BARRE DE RECHERCHE ---
-    search = st.text_input("🔍 Recherche rapide (Nom, Société, Email)...", "").upper()
-    if search:
-        df_active = df_active[
-            df_active['Nom'].str.contains(search, na=False) | 
-            df_active['Société'].str.contains(search, na=False) |
-            df_active['Email'].str.contains(search, na=False)
-        ]
-
-    # --- C. AFFICHAGE DES ONGLETS ---
+    # --- B. ONGLETS ---
     tab_encours, tab_archives = st.tabs(["⛵ EN COURS", "📦 ARCHIVES"])
 
-    # --- ONGLET 1 : EN COURS ---
     with tab_encours:
-        st.subheader(f"Dossiers actifs ({len(df_active)})")
         if df_active.empty:
             st.info("Aucun dossier actif.")
         else:
             for i, r in df_active.iterrows():
-                # Extraction complète des données
-                p_nom = str(r.get('Prénom', '')).strip()
-                n_nom = str(r.get('Nom', '')).strip().upper()
-                tel = str(r.get('Téléphone', '')).strip()
-                email = str(r.get('Email', 'Non renseigné')).lower()
-                soc = str(r.get('Société', 'PARTICULIER')).upper()
-                d_nav = str(r.get('DateNav', '--/--/--'))
-                
-                # Nouveaux champs demandés
-                nb_jours = str(r.get('Nbre de jours', '1'))
-                nb_pers = str(r.get('Nbre de personnes', '1'))
-                prix = str(r.get('Prix', '0'))
-                
-                # Gestion Statut (OK, En attente, Refusé, Terminé)
-                s_val = str(r.get('Statut', 'En attente')).upper()
-                if "OK" in s_val or "TERMINÉ" in s_val: s_col = "#2ecc71"
-                elif "REFUSÉ" in s_val: s_col = "#e74c3c"
-                else: s_col = "#f1c40f"
-                
-                # Paiement (Payé, Non payé)
-                p_val = str(r.get('Paiement', 'Non payé')).upper()
-                p_col = "#3498db" if "PAYÉ" in p_val else "#e67e22"
+                # --- SYSTÈME DE RÉCUPÉRATION ROBUSTE ---
+                # On cherche la donnée peu importe la majuscule ou le nom exact
+                def get_val(keys, default=""):
+                    for k in keys:
+                        if k in r and str(r[k]).strip() != "" and str(r[k]).lower() != "nan":
+                            return str(r[k]).strip()
+                    return default
 
-                # Nettoyage tel pour boutons
-                t_cl = tel.replace(" ", "").replace(".", "")
+                nom_complet = f"{get_val(['Nom'])} {get_val(['Prénom'])}".strip() or f"Client #{i}"
+                societe = get_val(['Société', 'Societe', 'Entreprise'], "PARTICULIER")
+                telephone = get_val(['Téléphone', 'Telephone', 'Tel', 'tel'], "")
+                email = get_val(['Email', 'email', 'Courriel'], "")
+                date_nav = get_val(['DateNav', 'Date', 'date'], "--/--/--")
+                prix_val = get_val(['Prix', 'prix', 'Montant'], "0")
+                jours = get_val(['Nbre de jours', 'jours', 'Jours'], "1")
+                personnes = get_val(['Nbre de personnes', 'pers', 'Pers'], "1")
+                
+                # Statuts pour les couleurs
+                s_raw = get_val(['Statut', 'statut'], "En attente").upper()
+                p_raw = get_val(['Paiement', 'paiement', 'Payé'], "Non payé").upper()
+                
+                s_col = "#2ecc71" if ("OK" in s_raw or "TERM" in s_raw) else "#e74c3c" if "REFU" in s_raw else "#f1c40f"
+                if "CMN" in societe.upper(): s_col = "#3498db"
+                p_col = "#3498db" if "PAYÉ" in p_raw or "PAYE" in p_raw else "#e67e22"
 
-                # Carte HTML Visuelle
+                # Nettoyage Tel pour liens
+                t_link = telephone.replace(" ", "").replace(".", "").replace("+", "")
+
+                # --- AFFICHAGE DE LA FICHE ---
                 st.markdown(f"""
                 <div style="background:white; padding:15px; border-radius:12px; border-left:10px solid {s_col}; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom:20px; color:#2c3e50;">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div style="display:flex; justify-content:space-between;">
                         <div>
-                            <div style="font-size:1.2rem; font-weight:bold; color:#1a2a6c;">{n_nom} {p_nom}</div>
-                            <div style="color:#2980b9; font-size:0.85rem; font-weight:bold; margin-top:2px;">🏢 {soc}</div>
+                            <div style="font-size:1.2rem; font-weight:bold; color:#1a2a6c;">{nom_complet}</div>
+                            <div style="color:#2980b9; font-size:0.9rem; font-weight:bold;">🏢 {societe}</div>
                         </div>
                         <div style="text-align:right;">
-                            <span style="background:{s_col}; color:white; padding:3px 12px; border-radius:15px; font-size:0.75rem; font-weight:bold;">{s_val}</span><br>
-                            <span style="background:{p_col}; color:white; padding:3px 12px; border-radius:15px; font-size:0.75rem; font-weight:bold; display:inline-block; margin-top:6px;">{p_val}</span>
+                            <span style="background:{s_col}; color:white; padding:3px 10px; border-radius:15px; font-size:0.7rem; font-weight:bold;">{s_raw}</span><br>
+                            <span style="background:{p_col}; color:white; padding:3px 10px; border-radius:15px; font-size:0.7rem; font-weight:bold; display:inline-block; margin-top:5px;">{p_raw}</span>
                         </div>
                     </div>
                     
                     <div style="margin-top:12px; padding:10px; background:#f8f9fa; border-radius:8px; border:1px solid #eee;">
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:0.9rem;">
-                            <div>📅 <b>{d_nav}</b></div>
-                            <div style="text-align:right;">💰 <b>{prix} €</b></div>
-                            <div>⏳ <b>{nb_jours} jour(s)</b></div>
-                            <div style="text-align:right;">👥 <b>{nb_pers} pers.</b></div>
+                            <div>📅 <b>{date_nav}</b></div>
+                            <div style="text-align:right;">💰 <b>{prix_val} €</b></div>
+                            <div>⏳ <b>{jours} jour(s)</b></div>
+                            <div style="text-align:right;">👥 <b>{personnes} pers.</b></div>
                         </div>
                     </div>
 
                     <div style="margin-top:10px; font-size:0.85rem; color:#7f8c8d; border-top:1px solid #eee; padding-top:10px;">
-                        📧 {email} | 📞 {tel}
+                        📧 {email} | 📞 {telephone}
                     </div>
 
                     <div style="display:flex; gap:8px; margin-top:15px;">
-                        <a href="tel:{t_cl}" style="flex:1; background:#34495e; color:white!important; text-align:center; padding:10px; border-radius:8px; text-decoration:none; font-size:0.8rem; font-weight:bold;">APPEL</a>
-                        <a href="https://wa.me/{t_cl}" style="flex:1; background:#25D366; color:white!important; text-align:center; padding:10px; border-radius:8px; text-decoration:none; font-size:0.8rem; font-weight:bold;">WHATSAPP</a>
+                        <a href="tel:{t_link}" style="flex:1; background:#34495e; color:white!important; text-align:center; padding:10px; border-radius:8px; text-decoration:none; font-size:0.8rem; font-weight:bold;">APPEL</a>
+                        <a href="https://wa.me/{t_link}" style="flex:1; background:#25D366; color:white!important; text-align:center; padding:10px; border-radius:8px; text-decoration:none; font-size:0.8rem; font-weight:bold;">WHATSAPP</a>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
                 # Boutons Streamlit
-                col_ed, col_del = st.columns(2)
-                if col_ed.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
+                c1, c2 = st.columns(2)
+                if c1.button(f"✏️ Modifier", key=f"ed_{i}"):
                     st.session_state.edit_idx = i
                     st.rerun()
-                if col_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
+                if c2.button(f"🗑️ Supprimer", key=f"del_{i}"):
                     st.session_state.confirm_del_idx = i
                     st.rerun()
 
-    # --- ONGLET 2 : ARCHIVES ---
     with tab_archives:
-        st.subheader(f"Dossiers clôturés ({len(df_arch)})")
-        if df_arch.empty:
-            st.info("Aucune archive disponible.")
-        else:
-            for i, r in df_arch.iterrows():
-                st.markdown(f"""
-                <div style="padding:12px; border-radius:10px; background:#f1f2f6; margin-bottom:10px; border:1px solid #ddd; color:black;">
-                    <div style="display:flex; justify-content:space-between;">
-                        <b>{r.get('Nom')} {r.get('Prénom')}</b>
-                        <span style="color:#2ecc71; font-weight:bold;">✔ ARCHIVÉ</span>
-                    </div>
-                    <div style="font-size:0.8rem; margin-top:5px;">
-                        📅 {r.get('DateNav')} | 💰 {r.get('Prix')} € | 🏢 {r.get('Société')}
-                    </div>
-                </div>""", unsafe_allow_html=True)
-                
-                if st.button(f"♻️ Réactiver", key=f"reac_{i}", use_container_width=True):
-                    df_c.at[i, 'Statut'] = "En attente"
-                    sauvegarder_data(df_c, "contacts.json")
-                    st.rerun()
+        # Même logique simplifiée pour les archives
+        for i, r in df_arch.iterrows():
+            st.info(f"📁 {r.get('Nom', 'Client')} - {r.get('DateNav', 'S.D')}")
+            if st.button(f"♻️ Réactiver {i}", key=f"reac_{i}"):
+                df_c.at[i, 'Statut'] = "En attente"
+                sauvegarder_data(df_c, "contacts.json")
+                st.rerun()
+
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
