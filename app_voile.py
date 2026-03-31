@@ -193,16 +193,20 @@ for i, r in df_disp.iterrows():
             <div style="font-size:0.75rem; color:#2980b9;">📞 {tel if tel else "Non renseigné"}</div>
             {btn_html}
         </div>"""
-    
-    st.markdown(card_html, unsafe_allow_html=True)
-    # Actions Modifier / Supprimer
-    c_ed, c_del = st.columns(2)
-    if c_ed.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
-        st.session_state.edit_idx = i
-        st.rerun()
-    if c_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
-        st.session_state.confirm_del_idx = i
-        st.rerun()
+# --- FIN DE LA CARTE CONTACT (BIEN INDENTÉ DANS LE FOR) ---
+        st.markdown(card_html, unsafe_allow_html=True)
+
+        # Actions Modifier / Supprimer
+        c_ed, c_del = st.columns(2)
+        if c_ed.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
+            st.session_state.edit_idx = i
+            st.rerun()
+        if c_del.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
+            st.session_state.confirm_del_idx = i
+            st.rerun()
+
+# --- ICI ON SORT DU BLOC IF CONTACTS (ZÉRO ESPACE AU DÉBUT) ---
+
 # =================================================================
 # --- 6. PAGE PLANNING ---
 # =================================================================
