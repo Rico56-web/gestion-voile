@@ -167,8 +167,8 @@ for i, r in df_disp.iterrows():
     btn_html += '</div>'
 
     # CARTE HTML MISE À JOUR
-    card_html = f"""
-        <div style="border:2px solid #1a2a6c;border-radius:12px;padding:12px;margin-bottom:10px;background:white;color:black;box-shadow: 2px 2px 5px rgba(0,0,0,0.05);">
+    card_html += f"""
+            <div style="border:2px solid #1a2a6c;border-radius:12px;padding:12px;margin-bottom:10px;background:white;color:black;box-shadow: 2px 2px 5px rgba(0,0,0,0.05);">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
                 <b style="color:#1a2a6c;font-size:1.05rem;">{nom_c}</b>
                 <div style="text-align:right;display:flex;flex-direction:column;gap:3px;">
@@ -189,7 +189,6 @@ for i, r in df_disp.iterrows():
                     <span>👥 Pers: <b>{n_per}</b></span>
                 </div>
             </div>
-
             <div style="font-size:0.75rem; color:#2980b9;">📞 {tel if tel else "Non renseigné"}</div>
             {btn_html}
          </div>"""
