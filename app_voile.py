@@ -405,14 +405,25 @@ elif st.session_state.page == "PLANNING":
     c1.metric("Missions", len(res_list))
     c2.metric("Payé", f"{ca_encaisse:.0f}€")
     c3.metric("Dû", f"{ca_attente:.0f}€")
-# =================================================================
-# --- 7. PAGE STATS (VERSION RESTAURÉE & OPTIMISÉE) ---
+
+  # =================================================================
+# --- 7. PAGE STATS (VERSION NETTOYÉE & OPTIMISÉE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
 
     # --- 1. PRÉPARATION DES DONNÉES ---
     df_st = df_c.copy()
+    
+    # --- NETTOYAGE DES DOUBLONS SOCIÉTÉ ---
+    if 'Société' in df_st.columns:
+        # 1. En Majuscules + suppression des espaces (Gère CMN/Cmn, Vog/vog, etc.)
+        df_st['Société'] = df_st['Société'].astype(str).str.strip().str.upper()
+        # 2. Remplacement des valeurs vides ou 'NAN' par 'PARTICULIER'
+        df_st['Société'] = df_st['Société'].replace(['NAN', '', 'NONE'], 'PARTICULIER')
+        # 3. Fusion PERSO et PARTICULIER (Optionnel : enlève cette ligne si tu veux les séparer)
+        df_st['Société'] = df_st['Société'].replace('PERSO', 'PARTICULIER')
+
     if not df_st.empty and 'Prix' in df_st.columns:
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
         
@@ -453,19 +464,18 @@ if st.session_state.page == "STATS":
     
     st.divider()
     
-    # --- 3. VISUALISATION GRAPHIQUE (RESTAURÉE) ---
+    # --- 3. VISUALISATION GRAPHIQUE ---
     st.subheader("📈 Analyse de l'Activité")
     if not mensuel.empty:
-        # Courbe Evolution CA vs Frais
         st.write("**Évolution mensuelle (€)**")
         chart_data = mensuel.set_index('Mois')[['CA', 'Frais']]
-        st.line_chart(chart_data, color=["#2ecc71", "#e74c3c"]) # Vert = CA, Rouge = Frais
+        st.line_chart(chart_data, color=["#2ecc71", "#e74c3c"])
         
-        # Répartition par Société
+        # Répartition par Société (Désormais sans doublons)
         if 'Société' in df_st.columns:
             st.write("**Répartition Clients (Nombre de missions)**")
-            stats_soc = df_st['Société'].value_counts()
-            st.dataframe(stats_soc, use_container_width=True)
+            stats_soc = df_st['Société'].value_counts().rename_axis('Client').reset_index(name='Nombre')
+            st.dataframe(stats_soc.set_index('Client'), use_container_width=True)
     else:
         st.info("Données insuffisantes pour les graphiques.")
 
@@ -473,25 +483,21 @@ if st.session_state.page == "STATS":
     st.divider()
     col1, col2 = st.columns(2)
     tot_encaisse = df_st[df_st['Paiement'].astype(str).str.upper().str.strip() == "PAYÉ"]['PrixNum'].sum()
-    # À venir = Missions OK mais non payées
     mask_a_venir = (df_st['Statut'].astype(str).str.upper() == "OK") & (df_st['Paiement'].astype(str).str.upper().str.strip() != "PAYÉ")
     tot_a_venir = df_st[mask_a_venir]['PrixNum'].sum()
     
     col1.metric("💰 ENCAISSÉ", f"{tot_encaisse:,.0f}€")
     col2.metric("🕒 À VENIR", f"{tot_a_venir:,.0f}€")
 
-    # --- 5. DÉTAIL MISSIONS À VENIR (RESTAURÉ) ---
+    # --- 5. DÉTAIL MISSIONS À VENIR ---
     st.subheader("⏳ Missions à venir (Détail)")
     df_avenir = df_st[mask_a_venir].copy()
 
     if not df_avenir.empty:
         tableau_mobile = df_avenir[['DateNav', 'Nom', 'PrixNum']]
         tableau_mobile.columns = ['📅 Date', '👤 Client', '💰 €']
-        
-        # Tri chronologique
         tableau_mobile['sort'] = pd.to_datetime(tableau_mobile['📅 Date'], format='%d/%m/%Y', errors='coerce')
         tableau_mobile = tableau_mobile.sort_values('sort').drop(columns=['sort'])
-        
         st.table(tableau_mobile.set_index('📅 Date'))
     else:
         st.info("Aucune mission en attente de paiement.")
@@ -510,8 +516,7 @@ if st.session_state.page == "STATS":
                 sauvegarder_data(df_qui_reste, "contacts.json")
                 st.success("Archive créée avec succès !")
                 time.sleep(1)
-                st.rerun()
-    
+                st.rerun()  
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION OPTIMISÉE IPHONE 2026) ---
 # =================================================================
