@@ -192,7 +192,7 @@ for i, r in df_disp.iterrows():
 
             <div style="font-size:0.75rem; color:#2980b9;">📞 {tel if tel else "Non renseigné"}</div>
             {btn_html}
-        </div>"""
+            </div>"""
 
         st.markdown(card_html, unsafe_allow_html=True)
 
