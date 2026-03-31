@@ -172,35 +172,30 @@ if st.session_state.page == "CONTACTS":
             st.session_state.confirm_del_idx = None
             st.rerun()
         st.stop()
-
 # --- B. AFFICHAGE DES ONGLETS ---
     tab_encours, tab_archives = st.tabs(["📑 EN COURS", "🗄️ ARCHIVES"])
 
-    # On définit PRECISEMENT ce qui est un dossier "En Cours"
-    # C'est un dossier qui n'est PAS ENCORE "OK" OU pas encore "PAYÉ"
-    mask_archives = (df_c['Statut'].str.upper().str.contains("OK", na=False)) & \
-                    (df_c['Paiement'].str.upper().str.contains("PAYÉ", na=False))
+    # 1. ON DÉFINIT LE FILTRE ICI (En dehors des onglets pour éviter le NameError)
+    # On harmonise tout en majuscules pour éviter les problèmes d'accents ou de casse
+    mask_termine_paye = (df_c['Statut'].str.upper().str.contains("OK", na=False)) & \
+                        (df_c['Paiement'].str.upper().str.contains("PAYÉ", na=False))
 
+    # --- ONGLET EN COURS ---
     with tab_encours:
-        # SI C'EST L'INVERSE : On enlève le "~" ici pour tester
-        df_active = df_c[~mask_archives] 
-        
-        # NOTE : Si après ce changement c'est TOUJOURS l'inverse, 
-        # remplace la ligne ci-dessus par : df_active = df_c[mask_archives]
+        # On affiche ceux qui ne sont PAS (~) dans le masque terminé/payé
+        df_active = df_c[~mask_termine_paye] 
         
         st.subheader(f"⛵ Suivi des dossiers ({len(df_active)})")
-        
-        # ... (Reste du code pour afficher les cartes) ...
         
         search = st.text_input("🔍 Filtrer la liste...", "", key="search_active").upper()
         if search:
             df_active = df_active[df_active['Nom'].str.contains(search, na=False) | df_active['Société'].str.contains(search, na=False)]
 
         if df_active.empty:
-            st.info("Aucun dossier actif pour le moment.")
+            st.info("Aucun dossier actif.")
         else:
             for i, r in df_active.iterrows():
-                # Données
+                # --- RÉCUPÉRATION DES DONNÉES ---
                 p_nom = str(r.get('Prénom', '')).strip()
                 n_nom = str(r.get('Nom', '')).strip().upper()
                 nom_c = f"{p_nom} {n_nom}" if (p_nom or n_nom) else f"Client #{i+1}"
@@ -214,63 +209,50 @@ if st.session_state.page == "CONTACTS":
                 p_val = str(r.get('Paiement', 'Non payé'))
                 p_col = "#3498db" if "PAYÉ" in p_val.upper() else "#e67e22"
 
-                # HTML Carte
-                t_cl = tel.replace(" ", "").replace(".", "")
-                btn_html = f'<div style="margin-top:12px;display:flex;gap:8px;">'
-                if len(t_cl) > 5:
-                    btn_html += f'<a href="tel:{t_cl}" style="flex:1;background:#34495e;color:white;padding:10px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;">📞 APPEL</a>'
-                    btn_html += f'<a href="https://wa.me/{t_cl}" style="flex:1;background:#25D366;color:white;padding:10px;border-radius:8px;text-decoration:none;text-align:center;font-size:0.75rem;">💬 WA</a>'
-                btn_html += '</div>'
-
+                # Carte HTML (Ta version habituelle)
                 st.markdown(f"""
-                <div class="fiche-globale {'border-cmn' if 'CMN' in soc else ''}">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div class="fiche-globale">
+                    <div style="display:flex;justify-content:space-between;">
                         <span class="prenom-style">{nom_c}</span>
                         <div>
                             <span class="statut-badge" style="background:{s_col};">{s_val.upper()}</span>
                             <span class="statut-badge" style="background:{p_col};">{p_val.upper()}</span>
                         </div>
                     </div>
-                    <div class="societe-style">🏢 {soc}</div>
-                    <div style="display:flex; justify-content:space-between; font-size:1rem; margin:10px 0;">
-                        <span>📅 <b>{d_nav}</b></span>
-                        <span>💰 <b>{prix} €</b></span>
-                    </div>
-                    {btn_html}
+                    <div class="societe-style">🏢 {soc} | 📅 {d_nav}</div>
+                    <div style="font-weight:bold; margin-top:5px;">💰 {prix} €</div>
                 </div>""", unsafe_allow_html=True)
 
                 c1, c2 = st.columns(2)
-                if c1.button(f"✏️ Modifier", key=f"ed_{i}", use_container_width=True):
+                if c1.button(f"✏️ Modifier", key=f"ed_{i}"):
                     st.session_state.edit_idx = i
                     st.rerun()
-                if c2.button(f"🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
+                if c2.button(f"🗑️ Supprimer", key=f"del_{i}"):
                     st.session_state.confirm_del_idx = i
                     st.rerun()
 
+    # --- ONGLET ARCHIVES ---
     with tab_archives:
-        df_arch = df_c[est_archive]
+        # Ici on utilise le masque SANS le "~" (on ne veut que les terminés/payés)
+        df_arch = df_c[mask_termine_paye]
+        
         st.subheader(f"✅ Dossiers clôturés ({len(df_arch)})")
 
         if df_arch.empty:
-            st.info("Aucune archive disponible.")
+            st.write("Aucune archive.")
         else:
             for i, r in df_arch.iterrows():
                 st.markdown(f"""
-                <div style="padding:12px; border-radius:10px; background:#f1f2f6; margin-bottom:8px; border:1px solid #dfe4ea; color:#2f3542;">
-                    <div style="display:flex; justify-content:space-between; font-weight:bold;">
-                        <span>{r.get('Nom')} {r.get('Prénom')}</span>
-                        <span style="color:#2ed573;">✔ TERMINÉ</span>
-                    </div>
-                    <div style="font-size:0.8rem; color:#57606f;">
-                        📅 {r.get('DateNav')} | 🏢 {r.get('Société')} | 💰 {r.get('Prix')} €
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                <div style="padding:10px; border-radius:8px; background:#f1f2f6; margin-bottom:5px; border:1px solid #ddd; color:black;">
+                    <b>{r.get('Nom')} {r.get('Prénom')}</b><br>
+                    <small>📅 {r.get('DateNav')} | 💰 {r.get('Prix')} €</small>
+                </div>""", unsafe_allow_html=True)
                 
-                if st.button(f"♻️ Réactiver", key=f"reac_{i}", use_container_width=True):
+                if st.button(f"♻️ Réactiver", key=f"reac_{i}"):
                     df_c.at[i, 'Statut'] = "En attente"
                     sauvegarder_data(df_c, "contacts.json")
                     st.rerun()
+
 
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
