@@ -135,64 +135,53 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 if st.session_state.page == "CONTACTS":
     st.title("📇 Vesta Skipper 2026")
 
-    # --- 1. FILTRAGE (Inversé pour tes 19 fiches actives) ---
-    mask_arch = (
+    # --- 1. FILTRAGE LOGIQUE (RÉTABLI) ---
+    # Un dossier est ARCHIVABLE s'il est (OK ou TERMINÉ) ET PAYÉ
+    mask_est_fini = (
         (df_c['Statut'].astype(str).str.upper().str.contains("OK|TERMINÉ", na=False)) & 
         (df_c['Paiement'].astype(str).str.upper().str.contains("PAYÉ", na=False))
     )
     
-    df_active = df_c[mask_arch]  
-    df_arch = df_c[~mask_arch]   
+    # CLASSEMENT CORRECT :
+    # EN COURS = Tout ce qui n'est pas fini (~mask)
+    # ARCHIVES = Tout ce qui est fini (mask)
+    df_active = df_c[~mask_est_fini]  
+    df_arch = df_c[mask_est_fini]   
 
     tab_encours, tab_archives = st.tabs([f"⛵ EN COURS ({len(df_active)})", f"📦 ARCHIVES ({len(df_arch)})"])
 
     # --- ONGLET EN COURS ---
     with tab_encours:
         if df_active.empty:
-            st.info("Aucun dossier actif.")
+            st.info("Bravo ! Tous les dossiers sont clôturés et payés.")
         else:
             for i, r in df_active.iterrows():
-                # Données
                 nom = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}"
                 soc = str(r.get('Société','PARTICULIER')).upper()
                 s_val = str(r.get('Statut','En attente')).upper()
                 p_val = str(r.get('Paiement','Non payé')).upper()
-                coms = str(r.get('Commentaires','')).strip()
                 
-                # --- LOGIQUE DES COULEURS ---
-                # Statut
+                # Couleurs
                 s_col = "green" if "OK" in s_val else "orange" if "ATTENTE" in s_val else "red" if "REFUS" in s_val else "blue"
-                # Paiement
                 p_col = "blue" if "PAYÉ" in p_val else "orange"
-                # Bordure de la fiche
-                border_col = "#2ecc71" if "OK" in s_val else "#3498db" if "CMN" in soc else "#f1c40f"
 
                 with st.container(border=True):
-                    # En-tête avec Badges de couleur
                     st.markdown(f"### {nom}")
-                    
-                    # Affichage des badges colorés (Méthode native Streamlit)
                     c_status, c_pay = st.columns(2)
-                    c_status.markdown(f":{s_col}[**● STATUT : {s_val}**]")
-                    c_pay.markdown(f":{p_col}[**● PAIEMENT : {p_val}**]")
+                    c_status.markdown(f":{s_col}[**● {s_val}**]")
+                    c_pay.markdown(f":{p_col}[**● {p_val}**]")
                     
                     st.caption(f"🏢 {soc}")
-                    
-                    # Grille d'infos
                     st.divider()
+                    
                     col1, col2, col3 = st.columns(3)
                     col1.write(f"📅 **{r.get('DateNav','--')}**")
                     col2.write(f"💰 **{r.get('Prix','0')}€**")
                     col3.write(f"👥 **{r.get('Nbre de personnes','1')}p**")
                     
-                    st.write(f"⏳ **Durée :** {r.get('Nbre de jours','1')} jour(s)")
-                    st.write(f"📞 {r.get('Téléphone','---')} | ✉️ {r.get('Email','---')}")
-                    
-                    if coms and coms.lower() != "nan":
-                        st.info(f"💬 {coms}")
+                    if str(r.get('Commentaires','')).strip() not in ["nan", ""]:
+                        st.info(f"💬 {r.get('Commentaires')}")
 
-                    # Boutons d'actions
-                    st.write("")
                     b1, b2, b3 = st.columns([1,1,2])
                     if b1.button("✏️", key=f"ed_{i}", use_container_width=True):
                         st.session_state.edit_idx = i
@@ -200,7 +189,6 @@ if st.session_state.page == "CONTACTS":
                     if b2.button("🗑️", key=f"del_{i}", use_container_width=True):
                         st.session_state.confirm_del_idx = i
                         st.rerun()
-                    
                     tel = str(r.get('Téléphone','')).replace(" ","").replace(".","")
                     if tel:
                         b3.link_button("💬 WhatsApp", f"https://wa.me/{tel}", use_container_width=True)
@@ -208,18 +196,19 @@ if st.session_state.page == "CONTACTS":
     # --- ONGLET ARCHIVES ---
     with tab_archives:
         if df_arch.empty:
-            st.info("Les archives sont vides.")
+            st.info("Aucune archive pour le moment.")
         else:
             for i, r in df_arch.iterrows():
                 with st.container(border=True):
                     col_a, col_b = st.columns([3, 1])
                     with col_a:
-                        st.write(f"📁 **{r.get('Nom')}** - {r.get('DateNav')}")
-                        st.caption(f"Prix: {r.get('Prix')}€")
+                        st.write(f"✅ **{r.get('Nom')}** - {r.get('DateNav')}")
+                        st.caption(f"Clôturé & Payé ({r.get('Prix')}€)")
                     
                     if col_b.button("♻️", key=f"reac_{i}", use_container_width=True):
-                        df_c.at[i, 'Statut'] = "En attente"
+                        # Pour réactiver, on enlève le statut "Payé"
                         df_c.at[i, 'Paiement'] = "Non payé"
+                        df_c.at[i, 'Statut'] = "En attente"
                         sauvegarder_data(df_c, "contacts.json")
                         st.rerun()
 # =================================================================
