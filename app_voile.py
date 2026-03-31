@@ -183,12 +183,7 @@ elif st.session_state.page == "CONTACTS":
                 st.rerun()
         st.write("---")
 
-# =================================================================
-# --- BLOC PLANNING (À SUIVRE...) ---
-# =================================================================
-elif st.session_state.page == "PLANNING":
-    st.title("⚓ Planning des Sorties")
-    # Insérer ici la logique planning...
+
 # =================================================================
 # --- 6. PAGE PLANNING (VERSION OPTIMISÉE IPHONE) ---
 # =================================================================
