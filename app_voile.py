@@ -250,22 +250,22 @@ if st.session_state.page == "CONTACTS":
             st.markdown('<br>', unsafe_allow_html=True)
 
 # =================================================================
-# --- 6. PAGE PPLANNING (VERSION RESTAURÉE & OPTIMISÉE) ---
+# --- 6. PAGE PLANNING (VERSION FIXÉE SANS CONFLIT) ---
 # =================================================================
-
 if st.session_state.page == "PLANNING":
     st.markdown('<div class="main-header">📅 PLANNING VESTA 2026</div>', unsafe_allow_html=True)
     
-    # On importe le visuel avec un nom différent pour éviter le bug
-    from streamlit_calendar import calendar as st_calendar 
-    import calendar # Le module de calcul standard de Python
+    # 1. On donne un nom unique au dessinateur (affiche_cal)
+    from streamlit_calendar import calendar as affiche_cal
+    import calendar as cal_logic # Et un nom unique aux calculs
 
-    # --- CSS COMPACT ---
+    # --- CSS COMPACT POUR IPHONE ---
     st.markdown("""
         <style>
-            .fc { max-width: 100% !important; font-size: 0.75rem !important; }
-            .fc .fc-daygrid-day-frame { min-height: 45px !important; }
-            .block-container { padding: 1rem 0.5rem !important; }
+            .fc { max-width: 100% !important; font-size: 0.70rem !important; }
+            .fc .fc-daygrid-day-frame { min-height: 35px !important; }
+            .fc .fc-toolbar-title { font-size: 0.9rem !important; }
+            .block-container { padding: 0.5rem !important; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -282,7 +282,7 @@ if st.session_state.page == "PLANNING":
                 bg_color = "#0056b3" if "CMN" in soc else "#1a2a6c"
                 
                 calendar_events.append({
-                    "title": f"{soc} - {nom}",
+                    "title": f"{soc}-{nom}",
                     "start": date_iso,
                     "end": date_iso,
                     "color": bg_color,
@@ -290,125 +290,20 @@ if st.session_state.page == "PLANNING":
                 })
         except: continue
 
-    # --- OPTIONS ---
+    # --- CONFIGURATION DU CALENDRIER ---
     calendar_options = {
         "headerToolbar": {"left": "prev,next", "center": "title", "right": "today"},
         "initialView": "dayGridMonth",
         "locale": "fr",
         "firstDay": 1,
-        "height": "auto"
-    }
-
-    # --- AFFICHAGE (On utilise le nouveau nom st_calendar) ---
-    st_calendar(events=calendar_events, options=calendar_options, key="vesta_calendar")
-
-    # --- CONFIGURATION DU CALENDRIER COMPACT ---
-    calendar_options = {
-        "headerToolbar": {
-            "left": "prev,next",
-            "center": "title",
-            "right": "today"
-        },
-        "initialView": "dayGridMonth",
-        "editable": False,
-        "selectable": True,
-        "locale": "fr",
-        "firstDay": 1, # Lundi
-        "height": "auto", # S'adapte au contenu pour éviter le scroll interne
+        "height": "auto",
         "contentHeight": "auto"
     }
 
-    calendar(events=calendar_events, options=calendar_options, key="vesta_calendar")
+    # --- AFFICHAGE (On utilise le nouveau nom unique) ---
+    affiche_cal(events=calendar_events, options=calendar_options, key="vesta_calendar_v2")
 
-    st.info("💡 Tapote une date pour voir les détails dans l'onglet CONTACTS.")
-    
-    maintenant = datetime.now()
-    aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
-    
-    col_m, col_y = st.columns(2)
-    m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-    sel_m = m_noms.index(col_m.selectbox("Mois", m_noms, index=aujourdhui.month - 1)) + 1
-    sel_y = col_y.selectbox("Année", [2026, 2027, 2028], index=0)
-
-    # CALCUL DES OCCUPATIONS
-    jours_occ = {}
-    for _, r in df_c.iterrows():
-        try:
-            d_str = str(r.get('DateNav', '')).strip()
-            if '/' not in d_str: continue
-            parts = d_str.split('/')
-            dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
-            if yv < 100: yv += 2000
-            
-            if mv == sel_m and yv == sel_y:
-                s_val = str(r.get('Statut', '')).strip().lower()
-                if s_val in ["refusé", "archivé", "annulé"]: continue
-                
-                this_date = date(yv, mv, dv)
-                p_val = str(r.get('Paiement', '')).lower()
-                is_paye = "pay" in p_val and not any(x in p_val for x in ["non", "pas"])
-                
-                # Couleur du rond
-                if this_date < aujourdhui:
-                    color = "#3498db" if is_paye else "#e74c3c"
-                else:
-                    color = "#2ecc71" if "ok" in s_val else "#f1c40f"
-                
-                n_j = int(r.get('NbreJours', 1))
-                for j in range(dv, dv + n_j):
-                    jours_occ[j] = {"c": color}
-        except: continue
-
-    # AFFICHAGE CALENDRIER
-    jours_semaine = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
-    h_cal = '<table style="width:100%; border-collapse:collapse; text-align:center; background:white; color:black;">'
-    h_cal += '<tr style="background:#f8f9fa;">' + "".join([f'<td style="padding:10px; font-size:12px; border:1px solid #eee;">{js}</td>' for js in jours_semaine]) + '</tr>'
-    
-    cal_mat = calendar.monthcalendar(sel_y, sel_m)
-    for sem in cal_mat:
-        h_cal += '<tr>'
-        for jour in sem:
-            if jour == 0:
-                h_cal += '<td style="height:50px; border:1px solid #eee;"></td>'
-            else:
-                bg = jours_occ.get(jour, {}).get("c", "transparent")
-                txt = "white" if bg != "transparent" else "black"
-                content = f'<div style="background:{bg}; color:{txt}; border-radius:50%; width:30px; height:30px; line-height:30px; margin:auto; font-weight:bold;">{jour}</div>' if bg != "transparent" else f"{jour}"
-                h_cal += f'<td style="border:1px solid #eee; height:50px;">{content}</td>'
-        h_cal += '</tr>'
-    h_cal += '</table>'
-    st.markdown(h_cal, unsafe_allow_html=True)
-    st.caption("🔴 Passé Impayé | 🔵 Passé Payé | 🟢 OK | 🟡 Attente")
-
-    # RÉCAPITULATIF FINANCIER
-    res_list = []
-    ca_enc, ca_att = 0.0, 0.0
-    for _, r in df_c.iterrows():
-        try:
-            d_parts = str(r.get('DateNav','')).split('/')
-            if int(d_parts[1]) == sel_m and (int(d_parts[2]) == sel_y or int(d_parts[2])+2000 == sel_y):
-                if str(r.get('Statut','')).lower() not in ["refusé", "annulé"]:
-                    res_list.append(r)
-                    p_val = clean_val(r.get('Prix', 0))
-                    if "pay" in str(r.get('Paiement','')).lower() and "non" not in str(r.get('Paiement','')).lower():
-                        ca_enc += p_val
-                    else: ca_att += p_val
-        except: continue
-
-    st.divider()
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Sorties", len(res_list))
-    c2.metric("Encaissé", f"{ca_enc:.0f}€")
-    c3.metric("Attente", f"{ca_att:.0f}€")
-
-    # LISTE DES MISSIONS DU MOIS
-    for res in sorted(res_list, key=lambda x: int(str(x.get('DateNav')).split('/')[0])):
-        with st.expander(f"📅 {res.get('DateNav')} - {res.get('Nom', '').upper()}"):
-            st.write(f"🏢 {res.get('Société')} | 💰 {res.get('Prix')} €")
-            if st.button("🔎 VOIR FICHE", key=f"go_{res.get('Nom')}_{res.get('DateNav')}"):
-                st.session_state.search_contact = res.get('Nom')
-                st.session_state.page = "CONTACTS"
-                st.rerun()
+    st.write("---")
 # =================================================================
 # --- 7. PAGE STATS (VERSION RESTAURÉE & OPTIMISÉE) ---
 # =================================================================
