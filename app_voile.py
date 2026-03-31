@@ -179,8 +179,6 @@ if st.session_state.page == "CONTACTS":
     tab_encours, tab_archives = st.tabs(["📑 EN COURS", "🗄️ ARCHIVES"])
 
     with tab_encours:
-        # LOGIQUE : On exclut ceux qui sont à la fois "OK" et "Payé"
-    with tab_encours:
         # LOGIQUE : On garde TOUT SAUF ceux qui sont à la fois "OK" ET "Payé"
         # On définit ce qui doit aller en ARCHIVE
         est_archive = (df_c['Statut'].str.upper().str.contains("OK", na=False)) & \
@@ -251,12 +249,16 @@ if st.session_state.page == "CONTACTS":
                     st.rerun()
 
     # --- ICI ON SORT BIEN DU BLOC "FOR" ET DU "ELSE" ---
-    with tab_archives:
-        # LOGIQUE : Uniquement OK + PAYÉ
-        df_arch = df_c[(df_c['Statut'].str.contains("OK", case=False, na=False)) & 
-                       (df_c['Paiement'].str.contains("Payé", case=False, na=False))]
+with tab_encours:
+        # LOGIQUE : On garde TOUT SAUF ceux qui sont à la fois "OK" ET "Payé"
+        # On définit ce qui doit aller en ARCHIVE
+        est_archive = (df_c['Statut'].str.upper().str.contains("OK", na=False)) & \
+                      (df_c['Paiement'].str.upper().str.contains("PAYÉ", na=False))
         
-        st.subheader(f"✅ Dossiers clôturés ({len(df_arch)})")
+        # Pour le "EN COURS", on prend l'inverse (~)
+        df_active = df_c[~est_archive]
+
+        st.subheader(f"⛵ Suivi des dossiers ({len(df_active)})")
 
         if df_arch.empty:
             st.write("Aucune archive disponible.")
