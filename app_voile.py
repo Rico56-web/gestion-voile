@@ -178,7 +178,12 @@ if st.session_state.page == "CONTACTS":
             curr_s = str(c_ref.get('Statut', 'En attente')).capitalize()
             s_idx = l_statuts.index(curr_s) if curr_s in l_statuts else 0
             f_statut = c3.selectbox("🚦 Statut", options=l_statuts, index=s_idx)
-            f_paie = c4.selectbox("💰 Paiement", options=["Non payé", "Payé"], index=1 if "Payé" in str(c_ref.get('Paiement','')) else 0)
+            # Correction de l'index pour le formulaire de saisie
+            p_val = str(c_ref.get('Paiement', '')).strip().upper()
+            # On met l'index sur 1 (Payé) seulement si ça commence par "PAYÉ"
+            p_idx = 1 if p_val.startswith("PAYÉ") else 0
+
+            f_paie = c4.selectbox("💰 Paiement", options=["Non payé", "Payé"], index=p_idx)
 
             # Ligne 5 : Détails Navigation
             c5, c6, c7 = st.columns(3)
