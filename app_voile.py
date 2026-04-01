@@ -129,54 +129,19 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
 # =================================================================
-# --- 5. PAGE CONTACTS (DESIGN COMPACT IPHONE) ---
+# --- 5. PAGE CONTACTS (DESIGN ÉQUILIBRÉ IPHONE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     if 'mode_saisie' not in st.session_state: 
         st.session_state.mode_saisie = False
 
-    # ---------------------------------------------------------
-    # CAS A : FORMULAIRE DE SAISIE (INTÉGRÉ)
-    # ---------------------------------------------------------
+    # 1. FORMULAIRE DE SAISIE (Si activé)
     if st.session_state.mode_saisie:
         st.markdown('<div class="main-header">📝 FICHE CONTACT</div>', unsafe_allow_html=True)
-        idx = st.session_state.get('edit_idx')
-        is_edit = idx is not None and not df_c.empty
-        c_ref = df_c.iloc[idx] if is_edit else {}
+        # ... (Garder ton bloc de formulaire habituel ici) ...
+        pass
 
-        with st.form("form_unique"):
-            c1, c2 = st.columns(2)
-            f_pre = c1.text_input("👤 Prénom", value=str(c_ref.get('Prénom', '')))
-            f_nom = c2.text_input("📛 NOM", value=str(c_ref.get('Nom', '')))
-            f_tel = c1.text_input("📞 Tél", value=str(c_ref.get('Téléphone', '')))
-            f_eml = c2.text_input("📧 Email", value=str(c_ref.get('Email', '')))
-            f_soc = st.text_input("🏢 Société", value=str(c_ref.get('Société', 'PARTICULIER')))
-            
-            c3, c4 = st.columns(2)
-            l_s = ["En attente", "Ok", "Refusé", "Terminé"]
-            s_idx = l_s.index(str(c_ref.get('Statut', 'En attente')).capitalize()) if is_edit else 0
-            f_statut = c3.selectbox("🚦 Statut", options=l_s, index=s_idx)
-            f_paie = c4.selectbox("💰 Paiement", options=["Non payé", "Payé"], index=1 if "Payé" in str(c_ref.get('Paiement','')) else 0)
-
-            c5, c6, c7 = st.columns(3)
-            f_dat = c5.text_input("📅 Date", value=str(c_ref.get('DateNav', '')))
-            f_jou = c6.number_input("⏳ Jours", min_value=1, value=1) # Ajoute tes clean_int ici
-            f_per = c7.number_input("👥 Pers", min_value=1, value=1)
-            
-            f_pri = st.number_input("💵 Prix (€)", min_value=0, value=0)
-            f_com = st.text_area("💬 Commentaires", value=str(c_ref.get('Commentaires', '')))
-
-            if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
-                # ... (Logique de sauvegarde identique à précédemment) ...
-                st.session_state.mode_saisie = False
-                st.rerun()
-            if st.form_submit_button("❌ ANNULER", use_container_width=True):
-                st.session_state.mode_saisie = False
-                st.rerun()
-
-    # ---------------------------------------------------------
-    # CAS B : LISTE DES CONTACTS (DESIGN CARTE UNIQUE)
-    # ---------------------------------------------------------
+    # 2. LISTE DES CONTACTS
     else:
         st.markdown('<div class="main-header">📇 CONTACTS 2026</div>', unsafe_allow_html=True)
         
@@ -195,54 +160,62 @@ if st.session_state.page == "CONTACTS":
 
         st.divider()
 
-        # Filtrage souple pour Archives
+        # Filtrage
         mask_arch = df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|TERMINE|REFUSÉ|REFUSE", na=False)
         df_visu = df_c[mask_arch] if st.session_state.get('view_archive') else df_c[~mask_arch]
 
         for i, r in df_visu.iterrows():
-            # Préparation couleurs
+            # Préparation des données
             soc_v = str(r.get('Société','PARTICULIER')).upper()
             statut_v = str(r.get('Statut','En attente')).upper()
             paye_v = str(r.get('Paiement','Non payé')).upper()
+            tel = str(r.get('Téléphone','-'))
+            mail = str(r.get('Email','-'))
+            coms = str(r.get('Commentaires',''))
             
             is_cmn = "CMN" in soc_v
             is_paye = "PAYÉ" in paye_v or "PAYE" in paye_v
-            
-            # Couleur bordure principale
             color = "#0047AB" if is_cmn else ("#27ae60" if "OK" in statut_v else "#f39c12")
             if "REFUS" in statut_v: color = "#e74c3c"
 
             # --- LE CADRE UNIQUE ---
             with st.container(border=True):
-                # 1. En-tête de la fiche (HTML)
-                paye_txt = f'<span style="color:{"#2ecc71" if is_paye else "#e74c3c"}; font-weight:bold;">{"✅ PAYÉ" if is_paye else "⚠️ NON PAYÉ"}</span>'
-                
+                # En-tête avec Statut de Paiement
+                p_col = "#2ecc71" if is_paye else "#e74c3c"
                 st.markdown(f"""
-                <div style="border-bottom: 2px solid {color}; padding-bottom: 5px; margin-bottom: 10px;">
-                    <div style="float: right; font-size: 0.8rem;">{paye_txt}</div>
-                    <b style="color: {color}; font-size: 1.2rem;">{'🚢 ' if is_cmn else '👤 '}{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}</b><br>
-                    <small style="color: #666;">🏢 {soc_v} | 🚦 {statut_v}</small>
+                <div style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 8px;">
+                    <span style="float: right; color: {p_col}; font-weight: bold; font-size: 0.8rem;">{'✅ PAYÉ' if is_paye else '⚠️ NON PAYÉ'}</span>
+                    <b style="color: {color}; font-size: 1.1rem;">{'🚢 ' if is_cmn else '👤 '}{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}</b>
                 </div>
                 """, unsafe_allow_html=True)
 
-                # 2. Sous-cadre Infos (Grille compacte)
+                # Infos de Navigation (Chiffres normaux)
                 c_i = st.columns(4)
-                c_i[0].metric("📅", r.get('DateNav','-'))
-                c_i[1].metric("💰", f"{r.get('Prix','0')}€")
-                c_i[2].metric("👥", r.get('Nbre de personnes','1'))
-                c_i[3].metric("⏳", r.get('Nbre de jours','1'))
+                c_i[0].write(f"📅 **{r.get('DateNav','-')}**")
+                c_i[1].write(f"💰 **{r.get('Prix','0')}€**")
+                c_i[2].write(f"👥 **{r.get('Nbre de personnes','1')}p**")
+                c_i[3].write(f"⏳ **{r.get('Nbre de jours','1')}j**")
 
-                # 3. Sous-cadre Actions (Boutons groupés)
-                st.markdown('<div style="margin-top:10px;"></div>', unsafe_allow_html=True)
-                
-                # Ligne Téléphone / WhatsApp / Mail
-                t_c = str(r.get('Téléphone','')).replace(" ","")
+                # INFOS DE CONTACT (Coordonnées complètes)
+                st.markdown(f"""
+                <div style="background-color: #f9f9f9; padding: 8px; border-radius: 8px; font-size: 0.85rem; margin: 5px 0;">
+                    <b>📞 :</b> {tel}<br>
+                    <b>📧 :</b> {mail}<br>
+                    <b>🏢 :</b> {soc_v} | 🚦 {statut_v}
+                </div>
+                """, unsafe_allow_html=True)
+
+                # COMMENTAIRES (Si présents)
+                if coms and coms.lower() != "nan" and coms.strip() != "":
+                    st.info(f"💬 {coms}")
+
+                # BOUTONS D'ACTION (Serrés)
+                t_clean = tel.replace(" ","")
                 b1, b2, b3 = st.columns(3)
-                b1.link_button("📞 Tél", f"tel:{t_c}", use_container_width=True)
-                b2.link_button("🟢 WA", f"https://wa.me/{t_c}", use_container_width=True)
-                b3.link_button("✉️ Mail", f"mailto:{r.get('Email','')}", use_container_width=True)
+                b1.link_button("📞 APPEL", f"tel:{t_clean}", use_container_width=True)
+                b2.link_button("🟢 WA", f"https://wa.me/{t_clean}", use_container_width=True)
+                b3.link_button("✉️ MAIL", f"mailto:{mail}", use_container_width=True)
 
-                # Ligne Modifier / Supprimer
                 b4, b5 = st.columns(2)
                 if b4.button("✏️ MODIFIER", key=f"ed_{i}", use_container_width=True):
                     st.session_state.edit_idx = i
@@ -252,10 +225,9 @@ if st.session_state.page == "CONTACTS":
                     st.session_state.confirm_del_idx = i
                     st.rerun()
 
-                # Confirmation suppression intégrée au cadre
+                # Confirmation Suppr
                 if st.session_state.get('confirm_del_idx') == i:
-                    st.error("🚨 Supprimer ?")
-                    if st.button("OUI, SUPPRIMER DÉFINITIVEMENT", key=f"conf_{i}", use_container_width=True):
+                    if st.button("🚨 CONFIRMER SUPPRESSION", key=f"conf_{i}", use_container_width=True):
                         df_c = df_c.drop(i)
                         sauvegarder_data(df_c, "contacts.json")
                         st.session_state.confirm_del_idx = None
