@@ -193,19 +193,38 @@ if st.session_state.page == "CONTACTS":
             # Boutons de validation (toujours dans le form)
             b_save, b_annul = st.columns(2)
             if b_save.form_submit_button("💾 ENREGISTRER", use_container_width=True):
-                new_row = {
-                    "Prénom": f_pre, "Nom": f_nom.upper(), "Téléphone": f_tel, "Email": f_eml, 
-                    "Société": f_soc, "Statut": f_statut, "DateNav": f_dat, 
-                    "Nbre de jours": f_jou, "Nbre de personnes": f_per, 
-                    "Prix": f_pri, "Paiement": f_paie, "Commentaires": clean_text(f_com)
+                # 1. Création de la nouvelle ligne proprement
+                new_data = {
+                    "Prénom": str(f_pre), 
+                    "Nom": str(f_nom).upper(), 
+                    "Téléphone": str(f_tel), 
+                    "Email": str(f_eml), 
+                    "Société": str(f_soc), 
+                    "Statut": str(f_statut), 
+                    "DateNav": str(f_dat), 
+                    "Nbre de jours": int(f_jou), 
+                    "Nbre de personnes": int(f_per), 
+                    "Prix": int(f_pri), 
+                    "Paiement": str(f_paie), 
+                    "Commentaires": clean_text(f_com)
                 }
+
                 if is_edit:
-                    for col, val in new_row.items(): df_c.at[idx, col] = val
+                    # ✅ MÉTHODE ANTI-PLANTAGE : On supprime l'ancienne et on insère la nouvelle
+                    # Cela évite le conflit de type de colonne de Pandas
+                    df_c = df_c.drop(idx)
+                    df_new_line = pd.DataFrame([new_data])
+                    df_c = pd.concat([df_c, df_new_line], ignore_index=True)
                 else:
-                    df_c = pd.concat([df_c, pd.DataFrame([new_row])], ignore_index=True)
+                    # CRÉATION SIMPLE
+                    df_new_line = pd.DataFrame([new_data])
+                    df_c = pd.concat([df_c, df_new_line], ignore_index=True)
                 
+                # 2. Sauvegarde et remise à zéro
                 sauvegarder_data(df_c, "contacts.json")
                 st.session_state.mode_saisie = False
+                st.session_state.edit_idx = None
+                st.success("Fiche mise à jour !")
                 st.rerun()
 
             if b_annul.form_submit_button("❌ ANNULER", use_container_width=True):
