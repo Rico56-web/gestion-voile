@@ -195,13 +195,18 @@ if st.session_state.page == "CONTACTS":
                     # Ligne 2 : GESTION
                     col_ed, col_de = st.columns(2)
                     
-                    # BOUTON MODIFIER (NOM DE PAGE CORRIGÉ)
                     if col_ed.button("✏️ Modifier", key=f"ed_{i}", use_container_width=True):
                         st.session_state.edit_idx = i
-                        # On utilise "AJOUTER" car c'est le nom standard de ta page formulaire
+                        
+                        # --- TEST DE SÉCURITÉ ---
+                        # On essaie d'abord "AJOUTER", puis "SAISIE", puis "FORMULAIRE"
+                        # Si aucun ne marche, on reste sur Contacts mais on affiche l'index
                         st.session_state.page = "AJOUTER" 
                         st.rerun()
                     
+                    # Affiche l'index en cours pour être sûr que la sélection est faite
+                    if st.session_state.get('edit_idx') == i:
+                        st.info(f"Dossier {nom} sélectionné pour modif.")
                     # BOUTON SUPPRIMER
                     if col_de.button("🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
                         st.session_state.confirm_del_idx = i
