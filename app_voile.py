@@ -236,46 +236,80 @@ if st.session_state.page == "CONTACTS":
         # Filtre
         mask_arch = df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|TERMINE|REFUSÉ|REFUSE", na=False)
         df_visu = df_c[mask_arch] if st.session_state.view_archive else df_c[~mask_arch]
-
         for i, r in df_visu.iterrows():
+            # 1. On définit proprement les variables AVANT de les utiliser
             statut_v = str(r.get('Statut','')).upper()
             soc_v = str(r.get('Société','PARTICULIER')).upper()
-            p_v = str(r.get('Paiement', 'Non payé')).strip().upper()
+            
+            # ✅ On utilise p_val ici pour correspondre à ta ligne 244
+            p_val = str(r.get('Paiement', 'Non payé')).strip().upper()
+            
+            # ✅ Maintenant la ligne 244 ne plantera plus
             is_paye = p_val.startswith("PAYÉ") or p_val == "PAYE"
             
-            # ✅ Couleur CMN (Bleu) ou OK (Vert)
+            # 2. Couleurs et Pastilles
             b_color = "#0047AB" if "CMN" in soc_v else ("#27ae60" if "OK" in statut_v else "#f39c12")
             if "REFUS" in statut_v: b_color = "#e74c3c"
+            
+            p_col = "#27ae60" if is_paye else "#e74c3c"
+            pastille = "🟢 " if "OK" in statut_v else ""
 
             with st.container(border=True):
-                # ✅ PASTILLE OK + PAIEMENT
-                pastille = "🟢 " if "OK" in statut_v else ""
-                p_col = "#27ae60" if is_paye else "#e74c3c"
-                
+                # EN-TÊTE
                 st.markdown(f"""
                 <div style="border-bottom: 2px solid {b_color}; margin-bottom: 10px;">
-                    <span style="float: right; color: {p_col}; font-weight: bold; font-size: 0.85rem;">{"✅ PAYÉ" if is_paye else "⚠️ NON PAYÉ"}</span>
+                    <span style="float: right; color: {p_col}; font-weight: bold; font-size: 0.85rem; background-color: {p_col}22; padding: 2px 6px; border-radius: 5px;">
+                        {"✅ PAYÉ" if is_paye else "⚠️ NON PAYÉ"}
+                    </span>
                     <b style="color: {b_color}; font-size: 1.1rem;">{pastille}{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}</b>
                 </div>
                 """, unsafe_allow_html=True)
 
-                # ✅ LIGNE SOCIÉTÉ ET COORDONNÉES
+                # ✅ AFFICHAGE SOCIÉTÉ (Ligne que tu voulais)
                 st.write(f"🏢 **SOCIÉTÉ : {soc_v}**")
+                
+                # COORDONNÉES
                 st.write(f"📞 {r.get('Téléphone','-')} | 📧 {r.get('Email','-')}")
                 
-                # Metrics
+                # CHIFFRES
                 cols = st.columns(4)
                 cols[0].write(f"📅**{r.get('DateNav','-')}**")
                 cols[1].write(f"💰**{r.get('Prix','0')}€**")
                 cols[2].write(f"👥**{r.get('Nbre de personnes','1')}p**")
                 cols[3].write(f"⏳**{r.get('Nbre de jours','1')}j**")
 
-                # Commentaire
-                com = r.get('Commentaires', '')
-                if com and str(com).strip() != "" and str(com).lower() != "nan":
-                    st.warning(f"💬 **NOTE :** {com}")
+                # COMMENTAIRE (Post-it)
+                com_txt = r.get('Commentaires', '')
+                if com_txt and str(com_txt).strip() != "" and str(com_txt).lower() != "nan":
+                    st.warning(f"💬 **NOTE :** {com_txt}")
 
-                # Boutons... (identiques à précédemment)
+                st.write("") # Espace
+
+                # BOUTONS CONTACT (Appel / WA / Mail)
+                t_clean = str(r.get('Téléphone','')).replace(" ","")
+                bc1, bc2, bc3 = st.columns(3)
+                bc1.link_button("📞 APPEL", f"tel:{t_clean}", use_container_width=True)
+                bc2.link_button("🟢 WA", f"https://wa.me/{t_clean}", use_container_width=True)
+                bc3.link_button("✉️ MAIL", f"mailto:{r.get('Email','')}", use_container_width=True)
+
+                # BOUTONS GESTION (Modifier / Supprimer)
+                bg1, bg2 = st.columns(2)
+                if bg1.button("✏️ MODIFIER", key=f"edit_{i}", use_container_width=True, type="secondary"):
+                    st.session_state.edit_idx = i
+                    st.session_state.mode_saisie = True
+                    st.rerun()
+                if bg2.button("🗑️ SUPPR.", key=f"del_{i}", use_container_width=True, type="secondary"):
+                    st.session_state.confirm_del_idx = i
+                    st.rerun()
+
+                # Sécurité suppression
+                if st.session_state.get('confirm_del_idx') == i:
+                    if st.button("🚨 CONFIRMER", key=f"conf_{i}", use_container_width=True):
+                        df_c = df_c.drop(i).reset_index(drop=True)
+                        sauvegarder_data(df_c, "contacts.json")
+                        st.session_state.confirm_del_idx = None
+                        st.rerun()
+
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
