@@ -128,9 +128,8 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
-
 # =================================================================
-# --- 5. PAGE CONTACTS (REPRISE ET CORRECTION FINALE) ---
+# --- 5. PAGE CONTACTS (VERSION ERGONOMIQUE IPHONE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("📇 VESTA SKIPPER 2026")
@@ -161,61 +160,78 @@ if st.session_state.page == "CONTACTS":
                 
                 is_cmn = "CMN" in soc
                 is_paye = "PAYÉ" in p_val or "PAYE" in p_val
+                # Couleur de bordure : Bleu CMN, Vert OK, Orange reste
                 b_color = "#0047AB" if is_cmn else ("#27ae60" if "OK" in s_val else "#f39c12")
 
-                # --- AFFICHAGE DE LA FICHE ---
+                # --- 1. ENTÊTE DE FICHE ---
                 p_label = f'<b style="color:red;">⚠️ {p_val}</b>' if not is_paye else f'<b style="color:blue;">✅ {p_val}</b>'
                 
                 st.markdown(f"""
-                <div style="background-color: white; border-left: 10px solid {b_color}; border: 1px solid #ddd; padding: 10px; border-radius: 12px; margin-bottom: 5px;">
-                    <div style="display: flex; justify-content:建设-between; font-size: 0.8rem;">{p_label}</div>
+                <div style="background-color: white; border-left: 10px solid {b_color}; border: 1px solid #ddd; padding: 10px; border-radius: 12px 12px 0 0; margin-bottom: 0px;">
+                    <div style="font-size: 0.8rem; margin-bottom: 2px;">{p_label}</div>
                     <b style="color: {b_color}; font-size: 1.1rem;">{'🚢 ' if is_cmn else '👤 '}{nom}</b><br>
                     <span style="font-size: 0.8rem; color: #666;">🏢 {soc} | STATUT: {s_val}</span>
                 </div>
                 """, unsafe_allow_html=True)
 
+                # --- 2. CORPS DE FICHE ---
                 with st.container(border=True):
-                    # Infos compactes
+                    # Infos compactes sur une ligne
                     c1, c2, c3, c4 = st.columns(4)
                     c1.write(f"📅**{r.get('DateNav','--')}**")
                     c2.write(f"💰**{r.get('Prix','0')}€**")
                     c3.write(f"👥**{r.get('Nbre de personnes','1')}p**")
                     c4.write(f"⏳**{n_jours}j**")
                     
-                    # --- ZONE BOUTONS ULTRA-COMPACTE ---
+                    # --- 3. ZONE BOUTONS ULTRA-COMPACTE ---
                     t_link = tel.replace(" ","").replace(".","")
                     
-                    # Ligne 1 : CONTACT (3 boutons)
+                    # Ligne 1 : CONTACTS
                     col_t, col_w, col_m = st.columns(3)
                     col_t.link_button("📞 Tél", f"tel:{t_link}", use_container_width=True)
                     col_w.link_button("💬 WA", f"https://wa.me/{t_link}", use_container_width=True)
                     col_m.link_button("📧 Mail", f"mailto:{mail}", use_container_width=True)
 
-                    # Ligne 2 : GESTION (2 boutons)
+                    # Ligne 2 : GESTION
                     col_ed, col_de = st.columns(2)
+                    
+                    # BOUTON MODIFIER (NOM DE PAGE CORRIGÉ)
                     if col_ed.button("✏️ Modifier", key=f"ed_{i}", use_container_width=True):
                         st.session_state.edit_idx = i
-                        st.session_state.page = "MODIFICATION" # Ajuste ce nom si besoin
+                        # On utilise "AJOUTER" car c'est le nom standard de ta page formulaire
+                        st.session_state.page = "AJOUTER" 
                         st.rerun()
                     
-                    # Bouton Supprimer
+                    # BOUTON SUPPRIMER
                     if col_de.button("🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
                         st.session_state.confirm_del_idx = i
                         st.rerun()
 
-                    # --- CONFIRMATION SUPPRESSION (Dans la fiche) ---
+                    # --- CONFIRMATION DE SUPPRESSION ---
                     if st.session_state.get('confirm_del_idx') == i:
-                        st.warning("❓ Supprimer ce dossier ?")
+                        st.error("❓ Supprimer définitivement ?")
                         ca, cb = st.columns(2)
-                        if ca.button("ANNULER", key=f"no_{i}", use_container_width=True):
+                        if ca.button("NON", key=f"no_{i}", use_container_width=True):
                             st.session_state.confirm_del_idx = None
                             st.rerun()
-                        if cb.button("OUI, SUPPRIMER", key=f"yes_{i}", use_container_width=True):
-                            # Action de suppression réelle
+                        if cb.button("OUI", key=f"yes_{i}", use_container_width=True):
                             df_c = df_c.drop(i)
                             sauvegarder_data(df_c, "contacts.json")
                             st.session_state.confirm_del_idx = None
                             st.rerun()
+                st.write("") # Petit espace entre les clients
+
+    # --- ARCHIVES ---
+    with tab_archives:
+        for i, r in df_arch.iterrows():
+            with st.container(border=True):
+                st.write(f"📁 **{r.get('Nom')}** - {r.get('DateNav')}")
+                if st.button("♻️ Réactiver", key=f"reac_{i}", use_container_width=True):
+                    df_c.at[i, 'Statut'] = "En attente"
+                    df_c.at[i, 'Paiement'] = "Non payé"
+                    sauvegarder_data(df_c, "contacts.json")
+                    st.rerun()
+
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
