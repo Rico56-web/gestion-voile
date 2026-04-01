@@ -192,8 +192,8 @@ if st.session_state.page == "CONTACTS":
                     col_w.link_button("💬 WA", f"https://wa.me/{t_link}", use_container_width=True)
                     col_m.link_button("📧 Mail", f"mailto:{mail}", use_container_width=True)
 
-                   # Ligne 2 : GESTION
-                      col_ed, col_de = st.columns(2)
+                    # Ligne 2 : GESTION
+                    col_ed, col_de = st.columns(2)
                     
                     if col_ed.button("✏️ Modifier", key=f"ed_{i}", use_container_width=True):
                         st.session_state.edit_idx = i
