@@ -171,7 +171,7 @@ if st.session_state.page == "CONTACTS":
             
             f_pri = st.number_input("💵 Prix (€)", min_value=0, value=safe_val(c_ref.get('Prix'), 0))
             f_com = st.text_area("💬 Commentaires (IMPORTANT)", value=str(c_ref.get('Commentaires', '')))
-         if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
+            if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
                 new_row = {
                     "Prénom": f_pre, "Nom": f_nom.upper(), "Téléphone": f_tel, 
                     "Email": f_eml, "Société": f_soc, "Statut": f_statut, 
