@@ -157,91 +157,65 @@ if st.session_state.page == "CONTACTS":
                 p_val = str(r.get('Paiement','Non payé')).upper()
                 tel = str(r.get('Téléphone','')).strip()
                 mail = str(r.get('Email','')).strip()
-                coms = str(r.get('Commentaires','')).strip()
-                n_jours = str(r.get('Nbre de jours','1')) # Nombre de jours
+                n_jours = str(r.get('Nbre de jours','1'))
                 
-                # --- LOGIQUE COULEURS ---
                 is_cmn = "CMN" in soc
                 is_paye = "PAYÉ" in p_val or "PAYE" in p_val
-                
-                # Couleur de fond et bordure
-                if is_cmn: bg_col, bord_col = "#ebf5fb", "#0047AB"
-                elif "OK" in s_val: bg_col, bord_col = "#eafaf1", "#27ae60"
-                else: bg_col, bord_col = "#fef9e7", "#f39c12"
+                b_color = "#0047AB" if is_cmn else ("#27ae60" if "OK" in s_val else "#f39c12")
 
                 # --- AFFICHAGE DE LA FICHE ---
-                # Le paiement "PAS PAYÉ" est mis en rouge et à gauche
-                p_html = f'<span style="color:red; font-weight:bold;">⚠️ {p_val}</span>' if not is_paye else f'<span style="color:blue;">✅ {p_val}</span>'
+                p_label = f'<b style="color:red;">⚠️ {p_val}</b>' if not is_paye else f'<b style="color:blue;">✅ {p_val}</b>'
                 
                 st.markdown(f"""
-                <div style="background-color: {bg_col}; border-left: 10px solid {bord_col}; padding: 12px; border-radius: 12px; margin-bottom: 5px;">
-                    <div style="font-size: 0.8rem; margin-bottom: 5px;">{p_html}</div>
-                    <b style="color: {bord_col}; font-size: 1.15rem;">{'🚢 ' if is_cmn else '👤 '}{nom}</b><br>
-                    <span style="font-size: 0.85rem; font-weight: bold; color: #555;">🏢 {soc} | STATUT: {s_val}</span>
+                <div style="background-color: white; border-left: 10px solid {b_color}; border: 1px solid #ddd; padding: 10px; border-radius: 12px; margin-bottom: 5px;">
+                    <div style="display: flex; justify-content:建设-between; font-size: 0.8rem;">{p_label}</div>
+                    <b style="color: {b_color}; font-size: 1.1rem;">{'🚢 ' if is_cmn else '👤 '}{nom}</b><br>
+                    <span style="font-size: 0.8rem; color: #666;">🏢 {soc} | STATUT: {s_val}</span>
                 </div>
                 """, unsafe_allow_html=True)
 
                 with st.container(border=True):
-                    # Grille d'infos avec le Nombre de Jours
+                    # Infos compactes
                     c1, c2, c3, c4 = st.columns(4)
                     c1.write(f"📅**{r.get('DateNav','--')}**")
                     c2.write(f"💰**{r.get('Prix','0')}€**")
                     c3.write(f"👥**{r.get('Nbre de personnes','1')}p**")
-                    c4.write(f"⏳**{n_jours}j**") # Affichage du nombre de jours
+                    c4.write(f"⏳**{n_jours}j**")
                     
-                    st.write(f"📞 {tel} | 📧 {mail}")
-                    if coms and coms.lower() != "nan":
-                        st.info(f"💬 {coms}")
-
-                    # --- BOUTONS CONTACTS ---
+                    # --- ZONE BOUTONS ULTRA-COMPACTE ---
                     t_link = tel.replace(" ","").replace(".","")
-                    col_t, col_w, col_m = st.columns(3)
-                    if t_link:
-                        col_t.link_button("📞 Appeler", f"tel:{t_link}", use_container_width=True)
-                        col_w.link_button("💬 WA", f"https://wa.me/{t_link}", use_container_width=True)
-                    if mail:
-                        col_m.link_button("📧 Mail", f"mailto:{mail}", use_container_width=True)
-
-                    # --- BOUTONS GESTION (FIXÉS) ---
-                    st.divider()
-                    col_edit, col_del = st.columns(2)
                     
-                    # Bouton Modifier (Redirige vers la page de saisie)
-                    if col_edit.button("✏️ Modifier", key=f"ed_{i}", use_container_width=True):
-                        st.session_state.edit_idx = i
-                        # Assure-toi que "AJOUTER" ou "MODIF" est le nom exact de ta page formulaire
-                        st.session_state.page = "MODIFICATION" 
-                        st.rerun()
+                    # Ligne 1 : CONTACT (3 boutons)
+                    col_t, col_w, col_m = st.columns(3)
+                    col_t.link_button("📞 Tél", f"tel:{t_link}", use_container_width=True)
+                    col_w.link_button("💬 WA", f"https://wa.me/{t_link}", use_container_width=True)
+                    col_m.link_button("📧 Mail", f"mailto:{mail}", use_container_width=True)
 
-                    # Bouton Supprimer avec Confirmation
-                    if col_del.button("🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
+                    # Ligne 2 : GESTION (2 boutons)
+                    col_ed, col_de = st.columns(2)
+                    if col_ed.button("✏️ Modifier", key=f"ed_{i}", use_container_width=True):
+                        st.session_state.edit_idx = i
+                        st.session_state.page = "MODIFICATION" # Ajuste ce nom si besoin
+                        st.rerun()
+                    
+                    # Bouton Supprimer
+                    if col_de.button("🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
                         st.session_state.confirm_del_idx = i
                         st.rerun()
 
-                    # Fenêtre de confirmation si on a cliqué sur Supprimer
+                    # --- CONFIRMATION SUPPRESSION (Dans la fiche) ---
                     if st.session_state.get('confirm_del_idx') == i:
-                        st.error("⚠️ Confirmer la suppression ?")
-                        c_annul, c_conf = st.columns(2)
-                        if c_annul.button("Annuler", key=f"annul_{i}", use_container_width=True):
+                        st.warning("❓ Supprimer ce dossier ?")
+                        ca, cb = st.columns(2)
+                        if ca.button("ANNULER", key=f"no_{i}", use_container_width=True):
                             st.session_state.confirm_del_idx = None
                             st.rerun()
-                        if c_conf.button("OUI, Supprimer", key=f"conf_{i}", use_container_width=True):
+                        if cb.button("OUI, SUPPRIMER", key=f"yes_{i}", use_container_width=True):
+                            # Action de suppression réelle
                             df_c = df_c.drop(i)
                             sauvegarder_data(df_c, "contacts.json")
                             st.session_state.confirm_del_idx = None
-                            st.success("Dossier supprimé")
                             st.rerun()
-
-    # --- ARCHIVES ---
-    with tab_archives:
-        for i, r in df_arch.iterrows():
-            with st.container(border=True):
-                st.write(f"📁 **{r.get('Nom')}** - {r.get('DateNav')}")
-                if st.button("♻️ Réactiver", key=f"reac_{i}", use_container_width=True):
-                    df_c.at[i, 'Statut'] = "En attente"
-                    df_c.at[i, 'Paiement'] = "Non payé"
-                    sauvegarder_data(df_c, "contacts.json")
-                    st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
