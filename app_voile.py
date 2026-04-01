@@ -143,15 +143,15 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
 # =================================================================
-# --- 5. PAGE CONTACTS (SAISIE COMPLÈTE + LISTE TOTALE) ---
+# --- 5. PAGE CONTACTS (VERSION FINALE SÉCURISÉE IPHONE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    # Initialisation forcée pour éviter les erreurs de navigation
+    # Initialisation des variables d'état
     if 'mode_saisie' not in st.session_state: st.session_state.mode_saisie = False
     if 'view_archive' not in st.session_state: st.session_state.view_archive = False
 
     # ---------------------------------------------------------
-    # CAS A : LE FORMULAIRE DE SAISIE (Vérifie bien TOUTES les lignes)
+    # CAS A : LE FORMULAIRE DE SAISIE (Modif / Nouveau)
     # ---------------------------------------------------------
     if st.session_state.mode_saisie:
         st.markdown('<div class="main-header">📝 FICHE CONTACT</div>', unsafe_allow_html=True)
@@ -178,11 +178,10 @@ if st.session_state.page == "CONTACTS":
             curr_s = str(c_ref.get('Statut', 'En attente')).capitalize()
             s_idx = l_statuts.index(curr_s) if curr_s in l_statuts else 0
             f_statut = c3.selectbox("🚦 Statut", options=l_statuts, index=s_idx)
-            # Correction de l'index pour le formulaire de saisie
+            
+            # ✅ CORRECTION LOGIQUE PAIEMENT (Index Sécurisé)
             p_val = str(c_ref.get('Paiement', '')).strip().upper()
-            # On met l'index sur 1 (Payé) seulement si ça commence par "PAYÉ"
             p_idx = 1 if p_val.startswith("PAYÉ") else 0
-
             f_paie = c4.selectbox("💰 Paiement", options=["Non payé", "Payé"], index=p_idx)
 
             # Ligne 5 : Détails Navigation
@@ -193,12 +192,12 @@ if st.session_state.page == "CONTACTS":
             
             # Ligne 6 : Prix et Commentaires
             f_pri = st.number_input("💵 Prix Total (€)", min_value=0, value=safe_val(c_ref.get('Prix'), 0))
+            # ✅ On assure que le commentaire est bien chargé
             f_com = st.text_area("💬 Commentaires / Notes particulières", value=str(c_ref.get('Commentaires', '')))
 
-            # Boutons de validation (toujours dans le form)
+            # Boutons de validation
             b_save, b_annul = st.columns(2)
             if b_save.form_submit_button("💾 ENREGISTRER", use_container_width=True):
-                # 1. Création de la nouvelle ligne proprement
                 new_data = {
                     "Prénom": str(f_pre), 
                     "Nom": str(f_nom).upper(), 
@@ -215,21 +214,17 @@ if st.session_state.page == "CONTACTS":
                 }
 
                 if is_edit:
-                    # ✅ MÉTHODE ANTI-PLANTAGE : On supprime l'ancienne et on insère la nouvelle
-                    # Cela évite le conflit de type de colonne de Pandas
+                    # ✅ MÉTHODE ANTI-PLANTAGE PANDAS 3.13
                     df_c = df_c.drop(idx)
                     df_new_line = pd.DataFrame([new_data])
                     df_c = pd.concat([df_c, df_new_line], ignore_index=True)
                 else:
-                    # CRÉATION SIMPLE
                     df_new_line = pd.DataFrame([new_data])
                     df_c = pd.concat([df_c, df_new_line], ignore_index=True)
                 
-                # 2. Sauvegarde et remise à zéro
                 sauvegarder_data(df_c, "contacts.json")
                 st.session_state.mode_saisie = False
                 st.session_state.edit_idx = None
-                st.success("Fiche mise à jour !")
                 st.rerun()
 
             if b_annul.form_submit_button("❌ ANNULER", use_container_width=True):
@@ -237,12 +232,12 @@ if st.session_state.page == "CONTACTS":
                 st.rerun()
 
     # ---------------------------------------------------------
-    # CAS B : LA LISTE DES CONTACTS (Si tous disparaissent, vérifie ici)
+    # CAS B : LA LISTE DES CONTACTS (Affichage par défaut)
     # ---------------------------------------------------------
     else:
         st.markdown('<div class="main-header">📇 CONTACTS 2026</div>', unsafe_allow_html=True)
         
-        # Navigation
+        # Navigation haute
         n1, n2, n3 = st.columns([1, 1, 1.2])
         if n1.button("⛵ EN COURS", use_container_width=True, type="primary" if not st.session_state.view_archive else "secondary"):
             st.session_state.view_archive = False
@@ -257,62 +252,66 @@ if st.session_state.page == "CONTACTS":
 
         st.divider()
 
-        # LOGIQUE DE FILTRE : On simplifie pour ne rien perdre
-        # Archives = Uniquement si c'est explicitement marqué "Terminé" ou "Refusé"
+        # Filtre intelligent
         mask_arch = df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|TERMINE|REFUSÉ|REFUSE", na=False)
-        
         df_visu = df_c[mask_arch] if st.session_state.view_archive else df_c[~mask_arch]
 
         if df_visu.empty:
             st.info("Aucune fiche dans cette catégorie.")
         else:
             for i, r in df_visu.iterrows():
-                # --- AFFICHAGE DE LA CARTE (Design Post-it + Pastille) ---
+                # Préparation des variables visuelles
                 statut_v = str(r.get('Statut','')).upper()
                 soc_v = str(r.get('Société','')).upper()
-                p_v = str(r.get('Paiement','')).upper()
-                is_paye = "PAYÉ" in p_v or "PAYE" in p_v
+                p_v = str(r.get('Paiement','')).strip().upper()
                 
-                # Couleur bordure
+                # ✅ CORRECTION DÉTECTION PAIEMENT
+                is_paye = p_v.startswith("PAYÉ") or p_v == "PAYE"
+                
+                # Couleur selon Société (CMN) ou Statut
                 b_color = "#0047AB" if "CMN" in soc_v else ("#27ae60" if "OK" in statut_v else "#f39c12")
                 if "REFUS" in statut_v: b_color = "#e74c3c"
 
                 with st.container(border=True):
-                    # En-tête avec pastille 🟢 si OK
+                    # En-tête : Pastille 🟢 et Statut de paiement
                     pastille = "🟢 " if "OK" in statut_v else ""
-                    paye_lbl = f'<span style="float:right; color:{"#27ae60" if is_paye else "#e74c3c"}; font-weight:bold;">{"✅ PAYÉ" if is_paye else "⚠️ NON PAYÉ"}</span>'
+                    p_col = "#27ae60" if is_paye else "#e74c3c"
+                    p_txt = "✅ PAYÉ" if is_paye else "⚠️ NON PAYÉ"
                     
                     st.markdown(f"""
-                    <div style="border-bottom: 2px solid {b_color}; margin-bottom: 8px;">
-                        {paye_lbl}
+                    <div style="border-bottom: 2px solid {b_color}; padding-bottom: 5px; margin-bottom: 10px;">
+                        <span style="float: right; color: {p_col}; font-weight: bold; font-size: 0.85rem; background-color: {p_col}22; padding: 2px 6px; border-radius: 5px;">
+                            {p_txt}
+                        </span>
                         <b style="color: {b_color}; font-size: 1.1rem;">{pastille}{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}</b>
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # Coordonnées directes
+                    # Coordonnées
                     st.write(f"📞 **{r.get('Téléphone','-')}** | 📧 **{r.get('Email','-')}**")
                     
-                    # Chiffres clés
+                    # Chiffres clés (Metrics taille humaine)
                     c_i = st.columns(4)
                     c_i[0].write(f"📅 **{r.get('DateNav','-')}**")
                     c_i[1].write(f"💰 **{r.get('Prix','0')}€**")
                     c_i[2].write(f"👥 **{r.get('Nbre de personnes','1')}p**")
                     c_i[3].write(f"⏳ **{r.get('Nbre de jours','1')}j**")
 
-                    # Commentaire (Post-it Jaune)
-                    com = clean_text(r.get('Commentaires', ''))
-                    if com:
+                    # ✅ ZONE COMMENTAIRE (Type Post-it Jaune)
+                    com = r.get('Commentaires', '')
+                    if com and str(com).strip() != "" and str(com).lower() != "nan":
                         st.warning(f"💬 **NOTE :** {com}")
 
-                    # Boutons Contact
-                    st.write("")
+                    st.write("") # Espace
+
+                    # BLOC CONTACT (Boutons couleurs)
                     t_clean = str(r.get('Téléphone','')).replace(" ","")
                     bc1, bc2, bc3 = st.columns(3)
                     bc1.link_button("📞 APPEL", f"tel:{t_clean}", use_container_width=True)
                     bc2.link_button("🟢 WA", f"https://wa.me/{t_clean}", use_container_width=True)
                     bc3.link_button("✉️ MAIL", f"mailto:{r.get('Email','')}", use_container_width=True)
 
-                    # Boutons Gestion (Gris)
+                    # BLOC GESTION (Boutons gris)
                     bg1, bg2 = st.columns(2)
                     if bg1.button("✏️ MODIFIER", key=f"edit_{i}", use_container_width=True, type="secondary"):
                         st.session_state.edit_idx = i
@@ -321,6 +320,14 @@ if st.session_state.page == "CONTACTS":
                     if bg2.button("🗑️ SUPPR.", key=f"del_{i}", use_container_width=True, type="secondary"):
                         st.session_state.confirm_del_idx = i
                         st.rerun()
+
+                    # Confirmation Suppression
+                    if st.session_state.get('confirm_del_idx') == i:
+                        if st.button("🚨 CONFIRMER SUPPRESSION", key=f"conf_{i}", use_container_width=True):
+                            df_c = df_c.drop(i).reset_index(drop=True)
+                            sauvegarder_data(df_c, "contacts.json")
+                            st.session_state.confirm_del_idx = None
+                            st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
