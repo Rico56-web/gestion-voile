@@ -6,7 +6,21 @@ import os
 import html
 import streamlit.components.v1 as components
 from datetime import datetime, date
- 
+# --- FONCTIONS DE SÉCURITÉ ---
+def clean_text(text):
+    """Nettoie le texte pour éviter de casser le JSON (supprime retours à la ligne et guillemets)"""
+    if text is None or pd.isna(text): 
+        return ""
+    # Remplace les guillemets doubles par des simples et supprime les sauts de ligne
+    return str(text).replace("\n", " ").replace('"', "'").strip()
+
+def safe_val(val, default=0):
+    """Convertit en entier sans planter"""
+    try:
+        if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan": return default
+        clean = "".join(filter(str.isdigit, str(val).split('.')[0]))
+        return int(clean) if clean else default
+    except: return default 
 # --- 1. CONFIGURATION & STYLE ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
