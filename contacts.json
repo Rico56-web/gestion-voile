@@ -34,7 +34,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":null
+        "Commentaires":null,
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Pedro",
@@ -71,7 +73,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":null
+        "Commentaires":null,
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Benoit",
@@ -108,7 +112,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":"None"
+        "Commentaires":"None",
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"CMN",
@@ -145,7 +151,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":null
+        "Commentaires":null,
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"",
@@ -182,44 +190,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":null
-    },
-    {
-        "Pr\u00e9nom":"Aurelien",
-        "Nom":"FAUCHEUX",
-        "Soci\u00e9t\u00e9":"PARTICULIER",
-        "Statut":"OK",
-        "Paiement":"Non pay\u00e9",
-        "DateNav":"04\/04\/2026",
-        "Prix":"540.00",
-        "NbreJours":"3",
-        "NbrePers":"1.0",
-        "T\u00e9l\u00e9phone":"0648470438",
-        "Email":"Aurelien.faucheux@gmail.com",
-        "Notes":"Ras",
-        "NbJours":"3",
-        "Paye":null,
-        "PrixJour":"540",
-        "Passagers":"",
-        "Historique":"",
-        "Milles":"0",
-        "HeuresMoteur":"0",
-        "dt_obj":1775260800000.0,
-        "dt_sort":1775260800000.0,
-        "dt":"1775260800000",
-        "Mail":null,
-        "Date":null,
-        "Jours":null,
-        "Date Nav":"04\/04\/2026",
-        "Nb jours":"4",
-        "Heures moteur":null,
-        "Passager":null,
-        "dt obj":null,
-        "dt sort":null,
-        "Prenom":null,
-        "Societe":null,
-        "Telephone":null,
-        "Commentaires":"None"
+        "Commentaires":null,
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Gildas",
@@ -256,7 +229,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":null
+        "Commentaires":null,
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Benoit",
@@ -293,7 +268,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":"Appel le 26\/03\/ pour reserver"
+        "Commentaires":"Appel le 26\/03\/ pour reserver",
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Camille",
@@ -330,7 +307,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":"None"
+        "Commentaires":"None",
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Laurent",
@@ -367,7 +346,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":null
+        "Commentaires":null,
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Julien",
@@ -404,7 +385,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":null
+        "Commentaires":null,
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Laurent",
@@ -441,7 +424,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":null
+        "Commentaires":null,
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Brigitte",
@@ -478,7 +463,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":null
+        "Commentaires":null,
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Florence et dominique",
@@ -515,7 +502,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":null
+        "Commentaires":null,
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Laurent",
@@ -552,7 +541,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":"None"
+        "Commentaires":"None",
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Yannick",
@@ -589,7 +580,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":null
+        "Commentaires":null,
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Jean louis",
@@ -626,7 +619,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":""
+        "Commentaires":"",
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Francoise",
@@ -663,7 +658,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":"None"
+        "Commentaires":"None",
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Philippe",
@@ -700,7 +697,9 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":null
+        "Commentaires":null,
+        "Nbre de jours":null,
+        "Nbre de personnes":null
     },
     {
         "Pr\u00e9nom":"Aurelien",
@@ -737,6 +736,47 @@
         "Prenom":null,
         "Societe":null,
         "Telephone":null,
-        "Commentaires":null
+        "Commentaires":null,
+        "Nbre de jours":null,
+        "Nbre de personnes":null
+    },
+    {
+        "Pr\u00e9nom":"Aurelien",
+        "Nom":"FAUCHEUX",
+        "Soci\u00e9t\u00e9":"PARTICULIER",
+        "Statut":"Ok",
+        "Paiement":"Non pay\u00e9",
+        "DateNav":"04\/04\/2026",
+        "Prix":540,
+        "NbreJours":null,
+        "NbrePers":null,
+        "T\u00e9l\u00e9phone":"0648470438",
+        "Email":"Aurelien.faucheux@gmail.com",
+        "Notes":null,
+        "NbJours":null,
+        "Paye":null,
+        "PrixJour":null,
+        "Passagers":null,
+        "Historique":null,
+        "Milles":null,
+        "HeuresMoteur":null,
+        "dt_obj":null,
+        "dt_sort":null,
+        "dt":null,
+        "Mail":null,
+        "Date":null,
+        "Jours":null,
+        "Date Nav":null,
+        "Nb jours":null,
+        "Heures moteur":null,
+        "Passager":null,
+        "dt obj":null,
+        "dt sort":null,
+        "Prenom":null,
+        "Societe":null,
+        "Telephone":null,
+        "Commentaires":"viens avec sa femme et se deux enfants",
+        "Nbre de jours":1.0,
+        "Nbre de personnes":1.0
     }
 ]
