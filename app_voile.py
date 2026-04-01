@@ -171,17 +171,31 @@ if st.session_state.page == "CONTACTS":
             
             f_pri = st.number_input("💵 Prix (€)", min_value=0, value=safe_val(c_ref.get('Prix'), 0))
             f_com = st.text_area("💬 Commentaires (IMPORTANT)", value=str(c_ref.get('Commentaires', '')))
+         if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
+                new_row = {
+                    "Prénom": f_pre, "Nom": f_nom.upper(), "Téléphone": f_tel, 
+                    "Email": f_eml, "Société": f_soc, "Statut": f_statut, 
+                    "DateNav": f_dat, "Nbre de jours": f_jou, 
+                    "Nbre de personnes": f_per, "Prix": f_pri, 
+                    "Paiement": f_paie, "Commentaires": clean_text(f_com)
+                }
 
-            if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
-                new_row = {"Prénom": f_pre, "Nom": f_nom.upper(), "Téléphone": f_tel, "Email": f_eml, "Société": f_soc, "Statut": f_statut, "DateNav": f_dat, "Nbre de jours": f_jou, "Nbre de personnes": f_per, "Prix": f_pri, "Paiement": f_paie, "Commentaires": f_com}
-                if is_edit: df_c.iloc[idx] = new_row
-                else: df_c = pd.concat([df_c, pd.DataFrame([new_row])], ignore_index=True)
+                if is_edit:
+                    # ✅ CORRECTION ICI : On met à jour chaque colonne précisément
+                    for col, valeur in new_row.items():
+                        df_c.at[idx, col] = valeur
+                else:
+                    # ✅ CRÉATION : On transforme le dictionnaire en DataFrame avant le concat
+                    df_new = pd.DataFrame([new_row])
+                    df_c = pd.concat([df_c, df_new], ignore_index=True)
+                
+                # Sauvegarde et nettoyage
                 sauvegarder_data(df_c, "contacts.json")
                 st.session_state.mode_saisie = False
+                st.session_state.edit_idx = None
+                st.success("✅ Fiche enregistrée !")
                 st.rerun()
-            if st.form_submit_button("❌ ANNULER", use_container_width=True):
-                st.session_state.mode_saisie = False
-                st.rerun()
+   
 
     # --- CAS B : LISTE DES CONTACTS ---
     else:
