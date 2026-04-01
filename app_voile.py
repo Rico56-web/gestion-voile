@@ -131,52 +131,108 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 # =================================================================
 # --- 5. PAGE CONTACTS (VERSION ERGONOMIQUE IPHONE) ---
 # =================================================================
+# =================================================================
+# --- 5. PAGE CONTACTS (CORRIGÉE & ERGONOMIQUE) ---
+# =================================================================
 if st.session_state.page == "CONTACTS":
-    # --- 1. EN-TÊTE & NAVIGATION RAPIDE ---
     st.markdown('<div class="main-header">📇 CONTACTS 2026</div>', unsafe_allow_html=True)
     
-    # Création d'une ligne de 3 boutons pour simuler des onglets + le bouton Nouveau
-    col_nav1, col_nav2, col_nav3 = st.columns([1, 1, 1.2]) # La 3ème est un peu plus large pour le "+"
+    # --- BARRE DE NAVIGATION INTERNE (3 COLONNES) ---
+    c_nav1, c_nav2, c_nav3 = st.columns([1, 1, 1.2])
     
-    # Simulation des onglets avec des boutons
-    if col_nav1.button("⛵ EN COURS", use_container_width=True, type="primary" if not st.session_state.view_archive else "secondary"):
+    if c_nav1.button("⛵ EN COURS", use_container_width=True, type="primary" if not st.session_state.get('view_archive', False) else "secondary"):
         st.session_state.view_archive = False
         st.rerun()
         
-    if col_nav2.button("📦 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_archive else "secondary"):
+    if c_nav2.button("📦 ARCHIVES", use_container_width=True, type="primary" if st.session_state.get('view_archive', False) else "secondary"):
         st.session_state.view_archive = True
         st.rerun()
 
-    # LE BOUTON NOUVEAU CONTACT (Toujours visible et coloré)
-    if col_nav3.button("➕ NOUVEAU", use_container_width=True, type="secondary"):
+    if c_nav3.button("➕ NOUVEAU", use_container_width=True, type="secondary"):
         st.session_state.edit_idx = None
-        st.session_state.page = "SAISIE" # On va vers la nouvelle page de formulaire
+        st.session_state.page = "SAISIE"
         st.rerun()
 
     st.divider()
 
-    # --- 2. FILTRAGE DES DONNÉES ---
-    mask_est_termine = (
+    # --- FILTRAGE ---
+    mask_arch = (
         (df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|TERMINE", na=False)) & 
         (df_c['Paiement'].astype(str).str.upper().str.contains("PAYÉ|PAYE", na=False))
     )
     
-    # On affiche soit l'un soit l'autre selon le bouton cliqué plus haut
-    if st.session_state.view_archive:
-        df_affichage = df_c[mask_est_termine]
-        st.subheader(f"📦 Archives ({len(df_affichage)})")
-    else:
-        df_affichage = df_c[~mask_est_termine]
-        st.subheader(f"⛵ Dossiers en cours ({len(df_affichage)})")
+    df_visu = df_c[mask_arch] if st.session_state.get('view_archive') else df_c[~mask_arch]
 
-    # --- 3. BOUCLE D'AFFICHAGE DES FICHES ---
-    if df_affichage.empty:
-        st.info("Aucun dossier ici.")
+    # --- BOUCLE D'AFFICHAGE (LÀ OÙ ÉTAIT L'ERREUR) ---
+    if df_visu.empty:
+        st.info("Aucun dossier à afficher.")
     else:
-        for i, r in df_affichage.iterrows():
-            # ... (Ici tu reprends le code de tes fiches colorées avec les 5 boutons) ...
-            # IMPORTANT : Dans le bouton "Modifier", mets bien :
-            # st.session_state.page = "SAISIE"
+        for i, r in df_visu.iterrows():
+            # 1. Préparation des données
+            nom = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}"
+            soc = str(r.get('Société','PARTICULIER')).upper()
+            s_val = str(r.get('Statut','En attente')).upper()
+            p_val = str(r.get('Paiement','Non payé')).upper()
+            tel = str(r.get('Téléphone','')).strip()
+            mail = str(r.get('Email','')).strip()
+            n_j = str(r.get('Nbre de jours','1'))
+            
+            is_cmn = "CMN" in soc
+            is_paye = "PAYÉ" in p_val or "PAYE" in p_val
+            b_col = "#0047AB" if is_cmn else ("#27ae60" if "OK" in s_val else "#f39c12")
+
+            # 2. Affichage de la fiche (HTML)
+            p_txt = f'<b style="color:red;">⚠️ {p_val}</b>' if not is_paye else f'<b style="color:blue;">✅ {p_val}</b>'
+            st.markdown(f"""
+            <div style="background-color: white; border-left: 10px solid {b_col}; border: 1px solid #ddd; padding: 10px; border-radius: 12px; margin-bottom: 5px;">
+                <div style="font-size: 0.8rem; margin-bottom: 2px;">{p_txt}</div>
+                <b style="color: {b_col}; font-size: 1.1rem;">{'🚢 ' if is_cmn else '👤 '}{nom}</b><br>
+                <span style="font-size: 0.8rem; color: #666;">🏢 {soc} | STATUT: {s_val}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # 3. Conteneur des boutons et infos (C'est ce bloc qui manquait !)
+            with st.container(border=True):
+                col1, col2, col3, col4 = st.columns(4)
+                col1.write(f"📅**{r.get('DateNav','-')}**")
+                col2.write(f"💰**{r.get('Prix','0')}€**")
+                col3.write(f"👥**{r.get('Nbre de personnes','1')}p**")
+                col4.write(f"⏳**{n_j}j**")
+                
+                # Boutons de contact
+                t_l = tel.replace(" ","").replace(".","")
+                bt1, bt2, bt3 = st.columns(3)
+                bt1.link_button("📞 Tél", f"tel:{t_l}", use_container_width=True)
+                bt2.link_button("💬 WA", f"https://wa.me/{t_l}", use_container_width=True)
+                bt3.link_button("📧 Mail", f"mailto:{mail}", use_container_width=True)
+
+                # Boutons Gestion
+                be, bd = st.columns(2)
+                if be.button("✏️ Modifier", key=f"edit_{i}", use_container_width=True):
+                    st.session_state.edit_idx = i
+                    st.session_state.page = "SAISIE"
+                    st.rerun()
+                if bd.button("🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
+                    st.session_state.confirm_del_idx = i
+                    st.rerun()
+
+                # Confirmation suppression
+                if st.session_state.get('confirm_del_idx') == i:
+                    st.warning("Supprimer ?")
+                    bno, byes = st.columns(2)
+                    if bno.button("NON", key=f"no_{i}", use_container_width=True):
+                        st.session_state.confirm_del_idx = None
+                        st.rerun()
+                    if byes.button("OUI", key=f"yes_{i}", use_container_width=True):
+                        df_c = df_c.drop(i)
+                        sauvegarder_data(df_c, "contacts.json")
+                        st.session_state.confirm_del_idx = None
+                        st.rerun()
+
+# --- ICI LE CODE CONTINUE VERS LE PLANNING ---
+elif st.session_state.page == "PLANNING":
+    st.subheader("🗓️ PLANNING DES SORTIES")
+    # ... suite du code
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
