@@ -133,29 +133,24 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 # --- 5. PAGE CONTACTS (SAISIE + LISTE INTÉGRÉE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    # On vérifie si on doit afficher le formulaire ou la liste
-    # On crée une variable 'mode_saisie' dans le session_state
     if 'mode_saisie' not in st.session_state: 
         st.session_state.mode_saisie = False
 
     # ---------------------------------------------------------
-    # CAS A : AFFICHAGE DU FORMULAIRE (Nouveau ou Modifier)
+    # CAS A : LE FORMULAIRE (S'affiche si mode_saisie est True)
     # ---------------------------------------------------------
     if st.session_state.mode_saisie:
         st.markdown('<div class="main-header">📝 FICHE CONTACT</div>', unsafe_allow_html=True)
-        
         idx = st.session_state.get('edit_idx')
         is_edit = idx is not None and not df_c.empty
         c_ref = df_c.iloc[idx] if is_edit else {}
 
         with st.form("form_interne"):
-            col_a, col_b = st.columns(2)
-            prenom = col_a.text_input("👤 Prénom", value=str(c_ref.get('Prénom', '')))
-            nom = col_b.text_input("📛 NOM", value=str(c_ref.get('Nom', '')))
-            
-            tel = col_a.text_input("📞 Téléphone", value=str(c_ref.get('Téléphone', '')))
-            email = col_b.text_input("📧 Email", value=str(c_ref.get('Email', '')))
-            
+            c_a, c_b = st.columns(2)
+            prenom = c_a.text_input("👤 Prénom", value=str(c_ref.get('Prénom', '')))
+            nom = c_b.text_input("📛 NOM", value=str(c_ref.get('Nom', '')))
+            tel = c_a.text_input("📞 Tél", value=str(c_ref.get('Téléphone', '')))
+            email = c_b.text_input("📧 Email", value=str(c_ref.get('Email', '')))
             soc = st.text_input("🏢 Société", value=str(c_ref.get('Société', 'PARTICULIER')))
             
             c_c, c_d = st.columns(2)
@@ -176,27 +171,23 @@ if st.session_state.page == "CONTACTS":
                 new_data = {"Prénom": prenom, "Nom": nom.upper(), "Téléphone": tel, "Email": email, "Société": soc, 
                             "Statut": statut, "DateNav": date_n, "Nbre de jours": n_j, "Nbre de personnes": n_p, 
                             "Prix": prix, "Paiement": paiement, "Commentaires": coms}
-                
                 if is_edit: df_c.iloc[idx] = new_data
                 else: df_c = pd.concat([df_c, pd.DataFrame([new_data])], ignore_index=True)
-                
                 sauvegarder_data(df_c, "contacts.json")
                 st.session_state.mode_saisie = False
-                st.session_state.edit_idx = None
                 st.rerun()
 
             if cb2.form_submit_button("❌ ANNULER", use_container_width=True):
                 st.session_state.mode_saisie = False
-                st.session_state.edit_idx = None
                 st.rerun()
 
     # ---------------------------------------------------------
-    # CAS B : AFFICHAGE DE LA LISTE DES CONTACTS
+    # CAS B : LA LISTE (S'affiche si mode_saisie est False)
     # ---------------------------------------------------------
     else:
         st.markdown('<div class="main-header">📇 CONTACTS 2026</div>', unsafe_allow_html=True)
         
-        # Navigation compacte
+        # Navigation
         c_nav1, c_nav2, c_nav3 = st.columns([1, 1, 1.2])
         if c_nav1.button("⛵ EN COURS", use_container_width=True, type="primary" if not st.session_state.get('view_archive') else "secondary"):
             st.session_state.view_archive = False
@@ -205,23 +196,71 @@ if st.session_state.page == "CONTACTS":
             st.session_state.view_archive = True
             st.rerun()
         if c_nav3.button("➕ NOUVEAU", use_container_width=True):
-            st.session_state.mode_saisie = True # On active le formulaire
+            st.session_state.mode_saisie = True
             st.session_state.edit_idx = None
             st.rerun()
 
         st.divider()
 
-        # Filtrage et Boucle d'affichage (reprendre ton code précédent ici)
+        # Filtrage
         mask_arch = (df_c['Statut'].str.upper().str.contains("TERMINE", na=False)) & (df_c['Paiement'] == "Payé")
         df_visu = df_c[mask_arch] if st.session_state.get('view_archive') else df_c[~mask_arch]
 
-        for i, r in df_visu.iterrows():
-            # ... (Tes fiches colorées habituelles) ...
-            # Dans le bouton MODIFIER de la fiche :
-            if st.button("✏️ Modifier", key=f"ed_{i}"):
-                st.session_state.edit_idx = i
-                st.session_state.mode_saisie = True # On active le formulaire
-                st.rerun()
+        if df_visu.empty:
+            st.info("Aucun dossier.")
+        else:
+            for i, r in df_visu.iterrows():
+                # Données
+                nom_c = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom',''))}"
+                soc = str(r.get('Société','PARTICULIER')).upper()
+                s_val = str(r.get('Statut','En attente')).upper()
+                p_val = str(r.get('Paiement','Non payé')).upper()
+                is_paye = "PAYÉ" in p_val or "PAYE" in p_val
+                b_col = "#0047AB" if "CMN" in soc else ("#27ae60" if "OK" in s_val else "#f39c12")
+
+                # Affichage Fiche
+                p_html = f'<b style="color:red;">⚠️ {p_val}</b>' if not is_paye else f'<b style="color:blue;">✅ {p_val}</b>'
+                st.markdown(f"""
+                <div style="background-color: white; border-left: 10px solid {b_col}; border: 1px solid #ddd; padding: 10px; border-radius: 12px; margin-bottom: 5px;">
+                    <div style="font-size: 0.8rem;">{p_html}</div>
+                    <b style="color: {b_col}; font-size: 1.1rem;">👤 {nom_c}</b><br>
+                    <span style="font-size: 0.8rem; color: #666;">🏢 {soc} | STATUT: {s_val}</span>
+                </div>
+                """, unsafe_allow_html=True)
+
+                with st.container(border=True):
+                    # Infos
+                    i1, i2, i3, i4 = st.columns(4)
+                    i1.write(f"📅**{r.get('DateNav','-')}**")
+                    i2.write(f"💰**{r.get('Prix','0')}€**")
+                    i3.write(f"👥**{r.get('Nbre de personnes','1')}p**")
+                    i4.write(f"⏳**{r.get('Nbre de jours','1')}j**")
+                    
+                    # Boutons Contact
+                    tel_clean = str(r.get('Téléphone','')).replace(" ","")
+                    bc1, bc2, bc3 = st.columns(3)
+                    bc1.link_button("📞 Tél", f"tel:{tel_clean}", use_container_width=True)
+                    bc2.link_button("💬 WA", f"https://wa.me/{tel_clean}", use_container_width=True)
+                    bc3.link_button("📧 Mail", f"mailto:{r.get('Email','')}", use_container_width=True)
+
+                    # Boutons Gestion
+                    be, bd = st.columns(2)
+                    if be.button("✏️ Modifier", key=f"btn_edit_{i}", use_container_width=True):
+                        st.session_state.edit_idx = i
+                        st.session_state.mode_saisie = True
+                        st.rerun()
+                    if bd.button("🗑️ Supprimer", key=f"btn_del_{i}", use_container_width=True):
+                        st.session_state.confirm_del_idx = i
+                        st.rerun()
+
+                    # Confirmation Suppr
+                    if st.session_state.get('confirm_del_idx') == i:
+                        st.error("Supprimer ?")
+                        if st.button("OUI, SUPPRIMER", key=f"conf_{i}", use_container_width=True):
+                            df_c = df_c.drop(i)
+                            sauvegarder_data(df_c, "contacts.json")
+                            st.session_state.confirm_del_idx = None
+                            st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
