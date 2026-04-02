@@ -142,14 +142,19 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
+
 # =================================================================
-# --- 5. PAGE CONTACTS (NUMÉROTATION & BOUTONS ULTRA-COMPACTS) ---
+# --- 5. PAGE CONTACTS (NUMÉROTATION + 2 LIGNES DE BOUTONS) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
+    # Initialisation des états
     if 'mode_saisie' not in st.session_state: st.session_state.mode_saisie = False
     if 'view_archive' not in st.session_state: st.session_state.view_archive = False
     if 'confirm_del_idx' not in st.session_state: st.session_state.confirm_del_idx = None
 
+    # ---------------------------------------------------------
+    # CAS A : FORMULAIRE DE SAISIE
+    # ---------------------------------------------------------
     if st.session_state.mode_saisie:
         st.markdown('<div class="main-header">📝 FICHE CONTACT</div>', unsafe_allow_html=True)
         idx = st.session_state.get('edit_idx')
@@ -199,6 +204,9 @@ if st.session_state.page == "CONTACTS":
                 st.session_state.mode_saisie = False
                 st.rerun()
 
+    # ---------------------------------------------------------
+    # CAS B : LISTE DES CONTACTS (AFFICHAGE IPHONE)
+    # ---------------------------------------------------------
     else:
         st.markdown('<div class="main-header">📇 CONTACTS 2026</div>', unsafe_allow_html=True)
         
@@ -219,7 +227,6 @@ if st.session_state.page == "CONTACTS":
         mask_arch = df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|TERMINE|REFUSÉ|REFUSE", na=False)
         df_visu = df_c[mask_arch] if st.session_state.view_archive else df_c[~mask_arch]
 
-        # On calcule le numéro de fiche (1, 2, 3...) basé sur l'affichage
         count = 0
         for i, r in df_visu.iterrows():
             count += 1
@@ -234,7 +241,7 @@ if st.session_state.page == "CONTACTS":
             paye_col = "#27ae60" if is_paye else "#e74c3c"
 
             with st.container(border=True):
-                # Header avec Numéro de fiche accentué
+                # Header avec relief et Numéro
                 st.markdown(f"""
                 <div style="border-left: 15px solid {bordure_c}; padding: 12px; background-color: #ffffff; 
                             border-radius: 12px; box-shadow: 4px 4px 12px rgba(0,0,0,0.15); margin-bottom: 5px;">
@@ -261,34 +268,41 @@ if st.session_state.page == "CONTACTS":
                 if com_txt and str(com_txt).strip() != "" and str(com_txt).lower() != "nan":
                     st.info(f"💬 **NOTE :** {com_txt}")
 
-                # --- LES 5 BOUTONS ULTRA-COMPACTS (SUR UNE SEULE LIGNE) ---
-                # On utilise des colonnes plus larges pour les boutons de contact et plus fines pour la gestion
-                st.write("")
-                b1, b2, b3, b4, b5 = st.columns([1, 1, 1, 1, 1])
+                # --- ZONE BOUTONS (FORCÉE SUR 2 LIGNES) ---
+                st.write("") 
+                
+                # LIGNE 1 : CONTACT (3 colonnes)
+                b_c1, b_c2, b_c3 = st.columns(3)
                 t_clean = str(r.get('Téléphone','')).replace(" ","")
                 
-                b1.link_button("📞", f"tel:{t_clean}", use_container_width=True)
-                b2.link_button("🟢", f"https://wa.me/{t_clean}", use_container_width=True)
-                b3.link_button("✉️", f"mailto:{r.get('Email','')}", use_container_width=True)
+                b_c1.link_button("📞 APPEL", f"tel:{t_clean}", use_container_width=True)
+                b_c2.link_button("🟢 WA", f"https://wa.me/{t_clean}", use_container_width=True)
+                b_c3.link_button("✉️ MAIL", f"mailto:{r.get('Email','')}", use_container_width=True)
+
+                st.write("") # Petit espace entre les deux rangées
+
+                # LIGNE 2 : GESTION (2 colonnes)
+                b_g1, b_g2 = st.columns(2)
                 
-                # Pour réduire encore plus, on passe ces boutons en type "secondary" ou on réduit l'icône
-                if b4.button("✏️", key=f"ed_{i}", use_container_width=True):
+                if b_g1.button("✏️ MODIFIER", key=f"ed_final_{i}", use_container_width=True, type="secondary"):
                     st.session_state.edit_idx = i
                     st.session_state.mode_saisie = True
                     st.rerun()
-                if b5.button("🗑️", key=f"dl_{i}", use_container_width=True):
+                    
+                if b_g2.button("🗑️ SUPPRIMER", key=f"dl_final_{i}", use_container_width=True, type="secondary"):
                     st.session_state.confirm_del_idx = i
                     st.rerun()
 
+                # Confirmation suppression
                 if st.session_state.get('confirm_del_idx') == i:
-                    st.warning("🔥 Supprimer ?")
+                    st.error(f"🔥 Supprimer fiche n°{count} ?")
                     c_y, c_n = st.columns(2)
-                    if c_y.button("OUI", key=f"y_{i}", use_container_width=True, type="primary"):
+                    if c_y.button("OUI, SUPPRIMER", key=f"y_conf_{i}", use_container_width=True, type="primary"):
                         df_c = df_c.drop(i).reset_index(drop=True)
                         sauvegarder_data(df_c, "contacts.json")
                         st.session_state.confirm_del_idx = None
                         st.rerun()
-                    if c_n.button("NON", key=f"n_{i}", use_container_width=True):
+                    if c_n.button("ANNULER", key=f"n_conf_{i}", use_container_width=True):
                         st.session_state.confirm_del_idx = None
                         st.rerun()
 
