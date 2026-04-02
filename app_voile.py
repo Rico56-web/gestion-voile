@@ -266,8 +266,7 @@ if st.session_state.page == "CONTACTS":
                 st.rerun()
             if g2.button("🗑️ SUPPRIMER", key=f"btn_dl_{i}", use_container_width=True):
                 st.session_state.confirm_del_idx = i
-                st.rerun()
-
+                
             # --- CONFIRMATION SUPPRESSION ---
             if st.session_state.get('confirm_del_idx') == i:
                 st.error(f"Supprimer la fiche {count} ?")
@@ -275,7 +274,12 @@ if st.session_state.page == "CONTACTS":
                 if cy.button("OUI, SUPPRIMER", key=f"y_v5_{i}", use_container_width=True, type="primary"):
                     df_c = df_c.drop(i).reset_index(drop=True)
                     sauvegarder_data(df_c, "contacts.json")
-                    st.
+                    st.session_state.confirm_del_idx = None
+                    st.rerun()
+                if cn.button("NON, GARDER", key=f"n_v5_{i}", use_container_width=True):
+                    st.session_state.confirm_del_idx = None
+                    st.rerun()         
+       
 
 
 # =================================================================
