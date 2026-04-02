@@ -142,19 +142,14 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
-
 # =================================================================
-# --- 5. PAGE CONTACTS (DESIGN PREMIUM & BOUTONS MINI) ---
+# --- 5. PAGE CONTACTS (NUMÉROTATION & BOUTONS ULTRA-COMPACTS) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    # Initialisation des états
     if 'mode_saisie' not in st.session_state: st.session_state.mode_saisie = False
     if 'view_archive' not in st.session_state: st.session_state.view_archive = False
     if 'confirm_del_idx' not in st.session_state: st.session_state.confirm_del_idx = None
 
-    # ---------------------------------------------------------
-    # CAS A : FORMULAIRE DE SAISIE (NOUVEAU / MODIFIER)
-    # ---------------------------------------------------------
     if st.session_state.mode_saisie:
         st.markdown('<div class="main-header">📝 FICHE CONTACT</div>', unsafe_allow_html=True)
         idx = st.session_state.get('edit_idx')
@@ -165,10 +160,8 @@ if st.session_state.page == "CONTACTS":
             c1, c2 = st.columns(2)
             f_pre = c1.text_input("👤 Prénom", value=str(c_ref.get('Prénom', '')))
             f_nom = c2.text_input("📛 NOM", value=str(c_ref.get('Nom', '')))
-            
             f_tel = c1.text_input("📞 Téléphone", value=str(c_ref.get('Téléphone', '')))
             f_eml = c2.text_input("📧 Email", value=str(c_ref.get('Email', '')))
-            
             f_soc = st.text_input("🏢 Société", value=str(c_ref.get('Société', 'PARTICULIER')))
             
             c3, c4 = st.columns(2)
@@ -206,9 +199,6 @@ if st.session_state.page == "CONTACTS":
                 st.session_state.mode_saisie = False
                 st.rerun()
 
-    # ---------------------------------------------------------
-    # CAS B : LISTE DES CONTACTS (AFFICHAGE PREMIUM)
-    # ---------------------------------------------------------
     else:
         st.markdown('<div class="main-header">📇 CONTACTS 2026</div>', unsafe_allow_html=True)
         
@@ -229,36 +219,38 @@ if st.session_state.page == "CONTACTS":
         mask_arch = df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|TERMINE|REFUSÉ|REFUSE", na=False)
         df_visu = df_c[mask_arch] if st.session_state.view_archive else df_c[~mask_arch]
 
+        # On calcule le numéro de fiche (1, 2, 3...) basé sur l'affichage
+        count = 0
         for i, r in df_visu.iterrows():
+            count += 1
             statut_brut = str(r.get('Statut','En attente')).strip().capitalize()
             soc_v = str(r.get('Société','PARTICULIER')).upper()
             p_val = str(r.get('Paiement', 'Non payé')).strip().upper()
             is_paye = p_val.startswith("PAYÉ") or p_val == "PAYE"
 
-            # Couleurs et Icônes
             statut_map = {"Ok": ("🟢", "#27ae60"), "Refusé": ("🔴", "#e74c3c"), "Terminé": ("⚫", "#34495e")}
             pastille_icon, statut_color = statut_map.get(statut_brut, ("🟠", "#f39c12"))
             bordure_c = "#0047AB" if "CMN" in soc_v else statut_color
             paye_col = "#27ae60" if is_paye else "#e74c3c"
 
             with st.container(border=True):
-                # Header Style "Card"
+                # Header avec Numéro de fiche accentué
                 st.markdown(f"""
-                <div style="border-left: 12px solid {bordure_c}; padding: 12px; background-color: #fdfdfd; 
-                            border-radius: 10px; box-shadow: 2px 2px 8px rgba(0,0,0,0.08); margin-bottom: 5px;">
-                    <span style="float: right; color: {paye_col}; font-weight: bold; font-size: 0.75rem; border: 1.5px solid {paye_col}; padding: 2px 6px; border-radius: 6px;">
-                        {"✅ PAYÉ" if is_paye else "⚠️ NON PAYÉ"}
+                <div style="border-left: 15px solid {bordure_c}; padding: 12px; background-color: #ffffff; 
+                            border-radius: 12px; box-shadow: 4px 4px 12px rgba(0,0,0,0.15); margin-bottom: 5px;">
+                    <span style="float: right; color: {paye_col}; font-weight: bold; font-size: 0.7rem; border: 1px solid {paye_col}; padding: 1px 4px; border-radius: 4px;">
+                        {"PAYÉ" if is_paye else "NON PAYÉ"}
                     </span>
-                    <div style="font-size: 1.1rem; font-weight: bold; color: {bordure_c};">
-                        {pastille_icon} {statut_brut.upper()} | {str(r.get('Nom',''))} {str(r.get('Prénom',''))}
+                    <div style="font-size: 1.15rem; font-weight: bold; color: {bordure_c};">
+                        <span style="background-color: {bordure_c}; color: white; padding: 2px 8px; border-radius: 50%; font-size: 0.9rem; margin-right: 8px;">{count}</span>
+                        {pastille_icon} {statut_brut.upper()} | {str(r.get('Nom',''))}
                     </div>
-                    <div style="color: #555; font-size: 0.85rem; font-weight: bold; margin-top: 4px;">🏢 {soc_v}</div>
+                    <div style="color: #444; font-size: 0.85rem; font-weight: bold; margin-top: 6px; padding-left: 35px;">🏢 {soc_v} - {str(r.get('Prénom',''))}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
                 st.write(f"📞 **{r.get('Téléphone','-')}** | 📧 **{r.get('Email','-')}**")
                 
-                # Metrics compactes
                 cm = st.columns(4)
                 cm[0].caption("📅 Date"); cm[0].write(f"**{r.get('DateNav','-')}**")
                 cm[1].caption("💰 Prix"); cm[1].write(f"**{r.get('Prix','0')}€**")
@@ -269,7 +261,8 @@ if st.session_state.page == "CONTACTS":
                 if com_txt and str(com_txt).strip() != "" and str(com_txt).lower() != "nan":
                     st.info(f"💬 **NOTE :** {com_txt}")
 
-                # --- LES 5 BOUTONS MINIATURES ---
+                # --- LES 5 BOUTONS ULTRA-COMPACTS (SUR UNE SEULE LIGNE) ---
+                # On utilise des colonnes plus larges pour les boutons de contact et plus fines pour la gestion
                 st.write("")
                 b1, b2, b3, b4, b5 = st.columns([1, 1, 1, 1, 1])
                 t_clean = str(r.get('Téléphone','')).replace(" ","")
@@ -278,6 +271,7 @@ if st.session_state.page == "CONTACTS":
                 b2.link_button("🟢", f"https://wa.me/{t_clean}", use_container_width=True)
                 b3.link_button("✉️", f"mailto:{r.get('Email','')}", use_container_width=True)
                 
+                # Pour réduire encore plus, on passe ces boutons en type "secondary" ou on réduit l'icône
                 if b4.button("✏️", key=f"ed_{i}", use_container_width=True):
                     st.session_state.edit_idx = i
                     st.session_state.mode_saisie = True
@@ -286,7 +280,6 @@ if st.session_state.page == "CONTACTS":
                     st.session_state.confirm_del_idx = i
                     st.rerun()
 
-                # Confirmation suppression
                 if st.session_state.get('confirm_del_idx') == i:
                     st.warning("🔥 Supprimer ?")
                     c_y, c_n = st.columns(2)
@@ -298,6 +291,7 @@ if st.session_state.page == "CONTACTS":
                     if c_n.button("NON", key=f"n_{i}", use_container_width=True):
                         st.session_state.confirm_del_idx = None
                         st.rerun()
+
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
 # =================================================================
