@@ -245,9 +245,17 @@ if st.session_state.page == "CONTACTS":
             tel_v = str(r.get('Téléphone',''))
             eml_v = str(r.get('Email',''))
             
-            # Correction détection Paiement stricte pour l'affichage
-            p_val_brut = str(r.get('Paiement', '')).strip().upper()
-            paye = (p_val_brut == "PAYÉ" or p_val_brut == "PAYE")
+            # Détection robuste pour l'index du menu déroulant
+            p_val_f = str(c_ref.get('Paiement', '')).strip().upper()
+            # On accepte "PAYÉ", "PAYE" et on vérifie que ce n'est pas "NON PAYÉ"
+            if "NON" in p_val_f:
+                p_idx = 0
+            elif "PAY" in p_val_f:
+                p_idx = 1
+            else:
+                p_idx = 0
+
+            f_paie = c4.selectbox("💰 Paiement", options=["Non payé", "Payé"], index=p_idx)
             
             # Couleurs dynamiques
             color_map = {"Ok": "#27ae60", "Refusé": "#e74c3c", "Terminé": "#34495e", "En attente": "#f39c12"}
