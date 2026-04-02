@@ -274,14 +274,14 @@
     },
     {
         "Pr\u00e9nom":"Benoit",
-        "Nom":"Couronne",
+        "Nom":"COURONNE",
         "Soci\u00e9t\u00e9":"PARTICULIER",
-        "Statut":"OK",
+        "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
         "DateNav":"11\/04\/2026",
-        "Prix":"30",
-        "NbreJours":1,
-        "NbrePers":1.0,
+        "Prix":30,
+        "NbreJours":null,
+        "NbrePers":null,
         "T\u00e9l\u00e9phone":"0608921723",
         "Email":"None",
         "Notes":null,
@@ -308,8 +308,8 @@
         "Societe":null,
         "Telephone":null,
         "Commentaires":"Appel le 26\/03\/ pour reserver",
-        "Nbre de jours":null,
-        "Nbre de personnes":null
+        "Nbre de jours":1.0,
+        "Nbre de personnes":1.0
     },
     {
         "Pr\u00e9nom":"Laurent",
