@@ -260,7 +260,62 @@ if st.session_state.page == "CONTACTS":
                 </div>
             </div>
             """, unsafe_allow_html=True)
+            # --- À INSÉRER DANS TON BOUCLE FOR i, r in df_v.iterrows(): ---
 
+# Nettoyage des données pour l'affichage
+nom_v = str(r.get('Nom','')).upper()
+pre_v = str(r.get('Prénom','')).capitalize()
+soc_v = str(r.get('Société','')).upper()
+tel_v = str(r.get('Téléphone',''))
+eml_v = str(r.get('Email',''))
+# Si la société est la même que le nom, on n'affiche que le nom
+label_soc = f"🏢 {soc_v}" if soc_v and soc_v != nom_v else "👤 PARTICULIER"
+
+st.markdown(f"""
+<div style="border: 5px solid {base_col}; 
+            border-left: 20px solid {base_col}; 
+            padding: 15px; 
+            border-radius: 15px; 
+            background-color: white; 
+            margin-bottom: 10px; 
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);">
+    
+    <span style="float: right; color: {"#27ae60" if paye else "#e74c3c"}; font-weight: bold; border: 2px solid; padding: 2px 5px; border-radius: 5px; font-size: 0.8rem;">
+        {"✅ PAYÉ" if paye else "⚠️ ATTENTE"}
+    </span>
+    
+    <div style="font-size: 1.3rem; font-weight: bold; color: {base_col}; margin-bottom: 2px; display: flex; align-items: center;">
+        <span style="background-color: {base_col}; color: white; min-width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 1rem; margin-right: 12px;">{count}</span>
+        {nom_v} {pre_v}
+    </div>
+    
+    <div style="font-weight: bold; color: #666; margin-left: 42px; font-size: 0.9rem; text-transform: uppercase;">
+        {label_soc}
+    </div>
+    
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 12px 0;">
+    
+    <div style="margin-left: 5px; margin-bottom: 10px;">
+        <div style="font-size: 1.1rem; margin-bottom: 3px;">📞 <b>{tel_v if tel_v != 'nan' else '---'}</b></div>
+        <div style="font-size: 0.9rem; color: #555;">📧 {eml_v if eml_v != 'nan' else '---'}</div>
+    </div>
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; background: #f8f9fa; padding: 8px 12px; border-radius: 8px; border: 1px solid #eee;">
+        <div style="text-align: center;">
+            <div style="font-size: 0.7rem; color: #888; text-transform: uppercase;">Date</div>
+            <div style="font-size: 0.9rem; font-weight: bold;">{r.get('DateNav','-')}</div>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 0.7rem; color: #888; text-transform: uppercase;">Prix</div>
+            <div style="font-size: 0.9rem; font-weight: bold; color: #27ae60;">{r.get('Prix','0')}€</div>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 0.7rem; color: #888; text-transform: uppercase;">Pers.</div>
+            <div style="font-size: 0.9rem; font-weight: bold;">{int(float(r.get('Nbre de personnes',1)))}p</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
             # --- BOUTONS ---
             # Ligne 1 : CONTACT (Forcé 1 ligne)
             t_cl = str(r.get('Téléphone','')).replace(" ","")
