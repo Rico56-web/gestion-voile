@@ -258,28 +258,32 @@ if st.session_state.page == "CONTACTS":
             # --- BOUTONS ACTIONS (LIGNE 1 : CONTACT / LIGNE 2 : GESTION) ---
             t_clean = str(tel_v).replace(" ","")
             st.markdown(f"""<div style="display:flex;gap:8px;margin-bottom:10px;"><a href="tel:{t_clean}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:14px;">📞 APPEL</a><a href="https://wa.me/{t_clean}" style="flex:1;text-align:center;background:#25D366;color:white;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;font-size:14px;">🟢 WA</a><a href="mailto:{eml_v}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:14px;">✉️ MAIL</a></div>""", unsafe_allow_html=True)
-
+             
+            # --- LIGNE 2 : GESTION (MODIFIER / SUPPRIMER AVEC NUMÉRO) ---
             g1, g2 = st.columns(2)
-            if g1.button("✏️ MODIFIER", key=f"btn_ed_{i}", use_container_width=True):
+            
+            # On utilise f-string pour insérer le numéro 'count' dans le texte
+            if g1.button(f"✏️ MODIFIER N°{count}", key=f"btn_ed_{i}", use_container_width=True):
                 st.session_state.edit_idx = i
                 st.session_state.mode_saisie = True
                 st.rerun()
-            if g2.button("🗑️ SUPPRIMER", key=f"btn_dl_{i}", use_container_width=True):
-                st.session_state.confirm_del_idx = i
                 
-            # --- CONFIRMATION SUPPRESSION ---
+            if g2.button(f"🗑️ SUPPRIMER N°{count}", key=f"btn_dl_{i}", use_container_width=True):
+                st.session_state.confirm_del_idx = i
+                st.rerun()
+
+            # --- CONFIRMATION SUPPRESSION (RAPPEL DU NUMÉRO) ---
             if st.session_state.get('confirm_del_idx') == i:
-                st.error(f"Supprimer la fiche {count} ?")
+                st.error(f"⚠️ CONFIRMER LA SUPPRESSION DE LA FICHE N°{count} ?")
                 cy, cn = st.columns(2)
-                if cy.button("OUI, SUPPRIMER", key=f"y_v5_{i}", use_container_width=True, type="primary"):
+                if cy.button(f"OUI, SUPPRIMER {count}", key=f"y_v5_{i}", use_container_width=True, type="primary"):
                     df_c = df_c.drop(i).reset_index(drop=True)
                     sauvegarder_data(df_c, "contacts.json")
                     st.session_state.confirm_del_idx = None
                     st.rerun()
-                if cn.button("NON, GARDER", key=f"n_v5_{i}", use_container_width=True):
+                if cn.button(f"NON, GARDER {count}", key=f"n_v5_{i}", use_container_width=True):
                     st.session_state.confirm_del_idx = None
-                    st.rerun()         
-       
+                    st.rerun()
 
 
 # =================================================================
