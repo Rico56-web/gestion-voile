@@ -230,12 +230,12 @@ if st.session_state.page == "CONTACTS":
             m_s = (df_visu['Nom'].astype(str).str.upper().str.contains(search_q, na=False) | 
                   df_visu['Société'].astype(str).str.upper().str.contains(search_q, na=False))
             df_visu = df_visu[m_s]
-        for i, r in df_visu.iterrows():
+     
+      for i, r in df_visu.iterrows():
             # --- PRÉPARATION DES DONNÉES ---
-            nom_v = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom','')).capitalize()}"
+            nom_complet = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom','')).capitalize()}"
             soc_v = str(r.get('Société','')).upper()
             tel_v = str(r.get('Téléphone',''))
-            eml_v = str(r.get('Email',''))
             date_v = str(r.get('DateNav','-'))
             prix_v = str(r.get('Prix','0'))
             jours_v = int(safe_val(r.get('Nbre de jours'), 1))
@@ -244,22 +244,25 @@ if st.session_state.page == "CONTACTS":
             col_statut = "#27ae60" if st_brut == "Ok" else "#f39c12"
             if st_brut == "Refusé": col_statut = "#e74c3c"
             
-            # Logique Paiement (Badge compact)
-            p_val = str(r.get('Paiement', '')).strip().upper()
-            is_paye = ("PAY" in p_val and "NON" not in p_val)
+            is_paye = ("PAY" in str(r.get('Paiement','')).upper() and "NON" not in str(r.get('Paiement','')).upper())
             p_bg = "#0047AB" if is_paye else "#e74c3c"
             p_txt = "PAYÉ" if is_paye else "NON PAYÉ"
 
-            # --- AFFICHAGE ÉPURÉ ---
-            st.subheader(nom_v)
+            # --- AFFICHAGE COMPACT (SANS SUBHEADER) ---
             
-            # Détails avec la barre de statut fine à gauche
+            # 1. Ligne NOM & PRÉNOM (On force une marge basse à 0)
+            st.markdown(f"<h3 style='margin:0; padding:0; color:#333;'>{nom_complet}</h3>", unsafe_allow_html=True)
+            
+            # 2. Détails avec barre latérale
             c_bord, c_cont = st.columns([0.05, 3.95])
             with c_bord:
-                st.markdown(f'<div style="background:{col_statut}; width:4px; height:90px; border-radius:2px;"></div>', unsafe_allow_html=True)
+                # Barre de statut ajustée en hauteur
+                st.markdown(f'<div style="background:{col_statut}; width:4px; height:75px; border-radius:2px; margin-top:5px;"></div>', unsafe_allow_html=True)
             
             with c_cont:
-                st.write(f"🏢 **{soc_v}** | 🚦 *{st_brut}*")
+                # Ligne SOCIÉTÉ (Collée au nom grâce à margin:0)
+                st.markdown(f"<div style='margin:0; color:#666; font-weight:bold; font-size:0.9rem;'>🏢 {soc_v} <span style='font-style:italic; font-weight:normal; color:{col_statut};'>| 🚦 {st_brut}</span></div>", unsafe_allow_html=True)
+                
                 st.write(f"📞 {tel_v}  |  📅 **{date_v}** ({jours_v}j)")
                 
                 # --- LIGNE FINANCIÈRE : PRIX + STATUT PAIEMENT ---
@@ -268,26 +271,24 @@ if st.session_state.page == "CONTACTS":
                     st.markdown(f"💰 **Total : {prix_v}€**")
                 with f2:
                     st.markdown(f"""
-                        <div style="background:{p_bg}; color:white; padding:3px 8px; border-radius:5px; 
+                        <div style="background:{p_bg}; color:white; padding:2px 8px; border-radius:5px; 
                                     text-align:center; font-weight:bold; font-size:0.7rem; width:fit-content; float:right;">
                             {p_txt}
                         </div>
                     """, unsafe_allow_html=True)
 
-            # Boutons d'action compacts
+            # Boutons d'action
             t_clean = tel_v.replace(" ","")
             col_a, col_w, col_e = st.columns(3)
-            
             col_a.markdown(f'<a href="tel:{t_clean}" style="text-decoration:none;"><button style="width:100%; height:35px; border-radius:5px; border:1px solid #ddd; background:#f0f2f6; font-size:12px;">📞 APPEL</button></a>', unsafe_allow_html=True)
             col_w.markdown(f'<a href="https://wa.me/{t_clean}" style="text-decoration:none;"><button style="width:100%; height:35px; border-radius:5px; border:none; background:#25D366; color:white; font-size:12px; font-weight:bold;">WA</button></a>', unsafe_allow_html=True)
             
-            if col_e.button("✏️ EDIT", key=f"ed_v3_{i}", use_container_width=True):
+            if col_e.button("✏️ EDIT", key=f"ed_v4_{i}", use_container_width=True):
                 st.session_state.edit_idx = i
                 st.session_state.mode_saisie = True
                 st.rerun()
 
             st.divider()
-      
 # =================================================================
 # --- 6. PAGE PLANNING (VUE MOIS + LISTE + BILAN FINANCIER) ---
 # =================================================================
