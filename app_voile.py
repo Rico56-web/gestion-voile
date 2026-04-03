@@ -230,8 +230,8 @@ if st.session_state.page == "CONTACTS":
             m_s = (df_visu['Nom'].astype(str).str.upper().str.contains(search_q, na=False) | 
                   df_visu['Société'].astype(str).str.upper().str.contains(search_q, na=False))
             df_visu = df_visu[m_s]
-        for i, r in df_visu.iterrows():
-            # --- 1. PRÉPARATION PROPRE DES DONNÉES ---
+for i, r in df_visu.iterrows():
+            # --- 1. PRÉPARATION ---
             nom_c = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom','')).capitalize()}"
             soc_v = str(r.get('Société','')).upper()
             tel_v = str(r.get('Téléphone',''))
@@ -239,60 +239,52 @@ if st.session_state.page == "CONTACTS":
             prix_v = str(r.get('Prix','0'))
             jours_v = int(safe_val(r.get('Nbre de jours'), 1))
             
-            # Couleurs Statut
             st_brut = str(r.get('Statut','En attente')).capitalize()
-            color_map = {"Ok": "#27ae60", "Refusé": "#e74c3c", "Terminé": "#34495e", "En attente": "#f39c12"}
-            col_st = color_map.get(st_brut, "#f39c12")
+            p_val = str(r.get('Paiement','')).upper()
+            is_p = ("PAY" in p_val and "NON" not in p_val)
+
+            # --- 2. AFFICHAGE NATIF (SANS AUCUN DIV DANGEREUX) ---
+            # On utilise une colonne fine pour la couleur du trait à gauche
+            col_barre, col_texte = st.columns([0.1, 3.9])
             
-            # Paiement
-            p_v = str(r.get('Paiement','')).upper()
-            is_p = ("PAY" in p_v and "NON" not in p_v)
-            p_bg = "#0047AB" if is_p else "#e74c3c"
-            p_txt = "PAYÉ" if is_p else "NON PAYÉ"
+            with col_barre:
+                # Seul petit bout de HTML très simple pour la barre de couleur
+                couleur = "#27ae60" if st_brut == "Ok" else "#f39c12"
+                if st_brut == "Refusé": couleur = "#e74c3c"
+                st.markdown(f'<div style="background:{couleur}; width:6px; height:100px; border-radius:3px;"></div>', unsafe_allow_html=True)
 
-            # --- 2. LE RENDU (UN SEUL BLOC HTML SANS F-STRING COMPLEXE) ---
-            # On construit la chaîne AVANT le markdown pour éviter les bugs d'interprétation
-            fiche_html = f"""
-            <div style="border-left: 10px solid {col_st}; 
-                        border-top: 1px solid #eee; border-right: 1px solid #eee; border-bottom: 1px solid #eee;
-                        padding: 12px; border-radius: 10px; background: white; 
-                        margin-bottom: 8px; box-shadow: 2px 2px 8px rgba(0,0,0,0.08); font-family: sans-serif;">
+            with col_texte:
+                # Titre en gras natif
+                st.markdown(f"### {nom_c}")
+                # Infos société et statut
+                st.caption(f"🏢 {soc_v}  |  🚦 Statut : {st_brut}")
+                # Téléphone et Date
+                st.write(f"📞 **{tel_v}**")
+                st.write(f"📅 **{date_v}** ({jours_v} jours)")
                 
-                <div style="margin:0; padding:0; color:#333; font-size:1.1rem; font-weight:bold;">{nom_c}</div>
+                # Ligne Prix et Paiement (en colonnes natives)
+                c_prix, c_paye = st.columns(2)
+                c_prix.markdown(f"💰 **{prix_v} €**")
                 
-                <div style="margin:2px 0 8px 0; color:#666; font-weight:bold; font-size:0.8rem;">
-                    🏢 {soc_v} <span style="font-style:italic; font-weight:normal; color:{col_st};">| 🚦 {st_brut}</span>
-                </div>
-                
-                <div style="margin-bottom:4px; font-size:0.9rem;">📞 <b>{tel_v}</b></div>
-                
-                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #ddd; padding-top:8px; margin-top:5px;">
-                    <span style="font-size:0.8rem; color:#444;">📅 <b>{date_v}</b> ({jours_v}j)</span>
-                </div>
+                if is_p:
+                    c_paye.info("✅ PAYÉ")
+                else:
+                    c_paye.error("⚠️ NON PAYÉ")
 
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-                    <span style="font-size:1rem; font-weight:bold; color:#27ae60;">💰 {prix_v}€</span>
-                    <span style="background:{p_bg}; color:white; padding:3px 10px; border-radius:5px; font-weight:bold; font-size:0.7rem; text-transform: uppercase;">
-                        {p_txt}
-                    </span>
-                </div>
-            </div>
-            """
-            
-            # --- 3. AFFICHAGE CRUCIAL ---
-            st.markdown(fiche_html, unsafe_allow_html=True)
-
-            # --- 4. BOUTONS D'ACTION (STREAMLIT STANDARD) ---
+            # --- 3. BOUTONS D'ACTION ---
             t_cl = tel_v.replace(" ","")
-            c_a, c_w, c_e = st.columns(3)
+            btn_tel, btn_wa, btn_edit = st.columns(3)
             
-            c_a.markdown(f'<a href="tel:{t_cl}" style="text-decoration:none;"><button style="width:100%; height:38px; border-radius:8px; border:1px solid #ddd; background:#f8f9fa; font-weight:bold; font-size:11px;">📞 APPEL</button></a>', unsafe_allow_html=True)
-            c_w.markdown(f'<a href="https://wa.me/{t_cl}" style="text-decoration:none;"><button style="width:100%; height:38px; border-radius:8px; border:none; background:#25D366; color:white; font-weight:bold; font-size:11px;">WA</button></a>', unsafe_allow_html=True)
+            # Liens d'action simples
+            btn_tel.markdown(f'[📞 APPEL](tel:{t_cl})', unsafe_allow_html=True)
+            btn_wa.markdown(f'[🟢 WHATSAPP](https://wa.me/{t_cl})', unsafe_allow_html=True)
             
-            if c_e.button("✏️ EDIT", key=f"edit_final_{i}", use_container_width=True):
+            if btn_edit.button("✏️ EDIT", key=f"btn_ed_{i}", use_container_width=True):
                 st.session_state.edit_idx = i
                 st.session_state.mode_saisie = True
                 st.rerun()
+
+            st.divider() # Trait de séparation propre
 # =================================================================
 # --- 6. PAGE PLANNING (VUE MOIS + LISTE + BILAN FINANCIER) ---
 # =================================================================
