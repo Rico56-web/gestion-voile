@@ -207,7 +207,7 @@ if st.session_state.page == "CONTACTS":
                     df_c.iloc[idx] = new_d
                 else:
                     df_c = pd.concat([df_c, pd.DataFrame([new_d])], ignore_index=True)
-                
+            
                 sauvegarder_data(df_c, "contacts.json")
                 st.session_state.mode_saisie = False
                 st.rerun()
