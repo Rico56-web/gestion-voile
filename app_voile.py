@@ -266,24 +266,15 @@ if st.session_state.page == "CONTACTS":
                 if cn.button("NON", key=f"n_vDur_{i}", use_container_width=True):
                     st.session_state.confirm_del_idx = None; st.rerun()
 # =================================================================
-# --- 6. PAGE PLANNING (CORRECTION NAMEERROR H_CAL) ---
+# --- 6. PAGE PLANNING (FINAL AVEC RÉCAPITULATIF FINANCIER) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
-    # 1. Sécurité : Initialisation de h_cal vide pour éviter le NameError
-    h_cal = "<p style='color:red;'>Erreur de génération du calendrier</p>"
-    
-    st.markdown("""
-        <style>
-            .block-container { padding: 10px !important; }
-            table { width: 100% !important; margin: 0 !important; border-collapse: collapse; }
-        </style>
-    """, unsafe_allow_html=True)
+    st.markdown("""<style>.block-container { padding: 10px !important; }</style>""", unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🗓️ PLANNING VESTA 2026</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="main-header">🗓️ PLANNING 2026</div>', unsafe_allow_html=True)
-
+    # --- SÉLECTEURS ---
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
-    
     col_m, col_y = st.columns([1.5, 1])
     with col_m:
         m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
@@ -291,10 +282,11 @@ elif st.session_state.page == "PLANNING":
     with col_y:
         sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
 
-    # --- LOGIQUE D'OCCUPATION ---
+    # --- TRAITEMENT DES DONNÉES ---
     jours_occ = {}
     total_mois = 0
     missions_list = []
+    nb_sorties = 0
 
     for idx, r in df_c.iterrows():
         try:
@@ -306,17 +298,21 @@ elif st.session_state.page == "PLANNING":
             
             if mv == sel_m and yv == sel_y:
                 s_val = str(r.get('Statut', '')).strip().lower()
-                soc_val = str(r.get('Société', '')).strip().upper()
                 if any(x in s_val for x in ["refusé", "archivé", "supprimé"]): continue
                 
-                # Stockage pour la liste
+                # Infos pour la liste
                 r_idx = r.copy()
                 r_idx['original_idx'] = idx
                 missions_list.append(r_idx)
-                total_mois += float(safe_val(r.get('Prix'), 0))
                 
-                # Couleurs
+                # Cumul financier
+                prix_v = float(safe_val(r.get('Prix'), 0))
+                total_mois += prix_v
+                nb_sorties += 1
+                
+                # Couleurs calendrier
                 this_date = date(yv, mv, dv)
+                soc_val = str(r.get('Société', '')).strip().upper()
                 p_val = str(r.get('Paiement', '')).strip().upper()
                 is_paye = ("PAY" in p_val) and ("NON" not in p_val)
                 
@@ -335,38 +331,31 @@ elif st.session_state.page == "PLANNING":
                             jours_occ[j] = {"c": color}
         except: continue
 
-    # --- 2. GÉNÉRATION DU HTML (C'est ici que h_cal est créé) ---
+    # --- AFFICHAGE CALENDRIER ---
+    import calendar
     jours_semaine = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"]
     h_cal = '<table style="width:100%; text-align: center; table-layout: fixed; background: white; border: 1px solid #eee;">'
     h_cal += '<tr style="background: #f1f3f5;">'
-    for js in jours_semaine:
-        h_cal += f'<td style="padding: 8px 0; font-size: 11px; font-weight: bold; border: 0.5px solid #eee;">{js}</td>'
+    for js in jours_semaine: h_cal += f'<td style="padding: 8px 0; font-size: 11px; font-weight: bold; border: 0.5px solid #eee;">{js}</td>'
     h_cal += '</tr>'
     
-    import calendar
     cal_mat = calendar.monthcalendar(sel_y, sel_m)
     for sem in cal_mat:
         h_cal += '<tr>'
         for jour in sem:
-            if jour == 0:
-                h_cal += '<td style="height:50px; border:0.5px solid #f8f9fa;"></td>'
+            if jour == 0: h_cal += '<td style="height:45px; border:0.5px solid #f8f9fa;"></td>'
             else:
                 bg = jours_occ.get(jour, {}).get("c", "transparent")
                 txt_c = "white" if bg != "transparent" else "black"
                 is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == aujourdhui.year)
-                border_style = "2px solid #0047AB" if is_today else "none"
-                
-                circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:30px; height:30px; line-height:30px; margin:auto; font-weight:bold; font-size:13px; border:{border_style};">{jour}</div>'
-                h_cal += f'<td style="border:0.5px solid #eee; height:50px;">{circle}</td>'
-        h_cal += '</tr>'
-    h_cal += '</table>'
-    
-    # Affichage du calendrier
+                border_s = "2px solid #0047AB" if is_today else "none"
+                circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:28px; height:28px; line-height:28px; margin:auto; font-weight:bold; font-size:12px; border:{border_s};">{jour}</div>'
+                h_cal += f'<td style="border:0.5px solid #eee; height:48px;">{circle}</td>'
+        h_cal += '</tr></table>'
     st.markdown(h_cal, unsafe_allow_html=True)
 
-    # --- 3. LISTE CHRONOLOGIQUE DES RÉSERVATIONS ---
-    st.markdown(f"#### 📋 Détails : **{total_mois:,.0f}€**")
-    
+    # --- LISTE DES RÉSERVATIONS ---
+    st.markdown(f"#### 📋 Missions de {m_noms[sel_m-1]}")
     if not missions_list:
         st.caption("Aucune mission prévue.")
     else:
@@ -377,26 +366,48 @@ elif st.session_state.page == "PLANNING":
         for _, row in df_m.iterrows():
             soc = str(row.get('Société','')).upper()
             c_line = "#0047AB" if "CMN" in soc else "#27ae60"
-            orig_idx = row['original_idx']
+            n_jours = int(safe_val(row.get('Nbre de jours'), 1))
+            jour_debut = int(row['j_int'])
+            date_label = f"{jour_debut}" if n_jours == 1 else f"{jour_debut}➔{jour_debut + n_jours - 1}"
             
             st.markdown(f"""
                 <div style="display: flex; padding: 10px 5px; border-bottom: 1px solid #eee; background: white; align-items: center;">
-                    <div style="background: {c_line}; color: white; border-radius: 8px; padding: 4px; min-width: 40px; text-align: center; font-weight: bold; margin-right: 10px;">
-                        {str(row.get('DateNav','')).split('/')[0]}<br><span style="font-size: 0.5rem;">JOUR</span>
+                    <div style="background: {c_line}; color: white; border-radius: 8px; padding: 4px; min-width: 55px; text-align: center; font-weight: bold; margin-right: 10px;">
+                        {date_label}<br><span style="font-size: 0.5rem;">JOUR</span>
                     </div>
                     <div style="flex-grow: 1;">
                         <b style="font-size: 0.9rem;">{str(row.get('Nom','')).upper()}</b><br>
-                        <small style="color: #666;">{soc} ({row.get('Prix','0')}€)</small>
+                        <small style="color: #666;">{soc} ({int(safe_val(row.get('Nbre de personnes'),1))} pers.)</small>
                     </div>
+                    <div style="text-align: right; font-weight: bold; color: #27ae60;">{row.get('Prix','0')}€</div>
                 </div>
             """, unsafe_allow_html=True)
             
-            # Bouton de retour vers la fiche contact
-            if st.button(f"🔍 VOIR FICHE : {str(row.get('Nom','')).upper()}", key=f"goto_{orig_idx}", use_container_width=True):
-                st.session_state.edit_idx = orig_idx
+            if st.button(f"🔍 VOIR FICHE : {str(row.get('Nom','')).upper()}", key=f"btn_p_{row['original_idx']}", use_container_width=True):
+                st.session_state.edit_idx = row['original_idx']
                 st.session_state.mode_saisie = True
                 st.session_state.page = "CONTACTS"
                 st.rerun()
+
+    # --- RÉCAPITULATIF FINAL (LE BILAN DU MOIS) ---
+    st.divider()
+    moyenne = total_mois / nb_sorties if nb_sorties > 0 else 0
+    st.markdown(f"""
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; border: 1px solid #eee; margin-top: 10px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span style="color: #666;">Nombre de sorties :</span>
+                <span style="font-weight: bold;">{nb_sorties}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span style="color: #666;">Panier moyen :</span>
+                <span style="font-weight: bold;">{moyenne:,.0f} €</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #0047AB;">
+                <span style="font-size: 1.1rem; font-weight: bold;">TOTAL DU MOIS :</span>
+                <span style="font-size: 1.1rem; font-weight: bold; color: #0047AB;">{total_mois:,.0f} €</span>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 # =================================================================
 # --- 7. PAGE STATS ---
 # =================================================================
