@@ -252,7 +252,7 @@ if st.session_state.page == "CONTACTS":
             
         
            # --- LOGIQUE PAIEMENT AFFICHAGE (STRICTE & COULEURS CIBLÉES) ---
-           p_val_brut = str(r.get('Paiement', '')).strip().upper()
+            p_val_brut = str(r.get('Paiement', '')).strip().upper()
 
            # Détection : Est-ce payé ?
            if "PAY" in p_val_brut and "NON" not in p_val_brut:
