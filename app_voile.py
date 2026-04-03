@@ -219,7 +219,7 @@ if st.session_state.page == "CONTACTS":
     # ---------------------------------------------------------
     # CAS B : LISTE DES CONTACTS (AFFICHAGE)
     # ---------------------------------------------------------
-     else:
+else:
         st.markdown('<div class="main-header">📇 CONTACTS 2026</div>', unsafe_allow_html=True)
         
         n1, n2, n3 = st.columns([1, 1, 1.2])
