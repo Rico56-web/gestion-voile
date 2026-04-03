@@ -250,15 +250,19 @@ if st.session_state.page == "CONTACTS":
             tel_v = str(r.get('Téléphone',''))
             eml_v = str(r.get('Email',''))
             
-            # --- LOGIQUE PAIEMENT AFFICHAGE ---
-            p_val_brut = str(r.get('Paiement', '')).strip().upper()
-            paye = "PAY" in p_val_brut and "NON" not in p_val_brut
-            
-            # Couleurs
-            color_map = {"Ok": "#27ae60", "Refusé": "#e74c3c", "Terminé": "#34495e", "En attente": "#f39c12"}
-            base_col = "#0047AB" if "CMN" in soc_v else color_map.get(st_b, "#f39c12")
-            p_status = "✅ PAYÉ" if paye else "⚠️ ATTENTE"
-            p_color = "#27ae60" if paye else "#e74c3c"
+        
+           # --- LOGIQUE PAIEMENT AFFICHAGE (STRICTE & COULEURS CIBLÉES) ---
+           p_val_brut = str(r.get('Paiement', '')).strip().upper()
+
+           # Détection : Est-ce payé ?
+           if "PAY" in p_val_brut and "NON" not in p_val_brut:
+               paye = True
+               p_status = "✅ PAYÉ"
+               p_color = "#0047AB"  # BLEU (comme demandé)
+           else:
+               paye = False
+               p_status = "⚠️ NON PAYÉ" # Remplace "ATTENTE"
+               p_color = "#e74c3c"  # ROUGE
 
             # --- CARTE HTML COMPACTÉE ---
             html_card = f"""<div style="border:5px solid {base_col};border-left:20px solid {base_col};padding:15px;border-radius:15px;background-color:white;margin-bottom:12px;box-shadow:5px 5px 15px rgba(0,0,0,0.1);"><span style="float:right;color:{p_color};font-weight:bold;border:2px solid;padding:2px 5px;border-radius:5px;font-size:0.8rem;">{p_status}</span><div style="font-size:1.25rem;font-weight:bold;color:{base_col};margin-bottom:2px;display:flex;align-items:center;"><span style="background-color:{base_col};color:white;min-width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.9rem;margin-right:12px;">{count}</span>{nom_v} {pre_v}</div><div style="font-weight:bold;color:#666;margin-left:40px;font-size:0.85rem;text-transform:uppercase;">{f"🏢 {soc_v}" if soc_v != nom_v else "👤 PARTICULIER"}</div><hr style="border:0;border-top:1px solid #eee;margin:12px 0;"><div style="margin-left:5px;margin-bottom:10px;"><div style="font-size:1.1rem;margin-bottom:3px;">📞 <b>{tel_v if tel_v not in ['nan','None',''] else '---'}</b></div><div style="font-size:0.9rem;color:#555;">📧 {eml_v if eml_v not in ['nan','None',''] else '---'}</div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;background:#f8f9fa;padding:8px 12px;border-radius:8px;border:1px solid #eee;"><div style="text-align:center;"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Date</div><div style="font-size:0.85rem;font-weight:bold;">{r.get('DateNav','-')}</div></div><div style="text-align:center;"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Prix</div><div style="font-size:0.85rem;font-weight:bold;color:#27ae60;">{r.get('Prix','0')}€</div></div><div style="text-align:center;"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Pers.</div><div style="font-size:0.85rem;font-weight:bold;">{int(safe_val(r.get('Nbre de personnes'),1))}p</div></div></div></div>"""
