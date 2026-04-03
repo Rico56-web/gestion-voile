@@ -231,7 +231,7 @@ if st.session_state.page == "CONTACTS":
                   df_visu['Société'].astype(str).str.upper().str.contains(search_q, na=False))
             df_visu = df_visu[m_s]
         for i, r in df_visu.iterrows():
-            # --- PRÉPARATION ---
+            # --- PRÉPARATION DES DONNÉES ---
             nom_v = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom','')).capitalize()}"
             soc_v = str(r.get('Société','')).upper()
             tel_v = str(r.get('Téléphone',''))
@@ -244,35 +244,35 @@ if st.session_state.page == "CONTACTS":
             col_statut = "#27ae60" if st_brut == "Ok" else "#f39c12"
             if st_brut == "Refusé": col_statut = "#e74c3c"
             
-            # Logique Paiement (Badge discret mais coloré)
+            # Logique Paiement (Badge compact)
             p_val = str(r.get('Paiement', '')).strip().upper()
             is_paye = ("PAY" in p_val and "NON" not in p_val)
             p_bg = "#0047AB" if is_paye else "#e74c3c"
             p_txt = "PAYÉ" if is_paye else "NON PAYÉ"
 
-            # --- AFFICHAGE ÉLÉGANT ---
-            # Header avec Nom à gauche et Badge à droite
-            h1, h2 = st.columns([2, 1])
-            with h1:
-                st.subheader(nom_v)
-            with h2:
-                # Le badge est aligné à droite, assez gros pour être vu, assez petit pour rester discret
-                st.markdown(f"""
-                    <div style="background:{p_bg}; color:white; padding:5px 10px; border-radius:15px; 
-                                text-align:center; font-weight:bold; font-size:0.7rem; margin-top:10px;">
-                        {p_txt}
-                    </div>
-                """, unsafe_allow_html=True)
-
+            # --- AFFICHAGE ÉPURÉ ---
+            st.subheader(nom_v)
+            
             # Détails avec la barre de statut fine à gauche
             c_bord, c_cont = st.columns([0.05, 3.95])
             with c_bord:
-                st.markdown(f'<div style="background:{col_statut}; width:4px; height:80px; border-radius:2px;"></div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="background:{col_statut}; width:4px; height:90px; border-radius:2px;"></div>', unsafe_allow_html=True)
             
             with c_cont:
                 st.write(f"🏢 **{soc_v}** | 🚦 *{st_brut}*")
                 st.write(f"📞 {tel_v}  |  📅 **{date_v}** ({jours_v}j)")
-                st.write(f"💰 **Total : {prix_v}€**")
+                
+                # --- LIGNE FINANCIÈRE : PRIX + STATUT PAIEMENT ---
+                f1, f2 = st.columns([1.5, 1])
+                with f1:
+                    st.markdown(f"💰 **Total : {prix_v}€**")
+                with f2:
+                    st.markdown(f"""
+                        <div style="background:{p_bg}; color:white; padding:3px 8px; border-radius:5px; 
+                                    text-align:center; font-weight:bold; font-size:0.7rem; width:fit-content; float:right;">
+                            {p_txt}
+                        </div>
+                    """, unsafe_allow_html=True)
 
             # Boutons d'action compacts
             t_clean = tel_v.replace(" ","")
@@ -281,7 +281,7 @@ if st.session_state.page == "CONTACTS":
             col_a.markdown(f'<a href="tel:{t_clean}" style="text-decoration:none;"><button style="width:100%; height:35px; border-radius:5px; border:1px solid #ddd; background:#f0f2f6; font-size:12px;">📞 APPEL</button></a>', unsafe_allow_html=True)
             col_w.markdown(f'<a href="https://wa.me/{t_clean}" style="text-decoration:none;"><button style="width:100%; height:35px; border-radius:5px; border:none; background:#25D366; color:white; font-size:12px; font-weight:bold;">WA</button></a>', unsafe_allow_html=True)
             
-            if col_e.button("✏️ EDIT", key=f"ed_final_{i}", use_container_width=True):
+            if col_e.button("✏️ EDIT", key=f"ed_v3_{i}", use_container_width=True):
                 st.session_state.edit_idx = i
                 st.session_state.mode_saisie = True
                 st.rerun()
