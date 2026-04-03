@@ -276,24 +276,36 @@ if st.session_state.page == "CONTACTS":
                     st.session_state.confirm_del_idx = None
                     st.rerun()       
 # =================================================================
-# --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
+# --- 6. PAGE PLANNING (OPTIMISÉE PLEINE LARGEUR IPHONE 16) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
-    st.subheader("🗓️ Planning Vesta 2026")
+    # CSS pour forcer la largeur maximale sur mobile
+    st.markdown("""
+        <style>
+            .block-container { padding: 10px !important; }
+            table { width: 100% !important; margin: 0 !important; }
+        </style>
+    """, unsafe_allow_html=True)
 
+    st.markdown('<div class="main-header">🗓️ PLANNING 2026</div>', unsafe_allow_html=True)
+
+    # Sélecteurs (Mois / Année) sur une seule ligne pour gagner de la place
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
     
-    col_m, col_y = st.columns(2)
+    col_m, col_y = st.columns([1.5, 1])
     with col_m:
         m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
         sel_m = m_noms.index(st.selectbox("Mois", m_noms, index=aujourdhui.month - 1)) + 1
     with col_y:
         sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
 
-    # Logique du calendrier
+    # --- LOGIQUE D'OCCUPATION ---
     jours_occ = {}
-    for _, r in df_c.iterrows():
+    total_mois = 0
+    missions_list = []
+
+    for idx, r in df_c.iterrows():
         try:
             d_str = str(r.get('DateNav', '')).strip()
             if '/' not in d_str: continue
@@ -303,39 +315,40 @@ elif st.session_state.page == "PLANNING":
             
             if mv == sel_m and yv == sel_y:
                 s_val = str(r.get('Statut', '')).strip().lower()
-                if s_val in ["", "archivé", "archive", "supprimé", "refusé"]: continue
+                soc_val = str(r.get('Société', '')).strip().upper()
+                if any(x in s_val for x in ["refusé", "archivé", "supprimé"]): continue
                 
+                # Pour la liste chronologique
+                missions_list.append(r)
+                total_mois += float(safe_val(r.get('Prix'), 0))
+                
+                # Pour le calendrier
                 this_date = date(yv, mv, dv)
-                p_val = str(r.get('Paiement', '')).strip().lower()
-                is_paye = ("pay" in p_val) and not any(x in p_val for x in ["un", "pas", "non"])
+                p_val = str(r.get('Paiement', '')).strip().upper()
+                is_paye = ("PAY" in p_val) and ("NON" not in p_val)
                 
-                if this_date < aujourdhui:
-                    current_c = "#3498db" if is_paye else "#e74c3c"
-                elif "ok" in s_val:
-                    current_c = "#2ecc71"
-                elif "attente" in s_val:
-                    current_c = "#f1c40f"
-                else:
-                    current_c = "transparent"
+                # Couleur
+                if this_date < aujourdhui: color = "#0047AB" if is_paye else "#e74c3c"
+                elif "CMN" in soc_val: color = "#0047AB"
+                elif "ok" in s_val: color = "#27ae60"
+                elif "attente" in s_val: color = "#f39c12"
+                else: color = "transparent"
                 
-                n_j = int(r.get('NbreJours', 1))
+                n_j = int(safe_val(r.get('Nbre de jours'), 1))
                 for j in range(dv, dv + n_j):
-                    if j in jours_occ:
-                        # Priorité au rouge (impayé) sur le reste
-                        if jours_occ[j]["c"] == "#e74c3c" or current_c == "#e74c3c":
-                            jours_occ[j] = {"c": "#e74c3c"}
-                        else:
-                            jours_occ[j] = {"c": current_c}
-                    else:
-                        jours_occ[j] = {"c": current_c}
+                    if j <= 31:
+                        if j in jours_occ and (color == "#e74c3c" or color == "#0047AB"): 
+                            jours_occ[j] = {"c": color}
+                        elif j not in jours_occ: 
+                            jours_occ[j] = {"c": color}
         except: continue
 
-    # Dessin du calendrier HTML
-    jours_semaine = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
-    h_cal = '<table style="width:100%; border-collapse: collapse; text-align: center; background: white; color: black;">'
-    h_cal += '<tr style="background: #f8f9fa; font-weight: bold; border-bottom: 2px solid #eee;">'
+    # --- DESSIN DU CALENDRIER (LARGEUR MAXIMALE) ---
+    jours_semaine = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"]
+    h_cal = '<table style="width:100%; border-collapse: collapse; text-align: center; table-layout: fixed; background: white; border: 1px solid #eee;">'
+    h_cal += '<tr style="background: #f1f3f5;">'
     for js in jours_semaine:
-        h_cal += f'<td style="padding: 10px; border: 0.5px solid #eee; font-size: 12px; color: #666;">{js}</td>'
+        h_cal += f'<td style="padding: 8px 0; font-size: 11px; font-weight: bold; color: #444; border: 0.5px solid #eee;">{js}</td>'
     h_cal += '</tr>'
     
     cal_mat = calendar.monthcalendar(sel_y, sel_m)
@@ -343,17 +356,51 @@ elif st.session_state.page == "PLANNING":
         h_cal += '<tr>'
         for jour in sem:
             if jour == 0:
-                h_cal += '<td style="height:55px; border:0.5px solid #eee;"></td>'
+                h_cal += '<td style="height:50px; border:0.5px solid #f8f9fa;"></td>'
             else:
                 bg = jours_occ.get(jour, {}).get("c", "transparent")
                 txt_c = "white" if bg != "transparent" else "black"
-                circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:32px; height:32px; line-height:32px; margin:auto; font-weight:bold; font-size:13px;">{jour}</div>' if bg != "transparent" else f'<span>{jour}</span>'
-                h_cal += f'<td style="border:0.5px solid #eee; height:55px;">{circle}</td>'
+                is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == aujourdhui.year)
+                border_style = "2px solid #0047AB" if is_today else "none"
+                
+                circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:30px; height:30px; line-height:30px; margin:auto; font-weight:bold; font-size:13px; border:{border_style};">{jour}</div>'
+                h_cal += f'<td style="border:0.5px solid #eee; height:50px;">{circle}</td>'
         h_cal += '</tr>'
     h_cal += '</table>'
     
     st.markdown(h_cal, unsafe_allow_html=True)
-    st.caption("🔴 Passé Impayé | 🔵 Passé Payé | 🟢 Confirmé | 🟡 En attente")
+
+    # --- LISTE CHRONOLOGIQUE ---
+    st.markdown(f"#### 📋 Détails du Mois : **{total_mois:,.0f}€**")
+    
+    if not missions_list:
+        st.caption("Aucune mission prévue.")
+    else:
+        df_m = pd.DataFrame(missions_list)
+        df_m['j_int'] = df_m['DateNav'].apply(lambda x: int(x.split('/')[0]) if '/' in str(x) else 0)
+        df_m = df_m.sort_values('j_int')
+
+        for _, row in df_m.iterrows():
+            soc = str(row.get('Société','')).upper()
+            c_line = "#0047AB" if "CMN" in soc else "#27ae60"
+            st.markdown(f"""
+                <div style="display: flex; padding: 12px; border-bottom: 1px solid #eee; background: white; align-items: center;">
+                    <div style="background: {c_line}; color: white; border-radius: 8px; padding: 5px; min-width: 45px; text-align: center; font-weight: bold; margin-right: 12px;">
+                        {row.get('DateNav','').split('/')[0]}<br><span style="font-size: 0.6rem;">JOUR</span>
+                    </div>
+                    <div style="flex-grow: 1;">
+                        <b style="color: #333; font-size: 0.95rem;">{str(row.get('Nom','')).upper()} {str(row.get('Prénom','')).capitalize()}</b><br>
+                        <small style="color: #666;">🏢 {soc}</small>
+                    </div>
+                    <div style="text-align: right; min-width: 70px;">
+                        <b style="color: {c_line}; font-size: 1rem;">{row.get('Prix','0')}€</b>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("""<div style="display: flex; justify-content: space-around; margin-top: 15px; font-size: 0.7rem; opacity: 0.8;">
+        <span>🔵 CMN/Payé</span><span>🟢 Confirmé</span><span>🟡 Option</span><span>🔴 Impayé</span>
+    </div>""", unsafe_allow_html=True)
 
 # =================================================================
 # --- 7. PAGE STATS ---
