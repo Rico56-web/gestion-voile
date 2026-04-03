@@ -21,7 +21,7 @@
         "HeuresMoteur":"0",
         "dt_obj":1772323200000.0,
         "dt_sort":1772323200000.0,
-        "dt":1772323200000,
+        "dt":1772323200000.0,
         "Mail":null,
         "Date":"25\/02\/2026",
         "Jours":"4",
@@ -372,7 +372,7 @@
         "HeuresMoteur":"0.0",
         "dt_obj":1777334400000.0,
         "dt_sort":1777334400000.0,
-        "dt":1777334400000,
+        "dt":1777334400000.0,
         "Mail":null,
         "Date":null,
         "Jours":null,
@@ -698,7 +698,7 @@
         "Societe":null,
         "Telephone":null,
         "Commentaires":"\u00c0 voir",
-        "Nbre de jours":1.0,
+        "Nbre de jours":31.0,
         "Nbre de personnes":1.0
     },
     {
