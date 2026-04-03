@@ -231,7 +231,7 @@ if st.session_state.page == "CONTACTS":
                   df_visu['Société'].astype(str).str.upper().str.contains(search_q, na=False))
             df_visu = df_visu[m_s]
      
-      for i, r in df_visu.iterrows():
+        for i, r in df_visu.iterrows():
             # --- PRÉPARATION DES DONNÉES ---
             nom_complet = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom','')).capitalize()}"
             soc_v = str(r.get('Société','')).upper()
