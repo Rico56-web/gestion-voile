@@ -222,7 +222,13 @@ if st.session_state.page == "CONTACTS":
 
         st.divider()
 
-        mask_arch = df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|REFUSÉ", na=False)
+     # --- NOUVELLE LOGIQUE : Archive SEULEMENT si Terminé ET Payé ---
+     # On crée une condition : est-ce que c'est payé ?
+     is_paye = df_c['Paiement'].astype(str).str.upper().str.contains("PAY", na=False) & \
+          ~df_c['Paiement'].astype(str).str.upper().str.contains("NON", na=False)
+
+     # On archive si (Statut est Terminé ou Refusé) ET (C'est payé)
+     mask_arch = df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|REFUSÉ", na=False) & is_paye
         df_visu = df_c[mask_arch] if st.session_state.view_archive else df_c[~mask_arch]
 
         count = 0
