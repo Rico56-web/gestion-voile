@@ -231,7 +231,7 @@ if st.session_state.page == "CONTACTS":
                   df_visu['Société'].astype(str).str.upper().str.contains(search_q, na=False))
             df_visu = df_visu[m_s]
         for i, r in df_visu.iterrows():
-            # 1. Préparation des variables
+            # --- PRÉPARATION DES DONNÉES ---
             nom_v = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom','')).capitalize()}"
             soc_v = str(r.get('Société','')).upper()
             tel_v = str(r.get('Téléphone',''))
@@ -240,49 +240,52 @@ if st.session_state.page == "CONTACTS":
             prix_v = str(r.get('Prix','0'))
             jours_v = int(safe_val(r.get('Nbre de jours'), 1))
             
-            # Gestion des couleurs et statuts
+            # Logique Statut Dossier
             st_brut = str(r.get('Statut','En attente')).capitalize()
-            p_val = str(r.get('Paiement', '')).strip().upper()
-            is_paye = ("PAY" in p_val and "NON" not in p_val)
-            
             col_statut = "#27ae60" if st_brut == "Ok" else "#f39c12"
             if st_brut == "Refusé": col_statut = "#e74c3c"
             
-            # 2. AFFICHAGE ÉPURÉ (Mélange Streamlit et HTML simple)
-            # On utilise une colonne pour le badge de couleur et une pour le contenu
-            c_bord, c_cont = st.columns([0.1, 3.9])
+            # Logique Paiement (GROS BADGE)
+            p_val = str(r.get('Paiement', '')).strip().upper()
+            is_paye = ("PAY" in p_val and "NON" not in p_val)
             
+            if is_paye:
+                p_html = f'<div style="background:#0047AB; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:1.2rem; margin-bottom:10px;">✅ PAYÉ</div>'
+            else:
+                p_html = f'<div style="background:#e74c3c; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:1.2rem; margin-bottom:10px;">⚠️ NON PAYÉ</div>'
+
+            # --- AFFICHAGE SUR LA FICHE ---
+            # 1. Le gros badge de paiement en premier
+            st.markdown(p_html, unsafe_allow_html=True)
+            
+            # 2. Infos Client avec barre de statut à gauche
+            c_bord, c_cont = st.columns([0.1, 3.9])
             with c_bord:
-                # Barre verticale de couleur
-                st.markdown(f'<div style="background:{col_statut}; width:10px; height:120px; border-radius:5px;"></div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="background:{col_statut}; width:8px; height:100px; border-radius:4px;"></div>', unsafe_allow_html=True)
             
             with c_cont:
-                # En-tête : Nom et État Paiement
-                p_txt = "✅ PAYÉ" if is_paye else "⚠️ NON PAYÉ"
-                st.markdown(f"**{nom_v}** |  *{p_txt}*", unsafe_allow_html=True)
-                st.caption(f"🏢 {soc_v}  •  🚦 Statut: {st_brut}")
-                
-                # Coordonnées en texte clair (plus de DIV ici pour éviter les bugs)
-                st.write(f"📞 {tel_v}")
+                st.subheader(f"{nom_v}")
+                st.write(f"🏢 **{soc_v}** | 🚦 *{st_brut}*")
+                st.write(f"📞 **{tel_v}**")
                 if eml_v and eml_v != "nan":
                     st.write(f"📧 {eml_v}")
-                
-                # Infos Navigation
-                st.markdown(f"📅 **{date_v}** ({jours_v}j)  •  💰 **{prix_v}€**")
+                st.markdown(f"📅 **{date_v}** ({jours_v}j)  —  💰 **{prix_v}€**")
 
-            # 3. BOUTONS D'ACTION (Standard Streamlit pour la stabilité)
+            # 3. BOUTONS D'ACTION (APPEL / WA / MODIF)
             t_clean = tel_v.replace(" ","")
-            btn_col1, btn_col2, btn_col3 = st.columns(3)
+            col1, col2, col3 = st.columns(3)
             
-            btn_col1.markdown(f'<a href="tel:{t_clean}" style="text-decoration:none;"><button style="width:100%; padding:10px; border-radius:5px; border:1px solid #ddd; background:#f0f2f6; font-weight:bold;">📞 APPEL</button></a>', unsafe_allow_html=True)
-            btn_col2.markdown(f'<a href="https://wa.me/{t_clean}" style="text-decoration:none;"><button style="width:100%; padding:10px; border-radius:5px; border:none; background:#25D366; color:white; font-weight:bold;">WA</button></a>', unsafe_allow_html=True)
+            # Appel & WhatsApp en HTML pour le style
+            col1.markdown(f'<a href="tel:{t_clean}" style="text-decoration:none;"><button style="width:100%; height:45px; border-radius:8px; border:1px solid #ddd; background:#f0f2f6; font-weight:bold;">📞 APPEL</button></a>', unsafe_allow_html=True)
+            col2.markdown(f'<a href="https://wa.me/{t_clean}" style="text-decoration:none;"><button style="width:100%; height:45px; border-radius:8px; border:none; background:#25D366; color:white; font-weight:bold;">WA</button></a>', unsafe_allow_html=True)
             
-            if btn_col3.button("✏️ Modifier", key=f"edit_{i}", use_container_width=True):
+            # Modifier en bouton natif Streamlit pour la fiabilité
+            if col3.button("✏️ EDIT", key=f"edit_v2_{i}", use_container_width=True):
                 st.session_state.edit_idx = i
                 st.session_state.mode_saisie = True
                 st.rerun()
 
-            st.divider() # Séparateur entre chaque contact
+            st.divider()
       
 # =================================================================
 # --- 6. PAGE PLANNING (VUE MOIS + LISTE + BILAN FINANCIER) ---
