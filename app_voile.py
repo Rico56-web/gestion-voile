@@ -230,9 +230,9 @@ if st.session_state.page == "CONTACTS":
             m_s = (df_visu['Nom'].astype(str).str.upper().str.contains(search_q, na=False) | 
                   df_visu['Société'].astype(str).str.upper().str.contains(search_q, na=False))
             df_visu = df_visu[m_s]
-    for i, r in df_visu.iterrows():
-            # --- PRÉPARATION DES DONNÉES ---
-            nom_complet = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom','')).capitalize()}"
+        for i, r in df_visu.iterrows():
+            # --- 1. PRÉPARATION PROPRE DES DONNÉES ---
+            nom_c = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom','')).capitalize()}"
             soc_v = str(r.get('Société','')).upper()
             tel_v = str(r.get('Téléphone',''))
             date_v = str(r.get('DateNav','-'))
@@ -242,56 +242,57 @@ if st.session_state.page == "CONTACTS":
             # Couleurs Statut
             st_brut = str(r.get('Statut','En attente')).capitalize()
             color_map = {"Ok": "#27ae60", "Refusé": "#e74c3c", "Terminé": "#34495e", "En attente": "#f39c12"}
-            col_statut = color_map.get(st_brut, "#f39c12")
+            col_st = color_map.get(st_brut, "#f39c12")
             
             # Paiement
-            is_paye = ("PAY" in str(r.get('Paiement','')).upper() and "NON" not in str(r.get('Paiement','')).upper())
-            p_bg = "#0047AB" if is_paye else "#e74c3c"
-            p_txt = "PAYÉ" if is_paye else "NON PAYÉ"
+            p_v = str(r.get('Paiement','')).upper()
+            is_p = ("PAY" in p_v and "NON" not in p_v)
+            p_bg = "#0047AB" if is_p else "#e74c3c"
+            p_txt = "PAYÉ" if is_p else "NON PAYÉ"
 
-            # --- LA FICHE ENCADRÉE (CARD DESIGN) ---
-            # Un seul bloc HTML pour tout l'intérieur de la fiche pour supprimer les espaces Streamlit
-            html_fiche = f"""
-            <div style="border-left: 10px solid {col_statut}; 
+            # --- 2. LE RENDU (UN SEUL BLOC HTML SANS F-STRING COMPLEXE) ---
+            # On construit la chaîne AVANT le markdown pour éviter les bugs d'interprétation
+            fiche_html = f"""
+            <div style="border-left: 10px solid {col_st}; 
                         border-top: 1px solid #eee; border-right: 1px solid #eee; border-bottom: 1px solid #eee;
                         padding: 12px; border-radius: 10px; background: white; 
-                        margin-bottom: 8px; box-shadow: 2px 2px 8px rgba(0,0,0,0.08);">
+                        margin-bottom: 8px; box-shadow: 2px 2px 8px rgba(0,0,0,0.08); font-family: sans-serif;">
                 
-                <h3 style="margin:0; padding:0; color:#333; font-size:1.15rem;">{nom_complet}</h3>
+                <div style="margin:0; padding:0; color:#333; font-size:1.1rem; font-weight:bold;">{nom_c}</div>
                 
-                <div style="margin:2px 0 8px 0; color:#666; font-weight:bold; font-size:0.85rem;">
-                    🏢 {soc_v} <span style="font-style:italic; font-weight:normal; color:{col_statut};">| 🚦 {st_brut}</span>
+                <div style="margin:2px 0 8px 0; color:#666; font-weight:bold; font-size:0.8rem;">
+                    🏢 {soc_v} <span style="font-style:italic; font-weight:normal; color:{col_st};">| 🚦 {st_brut}</span>
                 </div>
                 
-                <div style="margin-bottom:4px; font-size:0.95rem;">📞 <b>{tel_v}</b></div>
+                <div style="margin-bottom:4px; font-size:0.9rem;">📞 <b>{tel_v}</b></div>
                 
                 <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #ddd; padding-top:8px; margin-top:5px;">
-                    <span style="font-size:0.85rem;">📅 <b>{date_v}</b> ({jours_v}j)</span>
+                    <span style="font-size:0.8rem; color:#444;">📅 <b>{date_v}</b> ({jours_v}j)</span>
                 </div>
 
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
                     <span style="font-size:1rem; font-weight:bold; color:#27ae60;">💰 {prix_v}€</span>
-                    <span style="background:{p_bg}; color:white; padding:3px 10px; border-radius:5px; font-weight:bold; font-size:0.7rem;">
+                    <span style="background:{p_bg}; color:white; padding:3px 10px; border-radius:5px; font-weight:bold; font-size:0.7rem; text-transform: uppercase;">
                         {p_txt}
                     </span>
                 </div>
             </div>
             """
-            st.markdown(html_fiche, unsafe_allow_html=True)
+            
+            # --- 3. AFFICHAGE CRUCIAL ---
+            st.markdown(fiche_html, unsafe_allow_html=True)
 
-            # --- BOUTONS D'ACTION (En dehors de la card pour le clic tactile) ---
-            t_clean = tel_v.replace(" ","")
-            col_a, col_w, col_e = st.columns(3)
+            # --- 4. BOUTONS D'ACTION (STREAMLIT STANDARD) ---
+            t_cl = tel_v.replace(" ","")
+            c_a, c_w, c_e = st.columns(3)
             
-            col_a.markdown(f'<a href="tel:{t_clean}" style="text-decoration:none;"><button style="width:100%; height:38px; border-radius:8px; border:1px solid #ddd; background:#f8f9fa; font-weight:bold; font-size:12px;">📞 APPEL</button></a>', unsafe_allow_html=True)
-            col_w.markdown(f'<a href="https://wa.me/{t_clean}" style="text-decoration:none;"><button style="width:100%; height:38px; border-radius:8px; border:none; background:#25D366; color:white; font-weight:bold; font-size:12px;">WA</button></a>', unsafe_allow_html=True)
+            c_a.markdown(f'<a href="tel:{t_cl}" style="text-decoration:none;"><button style="width:100%; height:38px; border-radius:8px; border:1px solid #ddd; background:#f8f9fa; font-weight:bold; font-size:11px;">📞 APPEL</button></a>', unsafe_allow_html=True)
+            c_w.markdown(f'<a href="https://wa.me/{t_cl}" style="text-decoration:none;"><button style="width:100%; height:38px; border-radius:8px; border:none; background:#25D366; color:white; font-weight:bold; font-size:11px;">WA</button></a>', unsafe_allow_html=True)
             
-            if col_e.button("✏️ EDIT", key=f"ed_v5_{i}", use_container_width=True):
+            if c_e.button("✏️ EDIT", key=f"edit_final_{i}", use_container_width=True):
                 st.session_state.edit_idx = i
                 st.session_state.mode_saisie = True
                 st.rerun()
-
-            st.write("") # Petit espace avant le prochain contact
 # =================================================================
 # --- 6. PAGE PLANNING (VUE MOIS + LISTE + BILAN FINANCIER) ---
 # =================================================================
