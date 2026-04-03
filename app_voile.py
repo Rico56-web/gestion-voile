@@ -264,11 +264,11 @@ else:
             base_col = "#0047AB" if "CMN" in soc_v else color_map.get(st_b, "#f39c12")
             label_soc = f"🏢 {soc_v}" if soc_v != nom_v else "👤 PARTICULIER"
 
-            # 4. GÉNÉRATION DE LA CARTE HTML (UTILISE BASE_COL ET P_COLOR)
+            # 4. GÉNÉRATION DE LA CARTE HTML
             html_card = f"""<div style="border:5px solid {base_col};border-left:20px solid {base_col};padding:15px;border-radius:15px;background-color:white;margin-bottom:12px;box-shadow:5px 5px 15px rgba(0,0,0,0.1);"><span style="float:right;color:{p_color};font-weight:bold;border:2px solid {p_color};padding:2px 5px;border-radius:5px;font-size:0.8rem;">{p_status}</span><div style="font-size:1.25rem;font-weight:bold;color:{base_col};margin-bottom:2px;display:flex;align-items:center;"><span style="background-color:{base_col};color:white;min-width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.9rem;margin-right:12px;">{count}</span>{nom_v} {pre_v}</div><div style="font-weight:bold;color:#666;margin-left:40px;font-size:0.85rem;text-transform:uppercase;">{label_soc}</div><hr style="border:0;border-top:1px solid #eee;margin:12px 0;"><div style="margin-left:5px;margin-bottom:10px;"><div style="font-size:1.1rem;margin-bottom:3px;">📞 <b>{tel_v if tel_v not in ['nan','None',''] else '---'}</b></div><div style="font-size:0.9rem;color:#555;">📧 {eml_v if eml_v not in ['nan','None',''] else '---'}</div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;background:#f8f9fa;padding:8px 12px;border-radius:8px;border:1px solid #eee;"><div style="text-align:center;"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Date</div><div style="font-size:0.85rem;font-weight:bold;">{r.get('DateNav','-')}</div></div><div style="text-align:center;"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Prix</div><div style="font-size:0.85rem;font-weight:bold;color:#27ae60;">{r.get('Prix','0')}€</div></div><div style="text-align:center;"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Pers.</div><div style="font-size:0.85rem;font-weight:bold;">{int(safe_val(r.get('Nbre de personnes'),1))}p</div></div></div></div>"""
             st.markdown(html_card, unsafe_allow_html=True)
 
-            # --- BOUTONS ACTIONS ---
+            # --- BOUTONS ACTIONS (APPEL/WA/MAIL) ---
             t_clean = str(tel_v).replace(" ","")
             st.markdown(f"""<div style="display:flex;gap:8px;margin-bottom:10px;"><a href="tel:{t_clean}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:14px;">📞 APPEL</a><a href="https://wa.me/{t_clean}" style="flex:1;text-align:center;background:#25D366;color:white;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;font-size:14px;">🟢 WA</a><a href="mailto:{eml_v}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:14px;">✉️ MAIL</a></div>""", unsafe_allow_html=True)
 
@@ -281,6 +281,7 @@ else:
                 st.session_state.confirm_del_idx = i
                 st.rerun()
 
+            # --- CONFIRMATION SUPPRESSION ---
             if st.session_state.get('confirm_del_idx') == i:
                 st.error(f"⚠️ SUPPRIMER LA FICHE N°{count} ?")
                 cy, cn = st.columns(2)
