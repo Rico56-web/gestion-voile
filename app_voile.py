@@ -266,15 +266,17 @@ if st.session_state.page == "CONTACTS":
                 if cn.button("NON", key=f"n_vDur_{i}", use_container_width=True):
                     st.session_state.confirm_del_idx = None; st.rerun()
 # =================================================================
-# --- 6. PAGE PLANNING (FINAL AVEC RÉCAPITULATIF FINANCIER) ---
+# --- 6. PAGE PLANNING (VUE MOIS + LISTE + BILAN FINANCIER) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
-    st.markdown("""<style>.block-container { padding: 10px !important; }</style>""", unsafe_allow_html=True)
+    # Optimisation de la largeur pour iPhone 16
+    st.markdown("""<style>.block-container { padding: 10px !important; } table { width: 100% !important; border-collapse: collapse; }</style>""", unsafe_allow_html=True)
     st.markdown('<div class="main-header">🗓️ PLANNING VESTA 2026</div>', unsafe_allow_html=True)
 
-    # --- SÉLECTEURS ---
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
+    
+    # Sélecteurs de période
     col_m, col_y = st.columns([1.5, 1])
     with col_m:
         m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
@@ -282,11 +284,11 @@ elif st.session_state.page == "PLANNING":
     with col_y:
         sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
 
-    # --- TRAITEMENT DES DONNÉES ---
+    # --- INITIALISATION DES DONNÉES ---
     jours_occ = {}
     total_mois = 0
-    missions_list = []
     nb_sorties = 0
+    missions_list = []
 
     for idx, r in df_c.iterrows():
         try:
@@ -300,17 +302,14 @@ elif st.session_state.page == "PLANNING":
                 s_val = str(r.get('Statut', '')).strip().lower()
                 if any(x in s_val for x in ["refusé", "archivé", "supprimé"]): continue
                 
-                # Infos pour la liste
+                # Données pour la liste et le bilan
                 r_idx = r.copy()
                 r_idx['original_idx'] = idx
                 missions_list.append(r_idx)
-                
-                # Cumul financier
-                prix_v = float(safe_val(r.get('Prix'), 0))
-                total_mois += prix_v
+                total_mois += float(safe_val(r.get('Prix'), 0))
                 nb_sorties += 1
                 
-                # Couleurs calendrier
+                # Couleurs du Calendrier
                 this_date = date(yv, mv, dv)
                 soc_val = str(r.get('Société', '')).strip().upper()
                 p_val = str(r.get('Paiement', '')).strip().upper()
@@ -331,12 +330,12 @@ elif st.session_state.page == "PLANNING":
                             jours_occ[j] = {"c": color}
         except: continue
 
-    # --- AFFICHAGE CALENDRIER ---
+    # --- 1. DESSIN DU CALENDRIER (VUE MOIS) ---
     import calendar
-    jours_semaine = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"]
-    h_cal = '<table style="width:100%; text-align: center; table-layout: fixed; background: white; border: 1px solid #eee;">'
+    jours_sem = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"]
+    h_cal = '<table style="width:100%; text-align: center; table-layout: fixed; background: white; border: 1px solid #eee; border-radius:10px; overflow:hidden;">'
     h_cal += '<tr style="background: #f1f3f5;">'
-    for js in jours_semaine: h_cal += f'<td style="padding: 8px 0; font-size: 11px; font-weight: bold; border: 0.5px solid #eee;">{js}</td>'
+    for js in jours_sem: h_cal += f'<td style="padding: 8px 0; font-size: 11px; font-weight: bold; border: 0.5px solid #eee;">{js}</td>'
     h_cal += '</tr>'
     
     cal_mat = calendar.monthcalendar(sel_y, sel_m)
@@ -351,11 +350,12 @@ elif st.session_state.page == "PLANNING":
                 border_s = "2px solid #0047AB" if is_today else "none"
                 circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:28px; height:28px; line-height:28px; margin:auto; font-weight:bold; font-size:12px; border:{border_s};">{jour}</div>'
                 h_cal += f'<td style="border:0.5px solid #eee; height:48px;">{circle}</td>'
-        h_cal += '</tr></table>'
+        h_cal += '</tr>'
+    h_cal += '</table>'
     st.markdown(h_cal, unsafe_allow_html=True)
 
-    # --- LISTE DES RÉSERVATIONS ---
-    st.markdown(f"#### 📋 Missions de {m_noms[sel_m-1]}")
+    # --- 2. LISTE DES MISSIONS DU MOIS ---
+    st.markdown(f"#### 📋 Détails de {m_noms[sel_m-1]}")
     if not missions_list:
         st.caption("Aucune mission prévue.")
     else:
@@ -367,44 +367,35 @@ elif st.session_state.page == "PLANNING":
             soc = str(row.get('Société','')).upper()
             c_line = "#0047AB" if "CMN" in soc else "#27ae60"
             n_jours = int(safe_val(row.get('Nbre de jours'), 1))
-            jour_debut = int(row['j_int'])
-            date_label = f"{jour_debut}" if n_jours == 1 else f"{jour_debut}➔{jour_debut + n_jours - 1}"
+            j_deb = int(row['j_int'])
+            date_txt = f"{j_deb}" if n_jours <= 1 else f"{j_deb}➔{j_deb + n_jours - 1}"
             
             st.markdown(f"""
                 <div style="display: flex; padding: 10px 5px; border-bottom: 1px solid #eee; background: white; align-items: center;">
-                    <div style="background: {c_line}; color: white; border-radius: 8px; padding: 4px; min-width: 55px; text-align: center; font-weight: bold; margin-right: 10px;">
-                        {date_label}<br><span style="font-size: 0.5rem;">JOUR</span>
+                    <div style="background: {c_line}; color: white; border-radius: 8px; padding: 4px; min-width: 50px; text-align: center; font-weight: bold; margin-right: 10px;">
+                        {date_txt}<br><span style="font-size: 0.5rem;">JOUR</span>
                     </div>
                     <div style="flex-grow: 1;">
                         <b style="font-size: 0.9rem;">{str(row.get('Nom','')).upper()}</b><br>
-                        <small style="color: #666;">{soc} ({int(safe_val(row.get('Nbre de personnes'),1))} pers.)</small>
+                        <small style="color: #666;">{soc} ({row.get('Prix','0')}€)</small>
                     </div>
-                    <div style="text-align: right; font-weight: bold; color: #27ae60;">{row.get('Prix','0')}€</div>
                 </div>
             """, unsafe_allow_html=True)
             
-            if st.button(f"🔍 VOIR FICHE : {str(row.get('Nom','')).upper()}", key=f"btn_p_{row['original_idx']}", use_container_width=True):
+            if st.button(f"🔍 VOIR FICHE : {str(row.get('Nom','')).upper()}", key=f"p_goto_{row['original_idx']}", use_container_width=True):
                 st.session_state.edit_idx = row['original_idx']
                 st.session_state.mode_saisie = True
                 st.session_state.page = "CONTACTS"
                 st.rerun()
 
-    # --- RÉCAPITULATIF FINAL (LE BILAN DU MOIS) ---
-    st.divider()
-    moyenne = total_mois / nb_sorties if nb_sorties > 0 else 0
+    # --- 3. BILAN FINANCIER (BAS DE PAGE) ---
     st.markdown(f"""
-        <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; border: 1px solid #eee; margin-top: 10px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                <span style="color: #666;">Nombre de sorties :</span>
-                <span style="font-weight: bold;">{nb_sorties}</span>
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 12px; border: 1px solid #ddd; margin-top: 15px; box-shadow: 2px 2px 5px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #555;">
+                <span>Nombre de sorties :</span><b>{nb_sorties}</b>
             </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                <span style="color: #666;">Panier moyen :</span>
-                <span style="font-weight: bold;">{moyenne:,.0f} €</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #0047AB;">
-                <span style="font-size: 1.1rem; font-weight: bold;">TOTAL DU MOIS :</span>
-                <span style="font-size: 1.1rem; font-weight: bold; color: #0047AB;">{total_mois:,.0f} €</span>
+            <div style="display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: bold; border-top: 2px solid #0047AB; margin-top: 8px; padding-top: 8px;">
+                <span>TOTAL DU MOIS :</span><span style="color: #0047AB;">{total_mois:,.0f} €</span>
             </div>
         </div>
     """, unsafe_allow_html=True)
