@@ -143,7 +143,7 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
 # =================================================================
-# --- 5. PAGE CONTACTS (VERSION FINALE + DURÉE NAVIGATION) ---
+# --- 5. PAGE CONTACTS (VERSION FINALE + DURÉE + COORDONNÉES) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     if 'mode_saisie' not in st.session_state: st.session_state.mode_saisie = False
@@ -175,7 +175,6 @@ if st.session_state.page == "CONTACTS":
             p_idx = 1 if ("PAY" in p_val_f and "NON" not in p_val_f) else 0
             f_paie = col_paie.selectbox("💰 État Paiement", options=["Non payé", "Payé"], index=p_idx)
 
-            # --- LIGNE LOGISTIQUE : DATE / JOURS / PERSONNES ---
             c5, c6, c7 = st.columns([1.5, 1, 1])
             f_dat = c5.text_input("📅 Date Nav", value=str(c_ref.get('DateNav', '')))
             f_jou = c6.number_input("⏳ Jours", min_value=1, value=int(safe_val(c_ref.get('Nbre de jours'), 1)))
@@ -207,84 +206,63 @@ if st.session_state.page == "CONTACTS":
         
         n1, n2, n3 = st.columns([1, 1, 1.2])
         if n1.button("⛵ EN COURS", use_container_width=True, type="primary" if not st.session_state.view_archive else "secondary"):
-            st.session_state.view_archive = False
-            st.rerun()
+            st.session_state.view_archive = False; st.rerun()
         if n2.button("📦 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_archive else "secondary"):
-            st.session_state.view_archive = True
-            st.rerun()
+            st.session_state.view_archive = True; st.rerun()
         if n3.button("➕ NOUVEAU", use_container_width=True, type="primary"):
             st.session_state.mode_saisie = True; st.session_state.edit_idx = None; st.rerun()
 
-        col_search, col_reset = st.columns([4, 1])
-        search_q = col_search.text_input("🔍 Rechercher...", "").strip().upper()
-        if col_reset.button("🔙"): st.rerun()
+        search_q = st.text_input("🔍 Rechercher...", "").strip().upper()
 
         st.divider()
 
-        is_paye = df_c['Paiement'].astype(str).str.upper().str.contains("PAY", na=False) & \
+        is_paye_mask = df_c['Paiement'].astype(str).str.upper().str.contains("PAY", na=False) & \
                   ~df_c['Paiement'].astype(str).str.upper().str.contains("NON", na=False)
-        mask_arch = df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|REFUSÉ", na=False) & is_paye
+        mask_arch = df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|REFUSÉ", na=False) & is_paye_mask
         df_visu = df_c[mask_arch].copy() if st.session_state.view_archive else df_c[~mask_arch].copy()
 
         if search_q:
             m_s = (df_visu['Nom'].astype(str).str.upper().str.contains(search_q, na=False) | 
                   df_visu['Société'].astype(str).str.upper().str.contains(search_q, na=False))
             df_visu = df_visu[m_s]
+
         for i, r in df_visu.iterrows():
-            # --- 1. PRÉPARATION ---
-            nom_c = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom','')).capitalize()}"
+            st_b = str(r.get('Statut','En attente')).capitalize()
+            nom_v, pre_v = str(r.get('Nom','')).upper(), str(r.get('Prénom','')).capitalize()
             soc_v = str(r.get('Société','')).upper()
             tel_v = str(r.get('Téléphone',''))
-            date_v = str(r.get('DateNav','-'))
-            prix_v = str(r.get('Prix','0'))
-            jours_v = int(safe_val(r.get('Nbre de jours'), 1))
+            eml_v = str(r.get('Email',''))
             
-            st_brut = str(r.get('Statut','En attente')).capitalize()
-            p_val = str(r.get('Paiement','')).upper()
-            is_p = ("PAY" in p_val and "NON" not in p_val)
-
-            # --- 2. AFFICHAGE NATIF (SANS AUCUN DIV DANGEREUX) ---
-            # On utilise une colonne fine pour la couleur du trait à gauche
-            col_barre, col_texte = st.columns([0.1, 3.9])
+            p_val_brut = str(r.get('Paiement', '')).strip().upper()
+            p_status, p_color = ("✅ PAYÉ", "#0047AB") if ("PAY" in p_val_brut and "NON" not in p_val_brut) else ("⚠️ NON PAYÉ", "#e74c3c")
             
-            with col_barre:
-                # Seul petit bout de HTML très simple pour la barre de couleur
-                couleur = "#27ae60" if st_brut == "Ok" else "#f39c12"
-                if st_brut == "Refusé": couleur = "#e74c3c"
-                st.markdown(f'<div style="background:{couleur}; width:6px; height:100px; border-radius:3px;"></div>', unsafe_allow_html=True)
+            color_map = {"Ok": "#27ae60", "Refusé": "#e74c3c", "Terminé": "#34495e", "En attente": "#f39c12"}
+            base_col = "#0047AB" if "CMN" in soc_v else color_map.get(st_b, "#f39c12")
+            label_soc = f"🏢 {soc_v}" if soc_v != nom_v else "👤 PARTICULIER"
+            nb_jours = int(safe_val(r.get('Nbre de jours'), 1))
 
-            with col_texte:
-                # Titre en gras natif
-                st.markdown(f"### {nom_c}")
-                # Infos société et statut
-                st.caption(f"🏢 {soc_v}  |  🚦 Statut : {st_brut}")
-                # Téléphone et Date
-                st.write(f"📞 **{tel_v}**")
-                st.write(f"📅 **{date_v}** ({jours_v} jours)")
-                
-                # Ligne Prix et Paiement (en colonnes natives)
-                c_prix, c_paye = st.columns(2)
-                c_prix.markdown(f"💰 **{prix_v} €**")
-                
-                if is_p:
-                    c_paye.info("✅ PAYÉ")
-                else:
-                    c_paye.error("⚠️ NON PAYÉ")
+            # --- LA CARTE AVEC TÉLÉPHONE ET EMAIL AJOUTÉS ---
+            html_card = f"""<div style="border:5px solid {base_col};border-left:20px solid {base_col};padding:15px;border-radius:15px;background-color:white;margin-bottom:12px;box-shadow:5px 5px 15px rgba(0,0,0,0.1);"><span style="float:right;color:{p_color};font-weight:bold;border:2px solid {p_color};padding:2px 5px;border-radius:5px;font-size:0.8rem;">{p_status}</span><div style="font-size:1.25rem;font-weight:bold;color:{base_col};margin-bottom:2px;display:flex;align-items:center;"><span style="background-color:{base_col};color:white;min-width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.9rem;margin-right:12px;">{i+1}</span>{nom_v} {pre_v}</div><div style="font-weight:bold;color:#666;margin-left:40px;font-size:0.85rem;text-transform:uppercase;margin-bottom:8px;">{label_soc}</div><div style="margin-left:40px;font-size:1rem;font-weight:bold;color:#333;">📞 {tel_v if tel_v not in ['nan','None',''] else '---'}</div><div style="margin-left:40px;font-size:0.85rem;color:#555;">📧 {eml_v if eml_v not in ['nan','None',''] else '---'}</div><hr style="border:0;border-top:1px solid #eee;margin:12px 0;"><div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;background:#f8f9fa;padding:8px 12px;border-radius:8px;"><div style="text-align:center;"><div style="font-size:0.6rem;color:#888;">DATE & DURÉE</div><div style="font-size:0.85rem;font-weight:bold;">{r.get('DateNav','-')} ({nb_jours}j)</div></div><div style="text-align:center;"><div style="font-size:0.6rem;color:#888;">PRIX</div><div style="font-size:0.85rem;font-weight:bold;color:#27ae60;">{r.get('Prix','0')}€</div></div><div style="text-align:center;"><div style="font-size:0.6rem;color:#888;">PERS.</div><div style="font-size:0.85rem;font-weight:bold;">{int(safe_val(r.get('Nbre de personnes'),1))}p</div></div></div></div>"""
+            st.markdown(html_card, unsafe_allow_html=True)
 
-            # --- 3. BOUTONS D'ACTION ---
-            t_cl = tel_v.replace(" ","")
-            btn_tel, btn_wa, btn_edit = st.columns(3)
-            
-            # Liens d'action simples
-            btn_tel.markdown(f'[📞 APPEL](tel:{t_cl})', unsafe_allow_html=True)
-            btn_wa.markdown(f'[🟢 WHATSAPP](https://wa.me/{t_cl})', unsafe_allow_html=True)
-            
-            if btn_edit.button("✏️ EDIT", key=f"btn_ed_{i}", use_container_width=True):
-                st.session_state.edit_idx = i
-                st.session_state.mode_saisie = True
-                st.rerun()
+            # --- BOUTONS D'ACTION ---
+            t_clean = tel_v.replace(" ","")
+            st.markdown(f"""<div style="display:flex;gap:8px;margin-bottom:10px;"><a href="tel:{t_clean}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:14px;">📞 APPEL</a><a href="https://wa.me/{t_clean}" style="flex:1;text-align:center;background:#25D366;color:white;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;font-size:14px;">🟢 WA</a><a href="mailto:{eml_v}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:14px;">✉️ MAIL</a></div>""", unsafe_allow_html=True)
 
-            st.divider() # Trait de séparation propre
+            g1, g2 = st.columns(2)
+            if g1.button(f"✏️ MODIFIER {i+1}", key=f"ed_v_{i}", use_container_width=True):
+                st.session_state.edit_idx = i; st.session_state.mode_saisie = True; st.rerun()
+            if g2.button(f"🗑️ SUPPRIMER {i+1}", key=f"dl_v_{i}", use_container_width=True):
+                st.session_state.confirm_del_idx = i; st.rerun()
+
+            if st.session_state.get('confirm_del_idx') == i:
+                st.error("⚠️ SUPPRIMER ?")
+                cy, cn = st.columns(2)
+                if cy.button("OUI", key=f"y_v_{i}", use_container_width=True, type="primary"):
+                    df_c = df_c.drop(i).reset_index(drop=True); sauvegarder_data(df_c, "contacts.json")
+                    st.session_state.confirm_del_idx = None; st.rerun()
+                if cn.button("NON", key=f"n_v_{i}", use_container_width=True):
+                    st.session_state.confirm_del_idx = None; st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (VUE MOIS + LISTE + BILAN FINANCIER) ---
 # =================================================================
