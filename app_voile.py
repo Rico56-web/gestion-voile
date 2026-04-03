@@ -255,11 +255,11 @@ if st.session_state.page == "CONTACTS":
             p_val_brut = str(r.get('Paiement', '')).strip().upper()
 
            # Détection : Est-ce payé ?
-           if "PAY" in p_val_brut and "NON" not in p_val_brut:
+            if "PAY" in p_val_brut and "NON" not in p_val_brut:
                paye = True
                p_status = "✅ PAYÉ"
                p_color = "#0047AB"  # BLEU (comme demandé)
-           else:
+            else:
                paye = False
                p_status = "⚠️ NON PAYÉ" # Remplace "ATTENTE"
                p_color = "#e74c3c"  # ROUGE
