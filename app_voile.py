@@ -230,8 +230,7 @@ if st.session_state.page == "CONTACTS":
             m_s = (df_visu['Nom'].astype(str).str.upper().str.contains(search_q, na=False) | 
                   df_visu['Société'].astype(str).str.upper().str.contains(search_q, na=False))
             df_visu = df_visu[m_s]
-     
-        for i, r in df_visu.iterrows():
+    for i, r in df_visu.iterrows():
             # --- PRÉPARATION DES DONNÉES ---
             nom_complet = f"{str(r.get('Nom','')).upper()} {str(r.get('Prénom','')).capitalize()}"
             soc_v = str(r.get('Société','')).upper()
@@ -240,55 +239,59 @@ if st.session_state.page == "CONTACTS":
             prix_v = str(r.get('Prix','0'))
             jours_v = int(safe_val(r.get('Nbre de jours'), 1))
             
+            # Couleurs Statut
             st_brut = str(r.get('Statut','En attente')).capitalize()
-            col_statut = "#27ae60" if st_brut == "Ok" else "#f39c12"
-            if st_brut == "Refusé": col_statut = "#e74c3c"
+            color_map = {"Ok": "#27ae60", "Refusé": "#e74c3c", "Terminé": "#34495e", "En attente": "#f39c12"}
+            col_statut = color_map.get(st_brut, "#f39c12")
             
+            # Paiement
             is_paye = ("PAY" in str(r.get('Paiement','')).upper() and "NON" not in str(r.get('Paiement','')).upper())
             p_bg = "#0047AB" if is_paye else "#e74c3c"
             p_txt = "PAYÉ" if is_paye else "NON PAYÉ"
 
-            # --- AFFICHAGE COMPACT (SANS SUBHEADER) ---
-            
-            # 1. Ligne NOM & PRÉNOM (On force une marge basse à 0)
-            st.markdown(f"<h3 style='margin:0; padding:0; color:#333;'>{nom_complet}</h3>", unsafe_allow_html=True)
-            
-            # 2. Détails avec barre latérale
-            c_bord, c_cont = st.columns([0.05, 3.95])
-            with c_bord:
-                # Barre de statut ajustée en hauteur
-                st.markdown(f'<div style="background:{col_statut}; width:4px; height:75px; border-radius:2px; margin-top:5px;"></div>', unsafe_allow_html=True)
-            
-            with c_cont:
-                # Ligne SOCIÉTÉ (Collée au nom grâce à margin:0)
-                st.markdown(f"<div style='margin:0; color:#666; font-weight:bold; font-size:0.9rem;'>🏢 {soc_v} <span style='font-style:italic; font-weight:normal; color:{col_statut};'>| 🚦 {st_brut}</span></div>", unsafe_allow_html=True)
+            # --- LA FICHE ENCADRÉE (CARD DESIGN) ---
+            # Un seul bloc HTML pour tout l'intérieur de la fiche pour supprimer les espaces Streamlit
+            html_fiche = f"""
+            <div style="border-left: 10px solid {col_statut}; 
+                        border-top: 1px solid #eee; border-right: 1px solid #eee; border-bottom: 1px solid #eee;
+                        padding: 12px; border-radius: 10px; background: white; 
+                        margin-bottom: 8px; box-shadow: 2px 2px 8px rgba(0,0,0,0.08);">
                 
-                st.write(f"📞 {tel_v}  |  📅 **{date_v}** ({jours_v}j)")
+                <h3 style="margin:0; padding:0; color:#333; font-size:1.15rem;">{nom_complet}</h3>
                 
-                # --- LIGNE FINANCIÈRE : PRIX + STATUT PAIEMENT ---
-                f1, f2 = st.columns([1.5, 1])
-                with f1:
-                    st.markdown(f"💰 **Total : {prix_v}€**")
-                with f2:
-                    st.markdown(f"""
-                        <div style="background:{p_bg}; color:white; padding:2px 8px; border-radius:5px; 
-                                    text-align:center; font-weight:bold; font-size:0.7rem; width:fit-content; float:right;">
-                            {p_txt}
-                        </div>
-                    """, unsafe_allow_html=True)
+                <div style="margin:2px 0 8px 0; color:#666; font-weight:bold; font-size:0.85rem;">
+                    🏢 {soc_v} <span style="font-style:italic; font-weight:normal; color:{col_statut};">| 🚦 {st_brut}</span>
+                </div>
+                
+                <div style="margin-bottom:4px; font-size:0.95rem;">📞 <b>{tel_v}</b></div>
+                
+                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #ddd; padding-top:8px; margin-top:5px;">
+                    <span style="font-size:0.85rem;">📅 <b>{date_v}</b> ({jours_v}j)</span>
+                </div>
 
-            # Boutons d'action
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                    <span style="font-size:1rem; font-weight:bold; color:#27ae60;">💰 {prix_v}€</span>
+                    <span style="background:{p_bg}; color:white; padding:3px 10px; border-radius:5px; font-weight:bold; font-size:0.7rem;">
+                        {p_txt}
+                    </span>
+                </div>
+            </div>
+            """
+            st.markdown(html_fiche, unsafe_allow_html=True)
+
+            # --- BOUTONS D'ACTION (En dehors de la card pour le clic tactile) ---
             t_clean = tel_v.replace(" ","")
             col_a, col_w, col_e = st.columns(3)
-            col_a.markdown(f'<a href="tel:{t_clean}" style="text-decoration:none;"><button style="width:100%; height:35px; border-radius:5px; border:1px solid #ddd; background:#f0f2f6; font-size:12px;">📞 APPEL</button></a>', unsafe_allow_html=True)
-            col_w.markdown(f'<a href="https://wa.me/{t_clean}" style="text-decoration:none;"><button style="width:100%; height:35px; border-radius:5px; border:none; background:#25D366; color:white; font-size:12px; font-weight:bold;">WA</button></a>', unsafe_allow_html=True)
             
-            if col_e.button("✏️ EDIT", key=f"ed_v4_{i}", use_container_width=True):
+            col_a.markdown(f'<a href="tel:{t_clean}" style="text-decoration:none;"><button style="width:100%; height:38px; border-radius:8px; border:1px solid #ddd; background:#f8f9fa; font-weight:bold; font-size:12px;">📞 APPEL</button></a>', unsafe_allow_html=True)
+            col_w.markdown(f'<a href="https://wa.me/{t_clean}" style="text-decoration:none;"><button style="width:100%; height:38px; border-radius:8px; border:none; background:#25D366; color:white; font-weight:bold; font-size:12px;">WA</button></a>', unsafe_allow_html=True)
+            
+            if col_e.button("✏️ EDIT", key=f"ed_v5_{i}", use_container_width=True):
                 st.session_state.edit_idx = i
                 st.session_state.mode_saisie = True
                 st.rerun()
 
-            st.divider()
+            st.write("") # Petit espace avant le prochain contact
 # =================================================================
 # --- 6. PAGE PLANNING (VUE MOIS + LISTE + BILAN FINANCIER) ---
 # =================================================================
