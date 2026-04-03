@@ -231,63 +231,60 @@ if st.session_state.page == "CONTACTS":
                   df_visu['Société'].astype(str).str.upper().str.contains(search_q, na=False))
             df_visu = df_visu[m_s]
         for i, r in df_visu.iterrows():
-            st_b = str(r.get('Statut','En attente')).capitalize()
+            # Préparation des données pour éviter les erreurs d'affichage
             nom_v = str(r.get('Nom','')).upper()
             pre_v = str(r.get('Prénom','')).capitalize()
             soc_v = str(r.get('Société','')).upper()
-            tel_v = str(r.get('Téléphone',''))
-            eml_v = str(r.get('Email',''))
+            tel_v = str(r.get('Téléphone','')) if str(r.get('Téléphone','')) not in ['nan','None',''] else "---"
+            eml_v = str(r.get('Email','')) if str(r.get('Email','')) not in ['nan','None',''] else "---"
+            date_v = str(r.get('DateNav','-'))
+            prix_v = str(r.get('Prix','0'))
+            jours_v = int(safe_val(r.get('Nbre de jours'), 1))
             
-            # Logique Paiement
-            p_val = str(r.get('Paiement', '')).strip().upper()
-            p_paye = ("PAY" in p_val and "NON" not in p_val)
-            p_txt, p_col = ("✅ PAYÉ", "#0047AB") if p_paye else ("⚠️ NON PAYÉ", "#e74c3c")
-            
-            # Couleur de bordure (Bleu si CMN, sinon selon statut)
+            # Détermination de la couleur (Bleu CMN ou Statut)
+            st_b = str(r.get('Statut','En attente')).capitalize()
             color_map = {"Ok": "#27ae60", "Refusé": "#e74c3c", "Terminé": "#34495e", "En attente": "#f39c12"}
             base_col = "#0047AB" if "CMN" in soc_v else color_map.get(st_b, "#f39c12")
-            
-            # --- STRUCTURE UNIQUE ET PROPRE ---
-            html_card = f"""
-            <div style="border-left: 12px solid {base_col}; padding: 12px; border-radius: 10px; background: white; margin-bottom: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-top: 1px solid #eee; border-right: 1px solid #eee; border-bottom: 1px solid #eee;">
-                <span style="float:right; color:{p_col}; font-weight:bold; font-size:0.75rem;">{p_txt}</span>
+
+            # --- LA CARTE : UNE SEULE BALISE HTML PROPRE ---
+            card_html = f"""
+            <div style="border-left: 10px solid {base_col}; padding: 12px; background: white; border-radius: 8px; margin-bottom: 10px; box-shadow: 1px 1px 5px rgba(0,0,0,0.1); font-family: sans-serif;">
                 <div style="color:{base_col}; font-weight:bold; font-size:1.1rem;">{nom_v} {pre_v}</div>
-                <div style="font-size:0.8rem; color:#666; font-weight:bold; margin-bottom:8px;">🏢 {soc_v}</div>
-                
-                <div style="font-size:1rem; font-weight:bold; margin-bottom:2px;">📞 {tel_v if tel_v not in ['nan','None',''] else '---'}</div>
-                <div style="font-size:0.85rem; color:#444; margin-bottom:10px;">📧 {eml_v if eml_v not in ['nan','None',''] else '---'}</div>
-                
-                <div style="display:flex; justify-content:space-between; font-size:0.8rem; border-top:1px dashed #ddd; padding-top:8px;">
-                    <span>📅 <b>{r.get('DateNav','-')}</b> ({int(safe_val(r.get('Nbre de jours'), 1))}j)</span>
-                    <span style="color:#27ae60; font-weight:bold;">💰 {r.get('Prix','0')}€</span>
+                <div style="font-size:0.8rem; color:#666; margin-bottom:8px;">🏢 {soc_v}</div>
+                <div style="font-size:1rem; font-weight:bold;">📞 {tel_v}</div>
+                <div style="font-size:0.85rem; color:#444; margin-bottom:8px;">📧 {eml_v}</div>
+                <div style="border-top: 1px dashed #ccc; padding-top: 8px; display: flex; justify-content: space-between; font-size: 0.85rem;">
+                    <span>📅 <b>{date_v}</b> ({jours_v}j)</span>
+                    <span style="color:#27ae60; font-weight:bold;">💰 {prix_v}€</span>
                 </div>
             </div>
             """
-            st.markdown(html_card, unsafe_allow_html=True)
+            st.markdown(card_html, unsafe_allow_html=True)
 
-            # --- BOUTONS D'ACTION (ÉCRITURES SIMPLIFIÉES) ---
-            t_clean = str(tel_v).replace(" ","")
+            # --- LES BOUTONS D'ACTION (APPEL / WA / MAIL) ---
+            t_clean = tel_v.replace(" ","")
             st.markdown(f"""
                 <div style="display:flex; gap:5px; margin-bottom:15px;">
-                    <a href="tel:{t_clean}" style="flex:1; text-align:center; background:#f8f9fa; color:black; text-decoration:none; padding:10px; border-radius:8px; border:1px solid #ddd; font-size:13px; font-weight:bold;">Appel</a>
-                    <a href="https://wa.me/{t_clean}" style="flex:1; text-align:center; background:#25D366; color:white; text-decoration:none; padding:10px; border-radius:8px; font-size:13px; font-weight:bold;">WhatsApp</a>
-                    <a href="mailto:{eml_v}" style="flex:1; text-align:center; background:#f8f9fa; color:black; text-decoration:none; padding:10px; border-radius:8px; border:1px solid #ddd; font-size:13px; font-weight:bold;">Email</a>
+                    <a href="tel:{t_clean}" style="flex:1; text-align:center; background:#f0f2f6; color:black; text-decoration:none; padding:10px; border-radius:5px; font-size:12px; font-weight:bold; border:1px solid #ddd;">APPEL</a>
+                    <a href="https://wa.me/{t_clean}" style="flex:1; text-align:center; background:#25D366; color:white; text-decoration:none; padding:10px; border-radius:5px; font-size:12px; font-weight:bold;">WA</a>
+                    <a href="mailto:{eml_v}" style="flex:1; text-align:center; background:#f0f2f6; color:black; text-decoration:none; padding:10px; border-radius:5px; font-size:12px; font-weight:bold; border:1px solid #ddd;">MAIL</a>
                 </div>
             """, unsafe_allow_html=True)
 
-            # Boutons de gestion Système
-            g1, g2 = st.columns(2)
-            if g1.button(f"✏️ Modifier", key=f"ed_v_{i}", use_container_width=True):
+            # --- LES BOUTONS SYSTÈME (MODIFIER / SUPPRIMER) ---
+            c1, c2 = st.columns(2)
+            if c1.button("✏️ Modifier", key=f"edit_{i}", use_container_width=True):
                 st.session_state.edit_idx = i; st.session_state.mode_saisie = True; st.rerun()
-            if g2.button(f"🗑️ Supprimer", key=f"dl_v_{i}", use_container_width=True):
+            if c2.button("🗑️ Supprimer", key=f"del_{i}", use_container_width=True):
                 st.session_state.confirm_del_idx = i; st.rerun()
             
+            # Gestion de la confirmation de suppression
             if st.session_state.get('confirm_del_idx') == i:
-                st.warning("Confirmer suppression ?")
+                st.warning("Supprimer cette fiche ?")
                 cy, cn = st.columns(2)
-                if cy.button("OUI", key=f"y_v_{i}", use_container_width=True):
+                if cy.button("OUI", key=f"conf_y_{i}", use_container_width=True):
                     df_c = df_c.drop(i).reset_index(drop=True); sauvegarder_data(df_c, "contacts.json"); st.rerun()
-                if cn.button("NON", key=f"n_v_{i}", use_container_width=True):
+                if cn.button("NON", key=f"conf_n_{i}", use_container_width=True):
                     st.session_state.confirm_del_idx = None; st.rerun()
       
 # =================================================================
