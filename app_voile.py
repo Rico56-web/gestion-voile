@@ -219,19 +219,24 @@ if st.session_state.page == "CONTACTS":
             st.session_state.mode_saisie = True
             st.session_state.edit_idx = None
             st.rerun()
-
         st.divider()
-    # --- NOUVELLE LOGIQUE : Archive SEULEMENT si Terminé ET Payé ---
-    # On crée une condition : est-ce que c'est payé ?
-    is_paye = df_c['Paiement'].astype(str).str.upper().str.contains("PAY", na=False) & \
-              ~df_c['Paiement'].astype(str).str.upper().str.contains("NON", na=False)
-    
-    # On archive si (Statut est Terminé ou Refusé) ET (C'est payé)
-    mask_arch = df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|REFUSÉ", na=False) & is_paye
+
+        # --- NOUVELLE LOGIQUE : Archive SEULEMENT si Terminé/Refusé ET Payé ---
+        # 1. On identifie qui a payé
+        is_paye = df_c['Paiement'].astype(str).str.upper().str.contains("PAY", na=False) & \
+                  ~df_c['Paiement'].astype(str).str.upper().str.contains("NON", na=False)
+        
+        # 2. On définit le masque des archives
+        # Une fiche va en archive SI (Statut est Terminé ou Refusé) ET (Paiement est OK)
+        mask_arch = df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|REFUSÉ", na=False) & is_paye
+        
+        # 3. Application du filtre selon l'onglet sélectionné
+        df_visu = df_c[mask_arch] if st.session_state.view_archive else df_c[~mask_arch]
 
         count = 0
         for i, r in df_visu.iterrows():
             count += 1
+            # --- RÉCUPÉRATION DES DONNÉES ---
             st_b = str(r.get('Statut','En attente')).capitalize()
             nom_v = str(r.get('Nom','')).upper()
             pre_v = str(r.get('Prénom','')).capitalize()
@@ -239,14 +244,14 @@ if st.session_state.page == "CONTACTS":
             tel_v = str(r.get('Téléphone',''))
             eml_v = str(r.get('Email',''))
             
-            # --- LOGIQUE PAIEMENT (BLEU SI PAYÉ / ROUGE SI NON) ---
+            # --- LOGIQUE AFFICHAGE BADGE PAIEMENT ---
             p_val_brut = str(r.get('Paiement', '')).strip().upper()
             if "PAY" in p_val_brut and "NON" not in p_val_brut:
                 p_status, p_color = "✅ PAYÉ", "#0047AB"
             else:
                 p_status, p_color = "⚠️ NON PAYÉ", "#e74c3c"
             
-            # --- COULEUR BORDURE ---
+            # --- COULEURS ---
             color_map = {"Ok": "#27ae60", "Refusé": "#e74c3c", "Terminé": "#34495e", "En attente": "#f39c12"}
             base_col = "#0047AB" if "CMN" in soc_v else color_map.get(st_b, "#f39c12")
             label_soc = f"🏢 {soc_v}" if soc_v != nom_v else "👤 PARTICULIER"
@@ -260,25 +265,27 @@ if st.session_state.page == "CONTACTS":
             st.markdown(f"""<div style="display:flex;gap:8px;margin-bottom:10px;"><a href="tel:{t_clean}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:14px;">📞 APPEL</a><a href="https://wa.me/{t_clean}" style="flex:1;text-align:center;background:#25D366;color:white;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;font-size:14px;">🟢 WA</a><a href="mailto:{eml_v}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:14px;">✉️ MAIL</a></div>""", unsafe_allow_html=True)
 
             g1, g2 = st.columns(2)
-            if g1.button(f"✏️ MODIFIER N°{count}", key=f"ed_vfinal_{i}", use_container_width=True):
+            if g1.button(f"✏️ MODIFIER N°{count}", key=f"ed_vL_{i}", use_container_width=True):
                 st.session_state.edit_idx = i
                 st.session_state.mode_saisie = True
                 st.rerun()
-            if g2.button(f"🗑️ SUPPRIMER N°{count}", key=f"dl_vfinal_{i}", use_container_width=True):
+            if g2.button(f"🗑️ SUPPRIMER N°{count}", key=f"dl_vL_{i}", use_container_width=True):
                 st.session_state.confirm_del_idx = i
                 st.rerun()
 
+            # --- CONFIRMATION SUPPRESSION ---
             if st.session_state.get('confirm_del_idx') == i:
                 st.error(f"⚠️ SUPPRIMER N°{count} ?")
                 cy, cn = st.columns(2)
-                if cy.button(f"OUI", key=f"y_vfinal_{i}", use_container_width=True, type="primary"):
+                if cy.button(f"OUI", key=f"y_vL_{i}", use_container_width=True, type="primary"):
                     df_c = df_c.drop(i).reset_index(drop=True)
                     sauvegarder_data(df_c, "contacts.json")
                     st.session_state.confirm_del_idx = None
                     st.rerun()
-                if cn.button(f"NON", key=f"n_vfinal_{i}", use_container_width=True):
+                if cn.button(f"NON", key=f"n_vL_{i}", use_container_width=True):
                     st.session_state.confirm_del_idx = None
                     st.rerun()
+
                     
 # =================================================================
 # --- 6. PAGE PLANNING (BIEN COLLÉ À GAUCHE) ---
