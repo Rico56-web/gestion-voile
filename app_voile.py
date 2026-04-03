@@ -232,65 +232,63 @@ if st.session_state.page == "CONTACTS":
             df_visu = df_visu[m_s]
         for i, r in df_visu.iterrows():
             st_b = str(r.get('Statut','En attente')).capitalize()
-            nom_v, pre_v = str(r.get('Nom','')).upper(), str(r.get('Prénom','')).capitalize()
+            nom_v = str(r.get('Nom','')).upper()
+            pre_v = str(r.get('Prénom','')).capitalize()
             soc_v = str(r.get('Société','')).upper()
             tel_v = str(r.get('Téléphone',''))
             eml_v = str(r.get('Email',''))
             
-            p_val_brut = str(r.get('Paiement', '')).strip().upper()
-            p_status, p_color = ("✅ PAYÉ", "#0047AB") if ("PAY" in p_val_brut and "NON" not in p_val_brut) else ("⚠️ NON PAYÉ", "#e74c3c")
+            # Logique Paiement
+            p_val = str(r.get('Paiement', '')).strip().upper()
+            p_paye = ("PAY" in p_val and "NON" not in p_val)
+            p_txt, p_col = ("✅ PAYÉ", "#0047AB") if p_paye else ("⚠️ NON PAYÉ", "#e74c3c")
             
+            # Couleur de bordure (Bleu si CMN, sinon selon statut)
             color_map = {"Ok": "#27ae60", "Refusé": "#e74c3c", "Terminé": "#34495e", "En attente": "#f39c12"}
             base_col = "#0047AB" if "CMN" in soc_v else color_map.get(st_b, "#f39c12")
-            label_soc = f"🏢 {soc_v}" if soc_v != nom_v else "👤 PARTICULIER"
-            nb_jours = int(safe_val(r.get('Nbre de jours'), 1))
-
-            # --- CARTE AVEC COORDONNÉES RÉAPPARUES ---
+            
+            # --- STRUCTURE UNIQUE ET PROPRE ---
             html_card = f"""
-            <div style="border:5px solid {base_col};border-left:20px solid {base_col};padding:15px;border-radius:15px;background-color:white;margin-bottom:12px;box-shadow:5px 5px 15px rgba(0,0,0,0.1);">
-                <span style="float:right;color:{p_color};font-weight:bold;border:2px solid {p_color};padding:2px 5px;border-radius:5px;font-size:0.8rem;">{p_status}</span>
-                <div style="font-size:1.25rem;font-weight:bold;color:{base_col};margin-bottom:2px;display:flex;align-items:center;">
-                    <span style="background-color:{base_col};color:white;min-width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.9rem;margin-right:12px;">{i+1}</span>
-                    {nom_v} {pre_v}
-                </div>
-                <div style="font-weight:bold;color:#666;margin-left:40px;font-size:0.85rem;text-transform:uppercase;">{label_soc}</div>
+            <div style="border-left: 12px solid {base_col}; padding: 12px; border-radius: 10px; background: white; margin-bottom: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-top: 1px solid #eee; border-right: 1px solid #eee; border-bottom: 1px solid #eee;">
+                <span style="float:right; color:{p_col}; font-weight:bold; font-size:0.75rem;">{p_txt}</span>
+                <div style="color:{base_col}; font-weight:bold; font-size:1.1rem;">{nom_v} {pre_v}</div>
+                <div style="font-size:0.8rem; color:#666; font-weight:bold; margin-bottom:8px;">🏢 {soc_v}</div>
                 
-                <hr style="border:0;border-top:1px solid #eee;margin:12px 0;">
+                <div style="font-size:1rem; font-weight:bold; margin-bottom:2px;">📞 {tel_v if tel_v not in ['nan','None',''] else '---'}</div>
+                <div style="font-size:0.85rem; color:#444; margin-bottom:10px;">📧 {eml_v if eml_v not in ['nan','None',''] else '---'}</div>
                 
-                <div style="margin-left:5px; margin-bottom:10px;">
-                    <div style="font-size:1.05rem; font-weight:bold; color:#333;">📞 {tel_v if tel_v not in ['nan','None',''] else '---'}</div>
-                    <div style="font-size:0.9rem; color:#555;">📧 {eml_v if eml_v not in ['nan','None',''] else '---'}</div>
-                </div>
-
-                <div style="display:flex;justify-content:space-between;align-items:center;background:#f8f9fa;padding:8px 12px;border-radius:8px;border:1px solid #eee;">
-                    <div style="text-align:center;">
-                        <div style="font-size:0.6rem;color:#888;">DATE & DURÉE</div>
-                        <div style="font-size:0.85rem;font-weight:bold;">{r.get('DateNav','-')} ({nb_jours}j)</div>
-                    </div>
-                    <div style="text-align:center;">
-                        <div style="font-size:0.6rem;color:#888;">PRIX</div>
-                        <div style="font-size:0.85rem;font-weight:bold;color:#27ae60;">{r.get('Prix','0')}€</div>
-                    </div>
+                <div style="display:flex; justify-content:space-between; font-size:0.8rem; border-top:1px dashed #ddd; padding-top:8px;">
+                    <span>📅 <b>{r.get('DateNav','-')}</b> ({int(safe_val(r.get('Nbre de jours'), 1))}j)</span>
+                    <span style="color:#27ae60; font-weight:bold;">💰 {r.get('Prix','0')}€</span>
                 </div>
             </div>
             """
             st.markdown(html_card, unsafe_allow_html=True)
 
-            # --- BOUTONS D'ACTION RAPIDE ---
+            # --- BOUTONS D'ACTION (ÉCRITURES SIMPLIFIÉES) ---
             t_clean = str(tel_v).replace(" ","")
             st.markdown(f"""
-                <div style="display:flex;gap:8px;margin-bottom:10px;">
-                    <a href="tel:{t_clean}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:14px;">📞 APPEL</a>
-                    <a href="https://wa.me/{t_clean}" style="flex:1;text-align:center;background:#25D366;color:white;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;font-size:14px;">🟢 WA</a>
-                    <a href="mailto:{eml_v}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:14px;">✉️ MAIL</a>
+                <div style="display:flex; gap:5px; margin-bottom:15px;">
+                    <a href="tel:{t_clean}" style="flex:1; text-align:center; background:#f8f9fa; color:black; text-decoration:none; padding:10px; border-radius:8px; border:1px solid #ddd; font-size:13px; font-weight:bold;">Appel</a>
+                    <a href="https://wa.me/{t_clean}" style="flex:1; text-align:center; background:#25D366; color:white; text-decoration:none; padding:10px; border-radius:8px; font-size:13px; font-weight:bold;">WhatsApp</a>
+                    <a href="mailto:{eml_v}" style="flex:1; text-align:center; background:#f8f9fa; color:black; text-decoration:none; padding:10px; border-radius:8px; border:1px solid #ddd; font-size:13px; font-weight:bold;">Email</a>
                 </div>
             """, unsafe_allow_html=True)
 
-            # Boutons Modifier / Supprimer (le reste du code est inchangé)
+            # Boutons de gestion Système
             g1, g2 = st.columns(2)
-            if g1.button(f"✏️ MODIFIER {i+1}", key=f"ed_v_{i}", use_container_width=True):
+            if g1.button(f"✏️ Modifier", key=f"ed_v_{i}", use_container_width=True):
                 st.session_state.edit_idx = i; st.session_state.mode_saisie = True; st.rerun()
-            # ... (suite du bouton supprimer)
+            if g2.button(f"🗑️ Supprimer", key=f"dl_v_{i}", use_container_width=True):
+                st.session_state.confirm_del_idx = i; st.rerun()
+            
+            if st.session_state.get('confirm_del_idx') == i:
+                st.warning("Confirmer suppression ?")
+                cy, cn = st.columns(2)
+                if cy.button("OUI", key=f"y_v_{i}", use_container_width=True):
+                    df_c = df_c.drop(i).reset_index(drop=True); sauvegarder_data(df_c, "contacts.json"); st.rerun()
+                if cn.button("NON", key=f"n_v_{i}", use_container_width=True):
+                    st.session_state.confirm_del_idx = None; st.rerun()
       
 # =================================================================
 # --- 6. PAGE PLANNING (VUE MOIS + LISTE + BILAN FINANCIER) ---
