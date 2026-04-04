@@ -405,11 +405,12 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
 
+    # --- Fonctions Utilitaires ---
     def clean_val(val):
         try:
             if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
@@ -419,6 +420,7 @@ elif st.session_state.page == "STATS":
 
     def get_month_info(date_str):
         try:
+            # Gère les formats JJ/MM/AAAA ou JJ/MM
             parts = str(date_str).split('/')
             if len(parts) >= 2:
                 m_num = int(parts[1])
@@ -427,42 +429,63 @@ elif st.session_state.page == "STATS":
         except: pass
         return 99, "99-Inconnu"
 
-    # --- Initialisation des données ---
+    # --- Préparation des Données ---
     df_st = df_c.copy()
     
-    if not df_st.empty and 'Prix' in df_st.columns:
+    if not df_st.empty:
+        # Nettoyage des prix et extraction des mois
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
         df_st['M_Sort'], df_st['Mois'] = zip(*df_st['DateNav'].apply(get_month_info))
         
-        # Calcul du CA
-        def calc_ca(x):
-            p_val = str(x.get('Paiement', '')).upper()
-            s_val = str(x.get('Statut', '')).upper()
-            if "PAYÉ" in p_val or s_val == "OK":
-                return x['PrixNum']
+        # Logique de calcul du CA (On vérifie 'Paiement' ou le nouveau statut 'Paid')
+        def is_paid(row):
+            p_val = str(row.get('Paiement', '')).upper()
+            s_val = str(row.get('Statut', '')).upper()
+            # On considère payé si "PAYÉ" est présent ou si le statut est "PAID" ou "OK"
+            if any(term in p_val for term in ["PAYÉ", "PAID"]) or s_val == "OK":
+                return row['PrixNum']
             return 0.0
             
-        df_st['CA_Calcul'] = df_st.apply(calc_ca, axis=1)
+        df_st['CA_Calcul'] = df_st.apply(is_paid, axis=1)
 
-    # --- Affichage des résultats ---
-    st.subheader("📅 Synthèse Mensuelle 2026")
+    # --- Affichage des indicateurs (KPIs) ---
+    st.divider()
+    col1, col2, col3 = st.columns(3)
+    
+    # Calculs des totaux
+    mask_paye = df_st['Paiement'].astype(str).str.contains("PAYÉ|PAID", case=False, na=False)
+    tot_enc = df_st[mask_paye]['PrixNum'].sum()
+    
+    # "À venir" = Statut OK mais pas encore payé
+    mask_avenir = (df_st['Statut'].astype(str).str.upper() == "OK") & (~mask_paye)
+    tot_avr = df_st[mask_avenir]['PrixNum'].sum()
+    
+    # Focus CMN (votre règle métier)
+    cmn_share = df_st[df_st['Client'].astype(str).str.upper() == "CMN"]['PrixNum'].sum()
+
+    col1.metric("💰 ENCAISSÉ", f"{tot_enc:,.0f} €")
+    col2.metric("🕒 À VENIR", f"{tot_avr:,.0f} €")
+    col3.metric("🔵 TOTAL CMN", f"{cmn_share:,.0f} €")
+
+    # --- Synthèse Mensuelle ---
+    st.subheader("📅 Chiffre d'Affaires Mensuel")
     if not df_st.empty:
         mensuel = df_st.groupby(['M_Sort', 'Mois'])['CA_Calcul'].sum().reset_index()
+        mensuel = mensuel.sort_values('M_Sort')
+        
+        # Affichage avec barre de progression visuelle dans le tableau
         st.table(mensuel[['Mois', 'CA_Calcul']].set_index('Mois').style.format("{:.0f} €"))
 
-    col1, col2 = st.columns(2)
-    tot_enc = df_st[df_st['Paiement'].astype(str).str.contains("PAYÉ", case=False, na=False)]['PrixNum'].sum()
-    tot_avr = df_st[(df_st['Statut'].astype(str) == "OK") & (~df_st['Paiement'].astype(str).str.contains("PAYÉ", case=False, na=False))]['PrixNum'].sum()
+    # --- Détail des impayés / À venir ---
+    st.subheader("⏳ Détail des Missions à Encaisser")
+    df_avr = df_st[mask_avenir].copy()
     
-    col1.metric("💰 ENCAISSÉ", f"{tot_enc:,.0f}€")
-    col2.metric("🕒 À VENIR", f"{tot_avr:,.0f}€")
-
-    st.subheader("⏳ Missions à venir (Détail)")
-    df_avr = df_st[(df_st['Statut'].astype(str).str.upper() == "OK") & (df_st['Paiement'].astype(str).str.upper() != "PAYÉ")].copy()
     if not df_avr.empty:
-        tab = df_avr[['DateNav', 'Nom', 'PrixNum']]
-        tab.columns = ['📅 Date', '👤 Client', '💰 €']
-        st.table(tab.set_index('📅 Date'))
+        tab = df_avr[['DateNav', 'Client', 'PrixNum']]
+        tab.columns = ['📅 Date', '👤 Client', '💰 Montant']
+        st.dataframe(tab.set_index('📅 Date'), use_container_width=True)
+    else:
+        st.success("Toutes les missions validées sont payées ! ✅")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
