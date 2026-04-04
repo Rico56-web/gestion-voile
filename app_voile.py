@@ -463,31 +463,37 @@ elif st.session_state.page == "STATS":
 
         st.divider()
 
-        # --- 4. ANALYSE DES APPORTEURS D'AFFAIRES (SOCIÉTÉ) ---
-        st.subheader("🏢 Analyse Partenaires & Rentabilité")
-        c_g1, c_g2 = st.columns([2, 1])
+           # --- 4. ANALYSE DES APPORTEURS D'AFFAIRES (SOCIÉTÉ) ---
+            st.subheader("🏢 Analyse Partenaires & Rentabilité")
+            c_g1, c_g2 = st.columns([2, 1])
 
-        with c_g1:
-            # CA par Société (ex: CLICK, CMN, Direct)
-            df_soc = df_st.groupby('Société')['PrixNum'].sum().reset_index()
-            fig_soc = px.bar(df_soc, x='Société', y='PrixNum', title="Répartition CA par Plateforme",
-                             color='Société', color_discrete_sequence=px.colors.qualitative.Safe)
-            st.plotly_chart(fig_soc, use_container_width=True)
+            with c_g1:
+            # --- NORMALISATION DES NOMS DE SOCIÉTÉ ---
+            def normalize_soc(name):
+                n = str(name).strip().upper()
+                if n in ["PERSO", "PARTICULIER", "DIRECT", "NONE", "NAN", ""]:
+                    return "DIRECT / PERSO"
+                return n # Garde CLICK, CMN, etc. tels quels
 
-        with c_g2:
-            # Seuil de Rentabilité (CA vs Maintenance totale)
-            total_ca = df_st['PrixNum'].sum()
-            maint_total = 0.0
-            if not df_m.empty:
-                maint_total = pd.to_numeric(df_m['Montant'], errors='coerce').sum()
+            df_st['Société_Clean'] = df_st['Société'].apply(normalize_soc)
+
+            # Groupage pour le graphique
+            df_soc = df_st.groupby('Société_Clean')['PrixNum'].sum().reset_index()
             
-            fig_gauge = px.pie(values=[maint_total, max(0, total_ca - maint_total)], 
-                               names=['Frais Maintenance', 'Bénéfice Net'],
-                               hole=0.6, title="Santé Financière",
-                               color_discrete_sequence=['#e74c3c', '#2ecc71'])
-            st.plotly_chart(fig_gauge, use_container_width=True)
-
-        st.divider()
+            fig_soc = px.bar(
+                df_soc, 
+                x='Société_Clean', 
+                y='PrixNum', 
+                title="Répartition CA par Apporteur d'Affaires",
+                labels={'Société_Clean': 'Partenaire', 'PrixNum': 'Total CA (€)'},
+                color='Société_Clean', 
+                color_discrete_sequence=px.colors.qualitative.Safe
+            )
+            
+            # Optionnel : trier par montant pour voir le plus gros partenaire en premier
+            fig_soc.update_layout(xaxis={'categoryorder':'total descending'})
+            
+            st.plotly_chart(fig_soc, use_container_width=True)
 
         # --- 5. SYNTHÈSE MENSUELLE COMPTABLE ---
         st.subheader("📅 Historique Comptable Mensuel")
