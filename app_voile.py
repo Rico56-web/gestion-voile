@@ -487,9 +487,39 @@ elif st.session_state.page == "STATS":
         # Affichage avec barre de progression visuelle dans le tableau
         st.table(mensuel[['Mois', 'CA_Calcul']].set_index('Mois').style.format("{:.0f} €"))
 
-    # --- Détail des impayés / À venir ---
+    # --- ⏳ Détail des Missions à Encaisser (Correction NameError) ---
     st.subheader("⏳ Détail des Missions à Encaisser")
-    df_avr = df_st[mask_avenir].copy()
+
+    # 1. On définit proprement les critères de filtrage
+    # On cherche les missions validées (OK) qui ne sont PAS payées
+    if not df_st.empty:
+        # Masque pour le paiement (on cherche l'absence de "PAYÉ" ou "PAID")
+        mask_paye = df_st['Paiement'].astype(str).str.contains("PAYÉ|PAID", case=False, na=False)
+        
+        # Masque pour le statut validé
+        mask_statut_ok = (df_st['Statut'].astype(str).str.upper() == "OK")
+        
+        # Combinaison : Statut OK ET Pas payé
+        mask_avenir = mask_statut_ok & (~mask_paye)
+        
+        # 2. Application du filtre
+        df_avr = df_st[mask_avenir].copy()
+        
+        if not df_avr.empty:
+            # Identification de la colonne Nom/Client
+            col_nom = 'Nom' if 'Nom' in df_avr.columns else 'Client'
+            
+            tab_display = df_avr[['DateNav', col_nom, 'PrixNum']].copy()
+            tab_display.columns = ['📅 Date', '👤 Client', '💰 Montant (€)']
+            
+            # Affichage
+            st.dataframe(tab_display.set_index('📅 Date'), use_container_width=True)
+            st.info(f"Il reste **{len(df_avr)} missions** en attente de règlement.")
+        else:
+            st.success("✨ Félicitations ! Toutes les missions validées sont encaissées.")
+    else:
+        st.warning("Aucune donnée disponible pour analyser les missions.")
+
     
     if not df_avr.empty:
         tab = df_avr[['DateNav', 'Client', 'PrixNum']]
