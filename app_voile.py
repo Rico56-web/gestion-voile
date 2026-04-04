@@ -405,78 +405,78 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (MAPPING TOTAL) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (CLEAN CALCUL) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
     import re
 
     df_st = df_c.copy()
-    # Nettoyage des noms de colonnes
+    # On nettoie les noms de colonnes pour éviter les espaces invisibles
     df_st.columns = [str(c).strip() for c in df_st.columns]
 
-    # --- STRATÉGIE DE FUSION DES DOUBLONS ---
-    # On crée une colonne unique à partir des variantes possibles
-    def get_first_valid(row, cols):
-        for c in cols:
-            if c in row and str(row[c]).strip().lower() not in ["nan", "none", ""]:
-                return row[c]
-        return ""
+    # --- NETTOYAGE STRICT DU PRIX ---
+    def clean_price_strict(val):
+        if val is None or str(val).strip().lower() in ["nan", "none", ""]:
+            return 0.0
+        try:
+            # On ne garde que ce qui ressemble à un montant (chiffres, virgule, point)
+            # On retire les symboles monétaires et les espaces
+            s = str(val).replace('€', '').replace(' ', '').strip()
+            # Remplace la virgule par un point pour le calcul
+            s = s.replace(',', '.')
+            # On extrait uniquement le premier bloc numérique trouvé pour éviter de lire 
+            # deux nombres dans la même case
+            match = re.search(r"[-+]?\d*\.\d+|\d+", s)
+            return float(match.group()) if match else 0.0
+        except:
+            return 0.0
 
     if not df_st.empty:
-        # 1. Fusion des colonnes de Date
-        df_st['Date_Unique'] = df_st.apply(lambda r: get_first_valid(r, ['DateNav', 'Date Nav', 'Date']), axis=1)
+        # 1. On applique le nettoyage uniquement sur la colonne 'Prix'
+        # Si 'Prix' n'existe pas, on cherche 'Tarif' ou on met 0
+        target_price_col = 'Prix' if 'Prix' in df_st.columns else None
         
-        # 2. Fusion des colonnes de Paiement/Statut
-        df_st['Paye_Unique'] = df_st.apply(lambda r: get_first_valid(r, ['Paye', 'Paiement', 'Statut']), axis=1)
-        
-        # 3. Conversion du Prix (Bulldozer)
-        def b_price(x):
-            try:
-                s = re.sub(r'[^0-9.,]', '', str(x)).replace(',', '.')
-                return float(s) if s else 0.0
-            except: return 0.0
-        
-        df_st['PrixNum'] = df_st['Prix'].apply(b_price)
+        if target_price_col:
+            df_st['PrixNum'] = df_st[target_price_col].apply(clean_price_strict)
+        else:
+            df_st['PrixNum'] = 0.0
 
-        # 4. LOGIQUE DE FILTRAGE
-        # Est payé si "PAYÉ", "OK", "OUI" ou "PAID" est dans n'importe quelle colonne de suivi
-        def check_p(v):
-            val = str(v).upper()
-            return any(w in val for w in ["PAYÉ", "PAYE", "PAID", "OUI", "OK"])
+        # 2. Fusion des colonnes de Paiement (Paye ou Paiement)
+        def get_pay_status(r):
+            p1 = str(r.get('Paye', '')).upper()
+            p2 = str(r.get('Paiement', '')).upper()
+            combined = p1 + p2
+            return any(word in combined for word in ["PAYÉ", "PAYE", "PAID", "OUI", "OK"])
 
-        df_st['Is_Paid'] = df_st['Paye_Unique'].apply(check_p)
+        df_st['Is_Paid'] = df_st.apply(get_pay_status, axis=1)
 
         # --- RÉPARTITION ---
-        # Impayé = Pas marqué payé ET Prix > 0
-        df_impaye = df_st[(df_st['Is_Paid'] == False) & (df_st['PrixNum'] > 0)]
         df_paye = df_st[df_st['Is_Paid'] == True]
+        df_impaye = df_st[df_st['Is_Paid'] == False]
 
         # --- AFFICHAGE ---
         st.divider()
         c1, c2, c3 = st.columns(3)
         
-        enc = df_paye['PrixNum'].sum()
-        reste = df_impaye['PrixNum'].sum()
+        total_encaisse = df_paye['PrixNum'].sum()
+        total_reste = df_impaye['PrixNum'].sum()
         
-        c1.metric("💰 ENCAISSÉ", f"{enc:,.0f} €")
-        c2.metric("⚠️ RESTE À PAYER", f"{reste:,.0f} €", delta=f"{len(df_impaye)} missions")
-        c3.metric("📈 TOTAL PRÉVU", f"{(enc + reste):,.0f} €")
+        c1.metric("💰 ENCAISSÉ RÉEL", f"{total_encaisse:,.0f} €")
+        c2.metric("⚠️ RESTE À PAYER", f"{total_reste:,.0f} €", delta=f"{len(df_impaye)} dossiers")
+        c3.metric("📈 TOTAL ACTIVITÉ", f"{(total_encaisse + total_reste):,.0f} €")
 
-        st.subheader("⏳ Détail des Impayés (Reste à Payer)")
+        # --- VÉRIFICATION POUR VOUS ---
+        st.subheader("🧐 Vérification des calculs")
+        with st.expander("Cliquez ici pour voir le détail ligne par ligne"):
+            # On affiche ce que le code a compris pour chaque ligne
+            check_df = df_st[['DateNav', 'Nom', 'Prix', 'PrixNum', 'Is_Paid']].copy()
+            check_df.columns = ['Date', 'Client', 'Prix Texte', 'Prix Calculé', 'Payé ?']
+            st.dataframe(check_df, use_container_width=True)
+
         if not df_impaye.empty:
-            # On affiche un tableau propre
-            df_view = df_impaye[['Date_Unique', 'Nom', 'Prix', 'Paye_Unique']].copy()
-            df_view.columns = ['Date', 'Client', 'Tarif', 'Info Paiement']
-            st.dataframe(df_view.sort_values('Date'), use_container_width=True, hide_index=True)
-        else:
-            st.success("✅ Aucune mission impayée trouvée après analyse des colonnes 'Paye' et 'Paiement'.")
-
-        # --- OPTIONNEL : FOCUS SOCIÉTÉ CMN ---
-        col_soc = 'Société' if 'Société' in df_st.columns else 'Societe'
-        cmn_total = df_st[df_st[col_soc].astype(str).str.upper() == "CMN"]['PrixNum'].sum()
-        if cmn_total > 0:
-            st.info(f"🔵 Total Business **CMN** : {cmn_total:,.0f} €")
+            st.subheader("⏳ Liste des Impayés")
+            st.dataframe(df_impaye[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True)
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
