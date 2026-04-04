@@ -274,15 +274,33 @@ elif st.session_state.page == "PLANNING":
 
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
-    
+
+    # --- NAVIGATION ET SÉLECTEURS ---
     col_m, col_y, col_now = st.columns([1.5, 1, 0.8])
+    
+    # 1. On initialise les clés dans la session_state si elles n'existent pas
+    if 'sel_mois' not in st.session_state:
+        st.session_state.sel_mois = m_noms[aujourdhui.month - 1]
+    if 'sel_annee' not in st.session_state:
+        st.session_state.sel_annee = 2026
+
     with col_m:
         m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-        sel_m = m_noms.index(st.selectbox("Mois", m_noms, index=aujourdhui.month - 1)) + 1
+        # On lie le selectbox à la session_state
+        sel_m_nom = st.selectbox("Mois", m_noms, key="sel_mois")
+        sel_m = m_noms.index(sel_m_nom) + 1
+        
     with col_y:
-        sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
+        # On lie le selectbox à la session_state
+        sel_y = st.selectbox("Année", [2026, 2027, 2028], key="sel_annee")
+        
     with col_now:
-        if st.button("📍 ICI", use_container_width=True): st.rerun()
+        # LE BOUTON ICI : Il force les valeurs de la session_state
+        if st.button("📍 ICI", use_container_width=True):
+            st.session_state.sel_mois = m_noms[aujourdhui.month - 1]
+            st.session_state.sel_annee = aujourdhui.year
+            st.rerun()
+
 
     jours_occ = {}
     total_mois = 0
