@@ -284,27 +284,42 @@ elif st.session_state.page == "PLANNING":
     st.markdown("""<style>.block-container { padding: 10px 5px !important; } .full-width-cal { width: 98% !important; margin: auto !important; border-collapse: collapse; table-layout: fixed; } .full-width-cal td { width: 14.28%; padding: 0 !important; border: 0.5px solid #eee; }</style>""", unsafe_allow_html=True)
     st.markdown('<div class="main-header">🗓️ PLANNING VESTA 2026</div>', unsafe_allow_html=True)
 
-    # --- NAVIGATION ---
+    # --- NAVIGATION (VERSION SYNCHRONISÉE) ---
+    # On crée une clé unique qui change quand on clique sur "ICI"
+    if 'nav_key' not in st.session_state:
+        st.session_state.nav_key = 0
+
     col_m, col_y, col_now = st.columns([1.5, 1, 0.8])
     
     with col_m:
-        # On ne met PAS de 'key=' ici pour éviter l'erreur StreamlitAPIException
-        sel_m_nom = st.selectbox("Mois", m_noms, index=st.session_state.curr_month_idx)
+        # On ajoute la nav_key à la clé du widget pour forcer le rafraîchissement
+        sel_m_nom = st.selectbox(
+            "Mois", 
+            m_noms, 
+            index=st.session_state.curr_month_idx,
+            key=f"month_select_{st.session_state.nav_key}" 
+        )
         sel_m = m_noms.index(sel_m_nom) + 1
-        # On met à jour la session state APRES le choix
         st.session_state.curr_month_idx = sel_m - 1
         
     with col_y:
         annees_dispo = [2026, 2027, 2028]
         idx_y = annees_dispo.index(st.session_state.curr_year) if st.session_state.curr_year in annees_dispo else 0
-        sel_y = st.selectbox("Année", annees_dispo, index=idx_y)
+        sel_y = st.selectbox(
+            "Année", 
+            annees_dispo, 
+            index=idx_y,
+            key=f"year_select_{st.session_state.nav_key}"
+        )
         st.session_state.curr_year = sel_y
         
     with col_now:
         if st.button("📍 ICI", use_container_width=True):
-            # On change les index stockés et on relance
+            # 1. On remet les dates à aujourd'hui
             st.session_state.curr_month_idx = aujourdhui.month - 1
             st.session_state.curr_year = aujourdhui.year
+            # 2. On change la clé pour forcer Streamlit à redessiner les sélecteurs
+            st.session_state.nav_key += 1
             st.rerun()
 
     # --- CALCULS ---
