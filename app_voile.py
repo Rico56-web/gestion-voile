@@ -405,14 +405,14 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (SYNTHÈSE COMPLÈTE) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (SYNTHÈSE MENSUELLE FIX) ---
 # =================================================================
 elif st.session_state.page == "STATS":
-    st.title("📊 Vesta - Tableau de Bord Décisionnel")
+    st.title("📊 Vesta - Pilotage & Frais")
     import re
     from datetime import datetime
 
-    # 1. CHARGEMENT ET NETTOYAGE
+    # 1. CHARGEMENT
     df_st = df_c.copy()
     df_m = charger_data('maintenance.json')
     df_st.columns = [str(c).strip() for c in df_st.columns]
@@ -426,90 +426,77 @@ elif st.session_state.page == "STATS":
         except: return 0.0
 
     if not df_st.empty:
-        # Préparation des données Missions
+        # --- PRÉPARATION DES DONNÉES MISSIONS ---
         df_st['PrixNum'] = df_st['Prix'].apply(clean_price)
-        
-        # Conversion des dates pour le tri et la temporalité
         df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
-        df_st = df_st.dropna(subset=['dt_obj']) # On ignore les dates invalides
-        
-        # Identification du Paiement
+        df_st = df_st.dropna(subset=['dt_obj'])
+        df_st['Mois_Annee'] = df_st['dt_obj'].dt.strftime('%Y-%m')
+
+        # Logique de paiement stricte
         def check_p(r):
-            v = (str(r.get('Paiement', '')) + str(r.get('Paye', ''))).upper()
-            return any(w in v for w in ["PAYÉ", "PAYE", "OK", "PAID", "OUI"])
+            v = (str(r.get('Paiement', '')) + str(r.get('Paye', ''))).upper().strip()
+            return v in ["PAYÉ", "PAYE", "OK", "PAID", "OUI"]
+        
         df_st['Is_Paid'] = df_st.apply(check_p, axis=1)
 
-        # Temporel : Missions Faites vs A Venir (Aujourd'hui = seuil)
-        maintenant = datetime.now()
-        df_fait = df_st[df_st['dt_obj'] < maintenant].sort_values('dt_obj', ascending=False)
-        df_avenir = df_st[df_st['dt_obj'] >= maintenant].sort_values('dt_obj', ascending=True)
+        # Création de colonnes dédiées pour le calcul du groupage
+        df_st['Montant_Paye'] = df_st.apply(lambda r: r['PrixNum'] if r['Is_Paid'] else 0.0, axis=1)
+        df_st['Montant_Impaye'] = df_st.apply(lambda r: r['PrixNum'] if not r['Is_Paid'] else 0.0, axis=1)
 
-        # --- SECTION 1 : RÉCAPITULATIF FINANCIER MENSUEL ---
-        st.subheader("📅 Synthèse Mensuelle (Revenus vs Maintenance)")
+        # --- RÉCAPITULATIF MENSUEL ---
+        st.subheader("📅 Synthèse Mensuelle")
         
-        # Extraction Mois/Année pour le groupage
-        df_st['Mois_Annee'] = df_st['dt_obj'].dt.strftime('%Y-%m')
-        
-        # Groupage des Revenus
-        stats_rev = df_st.groupby('Mois_Annee').agg(
-            CA_Total=('PrixNum', 'sum'),
-            Paye=('PrixNum', lambda x: x[df_st.loc[x.index, 'Is_Paid']].sum()),
-            Impaye=('PrixNum', lambda x: x[~df_st.loc[x.index, 'Is_Paid']].sum()),
-            Nb_Missions=('PrixNum', 'count')
-        )
+        # Groupage des revenus (Somme des colonnes créées juste au-dessus)
+        stats_rev = df_st.groupby('Mois_Annee').agg({
+            'PrixNum': 'sum',
+            'Montant_Paye': 'sum',
+            'Montant_Impaye': 'sum'
+        }).rename(columns={'PrixNum': 'CA Total', 'Montant_Paye': 'Encaissé', 'Montant_Impaye': 'Impayé'})
 
         # Groupage des Frais Maintenance
         if not df_m.empty:
             df_m['dt_m'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
             df_m['Mois_Annee'] = df_m['dt_m'].dt.strftime('%Y-%m')
             df_m['MontantNum'] = pd.to_numeric(df_m['Montant'], errors='coerce').fillna(0)
-            stats_frais = df_m.groupby('Mois_Annee')['MontantNum'].sum()
+            stats_frais = df_m.groupby('Mois_Annee')['MontantNum'].sum().rename('Maintenance')
         else:
-            stats_frais = pd.Series(dtype=float)
+            stats_frais = pd.Series(name='Maintenance', dtype=float)
 
-        # Fusion des tableaux
-        synthèse = stats_rev.join(stats_frais.rename('Maintenance'), how='outer').fillna(0)
-        synthèse['Bénéfice'] = synthèse['CA_Total'] - synthèse['Maintenance']
+        # Fusion finale
+        synthese = stats_rev.join(stats_frais, how='outer').fillna(0)
+        synthese['Bénéfice'] = synthese['CA Total'] - synthese['Maintenance']
         
-        # Affichage du tableau de synthèse
+        # Tri par mois décroissant (plus récent en haut)
+        synthese = synthese.sort_index(ascending=False)
+
+        # Affichage du tableau de bord
         st.dataframe(
-            synthèse.sort_index(ascending=False).style.format("{:.0f} €", subset=['CA_Total', 'Paye', 'Impaye', 'Maintenance', 'Bénéfice']),
+            synthese.style.format("{:.0f} €"),
             use_container_width=True
         )
 
         st.divider()
 
-        # --- SECTION 2 : DÉTAIL OPÉRATIONNEL ---
-        col_a, col_b = st.columns(2)
-        
-        with col_a:
+        # --- MISSIONS FAITES vs A VENIR ---
+        maintenant = datetime.now()
+        df_fait = df_st[df_st['dt_obj'] < maintenant].sort_values('dt_obj', ascending=False)
+        df_avenir = df_st[df_st['dt_obj'] >= maintenant].sort_values('dt_obj', ascending=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
             st.subheader(f"🚀 À VENIR ({len(df_avenir)})")
             if not df_avenir.empty:
-                st.info(f"Total à venir : **{df_avenir['PrixNum'].sum():,.0f} €**")
+                st.info(f"Total prévu : **{df_avenir['PrixNum'].sum():,.0f} €**")
                 st.dataframe(df_avenir[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
-            else:
-                st.write("Aucune mission prévue.")
-
-        with col_b:
+        
+        with col2:
             st.subheader(f"⚓ FAITES ({len(df_fait)})")
             if not df_fait.empty:
                 st.success(f"Total réalisé : **{df_fait['PrixNum'].sum():,.0f} €**")
                 st.dataframe(df_fait[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
-            else:
-                st.write("Historique vide.")
-
-        # --- SECTION 3 : INDICATEURS GLOBAUX ---
-        st.write("---")
-        total_ca = df_st['PrixNum'].sum()
-        total_maint = synthèse['Maintenance'].sum()
-        
-        kpi1, kpi2, kpi3 = st.columns(3)
-        kpi1.metric("CA GLOBAL", f"{total_ca:,.0f} €")
-        kpi2.metric("MAINTENANCE TOTALE", f"-{total_maint:,.0f} €", delta_color="inverse")
-        kpi3.metric("RÉSULTAT NET", f"{(total_ca - total_maint):,.0f} €")
 
     else:
-        st.warning("Aucune donnée disponible pour générer la synthèse.")
+        st.warning("Aucune donnée disponible.")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
