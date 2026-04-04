@@ -405,7 +405,7 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (FINAL) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (TABLEAUX COMPLETS) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
@@ -414,7 +414,6 @@ elif st.session_state.page == "STATS":
     df_st = df_c.copy()
     df_st.columns = [str(c).strip() for c in df_st.columns]
 
-    # --- 1. NETTOYAGE DES PRIX ---
     def clean_price_final(val):
         if val is None or str(val).strip() == "" or str(val).lower() == "nan":
             return 0.0
@@ -427,58 +426,51 @@ elif st.session_state.page == "STATS":
     if not df_st.empty:
         df_st['PrixNum'] = df_st['Prix'].apply(clean_price_final)
         
-        # --- 2. LOGIQUE DE PAIEMENT ---
+        # Logique de paiement
         def is_paid_verified(row):
             p1 = str(row.get('Paiement', '')).upper().strip()
             p2 = str(row.get('Paye', '')).upper().strip()
-            valid_words = ["PAYÉ", "PAYE", "OK", "PAID", "OUI"]
-            return p1 in valid_words or p2 in valid_words
+            return p1 in ["PAYÉ", "PAYE", "OK", "PAID", "OUI"] or p2 in ["PAYÉ", "PAYE", "OK", "PAID", "OUI"]
 
         df_st['Is_Paid'] = df_st.apply(is_paid_verified, axis=1)
 
-        # --- 3. CALCULS ---
-        df_paye = df_st[df_st['Is_Paid'] == True]
-        df_impaye = df_st[df_st['Is_Paid'] == False]
-        
-        # Focus CMN
-        col_soc = 'Société' if 'Société' in df_st.columns else 'Societe'
-        df_cmn = df_st[df_st[col_soc].astype(str).str.upper() == "CMN"]
-        tot_cmn = df_cmn['PrixNum'].sum()
+        # Séparation
+        df_paye = df_st[df_st['Is_Paid'] == True].copy()
+        df_impaye = df_st[df_st['Is_Paid'] == False].copy()
 
-        # --- 4. AFFICHAGE DES MÉTRIQUES ---
+        # Métriques
         st.divider()
         c1, c2, c3 = st.columns(3)
-        
         enc_reel = df_paye['PrixNum'].sum()
         reste_reel = df_impaye['PrixNum'].sum()
-        
-        c1.metric("💰 ENCAISSÉ", f"{enc_reel:,.0f} €")
-        c2.metric("⚠️ À RECEVOIR", f"{reste_reel:,.0f} €", delta=f"{len(df_impaye)} dossiers", delta_color="inverse")
-        c3.metric("📈 TOTAL 2026", f"{(enc_reel + reste_reel):,.0f} €")
+        c1.metric("💰 TOTAL ENCAISSÉ", f"{enc_reel:,.0f} €")
+        c2.metric("⚠️ RESTE À RECEVOIR", f"{reste_reel:,.0f} €", delta=f"{len(df_impaye)} missions")
+        c3.metric("📈 PRÉVISIONNEL ANNUEL", f"{(enc_reel + reste_reel):,.0f} €")
 
-        # --- 5. RÉPARTITION CMN VS AUTRES ---
-        st.write("---")
-        col_a, col_b = st.columns([2, 1])
-        
-        with col_a:
-            st.subheader("⏳ Liste des Impayés")
+        # --- TABLEAUX CHRONOLOGIQUES ---
+        # On s'assure que DateNav est exploitable pour le tri
+        df_paye = df_paye.sort_values('DateNav', ascending=True)
+        df_impaye = df_impaye.sort_values('DateNav', ascending=True)
+
+        tabs = st.tabs(["⏳ Impayés", "✅ Encaissés", "🔵 Focus CMN"])
+
+        with tabs[0]:
+            st.subheader("Missions en attente de règlement")
             if not df_impaye.empty:
-                df_view = df_impaye[['DateNav', 'Nom', 'Prix', 'Paiement']].copy()
-                st.dataframe(df_view.sort_values('DateNav'), use_container_width=True, hide_index=True)
+                st.dataframe(df_impaye[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
             else:
-                st.success("Toutes les missions sont réglées ! ✅")
+                st.success("Aucun impayé ! ✨")
 
-        with col_b:
-            st.subheader("🔵 Focus CMN")
-            st.metric("Total CMN", f"{tot_cmn:,.0f} €")
-            # Petit indicateur visuel de la part de CMN dans le CA
-            if enc_reel + reste_reel > 0:
-                part_cmn = (tot_cmn / (enc_reel + reste_reel)) * 100
-                st.progress(min(part_cmn / 100, 1.0))
-                st.caption(f"CMN représente {part_cmn:.1f}% de l'activité.")
+        with tabs[1]:
+            st.subheader("Historique des paiements reçus")
+            if not df_paye.empty:
+                st.dataframe(df_paye[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
 
-    else:
-        st.warning("Aucune donnée disponible dans vos archives.")
+        with tabs[2]:
+            col_soc = 'Société' if 'Société' in df_st.columns else 'Societe'
+            df_cmn = df_st[df_st[col_soc].astype(str).str.upper() == "CMN"]
+            st.metric("Chiffre d'Affaires CMN", f"{df_cmn['PrixNum'].sum():,.0f} €")
+            st.dataframe(df_cmn[['DateNav', 'Nom', 'Prix', 'Is_Paid']], use_container_width=True, hide_index=True)
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
