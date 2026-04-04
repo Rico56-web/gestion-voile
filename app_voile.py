@@ -264,24 +264,16 @@ if st.session_state.page == "CONTACTS":
                 if cn.button("NON", key=f"n_v_{i}", use_container_width=True):
                     st.session_state.confirm_del_idx = None; st.rerun()
 # =================================================================
-# --- 6. PAGE PLANNING (VERSION AJUSTÉE LARGEUR IPHONE) ---
+# --- 6. PAGE PLANNING (VERSION FINALE ULTRA-COMPLÈTE) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
-    # CSS Ajusté : On passe à 98% pour éviter le débordement horizontal sur iPhone
     st.markdown("""
         <style>
             .block-container { padding: 10px 5px !important; }
             .stMain { padding: 0px !important; }
-            .full-width-cal { 
-                width: 98% !important; 
-                margin: auto !important; 
-                border-collapse: collapse; 
-                table-layout: fixed; 
-            }
-            .full-width-cal td { 
-                width: 14.28%; 
-                padding: 0 !important;
-            }
+            .full-width-cal { width: 98% !important; margin: auto !important; border-collapse: collapse; table-layout: fixed; }
+            .full-width-cal td { width: 14.28%; padding: 0 !important; }
+            .weekend-col { background-color: #f8f9fa; } /* Gris très léger pour Sam/Dim */
         </style>
     """, unsafe_allow_html=True)
 
@@ -290,13 +282,17 @@ elif st.session_state.page == "PLANNING":
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
     
-    # --- SÉLECTEURS DE PÉRIODE ---
-    col_m, col_y = st.columns([1.5, 1])
+    # --- NAVIGATION RAPIDE ---
+    col_m, col_y, col_now = st.columns([1.5, 1, 0.8])
     with col_m:
         m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
         sel_m = m_noms.index(st.selectbox("Mois", m_noms, index=aujourdhui.month - 1)) + 1
     with col_y:
         sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
+    with col_now:
+        # Bouton pour revenir instantanément à aujourd'hui
+        if st.button("📍 ICI", use_container_width=True, help="Revenir à aujourd'hui"):
+            st.rerun()
 
     # --- TRAITEMENT DES DONNÉES ---
     jours_occ = {}
@@ -317,7 +313,7 @@ elif st.session_state.page == "PLANNING":
                 s_val = str(r.get('Statut', '')).strip().lower()
                 is_paye = ("PAY" in p_val) and ("NON" not in p_val)
                 
-                # --- CODE COULEUR ---
+                # CODE COULEUR STRICT
                 if this_date < aujourdhui:
                     color = "#0047AB" if is_paye else "#e74c3c"
                 elif "ok" in s_val:
@@ -329,7 +325,7 @@ elif st.session_state.page == "PLANNING":
                 
                 n_j = int(safe_val(r.get('Nbre de jours'), 1))
                 for j in range(dv, dv + n_j):
-                    if j <= 31: jours_occ[j] = {"c": color}
+                    if j <= 31: jours_occ[j] = {"c": color, "paye": is_paye}
                 
                 r_idx = r.copy()
                 r_idx['original_idx'] = idx
@@ -338,54 +334,71 @@ elif st.session_state.page == "PLANNING":
                 total_mois += float(safe_val(r.get('Prix'), 0))
         except: continue
 
-    # --- 1. DESSIN DU CALENDRIER (CERCLES + MARRON) ---
+    # --- 1. LE CALENDRIER (CERCLES + MARRON + WEEK-ENDS) ---
     import calendar
     jours_sem = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"]
     h_cal = '<table class="full-width-cal" style="text-align:center; background:white; border: 1px solid #eee;">'
-    h_cal += '<tr style="background: #f8f9fa;">'
-    for js in jours_sem: h_cal += f'<td style="padding: 5px 0; font-size: 10px; font-weight: bold; color:#777; border-bottom: 1px solid #eee;">{js}</td>'
+    h_cal += '<tr style="background: #f1f3f5;">'
+    for i, js in enumerate(jours_sem):
+        style_head = 'color:#d9534f;' if i >= 5 else 'color:#777;' # Rouge léger pour Sa/Di
+        h_cal += f'<td style="padding: 8px 0; font-size: 10px; font-weight: bold; {style_head} border-bottom: 1px solid #eee;">{js}</td>'
     h_cal += '</tr>'
     
     cal_mat = calendar.monthcalendar(sel_y, sel_m)
     for sem in cal_mat:
         h_cal += '<tr>'
-        for jour in sem:
+        for i, jour in enumerate(sem):
             if jour == 0:
-                h_cal += '<td style="height:45px; border:0.5px solid #f9f9f9;"></td>'
+                h_cal += '<td style="height:48px; border:0.5px solid #f9f9f9;"></td>'
             else:
-                bg_circle = jours_occ.get(jour, {}).get("c", "transparent")
+                occ = jours_occ.get(jour, {})
+                bg_circle = occ.get("c", "transparent")
                 txt_c = "white" if bg_circle != "transparent" else "black"
                 
-                # MARRON POUR AUJOURD'HUI
                 is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == sel_y)
-                cell_bg = "background:#D2B48C;" if is_today else ""
+                is_weekend = (i >= 5)
+                
+                cell_bg = "background:#D2B48C;" if is_today else ("background:#fcfcfc;" if is_weekend else "")
                 
                 circle = f'<div style="background:{bg_circle}; color:{txt_c}; border-radius:50%; width:28px; height:28px; line-height:28px; margin:auto; font-weight:bold; font-size:12px;">{jour}</div>'
-                h_cal += f'<td style="border:0.5px solid #eee; height:48px; {cell_bg}">{circle}</td>'
+                h_cal += f'<td style="border:0.5px solid #eee; height:50px; {cell_bg}">{circle}</td>'
         h_cal += '</tr>'
     h_cal += '</table>'
     st.markdown(h_cal, unsafe_allow_html=True)
 
-    # --- 2. LISTE CHRONOLOGIQUE ---
+    # --- 2. LISTE CHRONOLOGIQUE + BOUTONS INTÉLLIGENTS ---
     st.markdown(f"#### 📋 Programme de {m_noms[sel_m-1]}")
+    
+    # Bouton rapide pour ajouter un contact sur ce mois
+    if st.button(f"➕ NOUVEAU DOSSIER EN {m_noms[sel_m-1].upper()}", use_container_width=True):
+        st.session_state.edit_idx = None
+        st.session_state.mode_saisie = True
+        st.session_state.page = "CONTACTS"
+        st.rerun()
+
     if missions_list:
         df_m = pd.DataFrame(missions_list).sort_values('day_start')
         for _, row in df_m.iterrows():
             soc = str(row.get('Société','')).upper()
             c_line = "#0047AB" if "CMN" in soc else "#27ae60"
+            
+            # Indicateur de paiement dans la liste
+            p_val = str(row.get('Paiement', '')).upper()
+            pay_icon = "💰" if "PAY" in p_val and "NON" not in p_val else "⚠️"
+            
             st.markdown(f"""
                 <div style="display: flex; padding: 10px; border-bottom: 1px solid #eee; background: white; align-items: center;">
                     <div style="background: {c_line}; color: white; border-radius: 5px; padding: 4px; min-width: 45px; text-align: center; font-weight: bold; margin-right: 10px;">
                         {row['day_start']}<br><span style="font-size: 0.5rem;">J</span>
                     </div>
                     <div style="flex-grow: 1;">
-                        <b style="font-size: 0.9rem;">{str(row.get('Nom','')).upper()}</b><br>
-                        <small style="color: #666;">{soc} ({row.get('Prix','0')}€)</small>
+                        <b style="font-size: 0.9rem;">{pay_icon} {str(row.get('Nom','')).upper()}</b><br>
+                        <small style="color: #666;">{soc} ({row.get('Prix','0')}€) | {int(safe_val(row.get('Nbre de jours'),1))}j</small>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
             
-            if st.button(f"👁️ FICHE : {str(row.get('Nom','')).upper()}", key=f"p_v_{row['original_idx']}", use_container_width=True):
+            if st.button(f"🔍 VOIR FICHE : {str(row.get('Nom','')).upper()}", key=f"p_v_{row['original_idx']}", use_container_width=True):
                 st.session_state.edit_idx = row['original_idx']
                 st.session_state.mode_saisie = True
                 st.session_state.page = "CONTACTS"
@@ -393,15 +406,21 @@ elif st.session_state.page == "PLANNING":
 
     # --- 3. BILAN FINANCIER ---
     st.markdown(f"""
-        <div style="background: #0047AB; padding: 12px; border-radius: 10px; color: white; text-align: center; margin-top: 15px;">
-            <span style="font-size: 1.2rem; font-weight: bold;">TOTAL : {total_mois:,.0f} €</span>
+        <div style="background: #0047AB; padding: 15px; border-radius: 10px; color: white; text-align: center; margin-top: 15px;">
+            <div style="font-size:0.8rem; opacity:0.8;">CHIFFRE D'AFFAIRES DU MOIS</div>
+            <div style="font-size: 1.5rem; font-weight: bold;">{total_mois:,.0f} €</div>
         </div>
     """, unsafe_allow_html=True)
 
-    # --- 4. ZONE DE DANGER ---
+    # --- 4. ZONE DE DANGER (ARCHIVAGE) ---
+    st.write("")
     with st.expander("⚠️ ZONE DE DANGER"):
+        st.subheader("Clôture de l'année")
+        st.info("Archive les dossiers terminés et nettoie le planning.")
         if st.button(f"🔒 ARCHIVER {sel_y}", use_container_width=True):
-            st.warning("Action irréversible.")
+            st.error("Êtes-vous certain ?")
+            if st.button("OUI, CONFIRMER"):
+                st.success(f"Année {sel_y} archivée.")
 # =================================================================
 # --- 7. PAGE STATS ---
 # =================================================================
