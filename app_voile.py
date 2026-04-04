@@ -463,11 +463,11 @@ elif st.session_state.page == "STATS":
 
         st.divider()
 
-           # --- 4. ANALYSE DES APPORTEURS D'AFFAIRES (SOCIÉTÉ) ---
-            st.subheader("🏢 Analyse Partenaires & Rentabilité")
-            c_g1, c_g2 = st.columns([2, 1])
+        # --- 4. ANALYSE DES APPORTEURS D'AFFAIRES (SOCIÉTÉ) ---
+        st.subheader("🏢 Analyse Partenaires & Rentabilité")
+        c_g1, c_g2 = st.columns([2, 1])
 
-            with c_g1:
+        with c_g1:
             # --- NORMALISATION DES NOMS DE SOCIÉTÉ ---
             def normalize_soc(name):
                 n = str(name).strip().upper()
@@ -494,6 +494,7 @@ elif st.session_state.page == "STATS":
             fig_soc.update_layout(xaxis={'categoryorder':'total descending'})
             
             st.plotly_chart(fig_soc, use_container_width=True)
+
 
         # --- 5. SYNTHÈSE MENSUELLE COMPTABLE ---
         st.subheader("📅 Historique Comptable Mensuel")
