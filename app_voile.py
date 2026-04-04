@@ -397,6 +397,12 @@ elif st.session_state.page == "PLANNING":
             </div>
         </div>
     """, unsafe_allow_html=True)
+    st.divider()
+    with st.expander("⚠️ ZONE DE DANGER"):
+        st.write("Clôture définitive de l'année pour archivage.")
+        if st.button(f"🔒 CLÔTURER L'ANNÉE {sel_y}", use_container_width=True):
+            st.warning("Cette action déplacera les dossiers terminés vers un dossier sécurisé.")
+            # Ici on ajoutera la fonction de nettoyage JSON plus tard
 # =================================================================
 # --- 7. PAGE STATS ---
 # =================================================================
