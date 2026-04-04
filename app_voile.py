@@ -405,69 +405,77 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (DIAGNOSTIC) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (FORCE & FIX) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
 
-    # --- NETTOYAGE ULTRA-ROBUSTE ---
-    def clean_val(val):
+    # Nettoyage ultra-large des noms de colonnes
+    df_st = df_c.copy()
+    df_st.columns = [str(c).strip() for c in df_st.columns]
+
+    def force_numeric(val):
         try:
-            if val is None or str(val).strip() == "": return 0.0
-            # Enlève tout sauf chiffres, points et virgules
+            if val is None: return 0.0
+            # On garde uniquement chiffres, virgule et point
             s = "".join(c for c in str(val) if c.isdigit() or c in ".,")
+            if not s: return 0.0
             return float(s.replace(",", "."))
         except: return 0.0
 
-    df_st = df_c.copy()
-    
-    # NETTOYAGE DES COLONNES (Supprime les espaces invisibles style 'Prix ')
-    df_st.columns = [c.strip() for c in df_st.columns]
-
     if not df_st.empty:
-        # 1. On force la conversion du prix
-        df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
+        # 1. Conversion forcée
+        df_st['PrixNum'] = df_st['Prix'].apply(force_numeric)
         
-        # 2. Détection du paiement (Très large)
-        # On considère payé UNIQUEMENT si on trouve ces mots. Tout le reste est IMPAYÉ.
-        def is_really_paid(val):
+        # 2. Identification du paiement : On cherche "PAYÉ" ou "OUI"
+        # Si la case est vide, NaN, ou contient n'importe quoi d'autre -> C'est impayé
+        def is_paid(val):
             v = str(val).upper().strip()
+            if v in ["NAN", "NONE", ""]: return False
             return any(word in v for word in ["PAYÉ", "PAYE", "PAID", "OUI", "OK"])
 
-        df_st['Est_Paye'] = df_st['Paiement'].apply(is_really_paid)
+        df_st['Est_Paye'] = df_st['Paiement'].apply(is_paid)
 
-        # 3. FILTRES STRICTS
+        # 3. FILTRAGE
+        # ENCAISSÉ = Est_Paye est Vrai
         df_paye = df_st[df_st['Est_Paye'] == True]
-        # RESTE A PAYER = Pas payé ET Prix > 0
+        
+        # RESTE À PAYER = Est_Paye est Faux ET le prix est > 0
         df_reste = df_st[(df_st['Est_Paye'] == False) & (df_st['PrixNum'] > 0)]
 
-        # --- AFFICHAGE DES CHIFFRES ---
+        # 4. AFFICHAGE DES MÉTRIQUES
         st.divider()
         c1, c2, c3 = st.columns(3)
         
-        tot_enc = df_paye['PrixNum'].sum()
-        tot_reste = df_reste['PrixNum'].sum()
+        val_enc = df_paye['PrixNum'].sum()
+        val_reste = df_reste['PrixNum'].sum()
         
-        c1.metric("💰 ENCAISSÉ", f"{tot_enc:,.0f} €")
-        c2.metric("⚠️ RESTE À PAYER", f"{tot_reste:,.0f} €")
-        c3.metric("📈 TOTAL PRÉVU", f"{(tot_enc + tot_reste):,.0f} €")
+        c1.metric("💰 ENCAISSÉ", f"{val_enc:,.0f} €")
+        c2.metric("⚠️ RESTE À PAYER", f"{val_reste:,.0f} €", delta=f"{len(df_reste)} missions")
+        c3.metric("📈 TOTAL PRÉVU", f"{(val_enc + val_reste):,.0f} €")
 
-        # --- SECTION RESTE À PAYER ---
+        # 5. LE TABLEAU CRITIQUE
         st.subheader("⏳ Détail du Reste à Payer")
         
         if not df_reste.empty:
+            # On affiche ce qui bloque avec les valeurs brutes pour comprendre
             col_nom = 'Nom' if 'Nom' in df_reste.columns else 'Client'
-            # On affiche les colonnes brutes pour vérifier ce qui bloque
-            tab_reste = df_reste[['DateNav', col_nom, 'Prix', 'Paiement']].copy()
-            st.dataframe(tab_reste, use_container_width=True)
+            cols_to_show = ['DateNav', col_nom, 'Prix', 'Paiement']
+            # On ne garde que les colonnes qui existent vraiment
+            cols_present = [c for c in cols_to_show if c in df_reste.columns]
+            
+            st.dataframe(df_reste[cols_present].sort_values('DateNav'), use_container_width=True)
         else:
-            st.error("DEBUG : Aucune ligne trouvée avec Prix > 0 et Paiement vide.")
-            # On affiche un échantillon pour comprendre pourquoi le filtre échoue
-            st.write("Aperçu de vos données actuelles (Colonnes lues) :")
-            st.write(df_st[['DateNav', 'Prix', 'Paiement']].head())
+            st.info("Toutes les missions avec un prix > 0 sont marquées comme payées.")
+            
+            # --- ZONE DE DIAGNOSTIC SI TOUJOURS VIDE ---
+            with st.expander("🔍 Diagnostic technique (si le tableau est vide par erreur)"):
+                st.write("Voici ce que le code voit dans vos 5 premières lignes :")
+                diag_df = df_st[['DateNav', 'Prix', 'PrixNum', 'Paiement', 'Est_Paye']].head()
+                st.write(diag_df)
 
     else:
-        st.warning("Aucune donnée dans df_c.")
+        st.warning("Aucune donnée disponible.")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
