@@ -405,12 +405,11 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (CORRECTION FORCEE) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (SCAN TOTAL) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
     import re
-    import pandas as pd
     from datetime import datetime
 
     df_st = df_c.copy()
@@ -425,75 +424,57 @@ elif st.session_state.page == "STATS":
             return float(match.group(1)) if match else 0.0
         except: return 0.0
 
-    def is_paid_final(row):
-        p1 = str(row.get('Paiement', '')).upper().strip()
-        p2 = str(row.get('Paye', '')).upper().strip()
-        txt = p1 + " " + p2
-        if not txt or txt == "NAN" or txt.strip() == "": return False
-        if any(no in txt for no in ["NON", "ATT", "PAS"]): return False
-        return any(ok in txt for ok in ["PAY", "OK", "OUI", "PAID"])
+    # --- DÉTECTION RADAR (SCAN TOUTE LA LIGNE) ---
+    def is_paid_radar(row):
+        # On transforme toute la ligne en une seule chaîne de texte
+        ligne_texte = " ".join([str(val) for val in row.values]).upper()
+        
+        # 1. Si on voit "NON" ou "ATTENTE", c'est impayé d'office
+        if "NON" in ligne_texte or "ATTENTE" in ligne_texte:
+            return False
+        
+        # 2. On cherche un signe de paiement
+        mots_ok = ["PAYÉ", "PAYE", "OK", "OUI", "PAID", "ENCAISSÉ"]
+        return any(mot in ligne_texte for mot in mots_ok)
 
     if not df_st.empty:
-        # 1. PRÉPARATION TECHNIQUE
+        # Préparation
         df_st['PrixNum'] = df_st['Prix'].apply(clean_price)
         df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
         df_st = df_st.dropna(subset=['dt_obj'])
         df_st['Mois_Annee'] = df_st['dt_obj'].dt.strftime('%Y-%m')
 
-        # 2. LOGIQUE DE PAIEMENT (On s'assure que c'est bien True/False)
-        df_st['Is_Paid'] = df_st.apply(is_paid_final, axis=1)
+        # Application du Radar
+        df_st['Is_Paid'] = df_st.apply(is_paid_radar, axis=1)
         
-        # ON FORCE LA CRÉATION DE COLONNES NUMÉRIQUES PURES
-        df_st['M_Paye'] = 0.0
-        df_st['M_Impaye'] = 0.0
-        
-        # On remplit ligne par ligne pour éviter tout bug de vecteur
-        for idx, row in df_st.iterrows():
-            valeur = float(row['PrixNum'])
-            if row['Is_Paid'] == True:
-                df_st.at[idx, 'M_Paye'] = valeur
-            else:
-                df_st.at[idx, 'M_Impaye'] = valeur
+        # Forçage numérique des colonnes de calcul
+        df_st['M_Paye'] = df_st.apply(lambda r: float(r['PrixNum']) if r['Is_Paid'] else 0.0, axis=1)
+        df_st['M_Impaye'] = df_st.apply(lambda r: float(r['PrixNum']) if not r['Is_Paid'] else 0.0, axis=1)
 
-        # 3. SYNTHÈSE MENSUELLE (RECALCULÉE À PARTIR DE ZÉRO)
+        # --- SYNTHÈSE MENSUELLE ---
         st.subheader("📅 Synthèse Mensuelle")
-        
-        # Groupage strict
-        stats_mensuelles = df_st.groupby('Mois_Annee').agg({
+        df_synth = df_st.groupby('Mois_Annee').agg({
             'PrixNum': 'sum',
             'M_Paye': 'sum',
             'M_Impaye': 'sum'
-        })
-        
-        # Renommer pour l'affichage
-        df_synth = stats_mensuelles.rename(columns={
-            'PrixNum': 'CA Total', 
-            'M_Paye': 'Encaissé', 
-            'M_Impaye': 'Impayé'
-        })
+        }).rename(columns={'PrixNum': 'CA Total', 'M_Paye': 'Encaissé', 'M_Impaye': 'Impayé'})
 
-        # Ajout Maintenance
-        df_synth['Maintenance'] = 0.0
+        # Maintenance
         if not df_m.empty:
             df_m['dt_m'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
             df_m['MA'] = df_m['dt_m'].dt.strftime('%Y-%m')
             df_m['Mt'] = pd.to_numeric(df_m['Montant'], errors='coerce').fillna(0)
             m_mens = df_m.groupby('MA')['Mt'].sum()
-            for mois in df_synth.index:
-                if mois in m_mens.index:
-                    df_synth.at[mois, 'Maintenance'] = float(m_mens[mois])
+            df_synth['Maintenance'] = m_mens
         
+        df_synth = df_synth.fillna(0)
         df_synth['Bénéfice'] = df_synth['CA Total'] - df_synth['Maintenance']
         
-        # AFFICHAGE DU TABLEAU
-        st.dataframe(
-            df_synth.sort_index(ascending=False).style.format("{:.0f} €"),
-            use_container_width=True
-        )
+        st.dataframe(df_synth.sort_index(ascending=False).style.format("{:.0f} €"), use_container_width=True)
 
         st.divider()
 
-        # 4. MISSIONS FAITES vs A VENIR
+        # --- DÉTAILS ---
         maintenant = datetime.now()
         df_fait = df_st[df_st['dt_obj'] < maintenant].sort_values('dt_obj', ascending=False)
         df_avenir = df_st[df_st['dt_obj'] >= maintenant].sort_values('dt_obj', ascending=True)
@@ -502,18 +483,18 @@ elif st.session_state.page == "STATS":
         with c1:
             st.subheader(f"🚀 À VENIR ({len(df_avenir)})")
             if not df_avenir.empty:
-                st.info(f"Prévisionnel : {df_avenir['PrixNum'].sum():,.0f} €")
+                st.info(f"Prévu : {df_avenir['PrixNum'].sum():,.0f} €")
                 st.dataframe(df_avenir[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
         
         with c2:
             st.subheader(f"⚓ FAITES ({len(df_fait)})")
             if not df_fait.empty:
                 st.success(f"Réalisé : {df_fait['PrixNum'].sum():,.0f} €")
-                # ON AFFICHE M_Paye POUR VÉRIFIER LE CHIFFRE QUI MONTE AU TABLEAU
-                st.dataframe(df_fait[['DateNav', 'Nom', 'Prix', 'M_Paye', 'Is_Paid']], use_container_width=True, hide_index=True)
+                # On affiche Is_Paid pour vérifier
+                st.dataframe(df_fait[['DateNav', 'Nom', 'Prix', 'Paiement', 'Is_Paid', 'M_Paye']], use_container_width=True, hide_index=True)
 
     else:
-        st.warning("Aucune donnée.")
+        st.warning("Aucune donnée disponible.")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
