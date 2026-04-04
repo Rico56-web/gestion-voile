@@ -405,103 +405,121 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER PRO (FULL DASHBOARD) ---
+# --- 7. PAGE STATS - VESTA SKIPPER PRO (DASHBOARD COMPLET FIX) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("⚓ Vesta Skipper Pro - Pilotage Global")
     import plotly.express as px
     from datetime import datetime
+    import pandas as pd
 
-    # --- 1. PRÉPARATION DES DONNÉES ---
+    # --- 1. CHARGEMENT ET NETTOYAGE ---
     df_st = df_c.copy()
     df_m = charger_data('maintenance.json')
+    
+    # Nettoyage des colonnes (suppression des espaces et gestion JSON)
     df_st.columns = [str(c).strip() for c in df_st.columns]
 
-    # Fonctions de nettoyage
     def clean_val(v):
-        try: return float(str(v).replace('€','').replace(' ','').replace(',','.'))
+        if v is None or str(v).strip() in ["", "nan", "None", "null"]: return 0.0
+        try: 
+            return float(str(v).replace('€','').replace(' ','').replace(',','.'))
         except: return 0.0
 
+    def is_paid_json(row):
+        p = str(row.get('Paiement', '')).strip()
+        # On gère l'encodage "Payé" et les variantes
+        if p.upper() in ["PAYÉ", "PAYE", "OK", "OUI", "TERMINÉ", "PAID"]: return True
+        return False
+
     if not df_st.empty:
+        # --- 2. PRÉPARATION TECHNIQUE ---
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
         df_st['HrsNum'] = df_st['HeuresMoteur'].apply(clean_val)
+        
+        # Conversion DateNav sécurisée
         df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
         df_st = df_st.dropna(subset=['dt_obj'])
         df_st['Mois_Annee'] = df_st['dt_obj'].dt.strftime('%Y-%m')
         
-        # Statut de paiement (Basé sur ton JSON Elisabeth)
-        df_st['Is_Paid'] = df_st['Paiement'].apply(lambda x: str(x).upper() in ["PAYÉ", "PAYE", "OK", "OUI", "TERMINÉ"])
-        df_st['M_Paye'] = df_st.apply(lambda r: r['PrixNum'] if r['Is_Paid'] else 0.0, axis=1)
+        # Logique de paiement
+        df_st['Is_Paid'] = df_st.apply(is_paid_json, axis=1)
+        df_st['M_Paye'] = df_st.apply(lambda r: float(r['PrixNum']) if r['Is_Paid'] else 0.0, axis=1)
+        df_st['M_Impaye'] = df_st.apply(lambda r: float(r['PrixNum']) if not r['Is_Paid'] else 0.0, axis=1)
 
-        # --- 2. INDICATEURS DE MAINTENANCE PRÉVENTIVE ---
-        total_heures = df_st['HrsNum'].max() # On prend la valeur la plus haute saisie
-        st.subheader("⚙️ État Mécanique")
+        # --- 3. INDICATEURS MÉCANIQUES (HEURES MOTEUR) ---
+        total_heures = df_st['HrsNum'].max() 
+        st.subheader("⚙️ État Mécanique & Entretien")
         col_m1, col_m2 = st.columns(2)
         
-        # Seuil de révision (ex: toutes les 100h)
         prochaine_rev = ((total_heures // 100) + 1) * 100
         heures_restantes = prochaine_rev - total_heures
         
-        col_m1.metric("Heures Moteur Totales", f"{total_heures} h")
-        if heures_restantes < 10:
-            col_m2.warning(f"⚠️ Révision dans {heures_restantes} h !")
+        col_m1.metric("Heures Moteur au compteur", f"{total_heures} h")
+        if heures_restantes < 15:
+            col_m2.warning(f"⚠️ RÉVISION PROCHE : dans {heures_restantes} h")
         else:
-            col_m2.success(f"✅ Prochaine révision dans {heures_restantes} h")
+            col_m2.success(f"✅ Moteur OK : révision dans {heures_restantes} h")
 
         st.divider()
 
-        # --- 3. ANALYSE DES APPORTEURS D'AFFAIRES ---
+        # --- 4. ANALYSE DES APPORTEURS D'AFFAIRES (SOCIÉTÉ) ---
         st.subheader("🏢 Analyse Partenaires & Rentabilité")
         c_g1, c_g2 = st.columns([2, 1])
 
         with c_g1:
             # CA par Société (ex: CLICK, CMN, Direct)
             df_soc = df_st.groupby('Société')['PrixNum'].sum().reset_index()
-            fig_soc = px.bar(df_soc, x='Société', y='PrixNum', title="CA par Plateforme",
-                             color='Société', color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig_soc = px.bar(df_soc, x='Société', y='PrixNum', title="Répartition CA par Plateforme",
+                             color='Société', color_discrete_sequence=px.colors.qualitative.Safe)
             st.plotly_chart(fig_soc, use_container_width=True)
 
         with c_g2:
-            # Seuil de Rentabilité (CA vs Maintenance)
+            # Seuil de Rentabilité (CA vs Maintenance totale)
             total_ca = df_st['PrixNum'].sum()
-            maint_total = pd.to_numeric(df_m['Montant'], errors='coerce').sum() if not df_m.empty else 0
+            maint_total = 0.0
+            if not df_m.empty:
+                maint_total = pd.to_numeric(df_m['Montant'], errors='coerce').sum()
             
-            # Gauge de rentabilité
             fig_gauge = px.pie(values=[maint_total, max(0, total_ca - maint_total)], 
-                               names=['Frais (Seuil)', 'Bénéfice Net'],
-                               hole=0.7, title="Couverture des Frais",
+                               names=['Frais Maintenance', 'Bénéfice Net'],
+                               hole=0.6, title="Santé Financière",
                                color_discrete_sequence=['#e74c3c', '#2ecc71'])
             st.plotly_chart(fig_gauge, use_container_width=True)
 
         st.divider()
 
-        # --- 4. SYNTHÈSE MENSUELLE & EXPORT ---
-        st.subheader("📅 Historique Comptable")
+        # --- 5. SYNTHÈSE MENSUELLE COMPTABLE ---
+        st.subheader("📅 Historique Comptable Mensuel")
         
-        # Calcul de la synthèse
-        df_synth = df_st.groupby('Mois_Annee').agg({'PrixNum':'sum', 'M_Paye':'sum'})
+        # Initialisation tableau de synthèse
+        df_synth = df_st.groupby('Mois_Annee').agg({'PrixNum':'sum', 'M_Paye':'sum', 'M_Impaye':'sum'})
+        df_synth = df_synth.rename(columns={'PrixNum':'CA Total', 'M_Paye':'Encaissé', 'M_Impaye':'Impayé'})
+        df_synth['Maintenance'] = 0.0
+
+        # Intégration Maintenance (SÉCURISÉE contre l'erreur de date)
         if not df_m.empty:
-            df_m['MA'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y').dt.strftime('%Y-%m')
-            df_synth['Maintenance'] = df_m.groupby('MA')['Montant'].sum()
-        else: df_synth['Maintenance'] = 0
-        
-        df_synth = df_synth.fillna(0).rename(columns={'PrixNum':'CA Total', 'M_Paye':'Encaissé'})
-        df_synth['Impayé'] = df_synth['CA Total'] - df_synth['Encaissé']
+            df_m['dt_m'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
+            df_m_clean = df_m.dropna(subset=['dt_m']).copy()
+            if not df_m_clean.empty:
+                df_m_clean['MA'] = df_m_clean['dt_m'].dt.strftime('%Y-%m')
+                df_m_clean['Mt'] = pd.to_numeric(df_m_clean['Montant'], errors='coerce').fillna(0)
+                m_sum = df_m_clean.groupby('MA')['Mt'].sum()
+                for mois in df_synth.index:
+                    if mois in m_sum.index:
+                        df_synth.at[mois, 'Maintenance'] = float(m_sum[mois])
+
         df_synth['Résultat'] = df_synth['CA Total'] - df_synth['Maintenance']
         
-        # Affichage tableau
+        # Affichage
         st.dataframe(df_synth.sort_index(ascending=False).style.format("{:.0f} €"), use_container_width=True)
 
-        # BOUTON D'EXPORTATION (Excel)
+        # Export CSV
         csv = df_synth.to_csv().encode('utf-8')
-        st.download_button(
-            label="📥 Télécharger le rapport (CSV)",
-            data=csv,
-            file_name=f'Vesta_Rapport_{datetime.now().year}.csv',
-            mime='text/csv',
-        )
+        st.download_button(label="📥 Télécharger le rapport financier", data=csv, 
+                           file_name=f'Vesta_Stats_{datetime.now().year}.csv', mime='text/csv')
 
-        # --- 5. DÉTAIL DES MISSIONS (TABS) ---
+        # --- 6. DÉTAILS DES MISSIONS (TABS) ---
         st.divider()
         tab_f, tab_v = st.tabs(["⚓ Missions Terminées", "🚀 Planning à Venir"])
         
@@ -510,12 +528,12 @@ elif st.session_state.page == "STATS":
         df_v = df_st[df_st['dt_obj'] >= maintenant].sort_values('dt_obj', ascending=True)
 
         with tab_f:
-            st.dataframe(df_f[['DateNav', 'Nom', 'Société', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
+            st.dataframe(df_f[['DateNav', 'Nom', 'Société', 'Prix', 'Paiement', 'Is_Paid']], use_container_width=True, hide_index=True)
         with tab_v:
             st.dataframe(df_v[['DateNav', 'Nom', 'Société', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
 
     else:
-        st.warning("Aucune donnée disponible pour l'analyse.")
+        st.warning("Aucune donnée disponible. Veuillez vérifier vos archives.")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
