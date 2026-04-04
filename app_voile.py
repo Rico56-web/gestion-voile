@@ -405,7 +405,7 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (DÉTECTION SOLIDE) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (SYNCHRONISATION TOTALE) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
@@ -414,7 +414,6 @@ elif st.session_state.page == "STATS":
 
     df_st = df_c.copy()
     df_m = charger_data('maintenance.json')
-    # Nettoyage profond des noms de colonnes
     df_st.columns = [str(c).strip() for c in df_st.columns]
 
     def clean_price(val):
@@ -425,58 +424,64 @@ elif st.session_state.page == "STATS":
             return float(match.group(1)) if match else 0.0
         except: return 0.0
 
-    # --- DÉTECTION "ZÉRO ERREUR" ---
     def is_paid_final(row):
-        # On fusionne le contenu de TOUTES les colonnes de statut possibles
-        # (Index 3:Statut, 4:Paiement, 13:Paye)
-        c1 = str(row.get('Paiement', '')).upper().strip()
-        c2 = str(row.get('Paye', '')).upper().strip()
-        c3 = str(row.get('Statut', '')).upper().strip()
+        # On check Paiement (col 4) et Paye (col 13)
+        p1 = str(row.get('Paiement', '')).upper().strip()
+        p2 = str(row.get('Paye', '')).upper().strip()
+        txt = p1 + " " + p2
         
-        txt = c1 + c2 + c3
-        
-        if not txt or txt == "NAN": return False
-        
-        # PRIORITÉ : Si on voit "NON" ou "ATT", c'est impayé
-        if any(no in txt for no in ["NON", "ATT", "PAS"]): return False
-        
-        # VALIDATION : Si on voit une lettre de confirmation (P, O, K)
-        # Cela couvre : "Payé", "Oui", "OK", "P", "O"
+        if not txt or txt == "NAN" or txt.strip() == "": return False
+        # Si "NON" est écrit, c'est mort
+        if "NON" in txt or "ATT" in txt: return False
+        # Validation par mots clés
         return any(ok in txt for ok in ["PAY", "OK", "OUI", "PAID"])
 
     if not df_st.empty:
-        # 1. Préparation technique
+        # 1. Calcul des colonnes de base
         df_st['PrixNum'] = df_st['Prix'].apply(clean_price)
         df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
         df_st = df_st.dropna(subset=['dt_obj'])
         df_st['Mois_Annee'] = df_st['dt_obj'].dt.strftime('%Y-%m')
 
-        # 2. Application de la logique
+        # 2. Application du statut (Celu qui marche dans ton tableau 'FAITES')
         df_st['Is_Paid'] = df_st.apply(is_paid_final, axis=1)
+        
+        # Colonnes pivots pour la synthèse
         df_st['M_Paye'] = df_st.apply(lambda r: r['PrixNum'] if r['Is_Paid'] else 0.0, axis=1)
         df_st['M_Impaye'] = df_st.apply(lambda r: r['PrixNum'] if not r['Is_Paid'] else 0.0, axis=1)
 
-        # 3. CONSTRUCTION DE LA SYNTHÈSE
+        # 3. SYNTHÈSE MENSUELLE
         st.subheader("📅 Synthèse Mensuelle")
-        stats_rev = df_st.groupby('Mois_Annee').agg({
-            'PrixNum': 'sum', 'M_Paye': 'sum', 'M_Impaye': 'sum'
+        
+        # Groupage des revenus
+        df_synth = df_st.groupby('Mois_Annee').agg({
+            'PrixNum': 'sum',
+            'M_Paye': 'sum',
+            'M_Impaye': 'sum'
         }).rename(columns={'PrixNum': 'CA Total', 'M_Paye': 'Encaissé', 'M_Impaye': 'Impayé'})
 
-        # Maintenance
+        # Ajout de la Maintenance
         if not df_m.empty:
             df_m['dt_m'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
-            m_mens = df_m.groupby(df_m['dt_m'].dt.strftime('%Y-%m'))['Montant'].sum()
-            stats_rev['Maintenance'] = m_mens
+            df_m['MA'] = df_m['dt_m'].dt.strftime('%Y-%m')
+            df_m['Mt'] = pd.to_numeric(df_m['Montant'], errors='coerce').fillna(0)
+            m_mens = df_m.groupby('MA')['Mt'].sum()
+            df_synth['Maintenance'] = m_mens
         
-        df_synth = stats_rev.fillna(0)
+        df_synth = df_synth.fillna(0)
         df_synth['Bénéfice'] = df_synth['CA Total'] - df_synth['Maintenance']
         
-        st.dataframe(df_synth.sort_index(ascending=False).style.format("{:.0f} €"), use_container_width=True)
+        # Affichage du tableau de bord
+        st.dataframe(
+            df_synth.sort_index(ascending=False).style.format("{:.0f} €"),
+            use_container_width=True
+        )
 
         st.divider()
 
         # 4. MISSIONS FAITES vs A VENIR
         maintenant = datetime.now()
+        # On sépare proprement
         df_fait = df_st[df_st['dt_obj'] < maintenant].sort_values('dt_obj', ascending=False)
         df_avenir = df_st[df_st['dt_obj'] >= maintenant].sort_values('dt_obj', ascending=True)
 
@@ -484,18 +489,19 @@ elif st.session_state.page == "STATS":
         with c1:
             st.subheader(f"🚀 À VENIR ({len(df_avenir)})")
             if not df_avenir.empty:
-                st.info(f"Total : {df_avenir['PrixNum'].sum():,.0f} €")
-                st.dataframe(df_avenir[['DateNav', 'Nom', 'Prix', 'Paiement', 'Is_Paid']], use_container_width=True, hide_index=True)
+                st.info(f"Prévisionnel : **{df_avenir['PrixNum'].sum():,.0f} €**")
+                # On cache Is_Paid pour que ce soit plus propre si tu veux
+                st.dataframe(df_avenir[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
         
-        with col2 if 'col2' in locals() else c2: # Securité sur le nom de colonne
+        with c2:
             st.subheader(f"⚓ FAITES ({len(df_fait)})")
             if not df_fait.empty:
-                st.success(f"Total : {df_fait['PrixNum'].sum():,.0f} €")
-                # ON AJOUTE LES COLONNES POUR COMPRENDRE SI ÇA ÉCHOUE
-                st.dataframe(df_fait[['DateNav', 'Nom', 'Prix', 'Paiement', 'Paye', 'Is_Paid']], use_container_width=True, hide_index=True)
+                st.success(f"Réalisé : **{df_fait['PrixNum'].sum():,.0f} €**")
+                # Ici on garde Is_Paid pour ton contrôle
+                st.dataframe(df_fait[['DateNav', 'Nom', 'Prix', 'Paiement', 'Is_Paid']], use_container_width=True, hide_index=True)
 
     else:
-        st.warning("Aucune donnée disponible.")
+        st.warning("Aucune mission archivée.")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
