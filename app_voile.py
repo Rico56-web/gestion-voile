@@ -405,69 +405,75 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (FORCE FIX) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (ULTRA-FIX) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
 
-    # 1. Copie et nettoyage des noms de colonnes
+    # 1. Préparation et nettoyage des colonnes
     df_st = df_c.copy()
     df_st.columns = [str(c).strip() for c in df_st.columns]
 
-    # 2. Conversion forcée des prix en nombres (même si c'est du texte)
-    def clean_price(x):
+    # Fonction de conversion de prix "Anti-Erreur"
+    def force_float(x):
         try:
-            val = str(x).replace('€', '').replace(' ', '').replace(',', '.').strip()
-            return float(val) if val not in ["nan", "None", ""] else 0.0
-        except:
-            return 0.0
+            if x is None or str(x).strip() in ["nan", "None", ""]: return 0.0
+            # On retire tout sauf les chiffres et la ponctuation de base
+            s = "".join(c for c in str(x) if c.isdigit() or c in ".,")
+            s = s.replace(',', '.')
+            # Gestion des points multiples si erreur de saisie
+            if s.count('.') > 1: s = s.replace('.', '', s.count('.') - 1)
+            return float(s)
+        except: return 0.0
 
     if not df_st.empty:
-        df_st['PrixNum'] = df_st['Prix'].apply(clean_price)
+        # Appliquer la conversion sur la colonne Prix
+        df_st['PrixNum'] = df_st['Prix'].apply(force_float)
         
-        # 3. Logique de paiement simplifiée à l'extrême
-        # On nettoie la colonne paiement : on enlève les espaces et on met en majuscules
-        df_st['Paiement_Clean'] = df_st['Paiement'].astype(str).str.upper().str.strip()
-        
-        # Est payé SI la case contient un des mots clés
-        keywords = ["PAYÉ", "PAYE", "PAID", "OUI", "OK"]
-        df_st['Est_Paye'] = df_st['Paiement_Clean'].apply(lambda x: any(k in x for k in keywords))
+        # 2. Logique de Paiement (On cherche l'affirmation du paiement)
+        # Si la case est vide ou contient autre chose, c'est considéré NON PAYÉ
+        def check_paid_strict(val):
+            v = str(val).upper().strip()
+            # Liste restrictive des mots qui valident un encaissement
+            return any(word in v for word in ["PAYÉ", "PAYE", "PAID", "OUI", "OK"])
 
-        # 4. Séparation des données
-        df_paye = df_st[df_st['Est_Paye'] == True]
-        # RESTE A PAYER : Tout ce qui a un prix > 0 et qui n'est PAS marqué payé
-        df_reste = df_st[(df_st['Est_Paye'] == False) & (df_st['PrixNum'] > 0)]
+        df_st['Is_Paid'] = df_st['Paiement'].apply(check_paid_strict)
 
-        # --- AFFICHAGE ---
+        # 3. Séparation des flux
+        df_encaisse = df_st[df_st['Is_Paid'] == True]
+        # RESTE A PAYER : Prix > 0 ET n'est pas marqué comme payé
+        df_impaye = df_st[(df_st['Is_Paid'] == False) & (df_st['PrixNum'] > 0)]
+
+        # --- 4. AFFICHAGE DES CHIFFRES ---
         st.divider()
         c1, c2, c3 = st.columns(3)
         
-        val_enc = df_paye['PrixNum'].sum()
-        val_reste = df_reste['PrixNum'].sum()
+        tot_enc = df_encaisse['PrixNum'].sum()
+        tot_reste = df_impaye['PrixNum'].sum()
         
-        c1.metric("💰 ENCAISSÉ", f"{val_enc:,.0f} €")
-        c2.metric("⚠️ RESTE À PAYER", f"{val_reste:,.0f} €", delta=f"{len(df_reste)} missions")
-        c3.metric("📈 TOTAL PRÉVU", f"{(val_enc + val_reste):,.0f} €")
+        c1.metric("💰 ENCAISSÉ", f"{tot_enc:,.0f} €")
+        c2.metric("⚠️ RESTE À PAYER", f"{tot_reste:,.0f} €", delta=f"{len(df_impaye)} missions")
+        c3.metric("📈 TOTAL PRÉVU", f"{(tot_enc + tot_reste):,.0f} €")
 
+        # --- 5. TABLEAU DE DÉTAIL ---
         st.subheader("⏳ Détail du Reste à Payer")
         
-        if not df_reste.empty:
-            # On affiche les colonnes importantes
-            cols = ['DateNav', 'Nom', 'Prix', 'Paiement']
-            # On vérifie si 'Nom' existe, sinon on cherche 'Client'
-            c_nom = 'Nom' if 'Nom' in df_reste.columns else 'Client'
-            st.dataframe(df_reste[['DateNav', c_nom, 'Prix', 'Paiement']].sort_values('DateNav'), use_container_width=True)
+        if not df_impaye.empty:
+            col_nom = 'Nom' if 'Nom' in df_impaye.columns else 'Client'
+            # On trie par date pour voir les plus anciennes en haut
+            tab_view = df_impaye[['DateNav', col_nom, 'Prix', 'Paiement']].sort_values('DateNav')
+            st.dataframe(tab_view, use_container_width=True, hide_index=True)
         else:
-            st.info("Le système ne trouve aucune mission impayée avec un prix supérieur à 0.")
+            # Si vide, on force l'affichage du diagnostic pour comprendre l'erreur
+            st.info("Aucune mission impayée détectée avec un prix > 0.")
             
-            # --- TABLEAU DE VÉRIFICATION VISUELLE ---
-            st.write("### 🔍 Vérification de vos données brutes :")
-            st.write("Si une mission ci-dessous devrait être dans 'Reste à payer', vérifiez son prix et sa case paiement.")
-            # On affiche tout pour que vous puissiez voir l'erreur de saisie
-            st.dataframe(df_st[['DateNav', 'Nom', 'Prix', 'PrixNum', 'Paiement', 'Est_Paye']].head(10))
+            with st.expander("🛠️ Panneau de Diagnostic (Pourquoi c'est vide ?)"):
+                st.write("Vérifiez les colonnes 'PrixNum' (doit être > 0) et 'Is_Paid' (doit être False) :")
+                # On montre les 10 premières lignes pour voir comment Python les traite
+                st.dataframe(df_st[['DateNav', 'Nom', 'Prix', 'PrixNum', 'Paiement', 'Is_Paid']].head(10))
 
     else:
-        st.warning("Aucune donnée disponible dans les archives.")
+        st.warning("Aucune donnée disponible dans vos archives.")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
