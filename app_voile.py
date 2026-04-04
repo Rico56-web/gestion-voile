@@ -405,75 +405,58 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (ULTRA-FIX) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (FORCE BRUTE) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
+    import re # Import pour le nettoyage de texte complexe
 
-    # 1. Préparation et nettoyage des colonnes
     df_st = df_c.copy()
     df_st.columns = [str(c).strip() for c in df_st.columns]
 
-    # Fonction de conversion de prix "Anti-Erreur"
-    def force_float(x):
+    # FONCTION BULLDOZER : Extrait les chiffres même si la case est "sale"
+    def bulldozer_price(x):
         try:
-            if x is None or str(x).strip() in ["nan", "None", ""]: return 0.0
-            # On retire tout sauf les chiffres et la ponctuation de base
-            s = "".join(c for c in str(x) if c.isdigit() or c in ".,")
-            s = s.replace(',', '.')
-            # Gestion des points multiples si erreur de saisie
-            if s.count('.') > 1: s = s.replace('.', '', s.count('.') - 1)
+            s = str(x).replace(',', '.')
+            # On ne garde que les chiffres et le point
+            s = re.sub(r'[^0-9.]', '', s)
+            if not s or s == '.': return 0.0
             return float(s)
         except: return 0.0
 
     if not df_st.empty:
-        # Appliquer la conversion sur la colonne Prix
-        df_st['PrixNum'] = df_st['Prix'].apply(force_float)
+        df_st['PrixNum'] = df_st['Prix'].apply(bulldozer_price)
         
-        # 2. Logique de Paiement (On cherche l'affirmation du paiement)
-        # Si la case est vide ou contient autre chose, c'est considéré NON PAYÉ
-        def check_paid_strict(val):
+        # LOGIQUE PAIEMENT : Si la case est vide ou contient "NON", c'est impayé
+        def is_it_paid(val):
             v = str(val).upper().strip()
-            # Liste restrictive des mots qui valident un encaissement
-            return any(word in v for word in ["PAYÉ", "PAYE", "PAID", "OUI", "OK"])
+            if v in ["NAN", "NONE", "", "NON", "UNPAID"]: return False
+            # On ne valide que si on voit un mot de confirmation
+            return any(w in v for w in ["PAYÉ", "PAYE", "PAID", "OUI", "OK"])
 
-        df_st['Is_Paid'] = df_st['Paiement'].apply(check_paid_strict)
+        df_st['Is_Paid'] = df_st['Paiement'].apply(is_it_paid)
 
-        # 3. Séparation des flux
-        df_encaisse = df_st[df_st['Is_Paid'] == True]
-        # RESTE A PAYER : Prix > 0 ET n'est pas marqué comme payé
-        df_impaye = df_st[(df_st['Is_Paid'] == False) & (df_st['PrixNum'] > 0)]
+        # SEPARATION
+        df_impaye = df_st[(df_st['Is_Paid'] == False) & (df_st['PrixNum'] > 0.1)]
+        df_paye = df_st[df_st['Is_Paid'] == True]
 
-        # --- 4. AFFICHAGE DES CHIFFRES ---
+        # --- AFFICHAGE ---
         st.divider()
         c1, c2, c3 = st.columns(3)
-        
-        tot_enc = df_encaisse['PrixNum'].sum()
-        tot_reste = df_impaye['PrixNum'].sum()
-        
-        c1.metric("💰 ENCAISSÉ", f"{tot_enc:,.0f} €")
-        c2.metric("⚠️ RESTE À PAYER", f"{tot_reste:,.0f} €", delta=f"{len(df_impaye)} missions")
-        c3.metric("📈 TOTAL PRÉVU", f"{(tot_enc + tot_reste):,.0f} €")
+        c1.metric("💰 ENCAISSÉ", f"{df_paye['PrixNum'].sum():,.0f} €")
+        c2.metric("⚠️ RESTE À PAYER", f"{df_impaye['PrixNum'].sum():,.0f} €")
+        c3.metric("📈 TOTAL", f"{(df_paye['PrixNum'].sum() + df_impaye['PrixNum'].sum()):,.0f} €")
 
-        # --- 5. TABLEAU DE DÉTAIL ---
-        st.subheader("⏳ Détail du Reste à Payer")
-        
+        st.subheader("⏳ Liste des impayés")
         if not df_impaye.empty:
-            col_nom = 'Nom' if 'Nom' in df_impaye.columns else 'Client'
-            # On trie par date pour voir les plus anciennes en haut
-            tab_view = df_impaye[['DateNav', col_nom, 'Prix', 'Paiement']].sort_values('DateNav')
-            st.dataframe(tab_view, use_container_width=True, hide_index=True)
+            c_nom = 'Nom' if 'Nom' in df_impaye.columns else 'Client'
+            st.dataframe(df_impaye[['DateNav', c_nom, 'Prix', 'Paiement']], use_container_width=True)
         else:
-            # Si vide, on force l'affichage du diagnostic pour comprendre l'erreur
-            st.info("Aucune mission impayée détectée avec un prix > 0.")
-            
-            with st.expander("🛠️ Panneau de Diagnostic (Pourquoi c'est vide ?)"):
-                st.write("Vérifiez les colonnes 'PrixNum' (doit être > 0) et 'Is_Paid' (doit être False) :")
-                # On montre les 10 premières lignes pour voir comment Python les traite
-                st.dataframe(df_st[['DateNav', 'Nom', 'Prix', 'PrixNum', 'Paiement', 'Is_Paid']].head(10))
-
-    else:
-        st.warning("Aucune donnée disponible dans vos archives.")
+            # SI TOUJOURS VIDE : On force l'affichage de TOUTES les lignes avec prix
+            st.warning("⚠️ Attention : Le filtre ne trouve rien. Voici vos données brutes pour comprendre :")
+            # On affiche les lignes où PrixNum est > 0 pour voir pourquoi elles ne sont pas dans "Impayés"
+            st.write("Colonnes détectées :", df_st.columns.tolist())
+            st.dataframe(df_st[['DateNav', 'Prix', 'PrixNum', 'Paiement', 'Is_Paid']].head(20))
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
