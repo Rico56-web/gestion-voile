@@ -405,95 +405,69 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (CORRIGÉ) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (DIAGNOSTIC) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
 
-    # --- 1. FONCTIONS DE NETTOYAGE ---
+    # --- NETTOYAGE ULTRA-ROBUSTE ---
     def clean_val(val):
         try:
-            if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
-            s = "".join(c for c in str(val) if c.isdigit() or c in ".,-")
+            if val is None or str(val).strip() == "": return 0.0
+            # Enlève tout sauf chiffres, points et virgules
+            s = "".join(c for c in str(val) if c.isdigit() or c in ".,")
             return float(s.replace(",", "."))
         except: return 0.0
 
-    def get_month_info(date_str):
-        try:
-            parts = str(date_str).split('/')
-            if len(parts) >= 2:
-                m_num = int(parts[1])
-                months = ["Janv", "Févr", "Mars", "Avril", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"]
-                return m_num, f"{m_num:02d}-{months[m_num-1]}"
-        except: pass
-        return 99, "99-Inconnu"
-
-    # --- 2. PRÉPARATION DES DONNÉES ---
     df_st = df_c.copy()
     
+    # NETTOYAGE DES COLONNES (Supprime les espaces invisibles style 'Prix ')
+    df_st.columns = [c.strip() for c in df_st.columns]
+
     if not df_st.empty:
-        # Identification de la colonne Nom/Client
-        col_nom = 'Nom' if 'Nom' in df_st.columns else 'Client'
-        
-        # Conversion numérique du prix
+        # 1. On force la conversion du prix
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
         
-        # Extraction du mois pour le groupage
-        df_st['M_Sort'], df_st['Mois'] = zip(*df_st['DateNav'].apply(get_month_info))
-        
-        # --- LOGIQUE DE FILTRAGE STRICTE ---
-        # Est considéré PAYÉ si la colonne contient "PAYÉ", "PAID" ou "OUI"
-        def check_is_paid(val):
+        # 2. Détection du paiement (Très large)
+        # On considère payé UNIQUEMENT si on trouve ces mots. Tout le reste est IMPAYÉ.
+        def is_really_paid(val):
             v = str(val).upper().strip()
-            return any(word in v for word in ["PAYÉ", "PAYE", "PAID", "OUI"])
+            return any(word in v for word in ["PAYÉ", "PAYE", "PAID", "OUI", "OK"])
 
-        mask_paye = df_st['Paiement'].apply(check_is_paid)
-        
-        # Est considéré EN ATTENTE si le prix > 0 et n'est pas marqué PAYÉ
-        mask_reste = (~mask_paye) & (df_st['PrixNum'] > 0)
+        df_st['Est_Paye'] = df_st['Paiement'].apply(is_really_paid)
 
-        # --- CALCULS DES TOTAUX ---
-        tot_enc = df_st[mask_paye]['PrixNum'].sum()
-        tot_reste = df_st[mask_reste]['PrixNum'].sum()
-        tot_total = tot_enc + tot_reste
-        
-        # Part de l'entreprise CMN (en bleu dans votre logique)
-        cmn_total = df_st[df_st[col_nom].astype(str).str.upper() == "CMN"]['PrixNum'].sum()
+        # 3. FILTRES STRICTS
+        df_paye = df_st[df_st['Est_Paye'] == True]
+        # RESTE A PAYER = Pas payé ET Prix > 0
+        df_reste = df_st[(df_st['Est_Paye'] == False) & (df_st['PrixNum'] > 0)]
 
-        # --- 3. AFFICHAGE DES INDICATEURS (KPIs) ---
+        # --- AFFICHAGE DES CHIFFRES ---
         st.divider()
         c1, c2, c3 = st.columns(3)
-        c1.metric("💰 ENCAISSÉ", f"{tot_enc:,.0f} €")
-        c2.metric("⚠️ RESTE À PAYER", f"{tot_reste:,.0f} €", delta=f"{len(df_st[mask_reste])} dossiers", delta_color="inverse")
-        c3.metric("📈 TOTAL PRÉVU", f"{tot_total:,.0f} €")
-
-        # --- 4. SYNTHÈSE MENSUELLE ---
-        st.subheader("📅 Chiffre d'Affaires Mensuel (Encaissé)")
-        # On ne groupe que ce qui est réellement payé pour le tableau mensuel
-        mensuel = df_st[mask_paye].groupby(['M_Sort', 'Mois'])['PrixNum'].sum().reset_index()
-        mensuel = mensuel.sort_values('M_Sort')
-        if not mensuel.empty:
-            st.table(mensuel[['Mois', 'PrixNum']].set_index('Mois').style.format("{:.0f} €"))
-        else:
-            st.info("Aucun encaissement enregistré pour le moment.")
-
-        # --- 5. SECTION RESTE À PAYER ---
-        st.subheader("⏳ Détail du Reste à Payer")
-        df_display_reste = df_st[mask_reste].copy()
         
-        if not df_display_reste.empty:
-            tab_reste = df_display_reste[['DateNav', col_nom, 'PrixNum']].copy()
-            tab_reste.columns = ['📅 Date', '👤 Client', '💰 Somme Due (€)']
-            st.dataframe(tab_reste.sort_values('📅 Date'), use_container_width=True, hide_index=True)
-        else:
-            st.success("✅ Félicitations ! Toutes les missions avec un montant saisi sont encaissées.")
+        tot_enc = df_paye['PrixNum'].sum()
+        tot_reste = df_reste['PrixNum'].sum()
+        
+        c1.metric("💰 ENCAISSÉ", f"{tot_enc:,.0f} €")
+        c2.metric("⚠️ RESTE À PAYER", f"{tot_reste:,.0f} €")
+        c3.metric("📈 TOTAL PRÉVU", f"{(tot_enc + tot_reste):,.0f} €")
 
-        # Petit rappel pour CMN
-        if cmn_total > 0:
-            st.info(f"🔵 Volume d'affaires CMN : **{cmn_total:,.0f} €**")
+        # --- SECTION RESTE À PAYER ---
+        st.subheader("⏳ Détail du Reste à Payer")
+        
+        if not df_reste.empty:
+            col_nom = 'Nom' if 'Nom' in df_reste.columns else 'Client'
+            # On affiche les colonnes brutes pour vérifier ce qui bloque
+            tab_reste = df_reste[['DateNav', col_nom, 'Prix', 'Paiement']].copy()
+            st.dataframe(tab_reste, use_container_width=True)
+        else:
+            st.error("DEBUG : Aucune ligne trouvée avec Prix > 0 et Paiement vide.")
+            # On affiche un échantillon pour comprendre pourquoi le filtre échoue
+            st.write("Aperçu de vos données actuelles (Colonnes lues) :")
+            st.write(df_st[['DateNav', 'Prix', 'Paiement']].head())
 
     else:
-        st.warning("La base de données est vide. Aucune statistique à afficher.")
+        st.warning("Aucune donnée dans df_c.")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
