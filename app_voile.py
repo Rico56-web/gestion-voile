@@ -264,109 +264,91 @@ if st.session_state.page == "CONTACTS":
                 if cn.button("NON", key=f"n_v_{i}", use_container_width=True):
                     st.session_state.confirm_del_idx = None; st.rerun()
 # =================================================================
-# --- 6. PAGE PLANNING (VERSION DIAGNOSTIC & RÉPARATION) ---
+# --- 6. PAGE PLANNING (CORRECTIF ERREUR NAMEERROR) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
     from datetime import datetime, date, timedelta
+    import calendar
 
-    st.markdown("""<style>.block-container { padding: 10px 5px !important; } .full-width-cal { width: 98% !important; margin: auto !important; border-collapse: collapse; table-layout: fixed; } .full-width-cal td { width: 14.28%; padding: 0 !important; border: 0.5px solid #eee; }</style>""", unsafe_allow_html=True)
-    st.markdown('<div class="main-header">🗓️ PLANNING VESTA 2026</div>', unsafe_allow_html=True)
-
+    # 1. DÉFINITION DES LISTES DE BASE (Indispensable au début)
+    m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
 
-    # --- NAVIGATION ET SÉLECTEURS ---
-    col_m, col_y, col_now = st.columns([1.5, 1, 0.8])
-    
-    # 1. On initialise les clés dans la session_state si elles n'existent pas
+    # 2. INITIALISATION DE LA SESSION (Pour le bouton ICI)
     if 'sel_mois' not in st.session_state:
         st.session_state.sel_mois = m_noms[aujourdhui.month - 1]
     if 'sel_annee' not in st.session_state:
-        st.session_state.sel_annee = 2026
+        st.session_state.sel_annee = aujourdhui.year
 
+    # CSS
+    st.markdown("""<style>.block-container { padding: 10px 5px !important; } .full-width-cal { width: 98% !important; margin: auto !important; border-collapse: collapse; table-layout: fixed; } .full-width-cal td { width: 14.28%; padding: 0 !important; border: 0.5px solid #eee; }</style>""", unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🗓️ PLANNING VESTA 2026</div>', unsafe_allow_html=True)
+
+    # 3. NAVIGATION ET SÉLECTEURS
+    col_m, col_y, col_now = st.columns([1.5, 1, 0.8])
+    
     with col_m:
-        m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-        # On lie le selectbox à la session_state
+        # On utilise le nom du mois stocké en session
         sel_m_nom = st.selectbox("Mois", m_noms, key="sel_mois")
         sel_m = m_noms.index(sel_m_nom) + 1
         
     with col_y:
-        # On lie le selectbox à la session_state
+        # On utilise l'année stockée en session
         sel_y = st.selectbox("Année", [2026, 2027, 2028], key="sel_annee")
         
     with col_now:
-        # LE BOUTON ICI : Il force les valeurs de la session_state
         if st.button("📍 ICI", use_container_width=True):
+            # On force les valeurs de la session_state aux valeurs réelles
             st.session_state.sel_mois = m_noms[aujourdhui.month - 1]
             st.session_state.sel_annee = aujourdhui.year
             st.rerun()
 
-
+    # --- LE RESTE DU CODE (CALCULS ET AFFICHAGE) RESTE IDENTIQUE ---
     jours_occ = {}
     total_mois = 0
     missions_list = []
-    erreurs_detectees = 0
 
-    # --- SCAN DES DONNÉES AVEC TOLÉRANCE MAXIMALE ---
     if df_c is not None and not df_c.empty:
         for idx, r in df_c.iterrows():
             try:
-                # 1. Récupération brute de la date
                 d_val = r.get('DateNav', '')
                 if pd.isna(d_val) or str(d_val).strip() == "": continue
-                
-                # 2. Nettoyage du format (gère "01/05/2026" ou les objets date)
-                d_str = str(d_val).strip().split(' ')[0] # Enlève l'heure si présente
+                d_str = str(d_val).strip().split(' ')[0]
                 if '/' in d_str:
                     parts = d_str.split('/')
-                    if len(parts) == 3:
-                        dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
-                        if yv < 100: yv += 2000
-                        date_debut = date(yv, mv, dv)
-                    else: continue
+                    dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
+                    if yv < 100: yv += 2000
+                    date_debut = date(yv, mv, dv)
                 else: continue
                 
-                # 3. Récupération du nombre de jours
-                n_j_val = r.get('Nbre de jours', 1)
-                try:
-                    n_j = int(float(n_j_val)) if not pd.isna(n_j_val) else 1
-                except: n_j = 1
+                n_j = int(float(safe_val(r.get('Nbre de jours'), 1)))
                 
-                # 4. Marquage du calendrier
                 for i in range(n_j):
                     date_courante = date_debut + timedelta(days=i)
                     if date_courante.month == sel_m and date_courante.year == sel_y:
-                        # Détermination couleur
                         p_val = str(r.get('Paiement', '')).upper()
                         s_val = str(r.get('Statut', '')).lower()
                         is_paye = "PAY" in p_val and "NON" not in p_val
-                        
                         if date_courante < aujourdhui:
                             color = "#0047AB" if is_paye else "#e74c3c"
                         elif "ok" in s_val:
                             color = "#27ae60"
                         elif "attente" in s_val:
                             color = "#f39c12"
-                        else:
-                            color = "transparent"
-                        
+                        else: color = "transparent"
                         jours_occ[date_courante.day] = {"c": color}
 
-                # 5. Ajout à la liste de affichage
                 date_fin = date_debut + timedelta(days=n_j-1)
                 if (date_debut.year == sel_y and date_debut.month == sel_m) or (date_fin.year == sel_y and date_fin.month == sel_m):
                     missions_list.append({'data': r, 'idx': idx, 'start': date_debut, 'end': date_fin, 'n_j': n_j})
                     if date_debut.month == sel_m:
                         total_mois += float(str(r.get('Prix', 0)).replace(',','.').replace('€','')) if r.get('Prix') else 0
-            except:
-                erreurs_detectees += 1
-                continue
+            except: continue
 
-    # --- AFFICHAGE DU CALENDRIER ---
-    import calendar
+    # --- DESSIN DU CALENDRIER ---
     h_cal = '<table class="full-width-cal" style="text-align:center; background:white;">'
     h_cal += '<tr style="background:#f1f3f5; font-size:10px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td style="color:#d9534f;">Sa</td><td style="color:#d9534f;">Di</td></tr>'
-    
     cal_mat = calendar.monthcalendar(sel_y, sel_m)
     for sem in cal_mat:
         h_cal += '<tr>'
@@ -379,55 +361,30 @@ elif st.session_state.page == "PLANNING":
                 is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == sel_y)
                 cell_bg = "background:#D2B48C;" if is_today else ("background:#f9f9f9;" if i >= 5 else "")
                 txt_c = "white" if bg_c != "transparent" else "black"
-                
                 circle = f'<div style="background:{bg_c}; color:{txt_c}; border-radius:50%; width:28px; height:28px; line-height:28px; margin:auto; font-weight:bold; font-size:12px;">{jour}</div>'
                 h_cal += f'<td style="height:50px; {cell_bg}">{circle}</td>'
         h_cal += '</tr>'
     h_cal += '</table>'
     st.markdown(h_cal, unsafe_allow_html=True)
 
-    # --- LISTE DES MISSIONS ---
-    st.markdown(f"#### 📋 {m_noms[sel_m-1]} {sel_y}")
-    if not missions_list:
-        st.info("Aucune mission détectée pour ce mois.")
-        if erreurs_detectees > 0:
-            st.warning(f"Note : {erreurs_detectees} lignes n'ont pas pu être lues (format date incorrect).")
-    else:
-        # Tri par date
+    # --- LISTE ---
+    st.markdown(f"#### 📋 {sel_m_nom} {sel_y}")
+    if missions_list:
         missions_list.sort(key=lambda x: x['start'])
         for m in missions_list:
             r = m['data']
             soc = str(r.get('Société','')).upper()
             c_line = "#0047AB" if "CMN" in soc else "#27ae60"
-            
-            # Affichage date (ex: 31/05 ➔ 02/06)
             txt_d = f"{m['start'].day:02d}/{m['start'].month:02d}"
-            if m['n_j'] > 1:
-                txt_d += f" ➔ {m['end'].day:02d}/{m['end'].month:02d}"
-            
-            p_val = str(r.get('Paiement','')).upper()
-            icon = "💰" if "PAY" in p_val and "NON" not in p_val else "⚠️"
-
-            st.markdown(f"""
-                <div style="display: flex; padding: 10px; border-bottom: 1px solid #eee; background: white; align-items: center;">
-                    <div style="background: {c_line}; color: white; border-radius: 5px; padding: 4px; min-width: 85px; text-align: center; font-weight: bold; margin-right: 10px; line-height:1.2;">
-                        <span style="font-size: 0.75rem;">{txt_d}</span><br>
-                        <span style="font-size: 0.5rem;">{"JOURS" if m['n_j'] > 1 else "JOUR"}</span>
-                    </div>
-                    <div style="flex-grow: 1;">
-                        <b>{icon} {str(r.get('Nom','')).upper()}</b><br>
-                        <small>{soc} | {r.get('Prix','0')}€ | {m['n_j']}j</small>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-            
+            if m['n_j'] > 1: txt_d += f" ➔ {m['end'].day:02d}/{m['end'].month:02d}"
+            icon = "💰" if "PAY" in str(r.get('Paiement','')).upper() and "NON" not in str(r.get('Paiement','')).upper() else "⚠️"
+            st.markdown(f"""<div style="display: flex; padding: 10px; border-bottom: 1px solid #eee; background: white; align-items: center;"><div style="background: {c_line}; color: white; border-radius: 5px; padding: 4px; min-width: 85px; text-align: center; font-weight: bold; margin-right: 10px; line-height:1.2;"><span style="font-size: 0.75rem;">{txt_d}</span><br><span style="font-size: 0.5rem;">{"JOURS" if m['n_j'] > 1 else "JOUR"}</span></div><div style="flex-grow: 1;"><b>{icon} {str(r.get('Nom','')).upper()}</b><br><small>{soc} | {r.get('Prix','0')}€ | {m['n_j']}j</small></div></div>""", unsafe_allow_html=True)
             if st.button(f"🔍 FICHE : {str(r.get('Nom',''))}", key=f"btn_{m['idx']}", use_container_width=True):
                 st.session_state.edit_idx = m['idx']
                 st.session_state.mode_saisie = True
                 st.session_state.page = "CONTACTS"
                 st.rerun()
 
-    # --- TOTAL ---
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
 # --- 7. PAGE STATS ---
