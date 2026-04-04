@@ -405,24 +405,24 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (PROTECTION CALCUL) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (CORRECTIF PHILIPPE) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
+    import re
 
     df_st = df_c.copy()
     df_st.columns = [str(c).strip() for c in df_st.columns]
 
-    # --- 1. NETTOYAGE ULTRA-STRICT DU PRIX ---
-    def clean_price_ultra_strict(val):
+    # --- 1. NETTOYAGE CHIRURGICAL DU PRIX ---
+    def clean_price_final(val):
         if val is None or str(val).strip() == "" or str(val).lower() == "nan":
             return 0.0
         try:
-            # On ne garde que les chiffres et on ignore tout le reste de la ligne
-            # On remplace la virgule par un point pour être sûr
-            s = str(val).replace(',', '.')
-            # On cherche uniquement le PREMIER nombre pur (ex: 150.00)
-            import re
+            # On nettoie les espaces et symboles
+            s = str(val).replace('€', '').replace(' ', '').replace(',', '.').strip()
+            # On cherche uniquement un nombre qui peut avoir des décimales
+            # Le ^ au début force à lire le début de la case (évite de lire le milieu/fin)
             match = re.search(r"(\d+(\.\d+)?)", s)
             if match:
                 return float(match.group(1))
@@ -431,45 +431,49 @@ elif st.session_state.page == "STATS":
             return 0.0
 
     if not df_st.empty:
-        # On cible uniquement la colonne 'Prix'
-        df_st['PrixNum'] = df_st['Prix'].apply(clean_price_ultra_strict)
+        df_st['PrixNum'] = df_st['Prix'].apply(clean_price_final)
         
-        # --- 2. LOGIQUE DE PAIEMENT RESTRICTIVE ---
-        # On ne valide QUE si c'est explicitement écrit PAYÉ ou OK
-        def check_is_paid_strict(val):
-            v = str(val).upper().strip()
-            # On exclut "NON", "ATTENTE", "VIDE" etc.
-            # Seuls ces mots exacts valident l'encaissement :
-            return v in ["PAYÉ", "PAYE", "OK", "PAID", "OUI"]
+        # --- 2. LOGIQUE DE PAIEMENT ULTRA-STRICTE ---
+        def is_paid_verified(row):
+            # On récupère les deux colonnes possibles
+            p1 = str(row.get('Paiement', '')).upper().strip()
+            p2 = str(row.get('Paye', '')).upper().strip()
+            
+            # LISTE DE VALIDATION STRICTE
+            # On ne valide QUE si l'un des champs contient EXACTEMENT un de ces mots
+            valid_words = ["PAYÉ", "PAYE", "OK", "PAID", "OUI"]
+            return p1 in valid_words or p2 in valid_words
 
-        # On vérifie dans 'Paiement' ET 'Paye' (vos deux colonnes détectées)
-        df_st['Is_Paid'] = df_st.apply(lambda r: check_is_paid_strict(r.get('Paiement', '')) or 
-                                                 check_is_paid_strict(r.get('Paye', '')), axis=1)
+        df_st['Is_Paid'] = df_st.apply(is_paid_verified, axis=1)
 
-        # --- 3. CALCULS ---
+        # --- 3. RÉPARTITION ---
         df_paye = df_st[df_st['Is_Paid'] == True]
         df_impaye = df_st[df_st['Is_Paid'] == False]
 
-        # --- 4. AFFICHAGE ---
+        # --- 4. AFFICHAGE DES MÉTRIQUES ---
         st.divider()
         c1, c2, c3 = st.columns(3)
         
-        tot_enc = df_paye['PrixNum'].sum()
-        tot_reste = df_impaye['PrixNum'].sum()
+        enc_reel = df_paye['PrixNum'].sum()
+        reste_reel = df_impaye['PrixNum'].sum()
         
-        c1.metric("💰 ENCAISSÉ RÉEL", f"{tot_enc:,.0f} €")
-        c2.metric("⚠️ RESTE À PAYER", f"{tot_reste:,.0f} €", delta=f"{len(df_impaye)} dossiers")
-        c3.metric("📈 TOTAL PRÉVU", f"{(tot_enc + tot_reste):,.0f} €")
+        c1.metric("💰 ENCAISSÉ RÉEL", f"{enc_reel:,.0f} €")
+        c2.metric("⚠️ RESTE À PAYER", f"{reste_reel:,.0f} €", delta=f"{len(df_impaye)} missions")
+        c3.metric("📈 TOTAL PRÉVU", f"{(enc_reel + reste_reel):,.0f} €")
 
-        # --- 5. VÉRIFICATION ---
-        with st.expander("🔍 Vérifier le détail des prix et paiements"):
-            st.write("Si 'Payé ?' est à True, la ligne va dans 'Encaissé'. Sinon, dans 'Reste à payer'.")
-            check_view = df_st[['DateNav', 'Nom', 'Prix', 'PrixNum', 'Paiement', 'Paye', 'Is_Paid']].copy()
-            st.dataframe(check_view, use_container_width=True)
-
+        # --- 5. LISTE DES IMPAYÉS ---
+        st.subheader(f"⏳ Liste des {len(df_impaye)} impayés")
         if not df_impaye.empty:
-            st.subheader("⏳ Liste des Impayés détectés")
-            st.dataframe(df_impaye[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True)
+            # On trie pour voir les dossiers vides de paiement
+            df_view = df_impaye[['DateNav', 'Nom', 'Prix', 'Paiement']].copy()
+            st.dataframe(df_view.sort_values('DateNav'), use_container_width=True, hide_index=True)
+        else:
+            st.success("Tout est à jour ! ✅")
+
+        # --- 6. TABLEAU DE VÉRIFICATION (EXPANDER) ---
+        with st.expander("🔍 Debug : Pourquoi ce montant ?"):
+            st.write("Vérifiez la colonne 'PrixNum' et 'Is_Paid' pour Philippe et Pimmel :")
+            st.dataframe(df_st[['DateNav', 'Nom', 'Prix', 'PrixNum', 'Paiement', 'Is_Paid']].head(20))
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
