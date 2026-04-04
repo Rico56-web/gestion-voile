@@ -264,25 +264,16 @@ if st.session_state.page == "CONTACTS":
                 if cn.button("NON", key=f"n_v_{i}", use_container_width=True):
                     st.session_state.confirm_del_idx = None; st.rerun()
 # =================================================================
-# --- 6. PAGE PLANNING (VERSION FINALE ULTRA-COMPLÈTE IPHONE) ---
+# --- 6. PAGE PLANNING (VERSION INTELLIGENTE & COMPLÈTE) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
-    # Configuration CSS pour le plein écran et le design mobile
     st.markdown("""
         <style>
             .block-container { padding: 10px 5px !important; }
             .stMain { padding: 0px !important; }
-            .full-width-cal { 
-                width: 98% !important; 
-                margin: auto !important; 
-                border-collapse: collapse; 
-                table-layout: fixed; 
-            }
-            .full-width-cal td { 
-                width: 14.28%; 
-                padding: 0 !important;
-            }
-            .weekend-head { color: #d9534f !important; } /* Rouge pour Sa/Di */
+            .full-width-cal { width: 98% !important; margin: auto !important; border-collapse: collapse; table-layout: fixed; }
+            .full-width-cal td { width: 14.28%; padding: 0 !important; }
+            .weekend-head { color: #d9534f !important; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -302,7 +293,7 @@ elif st.session_state.page == "PLANNING":
         if st.button("📍 ICI", use_container_width=True):
             st.rerun()
 
-    # --- TRAITEMENT DES DONNÉES ---
+    # --- LOGIQUE DE CALCUL DES OCCUPATIONS (MULTI-MOIS) ---
     jours_occ = {}
     total_mois = 0
     missions_list = []
@@ -311,35 +302,46 @@ elif st.session_state.page == "PLANNING":
         try:
             d_str = str(r.get('DateNav', '')).strip()
             if '/' not in d_str: continue
+            
+            # Transformation en objet date pour calcul précis
             parts = d_str.split('/')
             dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
             if yv < 100: yv += 2000
+            date_debut = date(yv, mv, dv)
             
-            if mv == sel_m and yv == sel_y:
-                this_date = date(yv, mv, dv)
-                p_val = str(r.get('Paiement', '')).strip().upper()
-                s_val = str(r.get('Statut', '')).strip().lower()
-                is_paye = ("PAY" in p_val) and ("NON" not in p_val)
+            n_j = int(safe_val(r.get('Nbre de jours'), 1))
+            # Calcul de toutes les dates de la mission
+            for i in range(n_j):
+                date_courante = date_debut + timedelta(days=i)
                 
-                # LOGIQUE COULEUR STRICTE
-                if this_date < aujourdhui:
-                    color = "#0047AB" if is_paye else "#e74c3c" # 🔵 Payé | 🔴 Impayé/Refusé
-                elif "ok" in s_val:
-                    color = "#27ae60" # 🟢 Confirmé
-                elif "attente" in s_val:
-                    color = "#f39c12" # 🟡 En attente
-                else:
-                    color = "transparent"
-                
-                n_j = int(safe_val(r.get('Nbre de jours'), 1))
-                for j in range(dv, dv + n_j):
-                    if j <= 31: jours_occ[j] = {"c": color}
-                
+                # On ne colorie que si la date courante tombe dans le mois/année sélectionné
+                if date_courante.month == sel_m and date_courante.year == sel_y:
+                    p_val = str(r.get('Paiement', '')).strip().upper()
+                    s_val = str(r.get('Statut', '')).strip().lower()
+                    is_paye = ("PAY" in p_val) and ("NON" not in p_val)
+                    
+                    if date_courante < aujourdhui:
+                        color = "#0047AB" if is_paye else "#e74c3c"
+                    elif "ok" in s_val:
+                        color = "#27ae60"
+                    elif "attente" in s_val:
+                        color = "#f39c12"
+                    else:
+                        color = "transparent"
+                    
+                    jours_occ[date_courante.day] = {"c": color}
+
+            # Ajout à la liste si la mission commence OU finit dans ce mois
+            date_fin = date_debut + timedelta(days=n_j-1)
+            if (date_debut.month == sel_m and date_debut.year == sel_y) or (date_fin.month == sel_m and date_fin.year == sel_y):
                 r_idx = r.copy()
                 r_idx['original_idx'] = idx
-                r_idx['day_start'] = dv
+                # On garde le jour de début réel pour le tri, même s'il est au mois précédent
+                r_idx['sort_key'] = (date_debut.month, date_debut.day)
                 missions_list.append(r_idx)
-                total_mois += float(safe_val(r.get('Prix'), 0))
+                # On ne compte le CA que si la mission COMMENCE ce mois-ci
+                if date_debut.month == sel_m:
+                    total_mois += float(safe_val(r.get('Prix'), 0))
         except: continue
 
     # --- 1. DESSIN DU CALENDRIER ---
@@ -361,11 +363,8 @@ elif st.session_state.page == "PLANNING":
             else:
                 bg_circle = jours_occ.get(jour, {}).get("c", "transparent")
                 txt_c = "white" if bg_circle != "transparent" else "black"
-                
                 is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == sel_y)
                 is_weekend = (i >= 5)
-                
-                # Fond marron pour aujourd'hui, sinon gris léger pour week-end
                 cell_bg = "background:#D2B48C;" if is_today else ("background:#fcfcfc;" if is_weekend else "")
                 
                 circle = f'<div style="background:{bg_circle}; color:{txt_c}; border-radius:50%; width:28px; height:28px; line-height:28px; margin:auto; font-weight:bold; font-size:12px;">{jour}</div>'
@@ -384,25 +383,33 @@ elif st.session_state.page == "PLANNING":
         st.rerun()
 
     if missions_list:
-        df_m = pd.DataFrame(missions_list).sort_values('day_start')
+        df_m = pd.DataFrame(missions_list).sort_values('sort_key')
         for _, row in df_m.iterrows():
             soc = str(row.get('Société','')).upper()
             c_line = "#0047AB" if "CMN" in soc else "#27ae60"
-            
-            # Gestion de l'affichage de la plage de dates (ex: 12➔15)
             n_jours = int(safe_val(row.get('Nbre de jours'), 1))
-            j_deb = int(row['day_start'])
-            txt_date = f"{j_deb:02d}➔{(j_deb + n_jours - 1):02d}" if n_jours > 1 else f"{j_deb:02d}"
             
-            # Icône Paiement
+            # Extraction propre des dates
+            d_parts = str(row['DateNav']).split('/')
+            j_deb, m_deb = int(d_parts[0]), int(d_parts[1])
+            
+            # Gestion de l'affichage de la plage (ex: 31/05 ➔ 02/06)
+            if n_jours > 1:
+                date_obj_deb = date(int(d_parts[2]) if int(d_parts[2]) > 100 else int(d_parts[2])+2000, m_deb, j_deb)
+                date_obj_fin = date_obj_deb + timedelta(days=n_jours-1)
+                txt_date = f"{date_obj_deb.day:02d}/{date_obj_deb.month:02d}➔{date_obj_fin.day:02d}/{date_obj_fin.month:02d}"
+            else:
+                txt_date = f"{j_deb:02d}/{m_deb:02d}"
+            
+            label_j = "JOURS" if n_jours > 1 else "JOUR"
             p_val = str(row.get('Paiement', '')).upper()
             pay_icon = "💰" if "PAY" in p_val and "NON" not in p_val else "⚠️"
             
             st.markdown(f"""
                 <div style="display: flex; padding: 10px; border-bottom: 1px solid #eee; background: white; align-items: center;">
-                    <div style="background: {c_line}; color: white; border-radius: 5px; padding: 4px; min-width: 65px; text-align: center; font-weight: bold; margin-right: 10px; line-height:1.2;">
-                        <span style="font-size: 0.85rem;">{txt_date}</span><br>
-                        <span style="font-size: 0.5rem;">JOURS</span>
+                    <div style="background: {c_line}; color: white; border-radius: 5px; padding: 4px; min-width: 85px; text-align: center; font-weight: bold; margin-right: 10px; line-height:1.2;">
+                        <span style="font-size: 0.75rem;">{txt_date}</span><br>
+                        <span style="font-size: 0.5rem;">{label_j}</span>
                     </div>
                     <div style="flex-grow: 1;">
                         <b style="font-size: 0.9rem;">{pay_icon} {str(row.get('Nom','')).upper()}</b><br>
@@ -420,7 +427,7 @@ elif st.session_state.page == "PLANNING":
     # --- 3. BILAN FINANCIER ---
     st.markdown(f"""
         <div style="background: #0047AB; padding: 15px; border-radius: 10px; color: white; text-align: center; margin-top: 15px;">
-            <div style="font-size:0.8rem; opacity:0.8;">CHIFFRE D'AFFAIRES DU MOIS</div>
+            <div style="font-size:0.8rem; opacity:0.8;">CHIFFRE D'AFFAIRES DÉBUTANT CE MOIS</div>
             <div style="font-size: 1.5rem; font-weight: bold;">{total_mois:,.0f} €</div>
         </div>
     """, unsafe_allow_html=True)
@@ -428,11 +435,8 @@ elif st.session_state.page == "PLANNING":
     # --- 4. ZONE DE DANGER ---
     st.write("")
     with st.expander("⚠️ ZONE DE DANGER"):
-        st.subheader("Clôture de l'année")
         if st.button(f"🔒 ARCHIVER L'ANNÉE {sel_y}", use_container_width=True):
-            st.error("Êtes-vous certain ? Cette action est irréversible.")
-            if st.button("OUI, CONFIRMER L'ARCHIVAGE"):
-                st.success(f"Année {sel_y} archivée.")
+            st.error("Action irréversible.")
 # =================================================================
 # --- 7. PAGE STATS ---
 # =================================================================
