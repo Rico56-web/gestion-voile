@@ -405,11 +405,12 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (SYNCHRONISATION TOTALE) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (CORRECTION FORCEE) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
     import re
+    import pandas as pd
     from datetime import datetime
 
     df_st = df_c.copy()
@@ -425,53 +426,66 @@ elif st.session_state.page == "STATS":
         except: return 0.0
 
     def is_paid_final(row):
-        # On check Paiement (col 4) et Paye (col 13)
         p1 = str(row.get('Paiement', '')).upper().strip()
         p2 = str(row.get('Paye', '')).upper().strip()
         txt = p1 + " " + p2
-        
         if not txt or txt == "NAN" or txt.strip() == "": return False
-        # Si "NON" est écrit, c'est mort
-        if "NON" in txt or "ATT" in txt: return False
-        # Validation par mots clés
+        if any(no in txt for no in ["NON", "ATT", "PAS"]): return False
         return any(ok in txt for ok in ["PAY", "OK", "OUI", "PAID"])
 
     if not df_st.empty:
-        # 1. Calcul des colonnes de base
+        # 1. PRÉPARATION TECHNIQUE
         df_st['PrixNum'] = df_st['Prix'].apply(clean_price)
         df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
         df_st = df_st.dropna(subset=['dt_obj'])
         df_st['Mois_Annee'] = df_st['dt_obj'].dt.strftime('%Y-%m')
 
-        # 2. Application du statut (Celu qui marche dans ton tableau 'FAITES')
+        # 2. LOGIQUE DE PAIEMENT (On s'assure que c'est bien True/False)
         df_st['Is_Paid'] = df_st.apply(is_paid_final, axis=1)
         
-        # Colonnes pivots pour la synthèse
-        df_st['M_Paye'] = df_st.apply(lambda r: r['PrixNum'] if r['Is_Paid'] else 0.0, axis=1)
-        df_st['M_Impaye'] = df_st.apply(lambda r: r['PrixNum'] if not r['Is_Paid'] else 0.0, axis=1)
+        # ON FORCE LA CRÉATION DE COLONNES NUMÉRIQUES PURES
+        df_st['M_Paye'] = 0.0
+        df_st['M_Impaye'] = 0.0
+        
+        # On remplit ligne par ligne pour éviter tout bug de vecteur
+        for idx, row in df_st.iterrows():
+            valeur = float(row['PrixNum'])
+            if row['Is_Paid'] == True:
+                df_st.at[idx, 'M_Paye'] = valeur
+            else:
+                df_st.at[idx, 'M_Impaye'] = valeur
 
-        # 3. SYNTHÈSE MENSUELLE
+        # 3. SYNTHÈSE MENSUELLE (RECALCULÉE À PARTIR DE ZÉRO)
         st.subheader("📅 Synthèse Mensuelle")
         
-        # Groupage des revenus
-        df_synth = df_st.groupby('Mois_Annee').agg({
+        # Groupage strict
+        stats_mensuelles = df_st.groupby('Mois_Annee').agg({
             'PrixNum': 'sum',
             'M_Paye': 'sum',
             'M_Impaye': 'sum'
-        }).rename(columns={'PrixNum': 'CA Total', 'M_Paye': 'Encaissé', 'M_Impaye': 'Impayé'})
+        })
+        
+        # Renommer pour l'affichage
+        df_synth = stats_mensuelles.rename(columns={
+            'PrixNum': 'CA Total', 
+            'M_Paye': 'Encaissé', 
+            'M_Impaye': 'Impayé'
+        })
 
-        # Ajout de la Maintenance
+        # Ajout Maintenance
+        df_synth['Maintenance'] = 0.0
         if not df_m.empty:
             df_m['dt_m'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
             df_m['MA'] = df_m['dt_m'].dt.strftime('%Y-%m')
             df_m['Mt'] = pd.to_numeric(df_m['Montant'], errors='coerce').fillna(0)
             m_mens = df_m.groupby('MA')['Mt'].sum()
-            df_synth['Maintenance'] = m_mens
+            for mois in df_synth.index:
+                if mois in m_mens.index:
+                    df_synth.at[mois, 'Maintenance'] = float(m_mens[mois])
         
-        df_synth = df_synth.fillna(0)
         df_synth['Bénéfice'] = df_synth['CA Total'] - df_synth['Maintenance']
         
-        # Affichage du tableau de bord
+        # AFFICHAGE DU TABLEAU
         st.dataframe(
             df_synth.sort_index(ascending=False).style.format("{:.0f} €"),
             use_container_width=True
@@ -481,7 +495,6 @@ elif st.session_state.page == "STATS":
 
         # 4. MISSIONS FAITES vs A VENIR
         maintenant = datetime.now()
-        # On sépare proprement
         df_fait = df_st[df_st['dt_obj'] < maintenant].sort_values('dt_obj', ascending=False)
         df_avenir = df_st[df_st['dt_obj'] >= maintenant].sort_values('dt_obj', ascending=True)
 
@@ -489,19 +502,18 @@ elif st.session_state.page == "STATS":
         with c1:
             st.subheader(f"🚀 À VENIR ({len(df_avenir)})")
             if not df_avenir.empty:
-                st.info(f"Prévisionnel : **{df_avenir['PrixNum'].sum():,.0f} €**")
-                # On cache Is_Paid pour que ce soit plus propre si tu veux
+                st.info(f"Prévisionnel : {df_avenir['PrixNum'].sum():,.0f} €")
                 st.dataframe(df_avenir[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
         
         with c2:
             st.subheader(f"⚓ FAITES ({len(df_fait)})")
             if not df_fait.empty:
-                st.success(f"Réalisé : **{df_fait['PrixNum'].sum():,.0f} €**")
-                # Ici on garde Is_Paid pour ton contrôle
-                st.dataframe(df_fait[['DateNav', 'Nom', 'Prix', 'Paiement', 'Is_Paid']], use_container_width=True, hide_index=True)
+                st.success(f"Réalisé : {df_fait['PrixNum'].sum():,.0f} €")
+                # ON AFFICHE M_Paye POUR VÉRIFIER LE CHIFFRE QUI MONTE AU TABLEAU
+                st.dataframe(df_fait[['DateNav', 'Nom', 'Prix', 'M_Paye', 'Is_Paid']], use_container_width=True, hide_index=True)
 
     else:
-        st.warning("Aucune mission archivée.")
+        st.warning("Aucune donnée.")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
