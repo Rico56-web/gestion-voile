@@ -405,14 +405,13 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (SYNTHÈSE MENSUELLE FIX) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (SYNTHÈSE SYNCHRONISÉE) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
     import re
     from datetime import datetime
 
-    # 1. CHARGEMENT
     df_st = df_c.copy()
     df_m = charger_data('maintenance.json')
     df_st.columns = [str(c).strip() for c in df_st.columns]
@@ -426,34 +425,34 @@ elif st.session_state.page == "STATS":
         except: return 0.0
 
     if not df_st.empty:
-        # --- PRÉPARATION DES DONNÉES MISSIONS ---
+        # --- 1. PRÉPARATION ---
         df_st['PrixNum'] = df_st['Prix'].apply(clean_price)
         df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
         df_st = df_st.dropna(subset=['dt_obj'])
         df_st['Mois_Annee'] = df_st['dt_obj'].dt.strftime('%Y-%m')
 
-        # Logique de paiement stricte
+        # Logique de paiement SOUPLE (comme dans tes tableaux qui marchent)
         def check_p(r):
-            v = (str(r.get('Paiement', '')) + str(r.get('Paye', ''))).upper().strip()
-            return v in ["PAYÉ", "PAYE", "OK", "PAID", "OUI"]
+            # On combine les colonnes de paiement possibles
+            v = (str(r.get('Paiement', '')) + " " + str(r.get('Paye', ''))).upper()
+            # Si l'un de ces mots est PRÉSENT dans la case
+            return any(w in v for w in ["PAYÉ", "PAYE", "OK", "PAID", "OUI"])
         
         df_st['Is_Paid'] = df_st.apply(check_p, axis=1)
 
-        # Création de colonnes dédiées pour le calcul du groupage
+        # Création des colonnes de calcul
         df_st['Montant_Paye'] = df_st.apply(lambda r: r['PrixNum'] if r['Is_Paid'] else 0.0, axis=1)
         df_st['Montant_Impaye'] = df_st.apply(lambda r: r['PrixNum'] if not r['Is_Paid'] else 0.0, axis=1)
 
-        # --- RÉCAPITULATIF MENSUEL ---
+        # --- 2. RÉCAPITULATIF MENSUEL ---
         st.subheader("📅 Synthèse Mensuelle")
         
-        # Groupage des revenus (Somme des colonnes créées juste au-dessus)
         stats_rev = df_st.groupby('Mois_Annee').agg({
             'PrixNum': 'sum',
             'Montant_Paye': 'sum',
             'Montant_Impaye': 'sum'
         }).rename(columns={'PrixNum': 'CA Total', 'Montant_Paye': 'Encaissé', 'Montant_Impaye': 'Impayé'})
 
-        # Groupage des Frais Maintenance
         if not df_m.empty:
             df_m['dt_m'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
             df_m['Mois_Annee'] = df_m['dt_m'].dt.strftime('%Y-%m')
@@ -462,22 +461,18 @@ elif st.session_state.page == "STATS":
         else:
             stats_frais = pd.Series(name='Maintenance', dtype=float)
 
-        # Fusion finale
         synthese = stats_rev.join(stats_frais, how='outer').fillna(0)
         synthese['Bénéfice'] = synthese['CA Total'] - synthese['Maintenance']
         
-        # Tri par mois décroissant (plus récent en haut)
-        synthese = synthese.sort_index(ascending=False)
-
-        # Affichage du tableau de bord
         st.dataframe(
-            synthese.style.format("{:.0f} €"),
+            synthese.sort_index(ascending=False).style.format("{:.0f} €"),
             use_container_width=True
         )
 
         st.divider()
 
-        # --- MISSIONS FAITES vs A VENIR ---
+        # --- 3. MISSIONS FAITES vs A VENIR ---
+        # On utilise EXACTEMENT la même colonne 'Is_Paid' pour l'affichage ici
         maintenant = datetime.now()
         df_fait = df_st[df_st['dt_obj'] < maintenant].sort_values('dt_obj', ascending=False)
         df_avenir = df_st[df_st['dt_obj'] >= maintenant].sort_values('dt_obj', ascending=True)
@@ -487,6 +482,7 @@ elif st.session_state.page == "STATS":
             st.subheader(f"🚀 À VENIR ({len(df_avenir)})")
             if not df_avenir.empty:
                 st.info(f"Total prévu : **{df_avenir['PrixNum'].sum():,.0f} €**")
+                # On affiche la colonne Is_Paid pour vérifier visuellement
                 st.dataframe(df_avenir[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
         
         with col2:
