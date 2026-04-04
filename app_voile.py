@@ -452,16 +452,27 @@ elif st.session_state.page == "STATS":
     st.divider()
     col1, col2, col3 = st.columns(3)
     
+    # Identification automatique de la colonne client (Nom ou Client)
+    col_client = 'Nom' if 'Nom' in df_st.columns else 'Client'
+    
     # Calculs des totaux
-    mask_paye = df_st['Paiement'].astype(str).str.contains("PAYÉ|PAID", case=False, na=False)
+    # On s'assure que la colonne 'Paiement' existe avant de filtrer
+    if 'Paiement' in df_st.columns:
+        mask_paye = df_st['Paiement'].astype(str).str.contains("PAYÉ|PAID", case=False, na=False)
+    else:
+        mask_paye = pd.Series([False] * len(df_st))
+
     tot_enc = df_st[mask_paye]['PrixNum'].sum()
     
     # "À venir" = Statut OK mais pas encore payé
-    mask_avenir = (df_st['Statut'].astype(str).str.upper() == "OK") & (~mask_paye)
-    tot_avr = df_st[mask_avenir]['PrixNum'].sum()
+    mask_statut_ok = df_st['Statut'].astype(str).str.upper() == "OK" if 'Statut' in df_st.columns else pd.Series([False] * len(df_st))
+    tot_avr = df_st[mask_statut_ok & (~mask_paye)]['PrixNum'].sum()
     
-    # Focus CMN (votre règle métier)
-    cmn_share = df_st[df_st['Client'].astype(str).str.upper() == "CMN"]['PrixNum'].sum()
+    # Focus CMN - On utilise la variable col_client identifiée plus haut
+    if col_client in df_st.columns:
+        cmn_share = df_st[df_st[col_client].astype(str).str.upper() == "CMN"]['PrixNum'].sum()
+    else:
+        cmn_share = 0.0
 
     col1.metric("💰 ENCAISSÉ", f"{tot_enc:,.0f} €")
     col2.metric("🕒 À VENIR", f"{tot_avr:,.0f} €")
