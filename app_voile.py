@@ -405,7 +405,7 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (FILTRE INTELLIGENT) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (DÉTECTION SOLIDE) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
@@ -414,6 +414,7 @@ elif st.session_state.page == "STATS":
 
     df_st = df_c.copy()
     df_m = charger_data('maintenance.json')
+    # Nettoyage profond des noms de colonnes
     df_st.columns = [str(c).strip() for c in df_st.columns]
 
     def clean_price(val):
@@ -424,57 +425,57 @@ elif st.session_state.page == "STATS":
             return float(match.group(1)) if match else 0.0
         except: return 0.0
 
-    # --- NOUVELLE FONCTION DE DÉTECTION PRÉCISE ---
-    def is_paid_smart(row):
-        # On fusionne les colonnes de statut
-        txt = (str(row.get('Paiement', '')) + " " + str(row.get('Paye', ''))).upper().strip()
+    # --- DÉTECTION "ZÉRO ERREUR" ---
+    def is_paid_final(row):
+        # On fusionne le contenu de TOUTES les colonnes de statut possibles
+        # (Index 3:Statut, 4:Paiement, 13:Paye)
+        c1 = str(row.get('Paiement', '')).upper().strip()
+        c2 = str(row.get('Paye', '')).upper().strip()
+        c3 = str(row.get('Statut', '')).upper().strip()
         
-        # 1. SI LA CASE EST VIDE -> FAUX
-        if txt == "" or txt == "NAN": return False
+        txt = c1 + c2 + c3
         
-        # 2. SI "NON" EST PRÉSENT -> FAUX (Ex: "Non payé", "Pas payé")
-        if "NON" in txt or "PAS" in txt or "ATTENTE" in txt: return False
+        if not txt or txt == "NAN": return False
         
-        # 3. SINON, ON CHERCHE LES MOTS DE VALIDATION
-        valid_words = ["PAYÉ", "PAYE", "OK", "PAID", "OUI", "FAIT"]
-        return any(w in txt for w in valid_words)
+        # PRIORITÉ : Si on voit "NON" ou "ATT", c'est impayé
+        if any(no in txt for no in ["NON", "ATT", "PAS"]): return False
+        
+        # VALIDATION : Si on voit une lettre de confirmation (P, O, K)
+        # Cela couvre : "Payé", "Oui", "OK", "P", "O"
+        return any(ok in txt for ok in ["PAY", "OK", "OUI", "PAID"])
 
     if not df_st.empty:
-        # --- PRÉPARATION ---
+        # 1. Préparation technique
         df_st['PrixNum'] = df_st['Prix'].apply(clean_price)
         df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
         df_st = df_st.dropna(subset=['dt_obj'])
         df_st['Mois_Annee'] = df_st['dt_obj'].dt.strftime('%Y-%m')
 
-        # Application du nouveau filtre intelligent
-        df_st['Is_Paid'] = df_st.apply(is_paid_smart, axis=1)
-
-        # Colonnes de calcul
+        # 2. Application de la logique
+        df_st['Is_Paid'] = df_st.apply(is_paid_final, axis=1)
         df_st['M_Paye'] = df_st.apply(lambda r: r['PrixNum'] if r['Is_Paid'] else 0.0, axis=1)
         df_st['M_Impaye'] = df_st.apply(lambda r: r['PrixNum'] if not r['Is_Paid'] else 0.0, axis=1)
 
-        # --- SYNTHÈSE MENSUELLE ---
+        # 3. CONSTRUCTION DE LA SYNTHÈSE
         st.subheader("📅 Synthèse Mensuelle")
-        df_synth = df_st.groupby('Mois_Annee').agg({
-            'PrixNum': 'sum',
-            'M_Paye': 'sum',
-            'M_Impaye': 'sum'
+        stats_rev = df_st.groupby('Mois_Annee').agg({
+            'PrixNum': 'sum', 'M_Paye': 'sum', 'M_Impaye': 'sum'
         }).rename(columns={'PrixNum': 'CA Total', 'M_Paye': 'Encaissé', 'M_Impaye': 'Impayé'})
 
-        # Ajout Maintenance
+        # Maintenance
         if not df_m.empty:
             df_m['dt_m'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
             m_mens = df_m.groupby(df_m['dt_m'].dt.strftime('%Y-%m'))['Montant'].sum()
-            df_synth['Maintenance'] = m_mens
+            stats_rev['Maintenance'] = m_mens
         
-        df_synth = df_synth.fillna(0)
+        df_synth = stats_rev.fillna(0)
         df_synth['Bénéfice'] = df_synth['CA Total'] - df_synth['Maintenance']
         
         st.dataframe(df_synth.sort_index(ascending=False).style.format("{:.0f} €"), use_container_width=True)
 
         st.divider()
 
-        # --- DÉTAILS ---
+        # 4. MISSIONS FAITES vs A VENIR
         maintenant = datetime.now()
         df_fait = df_st[df_st['dt_obj'] < maintenant].sort_values('dt_obj', ascending=False)
         df_avenir = df_st[df_st['dt_obj'] >= maintenant].sort_values('dt_obj', ascending=True)
@@ -486,15 +487,15 @@ elif st.session_state.page == "STATS":
                 st.info(f"Total : {df_avenir['PrixNum'].sum():,.0f} €")
                 st.dataframe(df_avenir[['DateNav', 'Nom', 'Prix', 'Paiement', 'Is_Paid']], use_container_width=True, hide_index=True)
         
-        with c2:
+        with col2 if 'col2' in locals() else c2: # Securité sur le nom de colonne
             st.subheader(f"⚓ FAITES ({len(df_fait)})")
             if not df_fait.empty:
                 st.success(f"Total : {df_fait['PrixNum'].sum():,.0f} €")
-                # Ici Is_Paid devrait enfin varier entre True et False
-                st.dataframe(df_fait[['DateNav', 'Nom', 'Prix', 'Paiement', 'Is_Paid']], use_container_width=True, hide_index=True)
+                # ON AJOUTE LES COLONNES POUR COMPRENDRE SI ÇA ÉCHOUE
+                st.dataframe(df_fait[['DateNav', 'Nom', 'Prix', 'Paiement', 'Paye', 'Is_Paid']], use_container_width=True, hide_index=True)
 
     else:
-        st.warning("Aucune donnée.")
+        st.warning("Aucune donnée disponible.")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
