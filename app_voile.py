@@ -405,15 +405,20 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (TABLEAUX COMPLETS) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (INTEGRATION MAINTENANCE) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
     import re
 
-    df_st = df_c.copy()
+    # 1. CHARGEMENT DES DEUX SOURCES
+    df_st = df_c.copy()  # Les missions (Revenus)
+    df_m = charger_data('maintenance.json')  # Les frais (Dépenses)
+    
+    # Nettoyage colonnes missions
     df_st.columns = [str(c).strip() for c in df_st.columns]
 
+    # Fonction de nettoyage prix (identique à la version fonctionnelle précédente)
     def clean_price_final(val):
         if val is None or str(val).strip() == "" or str(val).lower() == "nan":
             return 0.0
@@ -424,53 +429,73 @@ elif st.session_state.page == "STATS":
         except: return 0.0
 
     if not df_st.empty:
+        # --- TRAITEMENT REVENUS (MISSIONS) ---
         df_st['PrixNum'] = df_st['Prix'].apply(clean_price_final)
         
-        # Logique de paiement
         def is_paid_verified(row):
             p1 = str(row.get('Paiement', '')).upper().strip()
             p2 = str(row.get('Paye', '')).upper().strip()
-            return p1 in ["PAYÉ", "PAYE", "OK", "PAID", "OUI"] or p2 in ["PAYÉ", "PAYE", "OK", "PAID", "OUI"]
+            valid = ["PAYÉ", "PAYE", "OK", "PAID", "OUI"]
+            return p1 in valid or p2 in valid
 
         df_st['Is_Paid'] = df_st.apply(is_paid_verified, axis=1)
+        df_paye = df_st[df_st['Is_Paid'] == True]
+        df_impaye = df_st[df_st['Is_Paid'] == False]
 
-        # Séparation
-        df_paye = df_st[df_st['Is_Paid'] == True].copy()
-        df_impaye = df_st[df_st['Is_Paid'] == False].copy()
+        # --- TRAITEMENT FRAIS (MAINTENANCE) ---
+        if not df_m.empty:
+            # On s'assure que le montant de maintenance est numérique
+            df_m['MontantNum'] = pd.to_numeric(df_m['Montant'], errors='coerce').fillna(0)
+            total_frais = df_m['MontantNum'].sum()
+        else:
+            total_frais = 0.0
 
-        # Métriques
+        # --- CALCULS GLOBAUX ---
+        ca_total = df_st['PrixNum'].sum()
+        benefice_net = ca_total - total_frais
+        marge = (benefice_net / ca_total * 100) if ca_total > 0 else 0
+
+        # --- AFFICHAGE DES MÉTRIQUES ---
         st.divider()
         c1, c2, c3 = st.columns(3)
-        enc_reel = df_paye['PrixNum'].sum()
-        reste_reel = df_impaye['PrixNum'].sum()
-        c1.metric("💰 TOTAL ENCAISSÉ", f"{enc_reel:,.0f} €")
-        c2.metric("⚠️ RESTE À RECEVOIR", f"{reste_reel:,.0f} €", delta=f"{len(df_impaye)} missions")
-        c3.metric("📈 PRÉVISIONNEL ANNUEL", f"{(enc_reel + reste_reel):,.0f} €")
+        
+        # Le CA est basé sur les missions
+        c1.metric("💰 CA TOTAL (BRUT)", f"{ca_total:,.0f} €")
+        # Les FRAIS sont basés sur le fichier maintenance.json
+        c2.metric("🛠️ TOTAL MAINTENANCE", f"-{total_frais:,.0f} €", delta_color="inverse")
+        # Le RÉSULTAT est la différence
+        c3.metric("⚓ BÉNÉFICE NET", f"{benefice_net:,.0f} €", delta=f"{marge:.1f}% de marge")
 
-        # --- TABLEAUX CHRONOLOGIQUES ---
-        # On s'assure que DateNav est exploitable pour le tri
-        df_paye = df_paye.sort_values('DateNav', ascending=True)
-        df_impaye = df_impaye.sort_values('DateNav', ascending=True)
-
-        tabs = st.tabs(["⏳ Impayés", "✅ Encaissés", "🔵 Focus CMN"])
+        # --- AFFICHAGE DES DÉTAILS ---
+        tabs = st.tabs(["⏳ Impayés", "✅ Encaissés", "🛠️ Détail Maintenance", "🔵 Focus CMN"])
 
         with tabs[0]:
-            st.subheader("Missions en attente de règlement")
-            if not df_impaye.empty:
-                st.dataframe(df_impaye[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
-            else:
-                st.success("Aucun impayé ! ✨")
+            st.subheader(f"Missions à recevoir ({len(df_impaye)})")
+            st.dataframe(df_impaye[['DateNav', 'Nom', 'Prix', 'Paiement']].sort_values('DateNav'), 
+                         use_container_width=True, hide_index=True)
 
         with tabs[1]:
-            st.subheader("Historique des paiements reçus")
-            if not df_paye.empty:
-                st.dataframe(df_paye[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
+            st.subheader("Historique des encaissements")
+            st.dataframe(df_paye[['DateNav', 'Nom', 'Prix', 'Paiement']].sort_values('DateNav'), 
+                         use_container_width=True, hide_index=True)
 
         with tabs[2]:
+            st.subheader("Historique des dépenses (maintenance.json)")
+            if not df_m.empty:
+                # On réutilise les noms de colonnes du bloc maintenance : Date, Objet, Montant
+                df_m_view = df_m[['Date', 'Objet', 'Montant']].copy()
+                st.dataframe(df_m_view.sort_values('Date', ascending=False), use_container_width=True, hide_index=True)
+            else:
+                st.info("Aucune dépense enregistrée dans la section Maintenance.")
+
+        with tabs[3]:
             col_soc = 'Société' if 'Société' in df_st.columns else 'Societe'
             df_cmn = df_st[df_st[col_soc].astype(str).str.upper() == "CMN"]
-            st.metric("Chiffre d'Affaires CMN", f"{df_cmn['PrixNum'].sum():,.0f} €")
+            st.metric("Volume d'affaires CMN", f"{df_cmn['PrixNum'].sum():,.0f} €")
             st.dataframe(df_cmn[['DateNav', 'Nom', 'Prix', 'Is_Paid']], use_container_width=True, hide_index=True)
+
+    else:
+        st.warning("Aucune mission dans les archives. Les statistiques ne peuvent pas être calculées.")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
