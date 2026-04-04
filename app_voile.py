@@ -264,47 +264,50 @@ if st.session_state.page == "CONTACTS":
                 if cn.button("NON", key=f"n_v_{i}", use_container_width=True):
                     st.session_state.confirm_del_idx = None; st.rerun()
 # =================================================================
-# --- 6. PAGE PLANNING (CORRECTIF ERREUR NAMEERROR) ---
+# --- 6. PAGE PLANNING (CORRECTIF FINAL BOUTON ICI) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
     from datetime import datetime, date, timedelta
     import calendar
 
-    # 1. DÉFINITION DES LISTES DE BASE (Indispensable au début)
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
 
-    # 2. INITIALISATION DE LA SESSION (Pour le bouton ICI)
-    if 'sel_mois' not in st.session_state:
-        st.session_state.sel_mois = m_noms[aujourdhui.month - 1]
-    if 'sel_annee' not in st.session_state:
-        st.session_state.sel_annee = aujourdhui.year
+    # INITIALISATION SANS CONFLIT
+    if 'curr_month_idx' not in st.session_state:
+        st.session_state.curr_month_idx = aujourdhui.month - 1
+    if 'curr_year' not in st.session_state:
+        st.session_state.curr_year = aujourdhui.year
 
     # CSS
     st.markdown("""<style>.block-container { padding: 10px 5px !important; } .full-width-cal { width: 98% !important; margin: auto !important; border-collapse: collapse; table-layout: fixed; } .full-width-cal td { width: 14.28%; padding: 0 !important; border: 0.5px solid #eee; }</style>""", unsafe_allow_html=True)
     st.markdown('<div class="main-header">🗓️ PLANNING VESTA 2026</div>', unsafe_allow_html=True)
 
-    # 3. NAVIGATION ET SÉLECTEURS
+    # --- NAVIGATION ---
     col_m, col_y, col_now = st.columns([1.5, 1, 0.8])
     
     with col_m:
-        # On utilise le nom du mois stocké en session
-        sel_m_nom = st.selectbox("Mois", m_noms, key="sel_mois")
+        # On ne met PAS de 'key=' ici pour éviter l'erreur StreamlitAPIException
+        sel_m_nom = st.selectbox("Mois", m_noms, index=st.session_state.curr_month_idx)
         sel_m = m_noms.index(sel_m_nom) + 1
+        # On met à jour la session state APRES le choix
+        st.session_state.curr_month_idx = sel_m - 1
         
     with col_y:
-        # On utilise l'année stockée en session
-        sel_y = st.selectbox("Année", [2026, 2027, 2028], key="sel_annee")
+        annees_dispo = [2026, 2027, 2028]
+        idx_y = annees_dispo.index(st.session_state.curr_year) if st.session_state.curr_year in annees_dispo else 0
+        sel_y = st.selectbox("Année", annees_dispo, index=idx_y)
+        st.session_state.curr_year = sel_y
         
     with col_now:
         if st.button("📍 ICI", use_container_width=True):
-            # On force les valeurs de la session_state aux valeurs réelles
-            st.session_state.sel_mois = m_noms[aujourdhui.month - 1]
-            st.session_state.sel_annee = aujourdhui.year
+            # On change les index stockés et on relance
+            st.session_state.curr_month_idx = aujourdhui.month - 1
+            st.session_state.curr_year = aujourdhui.year
             st.rerun()
 
-    # --- LE RESTE DU CODE (CALCULS ET AFFICHAGE) RESTE IDENTIQUE ---
+    # --- CALCULS ---
     jours_occ = {}
     total_mois = 0
     missions_list = []
@@ -330,13 +333,13 @@ elif st.session_state.page == "PLANNING":
                         p_val = str(r.get('Paiement', '')).upper()
                         s_val = str(r.get('Statut', '')).lower()
                         is_paye = "PAY" in p_val and "NON" not in p_val
+                        color = "transparent"
                         if date_courante < aujourdhui:
                             color = "#0047AB" if is_paye else "#e74c3c"
                         elif "ok" in s_val:
                             color = "#27ae60"
                         elif "attente" in s_val:
                             color = "#f39c12"
-                        else: color = "transparent"
                         jours_occ[date_courante.day] = {"c": color}
 
                 date_fin = date_debut + timedelta(days=n_j-1)
@@ -346,7 +349,7 @@ elif st.session_state.page == "PLANNING":
                         total_mois += float(str(r.get('Prix', 0)).replace(',','.').replace('€','')) if r.get('Prix') else 0
             except: continue
 
-    # --- DESSIN DU CALENDRIER ---
+    # --- AFFICHAGE ---
     h_cal = '<table class="full-width-cal" style="text-align:center; background:white;">'
     h_cal += '<tr style="background:#f1f3f5; font-size:10px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td style="color:#d9534f;">Sa</td><td style="color:#d9534f;">Di</td></tr>'
     cal_mat = calendar.monthcalendar(sel_y, sel_m)
@@ -358,7 +361,7 @@ elif st.session_state.page == "PLANNING":
             else:
                 occ = jours_occ.get(jour, {})
                 bg_c = occ.get("c", "transparent")
-                is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == sel_y)
+                is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == aujourdhui.year)
                 cell_bg = "background:#D2B48C;" if is_today else ("background:#f9f9f9;" if i >= 5 else "")
                 txt_c = "white" if bg_c != "transparent" else "black"
                 circle = f'<div style="background:{bg_c}; color:{txt_c}; border-radius:50%; width:28px; height:28px; line-height:28px; margin:auto; font-weight:bold; font-size:12px;">{jour}</div>'
@@ -367,7 +370,7 @@ elif st.session_state.page == "PLANNING":
     h_cal += '</table>'
     st.markdown(h_cal, unsafe_allow_html=True)
 
-    # --- LISTE ---
+    # LISTE DES MISSIONS
     st.markdown(f"#### 📋 {sel_m_nom} {sel_y}")
     if missions_list:
         missions_list.sort(key=lambda x: x['start'])
