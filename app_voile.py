@@ -405,106 +405,109 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (FINAL JSON SYNC) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (VISUELS & GRAPHIQUES) ---
 # =================================================================
 elif st.session_state.page == "STATS":
-    st.title("📊 Vesta - Pilotage & Frais")
-    import re
-    from datetime import datetime
+    st.title("📊 Vesta - Tableau de Bord")
+    import plotly.express as px # Assure-toi d'avoir plotly installé
 
-    # Chargement des données
     df_st = df_c.copy()
     df_m = charger_data('maintenance.json')
-    
-    # Nettoyage des colonnes (Gestion des accents JSON)
     df_st.columns = [str(c).strip() for c in df_st.columns]
 
     def clean_price_json(val):
         if val is None or str(val).strip() in ["", "nan", "None", "null"]: return 0.0
         try:
-            # Nettoyage pour "479.00" ou "479,00 €"
             s = str(val).replace('€', '').replace(' ', '').replace(',', '.').strip()
             return float(s)
         except: return 0.0
 
     def is_paid_json(row):
-        # On récupère la valeur de "Paiement"
         p = str(row.get('Paiement', '')).strip()
-        # On gère l'encodage "Payé" (Unicode ou texte simple)
-        if p in ["Payé", "Paye", "PAYÉ", "PAYE", "OK", "OUI", "Terminé"]:
-            return True
+        if p in ["Payé", "Paye", "PAYÉ", "PAYE", "OK", "OUI", "Terminé"]: return True
         return False
 
     if not df_st.empty:
-        # 1. Traitement des données
+        # --- PREPARATION DES DONNÉES ---
         df_st['PrixNum'] = df_st['Prix'].apply(clean_price_json)
-        
-        # Gestion de la date (DateNav)
         df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
         df_st = df_st.dropna(subset=['dt_obj'])
         df_st['Mois_Annee'] = df_st['dt_obj'].dt.strftime('%Y-%m')
-
-        # Application du statut de paiement
         df_st['Is_Paid'] = df_st.apply(is_paid_json, axis=1)
-
-        # Création des colonnes de calcul (Assurer le type FLOAT)
         df_st['M_Paye'] = df_st.apply(lambda r: float(r['PrixNum']) if r['Is_Paid'] else 0.0, axis=1)
         df_st['M_Impaye'] = df_st.apply(lambda r: float(r['PrixNum']) if not r['Is_Paid'] else 0.0, axis=1)
 
-        # 2. SYNTHÈSE MENSUELLE
-        st.subheader("📅 Synthèse Mensuelle")
+        # --- 1. GRANDS TOTAUX (KPI) ---
+        total_ca = df_st['PrixNum'].sum()
+        total_encaisse = df_st['M_Paye'].sum()
+        total_attente = df_st['M_Impaye'].sum()
         
-        # Groupage des revenus
-        df_synth = df_st.groupby('Mois_Annee').agg({
-            'PrixNum': 'sum',
-            'M_Paye': 'sum',
-            'M_Impaye': 'sum'
-        }).rename(columns={'PrixNum': 'CA Total', 'M_Paye': 'Encaissé', 'M_Impaye': 'Impayé'})
-
-        # Intégration Maintenance (maintenance.json)
-        df_synth['Maintenance'] = 0.0
+        maint_total = 0
         if not df_m.empty:
-            df_m['dt_m'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
-            df_m['MA'] = df_m['dt_m'].dt.strftime('%Y-%m')
-            df_m['Mt'] = pd.to_numeric(df_m['Montant'], errors='coerce').fillna(0)
-            m_mens = df_m.groupby('MA')['Mt'].sum()
-            
-            for mois in df_synth.index:
-                if mois in m_mens.index:
-                    df_synth.at[mois, 'Maintenance'] = float(m_mens[mois])
+            maint_total = pd.to_numeric(df_m['Montant'], errors='coerce').sum()
 
-        df_synth['Bénéfice'] = df_synth['CA Total'] - df_synth['Maintenance']
-        
-        # Affichage du tableau de bord
-        st.dataframe(
-            df_synth.sort_index(ascending=False).style.format("{:.2f} €"),
-            use_container_width=True
-        )
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("💰 CA GLOBAL", f"{total_ca:,.0f} €")
+        c2.metric("✅ ENCAISSÉ", f"{total_encaisse:,.0f} €")
+        c3.metric("⏳ EN ATTENTE", f"{total_attente:,.0f} €", delta=f"{(total_attente/total_ca*100 if total_ca>0 else 0):.1f}%", delta_color="inverse")
+        c4.metric("🛠️ MAINTENANCE", f"{maint_total:,.0f} €")
 
         st.divider()
 
-        # 3. DÉTAIL MISSIONS (FAITES vs A VENIR)
+        # --- 2. GRAPHIQUES ---
+        col_g1, col_g2 = st.columns([2, 1])
+
+        with col_g1:
+            st.subheader("📈 Performance Mensuelle")
+            # Préparation du groupage pour le graph
+            df_g = df_st.groupby('Mois_Annee')['PrixNum'].sum().reset_index()
+            # On ajoute la maintenance au groupage
+            if not df_m.empty:
+                df_m['MA'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce').dt.strftime('%Y-%m')
+                m_mens = df_m.groupby('MA')['Montant'].sum().reset_index()
+                df_g = df_g.merge(m_mens, left_on='Mois_Annee', right_on='MA', how='left').fillna(0)
+            else:
+                df_g['Montant'] = 0
+
+            fig_bar = px.bar(df_g, x='Mois_Annee', y=['PrixNum', 'Montant'], 
+                             barmode='group', labels={'value':'Euros', 'Mois_Annee':'Mois'},
+                             title="CA vs Maintenance", color_discrete_sequence=['#2ecc71', '#e74c3c'])
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+        with col_g2:
+            st.subheader("🎯 État des Paiements")
+            fig_pie = px.pie(values=[total_encaisse, total_attente], names=['Payé', 'À recevoir'],
+                             hole=0.4, color_discrete_sequence=['#2ecc71', '#f1c40f'])
+            st.plotly_chart(fig_pie, use_container_width=True)
+
+        # --- 3. TABLEAU SYNTHÈSE ---
+        st.subheader("📋 Récapitulatif Mensuel")
+        df_synth = df_st.groupby('Mois_Annee').agg({'PrixNum':'sum', 'M_Paye':'sum', 'M_Impaye':'sum'})
+        # Fusion avec maintenance
+        if not df_m.empty:
+            m_sum = df_m.groupby('MA')['Montant'].sum()
+            df_synth['Maintenance'] = m_sum
+        else:
+            df_synth['Maintenance'] = 0
+            
+        df_synth = df_synth.fillna(0).rename(columns={'PrixNum':'CA Total', 'M_Paye':'Encaissé', 'M_Impaye':'Impayé'})
+        df_synth['Bénéfice'] = df_synth['CA Total'] - df_synth['Maintenance']
+        st.dataframe(df_synth.sort_index(ascending=False).style.format("{:.0f} €"), use_container_width=True)
+
+        # --- 4. DETAILS MISSIONS ---
+        st.divider()
         maintenant = datetime.now()
         df_fait = df_st[df_st['dt_obj'] < maintenant].sort_values('dt_obj', ascending=False)
         df_avenir = df_st[df_st['dt_obj'] >= maintenant].sort_values('dt_obj', ascending=True)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader(f"🚀 À VENIR ({len(df_avenir)})")
-            if not df_avenir.empty:
-                st.info(f"Prévisionnel : **{df_avenir['PrixNum'].sum():,.2f} €**")
-                st.dataframe(df_avenir[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
-        
-        with col2:
-            st.subheader(f"⚓ FAITES ({len(df_fait)})")
-            if not df_fait.empty:
-                st.success(f"Réalisé : **{df_fait['PrixNum'].sum():,.2f} €**")
-                # Ici on affiche Is_Paid pour vérifier que Elisabeth (Mars) est bien à True
-                st.dataframe(df_fait[['DateNav', 'Nom', 'Prix', 'Paiement', 'Is_Paid']], use_container_width=True, hide_index=True)
+        tab1, tab2 = st.tabs(["⚓ Missions Faites", "🚀 Prochaines Navigations"])
+        with tab1:
+            st.dataframe(df_fait[['DateNav', 'Nom', 'Prix', 'Paiement', 'Is_Paid']], use_container_width=True, hide_index=True)
+        with tab2:
+            st.dataframe(df_avenir[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
 
     else:
-        st.warning("Aucun contact trouvé dans le fichier JSON.")
+        st.warning("Aucune donnée pour générer les graphiques.")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
