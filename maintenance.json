@@ -40,5 +40,11 @@
         "Objet":"Assurances MAIF",
         "Montant":70.0,
         "Statut":"OK"
+    },
+    {
+        "Date":"15\/02\/2026",
+        "Objet":"Assurances MAIF",
+        "Montant":70.0,
+        "Statut":"OK"
     }
 ]
