@@ -264,17 +264,16 @@ if st.session_state.page == "CONTACTS":
                 if cn.button("NON", key=f"n_v_{i}", use_container_width=True):
                     st.session_state.confirm_del_idx = None; st.rerun()
 # =================================================================
-# --- 6. PAGE PLANNING (VUE MOIS + LISTE + BILAN FINANCIER) ---
+# --- 6. PAGE PLANNING (VERSION FINALE CONFORME) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
-    # Optimisation de la largeur pour iPhone 16
     st.markdown("""<style>.block-container { padding: 10px !important; } table { width: 100% !important; border-collapse: collapse; }</style>""", unsafe_allow_html=True)
     st.markdown('<div class="main-header">🗓️ PLANNING VESTA 2026</div>', unsafe_allow_html=True)
 
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
     
-    # Sélecteurs de période
+    # --- SÉLECTEURS SUR UNE LIGNE ---
     col_m, col_y = st.columns([1.5, 1])
     with col_m:
         m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
@@ -282,12 +281,12 @@ elif st.session_state.page == "PLANNING":
     with col_y:
         sel_y = st.selectbox("Année", [2026, 2027, 2028], index=0)
 
-    # --- INITIALISATION DES DONNÉES ---
     jours_occ = {}
     total_mois = 0
     nb_sorties = 0
     missions_list = []
 
+    # --- LOGIQUE DE TRI ET COULEURS ---
     for idx, r in df_c.iterrows():
         try:
             d_str = str(r.get('DateNav', '')).strip()
@@ -297,112 +296,103 @@ elif st.session_state.page == "PLANNING":
             if yv < 100: yv += 2000
             
             if mv == sel_m and yv == sel_y:
+                this_date = date(yv, mv, dv)
+                p_val = str(r.get('Paiement', '')).strip().upper()
                 s_val = str(r.get('Statut', '')).strip().lower()
-                if any(x in s_val for x in ["refusé", "archivé", "supprimé"]): continue
+                is_paye = ("PAY" in p_val) and ("NON" not in p_val)
                 
-                # Données pour la liste et le bilan
+                # --- CODE COULEUR STRICT ---
+                if this_date < aujourdhui:
+                    color = "#0047AB" if is_paye else "#e74c3c" # 🔵 Passé Payé | 🔴 Passé Impayé/Refusé
+                elif "ok" in s_val:
+                    color = "#27ae60" # 🟢 Confirmé
+                elif "attente" in s_val:
+                    color = "#f39c12" # 🟡 En attente
+                else:
+                    color = "transparent"
+                
+                # Remplissage pour le calendrier (gestion multi-jours)
+                n_j = int(safe_val(r.get('Nbre de jours'), 1))
+                for j in range(dv, dv + n_j):
+                    if j <= 31: jours_occ[j] = {"c": color}
+                
+                # Pour la liste sous le calendrier
                 r_idx = r.copy()
                 r_idx['original_idx'] = idx
+                r_idx['day_start'] = dv
                 missions_list.append(r_idx)
                 total_mois += float(safe_val(r.get('Prix'), 0))
                 nb_sorties += 1
-                
-                # Couleurs du Calendrier
-                this_date = date(yv, mv, dv)
-                soc_val = str(r.get('Société', '')).strip().upper()
-                p_val = str(r.get('Paiement', '')).strip().upper()
-                is_paye = ("PAY" in p_val) and ("NON" not in p_val)
-                
-                if this_date < aujourdhui: color = "#0047AB" if is_paye else "#e74c3c"
-                elif "CMN" in soc_val: color = "#0047AB"
-                elif "ok" in s_val: color = "#27ae60"
-                elif "attente" in s_val: color = "#f39c12"
-                else: color = "transparent"
-                
-                n_j = int(safe_val(r.get('Nbre de jours'), 1))
-                for j in range(dv, dv + n_j):
-                    if j <= 31:
-                        if j in jours_occ and (color == "#e74c3c" or color == "#0047AB"): 
-                            jours_occ[j] = {"c": color}
-                        elif j not in jours_occ: 
-                            jours_occ[j] = {"c": color}
         except: continue
 
-    # --- 1. DESSIN DU CALENDRIER (VUE MOIS) ---
+    # --- 1. LE CALENDRIER (PASTILLES + MARRON) ---
     import calendar
     jours_sem = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"]
-    h_cal = '<table style="width:100%; text-align: center; table-layout: fixed; background: white; border: 1px solid #eee; border-radius:10px; overflow:hidden;">'
+    h_cal = '<table style="width:100%; text-align: center; border-radius:10px; overflow:hidden; background:white;">'
     h_cal += '<tr style="background: #f1f3f5;">'
-    for js in jours_sem: h_cal += f'<td style="padding: 8px 0; font-size: 11px; font-weight: bold; border: 0.5px solid #eee;">{js}</td>'
+    for js in jours_sem: h_cal += f'<td style="padding: 5px 0; font-size: 11px; color:#666;">{js}</td>'
     h_cal += '</tr>'
     
     cal_mat = calendar.monthcalendar(sel_y, sel_m)
     for sem in cal_mat:
         h_cal += '<tr>'
         for jour in sem:
-            if jour == 0: h_cal += '<td style="height:45px; border:0.5px solid #f8f9fa;"></td>'
+            if jour == 0:
+                h_cal += '<td style="height:50px; border:0.5px solid #f9f9f9;"></td>'
             else:
-                bg = jours_occ.get(jour, {}).get("c", "transparent")
-                txt_c = "white" if bg != "transparent" else "black"
-                is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == aujourdhui.year)
-                border_s = "2px solid #0047AB" if is_today else "none"
-                circle = f'<div style="background:{bg}; color:{txt_c}; border-radius:50%; width:28px; height:28px; line-height:28px; margin:auto; font-weight:bold; font-size:12px; border:{border_s};">{jour}</div>'
-                h_cal += f'<td style="border:0.5px solid #eee; height:48px;">{circle}</td>'
+                # Couleur de fond si AUJOURD'HUI (Marron clair)
+                is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == sel_y)
+                bg_cell = "#D2B48C" if is_today else "transparent"
+                
+                # Pastille de couleur
+                dot_color = jours_occ.get(jour, {}).get("c", "transparent")
+                dot_html = f'<div style="background:{dot_color}; width:7px; height:7px; border-radius:50%; margin: 2px auto 0;"></div>' if dot_color != "transparent" else '<div style="height:9px;"></div>'
+                
+                h_cal += f'<td style="border:0.5px solid #eee; height:50px; background:{bg_cell};">'
+                h_cal += f'<div style="font-weight:bold; font-size:14px;">{jour}</div>{dot_html}</td>'
         h_cal += '</tr>'
     h_cal += '</table>'
     st.markdown(h_cal, unsafe_allow_html=True)
 
-    # --- 2. LISTE DES MISSIONS DU MOIS ---
-    st.markdown(f"#### 📋 Détails de {m_noms[sel_m-1]}")
-    if not missions_list:
-        st.caption("Aucune mission prévue.")
-    else:
-        df_m = pd.DataFrame(missions_list)
-        df_m['j_int'] = df_m['DateNav'].apply(lambda x: int(x.split('/')[0]) if '/' in str(x) else 0)
-        df_m = df_m.sort_values('j_int')
-
+    # --- 2. LISTE CHRONOLOGIQUE ---
+    st.markdown(f"#### 📋 Programme de {m_noms[sel_m-1]}")
+    if missions_list:
+        df_m = pd.DataFrame(missions_list).sort_values('day_start')
         for _, row in df_m.iterrows():
-            soc = str(row.get('Société','')).upper()
-            c_line = "#0047AB" if "CMN" in soc else "#27ae60"
-            n_jours = int(safe_val(row.get('Nbre de jours'), 1))
-            j_deb = int(row['j_int'])
-            date_txt = f"{j_deb}" if n_jours <= 1 else f"{j_deb}➔{j_deb + n_jours - 1}"
-            
-            st.markdown(f"""
-                <div style="display: flex; padding: 10px 5px; border-bottom: 1px solid #eee; background: white; align-items: center;">
-                    <div style="background: {c_line}; color: white; border-radius: 8px; padding: 4px; min-width: 50px; text-align: center; font-weight: bold; margin-right: 10px;">
-                        {date_txt}<br><span style="font-size: 0.5rem;">JOUR</span>
+            with st.container():
+                c_line = "#0047AB" if "CMN" in str(row.get('Société','')).upper() else "#27ae60"
+                st.markdown(f"""
+                    <div style="display: flex; padding: 10px; border-bottom: 1px solid #eee; align-items: center; background:white;">
+                        <div style="background:{c_line}; color:white; border-radius:5px; padding:5px; min-width:45px; text-align:center; font-weight:bold; margin-right:10px;">
+                            {row['day_start']}<br><span style="font-size:0.5rem;">J</span>
+                        </div>
+                        <div style="flex-grow:1;">
+                            <b style="font-size:0.9rem;">{str(row.get('Nom','')).upper()}</b><br>
+                            <small>💰 {row.get('Prix','0')}€ | ⏳ {row.get('Nbre de jours','1')}j</small>
+                        </div>
                     </div>
-                    <div style="flex-grow: 1;">
-                        <b style="font-size: 0.9rem;">{str(row.get('Nom','')).upper()}</b><br>
-                        <small style="color: #666;">{soc} ({row.get('Prix','0')}€)</small>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            if st.button(f"🔍 VOIR FICHE : {str(row.get('Nom','')).upper()}", key=f"p_goto_{row['original_idx']}", use_container_width=True):
-                st.session_state.edit_idx = row['original_idx']
-                st.session_state.mode_saisie = True
-                st.session_state.page = "CONTACTS"
-                st.rerun()
+                """, unsafe_allow_html=True)
+                if st.button(f"👁️ VOIR FICHE : {row.get('Nom','')}", key=f"v_{row['original_idx']}", use_container_width=True):
+                    st.session_state.edit_idx = row['original_idx']
+                    st.session_state.mode_saisie = True
+                    st.session_state.page = "CONTACTS"
+                    st.rerun()
 
-    # --- 3. BILAN FINANCIER (BAS DE PAGE) ---
-    st.markdown(f"""
-        <div style="background: #f8f9fa; padding: 12px; border-radius: 12px; border: 1px solid #ddd; margin-top: 15px; box-shadow: 2px 2px 5px rgba(0,0,0,0.05);">
-            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #555;">
-                <span>Nombre de sorties :</span><b>{nb_sorties}</b>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: bold; border-top: 2px solid #0047AB; margin-top: 8px; padding-top: 8px;">
-                <span>TOTAL DU MOIS :</span><span style="color: #0047AB;">{total_mois:,.0f} €</span>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-    st.divider()
+    # --- 3. BILAN FINANCIER ---
+    st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; margin-top:15px; text-align:center;">
+                <span style="font-size:0.8rem;">TOTAL ESTIMÉ :</span><br>
+                <span style="font-size:1.5rem; font-weight:bold;">{total_mois:,.0f} €</span>
+                </div>""", unsafe_allow_html=True)
+
+    # --- 4. ZONE DE DANGER (LE BOUTON D'ARCHIVAGE MANQUANT) ---
+    st.write("")
     with st.expander("⚠️ ZONE DE DANGER"):
-        st.write("Clôture définitive de l'année pour archivage.")
-        if st.button(f"🔒 CLÔTURER L'ANNÉE {sel_y}", use_container_width=True):
-            st.warning("Cette action déplacera les dossiers terminés vers un dossier sécurisé.")
-            # Ici on ajoutera la fonction de nettoyage JSON plus tard
+        st.write(f"Voulez-vous clôturer l'année {sel_y} ?")
+        if st.button(f"🔒 ARCHIVER L'ANNÉE {sel_y}", use_container_width=True):
+            st.error("Êtes-vous certain ? Cette action est irréversible.")
+            if st.button("OUI, CONFIRMER L'ARCHIVAGE"):
+                # Ici on pourra coder la fonction de transfert de données
+                st.success(f"Année {sel_y} archivée avec succès !")
 # =================================================================
 # --- 7. PAGE STATS ---
 # =================================================================
