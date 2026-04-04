@@ -405,7 +405,7 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (SYNTHÈSE SYNCHRONISÉE V3) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (SYNTHÈSE FINALE FIX) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
@@ -416,7 +416,6 @@ elif st.session_state.page == "STATS":
     df_m = charger_data('maintenance.json')
     df_st.columns = [str(c).strip() for c in df_st.columns]
 
-    # --- 1. FONCTIONS DE NETTOYAGE ---
     def clean_price(val):
         if val is None or str(val).strip() == "" or str(val).lower() == "nan": return 0.0
         try:
@@ -425,63 +424,61 @@ elif st.session_state.page == "STATS":
             return float(match.group(1)) if match else 0.0
         except: return 0.0
 
-    def is_paid_check(row):
-        # On regarde dans TOUTES les colonnes susceptibles de contenir le statut
-        # Paiement (index 4) et Paye (index 13)
-        p1 = str(row.get('Paiement', '')).upper()
-        p2 = str(row.get('Paye', '')).upper()
-        p3 = str(row.get('Statut', '')).upper()
-        
-        txt_complet = p1 + " " + p2 + " " + p3
-        
-        # On cherche les mots clés n'importe où dans le texte
-        for word in ["PAYÉ", "PAYE", "OK", "PAID", "OUI"]:
-            if word in txt_complet:
-                return True
-        return False
-
     if not df_st.empty:
-        # --- 2. PRÉPARATION DES DONNÉES ---
+        # --- 1. PRÉPARATION ---
         df_st['PrixNum'] = df_st['Prix'].apply(clean_price)
         df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
         df_st = df_st.dropna(subset=['dt_obj'])
         df_st['Mois_Annee'] = df_st['dt_obj'].dt.strftime('%Y-%m')
 
-        # Application de la logique de paiement
+        # Logique de paiement (Celle qui affiche True dans votre tableau "Faites")
+        def is_paid_check(row):
+            txt = (str(row.get('Paiement', '')) + " " + str(row.get('Paye', ''))).upper()
+            return any(w in txt for w in ["PAYÉ", "PAYE", "OK", "PAID", "OUI"])
+        
         df_st['Is_Paid'] = df_st.apply(is_paid_check, axis=1)
 
-        # Création des colonnes de calcul pour le groupage
+        # Colonnes de calcul direct
         df_st['M_Paye'] = df_st.apply(lambda r: r['PrixNum'] if r['Is_Paid'] else 0.0, axis=1)
         df_st['M_Impaye'] = df_st.apply(lambda r: r['PrixNum'] if not r['Is_Paid'] else 0.0, axis=1)
 
-        # --- 3. RÉCAPITULATIF MENSUEL ---
+        # --- 2. CONSTRUCTION DE LA SYNTHÈSE ---
         st.subheader("📅 Synthèse Mensuelle")
         
-        stats_rev = df_st.groupby('Mois_Annee').agg({
+        # On crée le tableau de base avec les Revenus
+        df_synth = df_st.groupby('Mois_Annee').agg({
             'PrixNum': 'sum',
             'M_Paye': 'sum',
             'M_Impaye': 'sum'
         }).rename(columns={'PrixNum': 'CA Total', 'M_Paye': 'Encaissé', 'M_Impaye': 'Impayé'})
 
+        # On ajoute la Maintenance proprement
         if not df_m.empty:
             df_m['dt_m'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
-            df_m['Mois_Annee_M'] = df_m['dt_m'].dt.strftime('%Y-%m')
-            df_m['MontantNum'] = pd.to_numeric(df_m['Montant'], errors='coerce').fillna(0)
-            stats_frais = df_m.groupby('Mois_Annee_M')['MontantNum'].sum().rename('Maintenance')
+            df_m['M_A'] = df_m['dt_m'].dt.strftime('%Y-%m')
+            df_m['Mt'] = pd.to_numeric(df_m['Montant'], errors='coerce').fillna(0)
+            
+            # On calcule le total maintenance par mois
+            maint_mensuelle = df_m.groupby('M_A')['Mt'].sum()
+            
+            # On injecte dans le tableau de synthèse
+            df_synth['Maintenance'] = maint_mensuelle
+            df_synth['Maintenance'] = df_synth['Maintenance'].fillna(0)
         else:
-            stats_frais = pd.Series(name='Maintenance', dtype=float)
+            df_synth['Maintenance'] = 0.0
 
-        synthese = stats_rev.join(stats_frais, how='outer').fillna(0)
-        synthese['Bénéfice'] = synthese['CA Total'] - synthese['Maintenance']
+        # Calcul du bénéfice final
+        df_synth['Bénéfice'] = df_synth['CA Total'] - df_synth['Maintenance']
         
+        # Affichage (Trié du plus récent au plus ancien)
         st.dataframe(
-            synthese.sort_index(ascending=False).style.format("{:.0f} €"),
+            df_synth.sort_index(ascending=False).style.format("{:.0f} €"),
             use_container_width=True
         )
 
         st.divider()
 
-        # --- 4. MISSIONS FAITES vs A VENIR ---
+        # --- 3. MISSIONS FAITES vs A VENIR ---
         maintenant = datetime.now()
         df_fait = df_st[df_st['dt_obj'] < maintenant].sort_values('dt_obj', ascending=False)
         df_avenir = df_st[df_st['dt_obj'] >= maintenant].sort_values('dt_obj', ascending=True)
@@ -491,13 +488,12 @@ elif st.session_state.page == "STATS":
             st.subheader(f"🚀 À VENIR ({len(df_avenir)})")
             if not df_avenir.empty:
                 st.info(f"Total prévu : **{df_avenir['PrixNum'].sum():,.0f} €**")
-                st.dataframe(df_avenir[['DateNav', 'Nom', 'Prix', 'Paiement', 'Is_Paid']], use_container_width=True, hide_index=True)
+                st.dataframe(df_avenir[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True, hide_index=True)
         
         with col2:
             st.subheader(f"⚓ FAITES ({len(df_fait)})")
             if not df_fait.empty:
                 st.success(f"Total réalisé : **{df_fait['PrixNum'].sum():,.0f} €**")
-                # Affichage de Is_Paid pour vérifier si c'est True/False
                 st.dataframe(df_fait[['DateNav', 'Nom', 'Prix', 'Paiement', 'Is_Paid']], use_container_width=True, hide_index=True)
 
     else:
