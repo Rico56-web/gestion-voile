@@ -264,9 +264,11 @@ if st.session_state.page == "CONTACTS":
                 if cn.button("NON", key=f"n_v_{i}", use_container_width=True):
                     st.session_state.confirm_del_idx = None; st.rerun()
 # =================================================================
-# --- 6. PAGE PLANNING (VERSION INTELLIGENTE & COMPLÈTE) ---
+# --- 6. PAGE PLANNING (VERSION ROBUSTE & INTELLIGENTE) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
+    from datetime import datetime, date, timedelta
+
     st.markdown("""
         <style>
             .block-container { padding: 10px 5px !important; }
@@ -282,7 +284,6 @@ elif st.session_state.page == "PLANNING":
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
     
-    # --- NAVIGATION ET SÉLECTEURS ---
     col_m, col_y, col_now = st.columns([1.5, 1, 0.8])
     with col_m:
         m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
@@ -293,28 +294,29 @@ elif st.session_state.page == "PLANNING":
         if st.button("📍 ICI", use_container_width=True):
             st.rerun()
 
-    # --- LOGIQUE DE CALCUL DES OCCUPATIONS (MULTI-MOIS) ---
     jours_occ = {}
     total_mois = 0
     missions_list = []
 
+    # --- LOGIQUE DE CALCUL (AVEC NETTOYAGE DE DONNÉES) ---
     for idx, r in df_c.iterrows():
         try:
             d_str = str(r.get('DateNav', '')).strip()
             if '/' not in d_str: continue
             
-            # Transformation en objet date pour calcul précis
-            parts = d_str.split('/')
+            # Nettoyage et conversion forcée en entiers
+            parts = [p.strip() for p in d_str.split('/')]
+            if len(parts) < 3: continue
+            
             dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
             if yv < 100: yv += 2000
-            date_debut = date(yv, mv, dv)
             
-            n_j = int(safe_val(r.get('Nbre de jours'), 1))
-            # Calcul de toutes les dates de la mission
+            date_debut = date(yv, mv, dv)
+            n_j = int(float(safe_val(r.get('Nbre de jours'), 1))) # Gestion si c'est un float
+            
+            # 1. On calcule l'occupation pour chaque jour de la mission
             for i in range(n_j):
                 date_courante = date_debut + timedelta(days=i)
-                
-                # On ne colorie que si la date courante tombe dans le mois/année sélectionné
                 if date_courante.month == sel_m and date_courante.year == sel_y:
                     p_val = str(r.get('Paiement', '')).strip().upper()
                     s_val = str(r.get('Statut', '')).strip().lower()
@@ -331,18 +333,21 @@ elif st.session_state.page == "PLANNING":
                     
                     jours_occ[date_courante.day] = {"c": color}
 
-            # Ajout à la liste si la mission commence OU finit dans ce mois
+            # 2. Ajout à la liste si la mission touche au mois sélectionné
             date_fin = date_debut + timedelta(days=n_j-1)
-            if (date_debut.month == sel_m and date_debut.year == sel_y) or (date_fin.month == sel_m and date_fin.year == sel_y):
+            # Vérification si la mission "touche" le mois sélectionné
+            if (date_debut.year == sel_y and date_debut.month == sel_m) or \
+               (date_fin.year == sel_y and date_fin.month == sel_m):
+                
                 r_idx = r.copy()
                 r_idx['original_idx'] = idx
-                # On garde le jour de début réel pour le tri, même s'il est au mois précédent
-                r_idx['sort_key'] = (date_debut.month, date_debut.day)
+                r_idx['sort_key'] = date_debut
                 missions_list.append(r_idx)
-                # On ne compte le CA que si la mission COMMENCE ce mois-ci
-                if date_debut.month == sel_m:
+                
+                if date_debut.month == sel_m and date_debut.year == sel_y:
                     total_mois += float(safe_val(r.get('Prix'), 0))
-        except: continue
+        except Exception as e:
+            continue # Ignore les lignes corrompues
 
     # --- 1. DESSIN DU CALENDRIER ---
     import calendar
@@ -361,7 +366,8 @@ elif st.session_state.page == "PLANNING":
             if jour == 0:
                 h_cal += '<td style="height:48px; border:0.5px solid #f9f9f9;"></td>'
             else:
-                bg_circle = jours_occ.get(jour, {}).get("c", "transparent")
+                occ = jours_occ.get(jour, {})
+                bg_circle = occ.get("c", "transparent")
                 txt_c = "white" if bg_circle != "transparent" else "black"
                 is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == sel_y)
                 is_weekend = (i >= 5)
@@ -373,10 +379,10 @@ elif st.session_state.page == "PLANNING":
     h_cal += '</table>'
     st.markdown(h_cal, unsafe_allow_html=True)
 
-    # --- 2. LISTE CHRONOLOGIQUE + AJOUT RAPIDE ---
+    # --- 2. LISTE CHRONOLOGIQUE ---
     st.markdown(f"#### 📋 Programme de {m_noms[sel_m-1]}")
     
-    if st.button(f"➕ NOUVEAU DOSSIER EN {m_noms[sel_m-1].upper()}", use_container_width=True):
+    if st.button(f"➕ NOUVEAU DOSSIER", use_container_width=True):
         st.session_state.edit_idx = None
         st.session_state.mode_saisie = True
         st.session_state.page = "CONTACTS"
@@ -387,21 +393,19 @@ elif st.session_state.page == "PLANNING":
         for _, row in df_m.iterrows():
             soc = str(row.get('Société','')).upper()
             c_line = "#0047AB" if "CMN" in soc else "#27ae60"
-            n_jours = int(safe_val(row.get('Nbre de jours'), 1))
+            n_jours = int(float(safe_val(row.get('Nbre de jours'), 1)))
             
-            # Extraction propre des dates
             d_parts = str(row['DateNav']).split('/')
             j_deb, m_deb = int(d_parts[0]), int(d_parts[1])
+            y_deb = int(d_parts[2])
+            if y_deb < 100: y_deb += 2000
             
-            # Gestion de l'affichage de la plage (ex: 31/05 ➔ 02/06)
-            if n_jours > 1:
-                date_obj_deb = date(int(d_parts[2]) if int(d_parts[2]) > 100 else int(d_parts[2])+2000, m_deb, j_deb)
-                date_obj_fin = date_obj_deb + timedelta(days=n_jours-1)
-                txt_date = f"{date_obj_deb.day:02d}/{date_obj_deb.month:02d}➔{date_obj_fin.day:02d}/{date_obj_fin.month:02d}"
-            else:
-                txt_date = f"{j_deb:02d}/{m_deb:02d}"
+            dt_deb = date(y_deb, m_deb, j_deb)
+            dt_fin = dt_deb + timedelta(days=n_jours-1)
             
+            txt_date = f"{dt_deb.day:02d}/{dt_deb.month:02d}➔{dt_fin.day:02d}/{dt_fin.month:02d}" if n_jours > 1 else f"{dt_deb.day:02d}/{dt_deb.month:02d}"
             label_j = "JOURS" if n_jours > 1 else "JOUR"
+            
             p_val = str(row.get('Paiement', '')).upper()
             pay_icon = "💰" if "PAY" in p_val and "NON" not in p_val else "⚠️"
             
@@ -425,17 +429,11 @@ elif st.session_state.page == "PLANNING":
                 st.rerun()
 
     # --- 3. BILAN FINANCIER ---
-    st.markdown(f"""
-        <div style="background: #0047AB; padding: 15px; border-radius: 10px; color: white; text-align: center; margin-top: 15px;">
-            <div style="font-size:0.8rem; opacity:0.8;">CHIFFRE D'AFFAIRES DÉBUTANT CE MOIS</div>
-            <div style="font-size: 1.5rem; font-weight: bold;">{total_mois:,.0f} €</div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<div style="background: #0047AB; padding: 15px; border-radius: 10px; color: white; text-align: center; margin-top: 15px;"><span style="font-size: 1.5rem; font-weight: bold;">TOTAL : {total_mois:,.0f} €</span></div>""", unsafe_allow_html=True)
 
     # --- 4. ZONE DE DANGER ---
-    st.write("")
     with st.expander("⚠️ ZONE DE DANGER"):
-        if st.button(f"🔒 ARCHIVER L'ANNÉE {sel_y}", use_container_width=True):
+        if st.button(f"🔒 ARCHIVER {sel_y}", use_container_width=True):
             st.error("Action irréversible.")
 # =================================================================
 # --- 7. PAGE STATS ---
