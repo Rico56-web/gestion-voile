@@ -405,12 +405,12 @@ elif st.session_state.page == "PLANNING":
 
     st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (CORRIGÉ) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Vesta - Pilotage & Frais")
 
-    # --- Fonctions Utilitaires ---
+    # --- 1. FONCTIONS DE NETTOYAGE ---
     def clean_val(val):
         try:
             if not val or str(val).lower() in ["nan", "none", ""]: return 0.0
@@ -420,7 +420,6 @@ elif st.session_state.page == "STATS":
 
     def get_month_info(date_str):
         try:
-            # Gère les formats JJ/MM/AAAA ou JJ/MM
             parts = str(date_str).split('/')
             if len(parts) >= 2:
                 m_num = int(parts[1])
@@ -429,104 +428,72 @@ elif st.session_state.page == "STATS":
         except: pass
         return 99, "99-Inconnu"
 
-    # --- Préparation des Données ---
+    # --- 2. PRÉPARATION DES DONNÉES ---
     df_st = df_c.copy()
     
     if not df_st.empty:
-        # Nettoyage des prix et extraction des mois
+        # Identification de la colonne Nom/Client
+        col_nom = 'Nom' if 'Nom' in df_st.columns else 'Client'
+        
+        # Conversion numérique du prix
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
+        
+        # Extraction du mois pour le groupage
         df_st['M_Sort'], df_st['Mois'] = zip(*df_st['DateNav'].apply(get_month_info))
         
-        # Logique de calcul du CA (On vérifie 'Paiement' ou le nouveau statut 'Paid')
-        def is_paid(row):
-            p_val = str(row.get('Paiement', '')).upper()
-            s_val = str(row.get('Statut', '')).upper()
-            # On considère payé si "PAYÉ" est présent ou si le statut est "PAID" ou "OK"
-            if any(term in p_val for term in ["PAYÉ", "PAID"]) or s_val == "OK":
-                return row['PrixNum']
-            return 0.0
-            
-        df_st['CA_Calcul'] = df_st.apply(is_paid, axis=1)
+        # --- LOGIQUE DE FILTRAGE STRICTE ---
+        # Est considéré PAYÉ si la colonne contient "PAYÉ", "PAID" ou "OUI"
+        def check_is_paid(val):
+            v = str(val).upper().strip()
+            return any(word in v for word in ["PAYÉ", "PAYE", "PAID", "OUI"])
 
-    # --- Affichage des indicateurs (KPIs) ---
-    st.divider()
-    col1, col2, col3 = st.columns(3)
-    
-    # Identification automatique de la colonne client (Nom ou Client)
-    col_client = 'Nom' if 'Nom' in df_st.columns else 'Client'
-    
-    # Calculs des totaux
-    # On s'assure que la colonne 'Paiement' existe avant de filtrer
-    if 'Paiement' in df_st.columns:
-        mask_paye = df_st['Paiement'].astype(str).str.contains("PAYÉ|PAID", case=False, na=False)
-    else:
-        mask_paye = pd.Series([False] * len(df_st))
+        mask_paye = df_st['Paiement'].apply(check_is_paid)
+        
+        # Est considéré EN ATTENTE si le prix > 0 et n'est pas marqué PAYÉ
+        mask_reste = (~mask_paye) & (df_st['PrixNum'] > 0)
 
-    tot_enc = df_st[mask_paye]['PrixNum'].sum()
-    
-    # "À venir" = Statut OK mais pas encore payé
-    mask_statut_ok = df_st['Statut'].astype(str).str.upper() == "OK" if 'Statut' in df_st.columns else pd.Series([False] * len(df_st))
-    tot_avr = df_st[mask_statut_ok & (~mask_paye)]['PrixNum'].sum()
-    
-    # Focus CMN - On utilise la variable col_client identifiée plus haut
-    if col_client in df_st.columns:
-        cmn_share = df_st[df_st[col_client].astype(str).str.upper() == "CMN"]['PrixNum'].sum()
-    else:
-        cmn_share = 0.0
+        # --- CALCULS DES TOTAUX ---
+        tot_enc = df_st[mask_paye]['PrixNum'].sum()
+        tot_reste = df_st[mask_reste]['PrixNum'].sum()
+        tot_total = tot_enc + tot_reste
+        
+        # Part de l'entreprise CMN (en bleu dans votre logique)
+        cmn_total = df_st[df_st[col_nom].astype(str).str.upper() == "CMN"]['PrixNum'].sum()
 
-    col1.metric("💰 ENCAISSÉ", f"{tot_enc:,.0f} €")
-    col2.metric("🕒 À VENIR", f"{tot_avr:,.0f} €")
-    col3.metric("🔵 TOTAL CMN", f"{cmn_share:,.0f} €")
+        # --- 3. AFFICHAGE DES INDICATEURS (KPIs) ---
+        st.divider()
+        c1, c2, c3 = st.columns(3)
+        c1.metric("💰 ENCAISSÉ", f"{tot_enc:,.0f} €")
+        c2.metric("⚠️ RESTE À PAYER", f"{tot_reste:,.0f} €", delta=f"{len(df_st[mask_reste])} dossiers", delta_color="inverse")
+        c3.metric("📈 TOTAL PRÉVU", f"{tot_total:,.0f} €")
 
-    # --- Synthèse Mensuelle ---
-    st.subheader("📅 Chiffre d'Affaires Mensuel")
-    if not df_st.empty:
-        mensuel = df_st.groupby(['M_Sort', 'Mois'])['CA_Calcul'].sum().reset_index()
+        # --- 4. SYNTHÈSE MENSUELLE ---
+        st.subheader("📅 Chiffre d'Affaires Mensuel (Encaissé)")
+        # On ne groupe que ce qui est réellement payé pour le tableau mensuel
+        mensuel = df_st[mask_paye].groupby(['M_Sort', 'Mois'])['PrixNum'].sum().reset_index()
         mensuel = mensuel.sort_values('M_Sort')
-        
-        # Affichage avec barre de progression visuelle dans le tableau
-        st.table(mensuel[['Mois', 'CA_Calcul']].set_index('Mois').style.format("{:.0f} €"))
-
-    # --- ⏳ Détail des Missions à Encaisser (Correction NameError) ---
-    st.subheader("⏳ Détail des Missions à Encaisser")
-
-    # 1. On définit proprement les critères de filtrage
-    # On cherche les missions validées (OK) qui ne sont PAS payées
-    if not df_st.empty:
-        # Masque pour le paiement (on cherche l'absence de "PAYÉ" ou "PAID")
-        mask_paye = df_st['Paiement'].astype(str).str.contains("PAYÉ|PAID", case=False, na=False)
-        
-        # Masque pour le statut validé
-        mask_statut_ok = (df_st['Statut'].astype(str).str.upper() == "OK")
-        
-        # Combinaison : Statut OK ET Pas payé
-        mask_avenir = mask_statut_ok & (~mask_paye)
-        
-        # 2. Application du filtre
-        df_avr = df_st[mask_avenir].copy()
-        
-        if not df_avr.empty:
-            # Identification de la colonne Nom/Client
-            col_nom = 'Nom' if 'Nom' in df_avr.columns else 'Client'
-            
-            tab_display = df_avr[['DateNav', col_nom, 'PrixNum']].copy()
-            tab_display.columns = ['📅 Date', '👤 Client', '💰 Montant (€)']
-            
-            # Affichage
-            st.dataframe(tab_display.set_index('📅 Date'), use_container_width=True)
-            st.info(f"Il reste **{len(df_avr)} missions** en attente de règlement.")
+        if not mensuel.empty:
+            st.table(mensuel[['Mois', 'PrixNum']].set_index('Mois').style.format("{:.0f} €"))
         else:
-            st.success("✨ Félicitations ! Toutes les missions validées sont encaissées.")
-    else:
-        st.warning("Aucune donnée disponible pour analyser les missions.")
+            st.info("Aucun encaissement enregistré pour le moment.")
 
-    
-    if not df_avr.empty:
-        tab = df_avr[['DateNav', 'Client', 'PrixNum']]
-        tab.columns = ['📅 Date', '👤 Client', '💰 Montant']
-        st.dataframe(tab.set_index('📅 Date'), use_container_width=True)
+        # --- 5. SECTION RESTE À PAYER ---
+        st.subheader("⏳ Détail du Reste à Payer")
+        df_display_reste = df_st[mask_reste].copy()
+        
+        if not df_display_reste.empty:
+            tab_reste = df_display_reste[['DateNav', col_nom, 'PrixNum']].copy()
+            tab_reste.columns = ['📅 Date', '👤 Client', '💰 Somme Due (€)']
+            st.dataframe(tab_reste.sort_values('📅 Date'), use_container_width=True, hide_index=True)
+        else:
+            st.success("✅ Félicitations ! Toutes les missions avec un montant saisi sont encaissées.")
+
+        # Petit rappel pour CMN
+        if cmn_total > 0:
+            st.info(f"🔵 Volume d'affaires CMN : **{cmn_total:,.0f} €**")
+
     else:
-        st.success("Toutes les missions validées sont payées ! ✅")
+        st.warning("La base de données est vide. Aucune statistique à afficher.")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
 # =================================================================
