@@ -546,52 +546,63 @@ elif st.session_state.page == "STATS":
                 st.dataframe(df_m[['Date', 'Objet', 'M_Calc']], use_container_width=True)
 
     st.divider()
-
-    # --- 7. TABLEAU COMPTABLE MENSUEL & BARGRAPH ---
+# --- 7. TABLEAU COMPTABLE MENSUEL & BARGRAPH ---
     st.subheader(f"📈 Bilan Mensuel - {annee_choisie}")
     
     mois_labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
     stats_mensuelles = []
 
+    # On prépare une copie propre pour le calcul mensuel
+    df_mensuel_calc = df_c.copy()
+    df_mensuel_calc.columns = [str(c).strip() for c in df_mensuel_calc.columns] # Nettoyage strict
+    
+    # Correction des dates et prix avant la boucle pour gagner en performance
+    df_mensuel_calc['dt_calc'] = pd.to_datetime(df_mensuel_calc['DateNav'].astype(str).str.replace('\\', '', regex=False), dayfirst=True, errors='coerce')
+    df_mensuel_calc['Prix_Num'] = df_mensuel_calc['Prix'].apply(clean_val)
+
     for m in range(1, 13):
-        # On recalcule sur le DF complet de l'année pour le tableau
-        df_an = df_c.copy()
-        df_an['dt'] = pd.to_datetime(df_an['DateNav'], dayfirst=True, errors='coerce')
-        df_an = df_an[df_an['dt'].dt.year == annee_choisie]
+        # Filtrage par mois et année
+        mask_mois = (df_mensuel_calc['dt_calc'].dt.month == m) & (df_mensuel_calc['dt_calc'].dt.year == annee_choisie)
+        rec_m = df_mensuel_calc[mask_mois]
         
-        rec_m = df_an[df_an['dt'].dt.month == m]
-        frais_m = df_m[df_m['dt_m'].dt.month == m] if not df_m.empty else pd.DataFrame()
+        # Filtrage maintenance
+        frais_m = df_m[(df_m['dt_m'].dt.month == m) & (df_m['dt_m'].dt.year == annee_choisie)] if not df_m.empty else pd.DataFrame()
         
-        ca_total = rec_m['Prix'].apply(clean_val).sum()
-        recu = rec_m[rec_m['Paiement'].apply(check_paye)]['Prix'].apply(clean_val).sum()
-        depenses = frais_m['M_Calc'].sum() if not frais_m.empty else 0
+        # Calculs
+        ca_prevu = rec_m['Prix_Num'].sum()
+        # On vérifie si la colonne Paiement existe avant d'appliquer le filtre
+        if 'Paiement' in rec_m.columns:
+            recu = rec_m[rec_m['Paiement'].apply(check_paye)]['Prix_Num'].sum()
+        else:
+            recu = 0.0
+            
+        depenses = frais_m['M_Calc'].sum() if not frais_m.empty else 0.0
         
         stats_mensuelles.append({
             "Mois": mois_labels[m-1],
-            "Recette Prévue": f"{int(ca_total)}€",
-            "Reçu (Encaissé)": f"{int(recu)}€",
-            "À recevoir": f"{int(ca_total - recu)}€",
-            "Frais": f"{int(depenses)}€",
-            "Solde Net": f"{int(recu - depenses)}€"
+            "Recette Prévue": f"{int(ca_prevu)} €",
+            "Reçu (Encaissé)": f"{int(recu)} €",
+            "À recevoir": f"{int(ca_prevu - recu)} €",
+            "Frais": f"{int(depenses)} €",
+            "Solde Net": f"{int(recu - depenses)} €",
+            # Valeurs numériques pour le graphique
+            "v_recu": recu,
+            "v_frais": depenses,
+            "v_solde": recu - depenses
         })
 
-    df_tableau = pd.DataFrame(stats_mensuelles)
-    st.table(df_tableau.set_index("Mois"))
+    # Affichage du tableau
+    df_final_table = pd.DataFrame(stats_mensuelles)
+    st.table(df_final_table.set_index("Mois")[["Recette Prévue", "Reçu (Encaissé)", "À recevoir", "Frais", "Solde Net"]])
 
-    # Graphique de Performance Mensuelle
-    # Transformation des strings en float pour le graph
-    df_plot = pd.DataFrame(stats_mensuelles)
-    df_plot['Reçu_Val'] = df_plot['Reçu (Encaissé)'].str.replace('€','').astype(float)
-    df_plot['Frais_Val'] = df_plot['Frais'].str.replace('€','').astype(float)
-    df_plot['Solde_Val'] = df_plot['Solde Net'].str.replace('€','').astype(float)
-
+    # --- 8. GRAPHIQUE DE PERFORMANCE ---
     fig_perf = go.Figure()
-    fig_perf.add_trace(go.Bar(x=df_plot['Mois'], y=df_plot['Reçu_Val'], name='Reçu', marker_color='#2ecc71'))
-    fig_perf.add_trace(go.Bar(x=df_plot['Mois'], y=df_plot['Frais_Val'], name='Frais', marker_color='#e74c3c'))
-    fig_perf.add_trace(go.Scatter(x=df_plot['Mois'], y=df_plot['Solde_Val'], name='Solde Net', 
+    fig_perf.add_trace(go.Bar(x=df_final_table['Mois'], y=df_final_table['v_recu'], name='Reçu', marker_color='#2ecc71'))
+    fig_perf.add_trace(go.Bar(x=df_final_table['Mois'], y=df_final_table['v_frais'], name='Frais', marker_color='#e74c3c'))
+    fig_perf.add_trace(go.Scatter(x=df_final_table['Mois'], y=df_final_table['v_solde'], name='Solde Net', 
                                  line=dict(color='gold', width=3), mode='lines+markers'))
     
-    fig_perf.update_layout(title="Performance Mensuelle (Revenus vs Dépenses)", barmode='group')
+    fig_perf.update_layout(title="Performance Mensuelle (Revenus vs Dépenses)", barmode='group', template="plotly_dark")
     st.plotly_chart(fig_perf, use_container_width=True)
 # =================================================================
 # --- 8. PAGE MAINTENANCE (EDITION & SÉCURITÉ SUPPRESSION) ---
