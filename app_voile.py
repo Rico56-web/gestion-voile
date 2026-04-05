@@ -459,27 +459,42 @@ elif st.session_state.page == "STATS":
         if v is None or str(v).strip() in ["", "nan", "None", "null"]: return 0.0
         try: return float(str(v).replace('€','').replace(' ','').replace(',','.'))
         except: return 0.0
-
-    # --- 2. CALCULS RECETTES (LOGIQUE DATE RÉINTRODUITE) ---
-    recette_faite = 0.0      # Missions passées ET payées
-    recette_a_recevoir = 0.0 # Missions passées MAIS non payées
-    recette_future = 0.0     # Tout ce qui est après aujourd'hui
+            
+# --- 2. CALCULS RECETTES (LOGIQUE STRICTE 619€) ---
+    recette_faite = 0.0      # UNIQUEMENT : Date passée ET Payé
+    recette_a_recevoir = 0.0 # UNIQUEMENT : Date passée ET NON Payé
+    recette_future = 0.0     # TOUT ce qui est après aujourd'hui (peu importe le paiement)
 
     if not df_st.empty:
+        # Conversion propre des données
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
         df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
         df_st = df_st.dropna(subset=['dt_obj'])
         
-        # Identification du payé
-        df_st['Is_Paid'] = df_st['Paiement'].fillna('').str.upper().apply(lambda x: any(k in x for k in ["OK", "OUI", "PAYÉ", "PAYE", "TERMINÉ"]))
+        # Identification stricte du statut payé
+        # On cherche les mots clés positifs. Si absent -> Non payé.
+        def verif_paye(val):
+            v = str(val).upper().strip()
+            return any(k in v for k in ["OK", "OUI", "PAYÉ", "PAYE", "TERMINÉ", "PAID"])
+
+        df_st['Is_Paid'] = df_st['Paiement'].apply(verif_paye)
         
-        # Séparation stricte par date (votre bloc initial)
-        df_faites = df_st[df_st['dt_obj'] <= maintenant]
-        df_futures = df_st[df_st['dt_obj'] > maintenant]
+        # FILTRAGE CHRONOLOGIQUE
+        # 1. Missions terminées (Date <= aujourd'hui)
+        df_passe = df_st[df_st['dt_obj'] <= maintenant]
         
-        recette_faite = df_faites[df_faites['Is_Paid'] == True]['PrixNum'].sum()
-        recette_a_recevoir = df_faites[df_faites['Is_Paid'] == False]['PrixNum'].sum()
-        recette_future = df_futures['PrixNum'].sum()
+        # 2. Missions à venir (Date > aujourd'hui)
+        df_futur = df_st[df_st['dt_obj'] > maintenant]
+        
+        # CALCUL DES SOMMES
+        # Encaissé REEL = Passé et Payé
+        recette_faite = df_passe[df_passe['Is_Paid'] == True]['PrixNum'].sum()
+        
+        # Retard = Passé et Non Payé
+        recette_a_recevoir = df_passe[df_passe['Is_Paid'] == False]['PrixNum'].sum()
+        
+        # Prévisionnel = Futur (on ne le mélange pas à l'encaissé actuel)
+        recette_future = df_futur['PrixNum'].sum()
 
     # --- 3. CALCULS MAINTENANCE ---
     maint_faite = 0.0
