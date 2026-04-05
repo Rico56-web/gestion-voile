@@ -591,7 +591,45 @@ elif st.session_state.page == "STATS":
     
     fig_perf.update_layout(title=f"Performance Mensuelle {annee_choisie}", barmode='group', template="plotly_dark")
     st.plotly_chart(fig_perf, use_container_width=True, key=f"bar_perf_{annee_choisie}")
+# --- 9. GRAPHIQUE DE LA BALANCE (CASCADE) ---
+    st.subheader("⚖️ Analyse de la Balance (Flux de Trésorerie)")
+    
+    # Calcul des totaux pour l'année/période sélectionnée
+    total_recu_val = df_final_table['v_recu'].sum()
+    total_frais_val = df_calc_m = df_final_table['v_frais'].sum()
+    solde_final = total_recu_val - total_frais_val
 
+    fig_water = go.Figure(go.Waterfall(
+        name = "Balance", orientation = "v",
+        measure = ["relative", "relative", "total"],
+        x = ["Total Encaissé", "Total Frais", "Solde Net"],
+        textposition = "outside",
+        text = [f"+{int(total_recu_val)}€", f"-{int(total_frais_val)}€", f"{int(solde_final)}€"],
+        y = [total_recu_val, -total_frais_val, 0],
+        connector = {"line":{"color":"rgb(63, 63, 63)"}},
+        increasing = {"marker":{"color":"#2ecc71"}},
+        decreasing = {"marker":{"color":"#e74c3c"}},
+        totals = {"marker":{"color":"#f1c40f"}}
+    ))
+
+    fig_water.update_layout(
+        title=f"Flux de Trésorerie Global {annee_choisie}",
+        showlegend = False,
+        template="plotly_dark"
+    )
+    
+    st.plotly_chart(fig_water, use_container_width=True, key=f"waterfall_{annee_choisie}")
+
+    # --- OPTIONNEL : Graphique de la Balance Cumulative ---
+    st.subheader("📈 Évolution du Solde Cumulé")
+    df_final_table['Solde_Cumule'] = df_final_table['v_solde'].cumsum()
+    
+    fig_area = px.area(df_final_table, x="Mois", y="Solde_Cumule", 
+                       title="Progression du compte (Revenus - Frais cumulés)",
+                       color_discrete_sequence=['#f1c40f'])
+    
+    fig_area.update_layout(template="plotly_dark")
+    st.plotly_chart(fig_area, use_container_width=True, key=f"area_cumul_{annee_choisie}")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (EDITION & SÉCURITÉ SUPPRESSION) ---
 # =================================================================
