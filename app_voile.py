@@ -143,7 +143,7 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
 # =================================================================
-# --- 5. PAGE CONTACTS (VERSION FINALE + DURÉE + COORDONNÉES) ---
+# --- 5. PAGE CONTACTS (VERSION FINALE + NOTES VISIBLES) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     if 'mode_saisie' not in st.session_state: st.session_state.mode_saisie = False
@@ -216,6 +216,7 @@ if st.session_state.page == "CONTACTS":
 
         st.divider()
 
+        # Filtrage
         is_paye_mask = df_c['Paiement'].astype(str).str.upper().str.contains("PAY", na=False) & \
                   ~df_c['Paiement'].astype(str).str.upper().str.contains("NON", na=False)
         mask_arch = df_c['Statut'].astype(str).str.upper().str.contains("TERMINÉ|REFUSÉ", na=False) & is_paye_mask
@@ -232,6 +233,7 @@ if st.session_state.page == "CONTACTS":
             soc_v = str(r.get('Société','')).upper()
             tel_v = str(r.get('Téléphone',''))
             eml_v = str(r.get('Email',''))
+            com_v = str(r.get('Commentaires','')).strip()
             
             p_val_brut = str(r.get('Paiement', '')).strip().upper()
             p_status, p_color = ("✅ PAYÉ", "#0047AB") if ("PAY" in p_val_brut and "NON" not in p_val_brut) else ("⚠️ NON PAYÉ", "#e74c3c")
@@ -241,8 +243,40 @@ if st.session_state.page == "CONTACTS":
             label_soc = f"🏢 {soc_v}" if soc_v != nom_v else "👤 PARTICULIER"
             nb_jours = int(safe_val(r.get('Nbre de jours'), 1))
 
-            # --- LA CARTE AVEC TÉLÉPHONE ET EMAIL AJOUTÉS ---
-            html_card = f"""<div style="border:5px solid {base_col};border-left:20px solid {base_col};padding:15px;border-radius:15px;background-color:white;margin-bottom:12px;box-shadow:5px 5px 15px rgba(0,0,0,0.1);"><span style="float:right;color:{p_color};font-weight:bold;border:2px solid {p_color};padding:2px 5px;border-radius:5px;font-size:0.8rem;">{p_status}</span><div style="font-size:1.25rem;font-weight:bold;color:{base_col};margin-bottom:2px;display:flex;align-items:center;"><span style="background-color:{base_col};color:white;min-width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.9rem;margin-right:12px;">{i+1}</span>{nom_v} {pre_v}</div><div style="font-weight:bold;color:#666;margin-left:40px;font-size:0.85rem;text-transform:uppercase;margin-bottom:8px;">{label_soc}</div><div style="margin-left:40px;font-size:1rem;font-weight:bold;color:#333;">📞 {tel_v if tel_v not in ['nan','None',''] else '---'}</div><div style="margin-left:40px;font-size:0.85rem;color:#555;">📧 {eml_v if eml_v not in ['nan','None',''] else '---'}</div><hr style="border:0;border-top:1px solid #eee;margin:12px 0;"><div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;background:#f8f9fa;padding:8px 12px;border-radius:8px;"><div style="text-align:center;"><div style="font-size:0.6rem;color:#888;">DATE & DURÉE</div><div style="font-size:0.85rem;font-weight:bold;">{r.get('DateNav','-')} ({nb_jours}j)</div></div><div style="text-align:center;"><div style="font-size:0.6rem;color:#888;">PRIX</div><div style="font-size:0.85rem;font-weight:bold;color:#27ae60;">{r.get('Prix','0')}€</div></div><div style="text-align:center;"><div style="font-size:0.6rem;color:#888;">PERS.</div><div style="font-size:0.85rem;font-weight:bold;">{int(safe_val(r.get('Nbre de personnes'),1))}p</div></div></div></div>"""
+            # --- GESTION DE L'AFFICHAGE DES NOTES ---
+            html_notes = ""
+            if com_v and com_v.lower() != 'none' and com_v != "":
+                html_notes = f"""<div style="margin-left:40px; margin-top:10px; padding:10px; background-color:#f1f3f5; border-left:4px solid {base_col}; border-radius:5px; font-size:0.9rem; color:#444; font-style:italic;">💬 {com_v}</div>"""
+
+            # --- LA CARTE (AVEC NOTES INTÉGRÉES) ---
+            html_card = f"""
+            <div style="border:5px solid {base_col};border-left:20px solid {base_col};padding:15px;border-radius:15px;background-color:white;margin-bottom:12px;box-shadow:5px 5px 15px rgba(0,0,0,0.1);">
+                <span style="float:right;color:{p_color};font-weight:bold;border:2px solid {p_color};padding:2px 5px;border-radius:5px;font-size:0.8rem;">{p_status}</span>
+                <div style="font-size:1.25rem;font-weight:bold;color:{base_col};margin-bottom:2px;display:flex;align-items:center;">
+                    <span style="background-color:{base_col};color:white;min-width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.9rem;margin-right:12px;">{i+1}</span>
+                    {nom_v} {pre_v}
+                </div>
+                <div style="font-weight:bold;color:#666;margin-left:40px;font-size:0.85rem;text-transform:uppercase;margin-bottom:8px;">{label_soc}</div>
+                <div style="margin-left:40px;font-size:1rem;font-weight:bold;color:#333;">📞 {tel_v if tel_v not in ['nan','None',''] else '---'}</div>
+                <div style="margin-left:40px;font-size:0.85rem;color:#555;">📧 {eml_v if eml_v not in ['nan','None',''] else '---'}</div>
+                {html_notes}
+                <hr style="border:0;border-top:1px solid #eee;margin:12px 0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;background:#f8f9fa;padding:8px 12px;border-radius:8px;">
+                    <div style="text-align:center;">
+                        <div style="font-size:0.6rem;color:#888;">DATE & DURÉE</div>
+                        <div style="font-size:0.85rem;font-weight:bold;">{r.get('DateNav','-')} ({nb_jours}j)</div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:0.6rem;color:#888;">PRIX</div>
+                        <div style="font-size:0.85rem;font-weight:bold;color:#27ae60;">{r.get('Prix','0')}€</div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:0.6rem;color:#888;">PERS.</div>
+                        <div style="font-size:0.85rem;font-weight:bold;">{int(safe_val(r.get('Nbre de personnes'),1))}p</div>
+                    </div>
+                </div>
+            </div>
+            """
             st.markdown(html_card, unsafe_allow_html=True)
 
             # --- BOUTONS D'ACTION ---
