@@ -459,35 +459,47 @@ elif st.session_state.page == "STATS":
         if v is None or str(v).strip() in ["", "nan", "None", "null"]: return 0.0
         try: return float(str(v).replace('€','').replace(' ','').replace(',','.'))
         except: return 0.0
-
-    # --- 2. CALCULS RECETTES (BASÉ SUR VOTRE JSON) ---
-    recette_faite = 0.0      # Doit faire 619€
-    recette_a_recevoir = 0.0 # Missions passées non payées
-    recette_future = 0.0     # Missions futures non payées
+            # --- 2. CALCULS RECETTES (VERROUILLAGE STRICT SUR 619€) ---
+    recette_faite = 0.0      
+    recette_a_recevoir = 0.0 
+    recette_future = 0.0     
 
     if not df_st.empty:
-        # Conversion des prix et des dates
-        df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
+        # Nettoyage des colonnes (Virer les espaces et gérer les accents)
+        df_st.columns = [str(c).strip() for c in df_st.columns]
+        
+        # Conversion du Prix en nombre (en gérant le format "479.00" ou 450)
+        df_st['PrixNum'] = pd.to_numeric(df_st['Prix'], errors='coerce').fillna(0.0)
+        
+        # Nettoyage de la date
         df_st['Date_C'] = df_st['DateNav'].astype(str).str.replace('\\', '', regex=False)
         df_st['dt_obj'] = pd.to_datetime(df_st['Date_C'], dayfirst=True, errors='coerce')
-        
-        # Logique de paiement stricte
-        def est_paye(val):
-            v = str(val).upper()
-            return "PAYÉ" in v or "PAYE" in v or "ACOMPTE" in v
 
-        df_st['Is_Paid'] = df_st['Paiement'].apply(est_paye)
+        # --- LA RÈGLE D'OR POUR LES 619€ ---
+        # On ne regarde QUE la colonne "Paiement" et RIEN d'autre.
+        # On cherche exactement "Payé" (ou la version encodée JSON)
+        def est_vraiment_paye(val):
+            s = str(val).lower()
+            # "payé" ou "pay\u00e9" ou "ok" (mais pas "non payé")
+            if "non" in s: 
+                return False
+            return "pay" in s or s == "ok"
 
-        # A. ENCAISSÉ : Tout ce qui est marqué "Payé" (619€ selon votre JSON)
+        df_st['Is_Paid'] = df_st['Paiement'].apply(est_vraiment_paye)
+
+        # --- RÉPARTITION ---
+        # 1. ENCAISSÉ RÉEL (Les lignes Elisabeth, Pedro, Benoit)
         recette_faite = df_st[df_st['Is_Paid'] == True]['PrixNum'].sum()
         
-        # B. RETARD : Date passée et Non Payé
+        # 2. RETARD (Missions passées et non payées - ex: CMN)
         mask_retard = (df_st['dt_obj'] <= maintenant) & (df_st['Is_Paid'] == False)
         recette_a_recevoir = df_st[mask_retard]['PrixNum'].sum()
         
-        # C. À VENIR : Date future et Non Payé
+        # 3. PRÉVISIONNEL (Missions futures et non payées)
         mask_futur = (df_st['dt_obj'] > maintenant) & (df_st['Is_Paid'] == False)
         recette_future = df_st[mask_futur]['PrixNum'].sum()
+
+
 
     # --- 3. CALCULS MAINTENANCE ---
     maint_faite = 0.0
