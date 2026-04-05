@@ -525,27 +525,66 @@ elif st.session_state.page == "STATS":
     k3.metric("💸 Frais Total", f"{int(total_frais)} €")
     k4.metric("📈 Solde Net", f"{int(recette_faite - total_frais)} €", delta_color="normal")
 
-    # --- 6. GRAPHIQUES "FROMAGES" & DÉTAILS ---
-    c1, c2 = st.columns(2)
-    with c1:
-        st.subheader("🎯 Trésorerie Net")
-        fig1 = px.pie(values=[total_frais, recette_faite, recette_a_recevoir],
-                     names=['Dépenses', 'Encaissé', 'Retards'],
-                     hole=0.5, color_discrete_sequence=['#e74c3c', '#2ecc71', '#f1c40f'])
-        st.plotly_chart(fig1, use_container_width=True)
-        with st.expander("📄 Détails des Recettes"):
-            st.dataframe(df_st[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True)
+# --- 7. TABLEAU COMPTABLE MENSUEL ---
+    st.subheader(f"📈 Bilan Mensuel - {annee_choisie}")
+    
+    mois_labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+    stats_mensuelles = []
 
-    with c2:
-        st.subheader("💸 Nature des Frais")
-        fig2 = px.pie(values=list(frais_par_cat.values()), names=list(frais_par_cat.keys()),
-                     hole=0.5, color_discrete_sequence=px.colors.qualitative.T10)
-        st.plotly_chart(fig2, use_container_width=True)
-        with st.expander("📄 Détails des Dépenses"):
-            if not df_m.empty:
-                st.dataframe(df_m[['Date', 'Objet', 'M_Calc']], use_container_width=True)
+    # 1. On prépare une copie de travail propre UNIQUE
+    df_calc = df_c.copy()
+    df_calc.columns = [str(c).strip() for c in df_calc.columns] # Nettoyage noms colonnes
+    
+    # 2. On crée les colonnes numériques et dates de façon sécurisée
+    df_calc['P_NET'] = df_calc['Prix'].apply(clean_val)
+    df_calc['DT_NET'] = pd.to_datetime(df_calc['DateNav'].astype(str).str.replace('\\', '', regex=False), dayfirst=True, errors='coerce')
+    
+    # 3. On définit le statut payé AVANT la boucle
+    if 'Paiement' in df_calc.columns:
+        df_calc['IS_PAID_NET'] = df_calc['Paiement'].apply(check_paye)
+    else:
+        df_calc['IS_PAID_NET'] = False
 
-    st.divider()
+    # 4. BOUCLE DE CALCUL
+    for m in range(1, 13):
+        # Filtre par mois et année sur les colonnes "NET" qu'on vient de créer
+        mask = (df_calc['DT_NET'].dt.month == m) & (df_calc['DT_NET'].dt.year == annee_choisie)
+        rec_m = df_calc[mask]
+        
+        # Filtre maintenance
+        frais_m = df_m[(df_m['dt_m'].dt.month == m) & (df_m['dt_m'].dt.year == annee_choisie)] if not df_m.empty else pd.DataFrame()
+        
+        # Calculs simplifiés (on utilise les noms de colonnes NET)
+        ca_prevu = rec_m['P_NET'].sum()
+        recu = rec_m[rec_m['IS_PAID_NET'] == True]['P_NET'].sum()
+        depenses = frais_m['M_Calc'].sum() if not frais_m.empty else 0.0
+        
+        stats_mensuelles.append({
+            "Mois": mois_labels[m-1],
+            "Recette Prévue": f"{int(ca_prevu)} €",
+            "Reçu (Encaissé)": f"{int(recu)} €",
+            "À recevoir": f"{int(ca_prevu - recu)} €",
+            "Frais": f"{int(depenses)} €",
+            "Solde Net": f"{int(recu - depenses)} €",
+            "v_recu": recu,
+            "v_frais": depenses,
+            "v_solde": recu - depenses
+        })
+
+    # --- 8. AFFICHAGE FINAL ---
+    df_final_table = pd.DataFrame(stats_mensuelles)
+    # Affichage du tableau (uniquement les colonnes texte)
+    st.table(df_final_table.set_index("Mois")[["Recette Prévue", "Reçu (Encaissé)", "À recevoir", "Frais", "Solde Net"]])
+
+    # Graphique de Performance
+    fig_perf = go.Figure()
+    fig_perf.add_trace(go.Bar(x=df_final_table['Mois'], y=df_final_table['v_recu'], name='Reçu', marker_color='#2ecc71'))
+    fig_perf.add_trace(go.Bar(x=df_final_table['Mois'], y=df_final_table['v_frais'], name='Frais', marker_color='#e74c3c'))
+    fig_perf.add_trace(go.Scatter(x=df_final_table['Mois'], y=df_final_table['v_solde'], name='Solde Net', 
+                                 line=dict(color='gold', width=3), mode='lines+markers'))
+    
+    fig_perf.update_layout(title=f"Performance Mensuelle {annee_choisie}", barmode='group', template="plotly_dark")
+    st.plotly_chart(fig_perf, use_container_width=True)
 # --- 7. TABLEAU COMPTABLE MENSUEL ---
     st.subheader(f"📈 Bilan Mensuel - {annee_choisie}")
     
