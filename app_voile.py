@@ -442,152 +442,95 @@ elif st.session_state.page == "PLANNING":
     </div>
     """, unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER PRO (VERSION FINALE VALIDÉE) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (CONFIGURATION FINALE) ---
 # =================================================================
 elif st.session_state.page == "STATS":
-    st.title("⚓ Vesta Skipper Pro - Pilotage Global")
+    st.title("⚓ Vesta Skipper 2026 - Pilotage Global")
     import plotly.express as px
     from datetime import datetime
     import pandas as pd
 
-    # --- 1. PRÉPARATION DES DONNÉES ---
+    # --- 1. CHARGEMENT & NETTOYAGE ---
     df_st = df_c.copy()
     df_m = charger_data('maintenance.json')
-    maintenant = datetime.now()
+    maintenant = pd.Timestamp.now().normalize()
 
     def clean_val(v):
         if v is None or str(v).strip() in ["", "nan", "None", "null"]: return 0.0
         try: return float(str(v).replace('€','').replace(' ','').replace(',','.'))
         except: return 0.0
 
-    # --- 2. INITIALISATION DES VARIABLES ---
-    recette_faite = 0.0      
-    recette_a_recevoir = 0.0 
-    recette_future = 0.0     
-    maint_faite = 0.0
-    maint_estimee = 0.0
-    f_vesta = 0.0
-    f_autres = 0.0
-    f_obligatoires = 0.0
+    # --- 2. CALCULS RECETTES (BASÉ SUR VOTRE JSON) ---
+    recette_faite = 0.0      # Doit faire 619€
+    recette_a_recevoir = 0.0 # Missions passées non payées
+    recette_future = 0.0     # Missions futures non payées
 
-# --- 3. CALCULS RECETTES (GESTION ACOMPTES & STICKY 619€) ---
     if not df_st.empty:
+        # Conversion des prix et des dates
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
-        df_st['Date_Clean'] = df_st['DateNav'].astype(str).str.replace('\\', '', regex=False)
-        df_st['dt_obj'] = pd.to_datetime(df_st['Date_Clean'], dayfirst=True, errors='coerce')
+        df_st['Date_C'] = df_st['DateNav'].astype(str).str.replace('\\', '', regex=False)
+        df_st['dt_obj'] = pd.to_datetime(df_st['Date_C'], dayfirst=True, errors='coerce')
         
-        def verif_paiement(x):
-            v = str(x).upper()
-            return any(mot in v for mot in ["OK", "OUI", "PAYÉ", "PAYE", "ACOMPTE"])
-        
-        df_st['Is_Paid'] = df_st['Paiement'].apply(verif_paiement)
-        
-        # Date du jour pour séparer Passé / Futur
-        date_pivot = pd.Timestamp.now().normalize() 
+        # Logique de paiement stricte
+        def est_paye(val):
+            v = str(val).upper()
+            return "PAYÉ" in v or "PAYE" in v or "ACOMPTE" in v
 
-        # --- RÉPARTITION FINALE ---
-        
-        # 1. ENCAISSÉ : Tout ce qui est payé (inclut les acomptes sur missions futures)
+        df_st['Is_Paid'] = df_st['Paiement'].apply(est_paye)
+
+        # A. ENCAISSÉ : Tout ce qui est marqué "Payé" (619€ selon votre JSON)
         recette_faite = df_st[df_st['Is_Paid'] == True]['PrixNum'].sum()
         
-        # 2. À RECEVOIR (RETARD) : Missions passées et non payées
-        mask_retard = (df_st['dt_obj'] <= date_pivot) & (df_st['Is_Paid'] == False)
+        # B. RETARD : Date passée et Non Payé
+        mask_retard = (df_st['dt_obj'] <= maintenant) & (df_st['Is_Paid'] == False)
         recette_a_recevoir = df_st[mask_retard]['PrixNum'].sum()
         
-        # 3. PRÉVISIONNEL (RESTE À VENIR) : Missions futures et non payées
-        mask_futur_non_paye = (df_st['dt_obj'] > date_pivot) & (df_st['Is_Paid'] == False)
-        recette_future = df_st[mask_futur_non_paye]['PrixNum'].sum()
+        # C. À VENIR : Date future et Non Payé
+        mask_futur = (df_st['dt_obj'] > maintenant) & (df_st['Is_Paid'] == False)
+        recette_future = df_st[mask_futur]['PrixNum'].sum()
 
-        # --- CONTRÔLE VISUEL ---
-        if recette_faite != 619:
-            with st.expander("⚠️ Analyse du montant encaissé"):
-                st.write(f"Le total calculé est de **{recette_faite} €**.")
-                st.write("Voici les lignes considérées comme payées :")
-                st.dataframe(df_st[df_st['Is_Paid'] == True][['DateNav', 'Client', 'Prix', 'Paiement']])
-
-    # --- 4. CALCULS MAINTENANCE (Basé sur votre JSON) ---
+    # --- 3. CALCULS MAINTENANCE ---
+    maint_faite = 0.0
+    f_vesta, f_autres, f_obligatoires = 0.0, 0.0, 0.0
     if not df_m.empty:
-        # Utilisation de M_Num si présent, sinon Montant
         df_m['M_Calc'] = df_m['M_Num'] if 'M_Num' in df_m.columns else df_m['Montant'].apply(clean_val)
-        
-        for idx, row in df_m.iterrows():
-            mt = row['M_Calc']
-            obj = str(row.get('Objet', '')).upper()
-            typ = str(row.get('Type', '')).upper()
-            stat = str(row.get('Statut', '')).upper()
+        for _, row in df_m.iterrows():
+            mt, obj = row['M_Calc'], str(row.get('Objet', '')).upper()
+            if "VESTA" in obj: f_vesta += mt
+            elif any(x in obj for x in ["MAIF", "ASSUR", "PORT"]): f_obligatoires += mt
+            else: f_autres += mt
+            if str(row.get('Statut', '')).upper() in ["OK", "FAIT"]: maint_faite += mt
 
-            # Classement par Type (avec sécurité pour le 'null')
-            if "VESTA" in obj or "VESTA" in typ:
-                f_vesta += mt
-            elif any(x in obj for x in ["ASSURANCE", "PORT", "PLACE", "MAIF", "DGAN"]) or "OBLIGATOIRE" in typ:
-                f_obligatoires += mt
-            else:
-                f_autres += mt
-
-            # Classement par Statut
-            if stat in ["OK", "FAIT"]:
-                maint_faite += mt
-            else:
-                maint_estimee += mt
-
-    # --- 5. AFFICHAGE DES KPI ---
-    st.subheader("📊 Performance Réelle")
+    # --- 4. AFFICHAGE DES CHIFFRES CLÉS ---
+    st.subheader("📊 État de la Trésorerie")
     k1, k2, k3 = st.columns(3)
-    k1.metric("Encaissé (Réel)", f"{int(recette_faite)} €")
-    k2.metric("Retards (Passé)", f"{int(recette_a_recevoir)} €")
-    k3.metric("Prévisionnel Futur", f"{int(recette_future)} €")
+    k1.metric("💰 Encaissé Réel", f"{int(recette_faite)} €")
+    k2.metric("⏳ Retards (Dû)", f"{int(recette_a_recevoir)} €")
+    k3.metric("📅 Prévisionnel", f"{int(recette_future)} €")
+
+    # --- 5. DÉTAIL DE L'ENCAISSÉ (Vérification) ---
+    with st.expander("🔍 Voir le détail des 619 € encaissés"):
+        # On utilise les noms exacts de vos colonnes avec accents
+        cols = ['DateNav', 'Prénom', 'Nom', 'Société', 'Prix', 'Paiement']
+        cols_existantes = [c for c in cols if c in df_st.columns]
+        st.dataframe(df_st[df_st['Is_Paid'] == True][cols_existantes], use_container_width=True)
 
     st.divider()
 
-    # --- 6. LES 3 FROMAGES ---
+    # --- 6. GRAPHIQUES ---
     c1, c2 = st.columns(2)
     with c1:
-        # Comparaison Argent Rentré (619) vs Argent Sorti (Maintenance Faite)
-        fig1 = px.pie(
-            values=[maint_faite, recette_faite, recette_a_recevoir],
-            names=['Dépenses Réelles', 'Recettes Encaissées', 'Retards'],
-            title="🎯 Flux de Trésorerie (Réalisé)",
-            color_discrete_sequence=['#e74c3c', '#2ecc71', '#f1c40f'], hole=0.5
-        )
+        fig1 = px.pie(values=[maint_faite, recette_faite, recette_a_recevoir],
+                     names=['Dépenses', 'Recettes OK', 'Retards'],
+                     title="🎯 Trésorerie (Réalisé)", hole=0.5,
+                     color_discrete_sequence=['#e74c3c', '#2ecc71', '#f1c40f'])
         st.plotly_chart(fig1, use_container_width=True)
-
     with c2:
-        # Répartition par nature (Vesta, Assurances, etc.)
-        fig2 = px.pie(
-            values=[f_vesta, f_obligatoires, f_autres],
-            names=['Maint. Vesta', 'Assurances/Port', 'Autres'],
-            title="💸 Nature des Charges",
-            color_discrete_sequence=['#3498db', '#34495e', '#9b59b6'], hole=0.5
-        )
+        fig2 = px.pie(values=[f_vesta, f_obligatoires, f_autres],
+                     names=['Vesta', 'Assur/Port', 'Autres'],
+                     title="💸 Nature des Frais", hole=0.5,
+                     color_discrete_sequence=['#3498db', '#34495e', '#9b59b6'])
         st.plotly_chart(fig2, use_container_width=True)
-
-    st.write("---")
-    # Vision globale : Tout le réalisé vs Tout le futur
-    fig3 = px.pie(
-        values=[maint_faite, maint_estimee, recette_faite, (recette_a_recevoir + recette_future)],
-        names=['Maint. OK', 'Maint. à Venir', 'CA Encaissé', 'CA à Venir'],
-        title="📈 Bilan Annuel Estimé",
-        color_discrete_sequence=['#c0392b', '#ff7675', '#27ae60', '#55efc4'], hole=0.4
-    )
-    st.plotly_chart(fig3, use_container_width=True)
-
-    # --- 7. TABLEAU MENSUEL ---
-    st.subheader("📅 Historique Mensuel 2026")
-    all_months = [f"2026-{m:02d}" for m in range(1, 13)]
-    df_synth = pd.DataFrame(index=all_months)
-    
-    if not df_st.empty:
-        df_st['MA'] = df_st['dt_obj'].dt.strftime('%Y-%m')
-        df_synth['Recettes'] = df_st.groupby('MA')['PrixNum'].sum()
-
-    if not df_m.empty:
-        df_m['dt_m'] = pd.to_datetime(df_m['Date'].str.replace('\\', '', regex=False), dayfirst=True, errors='coerce')
-        df_m['MA'] = df_m['dt_m'].dt.strftime('%Y-%m')
-        df_synth['Maintenance'] = df_m.groupby('MA')['M_Calc'].sum()
-
-    df_synth = df_synth.fillna(0)
-    df_synth['Résultat'] = df_synth['Recettes'] - df_synth['Maintenance']
-    st.dataframe(df_synth.style.format("{:.0f} €"), use_container_width=True)
 # =================================================================
 # --- 8. PAGE MAINTENANCE (EDITION & SÉCURITÉ SUPPRESSION) ---
 # =================================================================
