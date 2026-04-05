@@ -292,7 +292,7 @@ if st.session_state.page == "CONTACTS":
                     st.rerun()
   
 # =================================================================
-# --- 6. PAGE PLANNING (CORRECTIF FINAL BOUTON ICI) ---
+# --- 6. PAGE PLANNING (CORRECTIF CMN & COULEUR TOTAL) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
     from datetime import datetime, date, timedelta
@@ -313,14 +313,12 @@ elif st.session_state.page == "PLANNING":
     st.markdown('<div class="main-header">🗓️ PLANNING VESTA 2026</div>', unsafe_allow_html=True)
 
     # --- NAVIGATION (VERSION SYNCHRONISÉE) ---
-    # On crée une clé unique qui change quand on clique sur "ICI"
     if 'nav_key' not in st.session_state:
         st.session_state.nav_key = 0
 
     col_m, col_y, col_now = st.columns([1.5, 1, 0.8])
     
     with col_m:
-        # On ajoute la nav_key à la clé du widget pour forcer le rafraîchissement
         sel_m_nom = st.selectbox(
             "Mois", 
             m_noms, 
@@ -343,10 +341,8 @@ elif st.session_state.page == "PLANNING":
         
     with col_now:
         if st.button("📍 ICI", use_container_width=True):
-            # 1. On remet les dates à aujourd'hui
             st.session_state.curr_month_idx = aujourdhui.month - 1
             st.session_state.curr_year = aujourdhui.year
-            # 2. On change la clé pour forcer Streamlit à redessiner les sélecteurs
             st.session_state.nav_key += 1
             st.rerun()
 
@@ -369,6 +365,7 @@ elif st.session_state.page == "PLANNING":
                 else: continue
                 
                 n_j = int(float(safe_val(r.get('Nbre de jours'), 1)))
+                soc_v = str(r.get('Société','')).upper() # Récupération société
                 
                 for i in range(n_j):
                     date_courante = date_debut + timedelta(days=i)
@@ -376,23 +373,29 @@ elif st.session_state.page == "PLANNING":
                         p_val = str(r.get('Paiement', '')).upper()
                         s_val = str(r.get('Statut', '')).lower()
                         is_paye = "PAY" in p_val and "NON" not in p_val
+                        
+                        # --- LOGIQUE COULEUR CALENDRIER (CMN PRIORITAIRE) ---
                         color = "transparent"
-                        if date_courante < aujourdhui:
-                            color = "#0047AB" if is_paye else "#e74c3c"
+                        if "CMN" in soc_v:
+                            color = "#0047AB" # Bleu CMN
+                        elif date_courante < aujourdhui:
+                            color = "#34495e" if is_paye else "#e74c3c"
                         elif "ok" in s_val:
                             color = "#27ae60"
                         elif "attente" in s_val:
                             color = "#f39c12"
+                            
                         jours_occ[date_courante.day] = {"c": color}
 
                 date_fin = date_debut + timedelta(days=n_j-1)
                 if (date_debut.year == sel_y and date_debut.month == sel_m) or (date_fin.year == sel_y and date_fin.month == sel_m):
                     missions_list.append({'data': r, 'idx': idx, 'start': date_debut, 'end': date_fin, 'n_j': n_j})
                     if date_debut.month == sel_m:
-                        total_mois += float(str(r.get('Prix', 0)).replace(',','.').replace('€','')) if r.get('Prix') else 0
+                        val_prix = str(r.get('Prix', 0)).replace(',','.').replace('€','').strip()
+                        total_mois += float(val_prix) if val_prix else 0
             except: continue
 
-    # --- AFFICHAGE ---
+    # --- AFFICHAGE TABLEAU ---
     h_cal = '<table class="full-width-cal" style="text-align:center; background:white;">'
     h_cal += '<tr style="background:#f1f3f5; font-size:10px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td style="color:#d9534f;">Sa</td><td style="color:#d9534f;">Di</td></tr>'
     cal_mat = calendar.monthcalendar(sel_y, sel_m)
@@ -431,7 +434,13 @@ elif st.session_state.page == "PLANNING":
                 st.session_state.page = "CONTACTS"
                 st.rerun()
 
-    st.markdown(f"""<div style="background:#0047AB; color:white; padding:15px; border-radius:10px; text-align:center; margin-top:10px;"><b>TOTAL ESTIMÉ : {total_mois:,.0f} €</b></div>""", unsafe_allow_html=True)
+    # --- NOUVEAU BLOC TOTAL (Couleur différente du bleu) ---
+    st.markdown(f"""
+    <div style="background:#2c3e50; color:#f1c40f; padding:15px; border-radius:10px; text-align:center; margin-top:10px; border: 2px solid #f1c40f;">
+        <span style="font-size:0.8rem; color:white; text-transform:uppercase;">Estimation Chiffre d'Affaires</span><br>
+        <b style="font-size:1.4rem;">TOTAL : {total_mois:,.0f} €</b>
+    </div>
+    """, unsafe_allow_html=True)
 # =================================================================
 # --- 7. PAGE STATS - VESTA SKIPPER PRO (DASHBOARD ULTIME 2026) ---
 # =================================================================
