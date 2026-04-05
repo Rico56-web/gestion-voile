@@ -450,72 +450,66 @@ elif st.session_state.page == "STATS":
     from datetime import datetime
     import pandas as pd
 
-    # --- 1. CHARGEMENT ---
+    # --- 1. PRÉPARATION DES DONNÉES ---
+    # On travaille sur une copie propre pour ne pas polluer le reste de l'app
     df_st = df_c.copy()
     df_m = charger_data('maintenance.json')
     maintenant = datetime.now()
-    
+
     def clean_val(v):
         if v is None or str(v).strip() in ["", "nan", "None", "null"]: return 0.0
         try: return float(str(v).replace('€','').replace(' ','').replace(',','.'))
         except: return 0.0
-            
-# --- 2. CALCULS RECETTES (LOGIQUE STRICTE 619€) ---
-    recette_faite = 0.0      # UNIQUEMENT : Date passée ET Payé
-    recette_a_recevoir = 0.0 # UNIQUEMENT : Date passée ET NON Payé
-    recette_future = 0.0     # TOUT ce qui est après aujourd'hui (peu importe le paiement)
+
+    # Initialisation des compteurs
+    recette_faite = 0.0      # Devrait être 619
+    recette_a_recevoir = 0.0 # Retards
+    recette_future = 0.0     # Planning futur
 
     if not df_st.empty:
-        # Conversion propre des données
+        # Nettoyage strict des colonnes
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
-        df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
-        df_st = df_st.dropna(subset=['dt_obj'])
         
-        # Identification stricte du statut payé
-        # On cherche les mots clés positifs. Si absent -> Non payé.
-        def verif_paye(val):
-            v = str(val).upper().strip()
-            return any(k in v for k in ["OK", "OUI", "PAYÉ", "PAYE", "TERMINÉ", "PAID"])
+        # Conversion Date forcée (DayFirst pour le format français 05/04/2026)
+        df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], dayfirst=True, errors='coerce')
+        df_st = df_st.dropna(subset=['dt_obj']) # On vire les lignes sans date valide
 
-        df_st['Is_Paid'] = df_st['Paiement'].apply(verif_paye)
-        
-        # FILTRAGE CHRONOLOGIQUE
-        # 1. Missions terminées (Date <= aujourd'hui)
-        df_passe = df_st[df_st['dt_obj'] <= maintenant]
-        
-        # 2. Missions à venir (Date > aujourd'hui)
-        df_futur = df_st[df_st['dt_obj'] > maintenant]
-        
-        # CALCUL DES SOMMES
-        # Encaissé REEL = Passé et Payé
-        recette_faite = df_passe[df_passe['Is_Paid'] == True]['PrixNum'].sum()
-        
-        # Retard = Passé et Non Payé
-        recette_a_recevoir = df_passe[df_passe['Is_Paid'] == False]['PrixNum'].sum()
-        
-        # Prévisionnel = Futur (on ne le mélange pas à l'encaissé actuel)
-        recette_future = df_futur['PrixNum'].sum()
+        # Fonction de détection du paiement (Stricte)
+        def est_encaisse(row):
+            p = str(row.get('Paiement', '')).upper()
+            # On ne considère payé que si un mot clé de succès est présent
+            return any(k in p for k in ["OK", "OUI", "PAYÉ", "PAYE", "TERMINÉ", "PAID"])
 
-    # --- 3. CALCULS MAINTENANCE ---
-    maint_faite = 0.0
-    maint_estimee = 0.0
-    f_vesta = 0.0
-    f_autres = 0.0
-    f_obligatoires = 0.0
-
-    if not df_m.empty:
-        df_m['M_Num'] = df_m['Montant'].apply(clean_val)
-        for col in ['Type', 'Statut']:
-            if col not in df_m.columns: df_m[col] = ''
+        # --- LE FILTRE CRITIQUE ---
+        # On sépare physiquement les données dans des variables différentes
         
-        # Types pour Fromage 2
-        f_vesta = df_m[df_m['Type'].str.contains("VESTA", case=False, na=False)]['M_Num'].sum()
-        f_obligatoires = df_m[df_m['Type'].str.contains("OBLIGATOIRE", case=False, na=False)]['M_Num'].sum()
-        f_autres = df_m['M_Num'].sum() - (f_vesta + f_obligatoires)
+        # A. Missions passées (Date <= aujourd'hui)
+        df_passe = df_st[df_st['dt_obj'] <= maintenant].copy()
+        
+        # B. Missions futures (Date > aujourd'hui)
+        df_futur = df_st[df_st['dt_obj'] > maintenant].copy()
 
-        # Statuts pour Fromage 3
-        maint_faite = df_m[df_m['Statut'].str.upper() == "FAIT"]['M_Num'].sum()
-        maint_estimee = df_m[df_m['Statut'].str.upper() != "FAIT"]['M_Num'].sum()
+        # C. Calcul de l'encaissé RÉEL (Passé ET Payé)
+        # On vérifie chaque ligne du passé
+        if not df_passe.empty:
+            df_passe['Is_Paid'] = df_passe.apply(est_encaisse, axis=1)
+            recette_faite = df_passe[df_passe['Is_Paid'] == True]['PrixNum'].sum()
+            recette_a_recevoir = df_passe[df_passe['Is_Paid'] == False]['PrixNum'].sum()
+
+        # D. Calcul du futur
+        if not df_futur.empty:
+            recette_future = df_futur['PrixNum'].sum()
+
+    # --- 2. AFFICHAGE DES KPI (VÉRIFICATION) ---
+    st.subheader("📊 Performance Réelle")
+    k1, k2, k3 = st.columns(3)
+    
+    # Affichage sans décimales pour plus de clarté
+    k1.metric("Encaissé (Réalisé)", f"{int(recette_faite)} €")
+    k2.metric("À recevoir (Retard)", f"{int(recette_a_recevoir)} €")
+    k3.metric("Prévisionnel Futur", f"{int(recette_future)} €")
+    
+    st.divider()
 
     # --- 4. AFFICHAGE DES KPI ---
     st.subheader("📊 Performance Temps Réel")
