@@ -226,7 +226,7 @@ if st.session_state.page == "CONTACTS":
             m_s = (df_visu['Nom'].astype(str).str.upper().str.contains(search_q, na=False) | 
                   df_visu['Société'].astype(str).str.upper().str.contains(search_q, na=False))
             df_visu = df_visu[m_s]
-            for i, r in df_visu.iterrows():
+        for i, r in df_visu.iterrows():
             st_b = str(r.get('Statut','En attente')).capitalize()
             nom_v, pre_v = str(r.get('Nom','')).upper(), str(r.get('Prénom','')).capitalize()
             soc_v = str(r.get('Société','')).upper()
