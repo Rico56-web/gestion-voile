@@ -470,31 +470,40 @@ elif st.session_state.page == "STATS":
     f_autres = 0.0
     f_obligatoires = 0.0
 
-    # --- 3. CALCULS RECETTES (Cible: 619€) ---
+# --- 3. CALCULS RECETTES (GESTION ACOMPTES & STICKY 619€) ---
     if not df_st.empty:
-        # Nettoyage et conversion
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
-        # On gère le format de date 15/04/2026 même avec les backslashs du JSON
-        df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'].str.replace('\\', '', regex=False), dayfirst=True, errors='coerce')
-        df_st = df_st.dropna(subset=['dt_obj'])
-
-        # Détection du paiement
-        def est_encaisse(val):
-            p = str(val).upper().strip()
-            return any(k in p for k in ["OK", "OUI", "PAYÉ", "PAYE", "TERMINÉ", "PAID"])
-
-        # On applique le filtre Passé / Futur de manière très stricte
-        df_st['Is_Paid'] = df_st['Paiement'].apply(est_encaisse)
+        df_st['Date_Clean'] = df_st['DateNav'].astype(str).str.replace('\\', '', regex=False)
+        df_st['dt_obj'] = pd.to_datetime(df_st['Date_Clean'], dayfirst=True, errors='coerce')
         
-        df_passe = df_st[df_st['dt_obj'] <= maintenant].copy()
-        df_futur = df_st[df_st['dt_obj'] > maintenant].copy()
-
-        if not df_passe.empty:
-            recette_faite = df_passe[df_passe['Is_Paid'] == True]['PrixNum'].sum()
-            recette_a_recevoir = df_passe[df_passe['Is_Paid'] == False]['PrixNum'].sum()
+        def verif_paiement(x):
+            v = str(x).upper()
+            return any(mot in v for mot in ["OK", "OUI", "PAYÉ", "PAYE", "ACOMPTE"])
         
-        if not df_futur.empty:
-            recette_future = df_futur['PrixNum'].sum()
+        df_st['Is_Paid'] = df_st['Paiement'].apply(verif_paiement)
+        
+        # Date du jour pour séparer Passé / Futur
+        date_pivot = pd.Timestamp.now().normalize() 
+
+        # --- RÉPARTITION FINALE ---
+        
+        # 1. ENCAISSÉ : Tout ce qui est payé (inclut les acomptes sur missions futures)
+        recette_faite = df_st[df_st['Is_Paid'] == True]['PrixNum'].sum()
+        
+        # 2. À RECEVOIR (RETARD) : Missions passées et non payées
+        mask_retard = (df_st['dt_obj'] <= date_pivot) & (df_st['Is_Paid'] == False)
+        recette_a_recevoir = df_st[mask_retard]['PrixNum'].sum()
+        
+        # 3. PRÉVISIONNEL (RESTE À VENIR) : Missions futures et non payées
+        mask_futur_non_paye = (df_st['dt_obj'] > date_pivot) & (df_st['Is_Paid'] == False)
+        recette_future = df_st[mask_futur_non_paye]['PrixNum'].sum()
+
+        # --- CONTRÔLE VISUEL ---
+        if recette_faite != 619:
+            with st.expander("⚠️ Analyse du montant encaissé"):
+                st.write(f"Le total calculé est de **{recette_faite} €**.")
+                st.write("Voici les lignes considérées comme payées :")
+                st.dataframe(df_st[df_st['Is_Paid'] == True][['DateNav', 'Client', 'Prix', 'Paiement']])
 
     # --- 4. CALCULS MAINTENANCE (Basé sur votre JSON) ---
     if not df_m.empty:
