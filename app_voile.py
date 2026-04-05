@@ -442,7 +442,7 @@ elif st.session_state.page == "PLANNING":
     </div>
     """, unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER PRO (VERSION FIXÉE) ---
+# --- 7. PAGE STATS - VESTA SKIPPER PRO (VERSION SYNCHRO DATE) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("⚓ Vesta Skipper Pro - Pilotage Global")
@@ -453,27 +453,35 @@ elif st.session_state.page == "STATS":
     # --- 1. CHARGEMENT ---
     df_st = df_c.copy()
     df_m = charger_data('maintenance.json')
-    
-    df_st.columns = [str(c).strip() for c in df_st.columns]
+    maintenant = datetime.now()
     
     def clean_val(v):
         if v is None or str(v).strip() in ["", "nan", "None", "null"]: return 0.0
         try: return float(str(v).replace('€','').replace(' ','').replace(',','.'))
         except: return 0.0
 
-    # --- 2. CALCULS RECETTES (Basé sur Contacts/Missions) ---
-    recette_faite = 0.0
-    recette_a_recevoir = 0.0
-    
+    # --- 2. CALCULS RECETTES (LOGIQUE DATE RÉINTRODUITE) ---
+    recette_faite = 0.0      # Missions passées ET payées
+    recette_a_recevoir = 0.0 # Missions passées MAIS non payées
+    recette_future = 0.0     # Tout ce qui est après aujourd'hui
+
     if not df_st.empty:
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
-        # Identification simplifiée du payé
-        df_st['Paye'] = df_st['Paiement'].fillna('').str.upper().apply(lambda x: any(k in x for k in ["OK", "OUI", "PAYÉ", "PAYE", "TERMINÉ"]))
+        df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
+        df_st = df_st.dropna(subset=['dt_obj'])
         
-        recette_faite = df_st[df_st['Paye'] == True]['PrixNum'].sum()
-        recette_a_recevoir = df_st[df_st['Paye'] == False]['PrixNum'].sum()
+        # Identification du payé
+        df_st['Is_Paid'] = df_st['Paiement'].fillna('').str.upper().apply(lambda x: any(k in x for k in ["OK", "OUI", "PAYÉ", "PAYE", "TERMINÉ"]))
+        
+        # Séparation stricte par date (votre bloc initial)
+        df_faites = df_st[df_st['dt_obj'] <= maintenant]
+        df_futures = df_st[df_st['dt_obj'] > maintenant]
+        
+        recette_faite = df_faites[df_faites['Is_Paid'] == True]['PrixNum'].sum()
+        recette_a_recevoir = df_faites[df_faites['Is_Paid'] == False]['PrixNum'].sum()
+        recette_future = df_futures['PrixNum'].sum()
 
-    # --- 3. CALCULS MAINTENANCE (Basé sur Maintenance.json) ---
+    # --- 3. CALCULS MAINTENANCE ---
     maint_faite = 0.0
     maint_estimee = 0.0
     f_vesta = 0.0
@@ -482,83 +490,84 @@ elif st.session_state.page == "STATS":
 
     if not df_m.empty:
         df_m['M_Num'] = df_m['Montant'].apply(clean_val)
-        # On s'assure que les colonnes existent
         for col in ['Type', 'Statut']:
             if col not in df_m.columns: df_m[col] = ''
         
-        # Séparation pour le Fromage 2 (Types)
+        # Types pour Fromage 2
         f_vesta = df_m[df_m['Type'].str.contains("VESTA", case=False, na=False)]['M_Num'].sum()
         f_obligatoires = df_m[df_m['Type'].str.contains("OBLIGATOIRE", case=False, na=False)]['M_Num'].sum()
         f_autres = df_m['M_Num'].sum() - (f_vesta + f_obligatoires)
 
-        # Séparation pour le Fromage 3 (Réalisé)
+        # Statuts pour Fromage 3
         maint_faite = df_m[df_m['Statut'].str.upper() == "FAIT"]['M_Num'].sum()
         maint_estimee = df_m[df_m['Statut'].str.upper() != "FAIT"]['M_Num'].sum()
 
-    # --- 4. AFFICHAGE DES 3 FROMAGES ---
-    st.subheader("📊 Analyses Graphiques")
-    col_a, col_b = st.columns(2)
+    # --- 4. AFFICHAGE DES KPI ---
+    st.subheader("📊 Performance Temps Réel")
+    k1, k2, k3 = st.columns(3)
+    k1.metric("Encaissé (Réel)", f"{recette_faite:,.0f} €")
+    k2.metric("À encaisser (Retard)", f"{recette_a_recevoir:,.0f} €", delta_color="inverse")
+    k3.metric("Prévisionnel Futur", f"{recette_future:,.0f} €")
 
-    with col_a:
-        # FROMAGE 1 : SANTÉ FINANCIÈRE (Recettes vs Dépenses totales)
+    st.divider()
+
+    # --- 5. LES 3 FROMAGES ---
+    c1, c2 = st.columns(2)
+    with c1:
+        # FROMAGE 1 : Santé Financière (Argent déjà sorti vs Argent déjà rentré)
         fig1 = px.pie(
-            values=[(maint_faite + maint_estimee), recette_faite, recette_a_recevoir],
-            names=['Total Maintenance', 'Reçu (Encaissé)', 'À recevoir'],
-            title="🎯 Santé Financière (Global)",
+            values=[maint_faite, recette_faite, recette_a_recevoir],
+            names=['Maintenance Payée', 'Recettes Encaissées', 'Recettes en Attente'],
+            title="🎯 Santé Financière (Réalisé)",
             color_discrete_sequence=['#e74c3c', '#2ecc71', '#f1c40f'], hole=0.5
         )
         st.plotly_chart(fig1, use_container_width=True)
 
-    with col_b:
-        # FROMAGE 2 : RÉPARTITION DES COÛTS (Détail maintenance)
+    with c2:
+        # FROMAGE 2 : Répartition des types de dépenses
         fig2 = px.pie(
             values=[f_vesta, f_obligatoires, f_autres],
-            names=['Frais Maint Vesta', 'Frais Obligatoires', 'Frais Autres'],
-            title="💸 Détail des Dépenses",
+            names=['Maintenance Vesta', 'Charges Obligatoires', 'Autres Frais'],
+            title="💸 Nature des Dépenses",
             color_discrete_sequence=['#3498db', '#34495e', '#9b59b6'], hole=0.5
         )
         st.plotly_chart(fig2, use_container_width=True)
 
-    # FROMAGE 3 : RÉALISÉ VS ESTIMÉ (Faits vs Prévisions)
+    # FROMAGE 3 : Bilan Global Faits vs Estimés
     st.write("---")
     fig3 = px.pie(
-        values=[maint_faite, maint_estimee, recette_faite, recette_a_recevoir],
-        names=['Maint. Faite', 'Maint. Estimée', 'Recettes Faites', 'Recettes Estimées'],
-        title="📈 Bilan : Travaux & Recettes (Fait vs Estimé)",
+        values=[maint_faite, maint_estimee, recette_faite, (recette_a_recevoir + recette_future)],
+        names=['Maint. Finie', 'Maint. à Venir', 'Recettes Encaissées', 'Recettes Prévisionnelles'],
+        title="📈 Vision Globale : Fait vs À Venir",
         color_discrete_sequence=['#c0392b', '#ff7675', '#27ae60', '#55efc4'], hole=0.4
     )
     st.plotly_chart(fig3, use_container_width=True)
 
-    # --- 5. TABLEAU MENSUEL (CORRIGÉ SANS MATPLOTLIB) ---
+    # --- 6. TABLEAU MENSUEL ---
     st.subheader("📅 Historique Mensuel 2026")
     all_months = [f"2026-{m:02d}" for m in range(1, 13)]
     df_synth = pd.DataFrame(index=all_months)
-    df_synth.index.name = 'Mois'
     
-    # Intégration Recettes
     if not df_st.empty:
-        df_st['dt'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
-        df_st['MA'] = df_st['dt'].dt.strftime('%Y-%m')
+        df_st['MA'] = df_st['dt_obj'].dt.strftime('%Y-%m')
         df_synth['Recettes'] = df_st.groupby('MA')['PrixNum'].sum()
 
-    # Intégration Maintenance
     if not df_m.empty:
-        df_m['dt'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
-        df_m['MA'] = df_m['dt'].dt.strftime('%Y-%m')
+        df_m['dt_m'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
+        df_m['MA'] = df_m['dt_m'].dt.strftime('%Y-%m')
         df_synth['Maintenance'] = df_m.groupby('MA')['M_Num'].sum()
 
     df_synth = df_synth.fillna(0)
     df_synth['Résultat'] = df_synth['Recettes'] - df_synth['Maintenance']
-    
-    # Affichage simple pour éviter l'ImportError
     st.dataframe(df_synth.style.format("{:.0f} €"), use_container_width=True)
 
-    # --- 6. ZONE DE DANGER ---
+    # --- 7. ZONE DE DANGER ---
     st.divider()
-    if st.button("🗄️ ARCHIVER TOUTES LES MISSIONS (ZONE DE DANGER)", use_container_width=True):
+    if st.button("🗄️ ARCHIVER ZONE DE DANGER", use_container_width=True):
         df_arch = charger_data('archives_contacts.json')
         sauvegarder_data(pd.concat([df_arch, df_c], ignore_index=True), 'archives_contacts.json')
         sauvegarder_data(pd.DataFrame(), 'contacts.json')
+        st.success("Archives créées.")
         st.rerun()
 # =================================================================
 # --- 8. PAGE MAINTENANCE (EDITION & SÉCURITÉ SUPPRESSION) ---
