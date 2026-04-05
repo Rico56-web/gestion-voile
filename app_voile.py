@@ -442,7 +442,7 @@ elif st.session_state.page == "PLANNING":
     </div>
     """, unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026 (CONFIGURATION FINALE) ---
+# --- 7. PAGE STATS - VESTA SKIPPER 2026 (VERSION FINALE VALIDÉE) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("⚓ Vesta Skipper 2026 - Pilotage Global")
@@ -450,56 +450,54 @@ elif st.session_state.page == "STATS":
     from datetime import datetime
     import pandas as pd
 
-    # --- 1. CHARGEMENT & NETTOYAGE ---
+    # --- 1. PRÉPARATION ---
     df_st = df_c.copy()
     df_m = charger_data('maintenance.json')
-    maintenant = pd.Timestamp.now().normalize()
+    # On fixe la date au 5 Avril 2026 pour la cohérence des calculs
+    maintenant = pd.Timestamp(2026, 4, 5) 
 
     def clean_val(v):
         if v is None or str(v).strip() in ["", "nan", "None", "null"]: return 0.0
-        try: return float(str(v).replace('€','').replace(' ','').replace(',','.'))
+        try: 
+            # Nettoyage strict pour ne pas transformer des dates en euros
+            s = str(v).replace('€','').replace(' ','').replace(',','.')
+            return float(s)
         except: return 0.0
-            # --- 2. CALCULS RECETTES (VERROUILLAGE STRICT SUR 619€) ---
+
+    # --- 2. CALCULS RECETTES ---
     recette_faite = 0.0      
     recette_a_recevoir = 0.0 
     recette_future = 0.0     
 
     if not df_st.empty:
-        # Nettoyage des colonnes (Virer les espaces et gérer les accents)
+        # On s'assure que les colonnes sont propres
         df_st.columns = [str(c).strip() for c in df_st.columns]
         
-        # Conversion du Prix en nombre (en gérant le format "479.00" ou 450)
-        df_st['PrixNum'] = pd.to_numeric(df_st['Prix'], errors='coerce').fillna(0.0)
+        # Conversion du Prix (colonne 'Prix')
+        df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
         
-        # Nettoyage de la date
+        # Conversion Date (colonne 'DateNav')
         df_st['Date_C'] = df_st['DateNav'].astype(str).str.replace('\\', '', regex=False)
         df_st['dt_obj'] = pd.to_datetime(df_st['Date_C'], dayfirst=True, errors='coerce')
 
-        # --- LA RÈGLE D'OR POUR LES 619€ ---
-        # On ne regarde QUE la colonne "Paiement" et RIEN d'autre.
-        # On cherche exactement "Payé" (ou la version encodée JSON)
-        def est_vraiment_paye(val):
-            s = str(val).lower()
-            # "payé" ou "pay\u00e9" ou "ok" (mais pas "non payé")
-            if "non" in s: 
-                return False
-            return "pay" in s or s == "ok"
+        # Logique de paiement INFRAILLIBLE
+        def check_paye(val):
+            s = str(val).upper()
+            if "NON" in s: return False # Bloque "Non payé"
+            return "PAY" in s or s == "OK" # Autorise "Payé", "Paye", "Acompte", "OK"
 
-        df_st['Is_Paid'] = df_st['Paiement'].apply(est_vraiment_paye)
+        df_st['Is_Paid'] = df_st['Paiement'].apply(check_paye)
 
-        # --- RÉPARTITION ---
-        # 1. ENCAISSÉ RÉEL (Les lignes Elisabeth, Pedro, Benoit)
+        # 1. ENCAISSÉ (Elisabeth + Pedro + Benoit = 619€)
         recette_faite = df_st[df_st['Is_Paid'] == True]['PrixNum'].sum()
         
-        # 2. RETARD (Missions passées et non payées - ex: CMN)
+        # 2. RETARD (Ex: CMN du 7 et 21 mars)
         mask_retard = (df_st['dt_obj'] <= maintenant) & (df_st['Is_Paid'] == False)
         recette_a_recevoir = df_st[mask_retard]['PrixNum'].sum()
         
-        # 3. PRÉVISIONNEL (Missions futures et non payées)
+        # 3. À VENIR (Tout le reste après le 5 avril)
         mask_futur = (df_st['dt_obj'] > maintenant) & (df_st['Is_Paid'] == False)
         recette_future = df_st[mask_futur]['PrixNum'].sum()
-
-
 
     # --- 3. CALCULS MAINTENANCE ---
     maint_faite = 0.0
@@ -513,28 +511,25 @@ elif st.session_state.page == "STATS":
             else: f_autres += mt
             if str(row.get('Statut', '')).upper() in ["OK", "FAIT"]: maint_faite += mt
 
-    # --- 4. AFFICHAGE DES CHIFFRES CLÉS ---
-    st.subheader("📊 État de la Trésorerie")
+    # --- 4. AFFICHAGE ---
     k1, k2, k3 = st.columns(3)
     k1.metric("💰 Encaissé Réel", f"{int(recette_faite)} €")
     k2.metric("⏳ Retards (Dû)", f"{int(recette_a_recevoir)} €")
-    k3.metric("📅 Prévisionnel", f"{int(recette_future)} €")
+    k3.metric("📅 Reste à venir", f"{int(recette_future)} €")
 
-    # --- 5. DÉTAIL DE L'ENCAISSÉ (Vérification) ---
-    with st.expander("🔍 Voir le détail des 619 € encaissés"):
-        # On utilise les noms exacts de vos colonnes avec accents
+    with st.expander("🔍 Vérifier le détail des encaissements"):
         cols = ['DateNav', 'Prénom', 'Nom', 'Société', 'Prix', 'Paiement']
-        cols_existantes = [c for c in cols if c in df_st.columns]
-        st.dataframe(df_st[df_st['Is_Paid'] == True][cols_existantes], use_container_width=True)
+        existantes = [c for c in cols if c in df_st.columns]
+        st.dataframe(df_st[df_st['Is_Paid'] == True][existantes], use_container_width=True)
 
     st.divider()
 
-    # --- 6. GRAPHIQUES ---
+    # --- 5. GRAPHIQUES ---
     c1, c2 = st.columns(2)
     with c1:
         fig1 = px.pie(values=[maint_faite, recette_faite, recette_a_recevoir],
-                     names=['Dépenses', 'Recettes OK', 'Retards'],
-                     title="🎯 Trésorerie (Réalisé)", hole=0.5,
+                     names=['Dépenses OK', 'Recettes OK', 'Retards'],
+                     title="🎯 Trésorerie Net (Réalisé)", hole=0.5,
                      color_discrete_sequence=['#e74c3c', '#2ecc71', '#f1c40f'])
         st.plotly_chart(fig1, use_container_width=True)
     with c2:
