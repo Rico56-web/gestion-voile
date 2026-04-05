@@ -442,7 +442,7 @@ elif st.session_state.page == "PLANNING":
     </div>
     """, unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER 2026-2028 (PILOTAGE FINANCIER) ---
+# --- 7. PAGE STATS - VESTA SKIPPER (PILOTAGE FINANCIER COMPLET) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("⚓ Pilotage Financier - Vesta Skipper")
@@ -460,21 +460,20 @@ elif st.session_state.page == "STATS":
                             ["Réel (Jusqu'à aujourd'hui)", "Prévisionnel (Année complète)"], 
                             horizontal=True)
 
-    # --- 2. PRÉPARATION DES DONNÉES ---
+    # --- 2. PRÉPARATION ET NETTOYAGE ---
     df_st = df_c.copy()
     df_m = charger_data('maintenance.json')
-    maintenant = pd.Timestamp(2026, 4, 5) # Date pivot fixe pour vos tests
+    maintenant = pd.Timestamp(2026, 4, 5) # Date pivot pour calculs "Réel"
 
     def clean_val(v):
         if v is None or str(v).strip() in ["", "nan", "None", "null"]: return 0.0
         try: return float(str(v).replace('€','').replace(' ','').replace(',','.'))
         except: return 0.0
 
-    # Nettoyage Recettes
+    # Nettoyage Recettes (Colonnes Internes pour éviter KeyError)
     df_st.columns = [str(c).strip() for c in df_st.columns]
-    df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
-    df_st['Date_C'] = df_st['DateNav'].astype(str).str.replace('\\', '', regex=False)
-    df_st['dt_obj'] = pd.to_datetime(df_st['Date_C'], dayfirst=True, errors='coerce')
+    df_st['P_NET'] = df_st['Prix'].apply(clean_val)
+    df_st['DT_NET'] = pd.to_datetime(df_st['DateNav'].astype(str).str.replace('\\', '', regex=False), dayfirst=True, errors='coerce')
     
     # Nettoyage Maintenance
     if not df_m.empty:
@@ -482,37 +481,38 @@ elif st.session_state.page == "STATS":
         df_m['M_Calc'] = df_m['M_Num'] if 'M_Num' in df_m.columns else df_m['Montant'].apply(clean_val)
         df_m['dt_m'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
 
-    # Application du filtre Année
-    df_st = df_st[df_st['dt_obj'].dt.year == annee_choisie]
-    if not df_m.empty:
-        df_m = df_m[df_m['dt_m'].dt.year == annee_choisie]
-
-    # Application du filtre "À ce jour" si sélectionné
-    if mode_vue == "Réel (Jusqu'à aujourd'hui)":
-        df_st = df_st[df_st['dt_obj'] <= maintenant]
-        if not df_m.empty:
-            df_m = df_m[df_m['dt_m'] <= maintenant]
-
-    # Logique Paiement (Anti-erreur "Non payé")
+    # Logique de paiement
     def check_paye(val):
         s = str(val).upper()
         if "NON" in s: return False
         return "PAY" in s or s == "OK"
-    df_st['Is_Paid'] = df_st['Paiement'].apply(check_paye)
+    df_st['IS_PAID_NET'] = df_st['Paiement'].apply(check_paye) if 'Paiement' in df_st.columns else False
 
-    # --- 3. CALCULS TRÉSORERIE ---
-    recette_faite = df_st[df_st['Is_Paid'] == True]['PrixNum'].sum()
-    recette_a_recevoir = df_st[(df_st['dt_obj'] <= maintenant) & (df_st['Is_Paid'] == False)]['PrixNum'].sum()
+    # --- 3. APPLICATION DES FILTRES TEMPPORELS ---
+    # Filtre Année
+    df_st_an = df_st[df_st['DT_NET'].dt.year == annee_choisie]
+    df_m_an = df_m[df_m['dt_m'].dt.year == annee_choisie] if not df_m.empty else pd.DataFrame()
+
+    # Filtre "À ce jour" (pour les fromages et KPI)
+    if mode_vue == "Réel (Jusqu'à aujourd'hui)":
+        df_viz_rec = df_st_an[df_st_an['DT_NET'] <= maintenant]
+        df_viz_m = df_m_an[df_m_an['dt_m'] <= maintenant] if not df_m_an.empty else pd.DataFrame()
+    else:
+        df_viz_rec = df_st_an
+        df_viz_m = df_m_an
+
+    # --- 4. CALCULS KPI ---
+    recette_faite = df_viz_rec[df_viz_rec['IS_PAID_NET'] == True]['P_NET'].sum()
+    recette_a_recevoir = df_viz_rec[(df_viz_rec['DT_NET'] <= maintenant) & (df_viz_rec['IS_PAID_NET'] == False)]['P_NET'].sum()
     
-    # --- 4. CATÉGORISATION DES FRAIS ---
     frais_par_cat = {"Assurances": 0.0, "Port": 0.0, "Maintenance": 0.0, "Autres": 0.0}
-    if not df_m.empty:
-        for _, row in df_m.iterrows():
+    if not df_viz_m.empty:
+        for _, row in df_viz_m.iterrows():
             obj = str(row.get('Objet', '')).upper()
             mt = row['M_Calc']
             if any(x in obj for x in ["MAIF", "ASSUR"]): frais_par_cat["Assurances"] += mt
             elif "PORT" in obj: frais_par_cat["Port"] += mt
-            elif "VESTA" in obj or "MAINT" in obj: frais_par_cat["Maintenance"] += mt
+            elif any(x in obj for x in ["VESTA", "MAINT"]): frais_par_cat["Maintenance"] += mt
             else: frais_par_cat["Autres"] += mt
     
     total_frais = sum(frais_par_cat.values())
@@ -523,38 +523,48 @@ elif st.session_state.page == "STATS":
     k1.metric("💰 Encaissé Réel", f"{int(recette_faite)} €")
     k2.metric("⏳ Retards (Dû)", f"{int(recette_a_recevoir)} €")
     k3.metric("💸 Frais Total", f"{int(total_frais)} €")
-    k4.metric("📈 Solde Net", f"{int(recette_faite - total_frais)} €", delta_color="normal")
+    k4.metric("📈 Solde Net", f"{int(recette_faite - total_frais)} €")
 
-# --- 7. TABLEAU COMPTABLE MENSUEL ---
+    # --- 6. GRAPHIQUES "FROMAGES" & DÉTAILS ---
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("🎯 Trésorerie Net")
+        fig1 = px.pie(values=[total_frais, recette_faite, recette_a_recevoir],
+                     names=['Dépenses', 'Encaissé', 'Retards'],
+                     hole=0.5, color_discrete_sequence=['#e74c3c', '#2ecc71', '#f1c40f'])
+        st.plotly_chart(fig1, use_container_width=True, key=f"pie_treso_{annee_choisie}_{mode_vue[:3]}")
+        
+        with st.expander("📄 Détails des Recettes"):
+            cols_show = [c for c in ['DateNav', 'Nom', 'Prix', 'Paiement'] if c in df_viz_rec.columns]
+            st.dataframe(df_viz_rec[cols_show], use_container_width=True)
+            st.info(f"**Total affiché : {int(df_viz_rec['P_NET'].sum())} €**")
+
+    with c2:
+        st.subheader("💸 Nature des Frais")
+        fig2 = px.pie(values=list(frais_par_cat.values()), names=list(frais_par_cat.keys()),
+                     hole=0.5, color_discrete_sequence=px.colors.qualitative.T10)
+        st.plotly_chart(fig2, use_container_width=True, key=f"pie_frais_{annee_choisie}_{mode_vue[:3]}")
+        
+        with st.expander("📄 Détails des Dépenses"):
+            if not df_viz_m.empty:
+                df_det_m = df_viz_m[['Date', 'Objet', 'M_Calc']].copy()
+                df_det_m.columns = ['Date', 'Objet', 'Montant (€)']
+                st.dataframe(df_det_m, use_container_width=True)
+                st.info(f"**Total frais affichés : {int(df_viz_m['M_Calc'].sum())} €**")
+
+    st.divider()
+
+    # --- 7. TABLEAU COMPTABLE MENSUEL ---
     st.subheader(f"📈 Bilan Mensuel - {annee_choisie}")
-    
     mois_labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
     stats_mensuelles = []
 
-    # 1. On prépare une copie de travail propre UNIQUE
-    df_calc = df_c.copy()
-    df_calc.columns = [str(c).strip() for c in df_calc.columns] # Nettoyage noms colonnes
-    
-    # 2. On crée les colonnes numériques et dates de façon sécurisée
-    df_calc['P_NET'] = df_calc['Prix'].apply(clean_val)
-    df_calc['DT_NET'] = pd.to_datetime(df_calc['DateNav'].astype(str).str.replace('\\', '', regex=False), dayfirst=True, errors='coerce')
-    
-    # 3. On définit le statut payé AVANT la boucle
-    if 'Paiement' in df_calc.columns:
-        df_calc['IS_PAID_NET'] = df_calc['Paiement'].apply(check_paye)
-    else:
-        df_calc['IS_PAID_NET'] = False
-
-    # 4. BOUCLE DE CALCUL
     for m in range(1, 13):
-        # Filtre par mois et année sur les colonnes "NET" qu'on vient de créer
-        mask = (df_calc['DT_NET'].dt.month == m) & (df_calc['DT_NET'].dt.year == annee_choisie)
-        rec_m = df_calc[mask]
+        # On utilise toujours le DF de l'année entière pour le tableau mensuel
+        mask = (df_st_an['DT_NET'].dt.month == m)
+        rec_m = df_st_an[mask]
+        frais_m = df_m_an[df_m_an['dt_m'].dt.month == m] if not df_m_an.empty else pd.DataFrame()
         
-        # Filtre maintenance
-        frais_m = df_m[(df_m['dt_m'].dt.month == m) & (df_m['dt_m'].dt.year == annee_choisie)] if not df_m.empty else pd.DataFrame()
-        
-        # Calculs simplifiés (on utilise les noms de colonnes NET)
         ca_prevu = rec_m['P_NET'].sum()
         recu = rec_m[rec_m['IS_PAID_NET'] == True]['P_NET'].sum()
         depenses = frais_m['M_Calc'].sum() if not frais_m.empty else 0.0
@@ -566,17 +576,13 @@ elif st.session_state.page == "STATS":
             "À recevoir": f"{int(ca_prevu - recu)} €",
             "Frais": f"{int(depenses)} €",
             "Solde Net": f"{int(recu - depenses)} €",
-            "v_recu": recu,
-            "v_frais": depenses,
-            "v_solde": recu - depenses
+            "v_recu": recu, "v_frais": depenses, "v_solde": recu - depenses
         })
 
-    # --- 8. AFFICHAGE FINAL ---
     df_final_table = pd.DataFrame(stats_mensuelles)
-    # Affichage du tableau (uniquement les colonnes texte)
     st.table(df_final_table.set_index("Mois")[["Recette Prévue", "Reçu (Encaissé)", "À recevoir", "Frais", "Solde Net"]])
 
-    # Graphique de Performance
+    # --- 8. GRAPHIQUE DE PERFORMANCE ---
     fig_perf = go.Figure()
     fig_perf.add_trace(go.Bar(x=df_final_table['Mois'], y=df_final_table['v_recu'], name='Reçu', marker_color='#2ecc71'))
     fig_perf.add_trace(go.Bar(x=df_final_table['Mois'], y=df_final_table['v_frais'], name='Frais', marker_color='#e74c3c'))
@@ -584,67 +590,7 @@ elif st.session_state.page == "STATS":
                                  line=dict(color='gold', width=3), mode='lines+markers'))
     
     fig_perf.update_layout(title=f"Performance Mensuelle {annee_choisie}", barmode='group', template="plotly_dark")
-    st.plotly_chart(fig_perf, use_container_width=True)
-# --- 7. TABLEAU COMPTABLE MENSUEL ---
-    st.subheader(f"📈 Bilan Mensuel - {annee_choisie}")
-    
-    mois_labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
-    stats_mensuelles = []
-
-    # 1. On prépare une copie de travail propre UNIQUE
-    df_calc = df_c.copy()
-    df_calc.columns = [str(c).strip() for c in df_calc.columns] # Nettoyage noms colonnes
-    
-    # 2. On crée les colonnes numériques et dates de façon sécurisée
-    df_calc['P_NET'] = df_calc['Prix'].apply(clean_val)
-    df_calc['DT_NET'] = pd.to_datetime(df_calc['DateNav'].astype(str).str.replace('\\', '', regex=False), dayfirst=True, errors='coerce')
-    
-    # 3. On définit le statut payé AVANT la boucle
-    if 'Paiement' in df_calc.columns:
-        df_calc['IS_PAID_NET'] = df_calc['Paiement'].apply(check_paye)
-    else:
-        df_calc['IS_PAID_NET'] = False
-
-    # 4. BOUCLE DE CALCUL
-    for m in range(1, 13):
-        # Filtre par mois et année sur les colonnes "NET" qu'on vient de créer
-        mask = (df_calc['DT_NET'].dt.month == m) & (df_calc['DT_NET'].dt.year == annee_choisie)
-        rec_m = df_calc[mask]
-        
-        # Filtre maintenance
-        frais_m = df_m[(df_m['dt_m'].dt.month == m) & (df_m['dt_m'].dt.year == annee_choisie)] if not df_m.empty else pd.DataFrame()
-        
-        # Calculs simplifiés (on utilise les noms de colonnes NET)
-        ca_prevu = rec_m['P_NET'].sum()
-        recu = rec_m[rec_m['IS_PAID_NET'] == True]['P_NET'].sum()
-        depenses = frais_m['M_Calc'].sum() if not frais_m.empty else 0.0
-        
-        stats_mensuelles.append({
-            "Mois": mois_labels[m-1],
-            "Recette Prévue": f"{int(ca_prevu)} €",
-            "Reçu (Encaissé)": f"{int(recu)} €",
-            "À recevoir": f"{int(ca_prevu - recu)} €",
-            "Frais": f"{int(depenses)} €",
-            "Solde Net": f"{int(recu - depenses)} €",
-            "v_recu": recu,
-            "v_frais": depenses,
-            "v_solde": recu - depenses
-        })
-
-    # --- 8. AFFICHAGE FINAL ---
-    df_final_table = pd.DataFrame(stats_mensuelles)
-    # Affichage du tableau (uniquement les colonnes texte)
-    st.table(df_final_table.set_index("Mois")[["Recette Prévue", "Reçu (Encaissé)", "À recevoir", "Frais", "Solde Net"]])
-
-    # Graphique de Performance
-    fig_perf = go.Figure()
-    fig_perf.add_trace(go.Bar(x=df_final_table['Mois'], y=df_final_table['v_recu'], name='Reçu', marker_color='#2ecc71'))
-    fig_perf.add_trace(go.Bar(x=df_final_table['Mois'], y=df_final_table['v_frais'], name='Frais', marker_color='#e74c3c'))
-    fig_perf.add_trace(go.Scatter(x=df_final_table['Mois'], y=df_final_table['v_solde'], name='Solde Net', 
-                                 line=dict(color='gold', width=3), mode='lines+markers'))
-    
-    fig_perf.update_layout(title=f"Performance Mensuelle {annee_choisie}", barmode='group', template="plotly_dark")
-    st.plotly_chart(fig_perf, use_container_width=True)
+    st.plotly_chart(fig_perf, use_container_width=True, key=f"bar_perf_{annee_choisie}")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (EDITION & SÉCURITÉ SUPPRESSION) ---
