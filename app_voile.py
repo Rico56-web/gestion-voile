@@ -442,7 +442,7 @@ elif st.session_state.page == "PLANNING":
     </div>
     """, unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER PRO (INTEGRATION COMPLÈTE) ---
+# --- 7. PAGE STATS - VESTA SKIPPER PRO (VERSION FIXÉE) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("⚓ Vesta Skipper Pro - Pilotage Global")
@@ -450,147 +450,116 @@ elif st.session_state.page == "STATS":
     from datetime import datetime
     import pandas as pd
 
-    # --- 1. CHARGEMENT ET NETTOYAGE DES DONNÉES ---
+    # --- 1. CHARGEMENT ---
     df_st = df_c.copy()
     df_m = charger_data('maintenance.json')
     
-    # Nettoyage des colonnes (suppression des espaces invisibles)
     df_st.columns = [str(c).strip() for c in df_st.columns]
-    if not df_m.empty:
-        df_m.columns = [str(c).strip() for c in df_m.columns]
-
+    
     def clean_val(v):
         if v is None or str(v).strip() in ["", "nan", "None", "null"]: return 0.0
-        try: 
-            return float(str(v).replace('€','').replace(' ','').replace(',','.'))
+        try: return float(str(v).replace('€','').replace(' ','').replace(',','.'))
         except: return 0.0
 
-    def is_paid_json(row):
-        p = str(row.get('Paiement', '')).strip().upper()
-        # Si le champ est vide mais que la date est passée, on peut aussi checker le statut
-        return any(x in p for x in ["PAYÉ", "PAYE", "OK", "OUI", "TERMINÉ", "PAID"])
+    # --- 2. CALCULS RECETTES (Basé sur Contacts/Missions) ---
+    recette_faite = 0.0
+    recette_a_recevoir = 0.0
+    
+    if not df_st.empty:
+        df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
+        # Identification simplifiée du payé
+        df_st['Paye'] = df_st['Paiement'].fillna('').str.upper().apply(lambda x: any(k in x for k in ["OK", "OUI", "PAYÉ", "PAYE", "TERMINÉ"]))
+        
+        recette_faite = df_st[df_st['Paye'] == True]['PrixNum'].sum()
+        recette_a_recevoir = df_st[df_st['Paye'] == False]['PrixNum'].sum()
 
-    # --- 2. LOGIQUE D'INTEGRATION POUR LA MAINTENANCE ---
+    # --- 3. CALCULS MAINTENANCE (Basé sur Maintenance.json) ---
     maint_faite = 0.0
     maint_estimee = 0.0
-    frais_vesta = 0.0
-    frais_autres = 0.0
-    frais_obligatoires = 0.0
+    f_vesta = 0.0
+    f_autres = 0.0
+    f_obligatoires = 0.0
 
     if not df_m.empty:
         df_m['M_Num'] = df_m['Montant'].apply(clean_val)
+        # On s'assure que les colonnes existent
+        for col in ['Type', 'Statut']:
+            if col not in df_m.columns: df_m[col] = ''
         
-        # Intelligence artificielle de secours : si 'Type' ou 'Statut' n'existent pas encore dans le JSON
-        if 'Type' not in df_m.columns: df_m['Type'] = 'Frais Autres'
-        if 'Statut' not in df_m.columns: df_m['Statut'] = 'Fait' # On assume que l'ancien est fait
+        # Séparation pour le Fromage 2 (Types)
+        f_vesta = df_m[df_m['Type'].str.contains("VESTA", case=False, na=False)]['M_Num'].sum()
+        f_obligatoires = df_m[df_m['Type'].str.contains("OBLIGATOIRE", case=False, na=False)]['M_Num'].sum()
+        f_autres = df_m['M_Num'].sum() - (f_vesta + f_obligatoires)
 
-        for idx, r in df_m.iterrows():
-            mt = r['M_Num']
-            t = str(r.get('Type', '')).upper()
-            s = str(r.get('Statut', '')).upper()
-            obj = str(r.get('Objet', '')).upper()
+        # Séparation pour le Fromage 3 (Réalisé)
+        maint_faite = df_m[df_m['Statut'].str.upper() == "FAIT"]['M_Num'].sum()
+        maint_estimee = df_m[df_m['Statut'].str.upper() != "FAIT"]['M_Num'].sum()
 
-            # Classement automatique par mots-clés pour les anciennes données
-            if "VESTA" in obj or "VESTA" in t:
-                frais_vesta += mt
-            elif any(x in obj for x in ["PORT", "ASSURANCE", "PLACE", "DGAN", "TAXE"]) or "OBLIGATOIRE" in t:
-                frais_obligatoires += mt
-            else:
-                frais_autres += mt
+    # --- 4. AFFICHAGE DES 3 FROMAGES ---
+    st.subheader("📊 Analyses Graphiques")
+    col_a, col_b = st.columns(2)
 
-            # Classement par statut
-            if s == "FAIT" or s == "OK":
-                maint_faite += mt
-            else:
-                maint_estimee += mt
-
-    # --- 3. LOGIQUE D'INTEGRATION POUR LES RECETTES ---
-    if not df_st.empty:
-        df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
-        df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
-        df_st['Is_Paid'] = df_st.apply(is_paid_json, axis=1)
-        
-        recette_faite = df_st[df_st['Is_Paid']]['PrixNum'].sum()
-        recette_a_recevoir = df_st[~df_st['Is_Paid']]['PrixNum'].sum()
-
-        # --- 4. AFFICHAGE DES KPI ---
-        st.subheader("📊 Performance 2026")
-        k1, k2, k3 = st.columns(3)
-        total_ca = recette_faite + recette_a_recevoir
-        k1.metric("CA Prévisionnel", f"{total_ca:,.0f} €")
-        k2.metric("Encaissé", f"{recette_faite:,.0f} €", delta=f"{recette_a_recevoir:,.0f} € à venir", delta_color="normal")
-        k3.metric("Charges Totales", f"{(maint_faite + maint_estimee):,.0f} €")
-
-        st.divider()
-
-        # --- 5. LES 3 FROMAGES DEMANDÉS ---
-        c_f1, c_f2 = st.columns(2)
-        
-        with c_f1:
-            # Fromage 1 : Santé Financière (Maintenance vs Recettes)
-            fig1 = px.pie(
-                values=[(maint_faite + maint_estimee), recette_faite, recette_a_recevoir],
-                names=['Total Maintenance', 'Reçu', 'À recevoir'],
-                title="Santé Financière",
-                color_discrete_sequence=['#e74c3c', '#2ecc71', '#f1c40f'], hole=0.5
-            )
-            st.plotly_chart(fig1, use_container_width=True)
-
-        with c_f2:
-            # Fromage 2 : Détail des Coûts Maintenance
-            fig2 = px.pie(
-                values=[frais_vesta, frais_autres, frais_obligatoires],
-                names=['Frais Maint Vesta', 'Frais Autres', 'Frais Obligatoires'],
-                title="Répartition des Coûts",
-                color_discrete_sequence=['#3498db', '#9b59b6', '#34495e'], hole=0.5
-            )
-            st.plotly_chart(fig2, use_container_width=True)
-
-        # Fromage 3 : Réalisé vs Estimé (Global)
-        st.write("---")
-        fig3 = px.pie(
-            values=[maint_faite, maint_estimee, recette_faite, recette_a_recevoir],
-            names=['Maint. Faite', 'Maint. Estimée', 'Recettes Faites', 'Recettes Estimées'],
-            title="Bilan : Faits vs Estimés",
-            color_discrete_sequence=['#c0392b', '#ff7675', '#27ae60', '#55efc4'], hole=0.4
+    with col_a:
+        # FROMAGE 1 : SANTÉ FINANCIÈRE (Recettes vs Dépenses totales)
+        fig1 = px.pie(
+            values=[(maint_faite + maint_estimee), recette_faite, recette_a_recevoir],
+            names=['Total Maintenance', 'Reçu (Encaissé)', 'À recevoir'],
+            title="🎯 Santé Financière (Global)",
+            color_discrete_sequence=['#e74c3c', '#2ecc71', '#f1c40f'], hole=0.5
         )
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig1, use_container_width=True)
 
-        # --- 6. HISTORIQUE COMPTABLE MENSUEL (JANVIER À DÉCEMBRE) ---
-        st.subheader("📅 Historique Mensuel 2026")
-        all_months = [f"2026-{m:02d}" for m in range(1, 13)]
-        df_synth = pd.DataFrame(index=all_months)
-        df_synth.index.name = 'Mois'
-        
-        # Recettes par mois
-        df_st['MA'] = df_st['dt_obj'].dt.strftime('%Y-%m')
-        df_m_ca = df_st.groupby('MA')['PrixNum'].sum()
-        
-        # Maintenance par mois
-        df_m['dt_m'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
-        df_m['MA'] = df_m['dt_m'].dt.strftime('%Y-%m')
-        df_m_sum = df_m.groupby('MA')['M_Num'].sum()
-        
-        df_synth['Recettes'] = df_m_ca
-        df_synth['Maintenance'] = df_m_sum
-        df_synth = df_synth.fillna(0)
-        df_synth['Résultat'] = df_synth['Recettes'] - df_synth['Maintenance']
-        
-        st.dataframe(df_synth.style.format("{:.0f} €").background_gradient(cmap='RdYlGn', subset=['Résultat']), use_container_width=True)
+    with col_b:
+        # FROMAGE 2 : RÉPARTITION DES COÛTS (Détail maintenance)
+        fig2 = px.pie(
+            values=[f_vesta, f_obligatoires, f_autres],
+            names=['Frais Maint Vesta', 'Frais Obligatoires', 'Frais Autres'],
+            title="💸 Détail des Dépenses",
+            color_discrete_sequence=['#3498db', '#34495e', '#9b59b6'], hole=0.5
+        )
+        st.plotly_chart(fig2, use_container_width=True)
 
-        # --- 7. ZONE DE DANGER ---
-        st.divider()
-        with st.expander("🚨 ARCHIVER ZONE DE DANGER"):
-            st.error("Cette action déplacera toutes les missions actuelles vers les archives.")
-            if st.button("CONFIRMER L'ARCHIVAGE GLOBAL", use_container_width=True):
-                df_arch = charger_data('archives_contacts.json')
-                # Nettoyage des colonnes techniques avant archivage
-                cols_to_keep = [c for c in df_st.columns if c not in ['dt_obj', 'MA', 'PrixNum', 'Is_Paid', 'Société_Clean']]
-                sauvegarder_data(pd.concat([df_arch, df_st[cols_to_keep]], ignore_index=True), 'archives_contacts.json')
-                sauvegarder_data(pd.DataFrame(), 'contacts.json')
-                st.rerun()
-    else:
-        st.warning("Aucune donnée de navigation pour 2026.")
+    # FROMAGE 3 : RÉALISÉ VS ESTIMÉ (Faits vs Prévisions)
+    st.write("---")
+    fig3 = px.pie(
+        values=[maint_faite, maint_estimee, recette_faite, recette_a_recevoir],
+        names=['Maint. Faite', 'Maint. Estimée', 'Recettes Faites', 'Recettes Estimées'],
+        title="📈 Bilan : Travaux & Recettes (Fait vs Estimé)",
+        color_discrete_sequence=['#c0392b', '#ff7675', '#27ae60', '#55efc4'], hole=0.4
+    )
+    st.plotly_chart(fig3, use_container_width=True)
+
+    # --- 5. TABLEAU MENSUEL (CORRIGÉ SANS MATPLOTLIB) ---
+    st.subheader("📅 Historique Mensuel 2026")
+    all_months = [f"2026-{m:02d}" for m in range(1, 13)]
+    df_synth = pd.DataFrame(index=all_months)
+    df_synth.index.name = 'Mois'
+    
+    # Intégration Recettes
+    if not df_st.empty:
+        df_st['dt'] = pd.to_datetime(df_st['DateNav'], format='%d/%m/%Y', errors='coerce')
+        df_st['MA'] = df_st['dt'].dt.strftime('%Y-%m')
+        df_synth['Recettes'] = df_st.groupby('MA')['PrixNum'].sum()
+
+    # Intégration Maintenance
+    if not df_m.empty:
+        df_m['dt'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
+        df_m['MA'] = df_m['dt'].dt.strftime('%Y-%m')
+        df_synth['Maintenance'] = df_m.groupby('MA')['M_Num'].sum()
+
+    df_synth = df_synth.fillna(0)
+    df_synth['Résultat'] = df_synth['Recettes'] - df_synth['Maintenance']
+    
+    # Affichage simple pour éviter l'ImportError
+    st.dataframe(df_synth.style.format("{:.0f} €"), use_container_width=True)
+
+    # --- 6. ZONE DE DANGER ---
+    st.divider()
+    if st.button("🗄️ ARCHIVER TOUTES LES MISSIONS (ZONE DE DANGER)", use_container_width=True):
+        df_arch = charger_data('archives_contacts.json')
+        sauvegarder_data(pd.concat([df_arch, df_c], ignore_index=True), 'archives_contacts.json')
+        sauvegarder_data(pd.DataFrame(), 'contacts.json')
+        st.rerun()
 # =================================================================
 # --- 8. PAGE MAINTENANCE (EDITION & SÉCURITÉ SUPPRESSION) ---
 # =================================================================
