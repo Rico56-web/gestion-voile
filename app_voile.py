@@ -442,10 +442,7 @@ elif st.session_state.page == "PLANNING":
     </div>
     """, unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER PRO (VERSION SYNCHRO DATE) ---
-# =================================================================
-# =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER PRO (CORRECTION FINALE) ---
+# --- 7. PAGE STATS - VESTA SKIPPER PRO (VERSION FINALE VALIDÉE) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("⚓ Vesta Skipper Pro - Pilotage Global")
@@ -463,8 +460,8 @@ elif st.session_state.page == "STATS":
         try: return float(str(v).replace('€','').replace(' ','').replace(',','.'))
         except: return 0.0
 
-    # --- 2. INITIALISATION DE TOUTES LES VARIABLES (Évite le NameError) ---
-    recette_faite = 0.0      # Devrait être 619
+    # --- 2. INITIALISATION DES VARIABLES ---
+    recette_faite = 0.0      
     recette_a_recevoir = 0.0 
     recette_future = 0.0     
     maint_faite = 0.0
@@ -473,20 +470,22 @@ elif st.session_state.page == "STATS":
     f_autres = 0.0
     f_obligatoires = 0.0
 
-    # --- 3. CALCULS RECETTES (LOGIQUE STRICTE 619€) ---
+    # --- 3. CALCULS RECETTES (Cible: 619€) ---
     if not df_st.empty:
+        # Nettoyage et conversion
         df_st['PrixNum'] = df_st['Prix'].apply(clean_val)
-        # Format français Jours/Mois/Année
-        df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'], dayfirst=True, errors='coerce')
+        # On gère le format de date 15/04/2026 même avec les backslashs du JSON
+        df_st['dt_obj'] = pd.to_datetime(df_st['DateNav'].str.replace('\\', '', regex=False), dayfirst=True, errors='coerce')
         df_st = df_st.dropna(subset=['dt_obj'])
 
+        # Détection du paiement
         def est_encaisse(val):
             p = str(val).upper().strip()
             return any(k in p for k in ["OK", "OUI", "PAYÉ", "PAYE", "TERMINÉ", "PAID"])
 
+        # On applique le filtre Passé / Futur de manière très stricte
         df_st['Is_Paid'] = df_st['Paiement'].apply(est_encaisse)
         
-        # Séparation Passé / Futur
         df_passe = df_st[df_st['dt_obj'] <= maintenant].copy()
         df_futur = df_st[df_st['dt_obj'] > maintenant].copy()
 
@@ -497,62 +496,68 @@ elif st.session_state.page == "STATS":
         if not df_futur.empty:
             recette_future = df_futur['PrixNum'].sum()
 
-    # --- 4. CALCULS MAINTENANCE ---
+    # --- 4. CALCULS MAINTENANCE (Basé sur votre JSON) ---
     if not df_m.empty:
-        df_m['M_Num'] = df_m['Montant'].apply(clean_val)
-        # Sécurité colonnes
-        for col in ['Type', 'Statut']:
-            if col not in df_m.columns: df_m[col] = ''
+        # Utilisation de M_Num si présent, sinon Montant
+        df_m['M_Calc'] = df_m['M_Num'] if 'M_Num' in df_m.columns else df_m['Montant'].apply(clean_val)
         
-        # Types
-        f_vesta = df_m[df_m['Type'].str.contains("VESTA", case=False, na=False)]['M_Num'].sum()
-        f_obligatoires = df_m[df_m['Type'].str.contains("OBLIGATOIRE", case=False, na=False)]['M_Num'].sum()
-        f_autres = df_m['M_Num'].sum() - (f_vesta + f_obligatoires)
+        for idx, row in df_m.iterrows():
+            mt = row['M_Calc']
+            obj = str(row.get('Objet', '')).upper()
+            typ = str(row.get('Type', '')).upper()
+            stat = str(row.get('Statut', '')).upper()
 
-        # Statuts
-        maint_faite = df_m[df_m['Statut'].str.upper() == "FAIT"]['M_Num'].sum()
-        maint_estimee = df_m[df_m['Statut'].str.upper() != "FAIT"]['M_Num'].sum()
+            # Classement par Type (avec sécurité pour le 'null')
+            if "VESTA" in obj or "VESTA" in typ:
+                f_vesta += mt
+            elif any(x in obj for x in ["ASSURANCE", "PORT", "PLACE", "MAIF", "DGAN"]) or "OBLIGATOIRE" in typ:
+                f_obligatoires += mt
+            else:
+                f_autres += mt
+
+            # Classement par Statut
+            if stat in ["OK", "FAIT"]:
+                maint_faite += mt
+            else:
+                maint_estimee += mt
 
     # --- 5. AFFICHAGE DES KPI ---
     st.subheader("📊 Performance Réelle")
     k1, k2, k3 = st.columns(3)
     k1.metric("Encaissé (Réel)", f"{int(recette_faite)} €")
-    k2.metric("À recevoir (Retard)", f"{int(recette_a_recevoir)} €")
+    k2.metric("Retards (Passé)", f"{int(recette_a_recevoir)} €")
     k3.metric("Prévisionnel Futur", f"{int(recette_future)} €")
-
-    # OPTIONNEL : Tableau de contrôle si le chiffre est toujours faux
-    with st.expander("🔍 Vérifier le détail de l'Encaissé (619€)"):
-        if not df_st.empty:
-            check = df_passe[df_passe['Is_Paid'] == True][['DateNav', 'Client', 'Prix', 'Paiement']]
-            st.dataframe(check, use_container_width=True)
 
     st.divider()
 
     # --- 6. LES 3 FROMAGES ---
     c1, c2 = st.columns(2)
     with c1:
+        # Comparaison Argent Rentré (619) vs Argent Sorti (Maintenance Faite)
         fig1 = px.pie(
             values=[maint_faite, recette_faite, recette_a_recevoir],
-            names=['Dépenses Réelles', 'Recettes Encaissées', 'Retards de Paiement'],
-            title="🎯 Santé Financière (Réalisé)",
+            names=['Dépenses Réelles', 'Recettes Encaissées', 'Retards'],
+            title="🎯 Flux de Trésorerie (Réalisé)",
             color_discrete_sequence=['#e74c3c', '#2ecc71', '#f1c40f'], hole=0.5
         )
         st.plotly_chart(fig1, use_container_width=True)
 
     with c2:
+        # Répartition par nature (Vesta, Assurances, etc.)
         fig2 = px.pie(
             values=[f_vesta, f_obligatoires, f_autres],
-            names=['Maintenance Vesta', 'Charges Obligatoires', 'Autres Frais'],
-            title="💸 Nature des Dépenses",
+            names=['Maint. Vesta', 'Assurances/Port', 'Autres'],
+            title="💸 Nature des Charges",
             color_discrete_sequence=['#3498db', '#34495e', '#9b59b6'], hole=0.5
         )
         st.plotly_chart(fig2, use_container_width=True)
 
     st.write("---")
+    # Vision globale : Tout le réalisé vs Tout le futur
     fig3 = px.pie(
         values=[maint_faite, maint_estimee, recette_faite, (recette_a_recevoir + recette_future)],
-        names=['Maint. Finie', 'Maint. à Venir', 'Recettes Encaissées', 'Recettes Prévisionnelles'],
-        title="📈 Vision Globale (Fait vs À Venir)",
+        names=['Maint. OK', 'Maint. à Venir', 'CA Encaissé', 'CA à Venir'],
+        title="📈 Bilan Annuel Estimé",
         color_discrete_sequence=['#c0392b', '#ff7675', '#27ae60', '#55efc4'], hole=0.4
     )
     st.plotly_chart(fig3, use_container_width=True)
@@ -567,22 +572,13 @@ elif st.session_state.page == "STATS":
         df_synth['Recettes'] = df_st.groupby('MA')['PrixNum'].sum()
 
     if not df_m.empty:
-        df_m['dt_m'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
+        df_m['dt_m'] = pd.to_datetime(df_m['Date'].str.replace('\\', '', regex=False), dayfirst=True, errors='coerce')
         df_m['MA'] = df_m['dt_m'].dt.strftime('%Y-%m')
-        df_synth['Maintenance'] = df_m.groupby('MA')['M_Num'].sum()
+        df_synth['Maintenance'] = df_m.groupby('MA')['M_Calc'].sum()
 
     df_synth = df_synth.fillna(0)
     df_synth['Résultat'] = df_synth['Recettes'] - df_synth['Maintenance']
     st.dataframe(df_synth.style.format("{:.0f} €"), use_container_width=True)
-
-    # --- 7. ZONE DE DANGER ---
-    st.divider()
-    if st.button("🗄️ ARCHIVER ZONE DE DANGER", use_container_width=True):
-        df_arch = charger_data('archives_contacts.json')
-        sauvegarder_data(pd.concat([df_arch, df_c], ignore_index=True), 'archives_contacts.json')
-        sauvegarder_data(pd.DataFrame(), 'contacts.json')
-        st.success("Archives créées.")
-        st.rerun()
 # =================================================================
 # --- 8. PAGE MAINTENANCE (EDITION & SÉCURITÉ SUPPRESSION) ---
 # =================================================================
