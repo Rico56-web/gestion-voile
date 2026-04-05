@@ -586,65 +586,113 @@ elif st.session_state.page == "STATS":
     else:
         st.warning("Aucune donnée disponible. Commencez par ajouter des missions.")
 # =================================================================
-# --- 8. PAGE MAINTENANCE (VERSION PERMANENTE GITHUB 2026) ---
+# --- 8. PAGE MAINTENANCE (VERSION PRO 2026 - RÉCURRENCE) ---
 # =================================================================
-if st.session_state.page == "MAINT":
-    st.title("🔧 Maintenance Vesta")
+elif st.session_state.page == "MAINT":
+    st.title("🔧 Maintenance & Charges Vesta")
  
-    # 1. CHARGEMENT VIA GITHUB
+    # 1. CHARGEMENT
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
     
     if df_m.empty:
-        df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut"])
+        df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type"])
  
-    # 2. INTERFACE DE SAISIE
-    with st.expander("➕ Ajouter une nouvelle dépense", expanded=True):
-        f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"), key="m_date")
-        f_obj = st.text_input("Objet (ex: Taxes DGAN, Révision)", key="m_obj")
-        f_mt = st.number_input("Montant (€)", min_value=0.0, step=1.0, key="m_mt")
+    # 2. INTERFACE DE SAISIE AMÉLIORÉE
+    with st.expander("➕ Ajouter une dépense ou une charge", expanded=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"), key="m_date")
+            f_obj = st.text_input("Objet (ex: Assurance, Révision)", key="m_obj")
+        with col2:
+            # Menu déroulant pour les Stats
+            f_type = st.selectbox("Type de frais", 
+                                ["Frais Obligatoires", "Frais Maint Vesta", "Frais Autres"], 
+                                key="m_type")
+            f_statut = st.selectbox("Statut", ["À prévoir", "Fait"], key="m_statut")
+            
+        f_mt = st.number_input("Montant (€)", min_value=0.0, step=10.0, key="m_mt")
         
-        if st.button("💾 ENREGISTRER SUR GITHUB", type="primary", use_container_width=True):
-            if f_obj:
-                nouvelle_ligne = pd.DataFrame([{
-                    "Date": f_date,
-                    "Objet": f_obj,
-                    "Montant": float(f_mt),
-                    "Statut": "OK"
-                }])
-                df_m = pd.concat([df_m, nouvelle_ligne], ignore_index=True)
+        # --- OPTION RÉCURRENCE (Simplification mensuelle) ---
+        st.markdown("---")
+        is_recurring = st.checkbox("🔄 Répéter chaque mois jusqu'à fin 2026")
+        
+        if st.button("💾 ENREGISTRER LA SAISIE", type="primary", use_container_width=True):
+            if f_obj and f_mt > 0:
+                nouvelles_lignes = []
                 
-                # SAUVEGARDE SUR GITHUB
-                sauvegarder_data(df_m, file_path_m)
-                
-                st.balloons()
-                st.success(f"Enregistré : {f_obj}")
-                time.sleep(1)
-                st.rerun()
+                if is_recurring:
+                    # Logique de duplication mensuelle
+                    try:
+                        j, m_start, a = map(int, f_date.split('/'))
+                        for mois_index in range(m_start, 13): # Du mois choisi jusqu'à Décembre
+                            nouvelles_lignes.append({
+                                "Date": f"{j:02d}/{mois_index:02d}/{a}",
+                                "Objet": f"{f_obj} (Mois {mois_index})",
+                                "Montant": float(f_mt),
+                                "Statut": f_statut,
+                                "Type": f_type
+                            })
+                        msg_success = f"Charges mensuelles enregistrées jusqu'en Décembre !"
+                    except:
+                        st.error("Format de date invalide (JJ/MM/AAAA)")
+                else:
+                    # Saisie unique standard
+                    nouvelles_lignes.append({
+                        "Date": f_date,
+                        "Objet": f_obj,
+                        "Montant": float(f_mt),
+                        "Statut": f_statut,
+                        "Type": f_type
+                    })
+                    msg_success = f"Enregistré : {f_obj}"
+
+                if nouvelles_lignes:
+                    df_new = pd.DataFrame(nouvelles_lignes)
+                    df_m = pd.concat([df_m, df_new], ignore_index=True)
+                    sauvegarder_data(df_m, file_path_m)
+                    st.balloons()
+                    st.success(msg_success)
+                    time.sleep(1)
+                    st.rerun()
             else:
-                st.warning("Veuillez entrer un 'Objet'.")
+                st.warning("Veuillez remplir l'Objet et le Montant.")
  
     st.divider()
  
-    # 3. AFFICHAGE DE L'HISTORIQUE
+    # 3. AFFICHAGE DE L'HISTORIQUE FILTRÉ
     if not df_m.empty:
-        total_frais = pd.to_numeric(df_m['Montant'], errors='coerce').sum()
-        st.metric("TOTAL CUMULÉ 2026", f"{total_frais:.2f} €")
+        # Nettoyage rapide pour le calcul
+        df_m['M_Num'] = pd.to_numeric(df_m['Montant'], errors='coerce').fillna(0)
+        
+        c1, c2 = st.columns(2)
+        c1.metric("TOTAL CUMULÉ 2026", f"{df_m['M_Num'].sum():.0f} €")
+        c2.metric("DONT DÉJÀ PAYÉ", f"{df_m[df_m['Statut']=='Fait']['M_Num'].sum():.0f} €")
  
-        for index, item in df_m.iloc[::-1].iterrows():
-            with st.expander(f"📅 {item['Date']} - {item['Objet']} ({item['Montant']}€)"):
-                if st.button(f"🗑️ Supprimer", key=f"del_m_{index}", use_container_width=True):
+        # Tri par date (plus récent en premier)
+        df_m['dt_temp'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
+        df_m = df_m.sort_values('dt_temp', ascending=False).drop(columns=['dt_temp'])
+
+        for index, item in df_m.iterrows():
+            couleur = "🟢" if item['Statut'] == "Fait" else "⏳"
+            with st.expander(f"{couleur} {item['Date']} - {item['Objet']} ({item['Montant']}€)"):
+                st.write(f"**Type:** {item.get('Type', 'Non classé')} | **Statut:** {item['Statut']}")
+                if st.button(f"🗑️ Supprimer l'entrée", key=f"del_m_{index}", use_container_width=True):
                     df_m = df_m.drop(index).reset_index(drop=True)
                     sauvegarder_data(df_m, file_path_m)
                     st.rerun()
  
-    # 4. ZONE DE DANGER
+    # 4. ZONE DE DANGER (ARCHIVAGE)
     st.write("---")
-    with st.expander("⚠️ Zone de Danger"):
-        if st.checkbox("Confirmer la suppression totale"):
-            if st.button("🔴 VIDER LE FICHIER", type="primary", use_container_width=True):
-                df_vide = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut"])
-                sauvegarder_data(df_vide, file_path_m)
+    with st.expander("🚨 Zone de Danger / Archives"):
+        st.warning("Archiver déplace les données vers 'archives_maintenance.json' et vide la liste actuelle.")
+        if st.button("🗄️ ARCHIVER L'ANNÉE EN COURS", use_container_width=True):
+            if not df_m.empty:
+                df_arch = charger_data('archives_maintenance.json')
+                df_total = pd.concat([df_arch, df_m], ignore_index=True)
+                sauvegarder_data(df_total, 'archives_maintenance.json')
+                sauvegarder_data(pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type"]), file_path_m)
+                st.success("Données archivées !")
                 st.rerun()
 
 # =================================================================
