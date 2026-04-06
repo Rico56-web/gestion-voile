@@ -127,7 +127,7 @@ if "maint_confirm_del" not in st.session_state:
  
 # PASSAGE À 7 COLONNES ET AJOUT DE "LOG"
 m = st.columns(7) 
-menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES", "LOG"]
+menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES", "Livre de Bord"]
  
 for i, name in enumerate(menu):
     if m[i].button(name, key=f"nav_{name}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
@@ -238,8 +238,6 @@ if st.session_state.page == "CONTACTS":
         n1, n2, n3 = st.columns([1, 1, 1.2])
         if n1.button("⛵ EN COURS", use_container_width=True, type="primary" if not st.session_state.view_archive else "secondary"):
             st.session_state.view_archive = False; st.rerun()
-        if n2.button("📦 ARCHIVES", use_container_width=True, type="primary" if st.session_state.view_archive else "secondary"):
-            st.session_state.view_archive = True; st.rerun()
         if n3.button("➕ NOUVEAU", use_container_width=True, type="primary"):
             st.session_state.mode_saisie = True; st.session_state.edit_idx = None; st.rerun()
 
