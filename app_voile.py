@@ -614,7 +614,6 @@ elif st.session_state.page == "MAINT":
         st.rerun()
     # --- NAVIGATION HAUT (MAINTENANCE) ---
     c_nav1, c_nav2 = st.columns([1, 1])
-    with c_nav1:
     with c_nav2:
         st.button("🛠️ MAINTENANCE", disabled=True, use_container_width=True)
     st.divider()
