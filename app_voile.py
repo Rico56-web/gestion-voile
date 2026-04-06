@@ -550,7 +550,20 @@ elif st.session_state.page == "STATS":
 # =================================================================
 elif st.session_state.page == "MAINT":
     st.title("🔧 Maintenance & Charges - Vesta Skipper")
-    
+    # --- FIX NETTOYAGE & COHÉRENCE FINANCIÈRE ---
+    if not df_m.empty:
+        df_m['Statut'] = df_m['Statut'].replace('OK', 'Fait')
+        df_m['Date'] = df_m['Date'].str.replace(':', '/')
+        df_m['Objet'] = df_m['Objet'].str.strip()
+        df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
+        
+        # --- LE FIX POUR LE BILAN : ---
+        # Si le Type est vide ou NaN, on met "Frais Autres" par défaut 
+        # pour que le montant apparaisse dans les calculs par catégorie
+        df_m['Type'] = df_m['Type'].fillna("Frais Autres")
+        df_m.loc[df_m['Type'] == "", 'Type'] = "Frais Autres"
+    else:
+        df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
     
