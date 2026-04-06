@@ -567,35 +567,39 @@ elif st.session_state.page == "MAINT":
     else:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
 
-    # --- FIX 2 : LOGIQUE DE SUPPRESSION (SÉCURITÉ PAR INDEX PHYSIQUE) ---
+     # --- A. LOGIQUE DE SUPPRESSION (ZÉRO BOUTON - SÉCURITÉ ABSOLUE) ---
     if st.session_state.get("delete_target") is not None:
         target_idx = st.session_state.delete_target
         
-        # On vérifie que l'index existe dans le dataframe actuel
-        if target_idx < len(df_m):
-            item = df_m.iloc[target_idx]
+        if target_idx in df_m.index:
+            item = df_m.loc[target_idx]
             
-            st.error(f"🗑️ **CONFIRMATION DE SUPPRESSION**")
-            st.write(f"Voulez-vous supprimer : **{item['Objet']}** du {item['Date']} ?")
+            st.error(f"🗑️ **DEMANDE DE SUPPRESSION**")
+            st.write(f"Objet : **{item['Objet']}** | Date : {item['Date']}")
             
-            # Utilisation d'un formulaire pour isoler l'action et éviter les doublons de clés
-            with st.form(key=f"form_del_final_{target_idx}"):
-                st.write("⚠️ Cette action est irréversible.")
-                confirm_btn = st.form_submit_button("🔥 OUI, SUPPRIMER", type="danger", use_container_width=True)
+            # On remplace le formulaire par une simple liste déroulante
+            # Cela évite l'erreur "Missing Submit Button" et les conflits de clés
+            choix_confirm = st.selectbox(
+                "⚠️ Confirmer la suppression définitive ?",
+                ["--- Choisir une option ---", "❌ ANNULER (Garder la ligne)", "🔥 OUI, SUPPRIMER"],
+                key=f"safety_select_{target_idx}"
+            )
+            
+            if choix_confirm == "🔥 OUI, SUPPRIMER":
+                # Exécution immédiate
+                df_m = df_m.drop(target_idx).reset_index(drop=True)
+                sauvegarder_data(df_m, file_path_m)
+                st.session_state.delete_target = None
+                st.success("Suppression réussie !")
+                st.rerun()
                 
-                if confirm_btn:
-                    # Suppression par position physique dans le DataFrame
-                    df_m = df_m.drop(df_m.index[target_idx]).reset_index(drop=True)
-                    sauvegarder_data(df_m, file_path_m)
-                    st.session_state.delete_target = None
-                    st.success("Élément supprimé avec succès.")
-                    st.rerun()
-
-            if st.button("❌ ANNULER", use_container_width=True, key="cancel_global"):
+            elif choix_confirm == "❌ ANNULER (Garder la ligne)":
                 st.session_state.delete_target = None
                 st.rerun()
         else:
             st.session_state.delete_target = None
+            st.rerun()
+            
         st.divider()
 
     # --- B. ZONE D'AJOUT (AVEC RÉCURRENCE MENSUELLE) ---
