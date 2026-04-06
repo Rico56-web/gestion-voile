@@ -546,7 +546,7 @@ elif st.session_state.page == "STATS":
     fig_w = go.Figure(go.Waterfall(x=["Encaissé", "Frais", "Net"], y=[df_tab['Reçu'].sum(), -df_tab['Frais'].sum(), 0], measure=["relative", "relative", "total"]))
     st.plotly_chart(fig_w, use_container_width=True)
 # =================================================================
-# --- 8. PAGE MAINTENANCE (VERSION NETTOYAGE STRICT) ---
+# --- 8. PAGE MAINTENANCE (VUE TRIENNALE 2026-2028) ---
 # =================================================================
 elif st.session_state.page == "MAINT":
     st.title("🔧 Maintenance & Charges - Vesta Skipper")
@@ -556,63 +556,48 @@ elif st.session_state.page == "MAINT":
     
     LISTE_TYPES = ["Assurances", "Autres frais", "Maintenance, matériels", "Port", "Sécurité"]
     
-    # --- 1. NETTOYAGE DE FORCE (Correction du bug de calcul) ---
-    if not df_m.empty:
-        # On s'assure que M_Num est bien un nombre, sinon on met 0
-        df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
-        # On synchronise la colonne 'Montant' pour l'affichage
-        df_m['Montant'] = df_m['M_Num']
-        
-        # Nettoyage des types
-        if 'Type' not in df_m.columns:
-            df_m['Type'] = "Autres frais"
-        df_m['Type'] = df_m['Type'].fillna("Autres frais")
-        df_m.loc[~df_m['Type'].isin(LISTE_TYPES), 'Type'] = "Autres frais"
-        
-        # Nettoyage des statuts
-        if 'Statut' not in df_m.columns:
-            df_m['Statut'] = "À prévoir"
-        df_m['Statut'] = df_m['Statut'].replace('OK', 'Fait').fillna("À prévoir")
-    else:
-        df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
+    # --- 1. SÉLECTEUR D'ANNÉE FIXE (2026, 2027, 2028) ---
+    ANNEES_VUES = ["2026", "2027", "2028"]
+    
+    col_yr1, col_yr2 = st.columns([1, 3])
+    # On sélectionne l'année en cours par défaut si on est en 2026
+    annee_choisie = col_yr1.selectbox("📅 Saison", ANNEES_VUES, index=0)
 
-    # --- 2. FILTRAGE ET CALCULS ---
-    st.subheader("📊 État des Finances 2026")
+    # --- 2. NETTOYAGE & FILTRAGE STRICT PAR ANNÉE ---
+    if not df_m.empty:
+        df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
+        # On filtre pour ne garder que les lignes de l'année choisie (ex: finit par /2026)
+        df_annee = df_m[df_m['Date'].str.endswith(annee_choisie)].copy()
+    else:
+        df_annee = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
+
+    # --- 3. BILAN FINANCIER DE LA SAISON ---
+    st.subheader(f"📊 Bilan de la Saison {annee_choisie}")
     vue = st.radio("Filtrer :", ["✅ Payé", "📅 Prévisionnel (Total)"], horizontal=True, key="v_bilan")
     
-    # Séparation stricte pour le calcul
-    if "Payé" in vue:
-        df_view = df_m[df_m['Statut'] == "Fait"].copy()
-    else:
-        df_view = df_m.copy()
+    df_view = df_annee[df_annee['Statut'] == "Fait"].copy() if "Payé" in vue else df_annee.copy()
 
-    # Affichage des Metrics
+    # Metrics
     m1, m2, m3, m4, m5 = st.columns(5)
-    
-    # Fonction de calcul sécurisée pour éviter les erreurs de colonnes vides
-    def get_sum(df, cat):
-        return df[df['Type'] == cat]['M_Num'].sum()
+    def get_sum(df, cat): return df[df['Type'] == cat]['M_Num'].sum()
 
-    m1.metric("🛡️ Assur.", f"{get_sum(df_view, 'Assurances'):.2f}€")
-    m2.metric("⚓ Port", f"{get_sum(df_view, 'Port'):.2f}€")
-    m3.metric("🛠️ Maint.", f"{get_sum(df_view, 'Maintenance, matériels'):.2f}€")
-    m4.metric("🛟 Sécu.", f"{get_sum(df_view, 'Sécurité'):.2f}€")
-    m5.metric("📦 Autres", f"{get_sum(df_view, 'Autres frais'):.2f}€")
-    
-    total_affiche = df_view['M_Num'].sum()
-    st.info(f"**Somme totale affichée : {total_affiche:.2f} €**")
+    m1.metric("🛡️ Assur.", f"{get_sum(df_view, 'Assurances'):.0f}€")
+    m2.metric("⚓ Port", f"{get_sum(df_view, 'Port'):.0f}€")
+    m3.metric("🛠️ Maint.", f"{get_sum(df_view, 'Maintenance, matériels'):.0f}€")
+    m4.metric("🛟 Sécu.", f"{get_sum(df_view, 'Sécurité'):.0f}€")
+    m5.metric("💰 TOTAL", f"{df_view['M_Num'].sum():.2f}€")
 
     st.divider()
 
-    # --- 3. AJOUTER (CALENDRIER) ---
-    with st.expander("➕ Saisir une charge", expanded=False):
+    # --- 4. AJOUTER (AVEC CALENDRIER) ---
+    with st.expander("➕ Saisir une nouvelle charge", expanded=False):
         c1, c2 = st.columns(2)
-        f_date = c1.date_input("Date", datetime.now(), format="DD/MM/YYYY", key="new_date")
-        f_obj = c2.text_input("Objet", key="new_obj")
-        f_mt = c1.number_input("Montant (€)", min_value=0.0, key="new_mt")
-        f_type = c2.selectbox("Catégorie", LISTE_TYPES, key="new_type")
-        f_stat = c2.selectbox("Statut", ["À prévoir", "Fait"], key="new_stat")
-        is_rec = st.checkbox("Répéter jusqu'à Décembre", key="new_rec")
+        f_date = c1.date_input("Date", datetime.now(), format="DD/MM/YYYY", key="add_date")
+        f_obj = c2.text_input("Objet", key="add_obj")
+        f_mt = c1.number_input("Montant (€)", min_value=0.0, key="add_mt")
+        f_type = c2.selectbox("Catégorie", LISTE_TYPES, key="add_type")
+        f_stat = c2.selectbox("Statut", ["À prévoir", "Fait"], key="add_stat")
+        is_rec = st.checkbox("Répéter mensuellement jusqu'à Décembre", key="add_rec")
 
         if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
             if f_obj:
@@ -629,39 +614,38 @@ elif st.session_state.page == "MAINT":
                 sauvegarder_data(df_m, file_path_m)
                 st.rerun()
 
-    # --- 4. LISTE (AVEC TRI CHRONO) ---
+    # --- 5. LISTE (TRI CHRONO & FERMETURE AUTO) ---
     if not df_view.empty:
-        # Conversion pour le tri uniquement
+        # Tri : plus récent en haut
         df_view['dt_temp'] = pd.to_datetime(df_view['Date'], dayfirst=True, errors='coerce')
         df_view = df_view.sort_values('dt_temp', ascending=False)
 
         for idx, row in df_view.iterrows():
-            # On récupère l'index original pour modifier df_m
-            real_idx = idx 
             icon = "🟢" if row['Statut'] == "Fait" else "⏳"
-            
-            with st.expander(f"{icon} {row['Date']} - {row['Objet']} ({row['Montant']}€)"):
+            # Expanded=False assure que la fiche se ferme après chaque rerun (bouton OK)
+            with st.expander(f"{icon} {row['Date']} - {row['Objet']} ({row['Montant']}€)", expanded=False):
                 ce1, ce2 = st.columns(2)
-                e_mt = ce1.number_input("Prix €", value=float(row['M_Num']), key=f"m_{real_idx}")
-                e_type = ce2.selectbox("Type", LISTE_TYPES, index=LISTE_TYPES.index(row['Type']), key=f"t_{real_idx}")
-                e_stat = ce1.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"s_{real_idx}")
+                e_mt = ce1.number_input("Prix €", value=float(row['M_Num']), key=f"m_{idx}")
+                e_ty = ce2.selectbox("Type", LISTE_TYPES, index=LISTE_TYPES.index(row['Type']), key=f"t_{idx}")
+                e_st = ce1.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"s_{idx}")
                 
-                if ce2.button("💾 OK", key=f"ok_{real_idx}", use_container_width=True):
-                    df_m.at[real_idx, 'M_Num'] = e_mt
-                    df_m.at[real_idx, 'Montant'] = e_mt
-                    df_m.at[real_idx, 'Type'] = e_type
-                    df_m.at[real_idx, 'Statut'] = e_stat
+                if ce2.button("💾 OK", key=f"ok_{idx}", use_container_width=True):
+                    # On modifie directement dans le DataFrame maître df_m
+                    df_m.at[idx, 'M_Num'] = e_mt
+                    df_m.at[idx, 'Montant'] = e_mt
+                    df_m.at[idx, 'Type'] = e_ty
+                    df_m.at[idx, 'Statut'] = e_st
                     sauvegarder_data(df_m, file_path_m)
-                    st.rerun()
+                    st.rerun() # Rafraîchit et replie la fiche
                 
-                if st.button("🗑️ Supprimer", key=f"del_{real_idx}", use_container_width=True):
-                    df_m = df_m.drop(real_idx).reset_index(drop=True)
+                if st.button("🗑️ Supprimer", key=f"del_{idx}", use_container_width=True):
+                    df_m = df_m.drop(idx).reset_index(drop=True)
                     sauvegarder_data(df_m, file_path_m)
                     st.rerun()
 
-    # --- 5. ARCHIVES ---
+    # --- 6. ARCHIVAGE ---
     st.write("---")
-    if st.button("🗄️ ARCHIVER TOUT", use_container_width=True):
+    if st.button("🗄️ ARCHIVER TOUTES LES ANNÉES", use_container_width=True):
         if not df_m.empty:
             df_arch = charger_data('archives_maintenance.json')
             sauvegarder_data(pd.concat([df_arch, df_m], ignore_index=True), 'archives_maintenance.json')
