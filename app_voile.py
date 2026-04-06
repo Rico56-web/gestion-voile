@@ -557,33 +557,37 @@ elif st.session_state.page == "MAINT":
     if df_m.empty:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
 
-    # --- A. ZONE DE CONFIRMATION (DANS UN CONTENEUR ISOLÉ) ---
-    confirm_placeholder = st.empty() # Crée un espace réservé vide
-
+    # --- A. LOGIQUE DE SUPPRESSION (SÉCURITÉ PAR CASE À COCHER) ---
     if st.session_state.get("delete_target") is not None:
         target = st.session_state.delete_target
+        
         if target in df_m.index:
             item = df_m.loc[target]
             
-            # On utilise le placeholder pour injecter le message de confirmation
-            with confirm_placeholder.container():
-                st.error(f"🗑️ **SUPPRIMER DÉFINITIVEMENT ?**")
-                st.write(f"**{item['Objet']}** | {item['Date']} | {item['Montant']}€")
-                
-                col_y, col_n = st.columns(2)
-                
-                # CLÉ STATIQUE UNIQUE : Comme c'est dans un 'empty', 
-                # Streamlit garantit qu'il n'y en a qu'un seul à la fois.
-                if col_y.button("🔥 OUI, CONFIRMER", type="danger", use_container_width=True, key="BTN_FIXE_SUPPR"):
+            # On crée un bandeau d'alerte
+            st.error(f"🗑️ Suppression de : **{item['Objet']}** ({item['Date']})")
+            
+            # Utilisation d'une Checkbox pour confirmer (Plus stable qu'un bouton)
+            # On ajoute le target dans la clé pour qu'elle soit unique
+            confirm_action = st.checkbox(f"Cocher pour confirmer la suppression définitive", key=f"chk_confirm_{target}")
+            
+            if confirm_action:
+                # Le bouton d'exécution n'apparaît QUE si la case est cochée
+                if st.button("🔥 EXÉCUTER LA SUPPRESSION", type="danger", use_container_width=True, key=f"exec_btn_{target}"):
                     df_m = df_m.drop(target).reset_index(drop=True)
                     sauvegarder_data(df_m, file_path_m)
                     st.session_state.delete_target = None
+                    st.success("Supprimé !")
                     st.rerun()
-                
-                if col_n.button("❌ ANNULER", use_container_width=True, key="BTN_FIXE_ANNUL"):
-                    st.session_state.delete_target = None
-                    st.rerun()
-                st.divider()
+            
+            # Bouton d'annulation toujours présent
+            if st.button("❌ ANNULER", use_container_width=True, key=f"abort_btn_{target}"):
+                st.session_state.delete_target = None
+                st.rerun()
+        else:
+            st.session_state.delete_target = None
+            
+        st.divider()
 
     # --- B. ZONE D'AJOUT ---
     with st.expander("➕ Ajouter une dépense / Frais récurrent", expanded=False):
