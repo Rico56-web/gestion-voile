@@ -23,6 +23,22 @@ def safe_val(val, default=0):
         clean = "".join(filter(str.isdigit, str(val).split('.')[0]))
         return int(clean) if clean else default
     except: return default 
+        
+def archiver_donnees(df_source, date_debut, date_fin, fichier_source, fichier_archive, col_date='Date'):
+    df_source['dt_temp'] = pd.to_datetime(df_source[col_date], dayfirst=True, errors='coerce')
+    mask = (df_source['dt_temp'].dt.date >= date_debut) & (df_source['dt_temp'].dt.date <= date_fin)
+    
+    a_archiver = df_source[mask].copy()
+    a_garder = df_source[~mask].copy()
+    
+    if not a_archiver.empty:
+        df_arch_old = charger_data(fichier_archive)
+        df_arch_new = pd.concat([df_arch_old, a_archiver.drop(columns=['dt_temp'])], ignore_index=True)
+        sauvegarder_data(df_arch_new, fichier_archive)
+        sauvegarder_data(a_garder.drop(columns=['dt_temp']), fichier_source)
+        return len(a_archiver)
+    return 0
+
 # --- 1. CONFIGURATION & STYLE ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
@@ -780,7 +796,29 @@ elif st.session_state.page == "LOG":
         st.dataframe(df_arch, use_container_width=True)
     else:
         st.info("Aucune archive trouvée pour cette saison.")
- 
+        
+# =================================================================
+# --- 10. PAGE ARCHIVES (DESTINATION) ---
+# =================================================================
+elif st.session_state.page == "ARCHIVES":
+    # BOUTON RETOUR EN HAUT (Indispensable sur iPhone)
+    if st.button("⬅️ Retour aux Stats", use_container_width=True):
+        st.session_state.page = "STATS"
+        st.rerun()
+    
+    st.title("📂 Archives Complètes")
+    
+    # Affichage des données sans filtres (Historique total)
+    t1, t2 = st.tabs(["🛠️ Maintenance", "📅 Planning"])
+    
+    with t1:
+        df_m = charger_data('maintenance.json')
+        if not df_m.empty:
+            st.dataframe(df_m, use_container_width=True, hide_index=True)
+            
+    with t2:
+        if df_c is not None and not df_c.empty:
+            st.dataframe(df_c, use_container_width=True, hide_index=True)
 # --- FIN DU FICHIER ---
 
 
