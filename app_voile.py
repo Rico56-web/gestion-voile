@@ -164,6 +164,15 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 # --- 5. PAGE CONTACTS (VERSION FINALE + NOTES VISIBLES) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
+    # --- NAVIGATION HAUT (CONTACTS) ---
+    c_nav1, c_nav2 = st.columns([1, 1])
+    with c_nav1:
+        if st.button("📦 ARCHIVES", key="btn_arch_cont", use_container_width=True):
+            st.session_state.page = "ARCHIVES"
+            st.rerun()
+    with c_nav2:
+        st.button("👤 CONTACTS", disabled=True, use_container_width=True)
+    st.divider()
     if 'mode_saisie' not in st.session_state: st.session_state.mode_saisie = False
     if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
     if 'confirm_del_idx' not in st.session_state: st.session_state.confirm_del_idx = None
@@ -597,7 +606,15 @@ elif st.session_state.page == "STATS":
 # =================================================================
 elif st.session_state.page == "MAINT":
     st.title("🔧 Maintenance - Vesta")
-    
+    # --- NAVIGATION HAUT (MAINTENANCE) ---
+    c_nav1, c_nav2 = st.columns([1, 1])
+    with c_nav1:
+        if st.button("📦 ARCHIVES", key="btn_arch_maint", use_container_width=True):
+            st.session_state.page = "ARCHIVES"
+            st.rerun()
+    with c_nav2:
+        st.button("🛠️ MAINTENANCE", disabled=True, use_container_width=True)
+    st.divider()
     if 'edit_idx' not in st.session_state:
         st.session_state.edit_idx = None
 
