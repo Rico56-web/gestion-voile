@@ -444,97 +444,127 @@ elif st.session_state.page == "PLANNING":
     </div>
     """, unsafe_allow_html=True)
 # =================================================================
-# --- 9. PAGE STATS (LIÉE AU PLANNING EXISTANT) ---
+# --- 9. PAGE STATS (REEL/PREVI + SYNTHESE MENSUELLE) ---
 # =================================================================
 elif st.session_state.page == "STATS":
-    st.title("📊 Bilan Vesta Skipper")
     import plotly.express as px
+    import pandas as pd
 
-    # 1. Récupération des données déjà chargées dans ton app
-    # df_m = Maintenance / df_c = Planning/Missions
+    # --- 1. NAVIGATION & FILTRES ---
+    col_t1, col_t2 = st.columns([2, 1])
+    col_t1.title("📊 Bilan Vesta")
+    
+    ANNEES_STATS = [2026, 2027, 2028]
+    sel_y_stats = col_t2.selectbox("Saison", ANNEES_STATS, label_visibility="collapsed")
+    
+    # CASE À COCHER : RÉEL vs PRÉVISIONNEL
+    mode_previ = st.toggle("🔮 Voir le Prévisionnel (Toute l'année)", value=False)
+    
+    if st.button("📂 ARCHIVES", use_container_width=True):
+        st.session_state.page = "ARCHIVES"
+        st.rerun()
+
+    # --- 2. RÉCUPÉRATION & FILTRAGE ---
     df_m = charger_data('maintenance.json')
-    # On utilise df_c qui est déjà chargé en haut de ton script
+    # df_c est ton DataFrame Planning/Contacts déjà chargé
 
-    # --- 2. CALCUL DES CHARGES (Maintenance) ---
-    total_charges = 0
-    df_charges_reelles = pd.DataFrame()
-    if not df_m.empty:
-        df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
-        df_charges_reelles = df_m[df_m['Statut'] == "Fait"].copy()
-        total_charges = df_charges_reelles['M_Num'].sum()
+    # --- TRAITEMENT DES CHARGES ---
+    df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
+    df_m['dt'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+    # Filtre Année
+    df_m_yr = df_m[df_m['dt'].dt.year == sel_y_stats].copy()
+    
+    if not mode_previ:
+        # RÉEL : Uniquement Statut "Fait"
+        df_charges_view = df_m_yr[df_m_yr['Statut'] == "Fait"].copy()
+    else:
+        # PRÉVISIONNEL : Tout (Fait + À prévoir)
+        df_charges_view = df_m_yr.copy()
+    
+    total_charges = df_charges_view['M_Num'].sum()
 
-    # --- 3. CALCUL DES RECETTES (Basé sur ton Planning/Contacts) ---
+    # --- TRAITEMENT DES RECETTES ---
     total_recettes = 0
-    reste_a_encaisser = 0
-    df_recettes_ok = pd.DataFrame()
-    df_recettes_attente = pd.DataFrame()
-
+    df_recettes_view = pd.DataFrame()
+    
     if df_c is not None and not df_c.empty:
-        # Nettoyage des prix (gestion des virgules et symboles € comme dans ton planning)
         df_temp = df_c.copy()
+        df_temp['dt'] = pd.to_datetime(df_temp['DateNav'], dayfirst=True, errors='coerce')
+        df_temp = df_temp[df_temp['dt'].dt.year == sel_y_stats].copy()
+        
+        # Nettoyage prix
         df_temp['P_Num'] = df_temp['Prix'].astype(str).str.replace(',','.').str.replace('€','').str.strip()
         df_temp['P_Num'] = pd.to_numeric(df_temp['P_Num'], errors='coerce').fillna(0.0)
         
-        # Logique de paiement identique à ton planning : "PAY" présent et "NON" absent
-        def is_paye(val):
+        # Logique Paiement
+        def check_p(val):
             v = str(val).upper()
             return "PAY" in v and "NON" not in v
-
-        df_temp['is_ok'] = df_temp['Paiement'].apply(is_paye)
+        df_temp['is_ok'] = df_temp['Paiement'].apply(check_p)
         
-        # Séparation
-        df_recettes_ok = df_temp[df_temp['is_ok'] == True].copy()
-        df_recettes_attente = df_temp[(df_temp['is_ok'] == False) & (df_temp['P_Num'] > 0)].copy()
-        
-        total_recettes = df_recettes_ok['P_Num'].sum()
-        reste_a_encaisser = df_recettes_attente['P_Num'].sum()
+        if not mode_previ:
+            # RÉEL : Uniquement Encaissé
+            df_recettes_view = df_temp[df_temp['is_ok'] == True].copy()
+        else:
+            # PRÉVISIONNEL : Tout
+            df_recettes_view = df_temp.copy()
+            
+        total_recettes = df_recettes_view['P_Num'].sum()
 
-    # --- 4. VISUEL TRÉSORERIE ---
-    st.subheader("💰 Trésorerie Réelle")
-    col_pie, col_solde = st.columns([1, 1])
+    # --- 3. AFFICHAGE TRÉSORERIE ---
+    label_mode = "PRÉVISIONNEL" if mode_previ else "RÉEL (Encaissé)"
+    st.subheader(f"💰 {label_mode} {sel_y_stats}")
     
-    with col_pie:
-        if total_charges > 0 or total_recettes > 0:
-            fig_treso = px.pie(
-                names=['Charges', 'Recettes'], 
-                values=[total_charges, total_recettes],
-                color_discrete_map={'Charges': '#ef553b', 'Recettes': '#00cc96'},
-                hole=0.4
-            )
-            fig_treso.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=200, showlegend=False)
-            st.plotly_chart(fig_treso, use_container_width=True)
+    c_pie, c_sol = st.columns([1, 1])
+    with c_pie:
+        fig = px.pie(names=['Charges', 'Recettes'], values=[total_charges, total_recettes],
+                     color_discrete_map={'Charges': '#ef553b', 'Recettes': '#00cc96'}, hole=0.4)
+        fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=180, showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
     
-    with col_solde:
+    with c_sol:
         solde = total_recettes - total_charges
-        txt_col = "#28a745" if solde >= 0 else "#dc3545"
-        st.markdown(f"""
-            <div style="text-align: center; border: 1px solid #ddd; padding: 10px; border-radius: 10px; background:#f9f9f9; margin-top:20px;">
-                <small>SOLDE NET</small><br>
-                <b style="color: {txt_col}; font-size: 1.3rem;">{solde:,.0f} €</b>
-            </div>
-        """, unsafe_allow_html=True)
+        txt_c = "#28a745" if solde >= 0 else "#dc3545"
+        st.markdown(f"""<div style="text-align:center; border:1px solid #ddd; padding:10px; border-radius:10px; background:#fff; margin-top:15px;">
+            <small>SOLDE {label_mode}</small><br><b style="color:{txt_c}; font-size:1.4rem;">{solde:,.0f} €</b></div>""", unsafe_allow_html=True)
 
     st.divider()
 
-    # --- 5. DÉTAIL DES RECETTES (Uniquement Payées) ---
-    st.subheader("📥 Recettes (Encaissées)")
-    if not df_recettes_ok.empty:
-        # On affiche DateNav, Nom (Client) et Prix
-        st.dataframe(df_recettes_ok[['DateNav', 'Nom', 'Prix']], use_container_width=True, hide_index=True)
+    # --- 4. SYNTHÈSE MENSUELLE ---
+    st.subheader("📅 Synthèse Mensuelle")
+    
+    mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+    synthese_data = []
+
+    for m_idx in range(1, 13):
+        # Somme Recettes du mois
+        m_recettes = df_recettes_view[df_recettes_view['dt'].dt.month == m_idx]['P_Num'].sum()
+        # Somme Charges du mois
+        m_charges = df_charges_view[df_charges_view['dt'].dt.month == m_idx]['M_Num'].sum()
+        
+        if m_recettes > 0 or m_charges > 0:
+            synthese_data.append({
+                "Mois": mois_noms[m_idx-1],
+                "Recettes": f"{m_recettes:.0f}€",
+                "Frais": f"{m_charges:.0f}€",
+                "Net": f"{m_recettes - m_charges:.0f}€"
+            })
+
+    if synthese_data:
+        st.dataframe(pd.DataFrame(synthese_data), use_container_width=True, hide_index=True)
     else:
-        st.info("Aucune recette encaissée détectée.")
+        st.info("Aucune donnée pour générer la synthèse.")
 
-    if reste_a_encaisser > 0:
-        st.warning(f"⏳ **À RECEVOIR : {reste_a_encaisser:,.0f} €**")
-        with st.expander("Détail des attentes"):
-            st.dataframe(df_recettes_attente[['DateNav', 'Nom', 'Prix']], use_container_width=True, hide_index=True)
+    st.divider()
 
-    st.write("---")
-
-    # --- 6. DÉTAIL DES CHARGES (Uniquement Payées) ---
-    st.subheader("📤 Charges (Payées)")
-    if not df_charges_reelles.empty:
-        st.dataframe(df_charges_reelles[['Date', 'Objet', 'M_Num', 'Type']], use_container_width=True, hide_index=True)
+    # --- 5. DÉTAILS ---
+    tab1, tab2 = st.tabs(["📥 Détail Recettes", "📤 Détail Charges"])
+    with tab1:
+        if not df_recettes_view.empty:
+            st.dataframe(df_recettes_view[['DateNav', 'Nom', 'Prix']], use_container_width=True, hide_index=True)
+    with tab2:
+        if not df_charges_view.empty:
+            st.dataframe(df_charges_view[['Date', 'Objet', 'M_Num', 'Type']], use_container_width=True, hide_index=True)
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (OPTI IPHONE & AUTO-CLOSE) ---
