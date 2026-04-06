@@ -170,10 +170,6 @@ if st.session_state.page == "CONTACTS":
         st.rerun()
     # --- NAVIGATION HAUT (CONTACTS) ---
     c_nav1, c_nav2 = st.columns([1, 1])
-    with c_nav1:
-        if st.button("📦 ARCHIVES", key="btn_arch_cont", use_container_width=True):
-            st.session_state.page = "ARCHIVES"
-            st.rerun()
     with c_nav2:
         st.button("👤 CONTACTS", disabled=True, use_container_width=True)
     st.divider()
