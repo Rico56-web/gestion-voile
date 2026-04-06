@@ -546,7 +546,7 @@ elif st.session_state.page == "STATS":
     fig_w = go.Figure(go.Waterfall(x=["Encaissé", "Frais", "Net"], y=[df_tab['Reçu'].sum(), -df_tab['Frais'].sum(), 0], measure=["relative", "relative", "total"]))
     st.plotly_chart(fig_w, use_container_width=True)
 # =================================================================
-# --- 8. PAGE MAINTENANCE ---
+# --- 8. PAGE MAINTENANCE (CORRECTIF CLÉS UNIQUES) ---
 # =================================================================
 elif st.session_state.page == "MAINT":
     st.title("🔧 Maintenance & Charges Vesta")
@@ -556,71 +556,100 @@ elif st.session_state.page == "MAINT":
     if df_m.empty:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
 
-    # --- ZONE AJOUT (Avec Récurrence) ---
+    # --- ZONE AJOUT ---
     with st.expander("➕ Ajouter une dépense / Frais récurrent", expanded=False):
         c1, c2 = st.columns(2)
-        f_date = c1.text_input("Date (JJ/MM/AAAA)", datetime.now().strftime("%d/%m/%Y"))
-        f_obj = c2.text_input("Objet")
-        f_mt = c1.number_input("Montant (€)", min_value=0.0)
-        f_statut = c2.selectbox("Statut", ["À prévoir", "Fait"])
-        f_type = c2.selectbox("Type", ["Frais Obligatoires", "Frais Maint Vesta", "Frais Autres"])
-        is_rec = st.checkbox("🔄 Répéter chaque mois jusqu'à fin d'année")
+        f_date = c1.text_input("Date (JJ/MM/AAAA)", datetime.now().strftime("%d/%m/%Y"), key="add_date_main")
+        f_obj = c2.text_input("Objet", key="add_obj_main")
+        f_mt = c1.number_input("Montant (€)", min_value=0.0, key="add_mt_main")
+        f_statut = c2.selectbox("Statut", ["À prévoir", "Fait"], key="add_stat_main")
+        f_type = c2.selectbox("Type", ["Frais Obligatoires", "Frais Maint Vesta", "Frais Autres"], key="add_type_main")
+        is_rec = st.checkbox("🔄 Répéter chaque mois jusqu'à fin d'année", key="add_rec_main")
 
-        if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
+        if st.button("💾 ENREGISTRER", type="primary", use_container_width=True, key="btn_save_new"):
             if f_obj and f_mt > 0:
                 new_data = []
                 j, m_start, a = map(int, f_date.split('/'))
                 limit = 13 if is_rec else m_start + 1
                 for m_idx in range(m_start, limit):
-                    new_data.append({"Date": f"{j:02d}/{m_idx:02d}/{a}", "Objet": f_obj.upper(), 
-                                     "Montant": f_mt, "M_Num": float(f_mt), "Statut": f_statut, "Type": f_type})
+                    new_data.append({
+                        "Date": f"{j:02d}/{m_idx:02d}/{a}", 
+                        "Objet": f_obj.upper(), 
+                        "Montant": f_mt, 
+                        "M_Num": float(f_mt), 
+                        "Statut": f_statut, 
+                        "Type": f_type
+                    })
                 df_m = pd.concat([df_m, pd.DataFrame(new_data)], ignore_index=True)
                 sauvegarder_data(df_m, file_path_m)
                 st.rerun()
 
     st.divider()
 
-    # --- LISTE AVEC MODIFICATION ET SÉCURITÉ ---
+    # --- LISTE AVEC CLÉS SÉCURISÉES ---
     if not df_m.empty:
+        # On crée une colonne 'key_id' temporaire pour identifier la ligne de façon unique
+        df_m['key_id'] = df_m['Date'] + df_m['Objet'] + df_m['Montant'].astype(str)
+        
+        # Tri par date
         df_m['dt_t'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
         df_m = df_m.sort_values('dt_t', ascending=False).drop(columns=['dt_t'])
 
         for idx, item in df_m.iterrows():
+            # Génération d'un ID unique basé sur l'index ET le contenu pour éviter l'erreur API
+            safe_id = f"{idx}_{item['key_id']}".replace(" ", "_")
+            
             icon = "🟢" if item['Statut'] == "Fait" else "⏳"
             with st.expander(f"{icon} {item['Date']} - {item['Objet']} ({item['Montant']}€)"):
                 
                 # MODIFICATION
-                edit = st.toggle("📝 Modifier la fiche", key=f"ed_{idx}")
+                edit = st.toggle("📝 Modifier la fiche", key=f"tog_{safe_id}")
                 if edit:
-                    n_obj = st.text_input("Objet", item['Objet'], key=f"o_{idx}")
-                    n_mt = st.number_input("Montant", value=float(item.get('M_Num',0)), key=f"m_{idx}")
-                    n_st = st.selectbox("Statut", ["À prévoir", "Fait"], index=1 if item['Statut']=="Fait" else 0, key=f"s_{idx}")
-                    if st.button("✅ Valider", key=f"v_{idx}"):
-                        df_m.at[idx, 'Objet'], df_m.at[idx, 'M_Num'], df_m.at[idx, 'Statut'] = n_obj.upper(), n_mt, n_st
-                        sauvegarder_data(df_m, file_path_m)
+                    n_obj = st.text_input("Objet", item['Objet'], key=f"obj_in_{safe_id}")
+                    n_mt = st.number_input("Montant", value=float(item.get('M_Num', 0)), key=f"mt_in_{safe_id}")
+                    n_st = st.selectbox("Statut", ["À prévoir", "Fait"], 
+                                         index=1 if item['Statut'] == "Fait" else 0, key=f"st_in_{safe_id}")
+                    
+                    if st.button("✅ Valider les modifications", key=f"val_{safe_id}", type="primary"):
+                        df_m.at[idx, 'Objet'] = n_obj.upper()
+                        df_m.at[idx, 'M_Num'] = n_mt
+                        df_m.at[idx, 'Montant'] = n_mt
+                        df_m.at[idx, 'Statut'] = n_st
+                        # On retire la colonne temporaire avant sauvegarde
+                        df_to_save = df_m.drop(columns=['key_id'])
+                        sauvegarder_data(df_to_save, file_path_m)
                         st.rerun()
                 else:
-                    # SUPPRESSION SÉCURISÉE
+                    # AFFICHAGE & SUPPRESSION
+                    st.write(f"**Type :** {item.get('Type', 'N/A')}")
                     if item['Statut'] == "Fait":
-                        st.warning("🔒 Verrouillé (Payé)")
+                        st.warning("🔒 Verrouillé : Cette fiche est réglée. Modifiez le statut pour supprimer.")
                     else:
-                        if st.button("🗑️ Supprimer", key=f"del_{idx}"):
-                            st.session_state[f"conf_{idx}"] = True
-                        if st.session_state.get(f"conf_{idx}"):
-                            st.error("Confirmer ?")
-                            if st.button("OUI, SUPPRIMER", key=f"re_{idx}", type="danger"):
-                                df_m = df_m.drop(idx).reset_index(drop=True)
+                        if st.button("🗑️ Supprimer", key=f"pre_{safe_id}"):
+                            st.session_state[f"ask_{safe_id}"] = True
+                        
+                        if st.session_state.get(f"ask_{safe_id}"):
+                            st.error("Confirmer la suppression définitive ?")
+                            col_y, col_n = st.columns(2)
+                            if col_y.button("OUI, SUPPRIMER", key=f"real_{safe_id}", type="danger"):
+                                df_m = df_m.drop(idx).drop(columns=['key_id'])
                                 sauvegarder_data(df_m, file_path_m)
+                                del st.session_state[f"ask_{safe_id}"]
+                                st.rerun()
+                            if col_n.button("NON, ANNULER", key=f"no_{safe_id}"):
+                                st.session_state[f"ask_{safe_id}"] = False
                                 st.rerun()
 
-    # --- ARCHIVES ---
+    # --- ZONE DE DANGER ---
     st.write("---")
-    with st.expander("🚨 Zone de Danger"):
-        if st.button("🗄️ ARCHIVER TOUT", use_container_width=True):
-            df_arch = charger_data('archives_maintenance.json')
-            sauvegarder_data(pd.concat([df_arch, df_m], ignore_index=True), 'archives_maintenance.json')
-            sauvegarder_data(pd.DataFrame(columns=df_m.columns), file_path_m)
-            st.rerun()
+    with st.expander("🚨 Zone de Danger / Archives"):
+        if st.button("🗄️ ARCHIVER TOUT", use_container_width=True, key="btn_arch_all"):
+            if not df_m.empty:
+                df_arch = charger_data('archives_maintenance.json')
+                df_to_arch = df_m.drop(columns=['key_id']) if 'key_id' in df_m.columns else df_m
+                sauvegarder_data(pd.concat([df_arch, df_to_arch], ignore_index=True), 'archives_maintenance.json')
+                sauvegarder_data(pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"]), file_path_m)
+                st.rerun()
 # =================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
 # =================================================================
