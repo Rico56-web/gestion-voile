@@ -442,7 +442,7 @@ elif st.session_state.page == "PLANNING":
     </div>
     """, unsafe_allow_html=True)
 # =================================================================
-# --- 7. PAGE STATS - VESTA SKIPPER (PILOTAGE FINANCIER COMPLET) ---
+# --- 7. PAGE STATS - PILOTAGE COMPLET 2026-2028 ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("⚓ Pilotage Financier - Vesta Skipper")
@@ -451,291 +451,192 @@ elif st.session_state.page == "STATS":
     from datetime import datetime
     import pandas as pd
 
-    # --- 1. FILTRES DE PILOTAGE ---
+    # --- 1. FILTRES ---
     c_filt1, c_filt2 = st.columns([1, 2])
     with c_filt1:
         annee_choisie = st.selectbox("📅 Année d'analyse", [2026, 2027, 2028], index=0)
     with c_filt2:
-        mode_vue = st.radio("🔭 Portée de l'analyse", 
-                            ["Réel (Jusqu'à aujourd'hui)", "Prévisionnel (Année complète)"], 
+        mode_vue = st.radio("🔭 Période d'analyse", 
+                            ["Réel (Début d'année à ce jour)", "Prévisionnel (Année complète)"], 
                             horizontal=True)
 
-    # --- 2. PRÉPARATION ET NETTOYAGE ---
+    # --- 2. PRÉPARATION DES DONNÉES ---
     df_st = df_c.copy()
     df_m = charger_data('maintenance.json')
-    maintenant = pd.Timestamp(2026, 4, 5) # Date pivot pour calculs "Réel"
+    maintenant = pd.Timestamp(2026, 4, 5) # Date pivot pour le mode "Réel"
 
     def clean_val(v):
         if v is None or str(v).strip() in ["", "nan", "None", "null"]: return 0.0
         try: return float(str(v).replace('€','').replace(' ','').replace(',','.'))
         except: return 0.0
 
-    # Nettoyage Recettes (Colonnes Internes pour éviter KeyError)
+    # Nettoyage Recettes
     df_st.columns = [str(c).strip() for c in df_st.columns]
     df_st['P_NET'] = df_st['Prix'].apply(clean_val)
     df_st['DT_NET'] = pd.to_datetime(df_st['DateNav'].astype(str).str.replace('\\', '', regex=False), dayfirst=True, errors='coerce')
-    
+    df_st = df_st[df_st['DT_NET'].dt.year == annee_choisie]
+
     # Nettoyage Maintenance
     if not df_m.empty:
         df_m.columns = [str(c).strip() for c in df_m.columns]
-        df_m['M_Calc'] = df_m['M_Num'] if 'M_Num' in df_m.columns else df_m['Montant'].apply(clean_val)
+        df_m['M_Calc'] = pd.to_numeric(df_m.get('M_Num', 0), errors='coerce').fillna(df_m['Montant'].apply(clean_val))
         df_m['dt_m'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+        df_m = df_m[df_m['dt_m'].dt.year == annee_choisie]
 
-    # Logique de paiement
-    def check_paye(val):
-        s = str(val).upper()
-        if "NON" in s: return False
-        return "PAY" in s or s == "OK"
-    df_st['IS_PAID_NET'] = df_st['Paiement'].apply(check_paye) if 'Paiement' in df_st.columns else False
-
-    # --- 3. APPLICATION DES FILTRES TEMPPORELS ---
-    # Filtre Année
-    df_st_an = df_st[df_st['DT_NET'].dt.year == annee_choisie]
-    df_m_an = df_m[df_m['dt_m'].dt.year == annee_choisie] if not df_m.empty else pd.DataFrame()
-
-    # Filtre "À ce jour" (pour les fromages et KPI)
-    if mode_vue == "Réel (Jusqu'à aujourd'hui)":
-        df_viz_rec = df_st_an[df_st_an['DT_NET'] <= maintenant]
-        df_viz_m = df_m_an[df_m_an['dt_m'] <= maintenant] if not df_m_an.empty else pd.DataFrame()
+    # Filtrage selon le mode choisi
+    if mode_vue == "Réel (Début d'année à ce jour)":
+        df_viz_rec = df_st[df_st['DT_NET'] <= maintenant]
+        df_viz_m = df_m[df_m['dt_m'] <= maintenant] if not df_m.empty else df_m
     else:
-        df_viz_rec = df_st_an
-        df_viz_m = df_m_an
+        df_viz_rec = df_st
+        df_viz_m = df_m
 
-    # --- 4. CALCULS KPI ---
-    recette_faite = df_viz_rec[df_viz_rec['IS_PAID_NET'] == True]['P_NET'].sum()
-    recette_a_recevoir = df_viz_rec[(df_viz_rec['DT_NET'] <= maintenant) & (df_viz_rec['IS_PAID_NET'] == False)]['P_NET'].sum()
+    # --- 3. CALCULS TRÉSORERIE ---
+    def is_paid(val):
+        s = str(val).upper()
+        return "PAY" in s or s == "OK" or s == "FAIT"
+
+    recette_encaissee = df_viz_rec[df_viz_rec['Paiement'].apply(is_paid)]['P_NET'].sum()
+    frais_regles = df_viz_m[df_viz_m['Statut'] == "Fait"]['M_Calc'].sum() if not df_viz_m.empty else 0
     
-    frais_par_cat = {"Assurances": 0.0, "Port": 0.0, "Maintenance": 0.0, "Autres": 0.0}
+    # Catégories Frais
+    f_cat = {"Assurances": 0, "Port": 0, "Imprévus/Maint": 0, "Autres": 0}
     if not df_viz_m.empty:
-        for _, row in df_viz_m.iterrows():
-            obj = str(row.get('Objet', '')).upper()
-            mt = row['M_Calc']
-            if any(x in obj for x in ["MAIF", "ASSUR"]): frais_par_cat["Assurances"] += mt
-            elif "PORT" in obj: frais_par_cat["Port"] += mt
-            elif any(x in obj for x in ["VESTA", "MAINT"]): frais_par_cat["Maintenance"] += mt
-            else: frais_par_cat["Autres"] += mt
+        for _, r in df_viz_m.iterrows():
+            o = str(r['Objet']).upper()
+            v = r['M_Calc']
+            if any(x in o for x in ["MAIF", "ASSUR"]): f_cat["Assurances"] += v
+            elif "PORT" in o: f_cat["Port"] += v
+            elif any(x in o for x in ["VESTA", "MAINT", "REPAR"]): f_cat["Imprévus/Maint"] += v
+            else: f_cat["Autres"] += v
+
+    # --- 4. RATIO FRAIS FIXES VS IMPRÉVUS ---
+    st.subheader("📊 Structure des Charges")
+    frais_fixes = f_cat["Assurances"] + f_cat["Port"]
+    frais_variables = f_cat["Imprévus/Maint"] + f_cat["Autres"]
+    total_f = frais_fixes + frais_variables
     
-    total_frais = sum(frais_par_cat.values())
+    if total_f > 0:
+        ratio_fixe = (frais_fixes / total_f) * 100
+        st.progress(ratio_fixe / 100, text=f"Frais Fixes (Port/Assur) : {ratio_fixe:.1f}%")
+        st.caption(f"Fixes : {int(frais_fixes)}€ | Imprévus & Autres : {int(frais_variables)}€")
 
-    # --- 5. AFFICHAGE KPI ---
-    st.write("---")
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("💰 Encaissé Réel", f"{int(recette_faite)} €")
-    k2.metric("⏳ Retards (Dû)", f"{int(recette_a_recevoir)} €")
-    k3.metric("💸 Frais Total", f"{int(total_frais)} €")
-    k4.metric("📈 Solde Net", f"{int(recette_faite - total_frais)} €")
-
-    # --- 6. GRAPHIQUES "FROMAGES" & DÉTAILS ---
+    # --- 5. GRAPHIQUES "FROMAGES" ---
     c1, c2 = st.columns(2)
     with c1:
-        st.subheader("🎯 Trésorerie Net")
-        fig1 = px.pie(values=[total_frais, recette_faite, recette_a_recevoir],
-                     names=['Dépenses', 'Encaissé', 'Retards'],
-                     hole=0.5, color_discrete_sequence=['#e74c3c', '#2ecc71', '#f1c40f'])
-        st.plotly_chart(fig1, use_container_width=True, key=f"pie_treso_{annee_choisie}_{mode_vue[:3]}")
-        
-        with st.expander("📄 Détails des Recettes"):
-            cols_show = [c for c in ['DateNav', 'Nom', 'Prix', 'Paiement'] if c in df_viz_rec.columns]
-            st.dataframe(df_viz_rec[cols_show], use_container_width=True)
-            st.info(f"**Total affiché : {int(df_viz_rec['P_NET'].sum())} €**")
+        st.write("**Trésorerie Réelle (Encaissé vs Payé)**")
+        fig1 = px.pie(values=[frais_regles, recette_encaissee], 
+                     names=['Dépenses Payées', 'Recettes Reçues'],
+                     color_discrete_sequence=['#e74c3c', '#2ecc71'], hole=0.5)
+        st.plotly_chart(fig1, use_container_width=True, key=f"pie_tr_{annee_choisie}")
 
     with c2:
-        st.subheader("💸 Nature des Frais")
-        fig2 = px.pie(values=list(frais_par_cat.values()), names=list(frais_par_cat.keys()),
-                     hole=0.5, color_discrete_sequence=px.colors.qualitative.T10)
-        st.plotly_chart(fig2, use_container_width=True, key=f"pie_frais_{annee_choisie}_{mode_vue[:3]}")
-        
-        with st.expander("📄 Détails des Dépenses"):
-            if not df_viz_m.empty:
-                df_det_m = df_viz_m[['Date', 'Objet', 'M_Calc']].copy()
-                df_det_m.columns = ['Date', 'Objet', 'Montant (€)']
-                st.dataframe(df_det_m, use_container_width=True)
-                st.info(f"**Total frais affichés : {int(df_viz_m['M_Calc'].sum())} €**")
+        st.write("**Nature des Frais**")
+        fig2 = px.pie(values=list(f_cat.values()), names=list(f_cat.keys()),
+                     hole=0.5, color_discrete_sequence=px.colors.qualitative.Pastel)
+        st.plotly_chart(fig2, use_container_width=True, key=f"pie_nat_{annee_choisie}")
 
     st.divider()
 
-    # --- 7. TABLEAU COMPTABLE MENSUEL ---
+    # --- 6. BILAN MENSUEL ---
     st.subheader(f"📈 Bilan Mensuel - {annee_choisie}")
     mois_labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
     stats_mensuelles = []
 
     for m in range(1, 13):
-        # On utilise toujours le DF de l'année entière pour le tableau mensuel
-        mask = (df_st_an['DT_NET'].dt.month == m)
-        rec_m = df_st_an[mask]
-        frais_m = df_m_an[df_m_an['dt_m'].dt.month == m] if not df_m_an.empty else pd.DataFrame()
+        mask_r = (df_st['DT_NET'].dt.month == m)
+        rec_m = df_st[mask_r]
+        frais_m = df_m[df_m['dt_m'].dt.month == m] if not df_m.empty else pd.DataFrame()
         
-        ca_prevu = rec_m['P_NET'].sum()
-        recu = rec_m[rec_m['IS_PAID_NET'] == True]['P_NET'].sum()
-        depenses = frais_m['M_Calc'].sum() if not frais_m.empty else 0.0
+        ca_p = rec_m['P_NET'].sum()
+        recu = rec_m[rec_m['Paiement'].apply(is_paid)]['P_NET'].sum()
+        dep = frais_m['M_Calc'].sum() if not frais_m.empty else 0
         
         stats_mensuelles.append({
             "Mois": mois_labels[m-1],
-            "Recette Prévue": f"{int(ca_prevu)} €",
-            "Reçu (Encaissé)": f"{int(recu)} €",
-            "À recevoir": f"{int(ca_prevu - recu)} €",
-            "Frais": f"{int(depenses)} €",
-            "Solde Net": f"{int(recu - depenses)} €",
-            "v_recu": recu, "v_frais": depenses, "v_solde": recu - depenses
+            "Reçu": recu, "Frais": dep, "Solde": recu - dep,
+            "T_Reçu": f"{int(recu)}€", "T_Frais": f"{int(dep)}€", "T_Solde": f"{int(recu - dep)}€"
         })
 
-    df_final_table = pd.DataFrame(stats_mensuelles)
-    st.table(df_final_table.set_index("Mois")[["Recette Prévue", "Reçu (Encaissé)", "À recevoir", "Frais", "Solde Net"]])
+    df_tab = pd.DataFrame(stats_mensuelles)
+    st.table(df_tab.set_index("Mois")[["T_Reçu", "T_Frais", "T_Solde"]])
 
-    # --- 8. GRAPHIQUE DE PERFORMANCE ---
-    fig_perf = go.Figure()
-    fig_perf.add_trace(go.Bar(x=df_final_table['Mois'], y=df_final_table['v_recu'], name='Reçu', marker_color='#2ecc71'))
-    fig_perf.add_trace(go.Bar(x=df_final_table['Mois'], y=df_final_table['v_frais'], name='Frais', marker_color='#e74c3c'))
-    fig_perf.add_trace(go.Scatter(x=df_final_table['Mois'], y=df_final_table['v_solde'], name='Solde Net', 
-                                 line=dict(color='gold', width=3), mode='lines+markers'))
-    
-    fig_perf.update_layout(title=f"Performance Mensuelle {annee_choisie}", barmode='group', template="plotly_dark")
-    st.plotly_chart(fig_perf, use_container_width=True, key=f"bar_perf_{annee_choisie}")
-# --- 9. GRAPHIQUE DE LA BALANCE (CASCADE) ---
-    st.subheader("⚖️ Analyse de la Balance (Flux de Trésorerie)")
-    
-    # Calcul des totaux pour l'année/période sélectionnée
-    total_recu_val = df_final_table['v_recu'].sum()
-    total_frais_val = df_calc_m = df_final_table['v_frais'].sum()
-    solde_final = total_recu_val - total_frais_val
-
-    fig_water = go.Figure(go.Waterfall(
-        name = "Balance", orientation = "v",
-        measure = ["relative", "relative", "total"],
-        x = ["Total Encaissé", "Total Frais", "Solde Net"],
-        textposition = "outside",
-        text = [f"+{int(total_recu_val)}€", f"-{int(total_frais_val)}€", f"{int(solde_final)}€"],
-        y = [total_recu_val, -total_frais_val, 0],
-        connector = {"line":{"color":"rgb(63, 63, 63)"}},
-        increasing = {"marker":{"color":"#2ecc71"}},
-        decreasing = {"marker":{"color":"#e74c3c"}},
+    # --- 7. CASCADE (WATERFALL) ---
+    st.subheader("⚖️ Flux de Trésorerie Global")
+    tot_r = df_tab['Reçu'].sum()
+    tot_f = df_tab['Frais'].sum()
+    fig_w = go.Figure(go.Waterfall(
+        orientation = "v", measure = ["relative", "relative", "total"],
+        x = ["Encaissé", "Frais", "Net"],
+        y = [tot_r, -tot_f, 0],
+        text = [f"+{int(tot_r)}€", f"-{int(tot_f)}€", f"{int(tot_r-tot_f)}€"],
+        increasing = {"marker":{"color":"#2ecc71"}}, decreasing = {"marker":{"color":"#e74c3c"}},
         totals = {"marker":{"color":"#f1c40f"}}
     ))
-
-    fig_water.update_layout(
-        title=f"Flux de Trésorerie Global {annee_choisie}",
-        showlegend = False,
-        template="plotly_dark"
-    )
-    
-    st.plotly_chart(fig_water, use_container_width=True, key=f"waterfall_{annee_choisie}")
-
-    # --- OPTIONNEL : Graphique de la Balance Cumulative ---
-    st.subheader("📈 Évolution du Solde Cumulé")
-    df_final_table['Solde_Cumule'] = df_final_table['v_solde'].cumsum()
-    
-    fig_area = px.area(df_final_table, x="Mois", y="Solde_Cumule", 
-                       title="Progression du compte (Revenus - Frais cumulés)",
-                       color_discrete_sequence=['#f1c40f'])
-    
-    fig_area.update_layout(template="plotly_dark")
-    st.plotly_chart(fig_area, use_container_width=True, key=f"area_cumul_{annee_choisie}")
+    st.plotly_chart(fig_w, use_container_width=True, key=f"water_{annee_choisie}")
 # =================================================================
-# --- 8. PAGE MAINTENANCE (EDITION & SÉCURITÉ SUPPRESSION) ---
+# --- 8. PAGE MAINTENANCE ---
 # =================================================================
 elif st.session_state.page == "MAINT":
     st.title("🔧 Maintenance & Charges Vesta")
- 
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
     
     if df_m.empty:
-        df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type"])
- 
-    # --- ZONE D'AJOUT ---
-    with st.expander("➕ Ajouter une dépense ou une charge", expanded=False):
-        col1, col2 = st.columns(2)
-        with col1:
-            f_date = st.text_input("Date", datetime.now().strftime("%d/%m/%Y"), key="add_m_date")
-            f_obj = st.text_input("Objet", key="add_m_obj")
-        with col2:
-            f_type = st.selectbox("Type", ["Frais Obligatoires", "Frais Maint Vesta", "Frais Autres"], key="add_m_type")
-            f_statut = st.selectbox("Statut", ["À prévoir", "Fait"], key="add_m_statut")
-            
-        f_mt = st.number_input("Montant (€)", min_value=0.0, step=10.0, key="add_m_mt")
-        is_recurring = st.checkbox("🔄 Répéter chaque mois jusqu'à fin 2026")
+        df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
+
+    # --- AJOUT ---
+    with st.expander("➕ Ajouter une dépense", expanded=False):
+        c1, c2 = st.columns(2)
+        f_date = c1.text_input("Date (JJ/MM/AAAA)", datetime.now().strftime("%d/%m/%Y"))
+        f_obj = c2.text_input("Objet (ex: PORT, ASSUR, VESTA...)")
+        f_mt = c1.number_input("Montant (€)", min_value=0.0, step=10.0)
+        f_statut = c2.selectbox("Statut", ["À prévoir", "Fait"])
+        f_type = c2.selectbox("Type", ["Frais Obligatoires", "Frais Maint Vesta", "Frais Autres"])
         
-        if st.button("💾 ENREGISTRER L'ENTRÉE", type="primary", use_container_width=True):
+        if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
             if f_obj and f_mt > 0:
-                new_data = []
-                if is_recurring:
-                    j, m_start, a = map(int, f_date.split('/'))
-                    for m_idx in range(m_start, 13):
-                        new_data.append({"Date": f"{j:02d}/{m_idx:02d}/{a}", "Objet": f"{f_obj} (M{m_idx})", "Montant": float(f_mt), "Statut": f_statut, "Type": f_type})
-                else:
-                    new_data.append({"Date": f_date, "Objet": f_obj, "Montant": float(f_mt), "Statut": f_statut, "Type": f_type})
-                
-                df_m = pd.concat([df_m, pd.DataFrame(new_data)], ignore_index=True)
+                new_row = {"Date": f_date, "Objet": f_obj.upper(), "Montant": float(f_mt), 
+                           "M_Num": float(f_mt), "Statut": f_statut, "Type": f_type}
+                df_m = pd.concat([df_m, pd.DataFrame([new_row])], ignore_index=True)
                 sauvegarder_data(df_m, file_path_m)
-                st.success("Enregistré !")
                 st.rerun()
 
     st.divider()
- 
-    # --- LISTE DES DÉPENSES ---
-    if not df_m.empty:
-        df_m['M_Num'] = pd.to_numeric(df_m['Montant'], errors='coerce').fillna(0)
-        st.metric("TOTAL CUMULÉ", f"{df_m['M_Num'].sum():.0f} €")
- 
-        # Tri par date décroissante
-        df_m['dt_temp'] = pd.to_datetime(df_m['Date'], format='%d/%m/%Y', errors='coerce')
-        df_m = df_m.sort_values('dt_temp', ascending=False).drop(columns=['dt_temp'])
 
-        for index, item in df_m.iterrows():
-            couleur = "🟢" if item['Statut'] == "Fait" else "⏳"
-            with st.expander(f"{couleur} {item['Date']} - {item['Objet']} ({item['Montant']}€)"):
+    # --- LISTE ET SÉCURITÉ ---
+    if not df_m.empty:
+        # Tri par date
+        df_m['dt_t'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+        df_m = df_m.sort_values('dt_t', ascending=False).drop(columns=['dt_t'])
+
+        for idx, item in df_m.iterrows():
+            icon = "🟢" if item['Statut'] == "Fait" else "⏳"
+            with st.expander(f"{icon} {item['Date']} - {item['Objet']} ({item['Montant']}€)"):
                 
-                # --- MODE ÉDITION ---
-                edit_mode = st.toggle("📝 Modifier cette fiche", key=f"toggle_{index}")
-                
-                if edit_mode:
-                    e_date = st.text_input("Date", item['Date'], key=f"ed_date_{index}")
-                    e_obj = st.text_input("Objet", item['Objet'], key=f"ed_obj_{index}")
-                    e_mt = st.number_input("Montant (€)", value=float(item['Montant']), key=f"ed_mt_{index}")
-                    e_type = st.selectbox("Type", ["Frais Obligatoires", "Frais Maint Vesta", "Frais Autres"], 
-                                         index=["Frais Obligatoires", "Frais Maint Vesta", "Frais Autres"].index(item.get('Type', 'Frais Autres')), key=f"ed_type_{index}")
-                    e_statut = st.selectbox("Statut", ["À prévoir", "Fait"], 
-                                           index=0 if item['Statut'] != "Fait" else 1, key=f"ed_stat_{index}")
+                edit = st.toggle("📝 Modifier", key=f"ed_{idx}")
+                if edit:
+                    new_st = st.selectbox("Changer Statut", ["À prévoir", "Fait"], 
+                                         index=0 if item['Statut'] != "Fait" else 1, key=f"st_{idx}")
+                    new_obj = st.text_input("Objet", item['Objet'], key=f"obj_{idx}")
+                    new_mt = st.number_input("Montant", value=float(item.get('M_Num', 0)), key=f"mt_{idx}")
                     
-                    if st.button("✅ VALIDER LES MODIFICATIONS", key=f"save_{index}", use_container_width=True):
-                        df_m.at[index, 'Date'] = e_date
-                        df_m.at[index, 'Objet'] = e_obj
-                        df_m.at[index, 'Montant'] = e_mt
-                        df_m.at[index, 'Type'] = e_type
-                        df_m.at[index, 'Statut'] = e_statut
+                    if st.button("✅ Valider", key=f"btn_{idx}"):
+                        df_m.at[idx, 'Statut'] = new_st
+                        df_m.at[idx, 'Objet'] = new_obj.upper()
+                        df_m.at[idx, 'M_Num'] = new_mt
+                        df_m.at[idx, 'Montant'] = new_mt
                         sauvegarder_data(df_m, file_path_m)
                         st.rerun()
                 else:
-                    st.write(f"**Type :** {item.get('Type', 'N/A')}")
-                    st.write(f"**Statut actuel :** {item['Statut']}")
-
-                st.write("---")
-                # --- SUPPRESSION AVEC CONFIRMATION ---
-                if st.button(f"🗑️ Supprimer", key=f"pre_del_{index}", use_container_width=True, type="secondary"):
-                    st.session_state[f"confirm_del_{index}"] = True
-                
-                if st.session_state.get(f"confirm_del_{index}", False):
-                    st.warning("⚠️ Confirmer la suppression définitive ?")
-                    col_yes, col_no = st.columns(2)
-                    with col_yes:
-                        if st.button("OUI", key=f"real_del_{index}", type="danger", use_container_width=True):
-                            df_m = df_m.drop(index).reset_index(drop=True)
+                    # SÉCURITÉ DE SUPPRESSION
+                    if item['Statut'] == "Fait":
+                        st.warning("🔒 Réglé : Suppression bloquée. Repassez en 'À prévoir' pour supprimer.")
+                    else:
+                        if st.button("🗑️ Supprimer la fiche", key=f"del_{idx}", type="secondary"):
+                            df_m = df_m.drop(idx).reset_index(drop=True)
                             sauvegarder_data(df_m, file_path_m)
                             st.rerun()
-                    with col_no:
-                        if st.button("NON", key=f"cancel_del_{index}", use_container_width=True):
-                            st.session_state[f"confirm_del_{index}"] = False
-                            st.rerun()
-
-    # --- ZONE DE DANGER ---
-    st.write("---")
-    with st.expander("🚨 Archives"):
-        if st.button("🗄️ ARCHIVER TOUT", use_container_width=True):
-            if not df_m.empty:
-                df_arch = charger_data('archives_maintenance.json')
-                sauvegarder_data(pd.concat([df_arch, df_m], ignore_index=True), 'archives_maintenance.json')
-                sauvegarder_data(pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type"]), file_path_m)
-                st.rerun()
 # =================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
 # =================================================================
