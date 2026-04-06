@@ -619,25 +619,44 @@ elif st.session_state.page == "MAINT":
                         df_to_save = df_m.drop(columns=['key_id'])
                         sauvegarder_data(df_to_save, file_path_m)
                         st.rerun()
+              
                 else:
-                    # AFFICHAGE & SUPPRESSION
+                    # --- AFFICHAGE & SUPPRESSION SÉCURISÉE ---
                     st.write(f"**Type :** {item.get('Type', 'N/A')}")
+                    
                     if item['Statut'] == "Fait":
-                        st.warning("🔒 Verrouillé : Cette fiche est réglée. Modifiez le statut pour supprimer.")
+                        st.warning("🔒 Fiche réglée : repassez en 'À prévoir' pour supprimer.")
                     else:
-                        if st.button("🗑️ Supprimer", key=f"pre_{safe_id}"):
-                            st.session_state[f"ask_{safe_id}"] = True
+                        # On utilise une clé simplifiée pour le bouton de déclenchement
+                        key_trigger = f"pre_{idx}"
+                        key_confirm = f"conf_msg_{idx}"
+                        key_btn_yes = f"yes_{idx}"
+                        key_btn_no  = f"no_{idx}"
+
+                        if st.button("🗑️ Supprimer la ligne", key=key_trigger, use_container_width=True):
+                            st.session_state[key_confirm] = True
                         
-                        if st.session_state.get(f"ask_{safe_id}"):
-                            st.error("Confirmer la suppression définitive ?")
-                            col_y, col_n = st.columns(2)
-                            if col_y.button("OUI, SUPPRIMER", key=f"real_{safe_id}", type="danger"):
-                                df_m = df_m.drop(idx).drop(columns=['key_id'])
-                                sauvegarder_data(df_m, file_path_m)
-                                del st.session_state[f"ask_{safe_id}"]
+                        # Si la confirmation est demandée, on l'affiche hors colonnes complexes
+                        if st.session_state.get(key_confirm, False):
+                            st.error("⚠️ Supprimer définitivement ?")
+                            
+                            if st.button("👉 OUI, CONFIRMER LA SUPPRESSION", key=key_btn_yes, type="danger", use_container_width=True):
+                                # 1. On charge proprement le JSON actuel pour être sûr de ne pas décaler les index
+                                df_temp = charger_data(file_path_m)
+                                
+                                # 2. On identifie la ligne par son contenu exact pour éviter le décalage d'index
+                                # (On cherche la ligne qui correspond à l'objet et la date)
+                                mask = (df_temp['Date'] == item['Date']) & (df_temp['Objet'] == item['Objet'])
+                                df_temp = df_temp[~mask].reset_index(drop=True)
+                                
+                                # 3. Sauvegarde et nettoyage
+                                sauvegarder_data(df_temp, file_path_m)
+                                st.session_state[key_confirm] = False
+                                st.success("Suppression effectuée !")
                                 st.rerun()
-                            if col_n.button("NON, ANNULER", key=f"no_{safe_id}"):
-                                st.session_state[f"ask_{safe_id}"] = False
+
+                            if st.button("❌ ANNULER", key=key_btn_no, use_container_width=True):
+                                st.session_state[key_confirm] = False
                                 st.rerun()
 
     # --- ZONE DE DANGER ---
