@@ -555,40 +555,41 @@ elif st.session_state.page == "MAINT":
     
     if df_m.empty:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
-
     # --- A. LOGIQUE DE SUPPRESSION (SÉCURISÉE PAR FORMULAIRE) ---
     if "delete_target" in st.session_state and st.session_state.delete_target is not None:
         idx_to_del = st.session_state.delete_target
         
-        # Vérification de l'existence de l'index
+        # Vérification de l'existence de l'index dans le DataFrame actuel
         if idx_to_del in df_m.index:
             item_info = df_m.loc[idx_to_del]
             
             st.error(f"🗑️ **CONFIRMATION DE SUPPRESSION**")
-            st.write(f"Objet : **{item_info['Objet']}** | Date : **{item_info['Date']}**")
-            
-            # FORMULAIRE UNIQUE
+            st.info(f"Élément : {item_info['Objet']} | Date : {item_info['Date']}")
+
+            # DEBUT DU FORMULAIRE
             with st.form(key=f"form_destruction_{idx_to_del}"):
-                st.write("Cette action est irréversible. Voulez-vous continuer ?")
-                # Un seul bouton de soumission par formulaire pour une stabilité maximale
-                confirm_submit = st.form_submit_button("🔥 OUI, SUPPRIMER DÉFINITIVEMENT", type="danger", use_container_width=True)
+                st.write("⚠️ Cette action est définitive. Cliquez sur le bouton rouge pour confirmer.")
+                
+                # OBLIGATOIRE : Utiliser form_submit_button
+                confirm_submit = st.form_submit_button("🔥 OUI, SUPPRIMER DÉFINITIVEMENT", 
+                                                      type="danger", 
+                                                      use_container_width=True)
                 
                 if confirm_submit:
-                    # Action de suppression
+                    # Action de suppression réelle
                     df_m = df_m.drop(idx_to_del).reset_index(drop=True)
                     sauvegarder_data(df_m, file_path_m)
                     
-                    # Nettoyage de la cible
+                    # Nettoyage de l'état
                     st.session_state.delete_target = None
-                    st.success("Suppression effectuée.")
+                    st.success("Suppression effectuée avec succès.")
                     st.rerun()
 
-            # Bouton d'annulation HORS du formulaire
+            # BOUTON ANNULER (Doit être HORS du formulaire s'il est classique)
             if st.button("⬅️ ANNULER ET RETOURNER À LA LISTE", use_container_width=True, key="btn_cancel_global"):
                 st.session_state.delete_target = None
                 st.rerun()
         else:
-            # Sécurité si l'index a disparu
             st.session_state.delete_target = None
             st.rerun()
             
