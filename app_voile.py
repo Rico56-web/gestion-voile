@@ -601,7 +601,49 @@ elif st.session_state.page == "MAINT":
             st.rerun()
             
         st.divider()
+    # --- NOUVEAU : BILAN FINANCIER DYNAMIQUE ---
+    st.subheader("📊 État des Finances 2026")
+    
+    if not df_m.empty:
+        # 1. Sélecteur de vue
+        vue_bilan = st.radio(
+            "Afficher le bilan :",
+            ["✅ Dépenses Réalisées (Payé)", "📅 Total Annuel (Payé + À prévoir)"],
+            horizontal=True,
+            key="vue_bilan_radio"
+        )
 
+        # 2. Calcul des totaux par catégorie
+        if "Réalisées" in vue_bilan:
+            df_bilan = df_m[df_m['Statut'] == "Fait"]
+            titre_bilan = "Total déjà réglé"
+            couleur_metric = "normal"
+        else:
+            df_bilan = df_m
+            titre_bilan = "Engagement Total 2026"
+            couleur_metric = "inverse"
+
+        # Groupement par Type
+        bilan_cat = df_bilan.groupby('Type')['M_Num'].sum().to_dict()
+        total_gen = df_bilan['M_Num'].sum()
+
+        # 3. Affichage en colonnes (Metrics)
+        m1, m2, m3, m4 = st.columns(4)
+        
+        # On affiche les catégories selon ton dictionnaire 'Type'
+        m1.metric("Obligatoires", f"{bilan_cat.get('Frais Obligatoires', 0):.2f} €")
+        m2.metric("Maint. Vesta", f"{bilan_cat.get('Frais Maint Vesta', 0):.2f} €")
+        m3.metric("Autres", f"{bilan_cat.get('Frais Autres', 0):.2f} €")
+        m4.metric(titre_bilan, f"{total_gen:.2f} €", delta=None, delta_color=couleur_metric)
+
+        # Petit graphique barres pour visualiser la répartition
+        if total_gen > 0:
+            st.bar_chart(df_bilan.groupby('Type')['M_Num'].sum())
+    else:
+        st.info("Aucune donnée disponible pour le bilan financier.")
+
+    st.divider()
+    # --- (Ensuite vient ton bloc "Ajouter une dépense"...) ---
     # --- B. ZONE D'AJOUT (AVEC RÉCURRENCE MENSUELLE) ---
     with st.expander("➕ Ajouter une dépense (Assurance, Port, Sopalin...)", expanded=False):
         c1, c2 = st.columns(2)
@@ -636,6 +678,7 @@ elif st.session_state.page == "MAINT":
                     st.error("Format date invalide (JJ/MM/AAAA)")
 
     st.divider()
+    
     # --- C. LISTE DES CHARGES (AFFICHAGE TRIÉ ET AUTO-SAVE) ---
     if not df_m.empty:
         df_disp = df_m.copy()
