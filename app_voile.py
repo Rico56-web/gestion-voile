@@ -347,9 +347,7 @@ elif st.session_state.page == "PLANNING":
     # --- NAVIGATION ARCHIVES (AJOUT) ---
     col_nav1, col_nav2 = st.columns([1, 1])
     with col_nav1:
-        if st.button("📦 ARCHIVES", use_container_width=True, type="secondary"):
-            st.session_state.page = "ARCHIVES"
-            st.rerun()
+         
     with col_nav2:
         # Petit rappel visuel de la page actuelle
         st.button("🗓️ PLANNING", use_container_width=True, disabled=True)
@@ -619,9 +617,6 @@ elif st.session_state.page == "MAINT":
     # --- NAVIGATION HAUT (MAINTENANCE) ---
     c_nav1, c_nav2 = st.columns([1, 1])
     with c_nav1:
-        if st.button("📦 ARCHIVES", key="btn_arch_maint", use_container_width=True):
-            st.session_state.page = "ARCHIVES"
-            st.rerun()
     with c_nav2:
         st.button("🛠️ MAINTENANCE", disabled=True, use_container_width=True)
     st.divider()
