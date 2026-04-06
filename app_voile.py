@@ -329,7 +329,13 @@ elif st.session_state.page == "PLANNING":
     # CSS
     st.markdown("""<style>.block-container { padding: 10px 5px !important; } .full-width-cal { width: 98% !important; margin: auto !important; border-collapse: collapse; table-layout: fixed; } .full-width-cal td { width: 14.28%; padding: 0 !important; border: 0.5px solid #eee; }</style>""", unsafe_allow_html=True)
     st.markdown('<div class="main-header">🗓️ PLANNING VESTA 2026</div>', unsafe_allow_html=True)
-
+    col_arch, col_vide = st.columns([1, 1])
+    with col_arch:
+        if st.button("📦 ACCÉDER AUX ARCHIVES", use_container_width=True, type="secondary"):
+            st.session_state.page = "ARCHIVES"
+            st.rerun()
+    
+    st.divider() # Petite ligne de séparation pour la clarté
     # --- NAVIGATION (VERSION SYNCHRONISÉE) ---
     if 'nav_key' not in st.session_state:
         st.session_state.nav_key = 0
@@ -783,19 +789,6 @@ Eric (vesta)"""
 # =================================================================
 # --- 10. PAGE LOG (CONSULTATION DES ARCHIVES) ---
 # =================================================================
-elif st.session_state.page == "LOG":
-    st.title("📂 Archives & Logs")
-    
-    annee_actuelle = datetime.now().year
-    nom_archive = f"archives_{annee_actuelle}.json"
-    
-    df_arch = charger_data(nom_archive)
-    
-    if not df_arch.empty:
-        st.write(f"### 📋 Missions Archivées {annee_actuelle}")
-        st.dataframe(df_arch, use_container_width=True)
-    else:
-        st.info("Aucune archive trouvée pour cette saison.")
 elif st.session_state.page == "ARCHIVES":
     import pandas as pd
     import io
