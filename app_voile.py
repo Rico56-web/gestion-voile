@@ -796,29 +796,68 @@ elif st.session_state.page == "LOG":
         st.dataframe(df_arch, use_container_width=True)
     else:
         st.info("Aucune archive trouvée pour cette saison.")
-        
-# =================================================================
-# --- 10. PAGE ARCHIVES (DESTINATION) ---
-# =================================================================
 elif st.session_state.page == "ARCHIVES":
-    # BOUTON RETOUR EN HAUT (Indispensable sur iPhone)
-    if st.button("⬅️ Retour aux Stats", use_container_width=True):
+    import pandas as pd
+    import io
+
+    # 1. NAVIGATION RETOUR
+    if st.button("⬅️ RETOUR AUX STATS", use_container_width=True):
         st.session_state.page = "STATS"
         st.rerun()
-    
-    st.title("📂 Archives Complètes")
-    
-    # Affichage des données sans filtres (Historique total)
-    t1, t2 = st.tabs(["🛠️ Maintenance", "📅 Planning"])
-    
-    with t1:
-        df_m = charger_data('maintenance.json')
-        if not df_m.empty:
-            st.dataframe(df_m, use_container_width=True, hide_index=True)
+
+    st.title("📂 Gestion des Archives")
+
+    # --- 2. EXPORT VERS PC (EXCEL) ---
+    with st.expander("📤 TRANSPÉRER VERS PC (Excel)", expanded=True):
+        st.write("Téléchargez vos archives pour les ouvrir sur Excel ou Word.")
+        
+        # On prépare les fichiers
+        df_arch_m = charger_data('archives_maintenance.json')
+        df_arch_p = charger_data('archives_planning.json')
+        
+        if not df_arch_m.empty or not df_arch_p.empty:
+            # Création d'un fichier Excel en mémoire
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                if not df_arch_p.empty:
+                    df_arch_p.to_excel(writer, sheet_name='Planning_Contacts', index=False)
+                if not df_arch_m.empty:
+                    df_arch_m.to_excel(writer, sheet_name='Maintenance', index=False)
             
+            st.download_button(
+                label="📥 TÉLÉCHARGER LE FICHIER EXCEL",
+                data=buffer.getvalue(),
+                file_name=f"Archives_Vesta_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
+                mime="application/vnd.ms-excel",
+                use_container_width=True
+            )
+        else:
+            st.info("Aucune donnée à exporter pour le moment.")
+
+    # --- 3. VIDAGE DES ARCHIVES (SÉCURISÉ) ---
+    with st.expander("🗑️ VIDER LES ARCHIVES (Définitif)", expanded=False):
+        st.error("⚠️ Cette action est irréversible. Assurez-vous d'avoir téléchargé l'Excel avant.")
+        
+        # Double confirmation pour éviter les erreurs sur iPhone
+        confirm = st.checkbox("Je confirme vouloir supprimer TOUTES les archives")
+        
+        if st.button("🔥 SUPPRIMER DÉFINITIVEMENT", use_container_width=True, disabled=not confirm):
+            # On écrase avec des DataFrames vides
+            df_vide = pd.DataFrame()
+            sauvegarder_data(df_vide, 'archives_maintenance.json')
+            sauvegarder_data(df_vide, 'archives_planning.json')
+            st.success("Les archives ont été vidées.")
+            st.rerun()
+
+    st.divider()
+
+    # --- 4. CONSULTATION ---
+    st.subheader("📜 Historique actuel")
+    t1, t2 = st.tabs(["🛠️ Frais", "📅 Planning/Contacts"])
+    with t1:
+        st.dataframe(charger_data('archives_maintenance.json'), use_container_width=True, hide_index=True)
     with t2:
-        if df_c is not None and not df_c.empty:
-            st.dataframe(df_c, use_container_width=True, hide_index=True)
+        st.dataframe(charger_data('archives_planning.json'), use_container_width=True, hide_index=True)
 # --- FIN DU FICHIER ---
 
 
