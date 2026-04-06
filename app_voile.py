@@ -346,8 +346,6 @@ elif st.session_state.page == "PLANNING":
     st.markdown('<div class="main-header">🗓️ PLANNING VESTA 2026</div>', unsafe_allow_html=True)
     # --- NAVIGATION ARCHIVES (AJOUT) ---
     col_nav1, col_nav2 = st.columns([1, 1])
-    with col_nav1:
-         
     with col_nav2:
         # Petit rappel visuel de la page actuelle
         st.button("🗓️ PLANNING", use_container_width=True, disabled=True)
