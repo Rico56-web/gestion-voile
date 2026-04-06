@@ -545,100 +545,106 @@ elif st.session_state.page == "STATS":
     # --- 6. WATERFALL ---
     fig_w = go.Figure(go.Waterfall(x=["Encaissé", "Frais", "Net"], y=[df_tab['Reçu'].sum(), -df_tab['Frais'].sum(), 0], measure=["relative", "relative", "total"]))
     st.plotly_chart(fig_w, use_container_width=True)
-# =================================================================
-# --- 8. PAGE MAINTENANCE (SYSTÈME D'ÉDITION DYNAMIQUE) ---
+
+# # =================================================================
+# --- 8. PAGE MAINTENANCE (OPTI IPHONE & AUTO-CLOSE) ---
 # =================================================================
 elif st.session_state.page == "MAINT":
-    st.title("🔧 Maintenance & Charges - Vesta Skipper")
+    st.title("🔧 Maintenance - Vesta")
     
-    # On initialise l'index de la ligne en cours d'édition
     if 'edit_idx' not in st.session_state:
         st.session_state.edit_idx = None
 
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
     
-    LISTE_TYPES = ["Assurances", "Autres frais", "Maintenance, matériels", "Port", "Sécurité"]
+    # Liste complète des catégories
+    LISTE_TYPES = ["Assurances", "Port", "Maintenance, matériels", "Sécurité", "Autres frais"]
     ANNEES_VUES = ["2026", "2027", "2028"]
     
-    # --- 1. FILTRES ---
-    c_y1, c_y2 = st.columns([1, 3])
-    annee_choisie = c_y1.selectbox("📅 Saison", ANNEES_VUES, key="yr_sel")
-    vue = st.radio("Vue :", ["✅ Payé", "📅 Prévisionnel"], horizontal=True)
+    # --- 1. FILTRES COMPACTS ---
+    c_y1, c_y2 = st.columns([1, 2])
+    annee_choisie = c_y1.selectbox("📅", ANNEES_VUES, label_visibility="collapsed")
+    vue = c_y2.radio("Vue", ["✅ Payé", "📅 Tout"], horizontal=True, label_visibility="collapsed")
 
-    # --- 2. TRAITEMENT DONNÉES ---
+    # --- 2. TRAITEMENT ---
     if not df_m.empty:
         df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
         df_annee = df_m[df_m['Date'].str.endswith(annee_choisie)].copy()
         df_view = df_annee[df_annee['Statut'] == "Fait"].copy() if "Payé" in vue else df_annee.copy()
-        
-        # Tri chrono
         df_view['dt_t'] = pd.to_datetime(df_view['Date'], dayfirst=True, errors='coerce')
         df_view = df_view.sort_values('dt_t', ascending=False)
     else:
         df_view = pd.DataFrame()
 
-    # --- 3. METRICS ---
+    # --- 3. METRICS CONDENSÉES (2 lignes pour mobile) ---
     if not df_view.empty:
-        m1, m2, m3, m4, m5 = st.columns(5)
         def g_s(df, c): return df[df['Type'] == c]['M_Num'].sum()
-        m1.metric("🛡️ Assur.", f"{g_s(df_view, 'Assurances'):.0f}€")
-        m2.metric("⚓ Port", f"{g_s(df_view, 'Port'):.0f}€")
-        m3.metric("🛠️ Maint.", f"{g_s(df_view, 'Maintenance, matériels'):.0f}€")
-        m4.metric("🛟 Sécu.", f"{g_s(df_view, 'Sécurité'):.0f}€")
-        m5.metric("💰 TOTAL", f"{df_view['M_Num'].sum():.0f}€")
+        r1_1, r1_2, r1_3 = st.columns(3)
+        r1_1.metric("🛡️ Assur", f"{g_s(df_view, 'Assurances'):.0f}€")
+        r1_2.metric("⚓ Port", f"{g_s(df_view, 'Port'):.0f}€")
+        r1_3.metric("💰 TOTAL", f"{df_view['M_Num'].sum():.0f}€")
+        
+        r2_1, r2_2 = st.columns(2)
+        r2_1.metric("🛠️ Maint", f"{g_s(df_view, 'Maintenance, matériels'):.0f}€")
+        r2_2.metric("🛟 Sécu", f"{g_s(df_view, 'Sécurité'):.0f}€")
 
-    st.divider()
+    st.write("---")
 
-    # --- 4. LISTE D'AFFICHAGE ---
+    # --- 4. LISTE ULTRA-COMPACTE ---
     if not df_view.empty:
         for idx, row in df_view.iterrows():
-            # Style de la ligne
-            color = "#d4edda" if row['Statut'] == "Fait" else "#fff3cd"
-            
-            # Affichage de la ligne formatée
-            with st.container():
-                c1, c2, c3 = st.columns([5, 2, 1])
-                status_icon = "🟢" if row['Statut'] == "Fait" else "⏳"
-                c1.write(f"{status_icon} **{row['Date']}** — {row['Objet']}")
-                c2.write(f"**{row['Montant']:.2f} €**")
-                
-                # Bouton pour déclencher l'édition
-                if c3.button("📝", key=f"btn_ed_{idx}"):
-                    st.session_state.edit_idx = idx
-                    st.rerun()
-
-            # --- ZONE D'ÉDITION (Apparaît seulement si on a cliqué sur le stylo) ---
+            # Si on est en train d'éditer CETTE ligne
             if st.session_state.edit_idx == idx:
-                with st.info("Modification de la fiche :"):
-                    ce1, ce2 = st.columns(2)
-                    new_mt = ce1.number_input("Prix €", value=float(row['M_Num']), key=f"ed_mt_{idx}")
-                    new_ty = ce2.selectbox("Type", LISTE_TYPES, index=LISTE_TYPES.index(row['Type']), key=f"ed_ty_{idx}")
-                    new_st = ce1.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"ed_st_{idx}")
+                with st.container(border=True):
+                    st.caption(f"Modification : {row['Objet']}")
+                    new_mt = st.number_input("Prix €", value=float(row['M_Num']), key=f"ed_mt_{idx}")
+                    new_ty = st.selectbox("Type", LISTE_TYPES, index=LISTE_TYPES.index(row['Type']) if row['Type'] in LISTE_TYPES else 0, key=f"ed_ty_{idx}")
+                    new_st = st.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"ed_st_{idx}")
                     
-                    b_col1, b_col2, b_col3 = st.columns(3)
-                    if b_col1.button("💾 ENREGISTRER", key=f"sv_{idx}", type="primary"):
+                    c_b1, c_b2, c_b3 = st.columns(3)
+                    if c_b1.button("💾 OK", key=f"sv_{idx}", use_container_width=True, type="primary"):
                         df_m.at[idx, 'M_Num'] = new_mt
                         df_m.at[idx, 'Montant'] = new_mt
                         df_m.at[idx, 'Type'] = new_ty
                         df_m.at[idx, 'Statut'] = new_st
                         sauvegarder_data(df_m, file_path_m)
-                        st.session_state.edit_idx = None # ON FERME
+                        st.session_state.edit_idx = None # Fermeture
                         st.rerun()
-                    
-                    if b_col2.button("❌ ANNULER", key=f"ann_{idx}"):
-                        st.session_state.edit_idx = None # ON FERME
+                    if c_b2.button("❌", key=f"ann_{idx}", use_container_width=True):
+                        st.session_state.edit_idx = None
                         st.rerun()
-                        
-                    if b_col3.button("🗑️ SUPPRIMER", key=f"del_{idx}"):
+                    if c_b3.button("🗑️", key=f"del_{idx}", use_container_width=True):
                         df_m = df_m.drop(idx).reset_index(drop=True)
                         sauvegarder_data(df_m, file_path_m)
                         st.session_state.edit_idx = None
                         st.rerun()
-                st.write("---")
             else:
-                st.write("---")
-# =================================================================
+                # Affichage simple ligne par ligne pour iPhone
+                status_color = "🟢" if row['Statut'] == "Fait" else "⏳"
+                # On utilise des colonnes pour que tout tienne sur une seule ligne
+                col_txt, col_val, col_btn = st.columns([6, 3, 1.5])
+                col_txt.write(f"{status_color} {row['Date']} {row['Objet'][:15]}")
+                col_val.write(f"**{row['M_Num']:.0f}€**")
+                if col_btn.button("📝", key=f"edit_{idx}"):
+                    st.session_state.edit_idx = idx
+                    st.rerun()
+                st.write('<div style="margin-top:-15px"></div>', unsafe_allow_html=True) # Réduit l'espace vertical
+                st.divider()
+
+    # --- 5. AJOUT RAPIDE ---
+    with st.expander("➕ Nouvelle charge"):
+        f_date = st.date_input("Date", datetime.now(), format="DD/MM/YYYY")
+        f_obj = st.text_input("Objet")
+        f_mt = st.number_input("Montant €", min_value=0.0)
+        f_type = st.selectbox("Catégorie", LISTE_TYPES)
+        f_stat = st.selectbox("Statut", ["À prévoir", "Fait"])
+        if st.button("💾 ENREGISTRER LA SAISIE", use_container_width=True):
+            if f_obj:
+                new_data = {"Date": f_date.strftime("%d/%m/%Y"), "Objet": f_obj, "Montant": f_mt, "M_Num": f_mt, "Statut": f_stat, "Type": f_type}
+                df_m = pd.concat([df_m, pd.DataFrame([new_data])], ignore_index=True)
+                sauvegarder_data(df_m, file_path_m)
+                st.rerun()=================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
 # =================================================================
 if st.session_state.page == "FACTURES":
