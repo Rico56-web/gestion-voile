@@ -546,116 +546,134 @@ elif st.session_state.page == "STATS":
     fig_w = go.Figure(go.Waterfall(x=["Encaissé", "Frais", "Net"], y=[df_tab['Reçu'].sum(), -df_tab['Frais'].sum(), 0], measure=["relative", "relative", "total"]))
     st.plotly_chart(fig_w, use_container_width=True)
 # =================================================================
-# --- 8. PAGE MAINTENANCE (PROTECTION CONTRE LES DOUBLONS) ---
+# --- 8. PAGE MAINTENANCE (NETTOYAGE & SÉCURITÉ INDEX) ---
 # =================================================================
 elif st.session_state.page == "MAINT":
-    st.title("🔧 Maintenance & Charges Vesta")
+    st.title("🔧 Maintenance & Charges - Vesta Skipper")
     
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
     
-    if df_m.empty:
+    # --- FIX 1 : NETTOYAGE AUTOMATIQUE DES DONNÉES ---
+    if not df_m.empty:
+        # Correction des statuts 'OK' en 'Fait' pour la cohérence du code
+        df_m['Statut'] = df_m['Statut'].replace('OK', 'Fait')
+        # Correction des erreurs de frappe (ex: 15/01:2026 -> 15/01/2026)
+        df_m['Date'] = df_m['Date'].str.replace(':', '/')
+        # Nettoyage des espaces invisibles dans les noms d'objets
+        df_m['Objet'] = df_m['Objet'].str.strip()
+        # Conversion forcée du montant numérique
+        df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
+    else:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
 
-    # --- A. LOGIQUE DE SUPPRESSION (SÉCURITÉ MAX PAR ID UNIQUE) ---
+    # --- FIX 2 : LOGIQUE DE SUPPRESSION (SÉCURITÉ PAR INDEX PHYSIQUE) ---
     if st.session_state.get("delete_target") is not None:
         target_idx = st.session_state.delete_target
         
-        # Sécurité : on vérifie que l'index existe encore dans le DF chargé
-        if target_idx in df_m.index:
-            item = df_m.loc[target_idx]
+        # On vérifie que l'index existe dans le dataframe actuel
+        if target_idx < len(df_m):
+            item = df_m.iloc[target_idx]
             
-            # On crée une chaîne unique pour ce message (Objet + Date)
-            unique_id = f"{item['Objet']}_{item['Date']}".replace(" ", "_")
+            st.error(f"🗑️ **CONFIRMATION DE SUPPRESSION**")
+            st.write(f"Voulez-vous supprimer : **{item['Objet']}** du {item['Date']} ?")
             
-            st.error(f"🗑️ **CONFIRMATION :** Supprimer {item['Objet']} ?")
-            
-            # 1. La Case à cocher (Clé unique par contenu)
-            confirm_chk = st.checkbox(
-                "Cocher pour déverrouiller la suppression", 
-                key=f"chk_{unique_id}_{target_idx}"
-            )
-            
-            if confirm_chk:
-                # 2. Le bouton (Clé unique par contenu + ID)
-                # Si ça plante encore ici, c'est que la ligne est présente 2 fois à l'identique
-                if st.button("🔥 EXÉCUTER LA SUPPRESSION", type="danger", use_container_width=True, key=f"btn_exec_{unique_id}"):
-                    df_m = df_m.drop(target_idx).reset_index(drop=True)
+            # Utilisation d'un formulaire pour isoler l'action et éviter les doublons de clés
+            with st.form(key=f"form_del_final_{target_idx}"):
+                st.write("⚠️ Cette action est irréversible.")
+                confirm_btn = st.form_submit_button("🔥 OUI, SUPPRIMER", type="danger", use_container_width=True)
+                
+                if confirm_btn:
+                    # Suppression par position physique dans le DataFrame
+                    df_m = df_m.drop(df_m.index[target_idx]).reset_index(drop=True)
                     sauvegarder_data(df_m, file_path_m)
                     st.session_state.delete_target = None
-                    st.success("Supprimé !")
+                    st.success("Élément supprimé avec succès.")
                     st.rerun()
-            
-            if st.button("❌ ANNULER", use_container_width=True, key=f"abort_{unique_id}"):
+
+            if st.button("❌ ANNULER", use_container_width=True, key="cancel_global"):
                 st.session_state.delete_target = None
                 st.rerun()
         else:
             st.session_state.delete_target = None
-            st.rerun()
-            
         st.divider()
 
-    # --- B. ZONE D'AJOUT ---
-    with st.expander("➕ Ajouter une dépense / Frais récurrent", expanded=False):
+    # --- B. ZONE D'AJOUT (AVEC RÉCURRENCE MENSUELLE) ---
+    with st.expander("➕ Ajouter une dépense (Assurance, Port, Sopalin...)", expanded=False):
         c1, c2 = st.columns(2)
-        f_date = c1.text_input("Date (JJ/MM/AAAA)", datetime.now().strftime("%d/%m/%Y"), key="add_d")
-        f_obj = c2.text_input("Objet", key="add_o")
-        f_mt = c1.number_input("Montant (€)", min_value=0.0, key="add_m")
-        f_statut = c2.selectbox("Statut", ["À prévoir", "Fait"], key="add_s")
-        f_type = c2.selectbox("Type", ["Frais Obligatoires", "Frais Maint Vesta", "Frais Autres"], key="add_t")
-        is_rec = st.checkbox("🔄 Répéter chaque mois (Assurance/Port)", key="add_rec")
+        f_date = c1.text_input("Date (JJ/MM/AAAA)", datetime.now().strftime("%d/%m/%Y"), key="in_date")
+        f_obj = c2.text_input("Objet", key="in_obj")
+        f_mt = c1.number_input("Montant (€)", min_value=0.0, step=1.0, key="in_mt")
+        f_statut = c2.selectbox("Statut", ["À prévoir", "Fait"], key="in_stat")
+        f_type = c2.selectbox("Type", ["Frais Obligatoires", "Frais Maint Vesta", "Frais Autres"], key="in_type")
+        
+        is_rec = st.checkbox("🔄 Répéter chaque mois jusqu'à la fin de l'année", key="in_rec")
 
-        if st.button("💾 ENREGISTRER", type="primary", use_container_width=True, key="btn_save_main"):
-            if f_obj and f_mt > 0:
-                new_rows = []
-                j, m_start, a = map(int, f_date.split('/'))
-                for m_idx in range(m_start, 13 if is_rec else m_start + 1):
-                    new_rows.append({"Date": f"{j:02d}/{m_idx:02d}/{a}", "Objet": f_obj.upper(), 
-                                     "Montant": f_mt, "M_Num": float(f_mt), "Statut": f_statut, "Type": f_type})
-                df_m = pd.concat([df_m, pd.DataFrame(new_rows)], ignore_index=True)
-                sauvegarder_data(df_m, file_path_m)
-                st.rerun()
+        if st.button("💾 ENREGISTRER", type="primary", use_container_width=True, key="in_save_btn"):
+            if f_obj and f_mt >= 0:
+                new_data = []
+                try:
+                    d, m_start, a = map(int, f_date.split('/'))
+                    # Boucle du mois de départ jusqu'à Décembre (12)
+                    for m_idx in range(m_start, 13 if is_rec else m_start + 1):
+                        new_data.append({
+                            "Date": f"{d:02d}/{m_idx:02d}/{a}", 
+                            "Objet": f"{f_obj} (Mois {m_idx})" if is_rec else f_obj, 
+                            "Montant": float(f_mt), 
+                            "M_Num": float(f_mt), 
+                            "Statut": f_statut, 
+                            "Type": f_type
+                        })
+                    df_m = pd.concat([df_m, pd.DataFrame(new_data)], ignore_index=True)
+                    sauvegarder_data(df_m, file_path_m)
+                    st.success(f"Enregistré : {len(new_data)} ligne(s)")
+                    st.rerun()
+                except:
+                    st.error("Format date invalide (JJ/MM/AAAA)")
 
     st.divider()
 
-    # --- C. LISTE DES CHARGES ---
+    # --- C. LISTE DES CHARGES (AFFICHAGE TRIÉ) ---
     if not df_m.empty:
-        # Tri et préparation de l'affichage
+        # On crée une copie pour l'affichage sans perdre l'index d'origine
         df_disp = df_m.copy()
-        df_disp['real_idx'] = df_disp.index
-        df_disp['dt_t'] = pd.to_datetime(df_disp['Date'], dayfirst=True, errors='coerce')
-        df_disp = df_disp.sort_values('dt_t', ascending=False)
+        df_disp['orig_idx'] = df_disp.index
+        # Tri temporaire par date pour l'utilisateur
+        df_disp['dt_sort'] = pd.to_datetime(df_disp['Date'], dayfirst=True, errors='coerce')
+        df_disp = df_disp.sort_values('dt_sort', ascending=False)
 
         for _, row in df_disp.iterrows():
-            ridx = row['real_idx']
-            icon = "🟢" if row['Statut'] == "Fait" else "⏳"
+            ridx = row['orig_idx']
+            is_done = (row['Statut'] == "Fait")
+            icon = "🟢" if is_done else "⏳"
             
             with st.expander(f"{icon} {row['Date']} - {row['Objet']} ({row['Montant']}€)"):
-                if st.toggle("📝 Modifier", key=f"tgl_{ridx}"):
-                    # Edition simplifiée
-                    n_mt = st.number_input("Prix", value=float(row['M_Num']), key=f"ed_mt_{ridx}")
-                    n_st = st.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"ed_st_{ridx}")
-                    if st.button("✅ Valider", key=f"ed_btn_{ridx}"):
-                        df_m.at[ridx, 'M_Num'] = n_mt
-                        df_m.at[ridx, 'Montant'] = n_mt
-                        df_m.at[ridx, 'Statut'] = n_st
+                # Option de modification rapide
+                if st.toggle("📝 Modifier", key=f"tog_{ridx}"):
+                    new_mt = st.number_input("Montant (€)", value=float(row['M_Num']), key=f"ed_mt_{ridx}")
+                    new_st = st.selectbox("Statut", ["À prévoir", "Fait"], index=1 if is_done else 0, key=f"ed_st_{ridx}")
+                    if st.button("✅ Valider", key=f"btn_v_{ridx}"):
+                        df_m.at[ridx, 'M_Num'] = new_mt
+                        df_m.at[ridx, 'Montant'] = new_mt
+                        df_m.at[ridx, 'Statut'] = new_st
                         sauvegarder_data(df_m, file_path_m)
                         st.rerun()
+                
+                # Option de suppression (uniquement si pas encore payé ou via target)
                 else:
-                    if row['Statut'] != "Fait":
-                        if st.button("🗑️ Supprimer", key=f"pre_del_{ridx}", use_container_width=True):
-                            st.session_state.delete_target = ridx
-                            st.rerun()
-                    else:
-                        st.write("🔒 Payé (Modification verrouillée)")
+                    if st.button("🗑️ Supprimer cette ligne", key=f"del_{ridx}", use_container_width=True):
+                        st.session_state.delete_target = ridx
+                        st.rerun()
 
-    # --- D. ARCHIVES ---
+    # --- D. ARCHIVAGE ---
     st.write("---")
-    with st.expander("🚨 Archives"):
-        if st.button("🗄️ ARCHIVER TOUT", use_container_width=True, key="btn_arch_global"):
+    with st.expander("🚨 Archivage"):
+        if st.button("🗄️ ENVOYER TOUT EN ARCHIVE", use_container_width=True):
             df_arch = charger_data('archives_maintenance.json')
-            sauvegarder_data(pd.concat([df_arch, df_m], ignore_index=True), 'archives_maintenance.json')
+            df_total = pd.concat([df_arch, df_m], ignore_index=True)
+            sauvegarder_data(df_total, 'archives_maintenance.json')
             sauvegarder_data(pd.DataFrame(columns=df_m.columns), file_path_m)
+            st.success("Base de travail vidée et archivée.")
             st.rerun()
 # =================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
