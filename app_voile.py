@@ -818,90 +818,66 @@ Eric (vesta)"""
             st.info(f"Aucune mission CMN trouvée pour {sel_mois} {sel_annee}.")
     else:
         st.warning("La base de données 'Contacts' est vide.")
-
 # =================================================================
-# --- 10. PAGE ARCHIVES (GESTION COMPLÈTE) ---
+# --- 10. PAGE ARCHIVES (NETTOYAGE & EXPORT) ---
 # =================================================================
 elif st.session_state.page == "ARCHIVES":
     import pandas as pd
     import io
-    from datetime import datetime
 
-     # Dans le bloc ARCHIVES :
-# On récupère la dernière page visitée, sinon par défaut on met PLANNING
-retour_page = st.session_state.get('last_page', 'PLANNING')
+    # 1. BOUTON DE RETOUR (TOUT EN HAUT)
+    last = st.session_state.get('last_page', 'PLANNING')
+    if st.button(f"⬅️ RETOUR VERS {last}", use_container_width=True):
+        st.session_state.page = last
+        st.rerun()
 
-if st.button(f"⬅️ RETOUR VERS {retour_page}", use_container_width=True):
-    st.session_state.page = retour_page
-    st.rerun()
+    st.title("📂 Centre d'Archivage Vesta")
 
-    st.title("📂 Gestion des Archives")
-
-    # --- 2. NOUVEAU : PANNEAU DE NETTOYAGE (Jan-Fév-Mars 2026) ---
+    # --- 2. LE PANNEAU DE NETTOYAGE (Important : doit être ICI) ---
     with st.expander("✂️ ARCHIVER UNE PÉRIODE (Nettoyage)", expanded=True):
-        st.info("Déplacez les données du planning actif vers l'historique.")
+        st.info("Choisissez les dates pour déplacer les éléments vers l'historique.")
         
         c1, c2 = st.columns(2)
-        # Dates pré-réglées sur le premier trimestre 2026
-        d_debut = c1.date_input("Du", datetime(2026, 1, 1), format="DD/MM/YYYY")
-        d_fin = c2.date_input("Au", datetime(2026, 3, 31), format="DD/MM/YYYY")
+        d_debut = c1.date_input("Du", datetime(2026, 1, 1), key="arch_d1")
+        d_fin = c2.date_input("Au", datetime(2026, 3, 31), key="arch_d2")
         
-        if st.button("🚀 LANCER L'ARCHIVAGE MAINTENANT", use_container_width=True, type="primary"):
-            # A. Archivage Maintenance
+        if st.button("🚀 LANCER L'ARCHIVAGE GLOBAL", use_container_width=True, type="primary"):
+            # A. Maintenance
             df_m = charger_data('maintenance.json')
             nb_m = archiver_donnees(df_m, d_debut, d_fin, 'maintenance.json', 'archives_maintenance.json', 'Date')
             
-            # B. Archivage Planning/Contacts
-            df_c_actuel = charger_data('contacts.json')
-            nb_p = archiver_donnees(df_c_actuel, d_debut, d_fin, 'contacts.json', 'archives_planning.json', 'DateNav')
+            # B. Planning
+            df_c = charger_data('contacts.json')
+            nb_p = archiver_donnees(df_c, d_debut, d_fin, 'contacts.json', 'archives_planning.json', 'DateNav')
             
-            st.success(f"Opération réussie : {nb_m} frais et {nb_p} missions archivés.")
+            st.success(f"Terminé : {nb_m} frais et {nb_p} missions archivés.")
             st.rerun()
 
-    # --- 3. EXPORT VERS PC (EXCEL) ---
+    # --- 3. EXPORT EXCEL ---
     with st.expander("📤 TRANSPÉRER VERS PC (Excel)", expanded=False):
-        st.write("Téléchargez vos archives pour les ouvrir sur Excel ou Word.")
         df_arch_m = charger_data('archives_maintenance.json')
         df_arch_p = charger_data('archives_planning.json')
         
         if not df_arch_m.empty or not df_arch_p.empty:
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                if not df_arch_p.empty:
-                    df_arch_p.to_excel(writer, sheet_name='Planning_Contacts', index=False)
-                if not df_arch_m.empty:
-                    df_arch_m.to_excel(writer, sheet_name='Maintenance', index=False)
+                if not df_arch_p.empty: df_arch_p.to_excel(writer, sheet_name='Planning', index=False)
+                if not df_arch_m.empty: df_arch_m.to_excel(writer, sheet_name='Frais', index=False)
             
-            st.download_button(
-                label="📥 TÉLÉCHARGER LE FICHIER EXCEL",
-                data=buffer.getvalue(),
-                file_name=f"Archives_Vesta_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
-                mime="application/vnd.ms-excel",
-                use_container_width=True
-            )
-        else:
-            st.info("Aucune donnée à exporter.")
-
-    # --- 4. VIDAGE DES ARCHIVES (SÉCURISÉ) ---
-    with st.expander("🗑️ VIDER LES ARCHIVES (Définitif)", expanded=False):
-        st.error("⚠️ Action irréversible.")
-        confirm = st.checkbox("Je confirme vouloir tout supprimer")
-        if st.button("🔥 TOUT EFFACER", use_container_width=True, disabled=not confirm):
-            df_vide = pd.DataFrame()
-            sauvegarder_data(df_vide, 'archives_maintenance.json')
-            sauvegarder_data(df_vide, 'archives_planning.json')
-            st.success("Archives vidées.")
-            st.rerun()
+            st.download_button("📥 TÉLÉCHARGER L'EXCEL", buffer.getvalue(), 
+                               file_name=f"Archives_Vesta_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
+                               mime="application/vnd.ms-excel", use_container_width=True)
 
     st.divider()
 
-    # --- 5. CONSULTATION ---
+    # --- 4. AFFICHAGE DES TABLEAUX ---
     st.subheader("📜 Historique actuel")
-    t1, t2 = st.tabs(["🛠️ Frais", "📅 Planning/Contacts"])
+    t1, t2 = st.tabs(["🛠️ Frais", "📅 Planning"])
     with t1:
         st.dataframe(charger_data('archives_maintenance.json'), use_container_width=True, hide_index=True)
     with t2:
         st.dataframe(charger_data('archives_planning.json'), use_container_width=True, hide_index=True)
+
 # --- FIN DU FICHIER ---
 
 
