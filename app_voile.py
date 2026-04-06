@@ -546,10 +546,9 @@ elif st.session_state.page == "STATS":
     fig_w = go.Figure(go.Waterfall(x=["Encaissé", "Frais", "Net"], y=[df_tab['Reçu'].sum(), -df_tab['Frais'].sum(), 0], measure=["relative", "relative", "total"]))
     st.plotly_chart(fig_w, use_container_width=True)
 # =================================================================
-# --- 8. PAGE MAINTENANCE (VERSION ANTI-CRASH RADICALE) ---
+# --- 8. PAGE MAINTENANCE (PROTECTION CONTRE LES DOUBLONS) ---
 # =================================================================
 elif st.session_state.page == "MAINT":
-    import time
     st.title("🔧 Maintenance & Charges Vesta")
     
     file_path_m = 'maintenance.json'
@@ -558,38 +557,96 @@ elif st.session_state.page == "MAINT":
     if df_m.empty:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
 
-    # --- A. LOGIQUE DE SUPPRESSION (SANS FORMULAIRE, SANS DOUBLON) ---
+    # --- A. ZONE DE CONFIRMATION (DANS UN CONTENEUR ISOLÉ) ---
+    confirm_placeholder = st.empty() # Crée un espace réservé vide
+
     if st.session_state.get("delete_target") is not None:
         target = st.session_state.delete_target
-        
-        # On vérifie si la ligne existe encore
         if target in df_m.index:
             item = df_m.loc[target]
-            st.warning(f"⚠️ **CONFIRMER LA SUPPRESSION :** {item['Objet']} ({item['Date']})")
             
-            # On utilise un ID basé sur le temps pour forcer une clé unique à chaque milliseconde
-            unique_key = f"final_del_{int(time.time())}"
-            
-            col_y, col_n = st.columns(2)
-            
-            # BOUTON OUI
-            if col_y.button("🔥 OUI, SUPPRIMER", type="danger", use_container_width=True, key=unique_key):
-                df_m = df_m.drop(target).reset_index(drop=True)
-                sauvegarder_data(df_m, file_path_m)
-                st.session_state.delete_target = None
-                st.success("Supprimé !")
-                st.rerun()
-            
-            # BOUTON NON
-            if col_n.button("❌ ANNULER", use_container_width=True, key=f"cancel_{unique_key}"):
-                st.session_state.delete_target = None
-                st.rerun()
-        else:
-            st.session_state.delete_target = None
-            
-        st.divider()
+            # On utilise le placeholder pour injecter le message de confirmation
+            with confirm_placeholder.container():
+                st.error(f"🗑️ **SUPPRIMER DÉFINITIVEMENT ?**")
+                st.write(f"**{item['Objet']}** | {item['Date']} | {item['Montant']}€")
+                
+                col_y, col_n = st.columns(2)
+                
+                # CLÉ STATIQUE UNIQUE : Comme c'est dans un 'empty', 
+                # Streamlit garantit qu'il n'y en a qu'un seul à la fois.
+                if col_y.button("🔥 OUI, CONFIRMER", type="danger", use_container_width=True, key="BTN_FIXE_SUPPR"):
+                    df_m = df_m.drop(target).reset_index(drop=True)
+                    sauvegarder_data(df_m, file_path_m)
+                    st.session_state.delete_target = None
+                    st.rerun()
+                
+                if col_n.button("❌ ANNULER", use_container_width=True, key="BTN_FIXE_ANNUL"):
+                    st.session_state.delete_target = None
+                    st.rerun()
+                st.divider()
 
-    # --- LE RESTE DU CODE (AJOUT / LISTE) RESTE IDENTIQUE ---
+    # --- B. ZONE D'AJOUT ---
+    with st.expander("➕ Ajouter une dépense / Frais récurrent", expanded=False):
+        c1, c2 = st.columns(2)
+        f_date = c1.text_input("Date (JJ/MM/AAAA)", datetime.now().strftime("%d/%m/%Y"), key="add_d")
+        f_obj = c2.text_input("Objet", key="add_o")
+        f_mt = c1.number_input("Montant (€)", min_value=0.0, key="add_m")
+        f_statut = c2.selectbox("Statut", ["À prévoir", "Fait"], key="add_s")
+        f_type = c2.selectbox("Type", ["Frais Obligatoires", "Frais Maint Vesta", "Frais Autres"], key="add_t")
+        is_rec = st.checkbox("🔄 Répéter chaque mois (Assurance/Port)", key="add_rec")
+
+        if st.button("💾 ENREGISTRER", type="primary", use_container_width=True, key="btn_save_main"):
+            if f_obj and f_mt > 0:
+                new_rows = []
+                j, m_start, a = map(int, f_date.split('/'))
+                for m_idx in range(m_start, 13 if is_rec else m_start + 1):
+                    new_rows.append({"Date": f"{j:02d}/{m_idx:02d}/{a}", "Objet": f_obj.upper(), 
+                                     "Montant": f_mt, "M_Num": float(f_mt), "Statut": f_statut, "Type": f_type})
+                df_m = pd.concat([df_m, pd.DataFrame(new_rows)], ignore_index=True)
+                sauvegarder_data(df_m, file_path_m)
+                st.rerun()
+
+    st.divider()
+
+    # --- C. LISTE DES CHARGES ---
+    if not df_m.empty:
+        # Tri et préparation de l'affichage
+        df_disp = df_m.copy()
+        df_disp['real_idx'] = df_disp.index
+        df_disp['dt_t'] = pd.to_datetime(df_disp['Date'], dayfirst=True, errors='coerce')
+        df_disp = df_disp.sort_values('dt_t', ascending=False)
+
+        for _, row in df_disp.iterrows():
+            ridx = row['real_idx']
+            icon = "🟢" if row['Statut'] == "Fait" else "⏳"
+            
+            with st.expander(f"{icon} {row['Date']} - {row['Objet']} ({row['Montant']}€)"):
+                if st.toggle("📝 Modifier", key=f"tgl_{ridx}"):
+                    # Edition simplifiée
+                    n_mt = st.number_input("Prix", value=float(row['M_Num']), key=f"ed_mt_{ridx}")
+                    n_st = st.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"ed_st_{ridx}")
+                    if st.button("✅ Valider", key=f"ed_btn_{ridx}"):
+                        df_m.at[ridx, 'M_Num'] = n_mt
+                        df_m.at[ridx, 'Montant'] = n_mt
+                        df_m.at[ridx, 'Statut'] = n_st
+                        sauvegarder_data(df_m, file_path_m)
+                        st.rerun()
+                else:
+                    if row['Statut'] != "Fait":
+                        if st.button("🗑️ Supprimer", key=f"pre_del_{ridx}", use_container_width=True):
+                            st.session_state.delete_target = ridx
+                            st.rerun()
+                    else:
+                        st.write("🔒 Payé (Modification verrouillée)")
+
+    # --- D. ARCHIVES ---
+    st.write("---")
+    with st.expander("🚨 Archives"):
+        if st.button("🗄️ ARCHIVER TOUT", use_container_width=True, key="btn_arch_global"):
+            df_arch = charger_data('archives_maintenance.json')
+            sauvegarder_data(pd.concat([df_arch, df_m], ignore_index=True), 'archives_maintenance.json')
+            sauvegarder_data(pd.DataFrame(columns=df_m.columns), file_path_m)
+            st.rerun()
 # =================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
 # =================================================================
