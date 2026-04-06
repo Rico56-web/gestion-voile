@@ -546,153 +546,121 @@ elif st.session_state.page == "STATS":
     fig_w = go.Figure(go.Waterfall(x=["Encaissé", "Frais", "Net"], y=[df_tab['Reçu'].sum(), -df_tab['Frais'].sum(), 0], measure=["relative", "relative", "total"]))
     st.plotly_chart(fig_w, use_container_width=True)
 # =================================================================
-# --- 8. PAGE MAINTENANCE (NETTOYAGE & SÉCURITÉ INDEX) ---
+# --- 8. PAGE MAINTENANCE (VERSION FINALE - BILAN & SÉCURITÉ) ---
 # =================================================================
 elif st.session_state.page == "MAINT":
     st.title("🔧 Maintenance & Charges - Vesta Skipper")
-    # --- FIX NETTOYAGE & COHÉRENCE FINANCIÈRE ---
-    if not df_m.empty:
-        df_m['Statut'] = df_m['Statut'].replace('OK', 'Fait')
-        df_m['Date'] = df_m['Date'].str.replace(':', '/')
-        df_m['Objet'] = df_m['Objet'].str.strip()
-        df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
-        
-        # --- LE FIX POUR LE BILAN : ---
-        # Si le Type est vide ou NaN, on met "Frais Autres" par défaut 
-        # pour que le montant apparaisse dans les calculs par catégorie
-        df_m['Type'] = df_m['Type'].fillna("Frais Autres")
-        df_m.loc[df_m['Type'] == "", 'Type'] = "Frais Autres"
-    else:
-        df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
+    
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
     
-    # --- FIX 1 : NETTOYAGE AUTOMATIQUE DES DONNÉES ---
+    # --- 1. NETTOYAGE SÉCURISÉ DES DONNÉES (ANTI-CRASH) ---
     if not df_m.empty:
-        # Correction des statuts 'OK' en 'Fait' pour la cohérence du code
-        df_m['Statut'] = df_m['Statut'].replace('OK', 'Fait')
-        # Correction des erreurs de frappe (ex: 15/01:2026 -> 15/01/2026)
-        df_m['Date'] = df_m['Date'].str.replace(':', '/')
-        # Nettoyage des espaces invisibles dans les noms d'objets
-        df_m['Objet'] = df_m['Objet'].str.strip()
-        # Conversion forcée du montant numérique
-        df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
+        cols = df_m.columns
+        if 'Statut' in cols:
+            df_m['Statut'] = df_m['Statut'].replace('OK', 'Fait')
+        if 'Date' in cols:
+            df_m['Date'] = df_m['Date'].str.replace(':', '/')
+        if 'Objet' in cols:
+            df_m['Objet'] = df_m['Objet'].str.strip()
+        if 'M_Num' in cols:
+            df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
+        
+        # Initialisation forcée de la colonne Type si manquante ou vide
+        if 'Type' not in cols:
+            df_m['Type'] = "Frais Autres"
+        else:
+            df_m['Type'] = df_m['Type'].fillna("Frais Autres")
+            df_m.loc[df_m['Type'] == "", 'Type'] = "Frais Autres"
     else:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
 
-     # --- A. LOGIQUE DE SUPPRESSION (ZÉRO BOUTON - SÉCURITÉ ABSOLUE) ---
-    if st.session_state.get("delete_target") is not None:
-        target_idx = st.session_state.delete_target
-        
-        if target_idx in df_m.index:
-            item = df_m.loc[target_idx]
-            
-            st.error(f"🗑️ **DEMANDE DE SUPPRESSION**")
-            st.write(f"Objet : **{item['Objet']}** | Date : {item['Date']}")
-            
-            # On remplace le formulaire par une simple liste déroulante
-            # Cela évite l'erreur "Missing Submit Button" et les conflits de clés
-            choix_confirm = st.selectbox(
-                "⚠️ Confirmer la suppression définitive ?",
-                ["--- Choisir une option ---", "❌ ANNULER (Garder la ligne)", "🔥 OUI, SUPPRIMER"],
-                key=f"safety_select_{target_idx}"
-            )
-            
-            if choix_confirm == "🔥 OUI, SUPPRIMER":
-                # Exécution immédiate
-                df_m = df_m.drop(target_idx).reset_index(drop=True)
-                sauvegarder_data(df_m, file_path_m)
-                st.session_state.delete_target = None
-                st.success("Suppression réussie !")
-                st.rerun()
-                
-            elif choix_confirm == "❌ ANNULER (Garder la ligne)":
-                st.session_state.delete_target = None
-                st.rerun()
-        else:
-            st.session_state.delete_target = None
-            st.rerun()
-            
-        st.divider()
-    # --- NOUVEAU : BILAN FINANCIER DYNAMIQUE ---
+    # --- 2. BILAN FINANCIER DYNAMIQUE ---
     st.subheader("📊 État des Finances 2026")
-    
     if not df_m.empty:
-        # 1. Sélecteur de vue
         vue_bilan = st.radio(
             "Afficher le bilan :",
             ["✅ Dépenses Réalisées (Payé)", "📅 Total Annuel (Payé + À prévoir)"],
-            horizontal=True,
-            key="vue_bilan_radio"
+            horizontal=True, key="vue_bilan_radio"
         )
 
-        # 2. Calcul des totaux par catégorie
         if "Réalisées" in vue_bilan:
             df_bilan = df_m[df_m['Statut'] == "Fait"]
             titre_bilan = "Total déjà réglé"
-            couleur_metric = "normal"
         else:
             df_bilan = df_m
             titre_bilan = "Engagement Total 2026"
-            couleur_metric = "inverse"
 
-        # Groupement par Type
-        bilan_cat = df_bilan.groupby('Type')['M_Num'].sum().to_dict()
-        total_gen = df_bilan['M_Num'].sum()
+        # Calcul par catégorie
+        cat_map = {
+            "Obligatoires": df_bilan[df_bilan['Type'] == "Frais Obligatoires"]['M_Num'].sum(),
+            "Maint. Vesta": df_bilan[df_bilan['Type'] == "Frais Maint Vesta"]['M_Num'].sum(),
+            "Autres": df_bilan[df_bilan['Type'] == "Frais Autres"]['M_Num'].sum()
+        }
+        total_gen = sum(cat_map.values())
 
-        # 3. Affichage en colonnes (Metrics)
+        # Affichage Metrics
         m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Obligatoires", f"{cat_map['Obligatoires']:.2f} €")
+        m2.metric("Maint. Vesta", f"{cat_map['Maint. Vesta']:.2f} €")
+        m3.metric("Autres", f"{cat_map['Autres']:.2f} €")
+        m4.metric(titre_bilan, f"{total_gen:.2f} €")
         
-        # On affiche les catégories selon ton dictionnaire 'Type'
-        m1.metric("Obligatoires", f"{bilan_cat.get('Frais Obligatoires', 0):.2f} €")
-        m2.metric("Maint. Vesta", f"{bilan_cat.get('Frais Maint Vesta', 0):.2f} €")
-        m3.metric("Autres", f"{bilan_cat.get('Frais Autres', 0):.2f} €")
-        m4.metric(titre_bilan, f"{total_gen:.2f} €", delta=None, delta_color=couleur_metric)
-
-        # Petit graphique barres pour visualiser la répartition
         if total_gen > 0:
             st.bar_chart(df_bilan.groupby('Type')['M_Num'].sum())
     else:
-        st.info("Aucune donnée disponible pour le bilan financier.")
+        st.info("Aucune donnée pour le bilan.")
 
     st.divider()
-    # --- (Ensuite vient ton bloc "Ajouter une dépense"...) ---
-    # --- B. ZONE D'AJOUT (AVEC RÉCURRENCE MENSUELLE) ---
-    with st.expander("➕ Ajouter une dépense (Assurance, Port, Sopalin...)", expanded=False):
-        c1, c2 = st.columns(2)
-        f_date = c1.text_input("Date (JJ/MM/AAAA)", datetime.now().strftime("%d/%m/%Y"), key="in_date")
-        f_obj = c2.text_input("Objet", key="in_obj")
-        f_mt = c1.number_input("Montant (€)", min_value=0.0, step=1.0, key="in_mt")
-        f_statut = c2.selectbox("Statut", ["À prévoir", "Fait"], key="in_stat")
-        f_type = c2.selectbox("Type", ["Frais Obligatoires", "Frais Maint Vesta", "Frais Autres"], key="in_type")
-        
-        is_rec = st.checkbox("🔄 Répéter chaque mois jusqu'à la fin de l'année", key="in_rec")
 
-        if st.button("💾 ENREGISTRER", type="primary", use_container_width=True, key="in_save_btn"):
-            if f_obj and f_mt >= 0:
-                new_data = []
+    # --- 3. LOGIQUE DE SUPPRESSION SÉCURISÉE (SELECTBOX) ---
+    if st.session_state.get("delete_target") is not None:
+        t_idx = st.session_state.delete_target
+        if t_idx in df_m.index:
+            item = df_m.loc[t_idx]
+            st.error(f"🗑️ SUPPRIMER : **{item['Objet']}** ({item['Date']}) ?")
+            
+            conf = st.selectbox("Confirmer ?", ["--- Choisir ---", "ANNULER", "OUI, SUPPRIMER"], key=f"del_conf_{t_idx}")
+            if conf == "OUI, SUPPRIMER":
+                df_m = df_m.drop(t_idx).reset_index(drop=True)
+                sauvegarder_data(df_m, file_path_m)
+                st.session_state.delete_target = None
+                st.rerun()
+            elif conf == "ANNULER":
+                st.session_state.delete_target = None
+                st.rerun()
+        st.divider()
+
+    # --- 4. ZONE D'AJOUT ---
+    with st.expander("➕ Ajouter une dépense / Récurrence", expanded=False):
+        c1, c2 = st.columns(2)
+        f_date = c1.text_input("Date (JJ/MM/AAAA)", datetime.now().strftime("%d/%m/%Y"), key="add_date")
+        f_obj = c2.text_input("Objet", key="add_obj")
+        f_mt = c1.number_input("Montant (€)", min_value=0.0, key="add_mt")
+        f_statut = c2.selectbox("Statut", ["À prévoir", "Fait"], key="add_stat")
+        f_type = c2.selectbox("Type", ["Frais Obligatoires", "Frais Maint Vesta", "Frais Autres"], key="add_type")
+        is_rec = st.checkbox("🔄 Répéter chaque mois jusqu'à Décembre", key="add_rec")
+
+        if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
+            if f_obj:
+                new_rows = []
                 try:
                     d, m_start, a = map(int, f_date.split('/'))
-                    # Boucle du mois de départ jusqu'à Décembre (12)
                     for m_idx in range(m_start, 13 if is_rec else m_start + 1):
-                        new_data.append({
+                        new_rows.append({
                             "Date": f"{d:02d}/{m_idx:02d}/{a}", 
-                            "Objet": f"{f_obj} (Mois {m_idx})" if is_rec else f_obj, 
-                            "Montant": float(f_mt), 
-                            "M_Num": float(f_mt), 
-                            "Statut": f_statut, 
-                            "Type": f_type
+                            "Objet": f"{f_obj} (M{m_idx})" if is_rec else f_obj,
+                            "Montant": float(f_mt), "M_Num": float(f_mt), 
+                            "Statut": f_statut, "Type": f_type
                         })
-                    df_m = pd.concat([df_m, pd.DataFrame(new_data)], ignore_index=True)
+                    df_m = pd.concat([df_m, pd.DataFrame(new_rows)], ignore_index=True)
                     sauvegarder_data(df_m, file_path_m)
-                    st.success(f"Enregistré : {len(new_data)} ligne(s)")
                     st.rerun()
-                except:
-                    st.error("Format date invalide (JJ/MM/AAAA)")
+                except: st.error("Erreur Format Date")
 
     st.divider()
-    
-    # --- C. LISTE DES CHARGES (AFFICHAGE TRIÉ ET AUTO-SAVE) ---
+
+    # --- 5. LISTE DES CHARGES (AFFICHAGE & ÉDITION) ---
     if not df_m.empty:
         df_disp = df_m.copy()
         df_disp['orig_idx'] = df_disp.index
@@ -701,48 +669,31 @@ elif st.session_state.page == "MAINT":
 
         for _, row in df_disp.iterrows():
             ridx = row['orig_idx']
-            is_done = (row['Statut'] == "Fait")
-            icon = "🟢" if is_done else "⏳"
+            icon = "🟢" if row['Statut'] == "Fait" else "⏳"
             
             with st.expander(f"{icon} {row['Date']} - {row['Objet']} ({row['Montant']}€)"):
-                
-                # ON UTILISE DES COLONNES POUR MODIFIER SANS BOUTON "VALIDER"
-                st.write("🔧 **Modification rapide :**")
                 c1, c2, c3 = st.columns([2, 1, 1])
+                new_mt = c1.number_input("Prix €", value=float(row['M_Num']), key=f"mt_{ridx}")
+                new_st = c2.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"st_{ridx}")
                 
-                # 1. Modification du Montant
-                new_mt = c1.number_input(f"Prix (€)", value=float(row['M_Num']), key=f"mt_{ridx}")
-                
-                # 2. Modification du Statut
-                new_st = c2.selectbox(f"Statut", ["À prévoir", "Fait"], 
-                                      index=1 if is_done else 0, key=f"st_{ridx}")
-                
-                # 3. BOUTON DE SAUVEGARDE DÉDIÉ (Plus robuste)
-                if c3.button("💾 OK", key=f"save_btn_{ridx}", use_container_width=True):
+                if c3.button("💾 OK", key=f"ok_{ridx}", use_container_width=True):
                     df_m.at[ridx, 'M_Num'] = new_mt
                     df_m.at[ridx, 'Montant'] = new_mt
                     df_m.at[ridx, 'Statut'] = new_st
                     sauvegarder_data(df_m, file_path_m)
-                    st.success("Modifié !")
                     st.rerun()
-
-                st.divider()
-
-                # BOUTON SUPPRIMER (En bas de l'expander)
-                if st.button("🗑️ Supprimer cette ligne", key=f"del_btn_{ridx}", use_container_width=True):
+                
+                if st.button("🗑️ Supprimer", key=f"btn_del_{ridx}", use_container_width=True):
                     st.session_state.delete_target = ridx
                     st.rerun()
 
-    # --- D. ARCHIVAGE ---
+    # --- 6. ARCHIVAGE ---
     st.write("---")
-    with st.expander("🚨 Archivage"):
-        if st.button("🗄️ ENVOYER TOUT EN ARCHIVE", use_container_width=True):
-            df_arch = charger_data('archives_maintenance.json')
-            df_total = pd.concat([df_arch, df_m], ignore_index=True)
-            sauvegarder_data(df_total, 'archives_maintenance.json')
-            sauvegarder_data(pd.DataFrame(columns=df_m.columns), file_path_m)
-            st.success("Base de travail vidée et archivée.")
-            st.rerun()
+    if st.button("🗄️ ARCHIVER TOUT", use_container_width=True):
+        df_arch = charger_data('archives_maintenance.json')
+        sauvegarder_data(pd.concat([df_arch, df_m], ignore_index=True), 'archives_maintenance.json')
+        sauvegarder_data(pd.DataFrame(columns=df_m.columns), file_path_m)
+        st.rerun()
 # =================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
 # =================================================================
