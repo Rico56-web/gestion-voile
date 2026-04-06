@@ -556,33 +556,42 @@ elif st.session_state.page == "MAINT":
     if df_m.empty:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
 
-    # --- A. LOGIQUE DE SUPPRESSION (SYSTÈME ANTI-DOUBLON) ---
+    # --- A. LOGIQUE DE SUPPRESSION (SÉCURISÉE PAR FORMULAIRE) ---
     if "delete_target" in st.session_state and st.session_state.delete_target is not None:
         idx_to_del = st.session_state.delete_target
         
-        # On vérifie si l'index existe
+        # Vérification de l'existence de l'index
         if idx_to_del in df_m.index:
             item_info = df_m.loc[idx_to_del]
-            st.error(f"🗑️ Suppression de : **{item_info['Objet']}** ({item_info['Date']})")
             
-            # ON UTILISE UN FORMULAIRE : C'est le moyen le plus sûr de grouper des widgets
-            # sans que Streamlit ne s'y perde dans les clés.
-            with st.form(key=f"form_del_{idx_to_del}"):
-                st.write("Confirmez-vous l'action ?")
-                submit_del = st.form_submit_button("🔥 OUI, SUPPRIMER DÉFINITIVEMENT", type="danger", use_container_width=True)
-                cancel_del = st.form_submit_button("❌ ANNULER", use_container_width=True)
+            st.error(f"🗑️ **CONFIRMATION DE SUPPRESSION**")
+            st.write(f"Objet : **{item_info['Objet']}** | Date : **{item_info['Date']}**")
+            
+            # FORMULAIRE UNIQUE
+            with st.form(key=f"form_destruction_{idx_to_del}"):
+                st.write("Cette action est irréversible. Voulez-vous continuer ?")
+                # Un seul bouton de soumission par formulaire pour une stabilité maximale
+                confirm_submit = st.form_submit_button("🔥 OUI, SUPPRIMER DÉFINITIVEMENT", type="danger", use_container_width=True)
                 
-                if submit_del:
+                if confirm_submit:
+                    # Action de suppression
                     df_m = df_m.drop(idx_to_del).reset_index(drop=True)
                     sauvegarder_data(df_m, file_path_m)
+                    
+                    # Nettoyage de la cible
                     st.session_state.delete_target = None
+                    st.success("Suppression effectuée.")
                     st.rerun()
-                
-                if cancel_del:
-                    st.session_state.delete_target = None
-                    st.rerun()
+
+            # Bouton d'annulation HORS du formulaire
+            if st.button("⬅️ ANNULER ET RETOURNER À LA LISTE", use_container_width=True, key="btn_cancel_global"):
+                st.session_state.delete_target = None
+                st.rerun()
         else:
+            # Sécurité si l'index a disparu
             st.session_state.delete_target = None
+            st.rerun()
+            
         st.divider()
 
     # --- B. ZONE D'AJOUT ---
