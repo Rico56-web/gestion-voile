@@ -556,32 +556,36 @@ elif st.session_state.page == "MAINT":
     if df_m.empty:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
 
-# --- A. LOGIQUE DE SUPPRESSION (SANS COLONNES - SÉCURITÉ MAX) ---
+# --- A. LOGIQUE DE SUPPRESSION (SYSTÈME DE VERROU PAR CHECKBOX) ---
     if "delete_target" in st.session_state and st.session_state.delete_target is not None:
         idx_to_del = st.session_state.delete_target
         
         if idx_to_del in df_m.index:
             item_info = df_m.loc[idx_to_del]
             
-            # On crée un bandeau d'alerte rouge
-            st.error(f"⚠️ **CONFIRMATION REQUISE**")
-            st.write(f"Supprimer définitivement : **{item_info['Objet']}** du {item_info['Date']} ?")
+            st.warning(f"🗑️ Préparation de la suppression : **{item_info['Objet']}**")
             
-            # BOUTONS L'UN SOUS L'AUTRE (Évite le bug des colonnes dynamiques)
-            if st.button("👉 CLIQUEZ ICI POUR SUPPRIMER DÉFINITIVEMENT", type="danger", use_container_width=True, key="BTN_VALIDE_SUPP"):
-                df_m = df_m.drop(idx_to_del).reset_index(drop=True)
-                sauvegarder_data(df_m, file_path_m)
-                st.session_state.delete_target = None
-                st.success("Élément supprimé avec succès.")
-                st.rerun()
-                
-            if st.button("❌ ANNULER (Garder la fiche)", use_container_width=True, key="BTN_ANNULE_SUPP"):
+            # Utilisation d'une checkbox pour déverrouiller le bouton
+            # La clé inclut l'index pour être 100% unique
+            confirm_check = st.checkbox(f"Je confirme vouloir supprimer définitivement la fiche du {item_info['Date']}", key=f"chk_del_{idx_to_del}")
+            
+            if confirm_check:
+                # Le bouton n'apparaît QUE si la case est cochée
+                if st.button("🔥 EXÉCUTER LA SUPPRESSION", type="danger", use_container_width=True, key=f"final_exec_{idx_to_del}"):
+                    # Exécution
+                    df_m = df_m.drop(idx_to_del).reset_index(drop=True)
+                    sauvegarder_data(df_m, file_path_m)
+                    
+                    # Nettoyage complet
+                    st.session_state.delete_target = None
+                    st.success("Suppression réussie.")
+                    st.rerun()
+            
+            if st.button("⬅️ Annuler et revenir à la liste", key=f"abort_{idx_to_del}"):
                 st.session_state.delete_target = None
                 st.rerun()
         else:
-            # Si l'index n'existe plus, on reset
             st.session_state.delete_target = None
-            
         st.divider()
 
     # --- B. ZONE D'AJOUT ---
