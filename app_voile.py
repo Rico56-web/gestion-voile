@@ -127,13 +127,13 @@ if "maint_confirm_del" not in st.session_state:
  
 # PASSAGE À 7 COLONNES ET AJOUT DE "LOG"
 m = st.columns(7) 
-menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "NOTES", "Livre de Bord"]
- 
+menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "ARCHIVES", "LOGBOOK"]
+icones = {"CONTACTS": "👤", "PLANNING": "🗓️", "STATS": "📊", "MAINT": "🛠️", "FACTURES": "🧾", "ARCHIVES": "📂", "LOGBOOK": "📖"}
 for i, name in enumerate(menu):
-    if m[i].button(name, key=f"nav_{name}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
+    label = f"{icones[name]} {name}" if name != "LOGBOOK" else "📖 LOG" # Texte court pour LOGBOOK
+    if m[i].button(label, key=f"nav_{name}", use_container_width=True, 
+                   type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name
-        st.session_state.edit_idx = None
-        st.session_state.m_edit_idx = None
         st.rerun()
         
 # --- CHARGEMENT DES DONNÉES ---
