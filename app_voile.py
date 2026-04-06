@@ -164,6 +164,10 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 # --- 5. PAGE CONTACTS (VERSION FINALE + NOTES VISIBLES) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
+    if st.button("📦 ARCHIVES", key="btn_arch_cont"):
+    st.session_state.last_page = "CONTACTS" # On mémorise qu'on vient des contacts
+    st.session_state.page = "ARCHIVES"
+    st.rerun()
     # --- NAVIGATION HAUT (CONTACTS) ---
     c_nav1, c_nav2 = st.columns([1, 1])
     with c_nav1:
@@ -322,6 +326,10 @@ if st.session_state.page == "CONTACTS":
 # --- 6. PAGE PLANNING (CORRECTIF CMN & COULEUR TOTAL) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
+    if st.button("📦 ARCHIVES", key="btn_arch_plan"):
+    st.session_state.last_page = "PLANNING" # On mémorise qu'on vient du planning
+    st.session_state.page = "ARCHIVES"
+    st.rerun()
     from datetime import datetime, date, timedelta
     import calendar
 
@@ -606,6 +614,10 @@ elif st.session_state.page == "STATS":
 # =================================================================
 elif st.session_state.page == "MAINT":
     st.title("🔧 Maintenance - Vesta")
+    if st.button("📦 ARCHIVES", key="btn_arch_maint"):
+    st.session_state.last_page = "MAINTENANCE" # On mémorise qu'on vient de la maintenance
+    st.session_state.page = "ARCHIVES"
+    st.rerun()
     # --- NAVIGATION HAUT (MAINTENANCE) ---
     c_nav1, c_nav2 = st.columns([1, 1])
     with c_nav1:
@@ -815,10 +827,13 @@ elif st.session_state.page == "ARCHIVES":
     import io
     from datetime import datetime
 
-    # 1. NAVIGATION RETOUR
-    if st.button("⬅️ RETOUR AU PLANNING", use_container_width=True):
-        st.session_state.page = "PLANNING"
-        st.rerun()
+     # Dans le bloc ARCHIVES :
+# On récupère la dernière page visitée, sinon par défaut on met PLANNING
+retour_page = st.session_state.get('last_page', 'PLANNING')
+
+if st.button(f"⬅️ RETOUR VERS {retour_page}", use_container_width=True):
+    st.session_state.page = retour_page
+    st.rerun()
 
     st.title("📂 Gestion des Archives")
 
