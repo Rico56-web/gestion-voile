@@ -557,35 +557,41 @@ elif st.session_state.page == "MAINT":
     if df_m.empty:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
 
-    # --- A. LOGIQUE DE SUPPRESSION (SÉCURITÉ PAR CASE À COCHER) ---
+    # --- A. LOGIQUE DE SUPPRESSION (SÉCURITÉ MAX PAR ID UNIQUE) ---
     if st.session_state.get("delete_target") is not None:
-        target = st.session_state.delete_target
+        target_idx = st.session_state.delete_target
         
-        if target in df_m.index:
-            item = df_m.loc[target]
+        # Sécurité : on vérifie que l'index existe encore dans le DF chargé
+        if target_idx in df_m.index:
+            item = df_m.loc[target_idx]
             
-            # On crée un bandeau d'alerte
-            st.error(f"🗑️ Suppression de : **{item['Objet']}** ({item['Date']})")
+            # On crée une chaîne unique pour ce message (Objet + Date)
+            unique_id = f"{item['Objet']}_{item['Date']}".replace(" ", "_")
             
-            # Utilisation d'une Checkbox pour confirmer (Plus stable qu'un bouton)
-            # On ajoute le target dans la clé pour qu'elle soit unique
-            confirm_action = st.checkbox(f"Cocher pour confirmer la suppression définitive", key=f"chk_confirm_{target}")
+            st.error(f"🗑️ **CONFIRMATION :** Supprimer {item['Objet']} ?")
             
-            if confirm_action:
-                # Le bouton d'exécution n'apparaît QUE si la case est cochée
-                if st.button("🔥 EXÉCUTER LA SUPPRESSION", type="danger", use_container_width=True, key=f"exec_btn_{target}"):
-                    df_m = df_m.drop(target).reset_index(drop=True)
+            # 1. La Case à cocher (Clé unique par contenu)
+            confirm_chk = st.checkbox(
+                "Cocher pour déverrouiller la suppression", 
+                key=f"chk_{unique_id}_{target_idx}"
+            )
+            
+            if confirm_chk:
+                # 2. Le bouton (Clé unique par contenu + ID)
+                # Si ça plante encore ici, c'est que la ligne est présente 2 fois à l'identique
+                if st.button("🔥 EXÉCUTER LA SUPPRESSION", type="danger", use_container_width=True, key=f"btn_exec_{unique_id}"):
+                    df_m = df_m.drop(target_idx).reset_index(drop=True)
                     sauvegarder_data(df_m, file_path_m)
                     st.session_state.delete_target = None
                     st.success("Supprimé !")
                     st.rerun()
             
-            # Bouton d'annulation toujours présent
-            if st.button("❌ ANNULER", use_container_width=True, key=f"abort_btn_{target}"):
+            if st.button("❌ ANNULER", use_container_width=True, key=f"abort_{unique_id}"):
                 st.session_state.delete_target = None
                 st.rerun()
         else:
             st.session_state.delete_target = None
+            st.rerun()
             
         st.divider()
 
