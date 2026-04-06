@@ -546,7 +546,7 @@ elif st.session_state.page == "STATS":
     fig_w = go.Figure(go.Waterfall(x=["Encaissé", "Frais", "Net"], y=[df_tab['Reçu'].sum(), -df_tab['Frais'].sum(), 0], measure=["relative", "relative", "total"]))
     st.plotly_chart(fig_w, use_container_width=True)
 # =================================================================
-# --- 8. PAGE MAINTENANCE (BILAN + CLASSIFICATION COMPLÈTE) ---
+# --- 8. PAGE MAINTENANCE (TYPES : ASSUR, PORT, MAINT, SÉCU, AUTRES) ---
 # =================================================================
 elif st.session_state.page == "MAINT":
     st.title("🔧 Maintenance & Charges - Vesta Skipper")
@@ -554,8 +554,8 @@ elif st.session_state.page == "MAINT":
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
     
-    # Liste officielle des catégories pour Vesta
-    LISTE_TYPES = ["Frais Obligatoires", "Frais Maint Vesta", "Assurances", "Frais Autres"]
+    # --- TA LISTE DE CATÉGORIES MISE À JOUR ---
+    LISTE_TYPES = ["Assurances", "Autres frais", "Maintenance, matériels", "Port", "Sécurité"]
     
     # --- 1. NETTOYAGE & INITIALISATION ---
     if not df_m.empty:
@@ -564,49 +564,53 @@ elif st.session_state.page == "MAINT":
         if 'Date' in cols: df_m['Date'] = df_m['Date'].str.replace(':', '/')
         if 'M_Num' in cols: df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
         
-        # Initialisation du Type si manquant
         if 'Type' not in cols:
-            df_m['Type'] = "Frais Autres"
+            df_m['Type'] = "Autres frais"
         else:
-            df_m['Type'] = df_m['Type'].fillna("Frais Autres")
-            df_m.loc[~df_m['Type'].isin(LISTE_TYPES), 'Type'] = "Frais Autres"
+            df_m['Type'] = df_m['Type'].fillna("Autres frais")
+            # Recalage automatique si l'ancien type n'est plus dans la liste
+            df_m.loc[~df_m['Type'].isin(LISTE_TYPES), 'Type'] = "Autres frais"
     else:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
 
-    # --- 2. BILAN FINANCIER (AVEC 4 CATÉGORIES) ---
+    # --- 2. BILAN FINANCIER (6 COLONNES) ---
     st.subheader("📊 État des Finances 2026")
     if not df_m.empty:
         vue = st.radio("Vue :", ["✅ Payé", "📅 Prévisionnel (Total)"], horizontal=True, key="v_bilan")
         df_b = df_m[df_m['Statut'] == "Fait"] if "Payé" in vue else df_m
         
-        # Calculs
-        c_obl = df_b[df_b['Type'] == "Frais Obligatoires"]['M_Num'].sum()
-        c_maint = df_b[df_b['Type'] == "Frais Maint Vesta"]['M_Num'].sum()
+        # Calculs par catégorie
         c_assur = df_b[df_b['Type'] == "Assurances"]['M_Num'].sum()
-        c_autre = df_b[df_b['Type'] == "Frais Autres"]['M_Num'].sum()
+        c_maint = df_b[df_b['Type'] == "Maintenance, matériels"]['M_Num'].sum()
+        c_port = df_b[df_b['Type'] == "Port"]['M_Num'].sum()
+        c_secu = df_b[df_b['Type'] == "Sécurité"]['M_Num'].sum()
+        c_autre = df_b[df_b['Type'] == "Autres frais"]['M_Num'].sum()
         total = df_b['M_Num'].sum()
 
-        # Metrics (5 colonnes pour tout voir)
+        # Affichage Metrics
         m1, m2, m3, m4, m5 = st.columns(5)
-        m1.metric("Oblig.", f"{c_obl:.0f}€")
-        m2.metric("Maint.", f"{c_maint:.0f}€")
-        m3.metric("Assur.", f"{c_assur:.0f}€")
-        m4.metric("Autres", f"{c_autre:.0f}€")
-        m5.metric("TOTAL", f"{total:.2f}€")
+        m1.metric("🛡️ Assur.", f"{c_assur:.0f}€")
+        m2.metric("⚓ Port", f"{c_port:.0f}€")
+        m3.metric("🛠️ Maint.", f"{c_maint:.0f}€")
+        m4.metric("🛟 Sécu.", f"{c_secu:.0f}€")
+        m5.metric("📦 Autres", f"{c_autre:.0f}€")
+        
+        st.metric("💰 TOTAL (Vue sélectionnée)", f"{total:.2f} €")
     
     st.divider()
 
-    # --- 3. SUPPRESSION (SÉCURITÉ) ---
+    # --- 3. SUPPRESSION ---
     if st.session_state.get("delete_target") is not None:
         t_idx = st.session_state.delete_target
         if t_idx in df_m.index:
             st.warning(f"Supprimer définitivement : **{df_m.loc[t_idx, 'Objet']}** ?")
-            if st.button("🔥 OUI, SUPPRIMER", use_container_width=True):
+            col_del1, col_del2 = st.columns(2)
+            if col_del1.button("🔥 OUI, SUPPRIMER", use_container_width=True):
                 df_m = df_m.drop(t_idx).reset_index(drop=True)
                 sauvegarder_data(df_m, file_path_m)
                 st.session_state.delete_target = None
                 st.rerun()
-            if st.button("❌ ANNULER", use_container_width=True):
+            if col_del2.button("❌ ANNULER", use_container_width=True):
                 st.session_state.delete_target = None
                 st.rerun()
 
@@ -627,8 +631,10 @@ elif st.session_state.page == "MAINT":
                     new_rows = []
                     for m_idx in range(m_start, 13 if is_rec else m_start + 1):
                         new_rows.append({
-                            "Date": f"{d:02d}/{m_idx:02d}/{a}", "Objet": f"{f_obj} (M{m_idx})" if is_rec else f_obj,
-                            "Montant": float(f_mt), "M_Num": float(f_mt), "Statut": f_stat, "Type": f_type
+                            "Date": f"{d:02d}/{m_idx:02d}/{a}", 
+                            "Objet": f"{f_obj} (M{m_idx})" if is_rec else f_obj,
+                            "Montant": float(f_mt), "M_Num": float(f_mt), 
+                            "Statut": f_stat, "Type": f_type
                         })
                     df_m = pd.concat([df_m, pd.DataFrame(new_rows)], ignore_index=True)
                     sauvegarder_data(df_m, file_path_m)
@@ -637,7 +643,7 @@ elif st.session_state.page == "MAINT":
 
     st.divider()
 
-    # --- 5. LISTE ET ÉDITION (CLASSIFICATION ICI) ---
+    # --- 5. LISTE ET ÉDITION ---
     if not df_m.empty:
         df_disp = df_m.copy()
         df_disp['orig_idx'] = df_disp.index
@@ -649,9 +655,6 @@ elif st.session_state.page == "MAINT":
             icon = "🟢" if row['Statut'] == "Fait" else "⏳"
             
             with st.expander(f"{icon} {row['Date']} - {row['Objet']} ({row['Montant']}€)"):
-                st.write("**Modifier la classification ou le montant :**")
-                
-                # C'est ICI que tu classifies tes anciennes données
                 c_e1, c_e2 = st.columns(2)
                 e_mt = c_e1.number_input("Prix €", value=float(row['M_Num']), key=f"e_m_{ridx}")
                 e_type = c_e2.selectbox("Type", LISTE_TYPES, index=LISTE_TYPES.index(row['Type']), key=f"e_t_{ridx}")
