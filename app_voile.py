@@ -636,13 +636,10 @@ elif st.session_state.page == "MAINT":
                     st.error("Format date invalide (JJ/MM/AAAA)")
 
     st.divider()
-
-    # --- C. LISTE DES CHARGES (AFFICHAGE TRIÉ) ---
+    # --- C. LISTE DES CHARGES (AFFICHAGE TRIÉ ET AUTO-SAVE) ---
     if not df_m.empty:
-        # On crée une copie pour l'affichage sans perdre l'index d'origine
         df_disp = df_m.copy()
         df_disp['orig_idx'] = df_disp.index
-        # Tri temporaire par date pour l'utilisateur
         df_disp['dt_sort'] = pd.to_datetime(df_disp['Date'], dayfirst=True, errors='coerce')
         df_disp = df_disp.sort_values('dt_sort', ascending=False)
 
@@ -652,22 +649,33 @@ elif st.session_state.page == "MAINT":
             icon = "🟢" if is_done else "⏳"
             
             with st.expander(f"{icon} {row['Date']} - {row['Objet']} ({row['Montant']}€)"):
-                # Option de modification rapide
-                if st.toggle("📝 Modifier", key=f"tog_{ridx}"):
-                    new_mt = st.number_input("Montant (€)", value=float(row['M_Num']), key=f"ed_mt_{ridx}")
-                    new_st = st.selectbox("Statut", ["À prévoir", "Fait"], index=1 if is_done else 0, key=f"ed_st_{ridx}")
-                    if st.button("✅ Valider", key=f"btn_v_{ridx}"):
-                        df_m.at[ridx, 'M_Num'] = new_mt
-                        df_m.at[ridx, 'Montant'] = new_mt
-                        df_m.at[ridx, 'Statut'] = new_st
-                        sauvegarder_data(df_m, file_path_m)
-                        st.rerun()
                 
-                # Option de suppression (uniquement si pas encore payé ou via target)
-                else:
-                    if st.button("🗑️ Supprimer cette ligne", key=f"del_{ridx}", use_container_width=True):
-                        st.session_state.delete_target = ridx
-                        st.rerun()
+                # ON UTILISE DES COLONNES POUR MODIFIER SANS BOUTON "VALIDER"
+                st.write("🔧 **Modification rapide :**")
+                c1, c2, c3 = st.columns([2, 1, 1])
+                
+                # 1. Modification du Montant
+                new_mt = c1.number_input(f"Prix (€)", value=float(row['M_Num']), key=f"mt_{ridx}")
+                
+                # 2. Modification du Statut
+                new_st = c2.selectbox(f"Statut", ["À prévoir", "Fait"], 
+                                      index=1 if is_done else 0, key=f"st_{ridx}")
+                
+                # 3. BOUTON DE SAUVEGARDE DÉDIÉ (Plus robuste)
+                if c3.button("💾 OK", key=f"save_btn_{ridx}", use_container_width=True):
+                    df_m.at[ridx, 'M_Num'] = new_mt
+                    df_m.at[ridx, 'Montant'] = new_mt
+                    df_m.at[ridx, 'Statut'] = new_st
+                    sauvegarder_data(df_m, file_path_m)
+                    st.success("Modifié !")
+                    st.rerun()
+
+                st.divider()
+
+                # BOUTON SUPPRIMER (En bas de l'expander)
+                if st.button("🗑️ Supprimer cette ligne", key=f"del_btn_{ridx}", use_container_width=True):
+                    st.session_state.delete_target = ridx
+                    st.rerun()
 
     # --- D. ARCHIVAGE ---
     st.write("---")
