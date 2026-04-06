@@ -644,7 +644,8 @@ elif st.session_state.page == "MAINT":
                 new_data = {"Date": f_date.strftime("%d/%m/%Y"), "Objet": f_obj, "Montant": f_mt, "M_Num": f_mt, "Statut": f_stat, "Type": f_type}
                 df_m = pd.concat([df_m, pd.DataFrame([new_data])], ignore_index=True)
                 sauvegarder_data(df_m, file_path_m)
-                st.rerun()=================================================================
+                st.rerun()
+                =================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
 # =================================================================
 if st.session_state.page == "FACTURES":
