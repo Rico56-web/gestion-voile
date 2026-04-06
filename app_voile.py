@@ -546,83 +546,89 @@ elif st.session_state.page == "STATS":
     fig_w = go.Figure(go.Waterfall(x=["Encaissé", "Frais", "Net"], y=[df_tab['Reçu'].sum(), -df_tab['Frais'].sum(), 0], measure=["relative", "relative", "total"]))
     st.plotly_chart(fig_w, use_container_width=True)
 # =================================================================
-# --- 8. PAGE MAINTENANCE (FIX DÉFINITIF DES CLÉS) ---
+# --- 8. PAGE MAINTENANCE - GESTION DES CHARGES & ENTRETIEN ---
 # =================================================================
 elif st.session_state.page == "MAINT":
-    st.title("🔧 Maintenance & Charges Vesta")
+    st.title("🔧 Maintenance & Charges - Vesta Skipper")
+    
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
     
+    # Initialisation si fichier vide
     if df_m.empty:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
-    # --- A. LOGIQUE DE SUPPRESSION (SÉCURISÉE PAR FORMULAIRE) ---
+
+    # --- A. LOGIQUE DE SUPPRESSION (SÉCURITÉ ANTI-BUG) ---
     if "delete_target" in st.session_state and st.session_state.delete_target is not None:
         idx_to_del = st.session_state.delete_target
         
-        # Vérification de l'existence de l'index dans le DataFrame actuel
         if idx_to_del in df_m.index:
             item_info = df_m.loc[idx_to_del]
-            
             st.error(f"🗑️ **CONFIRMATION DE SUPPRESSION**")
-            st.info(f"Élément : {item_info['Objet']} | Date : {item_info['Date']}")
+            st.write(f"Voulez-vous supprimer définitivement : **{item_info['Objet']}** ({item_info['Date']}) ?")
 
-            # DEBUT DU FORMULAIRE
-            with st.form(key=f"form_destruction_{idx_to_del}"):
-                st.write("⚠️ Cette action est définitive. Cliquez sur le bouton rouge pour confirmer.")
-                
-                # OBLIGATOIRE : Utiliser form_submit_button
-                confirm_submit = st.form_submit_button("🔥 OUI, SUPPRIMER DÉFINITIVEMENT", 
-                                                      type="danger", 
-                                                      use_container_width=True)
-                
-                if confirm_submit:
-                    # Action de suppression réelle
-                    df_m = df_m.drop(idx_to_del).reset_index(drop=True)
-                    sauvegarder_data(df_m, file_path_m)
-                    
-                    # Nettoyage de l'état
-                    st.session_state.delete_target = None
-                    st.success("Suppression effectuée avec succès.")
-                    st.rerun()
+            # Formulaire pour stabiliser le bouton de soumission
+            suppr_form = st.form(key=f"force_del_form_{idx_to_del}")
+            confirm = suppr_form.form_submit_button("🔥 OUI, SUPPRIMER DÉFINITIVEMENT", type="danger", use_container_width=True)
+            
+            if confirm:
+                df_m = df_m.drop(idx_to_del).reset_index(drop=True)
+                sauvegarder_data(df_m, file_path_m)
+                st.session_state.delete_target = None
+                st.success("Suppression effectuée.")
+                st.rerun()
 
-            # BOUTON ANNULER (Doit être HORS du formulaire s'il est classique)
-            if st.button("⬅️ ANNULER ET RETOURNER À LA LISTE", use_container_width=True, key="btn_cancel_global"):
+            if st.button("⬅️ ANNULER", use_container_width=True, key="cancel_reset"):
                 st.session_state.delete_target = None
                 st.rerun()
         else:
             st.session_state.delete_target = None
-            st.rerun()
             
         st.divider()
 
-    # --- B. ZONE D'AJOUT ---
-    with st.expander("➕ Ajouter une dépense / Frais récurrent"):
-        col1, col2 = st.columns(2)
-        f_date = col1.text_input("Date", datetime.now().strftime("%d/%m/%Y"), key="in_date")
-        f_obj = col2.text_input("Objet", key="in_obj")
-        f_mt = col1.number_input("Montant (€)", min_value=0.0, key="in_mt")
-        f_statut = col2.selectbox("Statut", ["À prévoir", "Fait"], key="in_stat")
-        f_type = col2.selectbox("Type", ["Frais Obligatoires", "Frais Maint Vesta", "Frais Autres"], key="in_type")
-        is_rec = st.checkbox("🔄 Répéter chaque mois jusqu'à fin d'année", key="in_rec")
+    # --- B. ZONE D'AJOUT (AVEC RÉCURRENCE MENSUELLE) ---
+    with st.expander("➕ Ajouter une dépense (Assurance, Port, Entretien...)", expanded=False):
+        c1, c2 = st.columns(2)
+        f_date = c1.text_input("Date (JJ/MM/AAAA)", datetime.now().strftime("%d/%m/%Y"), key="in_date")
+        f_obj = c2.text_input("Objet (ex: PORT, MAIF, VESTA...)", key="in_obj")
+        f_mt = c1.number_input("Montant (€)", min_value=0.0, step=10.0, key="in_mt")
+        f_statut = c2.selectbox("Statut", ["À prévoir", "Fait"], key="in_stat")
+        f_type = c2.selectbox("Type", ["Frais Obligatoires", "Frais Maint Vesta", "Frais Autres"], key="in_type")
+        
+        # Option pour automatiser les frais mensuels (Port/Assurance)
+        is_rec = st.checkbox("🔄 Répéter chaque mois jusqu'à la fin de l'année", key="in_rec")
 
         if st.button("💾 ENREGISTRER L'ENTRÉE", type="primary", use_container_width=True, key="in_save_btn"):
             if f_obj and f_mt > 0:
                 new_data = []
-                j, m_start, a = map(int, f_date.split('/'))
-                for m_idx in range(m_start, 13 if is_rec else m_start + 1):
-                    new_data.append({
-                        "Date": f"{j:02d}/{m_idx:02d}/{a}", "Objet": f_obj.upper(), 
-                        "Montant": f_mt, "M_Num": float(f_mt), "Statut": f_statut, "Type": f_type
-                    })
-                df_m = pd.concat([df_m, pd.DataFrame(new_data)], ignore_index=True)
-                sauvegarder_data(df_m, file_path_m)
-                st.rerun()
+                try:
+                    day, month_start, year = map(int, f_date.split('/'))
+                    # Si récurrent, on boucle du mois de départ à décembre (12)
+                    limit = 13 if is_rec else month_start + 1
+                    for m_idx in range(month_start, limit):
+                        date_str = f"{day:02d}/{m_idx:02d}/{year}"
+                        new_data.append({
+                            "Date": date_str, 
+                            "Objet": f_obj.upper(), 
+                            "Montant": float(f_mt), 
+                            "M_Num": float(f_mt), 
+                            "Statut": f_statut, 
+                            "Type": f_type
+                        })
+                    
+                    df_new = pd.DataFrame(new_data)
+                    df_m = pd.concat([df_m, df_new], ignore_index=True)
+                    sauvegarder_data(df_m, file_path_m)
+                    st.success(f"Enregistré : {len(new_data)} ligne(s)")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur de format date : {e}")
 
     st.divider()
 
-    # --- C. LISTE DES DÉPENSES ---
+    # --- C. LISTE DES CHARGES ET ENTRETIENS ---
     if not df_m.empty:
-        # On garde une copie pour l'affichage triée, mais on référence l'index réel
+        # On prépare une vue triée mais on garde l'index réel pour modifier/supprimer
         df_view = df_m.copy()
         df_view['real_idx'] = df_view.index
         df_view['dt_sort'] = pd.to_datetime(df_view['Date'], dayfirst=True, errors='coerce')
@@ -630,44 +636,52 @@ elif st.session_state.page == "MAINT":
 
         for _, row in df_view.iterrows():
             ridx = row['real_idx']
-            status_done = (row['Statut'] == "Fait")
-            icon = "🟢" if status_done else "⏳"
+            is_done = (row['Statut'] == "Fait")
+            icon = "🟢" if is_done else "⏳"
             
+            # Titre de l'expander dynamique
             with st.expander(f"{icon} {row['Date']} - {row['Objet']} ({row['Montant']}€)"):
                 
-                # MODIFICATION
-                if st.toggle("📝 Modifier la fiche", key=f"tog_{ridx}"):
-                    # On modifie directement dans df_m via ridx
-                    n_obj = st.text_input("Objet", row['Objet'], key=f"obj_{ridx}")
-                    n_mt = st.number_input("Montant", value=float(row['M_Num']), key=f"mt_{ridx}")
-                    n_st = st.selectbox("Statut", ["À prévoir", "Fait"], 
-                                         index=1 if status_done else 0, key=f"st_{ridx}")
+                # --- MODE ÉDITION ---
+                if st.toggle("📝 Modifier cette fiche", key=f"tog_{ridx}"):
+                    edit_obj = st.text_input("Objet", row['Objet'], key=f"edit_obj_{ridx}")
+                    edit_mt = st.number_input("Montant (€)", value=float(row.get('M_Num', 0)), key=f"edit_mt_{ridx}")
+                    edit_stat = st.selectbox("Statut", ["À prévoir", "Fait"], 
+                                             index=1 if is_done else 0, key=f"edit_stat_{ridx}")
                     
-                    if st.button("✅ Sauvegarder", key=f"sv_{ridx}"):
-                        df_m.at[ridx, 'Objet'] = n_obj.upper()
-                        df_m.at[ridx, 'M_Num'] = n_mt
-                        df_m.at[ridx, 'Montant'] = n_mt
-                        df_m.at[ridx, 'Statut'] = n_st
+                    if st.button("✅ Sauvegarder les modifications", key=f"btn_save_{ridx}"):
+                        df_m.at[ridx, 'Objet'] = edit_obj.upper()
+                        df_m.at[ridx, 'M_Num'] = float(edit_mt)
+                        df_m.at[ridx, 'Montant'] = float(edit_mt)
+                        df_m.at[ridx, 'Statut'] = edit_stat
                         sauvegarder_data(df_m, file_path_m)
                         st.rerun()
+                
+                # --- MODE AFFICHAGE & SUPPRESSION ---
                 else:
-                    # SUPPRESSION
-                    if status_done:
-                        st.info("💡 Fiche payée. Changez le statut pour supprimer.")
+                    st.write(f"**Type :** {row.get('Type', 'Non spécifié')}")
+                    if is_done:
+                        st.info("✅ Cette charge est réglée. Pour la supprimer, repassez en 'À prévoir'.")
                     else:
-                        # Au lieu d'ouvrir une sous-section, on envoie l'ID en haut de page
+                        # On envoie l'ID vers le bloc de confirmation en haut de page
                         if st.button("🗑️ Supprimer", key=f"del_{ridx}", use_container_width=True):
                             st.session_state.delete_target = ridx
                             st.rerun()
 
-    # --- D. ARCHIVES ---
+    # --- D. ARCHIVAGE DES DONNÉES ---
     st.write("---")
-    with st.expander("🚨 Zone de Danger"):
-        if st.button("🗄️ ARCHIVER TOUTES LES DONNÉES", use_container_width=True, key="big_archive_btn"):
-            df_arch = charger_data('archives_maintenance.json')
-            sauvegarder_data(pd.concat([df_arch, df_m], ignore_index=True), 'archives_maintenance.json')
-            sauvegarder_data(pd.DataFrame(columns=df_m.columns), file_path_m)
-            st.rerun()
+    with st.expander("🚨 Gestion des Archives"):
+        st.write("Transférer toutes les lignes actuelles vers le fichier historique.")
+        if st.button("🗄️ ARCHIVER TOUTE LA MAINTENANCE", use_container_width=True, key="big_arch"):
+            if not df_m.empty:
+                df_arch = charger_data('archives_maintenance.json')
+                # Fusion avec l'ancien historique
+                df_total_arch = pd.concat([df_arch, df_m], ignore_index=True)
+                sauvegarder_data(df_total_arch, 'archives_maintenance.json')
+                # Remise à zéro du fichier actif
+                sauvegarder_data(pd.DataFrame(columns=df_m.columns), file_path_m)
+                st.success("Données archivées avec succès !")
+                st.rerun()
 # =================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
 # =================================================================
