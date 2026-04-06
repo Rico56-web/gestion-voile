@@ -556,27 +556,32 @@ elif st.session_state.page == "MAINT":
     if df_m.empty:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
 
-    # --- A. LOGIQUE DE SUPPRESSION (HORS BOUCLE) ---
-    # Cette section s'affiche TOUT EN HAUT seulement si on a cliqué sur "Supprimer" en bas
+# --- A. LOGIQUE DE SUPPRESSION (SANS COLONNES - SÉCURITÉ MAX) ---
     if "delete_target" in st.session_state and st.session_state.delete_target is not None:
         idx_to_del = st.session_state.delete_target
-        # Sécurité : on vérifie que l'index existe encore
+        
         if idx_to_del in df_m.index:
             item_info = df_m.loc[idx_to_del]
-            st.warning(f"⚠️ Confirmation : Supprimer **{item_info['Objet']}** ({item_info['Date']}) ?")
             
-            c_y, c_n = st.columns(2)
-            # ICI : On utilise des clés FIXES car cette section est unique sur la page
-            if c_y.button("✅ OUI, SUPPRIMER", type="danger", use_container_width=True, key="CONFIRM_YES_BTN"):
+            # On crée un bandeau d'alerte rouge
+            st.error(f"⚠️ **CONFIRMATION REQUISE**")
+            st.write(f"Supprimer définitivement : **{item_info['Objet']}** du {item_info['Date']} ?")
+            
+            # BOUTONS L'UN SOUS L'AUTRE (Évite le bug des colonnes dynamiques)
+            if st.button("👉 CLIQUEZ ICI POUR SUPPRIMER DÉFINITIVEMENT", type="danger", use_container_width=True, key="BTN_VALIDE_SUPP"):
                 df_m = df_m.drop(idx_to_del).reset_index(drop=True)
                 sauvegarder_data(df_m, file_path_m)
                 st.session_state.delete_target = None
-                st.success("Ligne supprimée.")
+                st.success("Élément supprimé avec succès.")
                 st.rerun()
                 
-            if c_n.button("❌ ANNULER", use_container_width=True, key="CONFIRM_NO_BTN"):
+            if st.button("❌ ANNULER (Garder la fiche)", use_container_width=True, key="BTN_ANNULE_SUPP"):
                 st.session_state.delete_target = None
                 st.rerun()
+        else:
+            # Si l'index n'existe plus, on reset
+            st.session_state.delete_target = None
+            
         st.divider()
 
     # --- B. ZONE D'AJOUT ---
