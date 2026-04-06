@@ -546,11 +546,15 @@ elif st.session_state.page == "STATS":
     fig_w = go.Figure(go.Waterfall(x=["Encaissé", "Frais", "Net"], y=[df_tab['Reçu'].sum(), -df_tab['Frais'].sum(), 0], measure=["relative", "relative", "total"]))
     st.plotly_chart(fig_w, use_container_width=True)
 # =================================================================
-# --- 8. PAGE MAINTENANCE (FIX FERMETURE AUTO) ---
+# --- 8. PAGE MAINTENANCE (FORCE CLOSE VIA SESSION STATE) ---
 # =================================================================
 elif st.session_state.page == "MAINT":
     st.title("🔧 Maintenance & Charges - Vesta Skipper")
     
+    # --- Initialisation d'un compteur de reset si inexistant ---
+    if 'maint_reset' not in st.session_state:
+        st.session_state.maint_reset = 0
+
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
     
@@ -559,9 +563,9 @@ elif st.session_state.page == "MAINT":
     
     # --- 1. SÉLECTEUR D'ANNÉE ---
     col_yr1, col_yr2 = st.columns([1, 3])
-    annee_choisie = col_yr1.selectbox("📅 Saison", ANNEES_VUES, key="sel_year_main")
+    annee_choisie = col_yr1.selectbox("📅 Saison", ANNEES_VUES, key=f"yr_{st.session_state.maint_reset}")
 
-    # --- 2. FILTRAGE ET NETTOYAGE ---
+    # --- 2. FILTRAGE ---
     if not df_m.empty:
         df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
         df_annee = df_m[df_m['Date'].str.endswith(annee_choisie)].copy()
@@ -569,10 +573,10 @@ elif st.session_state.page == "MAINT":
         df_annee = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
 
     # --- 3. BILAN ---
-    vue = st.radio("Vue :", ["✅ Payé", "📅 Prévisionnel"], horizontal=True, key="vue_radio")
+    vue = st.radio("Vue :", ["✅ Payé", "📅 Prévisionnel"], horizontal=True, key=f"vue_{st.session_state.maint_reset}")
     df_view = df_annee[df_annee['Statut'] == "Fait"].copy() if "Payé" in vue else df_annee.copy()
     
-    # Metrics rapides
+    # Metrics
     m1, m2, m3, m4, m5 = st.columns(5)
     def g_s(df, c): return df[df['Type'] == c]['M_Num'].sum()
     m1.metric("🛡️ Assur.", f"{g_s(df_view, 'Assurances'):.0f}€")
@@ -583,43 +587,39 @@ elif st.session_state.page == "MAINT":
 
     st.divider()
 
-    # --- 4. AJOUTER ---
-    with st.expander("➕ Saisir une charge", expanded=False):
-        # ... (Garder ton code d'ajout habituel ici) ...
-        pass
-
-    # --- 5. LISTE (AVEC LOGIQUE DE FERMETURE STRICTE) ---
+    # --- 4. LISTE AVEC FERMETURE FORCÉE ---
     if not df_view.empty:
-        df_view['dt_temp'] = pd.to_datetime(df_view['Date'], dayfirst=True, errors='coerce')
-        df_view = df_view.sort_values('dt_temp', ascending=False)
+        # Tri chrono
+        df_view['dt_t'] = pd.to_datetime(df_view['Date'], dayfirst=True, errors='coerce')
+        df_view = df_view.sort_values('dt_t', ascending=False)
 
         for idx, row in df_view.iterrows():
             icon = "🟢" if row['Statut'] == "Fait" else "⏳"
             
-            # Utilisation de expanded=False par défaut
-            # Quand le bouton OK est cliqué, st.rerun() recharge la page.
-            # Comme aucune variable ne force cet expander précis à rester ouvert, il se replie.
+            # L'astuce : On intègre le compteur 'maint_reset' dans la clé de l'expander
             with st.expander(f"{icon} {row['Date']} - {row['Objet']} ({row['Montant']}€)", expanded=False):
                 c_e1, c_e2 = st.columns(2)
-                e_mt = c_e1.number_input("Prix €", value=float(row['M_Num']), key=f"mt_{idx}")
-                e_ty = c_e2.selectbox("Type", LISTE_TYPES, index=LISTE_TYPES.index(row['Type']), key=f"ty_{idx}")
-                e_st = c_e1.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"st_{idx}")
+                e_mt = c_e1.number_input("Prix €", value=float(row['M_Num']), key=f"mt_{idx}_{st.session_state.maint_reset}")
+                e_ty = c_e2.selectbox("Type", LISTE_TYPES, index=LISTE_TYPES.index(row['Type']), key=f"ty_{idx}_{st.session_state.maint_reset}")
+                e_st = c_e1.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"st_{idx}_{st.session_state.maint_reset}")
                 
-                # Le bouton déclenche la sauvegarde ET le rafraîchissement
-                if c_e2.button("💾 ENREGISTRER", key=f"save_{idx}", use_container_width=True):
+                if c_e2.button("💾 ENREGISTRER", key=f"sav_{idx}_{st.session_state.maint_reset}", use_container_width=True):
+                    # Sauvegarde
                     df_m.at[idx, 'M_Num'] = e_mt
                     df_m.at[idx, 'Montant'] = e_mt
                     df_m.at[idx, 'Type'] = e_ty
                     df_m.at[idx, 'Statut'] = e_st
                     sauvegarder_data(df_m, file_path_m)
                     
-                    # On vide les clés temporaires de session pour cet index pour forcer le "propre"
-                    st.success("Validé !")
-                    st.rerun() # <--- C'est ce qui force la fermeture de TOUS les expanders
+                    # --- ACTION CRUCIALE ---
+                    # On change le compteur pour "tuer" l'ancien expander et en créer un nouveau (fermé)
+                    st.session_state.maint_reset += 1
+                    st.rerun()
                 
-                if st.button("🗑️ Supprimer", key=f"del_{idx}", use_container_width=True):
+                if st.button("🗑️ Supprimer", key=f"del_{idx}_{st.session_state.maint_reset}", use_container_width=True):
                     df_m = df_m.drop(idx).reset_index(drop=True)
                     sauvegarder_data(df_m, file_path_m)
+                    st.session_state.maint_reset += 1
                     st.rerun()
 # =================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
