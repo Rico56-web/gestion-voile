@@ -258,7 +258,6 @@ elif st.session_state.page == "CONTACTS":
             # --- BOUCLE D'AFFICHAGE SÉCURISÉE ---
         for i, r in df_visu.iterrows():
             # 1. Préparation et nettoyage strict des données
-            import html
             def clean_h(val):
                 """Nettoie la valeur pour l'affichage HTML"""
                 return html.escape(str(val)) if pd.notna(val) else ""
@@ -348,11 +347,6 @@ elif st.session_state.page == "PLANNING":
     # CSS
     st.markdown("""<style>.block-container { padding: 10px 5px !important; } .full-width-cal { width: 98% !important; margin: auto !important; border-collapse: collapse; table-layout: fixed; } .full-width-cal td { width: 14.28%; padding: 0 !important; border: 0.5px solid #eee; }</style>""", unsafe_allow_html=True)
     st.markdown('<div class="main-header">🗓️ PLANNING VESTA 2026</div>', unsafe_allow_html=True)
-    # --- NAVIGATION ARCHIVES (AJOUT) ---
-    col_nav1, col_nav2 = st.columns([1, 1])
-    with col_nav2:
-        # Petit rappel visuel de la page actuelle
-        st.button("🗓️ PLANNING", use_container_width=True, disabled=True)
     
     st.divider() # Sépare la navigation du calendrier
     # --- NAVIGATION (VERSION SYNCHRONISÉE) ---
