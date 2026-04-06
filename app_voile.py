@@ -546,7 +546,7 @@ elif st.session_state.page == "STATS":
     fig_w = go.Figure(go.Waterfall(x=["Encaissé", "Frais", "Net"], y=[df_tab['Reçu'].sum(), -df_tab['Frais'].sum(), 0], measure=["relative", "relative", "total"]))
     st.plotly_chart(fig_w, use_container_width=True)
 # =================================================================
-# --- 8. PAGE MAINTENANCE (VERSION FINALE - BILAN & SÉCURITÉ) ---
+# --- 8. PAGE MAINTENANCE (VERSION FINALE - ÉDITION DIRECTE) ---
 # =================================================================
 elif st.session_state.page == "MAINT":
     st.title("🔧 Maintenance & Charges - Vesta Skipper")
@@ -554,7 +554,7 @@ elif st.session_state.page == "MAINT":
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
     
-    # --- 1. NETTOYAGE SÉCURISÉ DES DONNÉES (ANTI-CRASH) ---
+    # --- 1. NETTOYAGE SÉCURISÉ DES DONNÉES ---
     if not df_m.empty:
         cols = df_m.columns
         if 'Statut' in cols:
@@ -566,7 +566,7 @@ elif st.session_state.page == "MAINT":
         if 'M_Num' in cols:
             df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
         
-        # Initialisation forcée de la colonne Type si manquante ou vide
+        # Gestion de la colonne Type (Indispensable pour le bilan)
         if 'Type' not in cols:
             df_m['Type'] = "Frais Autres"
         else:
@@ -584,12 +584,8 @@ elif st.session_state.page == "MAINT":
             horizontal=True, key="vue_bilan_radio"
         )
 
-        if "Réalisées" in vue_bilan:
-            df_bilan = df_m[df_m['Statut'] == "Fait"]
-            titre_bilan = "Total déjà réglé"
-        else:
-            df_bilan = df_m
-            titre_bilan = "Engagement Total 2026"
+        df_bilan = df_m[df_m['Statut'] == "Fait"] if "Réalisées" in vue_bilan else df_m
+        titre_bilan = "Total déjà réglé" if "Réalisées" in vue_bilan else "Engagement Total 2026"
 
         # Calcul par catégorie
         cat_map = {
@@ -599,15 +595,12 @@ elif st.session_state.page == "MAINT":
         }
         total_gen = sum(cat_map.values())
 
-        # Affichage Metrics
+        # Affichage des Metrics
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Obligatoires", f"{cat_map['Obligatoires']:.2f} €")
         m2.metric("Maint. Vesta", f"{cat_map['Maint. Vesta']:.2f} €")
         m3.metric("Autres", f"{cat_map['Autres']:.2f} €")
         m4.metric(titre_bilan, f"{total_gen:.2f} €")
-        
-        if total_gen > 0:
-            st.bar_chart(df_bilan.groupby('Type')['M_Num'].sum())
     else:
         st.info("Aucune donnée pour le bilan.")
 
@@ -660,8 +653,9 @@ elif st.session_state.page == "MAINT":
 
     st.divider()
 
-    # --- 5. LISTE DES CHARGES (AFFICHAGE & ÉDITION) ---
+    # --- 5. LISTE DES CHARGES (AFFICHAGE & ÉDITION DIRECTE) ---
     if not df_m.empty:
+        # Copie pour l'affichage trié sans casser les index originaux
         df_disp = df_m.copy()
         df_disp['orig_idx'] = df_disp.index
         df_disp['dt_sort'] = pd.to_datetime(df_disp['Date'], dayfirst=True, errors='coerce')
@@ -671,28 +665,36 @@ elif st.session_state.page == "MAINT":
             ridx = row['orig_idx']
             icon = "🟢" if row['Statut'] == "Fait" else "⏳"
             
+            # L'édition se fait ICI, directement dans l'expander
             with st.expander(f"{icon} {row['Date']} - {row['Objet']} ({row['Montant']}€)"):
-                c1, c2, c3 = st.columns([2, 1, 1])
-                new_mt = c1.number_input("Prix €", value=float(row['M_Num']), key=f"mt_{ridx}")
-                new_st = c2.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"st_{ridx}")
+                st.write("📝 **Édition rapide :**")
+                col_edit1, col_edit2, col_edit3 = st.columns([2, 1, 1])
                 
-                if c3.button("💾 OK", key=f"ok_{ridx}", use_container_width=True):
+                # Champs de saisie directe
+                new_mt = col_edit1.number_input(f"Prix (€) ##{ridx}", value=float(row['M_Num']), key=f"mt_{ridx}", label_visibility="collapsed")
+                new_st = col_edit2.selectbox(f"Statut ##{ridx}", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"st_{ridx}", label_visibility="collapsed")
+                
+                # Bouton de validation par ligne
+                if col_edit3.button("💾 OK", key=f"ok_{ridx}", use_container_width=True):
                     df_m.at[ridx, 'M_Num'] = new_mt
                     df_m.at[ridx, 'Montant'] = new_mt
                     df_m.at[ridx, 'Statut'] = new_st
                     sauvegarder_data(df_m, file_path_m)
+                    st.success("Mis à jour")
                     st.rerun()
                 
-                if st.button("🗑️ Supprimer", key=f"btn_del_{ridx}", use_container_width=True):
+                # Bouton de suppression
+                if st.button("🗑️ Supprimer cette ligne", key=f"btn_del_{ridx}", use_container_width=True):
                     st.session_state.delete_target = ridx
                     st.rerun()
 
     # --- 6. ARCHIVAGE ---
     st.write("---")
-    if st.button("🗄️ ARCHIVER TOUT", use_container_width=True):
+    if st.button("🗄️ ENVOYER TOUT EN ARCHIVE", use_container_width=True):
         df_arch = charger_data('archives_maintenance.json')
         sauvegarder_data(pd.concat([df_arch, df_m], ignore_index=True), 'archives_maintenance.json')
         sauvegarder_data(pd.DataFrame(columns=df_m.columns), file_path_m)
+        st.success("Données archivées.")
         st.rerun()
 # =================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
