@@ -164,7 +164,7 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 # --- 5. PAGE CONTACTS (VERSION FINALE + NOTES VISIBLES) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    if st.button("📦 ARCHIVES-OK", key="key_archives_contacts", use_container_width=True):
+    if st.button("📦 ARCHIVAGE", key="key_archives_contacts", use_container_width=True):
         st.session_state.last_page = "CONTACTS" # On mémorise qu'on vient des contacts
         st.session_state.page = "ARCHIVES"
         st.rerun()
@@ -320,7 +320,7 @@ if st.session_state.page == "CONTACTS":
 # --- 6. PAGE PLANNING (CORRECTIF CMN & COULEUR TOTAL) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
-    if st.button("📦 ARCHIVES-OK", key="key_archives_planning", use_container_width=True):
+    if st.button("📦 ARCHIVAGE", key="key_archives_planning", use_container_width=True):
         st.session_state.last_page = "PLANNING" # On mémorise qu'on vient du planning
         st.session_state.page = "ARCHIVES"
         st.rerun()
@@ -604,7 +604,7 @@ elif st.session_state.page == "STATS":
 # =================================================================
 elif st.session_state.page == "MAINT":
     st.title("🔧 Maintenance - Vesta")
-    if st.button("📦 ARCHIVES-OK", key="key_archives_maintenance", use_container_width=True):
+    if st.button("📦 ARCHIVAGE", key="key_archives_maintenance", use_container_width=True):
         st.session_state.last_page = "MAINTENANCE" # On mémorise qu'on vient de la maintenance
         st.session_state.page = "ARCHIVES"
         st.rerun()
