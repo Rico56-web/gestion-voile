@@ -791,29 +791,48 @@ Eric (vesta)"""
         st.warning("La base de données 'Contacts' est vide.")
 
 # =================================================================
-# --- 10. PAGE LOG (CONSULTATION DES ARCHIVES) ---
+# --- 10. PAGE ARCHIVES (GESTION COMPLÈTE) ---
 # =================================================================
 elif st.session_state.page == "ARCHIVES":
     import pandas as pd
     import io
+    from datetime import datetime
 
     # 1. NAVIGATION RETOUR
-    if st.button("⬅️ RETOUR AUX STATS", use_container_width=True):
-        st.session_state.page = "STATS"
+    if st.button("⬅️ RETOUR AU PLANNING", use_container_width=True):
+        st.session_state.page = "PLANNING"
         st.rerun()
 
     st.title("📂 Gestion des Archives")
 
-    # --- 2. EXPORT VERS PC (EXCEL) ---
-    with st.expander("📤 TRANSPÉRER VERS PC (Excel)", expanded=True):
-        st.write("Téléchargez vos archives pour les ouvrir sur Excel ou Word.")
+    # --- 2. NOUVEAU : PANNEAU DE NETTOYAGE (Jan-Fév-Mars 2026) ---
+    with st.expander("✂️ ARCHIVER UNE PÉRIODE (Nettoyage)", expanded=True):
+        st.info("Déplacez les données du planning actif vers l'historique.")
         
-        # On prépare les fichiers
+        c1, c2 = st.columns(2)
+        # Dates pré-réglées sur le premier trimestre 2026
+        d_debut = c1.date_input("Du", datetime(2026, 1, 1), format="DD/MM/YYYY")
+        d_fin = c2.date_input("Au", datetime(2026, 3, 31), format="DD/MM/YYYY")
+        
+        if st.button("🚀 LANCER L'ARCHIVAGE MAINTENANT", use_container_width=True, type="primary"):
+            # A. Archivage Maintenance
+            df_m = charger_data('maintenance.json')
+            nb_m = archiver_donnees(df_m, d_debut, d_fin, 'maintenance.json', 'archives_maintenance.json', 'Date')
+            
+            # B. Archivage Planning/Contacts
+            df_c_actuel = charger_data('contacts.json')
+            nb_p = archiver_donnees(df_c_actuel, d_debut, d_fin, 'contacts.json', 'archives_planning.json', 'DateNav')
+            
+            st.success(f"Opération réussie : {nb_m} frais et {nb_p} missions archivés.")
+            st.rerun()
+
+    # --- 3. EXPORT VERS PC (EXCEL) ---
+    with st.expander("📤 TRANSPÉRER VERS PC (Excel)", expanded=False):
+        st.write("Téléchargez vos archives pour les ouvrir sur Excel ou Word.")
         df_arch_m = charger_data('archives_maintenance.json')
         df_arch_p = charger_data('archives_planning.json')
         
         if not df_arch_m.empty or not df_arch_p.empty:
-            # Création d'un fichier Excel en mémoire
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 if not df_arch_p.empty:
@@ -829,26 +848,22 @@ elif st.session_state.page == "ARCHIVES":
                 use_container_width=True
             )
         else:
-            st.info("Aucune donnée à exporter pour le moment.")
+            st.info("Aucune donnée à exporter.")
 
-    # --- 3. VIDAGE DES ARCHIVES (SÉCURISÉ) ---
+    # --- 4. VIDAGE DES ARCHIVES (SÉCURISÉ) ---
     with st.expander("🗑️ VIDER LES ARCHIVES (Définitif)", expanded=False):
-        st.error("⚠️ Cette action est irréversible. Assurez-vous d'avoir téléchargé l'Excel avant.")
-        
-        # Double confirmation pour éviter les erreurs sur iPhone
-        confirm = st.checkbox("Je confirme vouloir supprimer TOUTES les archives")
-        
-        if st.button("🔥 SUPPRIMER DÉFINITIVEMENT", use_container_width=True, disabled=not confirm):
-            # On écrase avec des DataFrames vides
+        st.error("⚠️ Action irréversible.")
+        confirm = st.checkbox("Je confirme vouloir tout supprimer")
+        if st.button("🔥 TOUT EFFACER", use_container_width=True, disabled=not confirm):
             df_vide = pd.DataFrame()
             sauvegarder_data(df_vide, 'archives_maintenance.json')
             sauvegarder_data(df_vide, 'archives_planning.json')
-            st.success("Les archives ont été vidées.")
+            st.success("Archives vidées.")
             st.rerun()
 
     st.divider()
 
-    # --- 4. CONSULTATION ---
+    # --- 5. CONSULTATION ---
     st.subheader("📜 Historique actuel")
     t1, t2 = st.tabs(["🛠️ Frais", "📅 Planning/Contacts"])
     with t1:
