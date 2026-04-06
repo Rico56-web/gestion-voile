@@ -620,10 +620,13 @@ elif st.session_state.page == "MAINT":
                 st.rerun()
         st.divider()
 
-    # --- 4. AJOUTER UNE DÉPENSE ---
+# --- 4. AJOUTER UNE DÉPENSE ---
     with st.expander("➕ Saisir une nouvelle charge", expanded=False):
         c1, c2 = st.columns(2)
-        f_date = c1.text_input("Date (JJ/MM/AAAA)", datetime.now().strftime("%d/%m/%Y"), key="f_d")
+        
+        # REMPLACÉ : On utilise date_input au lieu de text_input
+        f_date_obj = c1.date_input("Date de la dépense", datetime.now(), format="DD/MM/YYYY", key="f_d_calendar")
+        
         f_obj = c2.text_input("Objet", key="f_o")
         f_mt = c1.number_input("Montant (€)", min_value=0.0, key="f_m")
         f_type = c2.selectbox("Catégorie", LISTE_TYPES, key="f_t")
@@ -632,22 +635,27 @@ elif st.session_state.page == "MAINT":
 
         if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
             if f_obj:
-                try:
-                    d, m_start, a = map(int, f_date.split('/'))
-                    new_rows = []
-                    for m_idx in range(m_start, 13 if is_rec else m_start + 1):
-                        new_rows.append({
-                            "Date": f"{d:02d}/{m_idx:02d}/{a}", 
-                            "Objet": f"{f_obj} (M{m_idx})" if is_rec else f_obj,
-                            "Montant": float(f_mt), "M_Num": float(f_mt), 
-                            "Statut": f_stat, "Type": f_type
-                        })
-                    df_m = pd.concat([df_m, pd.DataFrame(new_rows)], ignore_index=True)
-                    sauvegarder_data(df_m, file_path_m)
-                    st.rerun()
-                except: st.error("Format date erroné")
-
-    st.divider()
+                # Plus besoin de split('/') car f_date_obj est déjà un objet date
+                d = f_date_obj.day
+                m_start = f_date_obj.month
+                a = f_date_obj.year
+                
+                new_rows = []
+                for m_idx in range(m_start, 13 if is_rec else m_start + 1):
+                    # On reformate en texte pour ton JSON
+                    new_rows.append({
+                        "Date": f"{d:02d}/{m_idx:02d}/{a}", 
+                        "Objet": f"{f_obj} (M{m_idx})" if is_rec else f_obj,
+                        "Montant": float(f_mt), 
+                        "M_Num": float(f_mt), 
+                        "Statut": f_stat, 
+                        "Type": f_type
+                    })
+                
+                df_m = pd.concat([df_m, pd.DataFrame(new_rows)], ignore_index=True)
+                sauvegarder_data(df_m, file_path_m)
+                st.success(f"Enregistré : {f_obj}")
+                st.rerun()
 
     # --- 5. LISTE ET ÉDITION (TRI CHRONO INVERSÉ) ---
     if not df_active.empty:
