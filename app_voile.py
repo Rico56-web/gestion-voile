@@ -6,6 +6,8 @@ import os
 import html
 import streamlit.components.v1 as components
 from datetime import datetime, date
+import plotly.express as px
+
 # --- FONCTIONS DE SÉCURITÉ ---
 def clean_text(text):
     """Nettoie le texte pour éviter de casser le JSON (supprime retours à la ligne et guillemets)"""
@@ -442,32 +444,34 @@ elif st.session_state.page == "PLANNING":
     </div>
     """, unsafe_allow_html=True)
 # =================================================================
-# --- 9. PAGE STATS (SOLDE + TERMINOLOGIE + FILTRE STRICT) ---
+# --- 9. PAGE STATS (SOLDE + TERMINOLOGIE + SÉCURITÉ) ---
 # =================================================================
 elif st.session_state.page == "STATS":
-    st.title("📊 Tableau de Bord Financier")
+    st.title("📊 Bilan Vesta Skipper")
     
-    # 1. Chargement des données
-    df_m = charger_data('maintenance.json')
-    df_p = charger_data('planning.json') # Pour les recettes (missions)
+    # 1. Imports internes au bloc si nécessaire (sécurité)
+    import plotly.express as px
 
-    # --- 2. TRAITEMENT DES CHARGES (Maintenance) ---
+    # 2. Chargement
+    df_m = charger_data('maintenance.json')
+    df_p = charger_data('planning.json')
+
+    # --- 3. CALCUL DES CHARGES (Maintenance payée) ---
     if not df_m.empty:
         df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
-        # Uniquement ce qui est PAYÉ (Fait)
+        # Filtre strict : Uniquement ce qui est réellement payé
         df_charges_reelles = df_m[df_m['Statut'] == "Fait"].copy()
         total_charges = df_charges_reelles['M_Num'].sum()
     else:
         total_charges = 0
         df_charges_reelles = pd.DataFrame()
 
-    # --- 3. TRAITEMENT DES RECETTES (Planning) ---
+    # --- 4. CALCUL DES RECETTES (Missions payées) ---
     if not df_p.empty:
-        # On suppose que tu as une colonne 'Prix' et 'Payé' (Oui/Non) dans ton planning
         df_p['P_Num'] = pd.to_numeric(df_p['Prix'], errors='coerce').fillna(0.0)
-        
-        # Séparation Recettes encaissées / À recevoir
+        # Recettes encaissées (Payé = Oui)
         df_recettes_ok = df_p[df_p['Payé'] == "Oui"].copy()
+        # Recettes à venir (Payé != Oui)
         df_recettes_attente = df_p[df_p['Payé'] != "Oui"].copy()
         
         total_recettes = df_recettes_ok['P_Num'].sum()
@@ -477,8 +481,8 @@ elif st.session_state.page == "STATS":
         reste_a_encaisser = 0
         df_recettes_ok = pd.DataFrame()
 
-    # --- 4. CAMEMBERT : TRÉSORERIE RÉELLE ---
-    st.subheader("💰 Trésorerie Réelle")
+    # --- 5. VISUEL : TRÉSORERIE RÉELLE ---
+    st.subheader("💰 Trésorerie (Réel Encaissé/Décaissement)")
     if total_charges > 0 or total_recettes > 0:
         fig_treso = px.pie(
             names=['Charges', 'Recettes'], 
@@ -486,52 +490,54 @@ elif st.session_state.page == "STATS":
             color_discrete_sequence=['#ef553b', '#00cc96'], # Rouge / Vert
             hole=0.4
         )
+        fig_treso.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=300)
         st.plotly_chart(fig_treso, use_container_width=True)
         
-        # AFFICHAGE DU SOLDE (Demande spécifique)
+        # AFFICHAGE DU SOLDE (Trésorerie Nette)
         solde = total_recettes - total_charges
-        couleur_solde = "green" if solde >= 0 else "red"
+        couleur_solde = "#28a745" if solde >= 0 else "#dc3545"
         st.markdown(f"""
-            <div style="text-align: center; border: 2px solid #ddd; padding: 10px; border-radius: 10px;">
-                <p style="margin:0; font-size: 1.2em;">SOLDE ACTUEL</p>
-                <h2 style="margin:0; color: {couleur_solde};">{solde:.2f} €</h2>
+            <div style="text-align: center; border: 2px solid #ddd; padding: 15px; border-radius: 10px; background-color: #f8f9fa;">
+                <p style="margin:0; font-size: 1em; color: #666;">SOLDE RÉEL ACTUEL</p>
+                <h1 style="margin:0; color: {couleur_solde}; font-size: 2em;">{solde:.2f} €</h1>
             </div>
         """, unsafe_allow_html=True)
     
     st.divider()
 
-    # --- 5. CAMEMBERT : NATURE DES FRAIS (Avec Sécurité) ---
-    st.subheader("🛠️ Nature des Frais (Payés)")
+    # --- 6. NATURE DES FRAIS (Incluant Sécurité) ---
+    st.subheader("🛠️ Répartition des Charges")
     if not df_charges_reelles.empty:
-        # On s'assure que toutes les catégories dont 'Sécurité' sont bien groupées
+        # Plotly va grouper automatiquement par 'Type'
         fig_nature = px.pie(df_charges_reelles, names='Type', values='M_Num')
+        fig_nature.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=300)
         st.plotly_chart(fig_nature, use_container_width=True)
     else:
-        st.info("Aucune charge payée pour le moment.")
+        st.info("Aucune charge payée.")
 
     st.divider()
 
-    # --- 6. DÉTAILS (Suppression de la colonne d'index 0..X) ---
+    # --- 7. DÉTAILS SANS INDEX (iPhone 16 Friendly) ---
     
-    # Détail RECETTES ENCAISSÉES
+    # RECETTES
     st.subheader("📥 Détail Recettes (Encaissées)")
     if not df_recettes_ok.empty:
-        # hide_index=True supprime la colonne 0, 1, 2...
         st.dataframe(df_recettes_ok[['Date', 'Client', 'Prix']], use_container_width=True, hide_index=True)
     else:
-        st.write("Aucune recette encaissée.")
+        st.write("Aucune mission encaissée.")
 
-    # ALERTES : RESTE À PAYER (Bien ressorti)
+    # RESTE À ENCAISSER (Trésorerie à venir)
     if reste_a_encaisser > 0:
-        st.error(f"⚠️ **RESTE À RECEVOIR : {reste_a_encaisser:.2f} €**")
-        with st.expander("Voir les missions non payées"):
-            st.dataframe(df_recettes_attente[['Date', 'Client', 'Prix']], use_index=False, hide_index=True)
+        st.error(f"🚨 **RESTE À PERCEVOIR : {reste_a_encaisser:.2f} €**")
+        with st.expander("Voir le détail des impayés"):
+            st.dataframe(df_recettes_attente[['Date', 'Client', 'Prix']], use_container_width=True, hide_index=True)
 
     st.write("---")
 
-    # Détail CHARGES
+    # CHARGES
     st.subheader("📤 Détail Charges (Payées)")
     if not df_charges_reelles.empty:
+        # On affiche les colonnes utiles
         st.dataframe(df_charges_reelles[['Date', 'Objet', 'M_Num', 'Type']], use_container_width=True, hide_index=True)
 
 # =================================================================
