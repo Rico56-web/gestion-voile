@@ -327,9 +327,9 @@ if st.session_state.page == "CONTACTS":
 # =================================================================
 elif st.session_state.page == "PLANNING":
     if st.button("📦 ARCHIVES", key="btn_arch_plan"):
-    st.session_state.last_page = "PLANNING" # On mémorise qu'on vient du planning
-    st.session_state.page = "ARCHIVES"
-    st.rerun()
+        st.session_state.last_page = "PLANNING" # On mémorise qu'on vient du planning
+        st.session_state.page = "ARCHIVES"
+        st.rerun()
     from datetime import datetime, date, timedelta
     import calendar
 
