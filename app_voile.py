@@ -163,11 +163,15 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 # =================================================================
 # --- 5. PAGE CONTACTS (VERSION FINALE + NOTES VISIBLES) ---
 # =================================================================
-if st.session_state.page == "CONTACTS":
-    if st.button("📦 ARCHIVAGE", key="key_archives_contacts", use_container_width=True):
-        st.session_state.last_page = "CONTACTS" # On mémorise qu'on vient des contacts
+elif st.session_state.page == "CONTACTS":
+    # On affiche SEULEMENT le bouton Archives ici
+    if st.button("📦 ALLER AUX ARCHIVES", key="k_arch_c", use_container_width=True, type="primary"):
+        st.session_state.last_page = "CONTACTS"
         st.session_state.page = "ARCHIVES"
         st.rerun()
+    
+    st.title("👤 MES CONTACTS")
+    st.divider()
     # --- NAVIGATION HAUT (CONTACTS) ---
     c_nav1, c_nav2 = st.columns([1, 1])
     with c_nav2:
@@ -320,10 +324,14 @@ if st.session_state.page == "CONTACTS":
 # --- 6. PAGE PLANNING (CORRECTIF CMN & COULEUR TOTAL) ---
 # =================================================================
 elif st.session_state.page == "PLANNING":
-    if st.button("📦 ARCHIVAGE", key="key_archives_planning", use_container_width=True):
-        st.session_state.last_page = "PLANNING" # On mémorise qu'on vient du planning
+    # 1. Navigation condensée (Spécial iPhone)
+    if st.button("📦 ALLER AUX ARCHIVES", key="k_arch_p", use_container_width=True, type="primary"):
+        st.session_state.last_page = "PLANNING"
         st.session_state.page = "ARCHIVES"
         st.rerun()
+    
+    st.title("🗓️ PLANNING 2026")
+    st.divider()
     from datetime import datetime, date, timedelta
     import calendar
 
@@ -602,12 +610,14 @@ elif st.session_state.page == "STATS":
 # =================================================================
 # --- 8. PAGE MAINTENANCE (OPTI IPHONE & AUTO-CLOSE) ---
 # =================================================================
-elif st.session_state.page == "MAINT":
-    st.title("🔧 Maintenance - Vesta")
-    if st.button("📦 ARCHIVAGE", key="key_archives_maintenance", use_container_width=True):
-        st.session_state.last_page = "MAINTENANCE" # On mémorise qu'on vient de la maintenance
+elif st.session_state.page == "MAINTENANCE":
+    if st.button("📦 ALLER AUX ARCHIVES", key="k_arch_m", use_container_width=True, type="primary"):
+        st.session_state.last_page = "MAINTENANCE"
         st.session_state.page = "ARCHIVES"
         st.rerun()
+    
+    st.title("🛠️ MAINTENANCE")
+    st.divider()
     # --- NAVIGATION HAUT (MAINTENANCE) ---
     c_nav1, c_nav2 = st.columns([1, 1])
     with c_nav2:
