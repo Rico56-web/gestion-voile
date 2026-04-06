@@ -163,7 +163,7 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 # =================================================================
 # --- 5. PAGE CONTACTS (VERSION FINALE + NOTES VISIBLES) ---
 # =================================================================
-elif st.session_state.page == "CONTACTS":
+if st.session_state.page == "CONTACTS":
     # On affiche SEULEMENT le bouton Archives ici
     if st.button("📦 ALLER AUX ARCHIVES", key="k_arch_c", use_container_width=True, type="primary"):
         st.session_state.last_page = "CONTACTS"
