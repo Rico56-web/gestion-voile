@@ -604,7 +604,7 @@ if st.session_state.page == "STATS":
 # =================================================================
 # --- 8. PAGE MAINTENANCE (OPTI IPHONE & AUTO-CLOSE) ---
 # =================================================================
-if st.session_state.page == "MAINTENANCE":
+if st.session_state.page == "MAINT":
     if st.button("📦 ALLER AUX ARCHIVES", key="k_arch_m", use_container_width=True, type="primary"):
         st.session_state.last_page = "MAINTENANCE"
         st.session_state.page = "ARCHIVES"
