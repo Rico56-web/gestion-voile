@@ -615,9 +615,9 @@ elif st.session_state.page == "STATS":
 elif st.session_state.page == "MAINT":
     st.title("🔧 Maintenance - Vesta")
     if st.button("📦 ARCHIVES", key="btn_arch_maint"):
-    st.session_state.last_page = "MAINTENANCE" # On mémorise qu'on vient de la maintenance
-    st.session_state.page = "ARCHIVES"
-    st.rerun()
+        st.session_state.last_page = "MAINTENANCE" # On mémorise qu'on vient de la maintenance
+        st.session_state.page = "ARCHIVES"
+        st.rerun()
     # --- NAVIGATION HAUT (MAINTENANCE) ---
     c_nav1, c_nav2 = st.columns([1, 1])
     with c_nav1:
