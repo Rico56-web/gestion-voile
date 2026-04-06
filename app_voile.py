@@ -546,7 +546,7 @@ elif st.session_state.page == "STATS":
     fig_w = go.Figure(go.Waterfall(x=["Encaissé", "Frais", "Net"], y=[df_tab['Reçu'].sum(), -df_tab['Frais'].sum(), 0], measure=["relative", "relative", "total"]))
     st.plotly_chart(fig_w, use_container_width=True)
 # =================================================================
-# --- 8. PAGE MAINTENANCE (TYPES : ASSUR, PORT, MAINT, SÉCU, AUTRES) ---
+# --- 8. PAGE MAINTENANCE (TRI CHRONO + FILTRE + ARCHIVES) ---
 # =================================================================
 elif st.session_state.page == "MAINT":
     st.title("🔧 Maintenance & Charges - Vesta Skipper")
@@ -554,7 +554,6 @@ elif st.session_state.page == "MAINT":
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
     
-    # --- TA LISTE DE CATÉGORIES MISE À JOUR ---
     LISTE_TYPES = ["Assurances", "Autres frais", "Maintenance, matériels", "Port", "Sécurité"]
     
     # --- 1. NETTOYAGE & INITIALISATION ---
@@ -568,26 +567,29 @@ elif st.session_state.page == "MAINT":
             df_m['Type'] = "Autres frais"
         else:
             df_m['Type'] = df_m['Type'].fillna("Autres frais")
-            # Recalage automatique si l'ancien type n'est plus dans la liste
             df_m.loc[~df_m['Type'].isin(LISTE_TYPES), 'Type'] = "Autres frais"
     else:
         df_m = pd.DataFrame(columns=["Date", "Objet", "Montant", "Statut", "Type", "M_Num"])
 
-    # --- 2. BILAN FINANCIER (6 COLONNES) ---
+    # --- 2. BILAN FINANCIER (Metrics) ---
     st.subheader("📊 État des Finances 2026")
     if not df_m.empty:
-        vue = st.radio("Vue :", ["✅ Payé", "📅 Prévisionnel (Total)"], horizontal=True, key="v_bilan")
-        df_b = df_m[df_m['Statut'] == "Fait"] if "Payé" in vue else df_m
+        vue = st.radio("Filtrer la liste et le bilan :", ["✅ Payé", "📅 Prévisionnel (Total)"], horizontal=True, key="v_bilan")
         
-        # Calculs par catégorie
-        c_assur = df_b[df_b['Type'] == "Assurances"]['M_Num'].sum()
-        c_maint = df_b[df_b['Type'] == "Maintenance, matériels"]['M_Num'].sum()
-        c_port = df_b[df_b['Type'] == "Port"]['M_Num'].sum()
-        c_secu = df_b[df_b['Type'] == "Sécurité"]['M_Num'].sum()
-        c_autre = df_b[df_b['Type'] == "Autres frais"]['M_Num'].sum()
-        total = df_b['M_Num'].sum()
+        # Filtrage pour l'affichage
+        if "Payé" in vue:
+            df_active = df_m[df_m['Statut'] == "Fait"].copy()
+        else:
+            df_active = df_m.copy()
+            
+        # Calculs
+        c_assur = df_active[df_active['Type'] == "Assurances"]['M_Num'].sum()
+        c_maint = df_active[df_active['Type'] == "Maintenance, matériels"]['M_Num'].sum()
+        c_port = df_active[df_active['Type'] == "Port"]['M_Num'].sum()
+        c_secu = df_active[df_active['Type'] == "Sécurité"]['M_Num'].sum()
+        c_autre = df_active[df_active['Type'] == "Autres frais"]['M_Num'].sum()
+        total = df_active['M_Num'].sum()
 
-        # Affichage Metrics
         m1, m2, m3, m4, m5 = st.columns(5)
         m1.metric("🛡️ Assur.", f"{c_assur:.0f}€")
         m2.metric("⚓ Port", f"{c_port:.0f}€")
@@ -595,29 +597,33 @@ elif st.session_state.page == "MAINT":
         m4.metric("🛟 Sécu.", f"{c_secu:.0f}€")
         m5.metric("📦 Autres", f"{c_autre:.0f}€")
         
-        st.metric("💰 TOTAL (Vue sélectionnée)", f"{total:.2f} €")
-    
+        st.info(f"**Total affiché ({vue}) : {total:.2f} €**")
+    else:
+        df_active = df_m.copy()
+        st.info("Aucune donnée.")
+
     st.divider()
 
-    # --- 3. SUPPRESSION ---
+    # --- 3. LOGIQUE DE SUPPRESSION ---
     if st.session_state.get("delete_target") is not None:
         t_idx = st.session_state.delete_target
         if t_idx in df_m.index:
             st.warning(f"Supprimer définitivement : **{df_m.loc[t_idx, 'Objet']}** ?")
-            col_del1, col_del2 = st.columns(2)
-            if col_del1.button("🔥 OUI, SUPPRIMER", use_container_width=True):
+            c_d1, c_d2 = st.columns(2)
+            if c_d1.button("🔥 OUI, SUPPRIMER", use_container_width=True):
                 df_m = df_m.drop(t_idx).reset_index(drop=True)
                 sauvegarder_data(df_m, file_path_m)
                 st.session_state.delete_target = None
                 st.rerun()
-            if col_del2.button("❌ ANNULER", use_container_width=True):
+            if c_d2.button("❌ ANNULER", use_container_width=True):
                 st.session_state.delete_target = None
                 st.rerun()
+        st.divider()
 
     # --- 4. AJOUTER UNE DÉPENSE ---
     with st.expander("➕ Saisir une nouvelle charge", expanded=False):
         c1, c2 = st.columns(2)
-        f_date = c1.text_input("Date", datetime.now().strftime("%d/%m/%Y"), key="f_d")
+        f_date = c1.text_input("Date (JJ/MM/AAAA)", datetime.now().strftime("%d/%m/%Y"), key="f_d")
         f_obj = c2.text_input("Objet", key="f_o")
         f_mt = c1.number_input("Montant (€)", min_value=0.0, key="f_m")
         f_type = c2.selectbox("Catégorie", LISTE_TYPES, key="f_t")
@@ -643,15 +649,14 @@ elif st.session_state.page == "MAINT":
 
     st.divider()
 
-    # --- 5. LISTE ET ÉDITION ---
-    if not df_m.empty:
-        df_disp = df_m.copy()
-        df_disp['orig_idx'] = df_disp.index
-        df_disp['dt_sort'] = pd.to_datetime(df_disp['Date'], dayfirst=True, errors='coerce')
-        df_disp = df_disp.sort_values('dt_sort', ascending=False)
+    # --- 5. LISTE ET ÉDITION (TRI CHRONO INVERSÉ) ---
+    if not df_active.empty:
+        df_active['orig_idx'] = df_active.index
+        df_active['dt_obj'] = pd.to_datetime(df_active['Date'], dayfirst=True, errors='coerce')
+        df_active = df_active.sort_values('dt_obj', ascending=False)
 
-        for _, row in df_disp.iterrows():
-            ridx = row['orig_idx']
+        for _, row in df_active.iterrows():
+            ridx = row['orig_idx'] 
             icon = "🟢" if row['Statut'] == "Fait" else "⏳"
             
             with st.expander(f"{icon} {row['Date']} - {row['Objet']} ({row['Montant']}€)"):
@@ -660,7 +665,7 @@ elif st.session_state.page == "MAINT":
                 e_type = c_e2.selectbox("Type", LISTE_TYPES, index=LISTE_TYPES.index(row['Type']), key=f"e_t_{ridx}")
                 e_stat = c_e1.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"e_s_{ridx}")
                 
-                if c_e2.button("💾 ENREGISTRER MODIFS", key=f"e_b_{ridx}", use_container_width=True):
+                if c_e2.button("💾 ENREGISTRER", key=f"e_b_{ridx}", use_container_width=True):
                     df_m.at[ridx, 'M_Num'] = e_mt
                     df_m.at[ridx, 'Montant'] = e_mt
                     df_m.at[ridx, 'Type'] = e_type
@@ -671,6 +676,22 @@ elif st.session_state.page == "MAINT":
                 if st.button("🗑️ Supprimer", key=f"del_{ridx}", use_container_width=True):
                     st.session_state.delete_target = ridx
                     st.rerun()
+
+    # --- 6. ARCHIVAGE ---
+    st.write("---")
+    with st.expander("🚨 Archivage / Fin de saison"):
+        st.warning("L'archivage déplace toutes les lignes actuelles vers 'archives_maintenance.json' et vide la liste de travail.")
+        if st.button("🗄️ TOUT ENVOYER EN ARCHIVE", use_container_width=True):
+            if not df_m.empty:
+                df_arch = charger_data('archives_maintenance.json')
+                df_total = pd.concat([df_arch, df_m], ignore_index=True)
+                sauvegarder_data(df_total, 'archives_maintenance.json')
+                # On vide le fichier actuel en gardant la structure
+                sauvegarder_data(pd.DataFrame(columns=df_m.columns), file_path_m)
+                st.success("Archives mises à jour. Liste de travail réinitialisée.")
+                st.rerun()
+            else:
+                st.info("Rien à archiver.")
 # =================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
 # =================================================================
