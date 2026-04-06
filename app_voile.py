@@ -444,101 +444,93 @@ elif st.session_state.page == "PLANNING":
     </div>
     """, unsafe_allow_html=True)
 # =================================================================
-# --- 9. PAGE STATS (SOLDE + TERMINOLOGIE + SÉCURITÉ) ---
+# --- 9. PAGE STATS (VERSION NETTOYÉE) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Bilan Vesta Skipper")
-    
-    # 1. Imports internes au bloc si nécessaire (sécurité)
     import plotly.express as px
 
-    # 2. Chargement
     df_m = charger_data('maintenance.json')
     df_p = charger_data('planning.json')
 
-    # --- 3. CALCUL DES CHARGES (Maintenance payée) ---
+    # --- 1. CALCUL DES CHARGES (Uniquement ce qui est PAYÉ) ---
     if not df_m.empty:
         df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
-        # Filtre strict : Uniquement ce qui est réellement payé
+        # On ne prend que les lignes avec Statut "Fait"
         df_charges_reelles = df_m[df_m['Statut'] == "Fait"].copy()
         total_charges = df_charges_reelles['M_Num'].sum()
     else:
         total_charges = 0
         df_charges_reelles = pd.DataFrame()
 
-    # --- 4. CALCUL DES RECETTES (Missions payées) ---
+    # --- 2. CALCUL DES RECETTES (Uniquement ce qui est ENCAISSÉ) ---
+    total_recettes = 0
+    reste_a_encaisser = 0
+    df_recettes_ok = pd.DataFrame()
+    df_recettes_attente = pd.DataFrame()
+
     if not df_p.empty:
         df_p['P_Num'] = pd.to_numeric(df_p['Prix'], errors='coerce').fillna(0.0)
-        # Recettes encaissées (Payé = Oui)
-        df_recettes_ok = df_p[df_p['Payé'] == "Oui"].copy()
-        # Recettes à venir (Payé != Oui)
-        df_recettes_attente = df_p[df_p['Payé'] != "Oui"].copy()
-        
-        total_recettes = df_recettes_ok['P_Num'].sum()
-        reste_a_encaisser = df_recettes_attente['P_Num'].sum()
-    else:
-        total_recettes = 0
-        reste_a_encaisser = 0
-        df_recettes_ok = pd.DataFrame()
+        if 'Payé' in df_p.columns:
+            # Nettoyage pour accepter Oui, oui, OUI
+            df_p['check_p'] = df_p['Payé'].astype(str).str.strip().str.lower()
+            
+            df_recettes_ok = df_p[df_p['check_p'] == "oui"].copy()
+            df_recettes_attente = df_p[(df_p['check_p'] != "oui") & (df_p['P_Num'] > 0)].copy()
+            
+            total_recettes = df_recettes_ok['P_Num'].sum()
+            reste_a_encaisser = df_recettes_attente['P_Num'].sum()
 
-    # --- 5. VISUEL : TRÉSORERIE RÉELLE ---
-    st.subheader("💰 Trésorerie (Réel Encaissé/Décaissement)")
+    # --- 3. VISUEL TRÉSORERIE ---
+    st.subheader("💰 Trésorerie Réelle")
     if total_charges > 0 or total_recettes > 0:
         fig_treso = px.pie(
             names=['Charges', 'Recettes'], 
             values=[total_charges, total_recettes],
-            color_discrete_sequence=['#ef553b', '#00cc96'], # Rouge / Vert
+            color_discrete_map={'Charges': '#ef553b', 'Recettes': '#00cc96'},
             hole=0.4
         )
-        fig_treso.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=300)
+        fig_treso.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250)
         st.plotly_chart(fig_treso, use_container_width=True)
         
-        # AFFICHAGE DU SOLDE (Trésorerie Nette)
+        # Affichage du Solde
         solde = total_recettes - total_charges
-        couleur_solde = "#28a745" if solde >= 0 else "#dc3545"
+        txt_col = "#28a745" if solde >= 0 else "#dc3545"
         st.markdown(f"""
-            <div style="text-align: center; border: 2px solid #ddd; padding: 15px; border-radius: 10px; background-color: #f8f9fa;">
-                <p style="margin:0; font-size: 1em; color: #666;">SOLDE RÉEL ACTUEL</p>
-                <h1 style="margin:0; color: {couleur_solde}; font-size: 2em;">{solde:.2f} €</h1>
+            <div style="text-align: center; border: 2px solid #ddd; padding: 10px; border-radius: 10px;">
+                <p style="margin:0; font-size: 0.9em; color: #666;">SOLDE RÉEL (Recettes - Charges)</p>
+                <h2 style="margin:0; color: {txt_col};">{solde:.2f} €</h2>
             </div>
         """, unsafe_allow_html=True)
-    
+
     st.divider()
 
-    # --- 6. NATURE DES FRAIS (Incluant Sécurité) ---
-    st.subheader("🛠️ Répartition des Charges")
+    # --- 4. NATURE DES FRAIS (Vérification Sécurité) ---
+    st.subheader("🛡️ Détail des Charges")
     if not df_charges_reelles.empty:
-        # Plotly va grouper automatiquement par 'Type'
+        # Camembert par type (S'assure que Sécurité, Port, Assurances apparaissent)
         fig_nature = px.pie(df_charges_reelles, names='Type', values='M_Num')
-        fig_nature.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=300)
+        fig_nature.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250)
         st.plotly_chart(fig_nature, use_container_width=True)
+        
+        # Tableau sans index
+        st.dataframe(df_charges_reelles[['Date', 'Objet', 'M_Num', 'Type']], use_container_width=True, hide_index=True)
     else:
         st.info("Aucune charge payée.")
 
     st.divider()
 
-    # --- 7. DÉTAILS SANS INDEX (iPhone 16 Friendly) ---
-    
-    # RECETTES
-    st.subheader("📥 Détail Recettes (Encaissées)")
+    # --- 5. RECETTES & ALERTES ---
+    st.subheader("📥 Recettes Encaissées")
     if not df_recettes_ok.empty:
         st.dataframe(df_recettes_ok[['Date', 'Client', 'Prix']], use_container_width=True, hide_index=True)
     else:
-        st.write("Aucune mission encaissée.")
+        st.write("Aucun encaissement validé.")
 
-    # RESTE À ENCAISSER (Trésorerie à venir)
     if reste_a_encaisser > 0:
         st.error(f"🚨 **RESTE À PERCEVOIR : {reste_a_encaisser:.2f} €**")
-        with st.expander("Voir le détail des impayés"):
+        with st.expander("Voir les factures en attente"):
             st.dataframe(df_recettes_attente[['Date', 'Client', 'Prix']], use_container_width=True, hide_index=True)
-
-    st.write("---")
-
-    # CHARGES
-    st.subheader("📤 Détail Charges (Payées)")
-    if not df_charges_reelles.empty:
-        # On affiche les colonnes utiles
-        st.dataframe(df_charges_reelles[['Date', 'Objet', 'M_Num', 'Type']], use_container_width=True, hide_index=True)
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (OPTI IPHONE & AUTO-CLOSE) ---
