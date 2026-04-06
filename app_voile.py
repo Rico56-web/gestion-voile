@@ -165,9 +165,9 @@ if not df_c.empty and 'DateNav' in df_c.columns:
 # =================================================================
 if st.session_state.page == "CONTACTS":
     if st.button("📦 ARCHIVES", key="btn_arch_cont"):
-    st.session_state.last_page = "CONTACTS" # On mémorise qu'on vient des contacts
-    st.session_state.page = "ARCHIVES"
-    st.rerun()
+        st.session_state.last_page = "CONTACTS" # On mémorise qu'on vient des contacts
+        st.session_state.page = "ARCHIVES"
+        st.rerun()
     # --- NAVIGATION HAUT (CONTACTS) ---
     c_nav1, c_nav2 = st.columns([1, 1])
     with c_nav1:
