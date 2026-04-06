@@ -546,7 +546,7 @@ elif st.session_state.page == "STATS":
     fig_w = go.Figure(go.Waterfall(x=["Encaissé", "Frais", "Net"], y=[df_tab['Reçu'].sum(), -df_tab['Frais'].sum(), 0], measure=["relative", "relative", "total"]))
     st.plotly_chart(fig_w, use_container_width=True)
 
-# # =================================================================
+# =================================================================
 # --- 8. PAGE MAINTENANCE (OPTI IPHONE & AUTO-CLOSE) ---
 # =================================================================
 elif st.session_state.page == "MAINT":
@@ -645,7 +645,7 @@ elif st.session_state.page == "MAINT":
                 df_m = pd.concat([df_m, pd.DataFrame([new_data])], ignore_index=True)
                 sauvegarder_data(df_m, file_path_m)
                 st.rerun()
-                =================================================================
+# ===============================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
 # =================================================================
 if st.session_state.page == "FACTURES":
