@@ -444,93 +444,97 @@ elif st.session_state.page == "PLANNING":
     </div>
     """, unsafe_allow_html=True)
 # =================================================================
-# --- 9. PAGE STATS (VERSION NETTOYÉE) ---
+# --- 9. PAGE STATS (LIÉE AU PLANNING EXISTANT) ---
 # =================================================================
 elif st.session_state.page == "STATS":
     st.title("📊 Bilan Vesta Skipper")
     import plotly.express as px
 
+    # 1. Récupération des données déjà chargées dans ton app
+    # df_m = Maintenance / df_c = Planning/Missions
     df_m = charger_data('maintenance.json')
-    df_p = charger_data('planning.json')
+    # On utilise df_c qui est déjà chargé en haut de ton script
 
-    # --- 1. CALCUL DES CHARGES (Uniquement ce qui est PAYÉ) ---
+    # --- 2. CALCUL DES CHARGES (Maintenance) ---
+    total_charges = 0
+    df_charges_reelles = pd.DataFrame()
     if not df_m.empty:
         df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
-        # On ne prend que les lignes avec Statut "Fait"
         df_charges_reelles = df_m[df_m['Statut'] == "Fait"].copy()
         total_charges = df_charges_reelles['M_Num'].sum()
-    else:
-        total_charges = 0
-        df_charges_reelles = pd.DataFrame()
 
-    # --- 2. CALCUL DES RECETTES (Uniquement ce qui est ENCAISSÉ) ---
+    # --- 3. CALCUL DES RECETTES (Basé sur ton Planning/Contacts) ---
     total_recettes = 0
     reste_a_encaisser = 0
     df_recettes_ok = pd.DataFrame()
     df_recettes_attente = pd.DataFrame()
 
-    if not df_p.empty:
-        df_p['P_Num'] = pd.to_numeric(df_p['Prix'], errors='coerce').fillna(0.0)
-        if 'Payé' in df_p.columns:
-            # Nettoyage pour accepter Oui, oui, OUI
-            df_p['check_p'] = df_p['Payé'].astype(str).str.strip().str.lower()
-            
-            df_recettes_ok = df_p[df_p['check_p'] == "oui"].copy()
-            df_recettes_attente = df_p[(df_p['check_p'] != "oui") & (df_p['P_Num'] > 0)].copy()
-            
-            total_recettes = df_recettes_ok['P_Num'].sum()
-            reste_a_encaisser = df_recettes_attente['P_Num'].sum()
-
-    # --- 3. VISUEL TRÉSORERIE ---
-    st.subheader("💰 Trésorerie Réelle")
-    if total_charges > 0 or total_recettes > 0:
-        fig_treso = px.pie(
-            names=['Charges', 'Recettes'], 
-            values=[total_charges, total_recettes],
-            color_discrete_map={'Charges': '#ef553b', 'Recettes': '#00cc96'},
-            hole=0.4
-        )
-        fig_treso.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250)
-        st.plotly_chart(fig_treso, use_container_width=True)
+    if df_c is not None and not df_c.empty:
+        # Nettoyage des prix (gestion des virgules et symboles € comme dans ton planning)
+        df_temp = df_c.copy()
+        df_temp['P_Num'] = df_temp['Prix'].astype(str).str.replace(',','.').str.replace('€','').str.strip()
+        df_temp['P_Num'] = pd.to_numeric(df_temp['P_Num'], errors='coerce').fillna(0.0)
         
-        # Affichage du Solde
+        # Logique de paiement identique à ton planning : "PAY" présent et "NON" absent
+        def is_paye(val):
+            v = str(val).upper()
+            return "PAY" in v and "NON" not in v
+
+        df_temp['is_ok'] = df_temp['Paiement'].apply(is_paye)
+        
+        # Séparation
+        df_recettes_ok = df_temp[df_temp['is_ok'] == True].copy()
+        df_recettes_attente = df_temp[(df_temp['is_ok'] == False) & (df_temp['P_Num'] > 0)].copy()
+        
+        total_recettes = df_recettes_ok['P_Num'].sum()
+        reste_a_encaisser = df_recettes_attente['P_Num'].sum()
+
+    # --- 4. VISUEL TRÉSORERIE ---
+    st.subheader("💰 Trésorerie Réelle")
+    col_pie, col_solde = st.columns([1, 1])
+    
+    with col_pie:
+        if total_charges > 0 or total_recettes > 0:
+            fig_treso = px.pie(
+                names=['Charges', 'Recettes'], 
+                values=[total_charges, total_recettes],
+                color_discrete_map={'Charges': '#ef553b', 'Recettes': '#00cc96'},
+                hole=0.4
+            )
+            fig_treso.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=200, showlegend=False)
+            st.plotly_chart(fig_treso, use_container_width=True)
+    
+    with col_solde:
         solde = total_recettes - total_charges
         txt_col = "#28a745" if solde >= 0 else "#dc3545"
         st.markdown(f"""
-            <div style="text-align: center; border: 2px solid #ddd; padding: 10px; border-radius: 10px;">
-                <p style="margin:0; font-size: 0.9em; color: #666;">SOLDE RÉEL (Recettes - Charges)</p>
-                <h2 style="margin:0; color: {txt_col};">{solde:.2f} €</h2>
+            <div style="text-align: center; border: 1px solid #ddd; padding: 10px; border-radius: 10px; background:#f9f9f9; margin-top:20px;">
+                <small>SOLDE NET</small><br>
+                <b style="color: {txt_col}; font-size: 1.3rem;">{solde:,.0f} €</b>
             </div>
         """, unsafe_allow_html=True)
 
     st.divider()
 
-    # --- 4. NATURE DES FRAIS (Vérification Sécurité) ---
-    st.subheader("🛡️ Détail des Charges")
-    if not df_charges_reelles.empty:
-        # Camembert par type (S'assure que Sécurité, Port, Assurances apparaissent)
-        fig_nature = px.pie(df_charges_reelles, names='Type', values='M_Num')
-        fig_nature.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250)
-        st.plotly_chart(fig_nature, use_container_width=True)
-        
-        # Tableau sans index
-        st.dataframe(df_charges_reelles[['Date', 'Objet', 'M_Num', 'Type']], use_container_width=True, hide_index=True)
-    else:
-        st.info("Aucune charge payée.")
-
-    st.divider()
-
-    # --- 5. RECETTES & ALERTES ---
-    st.subheader("📥 Recettes Encaissées")
+    # --- 5. DÉTAIL DES RECETTES (Uniquement Payées) ---
+    st.subheader("📥 Recettes (Encaissées)")
     if not df_recettes_ok.empty:
-        st.dataframe(df_recettes_ok[['Date', 'Client', 'Prix']], use_container_width=True, hide_index=True)
+        # On affiche DateNav, Nom (Client) et Prix
+        st.dataframe(df_recettes_ok[['DateNav', 'Nom', 'Prix']], use_container_width=True, hide_index=True)
     else:
-        st.write("Aucun encaissement validé.")
+        st.info("Aucune recette encaissée détectée.")
 
     if reste_a_encaisser > 0:
-        st.error(f"🚨 **RESTE À PERCEVOIR : {reste_a_encaisser:.2f} €**")
-        with st.expander("Voir les factures en attente"):
-            st.dataframe(df_recettes_attente[['Date', 'Client', 'Prix']], use_container_width=True, hide_index=True)
+        st.warning(f"⏳ **À RECEVOIR : {reste_a_encaisser:,.0f} €**")
+        with st.expander("Détail des attentes"):
+            st.dataframe(df_recettes_attente[['DateNav', 'Nom', 'Prix']], use_container_width=True, hide_index=True)
+
+    st.write("---")
+
+    # --- 6. DÉTAIL DES CHARGES (Uniquement Payées) ---
+    st.subheader("📤 Charges (Payées)")
+    if not df_charges_reelles.empty:
+        st.dataframe(df_charges_reelles[['Date', 'Objet', 'M_Num', 'Type']], use_container_width=True, hide_index=True)
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (OPTI IPHONE & AUTO-CLOSE) ---
