@@ -322,7 +322,7 @@ if st.session_state.page == "CONTACTS":
 # =================================================================
 # --- 6. PAGE PLANNING (CORRECTIF CMN & COULEUR TOTAL) ---
 # =================================================================
-elif st.session_state.page == "PLANNING":
+if st.session_state.page == "PLANNING":
     # 1. Navigation condensée (Spécial iPhone)
     if st.button("📦 ALLER AUX ARCHIVES", key="k_arch_p", use_container_width=True, type="primary"):
         st.session_state.last_page = "PLANNING"
@@ -481,7 +481,7 @@ elif st.session_state.page == "PLANNING":
 # =================================================================
 # --- 9. PAGE STATS (REEL/PREVI + SYNTHESE MENSUELLE) ---
 # =================================================================
-elif st.session_state.page == "STATS":
+if st.session_state.page == "STATS":
     import plotly.express as px
     import pandas as pd
 
@@ -604,7 +604,7 @@ elif st.session_state.page == "STATS":
 # =================================================================
 # --- 8. PAGE MAINTENANCE (OPTI IPHONE & AUTO-CLOSE) ---
 # =================================================================
-elif st.session_state.page == "MAINTENANCE":
+if st.session_state.page == "MAINTENANCE":
     if st.button("📦 ALLER AUX ARCHIVES", key="k_arch_m", use_container_width=True, type="primary"):
         st.session_state.last_page = "MAINTENANCE"
         st.session_state.page = "ARCHIVES"
@@ -811,7 +811,7 @@ Eric (vesta)"""
 # =================================================================
 # --- 10. PAGE ARCHIVES (NETTOYAGE & EXPORT) ---
 # =================================================================
-elif st.session_state.page == "ARCHIVES":
+if st.session_state.page == "ARCHIVES":
     import pandas as pd
     import io
 
