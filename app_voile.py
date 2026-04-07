@@ -602,26 +602,25 @@ if st.session_state.page == "STATS":
             <b style="color:{txt_c}; font-size:1.6rem;">{solde:,.0f} €</b></div>""", unsafe_allow_html=True)
 
     st.divider()
-
+    
     # --- 4. ANALYSE NAVIGATION ---
     st.subheader("⚓ Analyse Navigation")
-    n1, n2, n3 = st.columns(3)
+    n1, n2, n3, n4 = st.columns(4) # Passage à 4 colonnes
+    
     n1.metric("⚙️ Heures Moteur", f"{total_h_moteur:.1f} h")
     n2.metric("📏 Milles parcourus", f"{total_milles:.0f} mn")
+    
+    # Ratio d'autonomie/voile
     ratio = round(total_milles / total_h_moteur, 1) if total_h_moteur > 0 else total_milles
     n3.metric("⛵ Ratio Voile", f"{ratio} mn/h mtr")
 
-    # --- INDICATEURS EXPLOITATION (Bien indentés) ---
-    st.markdown("##### 💡 Indicateurs d'Exploitation")
-    i1, i2 = st.columns(2)
-    cout_mille = round(total_charges / total_milles, 2) if total_milles > 0 else 0
-    i1.metric("💸 Coût au Mille", f"{cout_mille} €/mn")
+    # CALCUL DE LA CONSOMMATION MOYENNE
+    # On récupère le total des litres saisis dans le logbook
+    total_litres = pd.to_numeric(df_log_yr.get('Litre Gazoil', 0), errors='coerce').sum()
+    conso_moy = round(total_litres / total_h_moteur, 2) if total_h_moteur > 0 else 0
     
-    ratio_moteur = round((total_h_moteur * 5) / total_milles * 100, 1) if total_milles > 0 else 0
-    i2.metric("📉 Utilisation Moteur", f"{ratio_moteur} %")
-    st.caption("Estimation du temps passé au moteur par rapport à la distance totale.")
+    n4.metric("⛽ Conso Moyenne", f"{conso_moy} L/h")
 
-    st.divider()
 
     # --- 5. SYNTHÈSE MENSUELLE ---
     st.subheader("📅 Synthèse Mensuelle")
