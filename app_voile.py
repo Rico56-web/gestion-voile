@@ -636,32 +636,54 @@ if st.session_state.page == "MAINT":
         df_view = df_view.sort_values('dt_t', ascending=False)
     else:
         df_view = pd.DataFrame()
-# --- 3. METRICS CONDENSÉES (ORDRE : PORT, ASSUR, SÉCU, MAINT -> TOTAL EN BAS) ---
+    # --- 3. METRICS EN CARTES (PORT, ASSUR, SÉCU, MAINT -> TOTAL) ---
     if not df_view.empty:
         def g_s(df, c): return df[df['Type'] == c]['M_Num'].sum()
+        total_gen = df_view['M_Num'].sum()
+
+        # Fonction pour créer une petite carte stylisée
+        def metric_card(label, value, color):
+            st.markdown(f"""
+                <div style="
+                    background-color: {color}; 
+                    padding: 10px; 
+                    border-radius: 10px; 
+                    text-align: center; 
+                    border: 1px solid rgba(0,0,0,0.1);
+                    margin-bottom: 10px;
+                    box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+                ">
+                    <div style="font-size: 0.7rem; font-weight: bold; color: #555; text-transform: uppercase;">{label}</div>
+                    <div style="font-size: 1.1rem; font-weight: bold; color: #000;">{value:,.0f}€</div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        # Affichage en colonnes
+        col1, col2 = st.columns(2)
+        with col1:
+            metric_card("⚓ Port", g_s(df_view, 'Port'), "#e3f2fd")      # Bleu très clair
+            metric_card("🛟 Sécurité", g_s(df_view, 'Sécurité'), "#fff3e0") # Orange très clair
         
-        # Style pour réduire la taille du texte des metrics
-        st.markdown("""
-            <style>
-            [data-testid="stMetricValue"] { font-size: 1.1rem !important; }
-            [data-testid="stMetricLabel"] { font-size: 0.8rem !important; }
-            </style>
+        with col2:
+            metric_card("🛡️ Assur", g_s(df_view, 'Assurances'), "#f3e5f5") # Violet très clair
+            metric_card("🛠️ Maint", g_s(df_view, 'Maintenance, matériels'), "#e8f5e9") # Vert très clair
+
+        # Ligne du TOTAL en bas (plus large et plus forte)
+        st.markdown(f"""
+            <div style="
+                background-color: #01579b; 
+                padding: 12px; 
+                border-radius: 12px; 
+                text-align: center; 
+                margin-top: 5px;
+                box-shadow: 4px 4px 10px rgba(1, 87, 155, 0.2);
+            ">
+                <div style="font-size: 0.8rem; font-weight: bold; color: white; text-transform: uppercase; opacity: 0.9;">💰 TOTAL GÉNÉRAL</div>
+                <div style="font-size: 1.4rem; font-weight: bold; color: white;">{total_gen:,.0f}€</div>
+            </div>
         """, unsafe_allow_html=True)
-
-        # Ligne 1 : Port et Assurances
-        r1_1, r1_2 = st.columns(2)
-        r1_1.metric("⚓ Port", f"{g_s(df_view, 'Port'):.0f}€")
-        r1_2.metric("🛡️ Assur", f"{g_s(df_view, 'Assurances'):.0f}€")
         
-        # Ligne 2 : Sécurité et Maintenance
-        r2_1, r2_2 = st.columns(2)
-        r2_1.metric("🛟 Sécu", f"{g_s(df_view, 'Sécurité'):.0f}€")
-        r2_2.metric("🛠️ Maint", f"{g_s(df_view, 'Maintenance, matériels'):.0f}€")
-
-        # Ligne 3 : TOTAL (Mis en avant en bas)
-        st.write('<div style="margin-top:-10px"></div>', unsafe_allow_html=True)
-        c_tot = st.columns(1)[0]
-        c_tot.metric("💰 TOTAL", f"{df_view['M_Num'].sum():.0f}€")
+        st.write('<div style="margin-bottom:20px"></div>', unsafe_allow_html=True)
 
     # --- 4. LISTE ULTRA-COMPACTE (ENCADRÉ BLEU CLAIR) ---
     if not df_view.empty:
