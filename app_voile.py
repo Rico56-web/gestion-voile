@@ -3,11 +3,31 @@ import requests, base64, json, time, calendar
 import streamlit as st
 import pandas as pd
 import os
+import json
 import html
 import streamlit.components.v1 as components
 from datetime import datetime, date
 import plotly.express as px
 
+# --- BLOC DE SECOURS (A mettre ici) ---
+def reparer_df_log(df):
+    if df is None or df.empty:
+        # Si le fichier est vide, on crée un DataFrame avec les bonnes colonnes
+        return pd.DataFrame(columns=["Date", "TotalMot", "TotalMil", "Observations", "PortDep", "PortArr"])
+    
+    # Force la conversion des colonnes en nombres pour éviter les erreurs de calcul
+    cols_num = ['TotalMot', 'TotalMil', 'MotDep', 'MotArr', 'MilDep', 'MilArr']
+    for col in cols_num:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+    
+    # Force la conversion de la date pour le tri et les stats
+    if 'Date' in df.columns:
+        df['dt_fix'] = pd.to_datetime(df['Date'], dayfirst=True, errors='coerce')
+    
+    return df
+
+# ... vos autres fonctions (charger_data, sauvegarder_data) ...
 # --- FONCTIONS DE SÉCURITÉ ---
 def clean_text(text):
     """Nettoie le texte pour éviter de casser le JSON (supprime retours à la ligne et guillemets)"""
@@ -929,94 +949,130 @@ if st.session_state.page == "ARCHIVES":
         st.dataframe(charger_data('archives_maintenance.json'), use_container_width=True, hide_index=True)
     with t2:
         st.dataframe(charger_data('archives_planning.json'), use_container_width=True, hide_index=True)
-
 # =================================================================
 # --- 10. PAGE LOG (LIVRE DE BORD) ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 LIVRE DE BORD")
     
-    file_path_log = 'logbook.json'
-    df_log = charger_data(file_path_log)
+    # Bouton de navigation rapide
+    if st.button("🏠 RETOUR ACCUEIL", use_container_width=True):
+        st.session_state.page = "HOME"
+        st.rerun()
 
-    # --- 1. BOUTON NOUVELLE SORTIE ---
+    file_path_log = 'logbook.json'
+    # Chargement et réparation immédiate
+    raw_data = charger_data(file_path_log)
+    df_log = reparer_df_log(raw_data)
+
+    # --- 1. FORMULAIRE DE SAISIE ---
     with st.expander("🆕 ENREGISTRER UNE NAVIGATION", expanded=False):
-        with st.form("form_log"):
+        with st.form("form_log_new"):
             c1, c2 = st.columns(2)
             f_date = c1.date_input("Date", datetime.now())
-            f_meteo = c2.text_input("🌦️ Météo")
+            f_meteo = c2.text_input("🌦️ Météo", placeholder="ex: Calme, Vent NE 15nds")
             
             st.markdown("---")
-            c3, c4, c5 = st.columns([1, 1, 1.2])
-            f_p_dep = c3.text_input("⚓ Port Départ")
-            f_m_dep = c5.number_input("⚙️ Moteur Dép.", min_value=0.0, step=0.1)
-            f_mi_dep = c5.number_input("📏 Milles Dép.", min_value=0.0)
+            st.caption("⚓ DÉPART")
+            c3, c4, c5 = st.columns([1, 1, 1])
+            f_p_dep = c3.text_input("Port de départ")
+            f_m_dep = c4.number_input("H. Moteur Départ", min_value=0.0, step=0.1, format="%.1f")
+            f_mi_dep = c5.number_input("Milles Départ", min_value=0.0, step=0.1)
 
-            st.markdown("---")
-            c6, c7, c8 = st.columns([1, 1, 1.2])
-            f_p_arr = c6.text_input("🏁 Port Arrivée")
-            f_m_arr = c8.number_input("⚙️ Moteur Arr.", min_value=0.0, step=0.1)
-            f_mi_arr = c8.number_input("📏 Milles Arr.", min_value=0.0)
+            st.caption("🏁 ARRIVÉE")
+            c6, c7, c8 = st.columns([1, 1, 1])
+            f_p_arr = c6.text_input("Port d'arrivée")
+            f_m_arr = c7.number_input("H. Moteur Arrivée", min_value=0.0, step=0.1, format="%.1f")
+            f_mi_arr = c8.number_input("Milles Arrivée", min_value=0.0, step=0.1)
 
-            f_obs = st.text_area("📝 Observations")
+            f_obs = st.text_area("📝 Observations / Équipage")
             
-            if st.form_submit_button("💾 ENREGISTRER LA NAV", use_container_width=True):
-                # CALCULS SELON TA STRUCTURE JSON
+            if st.form_submit_button("💾 ENREGISTRER LA NAVIGATION", use_container_width=True):
+                # Calcul des deltas
                 t_moteur = round(f_m_arr - f_m_dep, 1)
                 t_milles = round(f_mi_arr - f_mi_dep, 1)
                 
-                new_nav = {
-                    "Date": f_date.strftime("%d/%m/%Y"),
-                    "Meteo": f_meteo,
-                    "PortDep": f_p_dep,
-                    "PortArr": f_p_arr,
-                    "MotDep": f_m_dep,
-                    "MotArr": f_m_arr,
-                    "MilDep": f_mi_dep,
-                    "MilArr": f_mi_arr,
-                    "TotalMot": t_moteur,
-                    "TotalMil": t_milles,
-                    "Observations": f_obs
-                }
-                df_log = pd.concat([df_log, pd.DataFrame([new_nav])], ignore_index=True)
-                sauvegarder_data(df_log, file_path_log)
-                st.success("Navigation enregistrée !")
-                st.rerun()
+                if t_moteur < 0 or t_milles < 0:
+                    st.error("⚠️ Erreur : Les compteurs d'arrivée sont inférieurs au départ.")
+                else:
+                    new_nav = {
+                        "Date": f_date.strftime("%d/%m/%Y"),
+                        "Meteo": f_meteo,
+                        "PortDep": f_p_dep.upper(),
+                        "PortArr": f_p_arr.upper(),
+                        "MotDep": f_m_dep,
+                        "MotArr": f_m_arr,
+                        "MilDep": f_mi_dep,
+                        "MilArr": f_mi_arr,
+                        "TotalMot": t_moteur,
+                        "TotalMil": t_milles,
+                        "Observations": f_obs
+                    }
+                    df_log = pd.concat([df_log, pd.DataFrame([new_nav])], ignore_index=True)
+                    # Nettoyage avant sauvegarde (on retire la colonne technique dt_fix)
+                    df_to_save = df_log.drop(columns=['dt_fix'], errors='ignore')
+                    sauvegarder_data(df_to_save, file_path_log)
+                    st.success("✅ Navigation enregistrée !")
+                    st.rerun()
 
-    # --- 2. AFFICHAGE DES DERNIÈRES NAVS ---
-    st.subheader("📍 Dernières Sorties")
-    if not df_log.empty:
-        # Tri par date
-        df_log['dt_t'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
-        df_view = df_log.sort_values('dt_t', ascending=False)
+    st.divider()
+
+    # --- 2. AFFICHAGE DES SORTIES (LISTE) ---
+    if df_log.empty:
+        st.info("Aucune navigation enregistrée pour le moment.")
+    else:
+        # Tri par date décroissante
+        df_view = df_log.sort_values('dt_fix', ascending=False)
         
         for idx, row in df_view.iterrows():
+            # Construction de la fiche
             st.markdown(f"""
-                <div style="border: 1px solid #03a9f4; border-left: 8px solid #01579b; 
-                            padding: 10px; border-radius: 10px; margin-bottom: 10px; 
+                <div style="border: 1px solid #03a9f4; border-left: 10px solid #01579b; 
+                            padding: 12px; border-radius: 12px; margin-bottom: 10px; 
                             background-color: #e1f5fe; font-family: sans-serif;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <b style="color:#01579b;">📅 {row['Date']}</b>
-                        <span style="font-size:0.75rem; background:white; padding:2px 6px; border-radius:5px; border:1px solid #03a9f4;">🌦️ {row.get('Meteo','-')}</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: bold; color: #01579b; font-size: 1rem;">📅 {row['Date']}</span>
+                        <span style="font-size: 0.7rem; background: white; padding: 2px 8px; border-radius: 20px; border: 1px solid #03a9f4; color: #01579b;">🌤️ {row.get('Meteo','-')}</span>
                     </div>
-                    <div style="font-size:0.9rem; margin-top:5px; color:#333;">
-                        🚢 <b>{row.get('PortDep','?')}</b> → <b>{row.get('PortArr','?')}</b>
+                    <div style="margin-top: 8px; font-size: 0.95rem; font-weight: bold; color: #333;">
+                        ⚓ {row.get('PortDep','-')} → 🏁 {row.get('PortArr','-')}
                     </div>
-                    <div style="display: flex; justify-content: space-between; margin-top: 8px; background: rgba(255,255,255,0.6); padding: 6px; border-radius: 8px;">
-                        <div style="text-align:center; flex:1;">
-                            <div style="font-size:0.6rem; color:#666; font-weight:bold;">MOTEUR</div>
-                            <div style="font-size:0.9rem; font-weight:bold; color:#01579b;">+{row.get('TotalMot',0)}h</div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 10px; background: rgba(255,255,255,0.7); padding: 8px; border-radius: 8px;">
+                        <div style="text-align: center; flex: 1;">
+                            <div style="font-size: 0.6rem; color: #666; font-weight: bold; text-transform: uppercase;">Moteur</div>
+                            <div style="font-size: 1rem; font-weight: bold; color: #01579b;">+{row.get('TotalMot',0):.1f}h</div>
                         </div>
-                        <div style="text-align:center; flex:1; border-left: 1px solid #add8e6;">
-                            <div style="font-size:0.6rem; color:#666; font-weight:bold;">DISTANCE</div>
-                            <div style="font-size:0.9rem; font-weight:bold; color:#01579b;">{row.get('TotalMil',0)} mn</div>
+                        <div style="text-align: center; flex: 1; border-left: 1px solid #add8e6; border-right: 1px solid #add8e6;">
+                            <div style="font-size: 0.6rem; color: #666; font-weight: bold; text-transform: uppercase;">Distance</div>
+                            <div style="font-size: 1rem; font-weight: bold; color: #01579b;">{row.get('TotalMil',0):.0f} mn</div>
+                        </div>
+                        <div style="text-align: center; flex: 1;">
+                            <div style="font-size: 0.6rem; color: #666; font-weight: bold; text-transform: uppercase;">Moyenne</div>
+                            <div style="font-size: 1rem; font-weight: bold; color: #01579b;">
+                                {round(row['TotalMil']/row['TotalMot'], 1) if row.get('TotalMot',0) > 0 else 0} nds
+                            </div>
                         </div>
                     </div>
-                    <div style="font-size:0.75rem; color:#555; font-style:italic; margin-top:6px; padding-top:4px; border-top:1px dashed #b3e5fc;">
+                    <div style="font-size: 0.8rem; color: #444; margin-top: 8px; font-style: italic; padding-top: 5px; border-top: 1px dashed #b3e5fc;">
                         📝 {row.get('Observations','')}
                     </div>
                 </div>
             """, unsafe_allow_html=True)
+            
+            # Bouton de suppression individuelle (optionnel)
+            c1, c2 = st.columns([4,1])
+            if c2.button("🗑️", key=f"del_log_{idx}", help="Supprimer cette entrée"):
+                df_log = df_log.drop(idx)
+                sauvegarder_data(df_log.drop(columns=['dt_fix'], errors='ignore'), file_path_log)
+                st.rerun()
+
+    # --- 3. ZONE DE DANGER ---
+    st.write("<br><br>", unsafe_allow_html=True)
+    with st.expander("⚠️ ZONE DE DANGER"):
+        st.error("Clôturer l'année archivera le journal actuel.")
+        if st.button("🔒 ARCHIVER LE JOURNAL", use_container_width=True):
+            st.info("Fonctionnalité d'archivage à configurer selon vos besoins.")
+
 # --- FIN DU FICHIER ---
 
 
