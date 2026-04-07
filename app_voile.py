@@ -9,25 +9,18 @@ import streamlit.components.v1 as components
 from datetime import datetime, date
 import plotly.express as px
 
-# --- BLOC DE SECOURS (A mettre ici) ---
 def preparer_log_safe(df):
-    cols_attendues = ["Date", "Meteo", "PortDep", "PortArr", "MotDep", "MotArr", "MilDep", "MilArr", "TotalMot", "TotalMil", "Observations"]
+    cols = ["Date", "Meteo", "PortDep", "PortArr", "MotDep", "MotArr", "MilDep", "MilArr", 
+            "TotalMot", "TotalMil", "Observations", "Vent", "Mouillage", "Equipage", 
+            "Plein", "Litre Gazoil", "Cout Gazoil"]
     if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        return pd.DataFrame(columns=cols_attendues)
-    
-    # S'assurer que les colonnes de calcul sont numériques
-    for c in ["TotalMot", "TotalMil", "MotDep", "MotArr", "MilDep", "MilArr"]:
+        return pd.DataFrame(columns=cols)
+    # Nettoyage des numériques
+    for c in ["TotalMot", "TotalMil", "MotDep", "MotArr", "MilDep", "MilArr", "Litre Gazoil", "Cout Gazoil"]:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0.0)
-        else:
-            df[c] = 0.0
-            
-    # Création d'une date technique pour le tri
     if 'Date' in df.columns:
         df['dt_tri'] = pd.to_datetime(df['Date'], dayfirst=True, errors='coerce')
-    else:
-        df['dt_tri'] = pd.Timestamp.now()
-        
     return df
 
 # ... vos autres fonctions (charger_data, sauvegarder_data) ...
@@ -948,127 +941,122 @@ if st.session_state.page == "ARCHIVES":
         st.dataframe(charger_data('archives_maintenance.json'), use_container_width=True, hide_index=True)
     with t2:
         st.dataframe(charger_data('archives_planning.json'), use_container_width=True, hide_index=True)
-
 # =================================================================
-# --- 10. PAGE LOG (LIVRE DE BORD) ---
+# --- 11. PAGE LOG (livre de Bord) ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.markdown('<div style="text-align:center; background-color:#01579b; color:white; padding:10px; border-radius:10px; margin-bottom:20px;"><h1>📖 LIVRE DE BORD</h1></div>', unsafe_allow_html=True)
     
     df_log = preparer_log_safe(charger_data('logbook.json'))
-
-    # --- A. FORMULAIRE (SAISIE OU MODIFICATION) ---
     is_editing = st.session_state.log_edit_idx is not None
-    titre_form = "📝 MODIFIER LA NAVIGATION" if is_editing else "➕ NOUVELLE SORTIE"
-    
-    with st.expander(titre_form, expanded=is_editing):
-        # Valeurs par défaut si modification
-        if is_editing:
-            row_edit = df_log.loc[st.session_state.log_edit_idx]
-            def_date = datetime.strptime(row_edit['Date'], "%d/%m/%Y")
-            def_meteo = row_edit['Meteo']
-            def_p_dep, def_p_arr = row_edit['PortDep'], row_edit['PortArr']
-            def_m_dep, def_m_arr = float(row_edit['MotDep']), float(row_edit['MotArr'])
-            def_mi_dep, def_mi_arr = float(row_edit['MilDep']), float(row_edit['MilArr'])
-            def_obs = row_edit['Observations']
-        else:
-            def_date, def_meteo = datetime.now(), ""
-            def_p_dep, def_p_arr = "", ""
-            def_m_dep, def_m_arr, def_mi_dep, def_mi_arr = 0.0, 0.0, 0.0, 0.0
-            def_obs = ""
 
-        with st.form("form_log_system"):
-            d1, d2 = st.columns(2)
-            f_date = d1.date_input("Date", def_date)
-            f_meteo = d2.text_input("🌦️ Météo", value=def_meteo)
+    with st.expander("📝 ENREGISTRER UNE NAVIGATION", expanded=is_editing):
+        # Récupération des valeurs si édition
+        row = df_log.loc[st.session_state.log_edit_idx] if is_editing else None
+        
+        with st.form("form_log_complet"):
+            # --- SECTION 1 : GÉNÉRAL ---
+            c1, c2, c3 = st.columns([1, 1, 1])
+            f_date = c1.date_input("Date", datetime.now() if not is_editing else datetime.strptime(row['Date'], "%d/%m/%Y"))
+            f_p_dep = c2.text_input("⚓ Départ", value=row['PortDep'] if is_editing else "")
+            f_p_arr = c3.text_input("🏁 Arrivée", value=row['PortArr'] if is_editing else "")
             
-            st.markdown("---")
-            c1, c2 = st.columns(2)
-            f_p_dep = c1.text_input("⚓ Port Départ", value=def_p_dep)
-            f_p_arr = c2.text_input("🏁 Port Arrivée", value=def_p_arr)
+            # --- SECTION 2 : NAVIGATION & MÉTÉO ---
+            st.markdown("##### 🌊 Conditions & Escales")
+            n1, n2, n3 = st.columns([1, 1, 1])
+            f_mouillage = n1.selectbox("Type d'escale", ["Port", "Ancre", "Bouée"], index=0)
+            f_vent = n2.select_slider("Vent (Beaufort)", options=list(range(11)), value=int(row['Vent']) if is_editing and 'Vent' in row else 2)
+            f_meteo = n3.text_input("🌤️ Météo (Ciel/Mer)", value=row['Meteo'] if is_editing else "")
             
+            # --- SECTION 3 : COMPTEURS ---
+            st.markdown("##### ⚙️ Compteurs")
             m1, m2, m3, m4 = st.columns(4)
-            f_m_dep = m1.number_input("H. Mot. Dép", value=def_m_dep, step=0.1, format="%.1f")
-            f_m_arr = m2.number_input("H. Mot. Arr", value=def_m_arr, step=0.1, format="%.1f")
-            f_mi_dep = m3.number_input("Mi. Dép", value=def_mi_dep, step=1.0)
-            f_mi_arr = m4.number_input("Mi. Arr", value=def_mi_arr, step=1.0)
+            f_m_dep = m1.number_input("H. Moteur Dép", value=float(row['MotDep']) if is_editing else 0.0, step=0.1)
+            f_m_arr = m2.number_input("H. Moteur Arr", value=float(row['MotArr']) if is_editing else 0.0, step=0.1)
+            f_mi_dep = m3.number_input("Milles Dép", value=float(row['MilDep']) if is_editing else 0.0, step=1.0)
+            f_mi_arr = m4.number_input("Milles Arr", value=float(row['MilArr']) if is_editing else 0.0, step=1.0)
             
-            f_obs = st.text_area("📝 Observations", value=def_obs)
+            # --- SECTION 4 : ÉQUIPAGE (6 Pers) ---
+            st.markdown("##### 👥 Équipage")
+            eq = st.columns(3)
+            # On stocke l'équipage sous forme de liste/string
+            e_prev = row['Equipage'].split(', ') if is_editing and 'Equipage' in row and row['Equipage'] else [""]*6
+            e1 = eq[0].text_input("Pers. 1", value=e_prev[0] if len(e_prev)>0 else "", label_visibility="collapsed", placeholder="Skipper")
+            e2 = eq[1].text_input("Pers. 2", value=e_prev[1] if len(e_prev)>1 else "", label_visibility="collapsed", placeholder="Équipier 2")
+            e3 = eq[2].text_input("Pers. 3", value=e_prev[2] if len(e_prev)>2 else "", label_visibility="collapsed", placeholder="Équipier 3")
+            e4 = eq[0].text_input("Pers. 4", value=e_prev[3] if len(e_prev)>3 else "", label_visibility="collapsed", placeholder="Équipier 4")
+            e5 = eq[1].text_input("Pers. 5", value=e_prev[4] if len(e_prev)>4 else "", label_visibility="collapsed", placeholder="Équipier 5")
+            e6 = eq[2].text_input("Pers. 6", value=e_prev[5] if len(e_prev)>5 else "", label_visibility="collapsed", placeholder="Équipier 6")
             
-            col_b1, col_b2 = st.columns(2)
-            submit = col_b1.form_submit_button("💾 ENREGISTRER", use_container_width=True)
-            if is_editing:
-                if col_b2.form_submit_button("❌ ANNULER", use_container_width=True):
-                    st.session_state.log_edit_idx = None
-                    st.rerun()
-
-            if submit:
-                t_mot = round(f_m_arr - f_m_dep, 1)
-                t_mil = round(f_mi_arr - f_mi_dep, 1)
-                
-                new_data = {
-                    "Date": f_date.strftime("%d/%m/%Y"), "Meteo": f_meteo,
-                    "PortDep": f_p_dep.upper(), "PortArr": f_p_arr.upper(),
-                    "MotDep": f_m_dep, "MotArr": f_m_arr,
-                    "MilDep": f_mi_dep, "MilArr": f_mi_arr,
-                    "TotalMot": t_mot, "TotalMil": t_mil, "Observations": f_obs
+            # --- SECTION 5 : CARBURANT ---
+            st.markdown("##### ⛽ Carburant")
+            f_plein = st.checkbox("Plein de Gazoil effectué ?", value=row['Paiement']=="Oui" if is_editing and 'Plein' in row else False)
+            g1, g2 = st.columns(2)
+            f_litres = g1.number_input("Volume (Litres)", min_value=0.0, value=float(row['Litre Gazoil']) if is_editing and 'Litre Gazoil' in row else 0.0) if f_plein else 0.0
+            f_cout = g2.number_input("Coût (€)", min_value=0.0, value=float(row['Cout Gazoil']) if is_editing and 'Cout Gazoil' in row else 0.0) if f_plein else 0.0
+            
+            f_obs = st.text_area("📝 Observations / Travaux du jour", value=row['Observations'] if is_editing else "")
+            
+            btn_col1, btn_col2 = st.columns(2)
+            if btn_col1.form_submit_button("💾 ENREGISTRER", use_container_width=True):
+                equipe_str = ", ".join(filter(None, [e1, e2, e3, e4, e5, e6]))
+                data = {
+                    "Date": f_date.strftime("%d/%m/%Y"), "Meteo": f_meteo, "Vent": f_vent,
+                    "PortDep": f_p_dep.upper(), "PortArr": f_p_arr.upper(), "Mouillage": f_mouillage,
+                    "MotDep": f_m_dep, "MotArr": f_m_arr, "TotalMot": round(f_m_arr - f_m_dep, 1),
+                    "MilDep": f_mi_dep, "MilArr": f_mi_arr, "TotalMil": round(f_mi_arr - f_mi_dep, 1),
+                    "Equipage": equipe_str, "Plein": "Oui" if f_plein else "Non",
+                    "Litre Gazoil": f_litres, "Cout Gazoil": f_cout, "Observations": f_obs
                 }
-                
                 if is_editing:
-                    for k, v in new_data.items(): df_log.at[st.session_state.log_edit_idx, k] = v
+                    for k, v in data.items(): df_log.at[st.session_state.log_edit_idx, k] = v
                     st.session_state.log_edit_idx = None
                 else:
-                    df_log = pd.concat([df_log, pd.DataFrame([new_data])], ignore_index=True)
+                    df_log = pd.concat([df_log, pd.DataFrame([data])], ignore_index=True)
                 
                 sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
-                st.success("✅ Journal mis à jour !")
+                st.success("C'est noté !")
+                st.rerun()
+            
+            if is_editing and btn_col2.form_submit_button("❌ ANNULER"):
+                st.session_state.log_edit_idx = None
                 st.rerun()
 
+    # --- AFFICHAGE (Cartes simplifiées) ---
     st.divider()
-
-    # --- B. AFFICHAGE DES FICHES ---
-    if df_log.empty:
-        st.info("ℹ️ Aucun historique.")
-    else:
+    if not df_log.empty:
         df_visu = df_log.sort_values('dt_tri', ascending=False)
         for idx, r in df_visu.iterrows():
-            # FICHE BLEUE
-            st.markdown(f"""
-                <div style="border: 1px solid #03a9f4; border-left: 10px solid #01579b; 
-                            padding: 12px; border-radius: 12px; margin-bottom: 5px; 
-                            background-color: #e1f5fe;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <b style="color: #01579b;">📅 {r['Date']}</b>
-                        <span style="font-size: 0.7rem; background: white; padding: 2px 8px; border-radius: 20px; border: 1px solid #03a9f4;">{r.get('Meteo','')}</span>
+            with st.container():
+                st.markdown(f"""
+                <div style="border:1px solid #ddd; border-radius:10px; padding:10px; margin-bottom:10px; background:#f9f9f9;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <b>📅 {r['Date']}</b> <span>💨 F{r.get('Vent',0)} | {r.get('Mouillage','Port')}</span>
                     </div>
-                    <div style="margin: 5px 0; font-weight: bold; color:#333;">⚓ {r['PortDep']} → {r['PortArr']}</div>
-                    <div style="display: flex; gap: 15px; background: rgba(255,255,255,0.5); padding: 5px; border-radius: 8px; font-size: 0.9rem;">
-                        <div>⚙️ <b>+{r['TotalMot']:.1f}h</b></div>
-                        <div style="border-left: 1px solid #ccc; padding-left: 10px;">📏 <b>{r['TotalMil']:.0f}mn</b></div>
-                    </div>
+                    <div style="font-size:0.9rem; color:#01579b; font-weight:bold;">⚓ {r['PortDep']} ➔ {r['PortArr']}</div>
+                    <div style="font-size:0.8rem; color:#666;">👥 {r.get('Equipage','-')}</div>
+                    <div style="margin-top:5px; font-size:0.85rem;">⚙️ {r['TotalMot']}h | 📏 {r['TotalMil']}mn {"| ⛽ Plein" if r.get('Plein')=="Oui" else ""}</div>
                 </div>
-            """, unsafe_allow_html=True)
-            
-            # BOUTONS ACTIONS
-            b1, b2, b3 = st.columns([1, 1, 2])
-            if b1.button("✏️", key=f"edit_{idx}", help="Modifier"):
-                st.session_state.log_edit_idx = idx
-                st.rerun()
+                """, unsafe_allow_html=True)
                 
-            # Système de confirmation de suppression
-            if st.session_state.log_confirm_del == idx:
-                if b2.button("✅ OUI", key=f"conf_{idx}", type="primary"):
-                    df_log = df_log.drop(idx)
-                    sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
-                    st.session_state.log_confirm_del = None
+                # Boutons 
+                c_b1, c_b2, c_b3 = st.columns([1, 1, 4])
+                if c_b1.button("✏️", key=f"ed_{idx}"):
+                    st.session_state.log_edit_idx = idx
                     st.rerun()
-                if b3.button("❌ NON", key=f"cancel_{idx}"):
-                    st.session_state.log_confirm_del = None
-                    st.rerun()
-            else:
-                if b2.button("🗑️", key=f"del_{idx}", help="Supprimer"):
-                    st.session_state.log_confirm_del = idx
-                    st.rerun()
+                if st.session_state.log_confirm_del == idx:
+                    if c_b2.button("✅", key=f"ok_{idx}"):
+                        df_log = df_log.drop(idx)
+                        sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
+                        st.session_state.log_confirm_del = None
+                        st.rerun()
+                    if c_b3.button("❌", key=f"no_{idx}"):
+                        st.session_state.log_confirm_del = None
+                        st.rerun()
+                else:
+                    if c_b2.button("🗑️", key=f"del_{idx}"):
+                        st.session_state.log_confirm_del = idx
+                        st.rerun()
 
 # --- FIN DU FICHIER ---
 
