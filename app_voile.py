@@ -651,11 +651,11 @@ if st.session_state.page == "MAINT":
 
     st.write("---")
 
-     # --- 4. LISTE ULTRA-COMPACTE (ENCADRÉE & DENSE) ---
+    # --- 4. LISTE ULTRA-COMPACTE (ENCADRÉ BLEU CLAIR) ---
     if not df_view.empty:
         for idx, row in df_view.iterrows():
             if st.session_state.edit_idx == idx:
-                # --- BLOC ÉDITION (Inchangé) ---
+                # --- BLOC ÉDITION ---
                 with st.container(border=True):
                     st.caption(f"Modification : {row['Objet']}")
                     new_mt = st.number_input("Prix €", value=float(row['M_Num']), key=f"ed_mt_{idx}")
@@ -680,44 +680,45 @@ if st.session_state.page == "MAINT":
                         st.session_state.edit_idx = None
                         st.rerun()
             else:
-                # --- AFFICHAGE FICHE ENCADRÉE ULTRA-COMPACTE ---
+                # --- AFFICHAGE FICHE BLEU CLAIR ---
                 st_b = row['Statut']
                 status_icon = "🟢" if st_b == "Fait" else "⏳"
-                # Couleur du trait selon le statut
-                border_color = "#27ae60" if st_b == "Fait" else "#f39c12"
                 
-                # Container HTML pour l'encadré
+                # Couleurs Thème Bleu
+                bg_color = "#e1f5fe"      # Bleu très clair (fond)
+                border_main = "#03a9f4"    # Bleu azur (contour)
+                border_strong = "#01579b"  # Bleu foncé (trait fort gauche)
+                
                 card_maint = f"""
-                <div style="border: 1px solid #ddd; border-left: 8px solid {border_color}; 
-                            padding: 8px; border-radius: 8px; margin-bottom: 5px; 
-                            background-color: white; font-family: sans-serif;">
+                <div style="border: 1px solid {border_main}; border-left: 8px solid {border_strong}; 
+                            padding: 8px; border-radius: 10px; margin-bottom: 5px; 
+                            background-color: {bg_color}; font-family: sans-serif;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="font-size: 0.85rem; font-weight: bold; color: #333;">
+                        <div style="font-size: 0.85rem; font-weight: bold; color: #01579b;">
                             {status_icon} {row['Date'][0:5]} | {row['Objet'][:18]}
                         </div>
-                        <div style="font-size: 0.95rem; font-weight: bold; color: {border_color};">
+                        <div style="font-size: 0.95rem; font-weight: bold; color: #d32f2f if row['M_Num'] > 0 else #333;">
                             {row['M_Num']:.0f}€
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; margin-top: 2px;">
-                        <div style="font-size: 0.7rem; color: #666; text-transform: uppercase; font-weight: 600;">
+                    <div style="display: flex; justify-content: space-between; margin-top: 2px; border-top: 1px dashed {border_main}; padding-top: 4px;">
+                        <div style="font-size: 0.7rem; color: #0277bd; text-transform: uppercase; font-weight: 600;">
                             📂 {row['Type']}
                         </div>
-                        <div style="font-size: 0.7rem; color: #888; font-style: italic;">
-                            {st_b}
+                        <div style="font-size: 0.7rem; color: #555; font-style: italic;">
+                            Statut: {st_b}
                         </div>
                     </div>
                 </div>
                 """
                 st.markdown(card_maint, unsafe_allow_html=True)
                 
-                # Bouton de modification aligné juste en dessous (très serré)
+                # Bouton de modification (collé sous l'encadré)
                 st.write('<div style="margin-top:-12px"></div>', unsafe_allow_html=True)
                 if st.button(f"✏️ ÉDITER {row['Objet'][:10]}", key=f"edit_{idx}", use_container_width=True):
                     st.session_state.edit_idx = idx
                     st.rerun()
                 
-                # Espace minimal avant la suivante
                 st.write('<div style="margin-bottom:8px"></div>', unsafe_allow_html=True)
 
     # --- 5. AJOUT RAPIDE ---
