@@ -948,110 +948,127 @@ if st.session_state.page == "ARCHIVES":
         st.dataframe(charger_data('archives_maintenance.json'), use_container_width=True, hide_index=True)
     with t2:
         st.dataframe(charger_data('archives_planning.json'), use_container_width=True, hide_index=True)
+
 # =================================================================
 # --- 10. PAGE LOG (LIVRE DE BORD) ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.markdown('<div style="text-align:center; background-color:#01579b; color:white; padding:10px; border-radius:10px; margin-bottom:20px;"><h1>📖 LIVRE DE BORD</h1></div>', unsafe_allow_html=True)
     
-    # Chargement sécurisé
-    try:
-        data_brute = charger_data('logbook.json')
-        df_log = preparer_log_safe(data_brute)
-    except Exception as e:
-        st.error(f"Erreur de lecture du fichier : {e}")
-        df_log = preparer_log_safe(None)
+    df_log = preparer_log_safe(charger_data('logbook.json'))
 
-    # --- A. SAISIE NOUVELLE NAVIGATION ---
-    with st.expander("➕ NOUVELLE SORTIE", expanded=False):
-        with st.form("form_log_2026"):
+    # --- A. FORMULAIRE (SAISIE OU MODIFICATION) ---
+    is_editing = st.session_state.log_edit_idx is not None
+    titre_form = "📝 MODIFIER LA NAVIGATION" if is_editing else "➕ NOUVELLE SORTIE"
+    
+    with st.expander(titre_form, expanded=is_editing):
+        # Valeurs par défaut si modification
+        if is_editing:
+            row_edit = df_log.loc[st.session_state.log_edit_idx]
+            def_date = datetime.strptime(row_edit['Date'], "%d/%m/%Y")
+            def_meteo = row_edit['Meteo']
+            def_p_dep, def_p_arr = row_edit['PortDep'], row_edit['PortArr']
+            def_m_dep, def_m_arr = float(row_edit['MotDep']), float(row_edit['MotArr'])
+            def_mi_dep, def_mi_arr = float(row_edit['MilDep']), float(row_edit['MilArr'])
+            def_obs = row_edit['Observations']
+        else:
+            def_date, def_meteo = datetime.now(), ""
+            def_p_dep, def_p_arr = "", ""
+            def_m_dep, def_m_arr, def_mi_dep, def_mi_arr = 0.0, 0.0, 0.0, 0.0
+            def_obs = ""
+
+        with st.form("form_log_system"):
             d1, d2 = st.columns(2)
-            f_date = d1.date_input("Date", datetime.now())
-            f_meteo = d2.text_input("🌦️ Météo")
+            f_date = d1.date_input("Date", def_date)
+            f_meteo = d2.text_input("🌦️ Météo", value=def_meteo)
             
             st.markdown("---")
             c1, c2 = st.columns(2)
-            f_p_dep = c1.text_input("⚓ Port Départ")
-            f_p_arr = c2.text_input("🏁 Port Arrivée")
+            f_p_dep = c1.text_input("⚓ Port Départ", value=def_p_dep)
+            f_p_arr = c2.text_input("🏁 Port Arrivée", value=def_p_arr)
             
-            st.write("**Compteurs :**")
             m1, m2, m3, m4 = st.columns(4)
-            f_m_dep = m1.number_input("H. Mot. Dép", min_value=0.0, step=0.1, format="%.1f")
-            f_m_arr = m2.number_input("H. Mot. Arr", min_value=0.0, step=0.1, format="%.1f")
-            f_mi_dep = m3.number_input("Mi. Dép", min_value=0.0, step=1.0)
-            f_mi_arr = m4.number_input("Mi. Arr", min_value=0.0, step=1.0)
+            f_m_dep = m1.number_input("H. Mot. Dép", value=def_m_dep, step=0.1, format="%.1f")
+            f_m_arr = m2.number_input("H. Mot. Arr", value=def_m_arr, step=0.1, format="%.1f")
+            f_mi_dep = m3.number_input("Mi. Dép", value=def_mi_dep, step=1.0)
+            f_mi_arr = m4.number_input("Mi. Arr", value=def_mi_arr, step=1.0)
             
-            f_obs = st.text_area("📝 Observations / Équipage")
+            f_obs = st.text_area("📝 Observations", value=def_obs)
             
-            if st.form_submit_button("💾 ENREGISTRER LA NAV", use_container_width=True):
+            col_b1, col_b2 = st.columns(2)
+            submit = col_b1.form_submit_button("💾 ENREGISTRER", use_container_width=True)
+            if is_editing:
+                if col_b2.form_submit_button("❌ ANNULER", use_container_width=True):
+                    st.session_state.log_edit_idx = None
+                    st.rerun()
+
+            if submit:
                 t_mot = round(f_m_arr - f_m_dep, 1)
                 t_mil = round(f_mi_arr - f_mi_dep, 1)
                 
-                new_row = {
-                    "Date": f_date.strftime("%d/%m/%Y"),
-                    "Meteo": f_meteo,
-                    "PortDep": f_p_dep.upper(),
-                    "PortArr": f_p_arr.upper(),
+                new_data = {
+                    "Date": f_date.strftime("%d/%m/%Y"), "Meteo": f_meteo,
+                    "PortDep": f_p_dep.upper(), "PortArr": f_p_arr.upper(),
                     "MotDep": f_m_dep, "MotArr": f_m_arr,
                     "MilDep": f_mi_dep, "MilArr": f_mi_arr,
-                    "TotalMot": t_mot, "TotalMil": t_mil,
-                    "Observations": f_obs
+                    "TotalMot": t_mot, "TotalMil": t_mil, "Observations": f_obs
                 }
-                df_log = pd.concat([df_log, pd.DataFrame([new_row])], ignore_index=True)
+                
+                if is_editing:
+                    for k, v in new_data.items(): df_log.at[st.session_state.log_edit_idx, k] = v
+                    st.session_state.log_edit_idx = None
+                else:
+                    df_log = pd.concat([df_log, pd.DataFrame([new_data])], ignore_index=True)
+                
                 sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
-                st.success("✅ Navigation enregistrée !")
+                st.success("✅ Journal mis à jour !")
                 st.rerun()
 
     st.divider()
 
     # --- B. AFFICHAGE DES FICHES ---
     if df_log.empty:
-        st.info("ℹ️ Aucun historique de navigation.")
+        st.info("ℹ️ Aucun historique.")
     else:
-        # Tri : Du plus récent au plus ancien
         df_visu = df_log.sort_values('dt_tri', ascending=False)
-        
         for idx, r in df_visu.iterrows():
-            # Affichage en fiches bleu clair
+            # FICHE BLEUE
             st.markdown(f"""
                 <div style="border: 1px solid #03a9f4; border-left: 10px solid #01579b; 
                             padding: 12px; border-radius: 12px; margin-bottom: 5px; 
-                            background-color: #e1f5fe; font-family: sans-serif;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: bold; color: #01579b;">📅 {r.get('Date','-')}</span>
-                        <span style="font-size: 0.75rem; background: white; padding: 2px 8px; border-radius: 20px; border: 1px solid #03a9f4;">🌤️ {r.get('Meteo','-')}</span>
+                            background-color: #e1f5fe;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <b style="color: #01579b;">📅 {r['Date']}</b>
+                        <span style="font-size: 0.7rem; background: white; padding: 2px 8px; border-radius: 20px; border: 1px solid #03a9f4;">{r.get('Meteo','')}</span>
                     </div>
-                    <div style="margin: 8px 0; font-size: 0.95rem; font-weight: bold; color:#333;">
-                        ⚓ {r.get('PortDep','-')} → 🏁 {r.get('PortArr','-')}
-                    </div>
-                    <div style="display: flex; justify-content: space-between; background: rgba(255,255,255,0.6); padding: 8px; border-radius: 8px;">
-                        <div style="text-align:center; flex:1;">
-                            <div style="font-size:0.6rem; color:#666; font-weight:bold;">MOTEUR</div>
-                            <div style="font-size:1rem; font-weight:bold; color:#01579b;">+{r.get('TotalMot',0):.1f}h</div>
-                        </div>
-                        <div style="text-align:center; flex:1; border-left:1px solid #add8e6;">
-                            <div style="font-size:0.6rem; color:#666; font-weight:bold;">MILLES</div>
-                            <div style="font-size:1rem; font-weight:bold; color:#01579b;">{r.get('TotalMil',0):.0f}mn</div>
-                        </div>
-                    </div>
-                    <div style="font-size: 0.75rem; color: #444; margin-top: 8px; font-style: italic; border-top: 1px dashed #b3e5fc; padding-top: 5px;">
-                        📝 {r.get('Observations','')}
+                    <div style="margin: 5px 0; font-weight: bold; color:#333;">⚓ {r['PortDep']} → {r['PortArr']}</div>
+                    <div style="display: flex; gap: 15px; background: rgba(255,255,255,0.5); padding: 5px; border-radius: 8px; font-size: 0.9rem;">
+                        <div>⚙️ <b>+{r['TotalMot']:.1f}h</b></div>
+                        <div style="border-left: 1px solid #ccc; padding-left: 10px;">📏 <b>{r['TotalMil']:.0f}mn</b></div>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
             
-            # Bouton de suppression très discret
-            if st.button(f"🗑️ Supprimer {r.get('Date','-')}", key=f"del_{idx}"):
-                df_log = df_log.drop(idx)
-                sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
+            # BOUTONS ACTIONS
+            b1, b2, b3 = st.columns([1, 1, 2])
+            if b1.button("✏️", key=f"edit_{idx}", help="Modifier"):
+                st.session_state.log_edit_idx = idx
                 st.rerun()
-
-    # --- C. ZONE DE DANGER (Clôture) ---
-    st.write("<br><br>", unsafe_allow_html=True)
-    with st.expander("☢️ ZONE DE DANGER"):
-        st.warning("L'archivage clôture la saison.")
-        if st.button("📁 CLÔTURER L'ANNÉE", use_container_width=True):
-            st.info("Le journal a été sauvegardé en archive.")
+                
+            # Système de confirmation de suppression
+            if st.session_state.log_confirm_del == idx:
+                if b2.button("✅ OUI", key=f"conf_{idx}", type="primary"):
+                    df_log = df_log.drop(idx)
+                    sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
+                    st.session_state.log_confirm_del = None
+                    st.rerun()
+                if b3.button("❌ NON", key=f"cancel_{idx}"):
+                    st.session_state.log_confirm_del = None
+                    st.rerun()
+            else:
+                if b2.button("🗑️", key=f"del_{idx}", help="Supprimer"):
+                    st.session_state.log_confirm_del = idx
+                    st.rerun()
 
 # --- FIN DU FICHIER ---
 
