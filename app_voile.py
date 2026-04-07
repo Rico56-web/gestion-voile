@@ -651,7 +651,7 @@ if st.session_state.page == "MAINT":
 
     st.write("---")
 
-    # --- 4. LISTE ULTRA-COMPACTE ---
+      # --- 4. LISTE ULTRA-COMPACTE (OPTIMISÉE HAUTEUR) ---
     if not df_view.empty:
         for idx, row in df_view.iterrows():
             # Si on est en train d'éditer CETTE ligne
@@ -669,7 +669,7 @@ if st.session_state.page == "MAINT":
                         df_m.at[idx, 'Type'] = new_ty
                         df_m.at[idx, 'Statut'] = new_st
                         sauvegarder_data(df_m, file_path_m)
-                        st.session_state.edit_idx = None # Fermeture
+                        st.session_state.edit_idx = None
                         st.rerun()
                     if c_b2.button("❌", key=f"ann_{idx}", use_container_width=True):
                         st.session_state.edit_idx = None
@@ -680,17 +680,29 @@ if st.session_state.page == "MAINT":
                         st.session_state.edit_idx = None
                         st.rerun()
             else:
-                # Affichage simple ligne par ligne pour iPhone
+                # --- AFFICHAGE LIGNE UNIQUE ULTRA-COMPACTE ---
                 status_color = "🟢" if row['Statut'] == "Fait" else "⏳"
-                # On utilise des colonnes pour que tout tienne sur une seule ligne
-                col_txt, col_val, col_btn = st.columns([6, 3, 1.5])
-                col_txt.write(f"{status_color} {row['Date']} {row['Objet'][:15]}")
-                col_val.write(f"**{row['M_Num']:.0f}€**")
-                if col_btn.button("📝", key=f"edit_{idx}"):
+                
+                # On utilise des colonnes très serrées
+                col_txt, col_val, col_btn = st.columns([6.5, 2.5, 1.5])
+                
+                # Texte : Date + Objet (tronqué court pour mobile)
+                short_obj = row['Objet'][:12] + ".." if len(row['Objet']) > 12 else row['Objet']
+                col_txt.markdown(f"<div style='font-size:0.85rem; padding-top:5px;'>{status_color} {row['Date'][0:5]} <b>{short_obj}</b></div>", unsafe_allow_html=True)
+                
+                # Valeur : Prix en gras
+                col_val.markdown(f"<div style='font-size:0.9rem; padding-top:5px; text-align:right;'><b>{row['M_Num']:.0f}€</b></div>", unsafe_allow_html=True)
+                
+                # Bouton : Petit et compact
+                if col_btn.button("📝", key=f"edit_{idx}", use_container_width=True):
                     st.session_state.edit_idx = idx
                     st.rerun()
-                st.write('<div style="margin-top:-15px"></div>', unsafe_allow_html=True) # Réduit l'espace vertical
+                
+                # --- LE HACK POUR SUPPRIMER LE VIDE ---
+                # On remonte la ligne suivante de 35 pixels pour coller les lignes entre elles
+                st.write('<div style="margin-top:-35px;"></div>', unsafe_allow_html=True)
                 st.divider()
+                st.write('<div style="margin-top:-25px;"></div>', unsafe_allow_html=True)
 
     # --- 5. AJOUT RAPIDE ---
     with st.expander("➕ Nouvelle charge"):
