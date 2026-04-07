@@ -605,6 +605,19 @@ if st.session_state.page == "STATS":
     n3.metric("⛵ Ratio Voile", f"{ratio} mn/h mtr")
 
     st.divider()
+    st.divider()
+st.subheader("💡 Indicateurs d'Exploitation")
+i1, i2 = st.columns(2)
+
+# Calcul coût au mille
+cout_mille = round(total_charges / total_milles, 2) if total_milles > 0 else 0
+i1.metric("💸 Coût au Mille", f"{cout_mille} €/mn")
+
+# Calcul intensité moteur
+ratio_moteur = round((total_h_moteur * 5) / total_milles * 100, 1) if total_milles > 0 else 0
+# (5 nds est une vitesse moyenne arbitraire pour l'exemple)
+i2.metric("📉 Utilisation Moteur", f"{ratio_moteur} %")
+st.caption("Estimation du temps passé au moteur par rapport à la distance totale.")
 
     # --- 5. SYNTHÈSE MENSUELLE ---
     st.subheader("📅 Synthèse Mensuelle")
