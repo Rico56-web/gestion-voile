@@ -65,9 +65,18 @@ def archiver_donnees(df_source, date_debut, date_fin, fichier_source, fichier_ar
 # --- 1. CONFIGURATION & STYLE ---
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
- # --- AJOUTER CE BLOC AU TOUT DÉBUT DE TON SCRIPT (HORS DU IF PAGE) ---
+# --- INITIALISATION DES VARIABLES DE SESSION (Haut du script) ---
+# Pour le Planning / Contacts
 if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
 if 'confirm_del_idx' not in st.session_state: st.session_state.confirm_del_idx = None
+
+# Pour le LOGBOOK (Livre de bord)
+if 'log_edit_idx' not in st.session_state: st.session_state.log_edit_idx = None
+if 'log_confirm_del' not in st.session_state: st.session_state.log_confirm_del = None
+
+# Pour la Maintenance
+if 'm_edit_idx' not in st.session_state: st.session_state.m_edit_idx = None
+if 'maint_confirm_del' not in st.session_state: st.session_state.maint_confirm_del = None
  
 # Date du jour en français
 jours_fr = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
