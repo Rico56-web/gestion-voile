@@ -24,6 +24,18 @@ def preparer_log_safe(df):
     return df
 
 # ... vos autres fonctions (charger_data, sauvegarder_data) ...
+def charger_data(file):
+    try:
+        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
+        url = f"https://api.github.com/repos/{repo}/contents/{file}"
+        # L'ajout de params={"v": time.time()} force la mise à jour
+        res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
+        if res.status_code == 200:
+            content = base64.b64decode(res.json()['content']).decode('utf-8')
+            return pd.DataFrame(json.loads(content))
+        return pd.DataFrame()
+    except:
+        return pd.DataFrame()
 # --- FONCTIONS DE SÉCURITÉ ---
 def clean_text(text):
     """Nettoie le texte pour éviter de casser le JSON (supprime retours à la ligne et guillemets)"""
