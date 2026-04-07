@@ -172,11 +172,6 @@ if st.session_state.page == "CONTACTS":
     
     st.title("👤 MES CONTACTS")
     st.divider()
-    # --- NAVIGATION HAUT (CONTACTS) ---
-    c_nav1, c_nav2 = st.columns([1, 1])
-    with c_nav2:
-        st.button("👤 CONTACTS", disabled=True, use_container_width=True)
-    st.divider()
     if 'mode_saisie' not in st.session_state: st.session_state.mode_saisie = False
     if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
     if 'confirm_del_idx' not in st.session_state: st.session_state.confirm_del_idx = None
