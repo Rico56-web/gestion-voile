@@ -926,7 +926,99 @@ if st.session_state.page == "ARCHIVES":
         st.dataframe(charger_data('archives_maintenance.json'), use_container_width=True, hide_index=True)
     with t2:
         st.dataframe(charger_data('archives_planning.json'), use_container_width=True, hide_index=True)
+# =================================================================
+# --- 10. PAGE LOG (LIVRE DE BORD) ---
+# =================================================================
+if st.session_state.page == "LOG":
+    st.title("📖 LIVRE DE BORD")
+    
+    file_path_log = 'logbook.json'
+    df_log = charger_data(file_path_log)
 
+    # --- 1. BOUTON NOUVELLE SORTIE ---
+    with st.expander("🆕 ENREGISTRER UNE NAVIGATION", expanded=False):
+        with st.form("form_log"):
+            c1, c2 = st.columns(2)
+            f_date = c1.date_input("Date", datetime.now())
+            f_meteo = c2.text_input("🌦️ Météo")
+            
+            st.markdown("---")
+            c3, c4, c5 = st.columns([1, 1, 1])
+            f_p_dep = c3.text_input("⚓ Port Départ")
+            f_h_dep = c4.text_input("🕒 Heure Départ", value="09:00")
+            f_m_dep = c5.number_input("⚙️ Moteur Dép.", min_value=0.0, step=0.1)
+            f_mi_dep = c5.number_input("📏 Milles Dép.", min_value=0)
+
+            st.markdown("---")
+            c6, c7, c8 = st.columns([1, 1, 1])
+            f_p_arr = c6.text_input("🏁 Port Arrivée")
+            f_h_arr = c7.text_input("🕕 Heure Arrivée", value="18:00")
+            f_m_arr = c8.number_input("⚙️ Moteur Arr.", min_value=0.0, step=0.1)
+            f_mi_arr = c8.number_input("📏 Milles Arr.", min_value=0)
+
+            f_notes = st.text_area("📝 Notes de navigation")
+            
+            if st.form_submit_button("💾 ENREGISTRER LA NAV", use_container_width=True):
+                # Calculs automatiques
+                h_moteur_faites = round(f_m_arr - f_m_dep, 1)
+                milles_parcourus = f_mi_arr - f_mi_dep
+                
+                new_nav = {
+                    "Date": f_date.strftime("%d/%m/%Y"),
+                    "Annee": f_date.year,
+                    "Meteo": f_meteo,
+                    "PortDep": f_p_dep, "HeureDep": f_h_dep, "MotDep": f_m_dep, "MilDep": f_mi_dep,
+                    "PortArr": f_p_arr, "HeureArr": f_h_arr, "MotArr": f_m_arr, "MilArr": f_mi_arr,
+                    "H_Moteur": h_moteur_faites,
+                    "Milles": milles_parcourus,
+                    "Notes": f_notes
+                }
+                df_log = pd.concat([df_log, pd.DataFrame([new_nav])], ignore_index=True)
+                sauvegarder_data(df_log, file_path_log)
+                st.success("Navigation enregistrée !")
+                st.rerun()
+
+    # --- 2. AFFICHAGE DES DERNIÈRES NAVS (Cartes compactes bleu clair) ---
+    st.subheader("📍 Dernières Sorties")
+    if not df_log.empty:
+        # Tri par date (nécessite conversion temporaire)
+        df_log['dt_temp'] = pd.to_datetime(df_log['Date'], dayfirst=True)
+        df_log = df_log.sort_values('dt_temp', ascending=False)
+        
+        for idx, row in df_log.iterrows():
+            st.markdown(f"""
+                <div style="border: 1px solid #03a9f4; border-left: 8px solid #01579b; 
+                            padding: 10px; border-radius: 10px; margin-bottom: 10px; 
+                            background-color: #e1f5fe; font-family: sans-serif;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <b style="color:#01579b;">📅 {row['Date']}</b>
+                        <span style="font-size:0.8rem; background:#fff; padding:2px 5px; border-radius:5px;">🌤️ {row['Meteo']}</span>
+                    </div>
+                    <div style="font-size:0.9rem; margin-top:5px;">
+                        🚢 <b>{row['PortDep']}</b> ({row['HeureDep']}) → <b>{row['PortArr']}</b> ({row['HeureArr']})
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 8px; background: rgba(255,255,255,0.5); padding: 5px; border-radius: 5px;">
+                        <div style="text-align:center; flex:1;">
+                            <div style="font-size:0.6rem; color:#666;">MOTEUR</div>
+                            <div style="font-size:0.85rem; font-weight:bold;">+{row['H_Moteur']}h</div>
+                        </div>
+                        <div style="text-align:center; flex:1; border-left: 1px solid #add8e6;">
+                            <div style="font-size:0.6rem; color:#666;">DISTANCE</div>
+                            <div style="font-size:0.85rem; font-weight:bold;">{row['Milles']} mn</div>
+                        </div>
+                    </div>
+                    {f'<div style="font-size:0.75rem; color:#444; font-style:italic; margin-top:5px;">📝 {row["Notes"]}</div>' if row["Notes"] else ""}
+                </div>
+            """, unsafe_allow_html=True)
+
+    # --- 3. ZONE DE DANGER (ARCHIVAGE) ---
+    st.write("---")
+    with st.expander("⚠️ ZONE DE DANGER"):
+        st.warning("L'archivage déplacera toutes les données de l'année vers le fichier historique et videra le log actuel.")
+        year_to_archive = st.selectbox("Année à clôturer", [2025, 2026, 2027])
+        if st.button(f"🔒 CLOTURER L'ANNÉE {year_to_archive}", use_container_width=True):
+            # Logique simple : On pourrait ici copier vers un fichier 'log_archives.json'
+            st.error("Action irréversible. Contactez l'admin pour confirmer.")
 # --- FIN DU FICHIER ---
 
 
