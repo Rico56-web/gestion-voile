@@ -636,7 +636,8 @@ if st.session_state.page == "MAINT":
         df_view = df_view.sort_values('dt_t', ascending=False)
     else:
         df_view = pd.DataFrame()
-    # --- 3. METRICS EN CARTES (PORT, ASSUR, SÉCU, MAINT -> TOTAL) ---
+        
+    # --- 3. METRICS EN CARTES (PLACE DE PORT, ASSURANCES, SÉCURITE, MAINTENANCE -> TOTAL) ---
     if not df_view.empty:
         def g_s(df, c): return df[df['Type'] == c]['M_Num'].sum()
         total_gen = df_view['M_Num'].sum()
