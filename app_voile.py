@@ -349,62 +349,49 @@ if st.session_state.page == "CONTACTS":
             st.write('<div style="margin-top:5px; margin-bottom:10px; border-bottom:1px solid #eee;"></div>', unsafe_allow_html=True)
   
 # =================================================================
-# --- 6. PAGE PLANNING (CORRECTIF CMN & COULEUR TOTAL) ---
+# --- 6. PAGE PLANNING (AVEC BOUTON ARCHIVES VISIBLE) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
-    # 1. Navigation condensée (Spécial iPhone)
-    if st.button("📦 ALLER AUX ARCHIVES", key="k_arch_p", use_container_width=True, type="primary"):
-        st.session_state.last_page = "PLANNING"
-        st.session_state.page = "ARCHIVES"
-        st.rerun()
-    
-    st.title("🗓️ PLANNING 2026")
-    st.divider()
     from datetime import datetime, date, timedelta
     import calendar
 
+    # --- EN-TÊTE & NAVIGATION HAUT ---
+    st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>🗓️ PLANNING 2026</h1></div>', unsafe_allow_html=True)
+    
+    # Bouton Archives mis en évidence
+    col_arch, col_vide = st.columns([1, 1])
+    with col_arch:
+        if st.button("📂 ACCÉDER AUX ARCHIVES", key="k_arch_p", use_container_width=True, type="primary"):
+            st.session_state.last_page = "PLANNING" # Pour le bouton retour des archives
+            st.session_state.page = "ARCHIVES"
+            st.rerun()
+
+    st.divider()
+
+    # --- LOGIQUE CALENDRIER ---
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
 
-    # INITIALISATION SANS CONFLIT
+    # Initialisation session_state
     if 'curr_month_idx' not in st.session_state:
         st.session_state.curr_month_idx = aujourdhui.month - 1
     if 'curr_year' not in st.session_state:
         st.session_state.curr_year = aujourdhui.year
-
-    # CSS
-    st.markdown("""<style>.block-container { padding: 10px 5px !important; } .full-width-cal { width: 98% !important; margin: auto !important; border-collapse: collapse; table-layout: fixed; } .full-width-cal td { width: 14.28%; padding: 0 !important; border: 0.5px solid #eee; }</style>""", unsafe_allow_html=True)
-    st.markdown('<div class="main-header">🗓️ PLANNING VESTA 2026</div>', unsafe_allow_html=True)
-    
-    st.divider() # Sépare la navigation du calendrier
-    # --- NAVIGATION (VERSION SYNCHRONISÉE) ---
     if 'nav_key' not in st.session_state:
         st.session_state.nav_key = 0
 
+    # Sélecteurs de date
     col_m, col_y, col_now = st.columns([1.5, 1, 0.8])
-    
     with col_m:
-        sel_m_nom = st.selectbox(
-            "Mois", 
-            m_noms, 
-            index=st.session_state.curr_month_idx,
-            key=f"month_select_{st.session_state.nav_key}" 
-        )
+        sel_m_nom = st.selectbox("Mois", m_noms, index=st.session_state.curr_month_idx, key=f"m_{st.session_state.nav_key}")
         sel_m = m_noms.index(sel_m_nom) + 1
         st.session_state.curr_month_idx = sel_m - 1
-        
     with col_y:
         annees_dispo = [2026, 2027, 2028]
         idx_y = annees_dispo.index(st.session_state.curr_year) if st.session_state.curr_year in annees_dispo else 0
-        sel_y = st.selectbox(
-            "Année", 
-            annees_dispo, 
-            index=idx_y,
-            key=f"year_select_{st.session_state.nav_key}"
-        )
+        sel_y = st.selectbox("Année", annees_dispo, index=idx_y, key=f"y_{st.session_state.nav_key}")
         st.session_state.curr_year = sel_y
-        
     with col_now:
         if st.button("📍 ICI", use_container_width=True):
             st.session_state.curr_month_idx = aujourdhui.month - 1
@@ -412,7 +399,7 @@ if st.session_state.page == "PLANNING":
             st.session_state.nav_key += 1
             st.rerun()
 
-    # --- CALCULS ---
+    # --- CALCULS OCCUPATION ---
     jours_occ = {}
     total_mois = 0
     missions_list = []
@@ -423,6 +410,7 @@ if st.session_state.page == "PLANNING":
                 d_val = r.get('DateNav', '')
                 if pd.isna(d_val) or str(d_val).strip() == "": continue
                 d_str = str(d_val).strip().split(' ')[0]
+                # Formatage date
                 if '/' in d_str:
                     parts = d_str.split('/')
                     dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
@@ -431,7 +419,7 @@ if st.session_state.page == "PLANNING":
                 else: continue
                 
                 n_j = int(float(safe_val(r.get('Nbre de jours'), 1)))
-                soc_v = str(r.get('Société','')).upper() # Récupération société
+                soc_v = str(r.get('Société','')).upper()
                 
                 for i in range(n_j):
                     date_courante = date_debut + timedelta(days=i)
@@ -440,19 +428,16 @@ if st.session_state.page == "PLANNING":
                         s_val = str(r.get('Statut', '')).lower()
                         is_paye = "PAY" in p_val and "NON" not in p_val
                         
-                        # --- LOGIQUE COULEUR CALENDRIER (CMN PRIORITAIRE) ---
+                        # Couleur CMN Prioritaire
                         color = "transparent"
-                        if "CMN" in soc_v:
-                            color = "#0047AB" # Bleu CMN
-                        elif date_courante < aujourdhui:
-                            color = "#34495e" if is_paye else "#e74c3c"
-                        elif "ok" in s_val:
-                            color = "#27ae60"
-                        elif "attente" in s_val:
-                            color = "#f39c12"
-                            
+                        if "CMN" in soc_v: color = "#0047AB"
+                        elif date_courante < aujourdhui: color = "#34495e" if is_paye else "#e74c3c"
+                        elif "ok" in s_val: color = "#27ae60"
+                        elif "attente" in s_val: color = "#f39c12"
+                        
                         jours_occ[date_courante.day] = {"c": color}
 
+                # Ajout à la liste pour affichage sous calendrier
                 date_fin = date_debut + timedelta(days=n_j-1)
                 if (date_debut.year == sel_y and date_debut.month == sel_m) or (date_fin.year == sel_y and date_fin.month == sel_m):
                     missions_list.append({'data': r, 'idx': idx, 'start': date_debut, 'end': date_fin, 'n_j': n_j})
@@ -461,9 +446,12 @@ if st.session_state.page == "PLANNING":
                         total_mois += float(val_prix) if val_prix else 0
             except: continue
 
-    # --- AFFICHAGE TABLEAU ---
+    # --- RENDU CALENDRIER HTML ---
+    st.markdown("""<style>.full-width-cal { width: 100%; border-collapse: collapse; table-layout: fixed; } .full-width-cal td { border: 0.5px solid #eee; padding: 5px 0; }</style>""", unsafe_allow_html=True)
+    
     h_cal = '<table class="full-width-cal" style="text-align:center; background:white;">'
     h_cal += '<tr style="background:#f1f3f5; font-size:10px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td style="color:#d9534f;">Sa</td><td style="color:#d9534f;">Di</td></tr>'
+    
     cal_mat = calendar.monthcalendar(sel_y, sel_m)
     for sem in cal_mat:
         h_cal += '<tr>'
@@ -482,8 +470,8 @@ if st.session_state.page == "PLANNING":
     h_cal += '</table>'
     st.markdown(h_cal, unsafe_allow_html=True)
 
-    # LISTE DES MISSIONS
-    st.markdown(f"#### 📋 {sel_m_nom} {sel_y}")
+    # --- LISTE DES MISSIONS & TOTAL ---
+    st.markdown(f"#### 📋 Détails {sel_m_nom}")
     if missions_list:
         missions_list.sort(key=lambda x: x['start'])
         for m in missions_list:
@@ -493,16 +481,17 @@ if st.session_state.page == "PLANNING":
             txt_d = f"{m['start'].day:02d}/{m['start'].month:02d}"
             if m['n_j'] > 1: txt_d += f" ➔ {m['end'].day:02d}/{m['end'].month:02d}"
             icon = "💰" if "PAY" in str(r.get('Paiement','')).upper() and "NON" not in str(r.get('Paiement','')).upper() else "⚠️"
-            st.markdown(f"""<div style="display: flex; padding: 10px; border-bottom: 1px solid #eee; background: white; align-items: center;"><div style="background: {c_line}; color: white; border-radius: 5px; padding: 4px; min-width: 85px; text-align: center; font-weight: bold; margin-right: 10px; line-height:1.2;"><span style="font-size: 0.75rem;">{txt_d}</span><br><span style="font-size: 0.5rem;">{"JOURS" if m['n_j'] > 1 else "JOUR"}</span></div><div style="flex-grow: 1;"><b>{icon} {str(r.get('Nom','')).upper()}</b><br><small>{soc} | {r.get('Prix','0')}€ | {m['n_j']}j</small></div></div>""", unsafe_allow_html=True)
-            if st.button(f"🔍 FICHE : {str(r.get('Nom',''))}", key=f"btn_{m['idx']}", use_container_width=True):
+            
+            st.markdown(f"""<div style="display: flex; padding: 10px; border-bottom: 1px solid #eee; background: white; align-items: center;"><div style="background: {c_line}; color: white; border-radius: 5px; padding: 4px; min-width: 85px; text-align: center; font-weight: bold; margin-right: 10px; line-height:1.2;"><span style="font-size: 0.75rem;">{txt_d}</span><br><span style="font-size: 0.5rem;">{"JOURS" if m['n_j'] > 1 else "JOUR"}</span></div><div style="flex-grow: 1;"><b>{icon} {str(r.get('Nom','')).upper()}</b><br><small>{soc} | {r.get('Prix','0')}€</small></div></div>""", unsafe_allow_html=True)
+            if st.button(f"🔍 FICHE : {str(r.get('Nom',''))}", key=f"p_btn_{m['idx']}", use_container_width=True):
                 st.session_state.edit_idx = m['idx']
                 st.session_state.mode_saisie = True
                 st.session_state.page = "CONTACTS"
                 st.rerun()
 
-    # --- NOUVEAU BLOC TOTAL (Couleur différente du bleu) ---
+    # Bloc CA (Couleur Or/Sombre)
     st.markdown(f"""
-    <div style="background:#2c3e50; color:#f1c40f; padding:15px; border-radius:10px; text-align:center; margin-top:10px; border: 2px solid #f1c40f;">
+    <div style="background:#2c3e50; color:#f1c40f; padding:15px; border-radius:10px; text-align:center; margin-top:15px; border: 2px solid #f1c40f;">
         <span style="font-size:0.8rem; color:white; text-transform:uppercase;">Estimation Chiffre d'Affaires</span><br>
         <b style="font-size:1.4rem;">TOTAL : {total_mois:,.0f} €</b>
     </div>
