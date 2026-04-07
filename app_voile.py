@@ -612,11 +612,6 @@ if st.session_state.page == "MAINT":
     
     st.title("🛠️ MAINTENANCE")
     st.divider()
-    # --- NAVIGATION HAUT (MAINTENANCE) ---
-    c_nav1, c_nav2 = st.columns([1, 1])
-    with c_nav2:
-        st.button("🛠️ MAINTENANCE", disabled=True, use_container_width=True)
-    st.divider()
     if 'edit_idx' not in st.session_state:
         st.session_state.edit_idx = None
 
