@@ -545,7 +545,23 @@ if st.session_state.page == "STATS":
             df_recettes_view = df_temp.copy()
             
         total_recettes = df_recettes_view['P_Num'].sum()
+        
+    # --- TRAITEMENT DES DONNÉES LOG (LIVRE DE BORD) ---
+    df_log = charger_data('logbook.json')
+    total_h_moteur = 0
+    total_milles = 0
+    
+    if not df_log.empty:
+        df_log['dt'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+        df_log_yr = df_log[df_log['dt'].dt.year == sel_y_stats]
+        total_h_moteur = df_log_yr['H_Moteur'].sum()
+        total_milles = df_log_yr['Milles'].sum()
 
+    # Affichage dans la synthèse (exemple de nouvelles metrics)
+    st.subheader("⚓ Activité Nautique")
+    c_l1, c_l2 = st.columns(2)
+    c_l1.metric("⚙️ Heures Moteur", f"{total_h_moteur:.1f} h")
+    c_l2.metric("📏 Distance", f"{total_milles} mn")
     # --- 3. AFFICHAGE TRÉSORERIE ---
     label_mode = "PRÉVISIONNEL" if mode_previ else "RÉEL (Encaissé)"
     st.subheader(f"💰 {label_mode} {sel_y_stats}")
