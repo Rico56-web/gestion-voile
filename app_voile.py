@@ -651,11 +651,11 @@ if st.session_state.page == "MAINT":
 
     st.write("---")
 
-      # --- 4. LISTE ULTRA-COMPACTE (OPTIMISÉE HAUTEUR) ---
+     # --- 4. LISTE ULTRA-COMPACTE (ENCADRÉE & DENSE) ---
     if not df_view.empty:
         for idx, row in df_view.iterrows():
-            # Si on est en train d'éditer CETTE ligne
             if st.session_state.edit_idx == idx:
+                # --- BLOC ÉDITION (Inchangé) ---
                 with st.container(border=True):
                     st.caption(f"Modification : {row['Objet']}")
                     new_mt = st.number_input("Prix €", value=float(row['M_Num']), key=f"ed_mt_{idx}")
@@ -680,29 +680,45 @@ if st.session_state.page == "MAINT":
                         st.session_state.edit_idx = None
                         st.rerun()
             else:
-                # --- AFFICHAGE LIGNE UNIQUE ULTRA-COMPACTE ---
-                status_color = "🟢" if row['Statut'] == "Fait" else "⏳"
+                # --- AFFICHAGE FICHE ENCADRÉE ULTRA-COMPACTE ---
+                st_b = row['Statut']
+                status_icon = "🟢" if st_b == "Fait" else "⏳"
+                # Couleur du trait selon le statut
+                border_color = "#27ae60" if st_b == "Fait" else "#f39c12"
                 
-                # On utilise des colonnes très serrées
-                col_txt, col_val, col_btn = st.columns([6.5, 2.5, 1.5])
+                # Container HTML pour l'encadré
+                card_maint = f"""
+                <div style="border: 1px solid #ddd; border-left: 8px solid {border_color}; 
+                            padding: 8px; border-radius: 8px; margin-bottom: 5px; 
+                            background-color: white; font-family: sans-serif;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-size: 0.85rem; font-weight: bold; color: #333;">
+                            {status_icon} {row['Date'][0:5]} | {row['Objet'][:18]}
+                        </div>
+                        <div style="font-size: 0.95rem; font-weight: bold; color: {border_color};">
+                            {row['M_Num']:.0f}€
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+                        <div style="font-size: 0.7rem; color: #666; text-transform: uppercase; font-weight: 600;">
+                            📂 {row['Type']}
+                        </div>
+                        <div style="font-size: 0.7rem; color: #888; font-style: italic;">
+                            {st_b}
+                        </div>
+                    </div>
+                </div>
+                """
+                st.markdown(card_maint, unsafe_allow_html=True)
                 
-                # Texte : Date + Objet (tronqué court pour mobile)
-                short_obj = row['Objet'][:12] + ".." if len(row['Objet']) > 12 else row['Objet']
-                col_txt.markdown(f"<div style='font-size:0.85rem; padding-top:5px;'>{status_color} {row['Date'][0:5]} <b>{short_obj}</b></div>", unsafe_allow_html=True)
-                
-                # Valeur : Prix en gras
-                col_val.markdown(f"<div style='font-size:0.9rem; padding-top:5px; text-align:right;'><b>{row['M_Num']:.0f}€</b></div>", unsafe_allow_html=True)
-                
-                # Bouton : Petit et compact
-                if col_btn.button("📝", key=f"edit_{idx}", use_container_width=True):
+                # Bouton de modification aligné juste en dessous (très serré)
+                st.write('<div style="margin-top:-12px"></div>', unsafe_allow_html=True)
+                if st.button(f"✏️ ÉDITER {row['Objet'][:10]}", key=f"edit_{idx}", use_container_width=True):
                     st.session_state.edit_idx = idx
                     st.rerun()
                 
-                # --- LE HACK POUR SUPPRIMER LE VIDE ---
-                # On remonte la ligne suivante de 35 pixels pour coller les lignes entre elles
-                st.write('<div style="margin-top:-35px;"></div>', unsafe_allow_html=True)
-                st.divider()
-                st.write('<div style="margin-top:-25px;"></div>', unsafe_allow_html=True)
+                # Espace minimal avant la suivante
+                st.write('<div style="margin-bottom:8px"></div>', unsafe_allow_html=True)
 
     # --- 5. AJOUT RAPIDE ---
     with st.expander("➕ Nouvelle charge"):
