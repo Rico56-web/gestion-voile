@@ -10,21 +10,19 @@ from datetime import datetime, date
 import plotly.express as px
 
 # --- BLOC DE SECOURS (A mettre ici) ---
-def reparer_df_log(df):
-    if df is None or df.empty:
-        # Si le fichier est vide, on crée un DataFrame avec les bonnes colonnes
-        return pd.DataFrame(columns=["Date", "TotalMot", "TotalMil", "Observations", "PortDep", "PortArr"])
+def preparer_log(df):
+    # Si le DF est vide ou None, on crée la structure de base
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame(columns=["Date", "Meteo", "PortDep", "PortArr", "MotDep", "MotArr", "MilDep", "MilArr", "TotalMot", "TotalMil", "Observations"])
     
-    # Force la conversion des colonnes en nombres pour éviter les erreurs de calcul
-    cols_num = ['TotalMot', 'TotalMil', 'MotDep', 'MotArr', 'MilDep', 'MilArr']
-    for col in cols_num:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+    # Conversion forcée en numérique pour les calculs
+    for c in ['TotalMot', 'TotalMil', 'MotDep', 'MotArr', 'MilDep', 'MilArr']:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0.0)
     
-    # Force la conversion de la date pour le tri et les stats
+    # Création d'une colonne technique pour le tri par date
     if 'Date' in df.columns:
-        df['dt_fix'] = pd.to_datetime(df['Date'], dayfirst=True, errors='coerce')
-    
+        df['dt_tri'] = pd.to_datetime(df['Date'], dayfirst=True, errors='coerce')
     return df
 
 # ... vos autres fonctions (charger_data, sauvegarder_data) ...
@@ -953,125 +951,103 @@ if st.session_state.page == "ARCHIVES":
 # --- 10. PAGE LOG (LIVRE DE BORD) ---
 # =================================================================
 if st.session_state.page == "LOG":
-    st.title("📖 LIVRE DE BORD")
+    st.markdown(f'<div style="text-align:center; background-color:#01579b; color:white; padding:10px; border-radius:10px; margin-bottom:20px;"><h1>📖 LIVRE DE BORD</h1></div>', unsafe_allow_html=True)
     
-    # Bouton de navigation rapide
-    if st.button("🏠 RETOUR ACCUEIL", use_container_width=True):
-        st.session_state.page = "HOME"
-        st.rerun()
+    # Chargement et sécurisation
+    df_log = preparer_log(charger_data('logbook.json'))
 
-    file_path_log = 'logbook.json'
-    # Chargement et réparation immédiate
-    raw_data = charger_data(file_path_log)
-    df_log = reparer_df_log(raw_data)
-
-    # --- 1. FORMULAIRE DE SAISIE ---
-    with st.expander("🆕 ENREGISTRER UNE NAVIGATION", expanded=False):
-        with st.form("form_log_new"):
-            c1, c2 = st.columns(2)
-            f_date = c1.date_input("Date", datetime.now())
-            f_meteo = c2.text_input("🌦️ Météo", placeholder="ex: Calme, Vent NE 15nds")
+    # --- A. SAISIE NOUVELLE NAV ---
+    with st.expander("➕ ENREGISTRER UNE SORTIE", expanded=False):
+        with st.form("form_nouveau_log"):
+            d1, d2 = st.columns(2)
+            f_date = d1.date_input("Date", datetime.now())
+            f_meteo = d2.text_input("🌦️ Météo")
             
-            st.markdown("---")
-            st.caption("⚓ DÉPART")
-            c3, c4, c5 = st.columns([1, 1, 1])
-            f_p_dep = c3.text_input("Port de départ")
-            f_m_dep = c4.number_input("H. Moteur Départ", min_value=0.0, step=0.1, format="%.1f")
-            f_mi_dep = c5.number_input("Milles Départ", min_value=0.0, step=0.1)
-
-            st.caption("🏁 ARRIVÉE")
-            c6, c7, c8 = st.columns([1, 1, 1])
-            f_p_arr = c6.text_input("Port d'arrivée")
-            f_m_arr = c7.number_input("H. Moteur Arrivée", min_value=0.0, step=0.1, format="%.1f")
-            f_mi_arr = c8.number_input("Milles Arrivée", min_value=0.0, step=0.1)
-
+            st.write("---")
+            c1, c2 = st.columns(2)
+            f_p_dep = c1.text_input("⚓ Port Départ")
+            f_p_arr = c2.text_input("🏁 Port Arrivée")
+            
+            st.write("**Compteurs :**")
+            m1, m2, m3, m4 = st.columns(4)
+            f_m_dep = m1.number_input("Moteur Dép.", min_value=0.0, step=0.1)
+            f_m_arr = m2.number_input("Moteur Arr.", min_value=0.0, step=0.1)
+            f_mi_dep = m3.number_input("Milles Dép.", min_value=0.0, step=0.1)
+            f_mi_arr = m4.number_input("Milles Arr.", min_value=0.0, step=0.1)
+            
             f_obs = st.text_area("📝 Observations / Équipage")
             
-            if st.form_submit_button("💾 ENREGISTRER LA NAVIGATION", use_container_width=True):
-                # Calcul des deltas
-                t_moteur = round(f_m_arr - f_m_dep, 1)
-                t_milles = round(f_mi_arr - f_mi_dep, 1)
+            if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
+                # Calculs
+                t_mot = round(f_m_arr - f_m_dep, 1)
+                t_mil = round(f_mi_arr - f_mi_dep, 1)
                 
-                if t_moteur < 0 or t_milles < 0:
-                    st.error("⚠️ Erreur : Les compteurs d'arrivée sont inférieurs au départ.")
-                else:
-                    new_nav = {
-                        "Date": f_date.strftime("%d/%m/%Y"),
-                        "Meteo": f_meteo,
-                        "PortDep": f_p_dep.upper(),
-                        "PortArr": f_p_arr.upper(),
-                        "MotDep": f_m_dep,
-                        "MotArr": f_m_arr,
-                        "MilDep": f_mi_dep,
-                        "MilArr": f_mi_arr,
-                        "TotalMot": t_moteur,
-                        "TotalMil": t_milles,
-                        "Observations": f_obs
-                    }
-                    df_log = pd.concat([df_log, pd.DataFrame([new_nav])], ignore_index=True)
-                    # Nettoyage avant sauvegarde (on retire la colonne technique dt_fix)
-                    df_to_save = df_log.drop(columns=['dt_fix'], errors='ignore')
-                    sauvegarder_data(df_to_save, file_path_log)
-                    st.success("✅ Navigation enregistrée !")
-                    st.rerun()
+                new_row = {
+                    "Date": f_date.strftime("%d/%m/%Y"),
+                    "Meteo": f_meteo,
+                    "PortDep": f_p_dep.upper(),
+                    "PortArr": f_p_arr.upper(),
+                    "MotDep": f_m_dep, "MotArr": f_m_arr,
+                    "MilDep": f_mi_dep, "MilArr": f_mi_arr,
+                    "TotalMot": t_mot, "TotalMil": t_mil,
+                    "Observations": f_obs
+                }
+                df_log = pd.concat([df_log, pd.DataFrame([new_row])], ignore_index=True)
+                # On sauve sans la colonne de tri
+                sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
+                st.success("✅ Navigation enregistrée !")
+                st.rerun()
 
     st.divider()
 
-    # --- 2. AFFICHAGE DES SORTIES (LISTE) ---
-    if df_log.empty:
-        st.info("Aucune navigation enregistrée pour le moment.")
+    # --- B. AFFICHAGE DES FICHES ---
+    if df_log.empty or len(df_log) == 0:
+        st.info("ℹ️ Aucun historique disponible.")
     else:
-        # Tri par date décroissante
-        df_view = df_log.sort_values('dt_fix', ascending=False)
+        # Tri : les plus récentes en premier
+        df_visu = df_log.sort_values('dt_tri', ascending=False)
         
-        for idx, row in df_view.iterrows():
-            # Construction de la fiche
+        for idx, r in df_visu.iterrows():
+            # Encadré Bleu Clair
             st.markdown(f"""
                 <div style="border: 1px solid #03a9f4; border-left: 10px solid #01579b; 
                             padding: 12px; border-radius: 12px; margin-bottom: 10px; 
                             background-color: #e1f5fe; font-family: sans-serif;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: bold; color: #01579b; font-size: 1rem;">📅 {row['Date']}</span>
-                        <span style="font-size: 0.7rem; background: white; padding: 2px 8px; border-radius: 20px; border: 1px solid #03a9f4; color: #01579b;">🌤️ {row.get('Meteo','-')}</span>
+                        <span style="font-weight: bold; color: #01579b;">📅 {r['Date']}</span>
+                        <span style="font-size: 0.75rem; background: white; padding: 2px 8px; border-radius: 20px; border: 1px solid #03a9f4;">🌤️ {r.get('Meteo','')}</span>
                     </div>
-                    <div style="margin-top: 8px; font-size: 0.95rem; font-weight: bold; color: #333;">
-                        ⚓ {row.get('PortDep','-')} → 🏁 {row.get('PortArr','-')}
+                    <div style="margin: 8px 0; font-size: 0.95rem; font-weight: bold;">
+                        ⚓ {r.get('PortDep','?')} → 🏁 {r.get('PortArr','?')}
                     </div>
-                    <div style="display: flex; justify-content: space-between; margin-top: 10px; background: rgba(255,255,255,0.7); padding: 8px; border-radius: 8px;">
-                        <div style="text-align: center; flex: 1;">
-                            <div style="font-size: 0.6rem; color: #666; font-weight: bold; text-transform: uppercase;">Moteur</div>
-                            <div style="font-size: 1rem; font-weight: bold; color: #01579b;">+{row.get('TotalMot',0):.1f}h</div>
+                    <div style="display: flex; justify-content: space-between; background: rgba(255,255,255,0.6); padding: 8px; border-radius: 8px;">
+                        <div style="text-align:center; flex:1;">
+                            <div style="font-size:0.6rem; color:#666;">MOTEUR</div>
+                            <div style="font-size:0.9rem; font-weight:bold; color:#01579b;">+{r.get('TotalMot',0):.1f}h</div>
                         </div>
-                        <div style="text-align: center; flex: 1; border-left: 1px solid #add8e6; border-right: 1px solid #add8e6;">
-                            <div style="font-size: 0.6rem; color: #666; font-weight: bold; text-transform: uppercase;">Distance</div>
-                            <div style="font-size: 1rem; font-weight: bold; color: #01579b;">{row.get('TotalMil',0):.0f} mn</div>
-                        </div>
-                        <div style="text-align: center; flex: 1;">
-                            <div style="font-size: 0.6rem; color: #666; font-weight: bold; text-transform: uppercase;">Moyenne</div>
-                            <div style="font-size: 1rem; font-weight: bold; color: #01579b;">
-                                {round(row['TotalMil']/row['TotalMot'], 1) if row.get('TotalMot',0) > 0 else 0} nds
-                            </div>
+                        <div style="text-align:center; flex:1; border-left:1px solid #add8e6;">
+                            <div style="font-size:0.6rem; color:#666;">MILLES</div>
+                            <div style="font-size:0.9rem; font-weight:bold; color:#01579b;">{r.get('TotalMil',0):.0f}mn</div>
                         </div>
                     </div>
-                    <div style="font-size: 0.8rem; color: #444; margin-top: 8px; font-style: italic; padding-top: 5px; border-top: 1px dashed #b3e5fc;">
-                        📝 {row.get('Observations','')}
+                    <div style="font-size: 0.75rem; color: #444; margin-top: 8px; font-style: italic; border-top: 1px dashed #b3e5fc; padding-top: 5px;">
+                        📝 {r.get('Observations','')}
                     </div>
                 </div>
             """, unsafe_allow_html=True)
             
-            # Bouton de suppression individuelle (optionnel)
-            c1, c2 = st.columns([4,1])
-            if c2.button("🗑️", key=f"del_log_{idx}", help="Supprimer cette entrée"):
+            # Petit bouton de suppression
+            if st.button(f"🗑️ Supprimer sortie du {r['Date']}", key=f"del_{idx}"):
                 df_log = df_log.drop(idx)
-                sauvegarder_data(df_log.drop(columns=['dt_fix'], errors='ignore'), file_path_log)
+                sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
                 st.rerun()
 
-    # --- 3. ZONE DE DANGER ---
+    # --- C. ZONE DE DANGER (ARCHIVAGE) ---
     st.write("<br><br>", unsafe_allow_html=True)
-    with st.expander("⚠️ ZONE DE DANGER"):
-        st.error("Clôturer l'année archivera le journal actuel.")
-        if st.button("🔒 ARCHIVER LE JOURNAL", use_container_width=True):
-            st.info("Fonctionnalité d'archivage à configurer selon vos besoins.")
+    with st.expander("☢️ ZONE DE DANGER"):
+        st.warning("L'archivage clôture la saison en cours.")
+        if st.button("📁 ARCHIVER L'ANNÉE", use_container_width=True):
+            st.info("Action à définir (copie vers log_archives.json)")
 
 # --- FIN DU FICHIER ---
 
