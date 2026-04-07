@@ -636,20 +636,32 @@ if st.session_state.page == "MAINT":
         df_view = df_view.sort_values('dt_t', ascending=False)
     else:
         df_view = pd.DataFrame()
-
-    # --- 3. METRICS CONDENSÉES (2 lignes pour mobile) ---
+# --- 3. METRICS CONDENSÉES (ORDRE : PORT, ASSUR, SÉCU, MAINT -> TOTAL EN BAS) ---
     if not df_view.empty:
         def g_s(df, c): return df[df['Type'] == c]['M_Num'].sum()
-        r1_1, r1_2, r1_3 = st.columns(3)
-        r1_1.metric("🛡️ Assur", f"{g_s(df_view, 'Assurances'):.0f}€")
-        r1_2.metric("⚓ Port", f"{g_s(df_view, 'Port'):.0f}€")
-        r1_3.metric("💰 TOTAL", f"{df_view['M_Num'].sum():.0f}€")
         
-        r2_1, r2_2 = st.columns(2)
-        r2_1.metric("🛠️ Maint", f"{g_s(df_view, 'Maintenance, matériels'):.0f}€")
-        r2_2.metric("🛟 Sécu", f"{g_s(df_view, 'Sécurité'):.0f}€")
+        # Style pour réduire la taille du texte des metrics
+        st.markdown("""
+            <style>
+            [data-testid="stMetricValue"] { font-size: 1.1rem !important; }
+            [data-testid="stMetricLabel"] { font-size: 0.8rem !important; }
+            </style>
+        """, unsafe_allow_html=True)
 
-    st.write("---")
+        # Ligne 1 : Port et Assurances
+        r1_1, r1_2 = st.columns(2)
+        r1_1.metric("⚓ Port", f"{g_s(df_view, 'Port'):.0f}€")
+        r1_2.metric("🛡️ Assur", f"{g_s(df_view, 'Assurances'):.0f}€")
+        
+        # Ligne 2 : Sécurité et Maintenance
+        r2_1, r2_2 = st.columns(2)
+        r2_1.metric("🛟 Sécu", f"{g_s(df_view, 'Sécurité'):.0f}€")
+        r2_2.metric("🛠️ Maint", f"{g_s(df_view, 'Maintenance, matériels'):.0f}€")
+
+        # Ligne 3 : TOTAL (Mis en avant en bas)
+        st.write('<div style="margin-top:-10px"></div>', unsafe_allow_html=True)
+        c_tot = st.columns(1)[0]
+        c_tot.metric("💰 TOTAL", f"{df_view['M_Num'].sum():.0f}€")
 
     # --- 4. LISTE ULTRA-COMPACTE (ENCADRÉ BLEU CLAIR) ---
     if not df_view.empty:
