@@ -507,6 +507,7 @@ if st.session_state.page == "PLANNING":
         <b style="font-size:1.4rem;">TOTAL : {total_mois:,.0f} €</b>
     </div>
     """, unsafe_allow_html=True)
+
 # =================================================================
 # --- 9. PAGE STATS (FINANCES & NAVIGATION) ---
 # =================================================================
@@ -532,7 +533,19 @@ if st.session_state.page == "STATS":
     df_c = charger_data('contacts.json')    
     df_log = charger_data('logbook.json')   
 
-    # --- TRAITEMENT DES CHARGES ---
+    # --- TRAITEMENT NAVIGATION & CARBURANT ---
+    total_h_moteur = 0
+    total_milles = 0
+    total_cout_gasoil = 0
+    if not df_log.empty:
+        df_log['dt'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+        df_log_yr = df_log[df_log['dt'].dt.year == sel_y_stats].copy()
+        total_h_moteur = pd.to_numeric(df_log_yr.get('TotalMot', 0), errors='coerce').sum()
+        total_milles = pd.to_numeric(df_log_yr.get('TotalMil', 0), errors='coerce').sum()
+        # On récupère le coût du gasoil saisi dans le log
+        total_cout_gasoil = pd.to_numeric(df_log_yr.get('Cout Gazoil', 0), errors='coerce').sum()
+
+    # --- TRAITEMENT DES CHARGES (Maintenances + Gasoil) ---
     total_charges = 0
     df_charges_view = pd.DataFrame()
     if not df_m.empty:
@@ -540,7 +553,7 @@ if st.session_state.page == "STATS":
         df_m['dt'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
         df_m_yr = df_m[df_m['dt'].dt.year == sel_y_stats].copy()
         df_charges_view = df_m_yr if mode_previ else df_m_yr[df_m_yr['Statut'] == "Fait"].copy()
-        total_charges = df_charges_view['M_Num'].sum()
+        total_charges = df_charges_view['M_Num'].sum() + total_cout_gasoil # Ajout du gasoil au total
 
     # --- TRAITEMENT DES RECETTES ---
     total_recettes = 0
@@ -558,15 +571,6 @@ if st.session_state.page == "STATS":
         df_recettes_view = df_temp if mode_previ else df_temp[df_temp['Paiement'].apply(check_p)].copy()
         total_recettes = df_recettes_view['P_Num'].sum()
 
-    # --- TRAITEMENT NAVIGATION ---
-    total_h_moteur = 0
-    total_milles = 0
-    if not df_log.empty:
-        df_log['dt'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
-        df_log_yr = df_log[df_log['dt'].dt.year == sel_y_stats].copy()
-        total_h_moteur = pd.to_numeric(df_log_yr.get('TotalMot', 0), errors='coerce').sum()
-        total_milles = pd.to_numeric(df_log_yr.get('TotalMil', 0), errors='coerce').sum()
-
     # --- 3. AFFICHAGE TRÉSORERIE & RÉPARTITION ---
     st.subheader(f"💰 Finances {sel_y_stats}")
     c_pie1, c_pie2, c_sol = st.columns([1, 1, 1])
@@ -582,6 +586,10 @@ if st.session_state.page == "STATS":
         st.caption("Répartition Frais")
         if not df_charges_view.empty and total_charges > 0:
             df_poste = df_charges_view.groupby('Type')['M_Num'].sum().reset_index()
+            # On ajoute artificiellement le gasoil s'il existe pour le graphique
+            if total_cout_gasoil > 0:
+                df_poste = pd.concat([df_poste, pd.DataFrame([{'Type': 'Gasoil', 'M_Num': total_cout_gasoil}])], ignore_index=True)
+            
             fig2 = px.pie(df_poste, names='Type', values='M_Num', hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
             fig2.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=180, showlegend=False)
             st.plotly_chart(fig2, use_container_width=True)
@@ -590,7 +598,7 @@ if st.session_state.page == "STATS":
         solde = total_recettes - total_charges
         txt_c = "#28a745" if solde >= 0 else "#dc3545"
         st.markdown(f"""<div style="text-align:center; border:1px solid #ddd; padding:10px; border-radius:10px; background:#fff; margin-top:25px;">
-            <small style="color:#666; font-weight:bold;">SOLDE</small><br>
+            <small style="color:#666; font-weight:bold;">SOLDE {"PRÉVU" if mode_previ else "RÉEL"}</small><br>
             <b style="color:{txt_c}; font-size:1.6rem;">{solde:,.0f} €</b></div>""", unsafe_allow_html=True)
 
     st.divider()
@@ -600,24 +608,20 @@ if st.session_state.page == "STATS":
     n1, n2, n3 = st.columns(3)
     n1.metric("⚙️ Heures Moteur", f"{total_h_moteur:.1f} h")
     n2.metric("📏 Milles parcourus", f"{total_milles:.0f} mn")
-    # Ratio d'autonomie/voile
     ratio = round(total_milles / total_h_moteur, 1) if total_h_moteur > 0 else total_milles
     n3.metric("⛵ Ratio Voile", f"{ratio} mn/h mtr")
 
-    st.divider()
-    st.divider()
-st.subheader("💡 Indicateurs d'Exploitation")
-i1, i2 = st.columns(2)
+    # --- INDICATEURS EXPLOITATION (Bien indentés) ---
+    st.markdown("##### 💡 Indicateurs d'Exploitation")
+    i1, i2 = st.columns(2)
+    cout_mille = round(total_charges / total_milles, 2) if total_milles > 0 else 0
+    i1.metric("💸 Coût au Mille", f"{cout_mille} €/mn")
+    
+    ratio_moteur = round((total_h_moteur * 5) / total_milles * 100, 1) if total_milles > 0 else 0
+    i2.metric("📉 Utilisation Moteur", f"{ratio_moteur} %")
+    st.caption("Estimation du temps passé au moteur par rapport à la distance totale.")
 
-# Calcul coût au mille
-cout_mille = round(total_charges / total_milles, 2) if total_milles > 0 else 0
-i1.metric("💸 Coût au Mille", f"{cout_mille} €/mn")
-
-# Calcul intensité moteur
-ratio_moteur = round((total_h_moteur * 5) / total_milles * 100, 1) if total_milles > 0 else 0
-# (5 nds est une vitesse moyenne arbitraire pour l'exemple)
-i2.metric("📉 Utilisation Moteur", f"{ratio_moteur} %")
-st.caption("Estimation du temps passé au moteur par rapport à la distance totale.")
+    st.divider()
 
     # --- 5. SYNTHÈSE MENSUELLE ---
     st.subheader("📅 Synthèse Mensuelle")
@@ -627,10 +631,20 @@ st.caption("Estimation du temps passé au moteur par rapport à la distance tota
     for m_idx in range(1, 13):
         m_rec = df_recettes_view[df_recettes_view['dt'].dt.month == m_idx]['P_Num'].sum() if not df_recettes_view.empty else 0
         m_cha = df_charges_view[df_charges_view['dt'].dt.month == m_idx]['M_Num'].sum() if not df_charges_view.empty else 0
+        # Ajout du gasoil du mois dans la synthèse
+        m_gasoil = df_log_yr[df_log_yr['dt'].dt.month == m_idx].get('Cout Gazoil', 0).sum() if not df_log.empty else 0
+        m_cha_totale = m_cha + m_gasoil
+        
         m_mil = df_log_yr[df_log_yr['dt'].dt.month == m_idx].get('TotalMil', 0).sum() if not df_log.empty else 0
         
-        if m_rec > 0 or m_cha > 0 or m_mil > 0:
-            synthese_data.append({"Mois": mois_noms[m_idx-1], "Recettes": f"{m_rec:.0f}€", "Frais": f"{m_cha:.0f}€", "Milles": f"{m_mil:.0f} mn", "Net": f"{m_rec - m_cha:.0f}€"})
+        if m_rec > 0 or m_cha_totale > 0 or m_mil > 0:
+            synthese_data.append({
+                "Mois": mois_noms[m_idx-1], 
+                "Recettes": f"{m_rec:.0f}€", 
+                "Frais": f"{m_cha_totale:.0f}€", 
+                "Milles": f"{m_mil:.0f} mn", 
+                "Net": f"{m_rec - m_cha_totale:.0f}€"
+            })
 
     if synthese_data:
         st.dataframe(pd.DataFrame(synthese_data), use_container_width=True, hide_index=True)
