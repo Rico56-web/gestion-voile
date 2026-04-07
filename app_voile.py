@@ -921,13 +921,13 @@ Eric (vesta)"""
     else:
         st.warning("La base de données 'Contacts' est vide.")
 # =================================================================
-# --- 10. PAGE ARCHIVES (NETTOYAGE & EXPORT) ---
+# --- 11. PAGE ARCHIVES (NETTOYAGE, EXPORT & LOG) ---
 # =================================================================
 if st.session_state.page == "ARCHIVES":
     import pandas as pd
     import io
 
-    # 1. BOUTON DE RETOUR (TOUT EN HAUT)
+    # 1. BOUTON DE RETOUR (Dynamique selon la provenance)
     last = st.session_state.get('last_page', 'PLANNING')
     if st.button(f"⬅️ RETOUR VERS {last}", use_container_width=True):
         st.session_state.page = last
@@ -935,55 +935,80 @@ if st.session_state.page == "ARCHIVES":
 
     st.title("📂 Centre d'Archivage Vesta")
 
-    # --- 2. LE PANNEAU DE NETTOYAGE (Important : doit être ICI) ---
+    # --- 2. LE PANNEAU DE NETTOYAGE (Incluant le LOG) ---
     with st.expander("✂️ ARCHIVER UNE PÉRIODE (Nettoyage)", expanded=True):
-        st.info("Choisissez les dates pour déplacer les éléments vers l'historique.")
+        st.info("Sélectionnez une période pour basculer les données actives vers l'historique.")
         
         c1, c2 = st.columns(2)
         d_debut = c1.date_input("Du", datetime(2026, 1, 1), key="arch_d1")
-        d_fin = c2.date_input("Au", datetime(2026, 3, 31), key="arch_d2")
+        d_fin = c2.date_input("Au", datetime(2026, 12, 31), key="arch_d2")
         
         if st.button("🚀 LANCER L'ARCHIVAGE GLOBAL", use_container_width=True, type="primary"):
             # A. Maintenance
             df_m = charger_data('maintenance.json')
             nb_m = archiver_donnees(df_m, d_debut, d_fin, 'maintenance.json', 'archives_maintenance.json', 'Date')
             
-            # B. Planning
+            # B. Planning / Contacts
             df_c = charger_data('contacts.json')
             nb_p = archiver_donnees(df_c, d_debut, d_fin, 'contacts.json', 'archives_planning.json', 'DateNav')
             
-            st.success(f"Terminé : {nb_m} frais et {nb_p} missions archivés.")
+            # C. Livre de Bord (Nouveau)
+            df_l = charger_data('logbook.json')
+            nb_l = archiver_donnees(df_l, d_debut, d_fin, 'logbook.json', 'archives_logbook.json', 'Date')
+            
+            st.success(f"Archivage réussi : {nb_m} frais, {nb_p} missions et {nb_l} navigations déplacés.")
             st.rerun()
 
-    # --- 3. EXPORT EXCEL ---
-    with st.expander("📤 TRANSPÉRER VERS PC (Excel)", expanded=False):
+    # --- 3. EXPORT EXCEL COMPLET ---
+    with st.expander("📤 TRANSFÉRER VERS PC (Excel)", expanded=False):
         df_arch_m = charger_data('archives_maintenance.json')
         df_arch_p = charger_data('archives_planning.json')
+        df_arch_l = charger_data('archives_logbook.json')
         
-        if not df_arch_m.empty or not df_arch_p.empty:
+        if not df_arch_m.empty or not df_arch_p.empty or not df_arch_l.empty:
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                if not df_arch_p.empty: df_arch_p.to_excel(writer, sheet_name='Planning', index=False)
-                if not df_arch_m.empty: df_arch_m.to_excel(writer, sheet_name='Frais', index=False)
+                if not df_arch_p.empty: 
+                    df_arch_p.to_excel(writer, sheet_name='Planning', index=False)
+                if not df_arch_m.empty: 
+                    df_arch_m.to_excel(writer, sheet_name='Frais', index=False)
+                if not df_arch_l.empty: 
+                    df_arch_l.to_excel(writer, sheet_name='Livre de Bord', index=False)
             
-            st.download_button("📥 TÉLÉCHARGER L'EXCEL", buffer.getvalue(), 
-                               file_name=f"Archives_Vesta_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
+            st.download_button("📥 TÉLÉCHARGER L'EXCEL GLOBAL", buffer.getvalue(), 
+                               file_name=f"Archives_Vesta_Total_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
                                mime="application/vnd.ms-excel", use_container_width=True)
 
     st.divider()
 
     # --- 4. AFFICHAGE DES TABLEAUX ---
     st.subheader("📜 Historique actuel")
-    t1, t2 = st.tabs(["🛠️ Frais", "📅 Planning"])
+    t1, t2, t3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Livre de Bord"])
+    
     with t1:
         st.dataframe(charger_data('archives_maintenance.json'), use_container_width=True, hide_index=True)
+    
     with t2:
+        # Ici apparaissent les statuts Paid/Unpaid pour ton suivi
         st.dataframe(charger_data('archives_planning.json'), use_container_width=True, hide_index=True)
+        
+    with t3:
+        # Affichage des navigations passées
+        df_log_arch = charger_data('archives_logbook.json')
+        if not df_log_arch.empty:
+            st.dataframe(df_log_arch, use_container_width=True, hide_index=True)
+        else:
+            st.write("Aucune navigation dans l'historique.")
 # =================================================================
 # --- 10. PAGE LOG (LIVRE DE BORD) ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.markdown('<div style="text-align:center; background-color:#01579b; color:white; padding:10px; border-radius:10px; margin-bottom:20px;"><h1>📖 LIVRE DE BORD</h1></div>', unsafe_allow_html=True)
+    
+    # --- BOUTON ARCHIVES (Même style que sur les autres pages) ---
+    if st.button("📂 ACCÉDER AUX ARCHIVES", use_container_width=True):
+        st.session_state.page = "ARCHIVES"
+        st.rerun()
     
     # 1. Chargement et préparation sécurisée des données
     df_log = preparer_log_safe(charger_data('logbook.json'))
