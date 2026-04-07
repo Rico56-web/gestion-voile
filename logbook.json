@@ -10,7 +10,13 @@
         "MilArr":147.0,
         "TotalMot":2.3,
         "TotalMil":46.0,
-        "Observations":"avec PEDRO et BENOIT (vog) sur 2 jours"
+        "Observations":"avec PEDRO et BENOIT (vog) sur 2 jours",
+        "Vent":null,
+        "Mouillage":null,
+        "Equipage":null,
+        "Plein":null,
+        "Litre Gazoil":null,
+        "Cout Gazoil":null
     },
     {
         "Date":"04\/03\/2026",
@@ -23,19 +29,31 @@
         "MilArr":2653.0,
         "TotalMot":0.9,
         "TotalMil":2653.0,
-        "Observations":"sortie Click avec Elisabeth Philippe et sa fille Maleis"
+        "Observations":"sortie Click avec Elisabeth Philippe et sa fille Maleis",
+        "Vent":null,
+        "Mouillage":null,
+        "Equipage":null,
+        "Plein":null,
+        "Litre Gazoil":null,
+        "Cout Gazoil":null
     },
     {
         "Date":"21\/02\/2026",
         "Meteo":"Correct",
-        "PortDep":"Arzon",
-        "PortArr":"arzon",
+        "PortDep":"ARZON",
+        "PortArr":"ARZON",
         "MotDep":2411.1,
         "MotArr":0.0024158,
         "MilDep":0.0,
         "MilArr":2600.0,
         "TotalMot":-2411.1,
         "TotalMil":2600.0,
-        "Observations":"sortie CMN"
+        "Observations":"sortie CMN",
+        "Vent":2.0,
+        "Mouillage":"Port",
+        "Equipage":"",
+        "Plein":"Non",
+        "Litre Gazoil":0.0,
+        "Cout Gazoil":0.0
     }
 ]
