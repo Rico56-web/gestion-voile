@@ -662,12 +662,12 @@ if st.session_state.page == "MAINT":
         # Affichage en colonnes
         col1, col2 = st.columns(2)
         with col1:
-            metric_card("⚓ Port", g_s(df_view, 'Port'), "#e3f2fd")      # Bleu très clair
+            metric_card("⚓ Place de Port", g_s(df_view, 'Port'), "#e3f2fd")      # Bleu très clair
             metric_card("🛟 Sécurité", g_s(df_view, 'Sécurité'), "#fff3e0") # Orange très clair
         
         with col2:
-            metric_card("🛡️ Assur", g_s(df_view, 'Assurances'), "#f3e5f5") # Violet très clair
-            metric_card("🛠️ Maint", g_s(df_view, 'Maintenance, matériels'), "#e8f5e9") # Vert très clair
+            metric_card("🛡️ Assurances", g_s(df_view, 'Assurances'), "#f3e5f5") # Violet très clair
+            metric_card("🛠️ Maintenance", g_s(df_view, 'Maintenance, matériels'), "#e8f5e9") # Vert très clair
 
         # Ligne du TOTAL en bas (plus large et plus forte)
         st.markdown(f"""
