@@ -136,25 +136,17 @@ def safe_get(r, key):
 # --- 4. NAVIGATION & ENTÊTE ---
 st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=True)
- 
+
 if "page" not in st.session_state:
     st.session_state.page = "CONTACTS"
-if "view_archive" not in st.session_state:
-    st.session_state.view_archive = False
-if "edit_idx" not in st.session_state:
-    st.session_state.edit_idx = None
-if "m_edit_idx" not in st.session_state:
-    st.session_state.m_edit_idx = None
-if "maint_confirm_del" not in st.session_state:
-    st.session_state.maint_confirm_del = None
- 
-# PASSAGE À 7 COLONNES ET AJOUT DE "LOG"
+
+# On remplace LOGBOOK par LOG ici pour correspondre à tes conditions 'if page == "LOG"'
 m = st.columns(7) 
-menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "ARCHIVES", "LOGBOOK"]
-icones = {"CONTACTS": "👤", "PLANNING": "🗓️", "STATS": "📊", "MAINT": "🛠️", "FACTURES": "🧾", "ARCHIVES": "📂", "LOGBOOK": "📖"}
+menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "ARCHIVES", "LOG"] # <-- CHANGÉ ICI
+icones = {"CONTACTS": "👤", "PLANNING": "🗓️", "STATS": "📊", "MAINT": "🛠️", "FACTURES": "🧾", "ARCHIVES": "📂", "LOG": "📖"}
+
 for i, name in enumerate(menu):
-    label = f"{icones[name]} {name}" if name != "LOGBOOK" else "📖 LOG" # Texte court pour LOGBOOK
-    if m[i].button(label, key=f"nav_{name}", use_container_width=True, 
+    if m[i].button(f"{icones[name]} {name}", key=f"nav_{name}", use_container_width=True, 
                    type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name
         st.rerun()
