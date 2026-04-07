@@ -161,10 +161,10 @@ if not df_c.empty and 'DateNav' in df_c.columns:
         df_c = df_c.drop(columns=['temp_date'])
     except: pass
 # =================================================================
-# --- 5. PAGE CONTACTS (VERSION FINALE + NOTES VISIBLES) ---
+# --- 5. PAGE CONTACTS (OPTIMISÉE COMPACTE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    # On affiche SEULEMENT le bouton Archives ici
+    # Bouton Archives en haut
     if st.button("📦 ALLER AUX ARCHIVES", key="k_arch_c", use_container_width=True, type="primary"):
         st.session_state.last_page = "CONTACTS"
         st.session_state.page = "ARCHIVES"
@@ -172,12 +172,14 @@ if st.session_state.page == "CONTACTS":
     
     st.title("👤 MES CONTACTS")
     st.divider()
+    
     if 'mode_saisie' not in st.session_state: st.session_state.mode_saisie = False
     if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
     if 'confirm_del_idx' not in st.session_state: st.session_state.confirm_del_idx = None
     if 'view_archive' not in st.session_state: st.session_state.view_archive = False
 
     if st.session_state.mode_saisie:
+        # --- FORMULAIRE DE SAISIE (Inchangé pour la stabilité) ---
         st.markdown('<div class="main-header">📝 FICHE CONTACT</div>', unsafe_allow_html=True)
         idx = st.session_state.edit_idx
         is_edit = idx is not None and idx < len(df_c)
@@ -228,6 +230,7 @@ if st.session_state.page == "CONTACTS":
                 st.rerun()
 
     else:
+        # --- MODE AFFICHAGE LISTE ---
         st.markdown('<div class="main-header">📇 CONTACTS 2026</div>', unsafe_allow_html=True)
         
         n1, n2, n3 = st.columns([1, 1, 1.2])
@@ -237,7 +240,6 @@ if st.session_state.page == "CONTACTS":
             st.session_state.mode_saisie = True; st.session_state.edit_idx = None; st.rerun()
 
         search_q = st.text_input("🔍 Rechercher...", "").strip().upper()
-
         st.divider()
 
         # Filtrage
@@ -250,12 +252,10 @@ if st.session_state.page == "CONTACTS":
             m_s = (df_visu['Nom'].astype(str).str.upper().str.contains(search_q, na=False) | 
                   df_visu['Société'].astype(str).str.upper().str.contains(search_q, na=False))
             df_visu = df_visu[m_s]
-            # --- BOUCLE D'AFFICHAGE SÉCURISÉE ---
+
+        # --- BOUCLE D'AFFICHAGE COMPACTE ---
         for i, r in df_visu.iterrows():
-            # 1. Préparation et nettoyage strict des données
-            def clean_h(val):
-                """Nettoie la valeur pour l'affichage HTML"""
-                return html.escape(str(val)) if pd.notna(val) else ""
+            def clean_h(val): return html.escape(str(val)) if pd.notna(val) else ""
 
             st_b = str(r.get('Statut','En attente')).capitalize()
             nom_v = clean_h(r.get('Nom','')).upper()
@@ -278,20 +278,22 @@ if st.session_state.page == "CONTACTS":
             pers_v = clean_h(r.get('Nbre de personnes', '1'))
             date_v = clean_h(r.get('DateNav', '-'))
 
-            # 2. Construction de la zone Note (uniquement si remplie)
+            # Zone Note compacte
             note_html = ""
             if com_v and com_v.lower() != 'none':
-                note_html = f"""<div style="margin-left:40px; margin-top:10px; padding:10px; background-color:#f8f9fa; border-left:4px solid {base_col}; border-radius:5px; font-size:0.9rem; color:#444; font-style:italic;">💬 {com_v}</div>"""
+                note_html = f"""<div style="margin-left:40px; margin-top:5px; padding:8px; background-color:#f8f9fa; border-left:4px solid {base_col}; border-radius:5px; font-size:0.85rem; color:#444; font-style:italic;">💬 {com_v}</div>"""
 
-            # 3. Assemblage de la carte (SANS ESPACES ENTRE LES BALISES pour éviter les bugs Markdown)
-            card_template = f"""<div style="border:5px solid {base_col}; border-left:20px solid {base_col}; padding:15px; border-radius:15px; background-color:white; margin-bottom:12px; box-shadow:5px 5px 15px rgba(0,0,0,0.1); font-family:sans-serif;"><span style="float:right; color:{p_color}; font-weight:bold; border:2px solid {p_color}; padding:2px 5px; border-radius:5px; font-size:0.8rem;">{p_status}</span><div style="font-size:1.25rem; font-weight:bold; color:{base_col}; margin-bottom:2px; display:flex; align-items:center;"><span style="background-color:{base_col}; color:white; min-width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-size:0.9rem; margin-right:12px;">{i+1}</span>{nom_v} {pre_v}</div><div style="font-weight:bold; color:#666; margin-left:40px; font-size:0.85rem; text-transform:uppercase; margin-bottom:8px;">{label_soc}</div><div style="margin-left:40px; font-size:1rem; font-weight:bold; color:#333;">📞 {tel_v if tel_v not in ['nan',''] else '---'}</div><div style="margin-left:40px; font-size:0.85rem; color:#555;">📧 {eml_v if eml_v not in ['nan',''] else '---'}</div>{note_html}<hr style="border:0; border-top:1px solid #eee; margin:12px 0;"><div style="display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; padding:8px 12px; border-radius:8px;"><div style="text-align:center; flex:1;"><div style="font-size:0.6rem; color:#888;">DATE/DURÉE</div><div style="font-size:0.85rem; font-weight:bold;">{date_v} ({nb_jours}j)</div></div><div style="text-align:center; flex:1; border-left:1px solid #ddd; border-right:1px solid #ddd;"><div style="font-size:0.6rem; color:#888;">PRIX</div><div style="font-size:0.85rem; font-weight:bold; color:#27ae60;">{prix_v}€</div></div><div style="text-align:center; flex:1;"><div style="font-size:0.6rem; color:#888;">PERS.</div><div style="font-size:0.85rem; font-weight:bold;">{pers_v}p</div></div></div></div>"""
-            
+            # 1. Carte HTML (margin-bottom: 5px et padding réduit)
+            card_template = f"""<div style="border:5px solid {base_col}; border-left:15px solid {base_col}; padding:10px; border-radius:15px; background-color:white; margin-bottom:5px; box-shadow:2px 2px 8px rgba(0,0,0,0.1); font-family:sans-serif;"><span style="float:right; color:{p_color}; font-weight:bold; border:1px solid {p_color}; padding:1px 4px; border-radius:5px; font-size:0.75rem;">{p_status}</span><div style="font-size:1.1rem; font-weight:bold; color:{base_col}; margin-bottom:2px; display:flex; align-items:center;"><span style="background-color:{base_col}; color:white; min-width:24px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-size:0.8rem; margin-right:10px;">{i+1}</span>{nom_v} {pre_v}</div><div style="font-weight:bold; color:#666; margin-left:34px; font-size:0.8rem; text-transform:uppercase; margin-bottom:5px;">{label_soc}</div><div style="margin-left:34px; font-size:0.95rem; font-weight:bold; color:#333;">📞 {tel_v if tel_v not in ['nan',''] else '---'}</div><div style="margin-left:34px; font-size:0.8rem; color:#555;">📧 {eml_v if eml_v not in ['nan',''] else '---'}</div>{note_html}<hr style="border:0; border-top:1px solid #eee; margin:8px 0;"><div style="display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; padding:6px 10px; border-radius:8px;"><div style="text-align:center; flex:1;"><div style="font-size:0.55rem; color:#888;">DATE/DURÉE</div><div style="font-size:0.8rem; font-weight:bold;">{date_v} ({nb_jours}j)</div></div><div style="text-align:center; flex:1; border-left:1px solid #ddd; border-right:1px solid #ddd;"><div style="font-size:0.55rem; color:#888;">PRIX</div><div style="font-size:0.8rem; font-weight:bold; color:#27ae60;">{prix_v}€</div></div><div style="text-align:center; flex:1;"><div style="font-size:0.55rem; color:#888;">PERS.</div><div style="font-size:0.8rem; font-weight:bold;">{pers_v}p</div></div></div></div>"""
             st.markdown(card_template, unsafe_allow_html=True)
 
-            # --- BOUTONS D'ACTION (Hors HTML pour plus de stabilité) ---
+            # 2. Boutons Com (Appel, WA, Mail) avec réduction d'espace Streamlit
+            st.write('<div style="margin-top:-15px"></div>', unsafe_allow_html=True)
             t_clean = str(tel_v).replace(" ","").replace(".","")
-            st.markdown(f"""<div style="display:flex;gap:8px;margin-bottom:5px;"><a href="tel:{t_clean}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:14px;">📞 APPEL</a><a href="https://wa.me/{t_clean}" style="flex:1;text-align:center;background:#25D366;color:white;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;font-size:14px;">🟢 WA</a><a href="mailto:{eml_v}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:12px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:14px;">✉️ MAIL</a></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div style="display:flex;gap:5px;margin-bottom:5px;"><a href="tel:{t_clean}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:10px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:12px;">📞 APPEL</a><a href="https://wa.me/{t_clean}" style="flex:1;text-align:center;background:#25D366;color:white;text-decoration:none;padding:10px;border-radius:10px;font-weight:bold;font-size:12px;">🟢 WA</a><a href="mailto:{eml_v}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:10px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:12px;">✉️ MAIL</a></div>""", unsafe_allow_html=True)
 
+            # 3. Boutons Modifier/Supprimer avec réduction d'espace Streamlit
+            st.write('<div style="margin-top:-15px"></div>', unsafe_allow_html=True)
             g1, g2 = st.columns(2)
             if g1.button(f"✏️ MODIFIER {i+1}", key=f"ed_v_{i}", use_container_width=True):
                 st.session_state.edit_idx = i
@@ -301,18 +303,21 @@ if st.session_state.page == "CONTACTS":
                 st.session_state.confirm_del_idx = i
                 st.rerun()
             
-            # Dialogue de suppression
+            # 4. Dialogue suppression
             if st.session_state.get('confirm_del_idx') == i:
-                st.warning(f"Confirmer la suppression de {nom_v} ?")
+                st.warning(f"Confirmer suppression ?")
                 cy, cn = st.columns(2)
-                if cy.button("OUI, SUPPRIMER", key=f"y_v_{i}", use_container_width=True, type="primary"):
+                if cy.button("OUI", key=f"y_v_{i}", use_container_width=True, type="primary"):
                     df_c = df_c.drop(i).reset_index(drop=True)
                     sauvegarder_data(df_c, "contacts.json")
                     st.session_state.confirm_del_idx = None
                     st.rerun()
-                if cn.button("ANNULER", key=f"n_v_{i}", use_container_width=True):
+                if cn.button("NON", key=f"n_v_{i}", use_container_width=True):
                     st.session_state.confirm_del_idx = None
                     st.rerun()
+            
+            # Séparateur final minimal
+            st.write('<div style="margin-top:5px; margin-bottom:10px; border-bottom:1px solid #eee;"></div>', unsafe_allow_html=True)
   
 # =================================================================
 # --- 6. PAGE PLANNING (CORRECTIF CMN & COULEUR TOTAL) ---
