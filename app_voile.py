@@ -493,132 +493,142 @@ if st.session_state.page == "PLANNING":
         <b style="font-size:1.4rem;">TOTAL : {total_mois:,.0f} €</b>
     </div>
     """, unsafe_allow_html=True)
+
 # =================================================================
-# --- 9. PAGE STATS (REEL/PREVI + SYNTHESE MENSUELLE) ---
+# --- 9. PAGE STATS (FINANCES & NAVIGATION) ---
 # =================================================================
 if st.session_state.page == "STATS":
     import plotly.express as px
-    import pandas as pd
-
-    # --- 1. NAVIGATION & FILTRES ---
-    col_t1, col_t2 = st.columns([2, 1])
-    col_t1.title("📊 Bilan Vesta")
     
-    ANNEES_STATS = [2026, 2027, 2028]
-    sel_y_stats = col_t2.selectbox("Saison", ANNEES_STATS, label_visibility="collapsed")
+    # --- 1. ENTÊTE & FILTRES ---
+    c_t1, c_t2 = st.columns([2, 1])
+    c_t1.title("📊 Bilan Vesta")
     
-    # CASE À COCHER : RÉEL vs PRÉVISIONNEL
-    mode_previ = st.toggle("🔮 Voir le Prévisionnel (Toute l'année)", value=False)
+    ANNEES_STATS = [2025, 2026, 2027, 2028]
+    sel_y_stats = c_t2.selectbox("Saison", ANNEES_STATS, index=1) # 2026 par défaut
     
-    if st.button("📂 ARCHIVES", use_container_width=True):
+    mode_previ = st.toggle("🔮 Voir le Prévisionnel (Fait + À prévoir)", value=False)
+    
+    if st.button("📂 ACCÉDER AUX ARCHIVES", use_container_width=True):
         st.session_state.page = "ARCHIVES"
         st.rerun()
 
-    # --- 2. RÉCUPÉRATION & FILTRAGE ---
+    # --- 2. CHARGEMENT & NETTOYAGE SÉCURISÉ ---
+    # Maintenance (Fichier correct : maintenance.json)
     df_m = charger_data('maintenance.json')
-    # df_c est ton DataFrame Planning/Contacts déjà chargé
+    # Contacts (Planning)
+    df_c = charger_data('contacts.json')
+    # Logbook (Navigation)
+    df_log = charger_data('logbook.json')
 
-    # --- TRAITEMENT DES CHARGES ---
-    df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
-    df_m['dt'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-    # Filtre Année
-    df_m_yr = df_m[df_m['dt'].dt.year == sel_y_stats].copy()
-    
-    if not mode_previ:
-        # RÉEL : Uniquement Statut "Fait"
-        df_charges_view = df_m_yr[df_m_yr['Statut'] == "Fait"].copy()
-    else:
-        # PRÉVISIONNEL : Tout (Fait + À prévoir)
-        df_charges_view = df_m_yr.copy()
-    
-    total_charges = df_charges_view['M_Num'].sum()
+    # --- TRAITEMENT CHARGES (MAINTENANCE) ---
+    total_charges = 0
+    df_charges_view = pd.DataFrame()
+    if not df_m.empty:
+        df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
+        df_m['dt'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+        df_m_yr = df_m[df_m['dt'].dt.year == sel_y_stats].copy()
+        
+        if not mode_previ:
+            df_charges_view = df_m_yr[df_m_yr['Statut'] == "Fait"].copy()
+        else:
+            df_charges_view = df_m_yr.copy()
+        total_charges = df_charges_view['M_Num'].sum()
 
-    # --- TRAITEMENT DES RECETTES ---
+    # --- TRAITEMENT RECETTES (PLANNING) ---
     total_recettes = 0
     df_recettes_view = pd.DataFrame()
-    
-    if df_c is not None and not df_c.empty:
+    if not df_c.empty:
         df_temp = df_c.copy()
         df_temp['dt'] = pd.to_datetime(df_temp['DateNav'], dayfirst=True, errors='coerce')
         df_temp = df_temp[df_temp['dt'].dt.year == sel_y_stats].copy()
         
-        # Nettoyage prix
+        # Nettoyage prix (supporte "150", "150€", "150,00")
         df_temp['P_Num'] = df_temp['Prix'].astype(str).str.replace(',','.').str.replace('€','').str.strip()
         df_temp['P_Num'] = pd.to_numeric(df_temp['P_Num'], errors='coerce').fillna(0.0)
         
-        # Logique Paiement
-        def check_p(val):
-            v = str(val).upper()
-            return "PAY" in v and "NON" not in v
-        df_temp['is_ok'] = df_temp['Paiement'].apply(check_p)
+        # Logique Paiement (Recherche "PAY" mais pas "NON")
+        def is_paid(v):
+            val = str(v).upper()
+            return "PAY" in val and "NON" not in val
         
         if not mode_previ:
-            # RÉEL : Uniquement Encaissé
-            df_recettes_view = df_temp[df_temp['is_ok'] == True].copy()
+            df_recettes_view = df_temp[df_temp['Paiement'].apply(is_paid)].copy()
         else:
-            # PRÉVISIONNEL : Tout
             df_recettes_view = df_temp.copy()
-            
         total_recettes = df_recettes_view['P_Num'].sum()
-     # --- TRAITEMENT DES DONNÉES LOG (Structure JSON précise) ---
-    df_log = charger_data('logbook.json')
+
+    # --- TRAITEMENT NAVIGATION (LOGBOOK) ---
     total_h_moteur = 0
     total_milles = 0
-    
     if not df_log.empty:
         df_log['dt'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
-        # Filtre sur l'année choisie dans le sélecteur de la page Stats
         df_log_yr = df_log[df_log['dt'].dt.year == sel_y_stats].copy()
-        
-        # On utilise .get() ou on vérifie la présence pour éviter le crash
-        if 'TotalMot' in df_log_yr.columns:
-            total_h_moteur = pd.to_numeric(df_log_yr['TotalMot'], errors='coerce').sum()
-        if 'TotalMil' in df_log_yr.columns:
-            total_milles = pd.to_numeric(df_log_yr['TotalMil'], errors='coerce').sum()
+        # On utilise .get() pour éviter le crash si la colonne manque
+        total_h_moteur = pd.to_numeric(df_log_yr.get('TotalMot', 0), errors='coerce').sum()
+        total_milles = pd.to_numeric(df_log_yr.get('TotalMil', 0), errors='coerce').sum()
 
-    # Affichage des metrics nautiques
-    st.subheader("⚓ Activité Nautique")
-    col_n1, col_n2 = st.columns(2)
-    col_n1.metric("⚙️ Heures Moteur", f"{total_h_moteur:.1f} h")
-    col_n2.metric("📏 Distance", f"{total_milles:.0f} mn")   
-   
-
-    # --- 4. SYNTHÈSE MENSUELLE ---
-    st.subheader("📅 Synthèse Mensuelle")
+    # --- 3. AFFICHAGE DES RÉSULTATS ---
     
+    # Bloc A : Trésorerie
+    st.subheader(f"💰 Finances {sel_y_stats}")
+    c_pie, c_sol = st.columns([1, 1])
+    
+    with c_pie:
+        if total_charges > 0 or total_recettes > 0:
+            fig = px.pie(names=['Charges', 'Recettes'], values=[total_charges, total_recettes],
+                         color_discrete_map={'Charges': '#ef553b', 'Recettes': '#00cc96'}, hole=0.4)
+            fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=180, showlegend=False)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Aucune donnée financière")
+
+    with c_sol:
+        solde = total_recettes - total_charges
+        color_solde = "#28a745" if solde >= 0 else "#dc3545"
+        st.markdown(f"""
+            <div style="text-align:center; border:1px solid #ddd; padding:15px; border-radius:10px; background:#f8f9fa;">
+                <small style="color:#666; font-weight:bold;">SOLDE {"PRÉVU" if mode_previ else "RÉEL"}</small><br>
+                <b style="color:{color_solde}; font-size:1.8rem;">{solde:,.0f} €</b>
+            </div>
+        """, unsafe_allow_html=True)
+
+    st.divider()
+
+    # Bloc B : Activité Nautique (Nouveau)
+    st.subheader("⚓ Activité de Navigation")
+    n1, n2, n3 = st.columns(3)
+    n1.metric("⚙️ Moteur", f"{total_h_moteur:.1f} h")
+    n2.metric("📏 Distance", f"{total_milles:.0f} mn")
+    # Calcul conso/moyenne si possible
+    moy = round(total_milles / total_h_moteur, 1) if total_h_moteur > 0 else 0
+    n3.metric("🚀 Moyenne", f"{moy} nds")
+
+    st.divider()
+
+    # Bloc C : Synthèse Mensuelle
+    st.subheader("📅 Détails par mois")
     mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     synthese_data = []
 
     for m_idx in range(1, 13):
-        # Somme Recettes du mois
-        m_recettes = df_recettes_view[df_recettes_view['dt'].dt.month == m_idx]['P_Num'].sum()
-        # Somme Charges du mois
-        m_charges = df_charges_view[df_charges_view['dt'].dt.month == m_idx]['M_Num'].sum()
+        m_rec = df_recettes_view[df_recettes_view['dt'].dt.month == m_idx]['P_Num'].sum() if not df_recettes_view.empty else 0
+        m_cha = df_charges_view[df_charges_view['dt'].dt.month == m_idx]['M_Num'].sum() if not df_charges_view.empty else 0
+        m_mil = df_log_yr[df_log_yr['dt'].dt.month == m_idx].get('TotalMil', 0).sum() if not df_log.empty else 0
         
-        if m_recettes > 0 or m_charges > 0:
+        if m_rec > 0 or m_cha > 0 or m_mil > 0:
             synthese_data.append({
                 "Mois": mois_noms[m_idx-1],
-                "Recettes": f"{m_recettes:.0f}€",
-                "Frais": f"{m_charges:.0f}€",
-                "Net": f"{m_recettes - m_charges:.0f}€"
+                "Recettes": f"{m_rec:.0f}€",
+                "Frais": f"{m_cha:.0f}€",
+                "Milles": f"{m_mil:.0f} mn",
+                "Net": f"{m_rec - m_cha:.0f}€"
             })
 
     if synthese_data:
         st.dataframe(pd.DataFrame(synthese_data), use_container_width=True, hide_index=True)
     else:
-        st.info("Aucune donnée pour générer la synthèse.")
-
-    st.divider()
-
-    # --- 5. DÉTAILS ---
-    tab1, tab2 = st.tabs(["📥 Détail Recettes", "📤 Détail Charges"])
-    with tab1:
-        if not df_recettes_view.empty:
-            st.dataframe(df_recettes_view[['DateNav', 'Nom', 'Prix']], use_container_width=True, hide_index=True)
-    with tab2:
-        if not df_charges_view.empty:
-            st.dataframe(df_charges_view[['Date', 'Objet', 'M_Num', 'Type']], use_container_width=True, hide_index=True)
-
+        st.info("Aucune activité enregistrée pour cette saison.")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (OPTI IPHONE & AUTO-CLOSE) ---
 # =================================================================
