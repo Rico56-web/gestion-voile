@@ -979,126 +979,144 @@ if st.session_state.page == "ARCHIVES":
         st.dataframe(charger_data('archives_maintenance.json'), use_container_width=True, hide_index=True)
     with t2:
         st.dataframe(charger_data('archives_planning.json'), use_container_width=True, hide_index=True)
+
+# --- FIN DU FICHIER ---
+
 # =================================================================
-# --- 11. PAGE LOG (livre de Bord) ---
+# --- 10. PAGE LOG (LIVRE DE BORD) ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.markdown('<div style="text-align:center; background-color:#01579b; color:white; padding:10px; border-radius:10px; margin-bottom:20px;"><h1>📖 LIVRE DE BORD</h1></div>', unsafe_allow_html=True)
     
+    # Chargement et préparation des données
     df_log = preparer_log_safe(charger_data('logbook.json'))
-    is_editing = st.session_state.log_edit_idx is not None
+    
+    # Vérification de sécurité pour l'index d'édition
+    is_editing = False
+    if st.session_state.log_edit_idx is not None:
+        if st.session_state.log_edit_idx in df_log.index:
+            is_editing = True
+        else:
+            # Si l'index n'existe plus (supprimé entre temps), on reset
+            st.session_state.log_edit_idx = None
 
-    with st.expander("📝 ENREGISTRER UNE NAVIGATION", expanded=is_editing):
-        # Récupération des valeurs si édition
+    titre_expander = "📝 MODIFIER LA NAVIGATION" if is_editing else "➕ NOUVELLE SORTIE"
+    
+    with st.expander(titre_expander, expanded=is_editing):
+        # Récupération des valeurs par défaut
         row = df_log.loc[st.session_state.log_edit_idx] if is_editing else None
         
-        with st.form("form_log_complet"):
-            # --- SECTION 1 : GÉNÉRAL ---
+        # --- DÉBUT DU FORMULAIRE ---
+        with st.form("form_log_global", clear_on_submit=True):
             c1, c2, c3 = st.columns([1, 1, 1])
             f_date = c1.date_input("Date", datetime.now() if not is_editing else datetime.strptime(row['Date'], "%d/%m/%Y"))
             f_p_dep = c2.text_input("⚓ Départ", value=row['PortDep'] if is_editing else "")
             f_p_arr = c3.text_input("🏁 Arrivée", value=row['PortArr'] if is_editing else "")
             
-            # --- SECTION 2 : NAVIGATION & MÉTÉO ---
             st.markdown("##### 🌊 Conditions & Escales")
             n1, n2, n3 = st.columns([1, 1, 1])
-            f_mouillage = n1.selectbox("Type d'escale", ["Port", "Ancre", "Bouée"], index=0)
-            f_vent = n2.select_slider("Vent (Beaufort)", options=list(range(11)), value=int(row['Vent']) if is_editing and 'Vent' in row else 2)
-            f_meteo = n3.text_input("🌤️ Météo (Ciel/Mer)", value=row['Meteo'] if is_editing else "")
+            # Gestion de l'index du mouillage pour l'édition
+            list_mouillage = ["Port", "Ancre", "Bouée"]
+            idx_m = list_mouillage.index(row['Mouillage']) if is_editing and row['Mouillage'] in list_mouillage else 0
+            f_mouillage = n1.selectbox("Type d'escale", list_mouillage, index=idx_m)
+            f_vent = n2.select_slider("Vent (Beaufort)", options=list(range(11)), value=int(row.get('Vent', 2)) if is_editing else 2)
+            f_meteo = n3.text_input("🌤️ Météo", value=row['Meteo'] if is_editing else "")
             
-            # --- SECTION 3 : COMPTEURS ---
             st.markdown("##### ⚙️ Compteurs")
             m1, m2, m3, m4 = st.columns(4)
-            f_m_dep = m1.number_input("H. Moteur Dép", value=float(row['MotDep']) if is_editing else 0.0, step=0.1)
-            f_m_arr = m2.number_input("H. Moteur Arr", value=float(row['MotArr']) if is_editing else 0.0, step=0.1)
-            f_mi_dep = m3.number_input("Milles Dép", value=float(row['MilDep']) if is_editing else 0.0, step=1.0)
-            f_mi_arr = m4.number_input("Milles Arr", value=float(row['MilArr']) if is_editing else 0.0, step=1.0)
+            f_m_dep = m1.number_input("H. Mot. Dép", value=float(row['MotDep']) if is_editing else 0.0, step=0.1, format="%.1f")
+            f_m_arr = m2.number_input("H. Mot. Arr", value=float(row['MotArr']) if is_editing else 0.0, step=0.1, format="%.1f")
+            f_mi_dep = m3.number_input("Mi. Dép", value=float(row['MilDep']) if is_editing else 0.0, step=1.0)
+            f_mi_arr = m4.number_input("Mi. Arr", value=float(row['MilArr']) if is_editing else 0.0, step=1.0)
             
-            # --- SECTION 4 : ÉQUIPAGE (6 Pers) ---
             st.markdown("##### 👥 Équipage")
-            eq = st.columns(3)
-            # On stocke l'équipage sous forme de liste/string
-            e_prev = row['Equipage'].split(', ') if is_editing and 'Equipage' in row and row['Equipage'] else [""]*6
-            e1 = eq[0].text_input("Pers. 1", value=e_prev[0] if len(e_prev)>0 else "", label_visibility="collapsed", placeholder="Skipper")
-            e2 = eq[1].text_input("Pers. 2", value=e_prev[1] if len(e_prev)>1 else "", label_visibility="collapsed", placeholder="Équipier 2")
-            e3 = eq[2].text_input("Pers. 3", value=e_prev[2] if len(e_prev)>2 else "", label_visibility="collapsed", placeholder="Équipier 3")
-            e4 = eq[0].text_input("Pers. 4", value=e_prev[3] if len(e_prev)>3 else "", label_visibility="collapsed", placeholder="Équipier 4")
-            e5 = eq[1].text_input("Pers. 5", value=e_prev[4] if len(e_prev)>4 else "", label_visibility="collapsed", placeholder="Équipier 5")
-            e6 = eq[2].text_input("Pers. 6", value=e_prev[5] if len(e_prev)>5 else "", label_visibility="collapsed", placeholder="Équipier 6")
+            e_cols = st.columns(3)
+            e_vals = row['Equipage'].split(', ') if is_editing and row.get('Equipage') else [""]*6
+            # On s'assure d'avoir 6 éléments
+            while len(e_vals) < 6: e_vals.append("")
             
-            # --- SECTION 5 : CARBURANT ---
+            e1 = e_cols[0].text_input("P1", value=e_vals[0], placeholder="Skipper", label_visibility="collapsed")
+            e2 = e_cols[1].text_input("P2", value=e_vals[1], placeholder="Équipier", label_visibility="collapsed")
+            e3 = e_cols[2].text_input("P3", value=e_vals[2], placeholder="Équipier", label_visibility="collapsed")
+            e4 = e_cols[0].text_input("P4", value=e_vals[3], placeholder="Équipier", label_visibility="collapsed")
+            e5 = e_cols[1].text_input("P5", value=e_vals[4], placeholder="Équipier", label_visibility="collapsed")
+            e6 = e_cols[2].text_input("P6", value=e_vals[5], placeholder="Équipier", label_visibility="collapsed")
+            
             st.markdown("##### ⛽ Carburant")
-            f_plein = st.checkbox("Plein de Gazoil effectué ?", value=row['Paiement']=="Oui" if is_editing and 'Plein' in row else False)
+            # Pour éviter le bug du formulaire, on ne peut pas cacher dynamiquement des champs dans un st.form sans rerun.
+            # On laisse donc les champs visibles ou on utilise un toggle hors formulaire.
+            f_plein = st.checkbox("Plein effectué ?", value=(row.get('Plein') == "Oui") if is_editing else False)
             g1, g2 = st.columns(2)
-            f_litres = g1.number_input("Volume (Litres)", min_value=0.0, value=float(row['Litre Gazoil']) if is_editing and 'Litre Gazoil' in row else 0.0) if f_plein else 0.0
-            f_cout = g2.number_input("Coût (€)", min_value=0.0, value=float(row['Cout Gazoil']) if is_editing and 'Cout Gazoil' in row else 0.0) if f_plein else 0.0
+            f_litres = g1.number_input("Litres", value=float(row.get('Litre Gazoil', 0.0)) if is_editing else 0.0)
+            f_cout = g2.number_input("Coût (€)", value=float(row.get('Cout Gazoil', 0.0)) if is_editing else 0.0)
             
-            f_obs = st.text_area("📝 Observations / Travaux du jour", value=row['Observations'] if is_editing else "")
-            
-            btn_col1, btn_col2 = st.columns(2)
-            if btn_col1.form_submit_button("💾 ENREGISTRER", use_container_width=True):
-                equipe_str = ", ".join(filter(None, [e1, e2, e3, e4, e5, e6]))
-                data = {
+            f_obs = st.text_area("📝 Observations", value=row['Observations'] if is_editing else "")
+
+            # BOUTON DE SOUMISSION UNIQUE POUR LE FORMULAIRE
+            col_sub1, col_sub2 = st.columns(2)
+            btn_save = col_sub1.form_submit_button("💾 ENREGISTRER", use_container_width=True)
+            btn_cancel = col_sub2.form_submit_button("❌ ANNULER", use_container_width=True)
+
+            if btn_cancel:
+                st.session_state.log_edit_idx = None
+                st.rerun()
+
+            if btn_save:
+                equipe_final = ", ".join(filter(None, [e1, e2, e3, e4, e5, e6]))
+                new_entry = {
                     "Date": f_date.strftime("%d/%m/%Y"), "Meteo": f_meteo, "Vent": f_vent,
                     "PortDep": f_p_dep.upper(), "PortArr": f_p_arr.upper(), "Mouillage": f_mouillage,
                     "MotDep": f_m_dep, "MotArr": f_m_arr, "TotalMot": round(f_m_arr - f_m_dep, 1),
                     "MilDep": f_mi_dep, "MilArr": f_mi_arr, "TotalMil": round(f_mi_arr - f_mi_dep, 1),
-                    "Equipage": equipe_str, "Plein": "Oui" if f_plein else "Non",
+                    "Equipage": equipe_final, "Plein": "Oui" if f_plein else "Non",
                     "Litre Gazoil": f_litres, "Cout Gazoil": f_cout, "Observations": f_obs
                 }
+                
                 if is_editing:
-                    for k, v in data.items(): df_log.at[st.session_state.log_edit_idx, k] = v
+                    for k, v in new_entry.items():
+                        df_log.at[st.session_state.log_edit_idx, k] = v
                     st.session_state.log_edit_idx = None
                 else:
-                    df_log = pd.concat([df_log, pd.DataFrame([data])], ignore_index=True)
+                    df_log = pd.concat([df_log, pd.DataFrame([new_entry])], ignore_index=True)
                 
                 sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
-                st.success("C'est noté !")
-                st.rerun()
-            
-            if is_editing and btn_col2.form_submit_button("❌ ANNULER"):
-                st.session_state.log_edit_idx = None
+                st.success("Données enregistrées !")
                 st.rerun()
 
-    # --- AFFICHAGE (Cartes simplifiées) ---
+    # --- LISTE DES FICHES ---
     st.divider()
     if not df_log.empty:
-        df_visu = df_log.sort_values('dt_tri', ascending=False)
+        # Tri par date
+        df_log['dt_tri'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+        df_visu = df_log.sort_values('dt_tri', ascending=False).drop(columns=['dt_tri'])
+        
         for idx, r in df_visu.iterrows():
-            with st.container():
-                st.markdown(f"""
-                <div style="border:1px solid #ddd; border-radius:10px; padding:10px; margin-bottom:10px; background:#f9f9f9;">
-                    <div style="display:flex; justify-content:space-between;">
-                        <b>📅 {r['Date']}</b> <span>💨 F{r.get('Vent',0)} | {r.get('Mouillage','Port')}</span>
-                    </div>
-                    <div style="font-size:0.9rem; color:#01579b; font-weight:bold;">⚓ {r['PortDep']} ➔ {r['PortArr']}</div>
-                    <div style="font-size:0.8rem; color:#666;">👥 {r.get('Equipage','-')}</div>
-                    <div style="margin-top:5px; font-size:0.85rem;">⚙️ {r['TotalMot']}h | 📏 {r['TotalMil']}mn {"| ⛽ Plein" if r.get('Plein')=="Oui" else ""}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Boutons 
-                c_b1, c_b2, c_b3 = st.columns([1, 1, 4])
-                if c_b1.button("✏️", key=f"ed_{idx}"):
-                    st.session_state.log_edit_idx = idx
+            st.markdown(f"""
+            <div style="border: 1px solid #ddd; padding: 10px; border-radius: 10px; background: #f9f9f9; margin-bottom: 5px;">
+                <b>📅 {r['Date']}</b> | 💨 F{r.get('Vent',0)} | ⚓ {r['PortDep']} ➔ {r['PortArr']} <br>
+                <small>👥 {r.get('Equipage','-')}</small><br>
+                ⚙️ {r['TotalMot']}h | 📏 {r['TotalMil']}mn | ⛽ {r.get('Litre Gazoil',0)}L
+            </div>
+            """, unsafe_allow_html=True)
+            
+            c_a, c_b, c_c = st.columns([1, 1, 4])
+            if c_a.button("✏️", key=f"edit_{idx}"):
+                st.session_state.log_edit_idx = idx
+                st.rerun()
+            
+            if st.session_state.log_confirm_del == idx:
+                if c_b.button("✅", key=f"conf_{idx}"):
+                    df_log = df_log.drop(idx)
+                    sauvegarder_data(df_log, 'logbook.json')
+                    st.session_state.log_confirm_del = None
                     st.rerun()
-                if st.session_state.log_confirm_del == idx:
-                    if c_b2.button("✅", key=f"ok_{idx}"):
-                        df_log = df_log.drop(idx)
-                        sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
-                        st.session_state.log_confirm_del = None
-                        st.rerun()
-                    if c_b3.button("❌", key=f"no_{idx}"):
-                        st.session_state.log_confirm_del = None
-                        st.rerun()
-                else:
-                    if c_b2.button("🗑️", key=f"del_{idx}"):
-                        st.session_state.log_confirm_del = idx
-                        st.rerun()
-
-# --- FIN DU FICHIER ---
-
-
+                if c_c.button("❌", key=f"can_{idx}"):
+                    st.session_state.log_confirm_del = None
+                    st.rerun()
+            else:
+                if c_b.button("🗑️", key=f"del_{idx}"):
+                    st.session_state.log_confirm_del = idx
+                    st.rerun()
 
 
 
