@@ -640,7 +640,7 @@ if st.session_state.page == "STATS":
     
     n4.metric("⛽ Conso Moyenne", f"{conso_moy} L/h")
 
-# --- NOUVELLE SECTION : ANALYSE PAR SOCIÉTÉ (AVEC REGROUPEMENT & RENDEMENT) ---
+# --- ANALYSE PAR SOCIÉTÉ (CA, VOLUME & RENDEMENT) ---
 st.divider()
 st.subheader("🏢 Analyse par Société")
 
@@ -649,17 +649,15 @@ if not df_c.empty:
     df_soc['dt'] = pd.to_datetime(df_soc['DateNav'], dayfirst=True, errors='coerce')
     df_soc = df_soc[df_soc['dt'].dt.year == sel_y_stats].copy()
     
-    # 1. Nettoyage et Regroupement
+    # 1. Regroupement Click & Boat et Nettoyage
     df_soc['Société'] = df_soc['Société'].replace(['', 'nan', None], 'PARTICULIER').str.upper().str.strip()
-    
-    # Fusion de "CLICK" et "CLICK & BOAT"
     df_soc['Société'] = df_soc['Société'].replace({
         'CLICK': 'CLICK & BOAT',
         'CLICK AND BOAT': 'CLICK & BOAT',
         'CLICK&BOAT': 'CLICK & BOAT'
     })
 
-    # 2. Préparation des calculs
+    # 2. Calculs
     df_soc['Prix_Num'] = pd.to_numeric(df_soc['Prix'].astype(str).str.replace('€','').str.strip(), errors='coerce').fillna(0.0)
     df_soc['Jours_Num'] = pd.to_numeric(df_soc['Nbre de jours'], errors='coerce').fillna(0.0)
 
@@ -669,32 +667,37 @@ if not df_c.empty:
         'Jours_Num': 'sum'
     }).reset_index()
 
-    # 4. Calcul du Revenu Moyen par Jour (Yield)
     stats_soc['Rendement/J'] = (stats_soc['Prix_Num'] / stats_soc['Jours_Num']).round(2)
     stats_soc.columns = ['Société', 'Total CA (€)', 'Total Jours', 'Moyenne / Jour (€)']
     stats_soc = stats_soc.sort_values(by='Total CA (€)', ascending=False)
 
-    # 5. Affichage Graphique
-    col_soc1, col_soc2 = st.columns([1, 1])
+    # 4. Affichage sur 3 colonnes
+    c_soc1, c_soc2, c_soc3 = st.columns(3)
 
-    with col_soc1:
-        st.caption("📈 Part du Chiffre d'Affaires")
+    with c_soc1:
+        st.caption("📈 Part du CA")
         fig_ca = px.pie(stats_soc, names='Société', values='Total CA (€)', 
                         hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
-        fig_ca.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250, showlegend=True)
+        fig_ca.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=220, showlegend=False)
         st.plotly_chart(fig_ca, use_container_width=True)
 
-    with col_soc2:
-        st.caption("💰 Revenu moyen par Jour (€)")
-        # On trie par rendement pour le graphique en barres
-        df_plot_yield = stats_soc.sort_values('Moyenne / Jour (€)', ascending=True)
-        fig_yield = px.bar(df_plot_yield, y='Société', x='Moyenne / Jour (€)', 
+    with c_soc2:
+        st.caption("⛵ Volume de Navigation (Jours)")
+        fig_vol = px.bar(stats_soc, x='Société', y='Total Jours', 
+                         color='Société', text_auto=True,
+                         color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig_vol.update_layout(margin=dict(t=20, b=0, l=0, r=0), height=220, showlegend=False, xaxis_title=None, yaxis_title=None)
+        st.plotly_chart(fig_vol, use_container_width=True)
+
+    with c_soc3:
+        st.caption("💰 Rendement / Jour (€)")
+        fig_yield = px.bar(stats_soc, y='Société', x='Moyenne / Jour (€)', 
                            orientation='h', text_auto='.0f',
-                           color='Moyenne / Jour (€)', color_continuous_scale='Viridis')
-        fig_yield.update_layout(margin=dict(t=20, b=0, l=0, r=0), height=250, coloraxis_showscale=False)
+                           color_continuous_scale='GnBu', color='Moyenne / Jour (€)')
+        fig_yield.update_layout(margin=dict(t=20, b=0, l=0, r=0), height=220, coloraxis_showscale=False, xaxis_title=None, yaxis_title=None)
         st.plotly_chart(fig_yield, use_container_width=True)
 
-    # 6. Tableau final
+    # 5. Tableau récapitulatif
     st.dataframe(stats_soc, use_container_width=True, hide_index=True)
 
 else:
