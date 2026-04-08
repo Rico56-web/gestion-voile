@@ -146,7 +146,7 @@ if not df_c.empty and 'Paiement' in df_c.columns:
     df_c['Paiement'] = df_c['Paiement'].apply(lambda x: "Payé" if "pay" in str(x).lower() and "non" not in str(x).lower() else "Non payé")
 
 # =================================================================
-# --- 5. BLOC CONTACTS (INTÉGRAL : APPEL, WHATSAPP, MAIL & TRI) ---
+# --- 5. BLOC CONTACTS (COMPLET : AFFICHAGE COORDONNÉES & ACTIONS) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("📅 Planning & Contacts")
@@ -191,13 +191,13 @@ if st.session_state.page == "CONTACTS":
         # --- 5. BOUCLE D'AFFICHAGE ---
         for idx, row in df_affichage.iterrows():
             
-            # --- MODE ÉDITION (TOUS LES CHAMPS) ---
+            # --- MODE ÉDITION ---
             if st.session_state.edit_idx == idx:
                 with st.form(f"f_full_{idx}"):
                     e_date = st.text_input("Date", row['DateNav'])
                     e_nom = st.text_input("Nom", row['Nom'])
-                    e_tel = st.text_input("Téléphone", row.get('Téléphone', ''))
-                    e_mail = st.text_input("Mail", row.get('Mail', ''))
+                    e_tel = st.text_input("Téléphone", str(row.get('Téléphone', '')))
+                    e_mail = st.text_input("Mail", str(row.get('Mail', '')))
                     e_soc = st.selectbox("Société", ["CMN", "Particulier", "Autre"], index=0 if row['Société']=="CMN" else 1)
                     e_prix = st.text_input("Prix", row['Prix'])
                     c1, c2 = st.columns(2)
@@ -220,14 +220,17 @@ if st.session_state.page == "CONTACTS":
                         st.session_state.edit_idx = None
                         st.rerun()
             
-            # --- MODE AFFICHAGE (CARTE + BOUTONS ACTIONS) ---
+            # --- MODE AFFICHAGE ---
             else:
                 is_cmn = str(row.get('Société', '')).upper() == "CMN"
                 color = "#01579b" if is_cmn else "#2e7d32"
                 bg = "#e1f5fe" if is_cmn else "#e8f5e9"
                 badge = "🔴 UNPAID" if row.get('Statut_Paye') == "Unpaid" else "🟢 PAID"
-                tel = str(row.get('Téléphone', '')).replace(" ", "")
-                mail = str(row.get('Mail', ''))
+                
+                # Données de contact
+                tel_val = str(row.get('Téléphone', ''))
+                mail_val = str(row.get('Mail', ''))
+                tel_link = tel_val.replace(" ", "")
 
                 st.markdown(f"""
                     <div style="border-left: 10px solid {color}; padding: 12px; border-radius: 10px; background-color: {bg}; margin-bottom: 5px;">
@@ -235,20 +238,24 @@ if st.session_state.page == "CONTACTS":
                             <b>{row['DateNav']}</b>
                             <span style="font-size:0.75rem; font-weight:bold;">{badge}</span>
                         </div>
-                        <div style="font-size: 1.2rem; font-weight: 900;">{row['Nom']}</div>
-                        <div style="font-size: 0.85rem; margin-bottom: 8px;">{row['Société']} | {row['Prix']}</div>
+                        <div style="font-size: 1.25rem; font-weight: 900;">{row['Nom']}</div>
+                        <div style="font-size: 0.9rem; margin-top: 5px;">
+                            🏢 {row['Société']} | 💰 <b>{row['Prix']}</b><br>
+                            📞 {tel_val if tel_val else '---'}<br>
+                            📧 {mail_val if mail_val else '---'}
+                        </div>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # --- BOUTONS ACTIONS (Appel, WA, Mail) ---
+                # --- BOUTONS ACTIONS ---
                 btn_col1, btn_col2, btn_col3 = st.columns(3)
-                if tel:
-                    btn_col1.markdown(f'[@ Appeler](tel:{tel})', unsafe_allow_html=True)
-                    btn_col2.markdown(f'[💬 WhatsApp](https://wa.me/{tel})', unsafe_allow_html=True)
-                if mail:
-                    btn_col3.markdown(f'[📧 Mail](mailto:{mail})', unsafe_allow_html=True)
+                if tel_val:
+                    btn_col1.markdown(f'<a href="tel:{tel_link}" style="text-decoration:none;">📞 Appel</a>', unsafe_allow_html=True)
+                    btn_col2.markdown(f'<a href="https://wa.me/{tel_link}" style="text-decoration:none;">💬 WA</a>', unsafe_allow_html=True)
+                if mail_val:
+                    btn_col3.markdown(f'<a href="mailto:{mail_val}" style="text-decoration:none;">📧 Mail</a>', unsafe_allow_html=True)
 
-                # --- BOUTONS GESTION (Modif, Suppr) ---
+                # --- BOUTONS GESTION ---
                 col1, col2, _ = st.columns([1, 1, 2])
                 if col1.button("✏️ Modifier", key=f"ed_{idx}"):
                     st.session_state.edit_idx = idx
@@ -257,7 +264,6 @@ if st.session_state.page == "CONTACTS":
                     st.session_state.delete_idx = idx
                     st.rerun()
 
-                # Confirmation suppression
                 if st.session_state.delete_idx == idx:
                     if st.button("✅ CONFIRMER SUPPRESSION", key=f"conf_{idx}", type="primary"):
                         df_c = df_c.drop(idx)
