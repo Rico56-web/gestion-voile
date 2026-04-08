@@ -647,7 +647,7 @@ if st.session_state.page == "STATS":
     if syn:
         st.table(pd.DataFrame(syn))
 # =================================================================
-# --- 8. PAGE MAINTENANCE (VERSION SYNCHRO LOGBOOK) ---
+# --- 8. PAGE MAINTENANCE (SYNC LOGBOOK CORRIGÉE) ---
 # =================================================================
 if st.session_state.page == "MAINT":
     import pandas as pd
@@ -665,24 +665,24 @@ if st.session_state.page == "MAINT":
     releve_h = 0
     
     if not df_log_for_maint.empty:
-        # On s'assure que TotalMot est numérique et on prend la dernière valeur
-        df_log_for_maint['TotalMot'] = pd.to_numeric(df_log_for_maint['TotalMot'], errors='coerce').fillna(0)
-        releve_h = df_log_for_maint['TotalMot'].iloc[-1]
+        # On utilise 'MotArr' (Heures compteur à l'arrivée) pour le calcul
+        df_log_for_maint['MotArr'] = pd.to_numeric(df_log_for_maint['MotArr'], errors='coerce').fillna(0)
+        releve_h = df_log_for_maint['MotArr'].iloc[-1]
     
     # Paramètres de vidange
-    PROCHAINE_VIDANGE = 2450
-    CYCLE_VIDANGE = 100
+    PROCHAINE_VIDANGE = 2450.0
+    CYCLE_VIDANGE = 100.0
     heures_restantes = PROCHAINE_VIDANGE - releve_h
     
-    # Calcul de la progression pour la barre (0.0 à 1.0)
-    # Plus on approche de la vidange, plus la barre se remplit
-    h_depuis_derniere = CYCLE_VIDANGE - heures_restantes
-    percent_prog = max(0.0, min(1.0, h_depuis_derniere / CYCLE_VIDANGE))
+    # Calcul de la progression (base 100h)
+    # Si on a fait 74.9h sur les 100h du cycle, la barre est à 75%
+    h_faites_cycle = CYCLE_VIDANGE - heures_restantes
+    percent_prog = max(0.0, min(1.0, h_faites_cycle / CYCLE_VIDANGE))
     
     # Alerte visuelle selon l'urgence
     if heures_restantes > 15:
         color_v, bg_v = "#2e7d32", "#e8f5e9" # Vert
-    elif heures_restantes > 5:
+    elif heures_restantes > 0:
         color_v, bg_v = "#ef6c00", "#fff3e0" # Orange
     else:
         color_v, bg_v = "#c62828", "#ffebee" # Rouge
@@ -690,9 +690,11 @@ if st.session_state.page == "MAINT":
     # Affichage du bandeau Vidange
     st.markdown(f"""
         <div style="background-color: {bg_v}; border: 2px solid {color_v}; padding: 12px; border-radius: 12px; text-align: center; margin-bottom: 5px;">
-            <div style="color: {color_v}; font-weight: bold; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;">🛢️ Vidange Moteur (Cycle 100h)</div>
-            <div style="font-size: 1.6rem; font-weight: 900; color: {color_v}; margin: 5px 0;">{heures_restantes:.1f} h <span style="font-size:0.8rem; font-weight:normal;">restantes</span></div>
-            <div style="font-size: 0.75rem; color: #555;">Objectif : <b>{PROCHAINE_VIDANGE}h</b> | Actuel : <b>{releve_h:.1f}h</b></div>
+            <div style="color: {color_v}; font-weight: bold; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;">🛢️ Vidange Moteur (Cycle {CYCLE_VIDANGE:.0f}h)</div>
+            <div style="font-size: 1.6rem; font-weight: 900; color: {color_v}; margin: 5px 0;">
+                {heures_restantes:.1f} h <span style="font-size:0.8rem; font-weight:normal;">restantes</span>
+            </div>
+            <div style="font-size: 0.75rem; color: #555;">Échéance : <b>{PROCHAINE_VIDANGE}h</b> | Compteur : <b>{releve_h:.1f}h</b></div>
         </div>
     """, unsafe_allow_html=True)
     st.progress(percent_prog)
@@ -716,7 +718,6 @@ if st.session_state.page == "MAINT":
     # --- 2. FILTRAGE DES DONNÉES ---
     if not df_m.empty:
         df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
-        # Filtrage par année (sur la colonne 'Date')
         df_annee = df_m[df_m['Date'].str.contains(annee_choisie, na=False)].copy()
         df_view = df_annee[df_annee['Statut'] == "Fait"].copy() if "Payé" in vue else df_annee.copy()
         
@@ -782,7 +783,6 @@ if st.session_state.page == "MAINT":
                         st.session_state.edit_idx = None
                         st.rerun()
             else:
-                # Affichage de la carte
                 st_b = row['Statut']
                 status_icon = "🟢" if st_b == "Fait" else "⏳"
                 
