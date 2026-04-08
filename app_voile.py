@@ -647,65 +647,65 @@ if st.session_state.page == "STATS":
     if syn:
         st.table(pd.DataFrame(syn))
 # =================================================================
-# --- 8. PAGE MAINTENANCE (SYNC LOGBOOK CORRIGÉE) ---
+# --- 8. PAGE MAINTENANCE (PILOTAGE DYNAMIQUE) ---
 # =================================================================
 if st.session_state.page == "MAINT":
     import pandas as pd
     from datetime import datetime
 
-    if st.button("📦 ALLER AUX ARCHIVES", key="k_arch_m", use_container_width=True, type="primary"):
-        st.session_state.last_page = "MAINTENANCE"
-        st.session_state.page = "ARCHIVES"
-        st.rerun()
-    
-    st.title("🛠️ MAINTENANCE")
-    # --- 0. RÉCUPÉRATION DES HEURES (DEPUIS LOGBOOK.JSON) ---
-    df_log_for_maint = charger_data('logbook.json')
+    # --- 0. RÉCUPÉRATION DES HEURES LOGBOOK ---
+    df_log = charger_data('logbook.json')
     releve_h = 0
+    if not df_log.empty:
+        # On force en numérique et on prend le MAX (le plus récent)
+        df_log['MotArr'] = pd.to_numeric(df_log['MotArr'], errors='coerce').fillna(0)
+        releve_h = df_log['MotArr'].max()
+
+    # --- 1. RÉGLAGE DE L'ÉCHÉANCE (Accessible & Persistant) ---
+    # On utilise le session_state pour garder la valeur en mémoire pendant la session
+    if 'cible_vidange' not in st.session_state:
+        st.session_state.cible_vidange = 2450.0
+
+    col_target, col_btn = st.columns([2, 1])
     
-    if not df_log_for_maint.empty:
-        # 1. On s'assure que MotArr est bien traité comme un nombre
-        df_log_for_maint['MotArr'] = pd.to_numeric(df_log_for_maint['MotArr'], errors='coerce')
-        
-        # 2. On prend la valeur MAX (le dernier relevé compteur du bateau)
-        releve_h = df_log_for_maint['MotArr'].max()
-        
-        # Sécurité : si le max est invalide (NaN), on met 0
-        if pd.isna(releve_h):
-            releve_h = 0
-    
-    # Paramètres de vidange pour Vesta Skipper 2026
-    PROCHAINE_VIDANGE = 2450.0
+    with col_target:
+        # Champ de saisie direct pour l'échéance
+        PROCHAINE_VIDANGE = st.number_input("Prochaine vidange à (h) :", 
+                                            value=float(st.session_state.cible_vidange), 
+                                            step=10.0,
+                                            format="%.1f",
+                                            key="input_vidange")
+        st.session_state.cible_vidange = PROCHAINE_VIDANGE
+
+    # Calculs dynamiques
     CYCLE_VIDANGE = 100.0
     heures_restantes = PROCHAINE_VIDANGE - releve_h
+    
+    # Calcul progression (pour la barre)
+    h_faites_dans_cycle = CYCLE_VIDANGE - heures_restantes
+    percent_prog = max(0.0, min(1.0, h_faites_dans_cycle / CYCLE_VIDANGE))
 
-    
-    # Calcul de la progression (base 100h)
-    # Si on a fait 74.9h sur les 100h du cycle, la barre est à 75%
-    h_faites_cycle = CYCLE_VIDANGE - heures_restantes
-    percent_prog = max(0.0, min(1.0, h_faites_cycle / CYCLE_VIDANGE))
-    
-    # Alerte visuelle selon l'urgence
+    # --- 2. AFFICHAGE DU BANDEAU D'ALERTE ---
     if heures_restantes > 15:
         color_v, bg_v = "#2e7d32", "#e8f5e9" # Vert
     elif heures_restantes > 0:
         color_v, bg_v = "#ef6c00", "#fff3e0" # Orange
     else:
-        color_v, bg_v = "#c62828", "#ffebee" # Rouge
+        color_v, bg_v = "#c62828", "#ffebee" # Rouge (Retard)
 
-    # Affichage du bandeau Vidange
     st.markdown(f"""
-        <div style="background-color: {bg_v}; border: 2px solid {color_v}; padding: 12px; border-radius: 12px; text-align: center; margin-bottom: 5px;">
-            <div style="color: {color_v}; font-weight: bold; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;">🛢️ Vidange Moteur (Cycle {CYCLE_VIDANGE:.0f}h)</div>
+        <div style="background-color: {bg_v}; border: 2px solid {color_v}; padding: 12px; border-radius: 12px; text-align: center; margin-top: 10px;">
+            <div style="color: {color_v}; font-weight: bold; font-size: 0.75rem; text-transform: uppercase;">🛢️ État du Cycle</div>
             <div style="font-size: 1.6rem; font-weight: 900; color: {color_v}; margin: 5px 0;">
                 {heures_restantes:.1f} h <span style="font-size:0.8rem; font-weight:normal;">restantes</span>
             </div>
-            <div style="font-size: 0.75rem; color: #555;">Échéance : <b>{PROCHAINE_VIDANGE}h</b> | Compteur : <b>{releve_h:.1f}h</b></div>
+            <div style="font-size: 0.75rem; color: #555;">Compteur actuel : <b>{releve_h:.1f} h</b></div>
         </div>
     """, unsafe_allow_html=True)
-    st.progress(percent_prog)
     
+    st.progress(percent_prog)
     st.divider()
+
 
     # --- 1. CONFIGURATION & FILTRES ---
     if 'edit_idx' not in st.session_state:
