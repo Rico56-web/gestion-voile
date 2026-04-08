@@ -108,7 +108,25 @@ st.markdown(f"""<style>
     .day-ok {{ background-color: #2ecc71 !important; color: white; }}
     .day-attente {{ background-color: #f1c40f !important; color: black; }}
 </style>""", unsafe_allow_html=True)
- 
+
+st.sidebar.divider()
+st.sidebar.subheader("💾 Sauvegarde de Sécurité")
+
+# Fonction pour préparer le téléchargement
+def preparer_download(file_path):
+    with open(file_path, 'r') as f:
+        return f.read()
+
+if st.sidebar.expander("Exporter les données"):
+    for file in ['logbook.json', 'maintenance.json', 'params_maint.json']:
+        if os.path.exists(file):
+            st.sidebar.download_button(
+                label=f"📥 Télécharger {file}",
+                data=preparer_download(file),
+                file_name=file,
+                mime="application/json",
+                use_container_width=True
+            )
 # --- 2. SÉCURITÉ ACCÈS ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
