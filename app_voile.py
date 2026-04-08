@@ -922,11 +922,12 @@ Eric (vesta)"""
     else:
         st.warning("La base de données 'Contacts' est vide.")
 # =================================================================
-# --- 11. PAGE ARCHIVES (NETTOYAGE, EXPORT & LOG) ---
+# --- 11. PAGE ARCHIVES (NETTOYAGE, EXPORT & CARTES VIDANGE) ---
 # =================================================================
 if st.session_state.page == "ARCHIVES":
     import pandas as pd
     import io
+    from datetime import datetime
 
     # 1. BOUTON DE RETOUR (Dynamique selon la provenance)
     last = st.session_state.get('last_page', 'PLANNING')
@@ -937,7 +938,7 @@ if st.session_state.page == "ARCHIVES":
     st.title("📂 Centre d'Archivage Vesta")
 
     # --- 2. LE PANNEAU DE NETTOYAGE (Incluant le LOG) ---
-    with st.expander("✂️ ARCHIVER UNE PÉRIODE (Nettoyage)", expanded=True):
+    with st.expander("✂️ ARCHIVER UNE PÉRIODE (Nettoyage)", expanded=False):
         st.info("Sélectionnez une période pour basculer les données actives vers l'historique.")
         
         c1, c2 = st.columns(2)
@@ -953,14 +954,14 @@ if st.session_state.page == "ARCHIVES":
             df_c = charger_data('contacts.json')
             nb_p = archiver_donnees(df_c, d_debut, d_fin, 'contacts.json', 'archives_planning.json', 'DateNav')
             
-            # C. Livre de Bord (Nouveau)
+            # C. Livre de Bord (Logbook)
             df_l = charger_data('logbook.json')
             nb_l = archiver_donnees(df_l, d_debut, d_fin, 'logbook.json', 'archives_logbook.json', 'Date')
             
             st.success(f"Archivage réussi : {nb_m} frais, {nb_p} missions et {nb_l} navigations déplacés.")
             st.rerun()
 
-    # --- 3. EXPORT EXCEL COMPLET ---
+    # --- 3. EXPORT EXCEL COMPLET POUR PC ---
     with st.expander("📤 TRANSFÉRER VERS PC (Excel)", expanded=False):
         df_arch_m = charger_data('archives_maintenance.json')
         df_arch_p = charger_data('archives_planning.json')
@@ -976,9 +977,10 @@ if st.session_state.page == "ARCHIVES":
                 if not df_arch_l.empty: 
                     df_arch_l.to_excel(writer, sheet_name='Livre de Bord', index=False)
             
-            st.download_button("📥 TÉLÉCHARGER L'EXCEL GLOBAL", buffer.getvalue(), 
+            st.download_button("📊 TÉLÉCHARGER L'EXCEL GLOBAL", buffer.getvalue(), 
                                file_name=f"Archives_Vesta_Total_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
-                               mime="application/vnd.ms-excel", use_container_width=True)
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                               use_container_width=True)
 
     st.divider()
 
@@ -987,14 +989,42 @@ if st.session_state.page == "ARCHIVES":
     t1, t2, t3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Livre de Bord"])
     
     with t1:
-        st.dataframe(charger_data('archives_maintenance.json'), use_container_width=True, hide_index=True)
+        # --- AFFICHAGE PEAUFINÉ DES FRAIS (AVEC DÉTECTION VIDANGE) ---
+        df_frais_arch = charger_data('archives_maintenance.json')
+        if not df_frais_arch.empty:
+            # Tri par date décroissante
+            df_frais_arch['dt_t'] = pd.to_datetime(df_frais_arch['Date'], dayfirst=True, errors='coerce')
+            df_frais_arch = df_frais_arch.sort_values('dt_t', ascending=False)
+            
+            for idx, row in df_frais_arch.iterrows():
+                est_vidange = "VIDANGE" in str(row['Objet']).upper()
+                
+                # Style dynamique
+                bg_c = "#fff3e0" if est_vidange else "#f1f3f4"
+                brd_c = "#ef6c00" if est_vidange else "#9aa0a6"
+                icon = "🛠️" if est_vidange else "📄"
+                suffix = " <span style='color:#e65100; font-size:0.7rem; font-weight:bold;'>[MAINTENANCE]</span>" if est_vidange else ""
+
+                st.markdown(f"""
+                <div style="border: 1px solid {brd_c}; border-left: 10px solid {brd_c}; padding: 12px; border-radius: 10px; margin-bottom: 8px; background-color: {bg_c};">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-size: 0.85rem; font-weight: bold;">{icon} {row['Date']} | {row['Objet']}{suffix}</div>
+                        <div style="font-size: 1rem; font-weight: 900;">{float(row.get('M_Num',0)):.0f} €</div>
+                    </div>
+                    <div style="font-size: 0.7rem; color: #5f6368; border-top: 1px dashed {brd_c}; margin-top: 5px; padding-top: 3px;">
+                        📂 {row['Type']} • <b>{str(row['Statut']).upper()}</b>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.write("Aucun frais archivé.")
     
     with t2:
-        # Ici apparaissent les statuts Paid/Unpaid pour ton suivi
+        # Planning : Statuts Paid/Unpaid conservés
         st.dataframe(charger_data('archives_planning.json'), use_container_width=True, hide_index=True)
         
     with t3:
-        # Affichage des navigations passées
+        # Livre de Bord : Navigations passées
         df_log_arch = charger_data('archives_logbook.json')
         if not df_log_arch.empty:
             st.dataframe(df_log_arch, use_container_width=True, hide_index=True)
