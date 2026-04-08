@@ -498,49 +498,52 @@ if st.session_state.page == "PLANNING":
     """, unsafe_allow_html=True)
 
 # =================================================================
-# --- 9. PAGE STATS (FINANCES & NAVIGATION) ---
+# --- 9. PAGE STATS (COMPLET & IPHONE SAFE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     import plotly.express as px
     import pandas as pd
 
-    # --- 1. NAVIGATION & FILTRES ---
+    # --- 1. INITIALISATION SÉCURISÉE (Anti NameError) ---
+    df_recettes_view = pd.DataFrame()
+    df_charges_view = pd.DataFrame()
+    df_log_yr = pd.DataFrame()
+    total_recettes = 0
+    total_charges = 0
+    total_h_moteur = 0
+    total_milles = 0
+    total_cout_gasoil = 0
+    total_litres = 0
+
+    # --- 2. CONFIGURATION & FILTRES ---
     col_t1, col_t2 = st.columns([2, 1])
     col_t1.title("📊 Bilan Vesta")
     
     ANNEES_STATS = [2025, 2026, 2027, 2028]
     sel_y_stats = col_t2.selectbox("Saison", ANNEES_STATS, index=1, label_visibility="collapsed")
-    
     mode_previ = st.toggle("🔮 Voir le Prévisionnel (Toute l'année)", value=False)
     
     if st.button("📂 ARCHIVES", use_container_width=True):
         st.session_state.page = "ARCHIVES"
         st.rerun()
 
-    # --- 2. RÉCUPÉRATION DES DONNÉES ---
+    # --- 3. RÉCUPÉRATION DES DONNÉES ---
     df_m = charger_data('maintenance.json') 
     df_c = charger_data('contacts.json')    
     df_log = charger_data('logbook.json')   
-
-    # Configuration pour affichage iPhone (statique, pas de blocage de scroll)
     config_static = {'staticPlot': True, 'responsive': True}
 
-    # --- TRAITEMENT NAVIGATION & CARBURANT ---
-    total_h_moteur = 0
-    total_milles = 0
-    total_cout_gasoil = 0
-    total_litres = 0
+    # --- 4. TRAITEMENT NAVIGATION & CARBURANT ---
     if not df_log.empty:
         df_log['dt'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
         df_log_yr = df_log[df_log['dt'].dt.year == sel_y_stats].copy()
-        total_h_moteur = pd.to_numeric(df_log_yr.get('TotalMot', 0), errors='coerce').sum()
-        total_milles = pd.to_numeric(df_log_yr.get('TotalMil', 0), errors='coerce').sum()
-        total_cout_gasoil = pd.to_numeric(df_log_yr.get('Cout Gazoil', 0), errors='coerce').sum()
-        total_litres = pd.to_numeric(df_log_yr.get('Litre Gazoil', 0), errors='coerce').sum()
+        if not df_log_yr.empty:
+            total_h_moteur = pd.to_numeric(df_log_yr.get('TotalMot', 0), errors='coerce').sum()
+            total_milles = pd.to_numeric(df_log_yr.get('TotalMil', 0), errors='coerce').sum()
+            total_cout_gasoil = pd.to_numeric(df_log_yr.get('Cout Gazoil', 0), errors='coerce').sum()
+            total_litres = pd.to_numeric(df_log_yr.get('Litre Gazoil', 0), errors='coerce').sum()
 
-    # --- TRAITEMENT DES CHARGES ---
-    total_charges = 0
-    df_charges_view = pd.DataFrame()
+    # --- 5. TRAITEMENT DES CHARGES ---
     if not df_m.empty:
         df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
         df_m['dt'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
@@ -548,14 +551,12 @@ if st.session_state.page == "STATS":
         df_charges_view = df_m_yr if mode_previ else df_m_yr[df_m_yr['Statut'] == "Fait"].copy()
         total_charges = df_charges_view['M_Num'].sum() + total_cout_gasoil
 
-    # --- TRAITEMENT DES RECETTES ---
-    total_recettes = 0
-    df_recettes_view = pd.DataFrame()
+    # --- 6. TRAITEMENT DES RECETTES ---
     if not df_c.empty:
         df_temp = df_c.copy()
         df_temp['dt'] = pd.to_datetime(df_temp['DateNav'], dayfirst=True, errors='coerce')
         df_temp = df_temp[df_temp['dt'].dt.year == sel_y_stats].copy()
-        df_temp['P_Num'] = pd.to_numeric(df_temp['Prix'].astype(str).str.replace('€','').str.strip(), errors='coerce').fillna(0.0)
+        df_temp['P_Num'] = pd.to_numeric(df_temp['Prix'].astype(str).str.replace('€','').str.replace(' ','').str.strip(), errors='coerce').fillna(0.0)
         
         def check_p(val):
             v = str(val).upper()
@@ -564,7 +565,7 @@ if st.session_state.page == "STATS":
         df_recettes_view = df_temp if mode_previ else df_temp[df_temp['Paiement'].apply(check_p)].copy()
         total_recettes = df_recettes_view['P_Num'].sum()
 
-    # --- 3. TRÉSORERIE ---
+    # --- 7. TRÉSORERIE ---
     st.subheader(f"💰 Finances {sel_y_stats}")
     c_pie1, c_pie2, c_sol = st.columns([1, 1, 1])
     
@@ -592,67 +593,81 @@ if st.session_state.page == "STATS":
             <small style="color:#666; font-weight:bold;">SOLDE {"PRÉVU" if mode_previ else "RÉEL"}</small><br>
             <b style="color:{txt_c}; font-size:1.6rem;">{solde:,.0f} €</b></div>""", unsafe_allow_html=True)
 
-# --- ANALYSE PAR SOCIÉTÉ (VERSION SÉCURISÉE PROGRESS BAR) ---
-st.divider()
-st.subheader("🏢 Analyse par Société")
+    # --- 8. ANALYSE PAR SOCIÉTÉ (VERSION ROBUSTE IPHONE) ---
+    st.divider()
+    st.subheader("🏢 Analyse par Société")
 
-if not df_c.empty and not df_recettes_view.empty:
-    df_soc = df_recettes_view.copy()
+    if not df_recettes_view.empty:
+        df_soc = df_recettes_view.copy()
+        
+        # Regroupement Click & Boat
+        df_soc['Société'] = df_soc['Société'].replace(['', 'nan', None], 'PARTICULIER').str.upper().str.strip()
+        df_soc['Société'] = df_soc['Société'].replace({
+            'CLICK': 'CLICK & BOAT', 'CLICK AND BOAT': 'CLICK & BOAT', 'CLICK&BOAT': 'CLICK & BOAT'
+        })
+        
+        df_soc['Jours_Num'] = pd.to_numeric(df_soc['Nbre de jours'], errors='coerce').fillna(0.0)
+        
+        # Groupement
+        stats_soc = df_soc.groupby('Société').agg({'P_Num': 'sum', 'Jours_Num': 'sum'}).reset_index()
+        stats_soc['Moy_Jour'] = stats_soc.apply(lambda x: round(x['P_Num'] / x['Jours_Num'], 0) if x['Jours_Num'] > 0 else 0, axis=1)
+        stats_soc = stats_soc.sort_values(by='P_Num', ascending=False)
+
+        # Camembert Société
+        st.caption("📈 Répartition du Chiffre d'Affaires")
+        fig_ca = px.pie(stats_soc, names='Société', values='P_Num', hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
+        fig_ca.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250, showlegend=True)
+        st.plotly_chart(fig_ca, use_container_width=True, config=config_static)
+
+        st.write("---")
+
+        # Indicateurs Statiques (Progress Bars)
+        m_j = stats_soc['Jours_Num'].max() if stats_soc['Jours_Num'].max() > 0 else 1
+        m_r = stats_soc['Moy_Jour'].max() if stats_soc['Moy_Jour'].max() > 0 else 1
+
+        for _, row in stats_soc.iterrows():
+            with st.container():
+                c_nom, c_barres = st.columns([1, 2])
+                c_nom.markdown(f"**{row['Société']}**")
+                with c_barres:
+                    # Sécurité 0.0 à 1.0 pour progress bar
+                    pct_vol = max(0.0, min(float(row['Jours_Num'] / m_j), 1.0))
+                    st.caption(f"⛵ Volume : {row['Jours_Num']:.0f} jours")
+                    st.progress(pct_vol)
+                    
+                    pct_yield = max(0.0, min(float(row['Moy_Jour'] / m_r), 1.0))
+                    st.caption(f"💰 Rendement : {row['Moy_Jour']:.0f} €/jour")
+                    st.progress(pct_yield)
+                st.write("") 
+
+        # Tableau final sans ascenseur
+        st.table(stats_soc[['Société', 'P_Num', 'Jours_Num', 'Moy_Jour']].rename(
+            columns={'P_Num': 'Total CA (€)', 'Jours_Num': 'Jours', 'Moy_Jour': '€/Jour'}
+        ))
+    else:
+        st.info("Aucune donnée de navigation pour cette saison.")
+
+    # --- 9. SYNTHÈSE MENSUELLE & NAVIGATION ---
+    st.divider()
+    st.subheader("⚓ Navigation & Détails")
     
-    # 1. Nettoyage et Regroupement
-    df_soc['Société'] = df_soc['Société'].replace(['', 'nan', None], 'PARTICULIER').str.upper().str.strip()
-    df_soc['Société'] = df_soc['Société'].replace({
-        'CLICK': 'CLICK & BOAT', 'CLICK AND BOAT': 'CLICK & BOAT', 'CLICK&BOAT': 'CLICK & BOAT'
-    })
+    n1, n2, n3, n4 = st.columns(4)
+    n1.metric("Moteur", f"{total_h_moteur:.1f}h")
+    n2.metric("Milles", f"{total_milles:.0f}mn")
+    n3.metric("Gasoil", f"{total_cout_gasoil:.0f}€")
+    conso = round(total_litres / total_h_moteur, 1) if total_h_moteur > 0 else 0
+    n4.metric("Conso", f"{conso}L/h")
+
+    mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+    syn = []
+    for i in range(1, 13):
+        r = df_recettes_view[df_recettes_view['dt'].dt.month == i]['P_Num'].sum() if not df_recettes_view.empty else 0
+        c = df_charges_view[df_charges_view['dt'].dt.month == i]['M_Num'].sum() if not df_charges_view.empty else 0
+        if r > 0 or c > 0:
+            syn.append({"Mois": mois_noms[i-1], "CA": f"{r:.0f}€", "Frais": f"{c:.0f}€", "Net": f"{r-c:.0f}€"})
     
-    # 2. Préparation des numériques
-    df_soc['P_Num'] = pd.to_numeric(df_soc['Prix'].astype(str).str.replace('€','').str.replace(' ','').str.strip(), errors='coerce').fillna(0.0)
-    df_soc['Jours_Num'] = pd.to_numeric(df_soc['Nbre de jours'], errors='coerce').fillna(0.0)
-    
-    # 3. Groupement
-    stats_soc = df_soc.groupby('Société').agg({'P_Num': 'sum', 'Jours_Num': 'sum'}).reset_index()
-    
-    # Calcul du rendement (sécurité division par zéro)
-    stats_soc['Moy_Jour'] = stats_soc.apply(lambda x: round(x['P_Num'] / x['Jours_Num'], 0) if x['Jours_Num'] > 0 else 0, axis=1)
-    stats_soc = stats_soc.sort_values(by='P_Num', ascending=False)
-
-    # 4. GRAPHIQUE CAMEMBERT
-    st.caption("📈 Répartition du Chiffre d'Affaires")
-    fig_ca = px.pie(stats_soc, names='Société', values='P_Num', hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
-    fig_ca.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250, showlegend=True)
-    st.plotly_chart(fig_ca, use_container_width=True, config={'staticPlot': True})
-
-    st.write("---")
-
-    # 5. INDICATEURS STATIQUES AVEC SÉCURITÉ "CLIP" [0.0, 1.0]
-    max_jours = stats_soc['Jours_Num'].max() if stats_soc['Jours_Num'].max() > 0 else 1
-    max_rendement = stats_soc['Moy_Jour'].max() if stats_soc['Moy_Jour'].max() > 0 else 1
-
-    for _, row in stats_soc.iterrows():
-        with st.container():
-            c_nom, c_barres = st.columns([1, 2])
-            c_nom.markdown(f"**{row['Société']}**")
-            
-            with c_barres:
-                # Sécurité clipping : force la valeur entre 0.0 et 1.0
-                val_vol = float(row['Jours_Num'] / max_jours)
-                pct_vol = max(0.0, min(val_vol, 1.0))
-                st.caption(f"⛵ Volume : {row['Jours_Num']:.0f} jours")
-                st.progress(pct_vol)
-                
-                val_yield = float(row['Moy_Jour'] / max_rendement)
-                pct_yield = max(0.0, min(val_yield, 1.0))
-                st.caption(f"💰 Rendement : {row['Moy_Jour']:.0f} €/jour")
-                st.progress(pct_yield)
-            st.write("") 
-
-    # 6. TABLEAU RÉCAPITULATIF FINAL
-    df_table = stats_soc.copy()
-    df_table.columns = ['Société', 'Total CA (€)', 'Jours', '€/Jour']
-    st.table(df_table)
-
-else:
-    st.info("Aucune donnée de navigation pour cette saison.")
+    if syn:
+        st.table(pd.DataFrame(syn))
 
 
 # =================================================================
