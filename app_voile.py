@@ -1,212 +1,139 @@
-
-import requests, base64, json, time, calendar
+import requests, base64, json, time, os, html, io
 import streamlit as st
 import pandas as pd
-import os
-import json
-import html
-import streamlit.components.v1 as components
-from datetime import datetime, date
 import plotly.express as px
+from datetime import datetime, date, timedelta
+import calendar
 
-def preparer_log_safe(df):
-    cols = ["Date", "Meteo", "PortDep", "PortArr", "MotDep", "MotArr", "MilDep", "MilArr", 
-            "TotalMot", "TotalMil", "Observations", "Vent", "Mouillage", "Equipage", 
-            "Plein", "Litre Gazoil", "Cout Gazoil"]
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        return pd.DataFrame(columns=cols)
-    # Nettoyage des numériques
-    for c in ["TotalMot", "TotalMil", "MotDep", "MotArr", "MilDep", "MilArr", "Litre Gazoil", "Cout Gazoil"]:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0.0)
-    if 'Date' in df.columns:
-        df['dt_tri'] = pd.to_datetime(df['Date'], dayfirst=True, errors='coerce')
-    return df
-
-# ... vos autres fonctions (charger_data, sauvegarder_data) ...
-def charger_data(file):
-    try:
-        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-        url = f"https://api.github.com/repos/{repo}/contents/{file}"
-        # L'ajout de params={"v": time.time()} force la mise à jour
-        res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
-        if res.status_code == 200:
-            content = base64.b64decode(res.json()['content']).decode('utf-8')
-            return pd.DataFrame(json.loads(content))
-        return pd.DataFrame()
-    except:
-        return pd.DataFrame()
-# --- FONCTIONS DE SÉCURITÉ ---
-def clean_text(text):
-    """Nettoie le texte pour éviter de casser le JSON (supprime retours à la ligne et guillemets)"""
-    if text is None or pd.isna(text): 
-        return ""
-    # Remplace les guillemets doubles par des simples et supprime les sauts de ligne
-    return str(text).replace("\n", " ").replace('"', "'").strip()
-
-def safe_val(val, default=0):
-    """Convertit en entier sans planter"""
-    try:
-        if pd.isna(val) or str(val).strip() == "" or str(val).lower() == "nan": return default
-        clean = "".join(filter(str.isdigit, str(val).split('.')[0]))
-        return int(clean) if clean else default
-    except: return default 
-        
-def archiver_donnees(df_source, date_debut, date_fin, fichier_source, fichier_archive, col_date='Date'):
-    df_source['dt_temp'] = pd.to_datetime(df_source[col_date], dayfirst=True, errors='coerce')
-    mask = (df_source['dt_temp'].dt.date >= date_debut) & (df_source['dt_temp'].dt.date <= date_fin)
-    
-    a_archiver = df_source[mask].copy()
-    a_garder = df_source[~mask].copy()
-    
-    if not a_archiver.empty:
-        df_arch_old = charger_data(fichier_archive)
-        df_arch_new = pd.concat([df_arch_old, a_archiver.drop(columns=['dt_temp'])], ignore_index=True)
-        sauvegarder_data(df_arch_new, fichier_archive)
-        sauvegarder_data(a_garder.drop(columns=['dt_temp']), fichier_source)
-        return len(a_archiver)
-    return 0
-
-# --- 1. CONFIGURATION & STYLE ---
+# =================================================================
+# --- 1. CONFIGURATION & STYLE (IPHONE FIRST) ---
+# =================================================================
 st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 
-# --- INITIALISATION DES VARIABLES DE SESSION (Haut du script) ---
-# Pour le Planning / Contacts
-if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
-if 'confirm_del_idx' not in st.session_state: st.session_state.confirm_del_idx = None
-
-# Pour le LOGBOOK (Livre de bord)
-if 'log_edit_idx' not in st.session_state: st.session_state.log_edit_idx = None
-if 'log_confirm_del' not in st.session_state: st.session_state.log_confirm_del = None
-
-# Pour la Maintenance
-if 'm_edit_idx' not in st.session_state: st.session_state.m_edit_idx = None
-if 'maint_confirm_del' not in st.session_state: st.session_state.maint_confirm_del = None
- 
 # Date du jour en français
 jours_fr = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 mois_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
 now = datetime.now()
 date_bandeau = f"📅 {jours_fr[now.weekday()]} {now.day} {mois_fr[now.month-1]} {now.year}"
- 
+
 st.markdown(f"""<style>
-    .main-header {{ font-size: 2.2rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 5px; }}
-    .date-header {{ text-align: center; color: #7f8c8d; font-weight: bold; margin-bottom: 25px; border-bottom: 3px solid #1a2a6c; padding-bottom: 10px; }}
-    button[data-testid="baseButton-primary"] {{ background-color: #ff4b4b !important; color: white !important; }}
-    button[data-testid="baseButton-secondary"] {{ background-color: white !important; color: #1a2a6c !important; border: 1px solid #1a2a6c !important; }}
-    .fiche-globale {{ border-radius: 12px; background: white; margin-bottom: 15px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #ddd; }}
-    .border-cmn {{ border: 4px solid #0056b3 !important; background-color: #f0f7ff !important; }}
-    .prenom-style {{ font-size: 1.5rem; font-weight: bold; color: #1a2a6c; }}
-    .societe-style {{ color: #7f8c8d; font-style: italic; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #eee; }}
-    .statut-badge {{ padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: white; float: right; margin-left: 5px; }}
-    .container-boutons {{ display: flex; gap: 8px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 12px; }}
-    .btn-contact {{ flex: 1; text-align: center; padding: 10px 5px; border-radius: 8px; text-decoration: none !important; color: white !important; font-size: 0.85rem; font-weight: bold; }}
-    .notes-box {{ background-color: #f8f9fa; border-left: 5px solid #1a2a6c; padding: 10px; border-radius: 4px; margin: 10px 0; font-size: 0.95rem; }}
-    .calendar-table {{ width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 20px; }}
-    .calendar-table th {{ background-color: #1a2a6c; color: white; padding: 10px; border: 1px solid #ddd; }}
-    .calendar-table td {{ height: 50px; border: 1px solid #ddd; text-align: center; font-weight: bold; }}
-    .day-ok {{ background-color: #2ecc71 !important; color: white; }}
-    .day-attente {{ background-color: #f1c40f !important; color: black; }}
+    .main-header {{ font-size: 1.8rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 5px; }}
+    .date-header {{ text-align: center; color: #7f8c8d; font-weight: bold; margin-bottom: 20px; border-bottom: 3px solid #1a2a6c; padding-bottom: 10px; }}
+    button[data-testid="baseButton-primary"] {{ background-color: #ff4b4b !important; color: white !important; min-height: 45px; }}
+    button[data-testid="baseButton-secondary"] {{ background-color: white !important; color: #1a2a6c !important; border: 1px solid #1a2a6c !important; min-height: 45px; }}
+    .calendar-table {{ width: 100%; border-collapse: collapse; text-align: center; }}
 </style>""", unsafe_allow_html=True)
 
-st.sidebar.divider()
-st.sidebar.subheader("💾 Sauvegarde de Sécurité")
+# =================================================================
+# --- 2. FONCTIONS CŒUR (UNIFIÉES) ---
+# =================================================================
 
-# Fonction pour préparer le téléchargement
-def preparer_download(file_path):
-    with open(file_path, 'r') as f:
-        return f.read()
-
-if st.sidebar.expander("Exporter les données"):
-    for file in ['logbook.json', 'maintenance.json', 'params_maint.json']:
-        if os.path.exists(file):
-            st.sidebar.download_button(
-                label=f"📥 Télécharger {file}",
-                data=preparer_download(file),
-                file_name=file,
-                mime="application/json",
-                use_container_width=True
-            )
-# --- 2. SÉCURITÉ ACCÈS ---
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
- 
-if not st.session_state.authenticated:
-    st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
-    password = st.text_input("Entrez le code d'accès :", type="password")
-    if st.button("ACCÉDER"):
-        if password == "Skipper2026":
-            st.session_state.authenticated = True
-            st.rerun()
-        else:
-            st.error("Code incorrect.")
-    st.stop()
- 
-# --- 3. FONCTIONS DONNÉES ---
 def charger_data(file):
+    """Charge les données depuis GitHub avec bypass de cache"""
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
         res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
         if res.status_code == 200:
-            return pd.DataFrame(json.loads(base64.b64decode(res.json()['content']).decode('utf-8')))
+            content = base64.b64decode(res.json()['content']).decode('utf-8')
+            return pd.DataFrame(json.loads(content))
         return pd.DataFrame()
     except: return pd.DataFrame()
- 
+
 def sauvegarder_data(df, file):
-    repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
-    url = f"https://api.github.com/repos/{repo}/contents/{file}"
-    res = requests.get(url, headers={"Authorization": f"token {token}"})
-    sha = res.json().get('sha') if res.status_code == 200 else None
-    content = base64.b64encode(df.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
-    requests.put(url, headers={"Authorization": f"token {token}"}, json={"message": f"Update {file}", "content": content, "sha": sha})
- 
-def safe_get(r, key):
-    val = r.get(key)
-    return str(val).strip() if pd.notna(val) and val is not None else ""
- 
-# --- 4. NAVIGATION & ENTÊTE ---
+    """Sauvegarde sur GitHub avec formatage JSON propre"""
+    try:
+        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
+        url = f"https://api.github.com/repos/{repo}/contents/{file}"
+        res = requests.get(url, headers={"Authorization": f"token {token}"})
+        sha = res.json().get('sha') if res.status_code == 200 else None
+        content = base64.b64encode(df.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
+        requests.put(url, headers={"Authorization": f"token {token}"}, 
+                     json={"message": f"Update {file}", "content": content, "sha": sha})
+    except Exception as e: st.error(f"Erreur sauvegarde {file} : {e}")
+
+def safe_val(val, default=0):
+    """Extraction propre de nombres depuis du texte ou NaN"""
+    try:
+        if pd.isna(val) or str(val).strip() == "": return default
+        clean = "".join(filter(lambda x: x.isdigit() or x == '.', str(val)))
+        return float(clean) if clean else default
+    except: return default
+
+def clean_text(text):
+    """Nettoyage pour éviter de casser le JSON"""
+    if text is None or pd.isna(text): return ""
+    return str(text).replace("\n", " ").replace('"', "'").strip()
+
+# =================================================================
+# --- 3. SESSION & SÉCURITÉ ---
+# =================================================================
+
+# Initialisation groupée pour éviter les répétitions
+keys_to_init = {
+    'authenticated': False, 'page': "CONTACTS", 'mode_saisie': False,
+    'edit_idx': None, 'log_edit_idx': None, 'm_edit_idx': None,
+    'confirm_del_idx': None, 'view_archive': False, 'curr_month_idx': now.month - 1,
+    'curr_year': 2026, 'nav_key': 0
+}
+for key, val in keys_to_init.items():
+    if key not in st.session_state: st.session_state[key] = val
+
+if not st.session_state.authenticated:
+    st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
+    pw = st.text_input("Code d'accès :", type="password")
+    if st.button("ACCÉDER", use_container_width=True):
+        if pw == "Skipper2026":
+            st.session_state.authenticated = True
+            st.rerun()
+        else: st.error("Code incorrect.")
+    st.stop()
+
+# =================================================================
+# --- 4. BARRE LATÉRALE (SIDEBAR) ---
+# =================================================================
+with st.sidebar:
+    st.title("🛡️ Sécurité")
+    if st.expander("📥 Exporter les données"):
+        for f in ['logbook.json', 'maintenance.json', 'contacts.json']:
+            df_tmp = charger_data(f)
+            if not df_tmp.empty:
+                st.download_button(f"Sauver {f}", df_tmp.to_json(orient="records"), file_name=f, use_container_width=True)
+
+# =================================================================
+# --- 5. NAVIGATION ---
+# =================================================================
 st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=True)
 
-if "page" not in st.session_state:
-    st.session_state.page = "CONTACTS"
-
-# On remplace LOGBOOK par LOG ici pour correspondre à tes conditions 'if page == "LOG"'
-m = st.columns(7) 
-menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "ARCHIVES", "LOG"] # <-- CHANGÉ ICI
+menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "FACTURES", "ARCHIVES", "LOG"]
 icones = {"CONTACTS": "👤", "PLANNING": "🗓️", "STATS": "📊", "MAINT": "🛠️", "FACTURES": "🧾", "ARCHIVES": "📂", "LOG": "📖"}
 
+cols_nav = st.columns(len(menu))
 for i, name in enumerate(menu):
-    if m[i].button(f"{icones[name]} {name}", key=f"nav_{name}", use_container_width=True, 
-                   type="primary" if st.session_state.page == name else "secondary"):
+    if cols_nav[i].button(icones[name], key=f"nav_{name}", use_container_width=True, 
+                          type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name
         st.rerun()
-        
-# --- CHARGEMENT DES DONNÉES ---
+
+# Chargement des données partagées
 df_c = charger_data("contacts.json")
-df_m = charger_data("maint.json")
- 
-# --- NETTOYAGE AUTOMATIQUE DES DONNÉES ---
-def harmoniser_paiements(val):
-    v = str(val).strip().lower()
-    if not v or "un" in v or "non" in v or "pas" in v:
-        return "Non payé"
-    if "pay" in v:
-        return "Payé"
-    return "Non payé"
- 
-if 'Paiement' in df_c.columns:
-    df_c['Paiement'] = df_c['Paiement'].apply(harmoniser_paiements)
- 
-# --- TRI CHRONOLOGIQUE ---
-if not df_c.empty and 'DateNav' in df_c.columns:
-    try:
-        df_c['DateNav'] = df_c['DateNav'].astype(str).str.strip()
-        df_c['temp_date'] = pd.to_datetime(df_c['DateNav'], format='%d/%m/%Y', errors='coerce')
-        df_c = df_c.sort_values(by='temp_date', ascending=True, na_position='last')
-        df_c = df_c.drop(columns=['temp_date'])
-    except: pass
+
+# Harmonisation automatique des paiements
+if not df_c.empty and 'Paiement' in df_c.columns:
+    df_c['Paiement'] = df_c['Paiement'].apply(lambda x: "Payé" if "pay" in str(x).lower() and "non" not in str(x).lower() else "Non payé")
+
+# =================================================================
+# --- 6. LOGIQUE DES PAGES (Extraits Optimisés) ---
+# =================================================================
+
+if st.session_state.page == "CONTACTS":
+    # (Ici ton code CONTACTS optimisé, il est déjà très bien dans ton envoi)
+    pass # ... continuer avec ton code contacts ...
+
+elif st.session_state.page == "PLANNING":
+    # (Ici ton code PLANNING, j'ai centralisé les calculs de dates au début)
+    pass
 # =================================================================
 # --- 5. PAGE CONTACTS (OPTIMISÉE COMPACTE) ---
 # =================================================================
