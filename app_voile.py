@@ -5,6 +5,28 @@ import plotly.express as px
 from datetime import datetime, date, timedelta
 import calendar
 
+def preparer_log_safe(df):
+    """Nettoie et sécurise les données du logbook pour éviter les plantages d'affichage."""
+    if df.empty:
+        # Retourne un DataFrame vide avec les colonnes minimales attendues
+        return pd.DataFrame(columns=[
+            'Date', 'PortDep', 'PortArr', 'MotDep', 'MotArr', 
+            'TotalMot', 'MilDep', 'MilArr', 'TotalMil', 'Equipage'
+        ])
+    
+    # Conversion forcée en numérique pour les calculs (évite les erreurs de type)
+    cols_num = ['MotDep', 'MotArr', 'MilDep', 'MilArr', 'TotalMot', 'TotalMil']
+    for col in cols_num:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+    
+    # S'assurer que les colonnes de texte existent pour l'affichage
+    cols_texte = ['PortDep', 'PortArr', 'Equipage', 'Mouillage', 'Date']
+    for col in cols_texte:
+        if col not in df.columns:
+            df[col] = ""
+            
+    return df
 # =================================================================
 # --- 1. CONFIGURATION & STYLE (IPHONE FIRST) ---
 # =================================================================
