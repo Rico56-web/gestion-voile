@@ -592,7 +592,7 @@ if st.session_state.page == "STATS":
             <small style="color:#666; font-weight:bold;">SOLDE {"PRÉVU" if mode_previ else "RÉEL"}</small><br>
             <b style="color:{txt_c}; font-size:1.6rem;">{solde:,.0f} €</b></div>""", unsafe_allow_html=True)
 
-# --- ANALYSE PAR SOCIÉTÉ (VERSION ULTRA-ROBUSTE & SANS ERREUR) ---
+# --- ANALYSE PAR SOCIÉTÉ (VERSION SÉCURISÉE PROGRESS BAR) ---
 st.divider()
 st.subheader("🏢 Analyse par Société")
 
@@ -602,64 +602,58 @@ if not df_c.empty and not df_recettes_view.empty:
     # 1. Nettoyage et Regroupement
     df_soc['Société'] = df_soc['Société'].replace(['', 'nan', None], 'PARTICULIER').str.upper().str.strip()
     df_soc['Société'] = df_soc['Société'].replace({
-        'CLICK': 'CLICK & BOAT', 
-        'CLICK AND BOAT': 'CLICK & BOAT', 
-        'CLICK&BOAT': 'CLICK & BOAT'
+        'CLICK': 'CLICK & BOAT', 'CLICK AND BOAT': 'CLICK & BOAT', 'CLICK&BOAT': 'CLICK & BOAT'
     })
     
     # 2. Préparation des numériques
     df_soc['P_Num'] = pd.to_numeric(df_soc['Prix'].astype(str).str.replace('€','').str.replace(' ','').str.strip(), errors='coerce').fillna(0.0)
     df_soc['Jours_Num'] = pd.to_numeric(df_soc['Nbre de jours'], errors='coerce').fillna(0.0)
     
-    # 3. Groupement (On garde des noms de colonnes stables)
-    stats_soc = df_soc.groupby('Société').agg({
-        'P_Num': 'sum',
-        'Jours_Num': 'sum'
-    }).reset_index()
+    # 3. Groupement
+    stats_soc = df_soc.groupby('Société').agg({'P_Num': 'sum', 'Jours_Num': 'sum'}).reset_index()
     
-    # Calcul du rendement
-    stats_soc['Moy_Jour'] = (stats_soc['P_Num'] / stats_soc['Jours_Num']).round(0)
+    # Calcul du rendement (sécurité division par zéro)
+    stats_soc['Moy_Jour'] = stats_soc.apply(lambda x: round(x['P_Num'] / x['Jours_Num'], 0) if x['Jours_Num'] > 0 else 0, axis=1)
     stats_soc = stats_soc.sort_values(by='P_Num', ascending=False)
 
-    # 4. GRAPHIQUE CAMEMBERT (Toujours fonctionnel)
+    # 4. GRAPHIQUE CAMEMBERT
     st.caption("📈 Répartition du Chiffre d'Affaires")
-    fig_ca = px.pie(stats_soc, names='Société', values='P_Num', hole=0.4, 
-                    color_discrete_sequence=px.colors.qualitative.Safe)
+    fig_ca = px.pie(stats_soc, names='Société', values='P_Num', hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
     fig_ca.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250, showlegend=True)
     st.plotly_chart(fig_ca, use_container_width=True, config={'staticPlot': True})
 
     st.write("---")
 
-    # 5. INDICATEURS STATIQUES (Barres de progression sans KeyError)
+    # 5. INDICATEURS STATIQUES AVEC SÉCURITÉ "CLIP" [0.0, 1.0]
     max_jours = stats_soc['Jours_Num'].max() if stats_soc['Jours_Num'].max() > 0 else 1
     max_rendement = stats_soc['Moy_Jour'].max() if stats_soc['Moy_Jour'].max() > 0 else 1
 
     for _, row in stats_soc.iterrows():
-        # Conteneur par société
         with st.container():
             c_nom, c_barres = st.columns([1, 2])
-            
             c_nom.markdown(f"**{row['Société']}**")
             
             with c_barres:
-                # Volume : on utilise les noms exacts du DataFrame (Jours_Num)
-                pct_vol = float(min(row['Jours_Num'] / max_jours, 1.0))
+                # Sécurité clipping : force la valeur entre 0.0 et 1.0
+                val_vol = float(row['Jours_Num'] / max_jours)
+                pct_vol = max(0.0, min(val_vol, 1.0))
                 st.caption(f"⛵ Volume : {row['Jours_Num']:.0f} jours")
                 st.progress(pct_vol)
                 
-                # Rendement : on utilise Moy_Jour
-                pct_yield = float(min(row['Moy_Jour'] / max_rendement, 1.0))
+                val_yield = float(row['Moy_Jour'] / max_rendement)
+                pct_yield = max(0.0, min(val_yield, 1.0))
                 st.caption(f"💰 Rendement : {row['Moy_Jour']:.0f} €/jour")
                 st.progress(pct_yield)
             st.write("") 
 
-    # 6. TABLEAU RÉCAPITULATIF FINAL (Nommage propre pour l'affichage)
+    # 6. TABLEAU RÉCAPITULATIF FINAL
     df_table = stats_soc.copy()
     df_table.columns = ['Société', 'Total CA (€)', 'Jours', '€/Jour']
     st.table(df_table)
 
 else:
     st.info("Aucune donnée de navigation pour cette saison.")
+
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (OPTI IPHONE & AUTO-CLOSE) ---
