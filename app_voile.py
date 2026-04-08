@@ -591,60 +591,63 @@ if st.session_state.page == "STATS":
         st.markdown(f"""<div style="text-align:center; border:1px solid #ddd; padding:10px; border-radius:10px; background:#fff; margin-top:25px;">
             <small style="color:#666; font-weight:bold;">SOLDE {"PRÉVU" if mode_previ else "RÉEL"}</small><br>
             <b style="color:{txt_c}; font-size:1.6rem;">{solde:,.0f} €</b></div>""", unsafe_allow_html=True)
+# --- ANALYSE PAR SOCIÉTÉ (VERSION ULTRA-ROBUSTE POUR IPHONE) ---
+st.divider()
+st.subheader("🏢 Analyse par Société")
 
-    # --- 4. ANALYSE PAR SOCIÉTÉ (COULEURS FIXES & IPHONE SAFE) ---
-    st.divider()
-    st.subheader("🏢 Analyse par Société")
-    if not df_c.empty and not df_recettes_view.empty:
-        df_soc = df_recettes_view.copy()
-        df_soc['Société'] = df_soc['Société'].replace(['', 'nan', None], 'PARTICULIER').str.upper().str.strip()
-        df_soc['Société'] = df_soc['Société'].replace({'CLICK': 'CLICK & BOAT', 'CLICK AND BOAT': 'CLICK & BOAT', 'CLICK&BOAT': 'CLICK & BOAT'})
-        
-        df_soc['Jours_Num'] = pd.to_numeric(df_soc['Nbre de jours'], errors='coerce').fillna(0.0)
-        stats_soc = df_soc.groupby('Société').agg({'P_Num': 'sum', 'Jours_Num': 'sum'}).reset_index()
-        stats_soc['Moy/Jour'] = (stats_soc['P_Num'] / stats_soc['Jours_Num']).round(0)
-        stats_soc.columns = ['Société', 'Total CA (€)', 'Total Jours', 'Moy/Jour (€)']
-        stats_soc = stats_soc.sort_values(by='Total CA (€)', ascending=False)
+if not df_c.empty and not df_recettes_view.empty:
+    df_soc = df_recettes_view.copy()
+    df_soc['Société'] = df_soc['Société'].replace(['', 'nan', None], 'PARTICULIER').str.upper().str.strip()
+    df_soc['Société'] = df_soc['Société'].replace({'CLICK': 'CLICK & BOAT', 'CLICK AND BOAT': 'CLICK & BOAT', 'CLICK&BOAT': 'CLICK & BOAT'})
+    
+    df_soc['Jours_Num'] = pd.to_numeric(df_soc['Nbre de jours'], errors='coerce').fillna(0.0)
+    stats_soc = df_soc.groupby('Société').agg({'P_Num': 'sum', 'Jours_Num': 'sum'}).reset_index()
+    stats_soc['Moy/Jour'] = (stats_soc['P_Num'] / stats_soc['Jours_Num']).round(0)
+    stats_soc = stats_soc.sort_values(by='P_Num', ascending=False)
 
-        # Palette cohérente
-        colors_palette = px.colors.qualitative.Safe
-        color_map = {s: colors_palette[i % len(colors_palette)] for i, s in enumerate(stats_soc['Société'].unique())}
-        if 'CMN' in color_map: color_map['CMN'] = '#0056b3'
+    # 1. LE GRAPHIQUE DE RÉPARTITION (On le garde seul en haut car il passe bien en large)
+    st.caption("📈 Répartition du Chiffre d'Affaires")
+    fig_ca = px.pie(stats_soc, names='Société', values='P_Num', hole=0.4, 
+                    color_discrete_sequence=px.colors.qualitative.Safe)
+    fig_ca.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250, showlegend=True)
+    st.plotly_chart(fig_ca, use_container_width=True, config={'staticPlot': True})
 
-        cs1, cs2, cs3 = st.columns(3)
-        with cs1:
-            st.caption("📈 Part CA")
-            f_soc1 = px.pie(stats_soc, names='Société', values='Total CA (€)', hole=0.4, color='Société', color_discrete_map=color_map)
-            f_soc1.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250, showlegend=False)
-            st.plotly_chart(f_soc1, use_container_width=True, config=config_static)
-        with cs2:
-            st.caption("⛵ Jours Nav")
-            f_soc2 = px.bar(stats_soc, x='Société', y='Total Jours', color='Société', text_auto=True, color_discrete_map=color_map)
-            f_soc2.update_layout(margin=dict(t=20, b=10, l=0, r=0), height=250, showlegend=False, xaxis_title=None, yaxis_title=None)
-            st.plotly_chart(f_soc2, use_container_width=True, config=config_static)
-        with cs3:
-            st.caption("💰 Rendement/J")
-            f_soc3 = px.bar(stats_soc, y='Société', x='Moy/Jour (€)', orientation='h', color='Société', text_auto='.0f', color_discrete_map=color_map)
-            f_soc3.update_layout(margin=dict(t=20, b=10, l=0, r=0), height=250, showlegend=False, xaxis_title=None, yaxis_title=None)
-            st.plotly_chart(f_soc3, use_container_width=True, config=config_static)
-        
-        st.table(stats_soc)
-    else:
-        st.info("Aucune donnée de navigation pour cette saison.")
+    st.write("---")
 
-    # --- 5. SYNTHÈSE MENSUELLE ---
-    st.divider()
-    st.subheader("📅 Synthèse Mensuelle")
-    mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
-    synthese_data = []
-    for m_idx in range(1, 13):
-        m_rec = df_recettes_view[df_recettes_view['dt'].dt.month == m_idx]['P_Num'].sum() if not df_recettes_view.empty else 0
-        m_cha = df_charges_view[df_charges_view['dt'].dt.month == m_idx]['M_Num'].sum() if not df_charges_view.empty else 0
-        m_gasoil = df_log_yr[df_log_yr['dt'].dt.month == m_idx].get('Cout Gazoil', 0).sum() if not df_log.empty else 0
-        m_cha_totale = m_cha + m_gasoil
-        m_mil = df_log_yr[df_log_yr['dt'].dt.month == m_idx].get('TotalMil', 0).sum() if not df_log.empty else 0
-        if m_rec > 0 or m_cha_totale > 0 or m_mil > 0:
-            synthese_data.append({"Mois": mois_noms[m_
+    # 2. INDICATEURS VISUELS STATIQUES (Barres de progression)
+    # On définit le max pour calculer le % des barres
+    max_jours = stats_soc['Jours_Num'].max() if stats_soc['Jours_Num'].max() > 0 else 1
+    max_rendement = stats_soc['Moy/Jour'].max() if stats_soc['Moy/Jour'].max() > 0 else 1
+
+    for _, row in stats_soc.iterrows():
+        with st.container():
+            col_nom, col_stats = st.columns([1, 2])
+            
+            # Nom de la société
+            col_nom.markdown(f"**{row['Société']}**")
+            
+            # Barres de volume et rendement
+            with col_stats:
+                # Volume de Navigation
+                pct_vol = min(row['Jours_Num'] / max_jours, 1.0)
+                st.caption(f"⛵ Volume : {row['Total Jours']:.0f} jours")
+                st.progress(pct_vol)
+                
+                # Rendement par jour
+                pct_yield = min(row['Moy/Jour'] / max_rendement, 1.0)
+                st.caption(f"💰 Rendement : {row['Moy/Jour']:.0f} €/jour")
+                st.progress(pct_yield)
+            
+            st.write("") # Espace entre sociétés
+
+    # 3. LE TABLEAU RÉCAPITULATIF FINAL
+    st.table(stats_soc[['Société', 'P_Num', 'Jours_Num', 'Moy/Jour']].rename(
+        columns={'P_Num': 'Total CA', 'Jours_Num': 'Jours', 'Moy/Jour': '€/Jour'}
+    ))
+
+else:
+    st.info("Aucune donnée de navigation pour cette saison.")
+
 
 
 # =================================================================
