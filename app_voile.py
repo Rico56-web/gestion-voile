@@ -592,26 +592,7 @@ if st.session_state.page == "STATS":
 
     st.divider()
     
-    # --- 4. ANALYSE NAVIGATION ---
-    st.subheader("⚓ Analyse Navigation")
-    n1, n2, n3, n4 = st.columns(4) # Passage à 4 colonnes
-    
-    n1.metric("⚙️ Heures Moteur", f"{total_h_moteur:.1f} h")
-    n2.metric("📏 Milles parcourus", f"{total_milles:.0f} mn")
-    
-    # Ratio d'autonomie/voile
-    ratio = round(total_milles / total_h_moteur, 1) if total_h_moteur > 0 else total_milles
-    n3.metric("⛵ Ratio Voile", f"{ratio} mn/h mtr")
-
-    # CALCUL DE LA CONSOMMATION MOYENNE
-    # On récupère le total des litres saisis dans le logbook
-    total_litres = pd.to_numeric(df_log_yr.get('Litre Gazoil', 0), errors='coerce').sum()
-    conso_moy = round(total_litres / total_h_moteur, 2) if total_h_moteur > 0 else 0
-    
-    n4.metric("⛽ Conso Moyenne", f"{conso_moy} L/h")
-
-
-    # --- 5. SYNTHÈSE MENSUELLE ---
+        # --- 5. SYNTHÈSE MENSUELLE ---
     st.subheader("📅 Synthèse Mensuelle")
     mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     synthese_data = []
@@ -636,6 +617,23 @@ if st.session_state.page == "STATS":
 
     if synthese_data:
         st.dataframe(pd.DataFrame(synthese_data), use_container_width=True, hide_index=True)
+    # --- 4. ANALYSE NAVIGATION ---
+    st.subheader("⚓ Analyse Navigation")
+    n1, n2, n3, n4 = st.columns(4) # Passage à 4 colonnes
+    
+    n1.metric("⚙️ Heures Moteur", f"{total_h_moteur:.1f} h")
+    n2.metric("📏 Milles parcourus", f"{total_milles:.0f} mn")
+    
+    # Ratio d'autonomie/voile
+    ratio = round(total_milles / total_h_moteur, 1) if total_h_moteur > 0 else total_milles
+    n3.metric("⛵ Ratio Voile", f"{ratio} mn/h mtr")
+
+    # CALCUL DE LA CONSOMMATION MOYENNE
+    # On récupère le total des litres saisis dans le logbook
+    total_litres = pd.to_numeric(df_log_yr.get('Litre Gazoil', 0), errors='coerce').sum()
+    conso_moy = round(total_litres / total_h_moteur, 2) if total_h_moteur > 0 else 0
+    
+    n4.metric("⛽ Conso Moyenne", f"{conso_moy} L/h")
 
     # --- 6. TABS DÉTAILLÉS ---
     st.divider()
