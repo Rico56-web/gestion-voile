@@ -156,7 +156,7 @@ if st.session_state.page == "CONTACTS":
 elif st.session_state.page == "PLANNING":
     # (Ici ton code PLANNING, j'ai centralisé les calculs de dates au début)
     pass
-=================================================================
+# ================================================================
 # --- 5. PAGE CONTACTS (OPTIMISÉE COM-PACTE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
