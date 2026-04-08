@@ -592,6 +592,11 @@ if st.session_state.page == "STATS":
 
     st.divider()
     
+    # --- 6. TABS DÉTAILLÉS ---
+    st.divider()
+    t1, t2 = st.tabs(["📥 Recettes", "📤 Charges"])
+    with t1: st.dataframe(df_recettes_view[['DateNav', 'Nom', 'Prix', 'Paiement']] if not df_recettes_view.empty else pd.DataFrame())
+    with t2: st.dataframe(df_charges_view[['Date', 'Objet', 'M_Num', 'Type']] if not df_charges_view.empty else pd.DataFrame())
         # --- 5. SYNTHÈSE MENSUELLE ---
     st.subheader("📅 Synthèse Mensuelle")
     mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
@@ -634,12 +639,6 @@ if st.session_state.page == "STATS":
     conso_moy = round(total_litres / total_h_moteur, 2) if total_h_moteur > 0 else 0
     
     n4.metric("⛽ Conso Moyenne", f"{conso_moy} L/h")
-
-    # --- 6. TABS DÉTAILLÉS ---
-    st.divider()
-    t1, t2 = st.tabs(["📥 Recettes", "📤 Charges"])
-    with t1: st.dataframe(df_recettes_view[['DateNav', 'Nom', 'Prix', 'Paiement']] if not df_recettes_view.empty else pd.DataFrame())
-    with t2: st.dataframe(df_charges_view[['Date', 'Objet', 'M_Num', 'Type']] if not df_charges_view.empty else pd.DataFrame())
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (OPTI IPHONE & AUTO-CLOSE) ---
