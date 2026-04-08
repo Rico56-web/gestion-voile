@@ -647,7 +647,7 @@ if st.session_state.page == "STATS":
     if syn:
         st.table(pd.DataFrame(syn))
 # =================================================================
-# --- 8. PAGE MAINTENANCE (OPTI IPHONE & AUTO-CLOSE) ---
+# --- 8. PAGE MAINTENANCE (OPTI IPHONE & MOTEUR) ---
 # =================================================================
 if st.session_state.page == "MAINT":
     if st.button("📦 ALLER AUX ARCHIVES", key="k_arch_m", use_container_width=True, type="primary"):
@@ -656,23 +656,47 @@ if st.session_state.page == "MAINT":
         st.rerun()
     
     st.title("🛠️ MAINTENANCE")
-    st.divider()
-    if 'edit_idx' not in st.session_state:
-        st.session_state.edit_idx = None
+    
+    # --- 0. GESTION VIDANGE MOTEUR ---
+    df_log = charger_data('logbook.json')
+    releve_h = 0
+    if not df_log.empty:
+        # On prend la dernière valeur saisie dans le logbook
+        releve_h = pd.to_numeric(df_log['TotalMot'], errors='coerce').iloc[-1]
+    
+    PROCHAINE_VIDANGE = 2450
+    CYCLE_VIDANGE = 100
+    heures_restantes = PROCHAINE_VIDANGE - releve_h
+    progression = max(0, min(1.0, (CYCLE_VIDANGE - heures_restantes) / CYCLE_VIDANGE))
+    
+    # Couleur de l'alerte
+    if heures_restantes > 20: color_v, bg_v = "#2e7d32", "#e8f5e9" # Vert
+    elif heures_restantes > 5: color_v, bg_v = "#ef6c00", "#fff3e0" # Orange
+    else: color_v, bg_v = "#c62828", "#ffebee" # Rouge
 
+    st.markdown(f"""
+        <div style="background-color: {bg_v}; border: 2px solid {color_v}; padding: 10px; border-radius: 12px; text-align: center;">
+            <div style="color: {color_v}; font-weight: bold; font-size: 0.8rem; text-transform: uppercase;">🛢️ Prochaine Vidange</div>
+            <div style="font-size: 1.4rem; font-weight: bold; color: {color_v};">{heures_restantes:.1f} h <small style="font-size:0.7rem;">restantes</small></div>
+            <div style="font-size: 0.7rem; color: #666;">Seuil : {PROCHAINE_VIDANGE}h | Actuel : {releve_h}h</div>
+        </div>
+    """, unsafe_allow_html=True)
+    st.progress(progression)
+    
+    st.divider()
+    
+    # --- 1. FILTRES & SETUP ---
+    if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
-    
-    # Liste complète des catégories
     LISTE_TYPES = ["Assurances", "Port", "Maintenance, matériels", "Sécurité", "Autres frais"]
     ANNEES_VUES = ["2026", "2027", "2028"]
     
-    # --- 1. FILTRES COMPACTS ---
     c_y1, c_y2 = st.columns([1, 2])
-    annee_choisie = c_y1.selectbox("📅", ANNEES_VUES, label_visibility="collapsed")
-    vue = c_y2.radio("Vue", ["✅ Payé", "📅 Tout"], horizontal=True, label_visibility="collapsed")
+    annee_choisie = c_y1.selectbox("📅", ANNEES_VUES, label_visibility="collapsed", key="sel_y_m")
+    vue = c_y2.radio("Vue", ["✅ Payé", "📅 Tout"], horizontal=True, label_visibility="collapsed", key="rad_v_m")
 
-    # --- 2. TRAITEMENT ---
+    # --- 2. TRAITEMENT DONNÉES ---
     if not df_m.empty:
         df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
         df_annee = df_m[df_m['Date'].str.endswith(annee_choisie)].copy()
@@ -682,133 +706,71 @@ if st.session_state.page == "MAINT":
     else:
         df_view = pd.DataFrame()
         
-    # --- 3. METRICS EN CARTES (PLACE DE PORT, ASSURANCES, SÉCURITE, MAINTENANCE -> TOTAL) ---
+    # --- 3. METRICS ---
     if not df_view.empty:
-        def g_s(df, c): return df[df['Type'] == c]['M_Num'].sum()
         total_gen = df_view['M_Num'].sum()
-
-        # Fonction pour créer une petite carte stylisée
+        def g_s(df, c): return df[df['Type'] == c]['M_Num'].sum()
+        
         def metric_card(label, value, color):
             st.markdown(f"""
-                <div style="
-                    background-color: {color}; 
-                    padding: 10px; 
-                    border-radius: 10px; 
-                    text-align: center; 
-                    border: 1px solid rgba(0,0,0,0.1);
-                    margin-bottom: 10px;
-                    box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
-                ">
-                    <div style="font-size: 0.7rem; font-weight: bold; color: #555; text-transform: uppercase;">{label}</div>
-                    <div style="font-size: 1.1rem; font-weight: bold; color: #000;">{value:,.0f}€</div>
+                <div style="background-color: {color}; padding: 10px; border-radius: 10px; text-align: center; border: 1px solid rgba(0,0,0,0.1); margin-bottom: 10px;">
+                    <div style="font-size: 0.65rem; font-weight: bold; color: #555;">{label}</div>
+                    <div style="font-size: 1rem; font-weight: bold; color: #000;">{value:,.0f}€</div>
                 </div>
             """, unsafe_allow_html=True)
 
-        # Affichage en colonnes
         col1, col2 = st.columns(2)
         with col1:
-            metric_card("⚓ Place de Port", g_s(df_view, 'Port'), "#e3f2fd")      # Bleu très clair
-            metric_card("🛟 Sécurité", g_s(df_view, 'Sécurité'), "#fff3e0") # Orange très clair
-        
+            metric_card("⚓ Port", g_s(df_view, 'Port'), "#e3f2fd")
+            metric_card("🛟 Sécurité", g_s(df_view, 'Sécurité'), "#fff3e0")
         with col2:
-            metric_card("🛡️ Assurances", g_s(df_view, 'Assurances'), "#f3e5f5") # Violet très clair
-            metric_card("🛠️ Maintenance", g_s(df_view, 'Maintenance, matériels'), "#e8f5e9") # Vert très clair
+            metric_card("🛡️ Assurances", g_s(df_view, 'Assurances'), "#f3e5f5")
+            metric_card("🛠️ Maint.", g_s(df_view, 'Maintenance, matériels'), "#e8f5e9")
 
-        # Ligne du TOTAL en bas (plus large et plus forte)
         st.markdown(f"""
-            <div style="
-                background-color: #01579b; 
-                padding: 12px; 
-                border-radius: 12px; 
-                text-align: center; 
-                margin-top: 5px;
-                box-shadow: 4px 4px 10px rgba(1, 87, 155, 0.2);
-            ">
-                <div style="font-size: 0.8rem; font-weight: bold; color: white; text-transform: uppercase; opacity: 0.9;">💰 TOTAL GÉNÉRAL</div>
-                <div style="font-size: 1.4rem; font-weight: bold; color: white;">{total_gen:,.0f}€</div>
+            <div style="background-color: #01579b; padding: 12px; border-radius: 12px; text-align: center; color: white;">
+                <div style="font-size: 0.7rem; opacity: 0.8;">💰 TOTAL GÉNÉRAL</div>
+                <div style="font-size: 1.3rem; font-weight: bold;">{total_gen:,.0f}€</div>
             </div>
         """, unsafe_allow_html=True)
-        
-        st.write('<div style="margin-bottom:20px"></div>', unsafe_allow_html=True)
+        st.write('<div style="margin-bottom:15px"></div>', unsafe_allow_html=True)
 
-    # --- 4. LISTE ULTRA-COMPACTE (ENCADRÉ BLEU CLAIR) ---
+    # --- 4. LISTE DES TACHES ---
     if not df_view.empty:
         for idx, row in df_view.iterrows():
             if st.session_state.edit_idx == idx:
-                # --- BLOC ÉDITION ---
                 with st.container(border=True):
-                    st.caption(f"Modification : {row['Objet']}")
                     new_mt = st.number_input("Prix €", value=float(row['M_Num']), key=f"ed_mt_{idx}")
-                    new_ty = st.selectbox("Type", LISTE_TYPES, index=LISTE_TYPES.index(row['Type']) if row['Type'] in LISTE_TYPES else 0, key=f"ed_ty_{idx}")
                     new_st = st.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"ed_st_{idx}")
-                    
-                    c_b1, c_b2, c_b3 = st.columns(3)
-                    if c_b1.button("💾 OK", key=f"sv_{idx}", use_container_width=True, type="primary"):
+                    if st.button("💾 SAUVER", key=f"sv_{idx}", use_container_width=True, type="primary"):
                         df_m.at[idx, 'M_Num'] = new_mt
-                        df_m.at[idx, 'Montant'] = new_mt
-                        df_m.at[idx, 'Type'] = new_ty
                         df_m.at[idx, 'Statut'] = new_st
                         sauvegarder_data(df_m, file_path_m)
                         st.session_state.edit_idx = None
                         st.rerun()
-                    if c_b2.button("❌", key=f"ann_{idx}", use_container_width=True):
-                        st.session_state.edit_idx = None
-                        st.rerun()
-                    if c_b3.button("🗑️", key=f"del_{idx}", use_container_width=True):
-                        df_m = df_m.drop(idx).reset_index(drop=True)
-                        sauvegarder_data(df_m, file_path_m)
-                        st.session_state.edit_idx = None
-                        st.rerun()
             else:
-                # --- AFFICHAGE FICHE BLEU CLAIR ---
                 st_b = row['Statut']
                 status_icon = "🟢" if st_b == "Fait" else "⏳"
-                
-                # Couleurs Thème Bleu
-                bg_color = "#e1f5fe"      # Bleu très clair (fond)
-                border_main = "#03a9f4"    # Bleu azur (contour)
-                border_strong = "#01579b"  # Bleu foncé (trait fort gauche)
-                
                 card_maint = f"""
-                <div style="border: 1px solid {border_main}; border-left: 8px solid {border_strong}; 
-                            padding: 8px; border-radius: 10px; margin-bottom: 5px; 
-                            background-color: {bg_color}; font-family: sans-serif;">
+                <div style="border: 1px solid #03a9f4; border-left: 8px solid #01579b; padding: 8px; border-radius: 10px; margin-bottom: 5px; background-color: #e1f5fe;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="font-size: 0.85rem; font-weight: bold; color: #01579b;">
-                            {status_icon} {row['Date'][0:5]} | {row['Objet'][:18]}
-                        </div>
-                        <div style="font-size: 0.95rem; font-weight: bold; color: #d32f2f if row['M_Num'] > 0 else #333;">
-                            {row['M_Num']:.0f}€
-                        </div>
+                        <div style="font-size: 0.8rem; font-weight: bold; color: #01579b;">{status_icon} {row['Date'][0:5]} | {row['Objet'][:20]}</div>
+                        <div style="font-size: 0.9rem; font-weight: bold;">{row['M_Num']:.0f}€</div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; margin-top: 2px; border-top: 1px dashed {border_main}; padding-top: 4px;">
-                        <div style="font-size: 0.7rem; color: #0277bd; text-transform: uppercase; font-weight: 600;">
-                            📂 {row['Type']}
-                        </div>
-                        <div style="font-size: 0.7rem; color: #555; font-style: italic;">
-                            Statut: {st_b}
-                        </div>
-                    </div>
-                </div>
-                """
+                </div>"""
                 st.markdown(card_maint, unsafe_allow_html=True)
-                
-                # Bouton de modification (collé sous l'encadré)
-                st.write('<div style="margin-top:-12px"></div>', unsafe_allow_html=True)
-                if st.button(f"✏️ ÉDITER {row['Objet'][:10]}", key=f"edit_{idx}", use_container_width=True):
+                if st.button(f"✏️ MODIFIER {row['Objet'][:10]}", key=f"edit_{idx}", use_container_width=True):
                     st.session_state.edit_idx = idx
                     st.rerun()
-                
-                st.write('<div style="margin-bottom:8px"></div>', unsafe_allow_html=True)
 
     # --- 5. AJOUT RAPIDE ---
     with st.expander("➕ Nouvelle charge"):
-        f_date = st.date_input("Date", datetime.now(), format="DD/MM/YYYY")
-        f_obj = st.text_input("Objet")
-        f_mt = st.number_input("Montant €", min_value=0.0)
-        f_type = st.selectbox("Catégorie", LISTE_TYPES)
-        f_stat = st.selectbox("Statut", ["À prévoir", "Fait"])
-        if st.button("💾 ENREGISTRER LA SAISIE", use_container_width=True):
+        f_date = st.date_input("Date", datetime.now(), format="DD/MM/YYYY", key="new_date_m")
+        f_obj = st.text_input("Objet", key="new_obj_m")
+        f_mt = st.number_input("Montant €", min_value=0.0, key="new_mt_m")
+        f_type = st.selectbox("Catégorie", LISTE_TYPES, key="new_type_m")
+        f_stat = st.selectbox("Statut", ["À prévoir", "Fait"], key="new_stat_m")
+        if st.button("💾 ENREGISTRER", use_container_width=True, key="btn_save_m"):
             if f_obj:
                 new_data = {"Date": f_date.strftime("%d/%m/%Y"), "Objet": f_obj, "Montant": f_mt, "M_Num": f_mt, "Statut": f_stat, "Type": f_type}
                 df_m = pd.concat([df_m, pd.DataFrame([new_data])], ignore_index=True)
