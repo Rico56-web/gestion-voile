@@ -594,28 +594,36 @@ if st.session_state.page == "STATS":
             <b style="color:{txt_c}; font-size:1.6rem;">{solde:,.0f} €</b></div>""", unsafe_allow_html=True)
 
 # =================================================================
-# --- 9. PAGE STATS (COMPLET - LÉGENDES & OPTI IPHONE) ---
+# --- 9. PAGE STATS (COMPLET - ANTI-DUPLICATE & OPTI IPHONE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     import plotly.express as px
     import pandas as pd
 
-    # --- 1. INITIALISATION SÉCURISÉE ---
+    # --- 1. INITIALISATION SÉCURISÉE (Anti NameError) ---
     df_recettes_view = pd.DataFrame()
     df_charges_view = pd.DataFrame()
     df_log_yr = pd.DataFrame()
     total_recettes, total_charges, total_h_moteur = 0, 0, 0
     total_milles, total_cout_gasoil, total_litres = 0, 0, 0
 
-    # --- 2. NAVIGATION & FILTRES ---
+    # --- 2. NAVIGATION & FILTRES (AVEC CLÉS UNIQUES) ---
     col_t1, col_t2 = st.columns([2, 1])
     col_t1.title("📊 Bilan Vesta")
     
     ANNEES_STATS = [2025, 2026, 2027, 2028]
-    sel_y_stats = col_t2.selectbox("Saison", ANNEES_STATS, index=1, label_visibility="collapsed")
-    mode_previ = st.toggle("🔮 Voir le Prévisionnel (Toute l'année)", value=False)
+    # Clé unique pour éviter StreamlitDuplicateElementId
+    sel_y_stats = col_t2.selectbox(
+        "Saison", ANNEES_STATS, index=1, 
+        label_visibility="collapsed", key="select_annee_stats_unique"
+    )
     
-    if st.button("📂 ARCHIVES", use_container_width=True):
+    mode_previ = st.toggle(
+        "🔮 Voir le Prévisionnel (Toute l'année)", 
+        value=False, key="toggle_previ_stats_unique"
+    )
+    
+    if st.button("📂 ARCHIVES", use_container_width=True, key="btn_arch_stats"):
         st.session_state.page = "ARCHIVES"; st.rerun()
 
     # --- 3. RÉCUPÉRATION DES DONNÉES ---
@@ -624,15 +632,17 @@ if st.session_state.page == "STATS":
     df_log = charger_data('logbook.json')   
     config_static = {'staticPlot': True, 'responsive': True}
 
-    # --- 4. CALCULS (Navigation, Charges, Recettes) ---
+    # --- 4. CALCULS NAVIGATION & CARBURANT ---
     if not df_log.empty:
         df_log['dt'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
         df_log_yr = df_log[df_log['dt'].dt.year == sel_y_stats].copy()
-        total_h_moteur = pd.to_numeric(df_log_yr.get('TotalMot', 0), errors='coerce').sum()
-        total_milles = pd.to_numeric(df_log_yr.get('TotalMil', 0), errors='coerce').sum()
-        total_cout_gasoil = pd.to_numeric(df_log_yr.get('Cout Gazoil', 0), errors='coerce').sum()
-        total_litres = pd.to_numeric(df_log_yr.get('Litre Gazoil', 0), errors='coerce').sum()
+        if not df_log_yr.empty:
+            total_h_moteur = pd.to_numeric(df_log_yr.get('TotalMot', 0), errors='coerce').sum()
+            total_milles = pd.to_numeric(df_log_yr.get('TotalMil', 0), errors='coerce').sum()
+            total_cout_gasoil = pd.to_numeric(df_log_yr.get('Cout Gazoil', 0), errors='coerce').sum()
+            total_litres = pd.to_numeric(df_log_yr.get('Litre Gazoil', 0), errors='coerce').sum()
 
+    # --- 5. CALCULS FINANCIERS ---
     if not df_m.empty:
         df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
         df_m['dt'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
@@ -648,7 +658,7 @@ if st.session_state.page == "STATS":
         df_recettes_view = df_c_yr if mode_previ else df_c_yr[df_c_yr['Paiement'].apply(is_paye)].copy()
         total_recettes = df_recettes_view['P_Num'].sum()
 
-    # --- 5. FINANCES (AVEC LÉGENDES) ---
+    # --- 6. FINANCES (AVEC LÉGENDES - IPHONE SAFE) ---
     st.subheader(f"💰 Finances {sel_y_stats}")
     c1, c2, c3 = st.columns([1.1, 1.1, 0.8])
     
@@ -656,9 +666,8 @@ if st.session_state.page == "STATS":
         st.caption("Revenus vs Frais")
         fig1 = px.pie(names=['Frais', 'Revenus'], values=[total_charges, total_recettes],
                       color_discrete_map={'Frais': '#ef553b', 'Revenus': '#00cc96'}, hole=0.4)
-        # Activation de la légende en bas
-        fig1.update_layout(margin=dict(t=0,b=0,l=0,r=0), height=220, 
-                          showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
+        fig1.update_layout(margin=dict(t=0,b=0,l=0,r=0), height=240, 
+                          showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5))
         st.plotly_chart(fig1, use_container_width=True, config=config_static)
     
     with c2:
@@ -668,8 +677,8 @@ if st.session_state.page == "STATS":
             if total_cout_gasoil > 0:
                 df_p = pd.concat([df_p, pd.DataFrame([{'Type': 'Gasoil', 'M_Num': total_cout_gasoil}])], ignore_index=True)
             fig2 = px.pie(df_p, names='Type', values='M_Num', hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
-            fig2.update_layout(margin=dict(t=0,b=0,l=0,r=0), height=220, 
-                              showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
+            fig2.update_layout(margin=dict(t=0,b=0,l=0,r=0), height=240, 
+                              showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5))
             st.plotly_chart(fig2, use_container_width=True, config=config_static)
     
     with c3:
@@ -678,7 +687,7 @@ if st.session_state.page == "STATS":
             <small style="color:#666;">SOLDE {"PRÉVU" if mode_previ else "RÉEL"}</small><br>
             <b style="color:{'#28a745' if solde>=0 else '#dc3545'}; font-size:1.2rem;">{solde:,.0f} €</b></div>""", unsafe_allow_html=True)
 
-    # --- 6. ANALYSE PAR SOCIÉTÉ (BARRES HORIZONTALES LARGES) ---
+    # --- 7. ANALYSE PAR SOCIÉTÉ (BARRES HORIZONTALES OPTIMISÉES) ---
     st.divider()
     st.subheader("🏢 Analyse par Société")
     if not df_recettes_view.empty:
@@ -691,7 +700,6 @@ if st.session_state.page == "STATS":
         stats_soc['Moy_Jour'] = stats_soc.apply(lambda x: round(x['P_Num']/x['Jours_Num'],0) if x['Jours_Num']>0 else 0, axis=1)
         stats_soc = stats_soc.sort_values(by='P_Num', ascending=False)
 
-        # Graphiques horizontaux optimisés iPhone
         st.caption("⛵ Volume de Navigation (Jours)")
         f_vol = px.bar(stats_soc, y='Société', x='Jours_Num', orientation='h', text_auto=True, 
                        color='Société', color_discrete_sequence=px.colors.qualitative.Pastel)
@@ -708,7 +716,7 @@ if st.session_state.page == "STATS":
     else:
         st.info("Aucune donnée disponible.")
 
-    # --- 7. NAVIGATION & SYNTHÈSE ---
+    # --- 8. NAVIGATION & SYNTHÈSE (SANS ASCENSEUR) ---
     st.divider()
     st.subheader("⚓ Navigation & Détails")
     n1, n2, n3, n4 = st.columns(4)
@@ -725,8 +733,9 @@ if st.session_state.page == "STATS":
         c = df_charges_view[df_charges_view['dt'].dt.month == i]['M_Num'].sum() if not df_charges_view.empty else 0
         if r > 0 or c > 0:
             syn.append({"Mois": mois_noms[i-1], "CA": f"{r:.0f}€", "Frais": f"{c:.0f}€", "Net": f"{r-c:.0f}€"})
-    if syn: st.table(pd.DataFrame(syn))
-
+    
+    if syn:
+        st.table(pd.DataFrame(syn))
 # =================================================================
 # --- 8. PAGE MAINTENANCE (OPTI IPHONE & AUTO-CLOSE) ---
 # =================================================================
