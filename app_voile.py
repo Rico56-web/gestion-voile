@@ -262,6 +262,71 @@ if st.session_state.page == "CONTACTS":
         st.session_state.page = "AJOUT_CONTACT"
         st.rerun()
 
+    if st.session_state.page in ["AJOUT_CONTACT", "MODIF_CONTACT"]:
+        is_edit = (st.session_state.page == "MODIF_CONTACT")
+        st.title("📝 " + ("Modifier la Mission" if is_edit else "Nouvelle Mission"))
+
+    # 1. Chargement des données existantes
+        df_c = charger_data('contacts.json')
+    
+    # 2. Pré-remplissage si modification
+        row = {"DateNav": datetime.now(), "Nom": "", "Société": "CMN", "Prix": "0 €", "Statut": "En cours", "Statut_Paye": "Unpaid"}
+    if is_edit and st.session_state.edit_contact_idx is not None:
+        try:
+            data_row = df_c.loc[st.session_state.edit_contact_idx]
+            row["DateNav"] = datetime.strptime(data_row['DateNav'], "%d/%m/%Y")
+            row["Nom"] = data_row['Nom']
+            row["Société"] = data_row['Société']
+            row["Prix"] = data_row['Prix']
+            row["Statut"] = data_row['Statut']
+            row["Statut_Paye"] = data_row.get('Statut_Paye', 'Unpaid')
+        except:
+            pass
+
+    # 3. LE FORMULAIRE
+    with st.form("form_contact"):
+        f_date = st.date_input("Date de la navigation", row["DateNav"])
+        f_nom = st.text_input("Nom du client / Mission", row["Nom"])
+        f_soc = st.selectbox("Société", ["CMN", "Particulier", "Autre"], index=0 if row["Société"]=="CMN" else 1)
+        f_prix = st.text_input("Prix (ex: 150 €)", row["Prix"])
+        
+        c1, c2 = st.columns(2)
+        f_statut = c1.selectbox("État mission", ["En cours", "Terminé"], index=0 if row["Statut"]=="En cours" else 1)
+        f_paye = c2.selectbox("Paiement", ["Unpaid", "Paid"], index=0 if row["Statut_Paye"]=="Unpaid" else 1)
+
+        st.divider()
+        col_btn1, col_btn2 = st.columns(2)
+        submit = col_btn1.form_submit_button("💾 ENREGISTRER", use_container_width=True)
+        cancel = col_btn2.form_submit_button("❌ ANNULER", use_container_width=True)
+
+    # 4. LOGIQUE DE SAUVEGARDE
+    if submit:
+        new_data = {
+            "DateNav": f_date.strftime("%d/%m/%Y"),
+            "Nom": f_nom,
+            "Société": f_soc,
+            "Prix": f_prix,
+            "Statut": "Payé" if f_paye == "Paid" else f_statut,
+            "Statut_Paye": f_paye
+        }
+
+        if is_edit:
+            # On remplace l'ancienne ligne
+            for key, val in new_data.items():
+                df_c.at[st.session_state.edit_contact_idx, key] = val
+        else:
+            # On ajoute une nouvelle ligne
+            df_c = pd.concat([df_c, pd.DataFrame([new_data])], ignore_index=True)
+
+        sauvegarder_data(df_c, 'contacts.json')
+        st.session_state.page = "CONTACTS"
+        st.session_state.edit_contact_idx = None
+        st.rerun()
+
+    if cancel:
+        st.session_state.page = "CONTACTS"
+        st.session_state.edit_contact_idx = None
+        st.rerun()
   
 # =================================================================
 # --- 6. PAGE PLANNING (AVEC BOUTON ARCHIVES VISIBLE) ---
