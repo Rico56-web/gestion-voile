@@ -659,20 +659,26 @@ if st.session_state.page == "MAINT":
         st.rerun()
     
     st.title("🛠️ MAINTENANCE")
-
     # --- 0. RÉCUPÉRATION DES HEURES (DEPUIS LOGBOOK.JSON) ---
     df_log_for_maint = charger_data('logbook.json')
     releve_h = 0
     
     if not df_log_for_maint.empty:
-        # On utilise 'MotArr' (Heures compteur à l'arrivée) pour le calcul
-        df_log_for_maint['MotArr'] = pd.to_numeric(df_log_for_maint['MotArr'], errors='coerce').fillna(0)
-        releve_h = df_log_for_maint['MotArr'].iloc[-1]
+        # 1. On s'assure que MotArr est bien traité comme un nombre
+        df_log_for_maint['MotArr'] = pd.to_numeric(df_log_for_maint['MotArr'], errors='coerce')
+        
+        # 2. On prend la valeur MAX (le dernier relevé compteur du bateau)
+        releve_h = df_log_for_maint['MotArr'].max()
+        
+        # Sécurité : si le max est invalide (NaN), on met 0
+        if pd.isna(releve_h):
+            releve_h = 0
     
-    # Paramètres de vidange
+    # Paramètres de vidange pour Vesta Skipper 2026
     PROCHAINE_VIDANGE = 2450.0
     CYCLE_VIDANGE = 100.0
     heures_restantes = PROCHAINE_VIDANGE - releve_h
+
     
     # Calcul de la progression (base 100h)
     # Si on a fait 74.9h sur les 100h du cycle, la barre est à 75%
