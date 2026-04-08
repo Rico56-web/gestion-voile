@@ -647,74 +647,93 @@ if st.session_state.page == "STATS":
     if syn:
         st.table(pd.DataFrame(syn))
 # =================================================================
-# --- 8. PAGE MAINTENANCE (OPTI IPHONE & MOTEUR) ---
+# --- 8. PAGE MAINTENANCE (VERSION SYNCHRO LOGBOOK) ---
 # =================================================================
 if st.session_state.page == "MAINT":
+    import pandas as pd
+    from datetime import datetime
+
     if st.button("📦 ALLER AUX ARCHIVES", key="k_arch_m", use_container_width=True, type="primary"):
         st.session_state.last_page = "MAINTENANCE"
         st.session_state.page = "ARCHIVES"
         st.rerun()
     
     st.title("🛠️ MAINTENANCE")
-    
-    # --- 0. GESTION VIDANGE MOTEUR ---
-    df_log = charger_data('logbook.json')
+
+    # --- 0. RÉCUPÉRATION DES HEURES (DEPUIS LOGBOOK.JSON) ---
+    df_log_for_maint = charger_data('logbook.json')
     releve_h = 0
-    if not df_log.empty:
-        # On prend la dernière valeur saisie dans le logbook
-        releve_h = pd.to_numeric(df_log['TotalMot'], errors='coerce').iloc[-1]
     
+    if not df_log_for_maint.empty:
+        # On s'assure que TotalMot est numérique et on prend la dernière valeur
+        df_log_for_maint['TotalMot'] = pd.to_numeric(df_log_for_maint['TotalMot'], errors='coerce').fillna(0)
+        releve_h = df_log_for_maint['TotalMot'].iloc[-1]
+    
+    # Paramètres de vidange
     PROCHAINE_VIDANGE = 2450
     CYCLE_VIDANGE = 100
     heures_restantes = PROCHAINE_VIDANGE - releve_h
-    progression = max(0, min(1.0, (CYCLE_VIDANGE - heures_restantes) / CYCLE_VIDANGE))
     
-    # Couleur de l'alerte
-    if heures_restantes > 20: color_v, bg_v = "#2e7d32", "#e8f5e9" # Vert
-    elif heures_restantes > 5: color_v, bg_v = "#ef6c00", "#fff3e0" # Orange
-    else: color_v, bg_v = "#c62828", "#ffebee" # Rouge
+    # Calcul de la progression pour la barre (0.0 à 1.0)
+    # Plus on approche de la vidange, plus la barre se remplit
+    h_depuis_derniere = CYCLE_VIDANGE - heures_restantes
+    percent_prog = max(0.0, min(1.0, h_depuis_derniere / CYCLE_VIDANGE))
+    
+    # Alerte visuelle selon l'urgence
+    if heures_restantes > 15:
+        color_v, bg_v = "#2e7d32", "#e8f5e9" # Vert
+    elif heures_restantes > 5:
+        color_v, bg_v = "#ef6c00", "#fff3e0" # Orange
+    else:
+        color_v, bg_v = "#c62828", "#ffebee" # Rouge
 
+    # Affichage du bandeau Vidange
     st.markdown(f"""
-        <div style="background-color: {bg_v}; border: 2px solid {color_v}; padding: 10px; border-radius: 12px; text-align: center;">
-            <div style="color: {color_v}; font-weight: bold; font-size: 0.8rem; text-transform: uppercase;">🛢️ Prochaine Vidange</div>
-            <div style="font-size: 1.4rem; font-weight: bold; color: {color_v};">{heures_restantes:.1f} h <small style="font-size:0.7rem;">restantes</small></div>
-            <div style="font-size: 0.7rem; color: #666;">Seuil : {PROCHAINE_VIDANGE}h | Actuel : {releve_h}h</div>
+        <div style="background-color: {bg_v}; border: 2px solid {color_v}; padding: 12px; border-radius: 12px; text-align: center; margin-bottom: 5px;">
+            <div style="color: {color_v}; font-weight: bold; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;">🛢️ Vidange Moteur (Cycle 100h)</div>
+            <div style="font-size: 1.6rem; font-weight: 900; color: {color_v}; margin: 5px 0;">{heures_restantes:.1f} h <span style="font-size:0.8rem; font-weight:normal;">restantes</span></div>
+            <div style="font-size: 0.75rem; color: #555;">Objectif : <b>{PROCHAINE_VIDANGE}h</b> | Actuel : <b>{releve_h:.1f}h</b></div>
         </div>
     """, unsafe_allow_html=True)
-    st.progress(progression)
+    st.progress(percent_prog)
     
     st.divider()
-    
-    # --- 1. FILTRES & SETUP ---
-    if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
+
+    # --- 1. CONFIGURATION & FILTRES ---
+    if 'edit_idx' not in st.session_state:
+        st.session_state.edit_idx = None
+
     file_path_m = 'maintenance.json'
     df_m = charger_data(file_path_m)
+    
     LISTE_TYPES = ["Assurances", "Port", "Maintenance, matériels", "Sécurité", "Autres frais"]
     ANNEES_VUES = ["2026", "2027", "2028"]
     
     c_y1, c_y2 = st.columns([1, 2])
-    annee_choisie = c_y1.selectbox("📅", ANNEES_VUES, label_visibility="collapsed", key="sel_y_m")
-    vue = c_y2.radio("Vue", ["✅ Payé", "📅 Tout"], horizontal=True, label_visibility="collapsed", key="rad_v_m")
+    annee_choisie = c_y1.selectbox("📅", ANNEES_VUES, index=0, label_visibility="collapsed", key="maint_yr")
+    vue = c_y2.radio("Vue", ["✅ Payé", "📅 Tout"], horizontal=True, label_visibility="collapsed", key="maint_vue")
 
-    # --- 2. TRAITEMENT DONNÉES ---
+    # --- 2. FILTRAGE DES DONNÉES ---
     if not df_m.empty:
         df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
-        df_annee = df_m[df_m['Date'].str.endswith(annee_choisie)].copy()
+        # Filtrage par année (sur la colonne 'Date')
+        df_annee = df_m[df_m['Date'].str.contains(annee_choisie, na=False)].copy()
         df_view = df_annee[df_annee['Statut'] == "Fait"].copy() if "Payé" in vue else df_annee.copy()
+        
         df_view['dt_t'] = pd.to_datetime(df_view['Date'], dayfirst=True, errors='coerce')
         df_view = df_view.sort_values('dt_t', ascending=False)
     else:
         df_view = pd.DataFrame()
         
-    # --- 3. METRICS ---
+    # --- 3. RÉCAPITULATIF FINANCIER (CARTES) ---
     if not df_view.empty:
         total_gen = df_view['M_Num'].sum()
         def g_s(df, c): return df[df['Type'] == c]['M_Num'].sum()
-        
+
         def metric_card(label, value, color):
             st.markdown(f"""
-                <div style="background-color: {color}; padding: 10px; border-radius: 10px; text-align: center; border: 1px solid rgba(0,0,0,0.1); margin-bottom: 10px;">
-                    <div style="font-size: 0.65rem; font-weight: bold; color: #555;">{label}</div>
+                <div style="background-color: {color}; padding: 10px; border-radius: 10px; text-align: center; border: 1px solid rgba(0,0,0,0.05); margin-bottom: 10px;">
+                    <div style="font-size: 0.65rem; font-weight: bold; color: #555; text-transform: uppercase;">{label}</div>
                     <div style="font-size: 1rem; font-weight: bold; color: #000;">{value:,.0f}€</div>
                 </div>
             """, unsafe_allow_html=True)
@@ -725,55 +744,90 @@ if st.session_state.page == "MAINT":
             metric_card("🛟 Sécurité", g_s(df_view, 'Sécurité'), "#fff3e0")
         with col2:
             metric_card("🛡️ Assurances", g_s(df_view, 'Assurances'), "#f3e5f5")
-            metric_card("🛠️ Maint.", g_s(df_view, 'Maintenance, matériels'), "#e8f5e9")
+            metric_card("🛠️ Maintenance", g_s(df_view, 'Maintenance, matériels'), "#e8f5e9")
 
         st.markdown(f"""
-            <div style="background-color: #01579b; padding: 12px; border-radius: 12px; text-align: center; color: white;">
-                <div style="font-size: 0.7rem; opacity: 0.8;">💰 TOTAL GÉNÉRAL</div>
-                <div style="font-size: 1.3rem; font-weight: bold;">{total_gen:,.0f}€</div>
+            <div style="background-color: #01579b; padding: 12px; border-radius: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <div style="font-size: 0.75rem; color: white; opacity: 0.8; font-weight: bold;">TOTAL DÉPENSES {annee_choisie}</div>
+                <div style="font-size: 1.4rem; font-weight: bold; color: white;">{total_gen:,.0f}€</div>
             </div>
         """, unsafe_allow_html=True)
-        st.write('<div style="margin-bottom:15px"></div>', unsafe_allow_html=True)
+        st.write('<div style="margin-bottom:20px"></div>', unsafe_allow_html=True)
 
-    # --- 4. LISTE DES TACHES ---
+    # --- 4. LISTE DES TÂCHES ET ÉDITION ---
     if not df_view.empty:
         for idx, row in df_view.iterrows():
             if st.session_state.edit_idx == idx:
                 with st.container(border=True):
-                    new_mt = st.number_input("Prix €", value=float(row['M_Num']), key=f"ed_mt_{idx}")
-                    new_st = st.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"ed_st_{idx}")
-                    if st.button("💾 SAUVER", key=f"sv_{idx}", use_container_width=True, type="primary"):
+                    st.caption(f"Modification : {row['Objet']}")
+                    new_mt = st.number_input("Prix €", value=float(row['M_Num']), key=f"m_mt_{idx}")
+                    new_ty = st.selectbox("Type", LISTE_TYPES, index=LISTE_TYPES.index(row['Type']) if row['Type'] in LISTE_TYPES else 0, key=f"m_ty_{idx}")
+                    new_st = st.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"m_st_{idx}")
+                    
+                    c_b1, c_b2, c_b3 = st.columns(3)
+                    if c_b1.button("💾", key=f"m_save_{idx}", use_container_width=True):
                         df_m.at[idx, 'M_Num'] = new_mt
+                        df_m.at[idx, 'Montant'] = new_mt
+                        df_m.at[idx, 'Type'] = new_ty
                         df_m.at[idx, 'Statut'] = new_st
                         sauvegarder_data(df_m, file_path_m)
                         st.session_state.edit_idx = None
                         st.rerun()
+                    if c_b2.button("❌", key=f"m_can_{idx}", use_container_width=True):
+                        st.session_state.edit_idx = None
+                        st.rerun()
+                    if c_b3.button("🗑️", key=f"m_del_{idx}", use_container_width=True):
+                        df_m = df_m.drop(idx).reset_index(drop=True)
+                        sauvegarder_data(df_m, file_path_m)
+                        st.session_state.edit_idx = None
+                        st.rerun()
             else:
+                # Affichage de la carte
                 st_b = row['Statut']
                 status_icon = "🟢" if st_b == "Fait" else "⏳"
-                card_maint = f"""
-                <div style="border: 1px solid #03a9f4; border-left: 8px solid #01579b; padding: 8px; border-radius: 10px; margin-bottom: 5px; background-color: #e1f5fe;">
+                
+                card_html = f"""
+                <div style="border: 1px solid #03a9f4; border-left: 8px solid #01579b; 
+                            padding: 10px; border-radius: 10px; margin-bottom: 5px; 
+                            background-color: #e1f5fe;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="font-size: 0.8rem; font-weight: bold; color: #01579b;">{status_icon} {row['Date'][0:5]} | {row['Objet'][:20]}</div>
-                        <div style="font-size: 0.9rem; font-weight: bold;">{row['M_Num']:.0f}€</div>
+                        <div style="font-size: 0.85rem; font-weight: bold; color: #01579b;">
+                            {status_icon} {row['Date'][:5]} | {row['Objet'][:22]}
+                        </div>
+                        <div style="font-size: 1rem; font-weight: bold; color: #333;">
+                            {row['M_Num']:.0f}€
+                        </div>
                     </div>
-                </div>"""
-                st.markdown(card_maint, unsafe_allow_html=True)
-                if st.button(f"✏️ MODIFIER {row['Objet'][:10]}", key=f"edit_{idx}", use_container_width=True):
+                    <div style="font-size: 0.7rem; color: #0277bd; margin-top: 4px; border-top: 1px dashed #b3e5fc; padding-top:4px;">
+                        📂 {row['Type']} • {st_b}
+                    </div>
+                </div>
+                """
+                st.markdown(card_html, unsafe_allow_html=True)
+                if st.button(f"✏️ ÉDITER {row['Objet'][:10]}...", key=f"m_edit_btn_{idx}", use_container_width=True):
                     st.session_state.edit_idx = idx
                     st.rerun()
+                st.write('<div style="margin-bottom:10px"></div>', unsafe_allow_html=True)
 
     # --- 5. AJOUT RAPIDE ---
-    with st.expander("➕ Nouvelle charge"):
-        f_date = st.date_input("Date", datetime.now(), format="DD/MM/YYYY", key="new_date_m")
-        f_obj = st.text_input("Objet", key="new_obj_m")
-        f_mt = st.number_input("Montant €", min_value=0.0, key="new_mt_m")
-        f_type = st.selectbox("Catégorie", LISTE_TYPES, key="new_type_m")
-        f_stat = st.selectbox("Statut", ["À prévoir", "Fait"], key="new_stat_m")
-        if st.button("💾 ENREGISTRER", use_container_width=True, key="btn_save_m"):
+    with st.expander("➕ AJOUTER UNE DÉPENSE"):
+        f_date = st.date_input("Date", datetime.now(), format="DD/MM/YYYY", key="new_m_date")
+        f_obj = st.text_input("Objet", key="new_m_obj")
+        f_mt = st.number_input("Montant €", min_value=0.0, key="new_m_mt")
+        f_type = st.selectbox("Catégorie", LISTE_TYPES, key="new_m_type")
+        f_stat = st.selectbox("Statut", ["À prévoir", "Fait"], key="new_m_stat")
+        
+        if st.button("💾 ENREGISTRER", use_container_width=True, key="new_m_save"):
             if f_obj:
-                new_data = {"Date": f_date.strftime("%d/%m/%Y"), "Objet": f_obj, "Montant": f_mt, "M_Num": f_mt, "Statut": f_stat, "Type": f_type}
-                df_m = pd.concat([df_m, pd.DataFrame([new_data])], ignore_index=True)
+                new_row = {
+                    "Date": f_date.strftime("%d/%m/%Y"), 
+                    "Objet": f_obj, 
+                    "Montant": f_mt, 
+                    "M_Num": f_mt, 
+                    "Statut": f_stat, 
+                    "Type": f_type
+                }
+                df_m = pd.concat([df_m, pd.DataFrame([new_row])], ignore_index=True)
                 sauvegarder_data(df_m, file_path_m)
                 st.rerun()
 # ===============================================================================
