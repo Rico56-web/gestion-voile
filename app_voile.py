@@ -593,14 +593,14 @@ if st.session_state.page == "STATS":
             <small style="color:#666; font-weight:bold;">SOLDE {"PRÉVU" if mode_previ else "RÉEL"}</small><br>
             <b style="color:{txt_c}; font-size:1.6rem;">{solde:,.0f} €</b></div>""", unsafe_allow_html=True)
 
-    # --- 8. ANALYSE PAR SOCIÉTÉ (VERSION ROBUSTE IPHONE) ---
+# --- 8. ANALYSE PAR SOCIÉTÉ (VERSION ERGONOMIQUE & LARGE IPHONE) ---
     st.divider()
     st.subheader("🏢 Analyse par Société")
 
     if not df_recettes_view.empty:
         df_soc = df_recettes_view.copy()
         
-        # Regroupement Click & Boat
+        # Nettoyage et Regroupement
         df_soc['Société'] = df_soc['Société'].replace(['', 'nan', None], 'PARTICULIER').str.upper().str.strip()
         df_soc['Société'] = df_soc['Société'].replace({
             'CLICK': 'CLICK & BOAT', 'CLICK AND BOAT': 'CLICK & BOAT', 'CLICK&BOAT': 'CLICK & BOAT'
@@ -613,61 +613,39 @@ if st.session_state.page == "STATS":
         stats_soc['Moy_Jour'] = stats_soc.apply(lambda x: round(x['P_Num'] / x['Jours_Num'], 0) if x['Jours_Num'] > 0 else 0, axis=1)
         stats_soc = stats_soc.sort_values(by='P_Num', ascending=False)
 
-        # Camembert Société
-        st.caption("📈 Répartition du Chiffre d'Affaires")
-        fig_ca = px.pie(stats_soc, names='Société', values='P_Num', hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
-        fig_ca.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250, showlegend=True)
+        # 1. Camembert (Toujours utile pour la vue d'ensemble)
+        st.caption("📈 Part du Chiffre d'Affaires")
+        fig_ca = px.pie(stats_soc, names='Société', values='P_Num', hole=0.4, 
+                        color_discrete_sequence=px.colors.qualitative.Safe)
+        fig_ca.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=220, showlegend=True)
         st.plotly_chart(fig_ca, use_container_width=True, config=config_static)
 
+        # 2. Graphiques Horizontaux "Full Width" (Ergonomie iPhone)
         st.write("---")
+        
+        # Volume de navigation
+        st.caption("⛵ Volume de Navigation (Jours en mer)")
+        fig_vol = px.bar(stats_soc, y='Société', x='Jours_Num', orientation='h',
+                         text_auto=True, color='Société', color_discrete_sequence=px.colors.qualitative.Pastel)
+        # On cache les axes pour gagner de la place et éviter le bug de disparition
+        fig_vol.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=150, showlegend=False,
+                              xaxis_visible=False, yaxis_title=None)
+        st.plotly_chart(fig_vol, use_container_width=True, config=config_static)
 
-        # Indicateurs Statiques (Progress Bars)
-        m_j = stats_soc['Jours_Num'].max() if stats_soc['Jours_Num'].max() > 0 else 1
-        m_r = stats_soc['Moy_Jour'].max() if stats_soc['Moy_Jour'].max() > 0 else 1
+        # Rendement journalier
+        st.caption("💰 Revenu moyen par jour (€/jour)")
+        fig_yield = px.bar(stats_soc, y='Société', x='Moy_Jour', orientation='h',
+                           text_auto='.0f', color='Société', color_discrete_sequence=px.colors.qualitative.Safe)
+        fig_yield.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=150, showlegend=False,
+                               xaxis_visible=False, yaxis_title=None)
+        st.plotly_chart(fig_yield, use_container_width=True, config=config_static)
 
-        for _, row in stats_soc.iterrows():
-            with st.container():
-                c_nom, c_barres = st.columns([1, 2])
-                c_nom.markdown(f"**{row['Société']}**")
-                with c_barres:
-                    # Sécurité 0.0 à 1.0 pour progress bar
-                    pct_vol = max(0.0, min(float(row['Jours_Num'] / m_j), 1.0))
-                    st.caption(f"⛵ Volume : {row['Jours_Num']:.0f} jours")
-                    st.progress(pct_vol)
-                    
-                    pct_yield = max(0.0, min(float(row['Moy_Jour'] / m_r), 1.0))
-                    st.caption(f"💰 Rendement : {row['Moy_Jour']:.0f} €/jour")
-                    st.progress(pct_yield)
-                st.write("") 
-
-        # Tableau final sans ascenseur
+        # 3. Tableau Récapitulatif
         st.table(stats_soc[['Société', 'P_Num', 'Jours_Num', 'Moy_Jour']].rename(
             columns={'P_Num': 'Total CA (€)', 'Jours_Num': 'Jours', 'Moy_Jour': '€/Jour'}
         ))
     else:
-        st.info("Aucune donnée de navigation pour cette saison.")
-
-    # --- 9. SYNTHÈSE MENSUELLE & NAVIGATION ---
-    st.divider()
-    st.subheader("⚓ Navigation & Détails")
-    
-    n1, n2, n3, n4 = st.columns(4)
-    n1.metric("Moteur", f"{total_h_moteur:.1f}h")
-    n2.metric("Milles", f"{total_milles:.0f}mn")
-    n3.metric("Gasoil", f"{total_cout_gasoil:.0f}€")
-    conso = round(total_litres / total_h_moteur, 1) if total_h_moteur > 0 else 0
-    n4.metric("Conso", f"{conso}L/h")
-
-    mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
-    syn = []
-    for i in range(1, 13):
-        r = df_recettes_view[df_recettes_view['dt'].dt.month == i]['P_Num'].sum() if not df_recettes_view.empty else 0
-        c = df_charges_view[df_charges_view['dt'].dt.month == i]['M_Num'].sum() if not df_charges_view.empty else 0
-        if r > 0 or c > 0:
-            syn.append({"Mois": mois_noms[i-1], "CA": f"{r:.0f}€", "Frais": f"{c:.0f}€", "Net": f"{r-c:.0f}€"})
-    
-    if syn:
-        st.table(pd.DataFrame(syn))
+        st.info("Aucune donnée disponible.")
 
 
 # =================================================================
