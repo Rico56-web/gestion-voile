@@ -622,6 +622,7 @@ if st.session_state.page == "STATS":
 
     if synthese_data:
         st.dataframe(pd.DataFrame(synthese_data), use_container_width=True, hide_index=True)
+        
     # --- 4. ANALYSE NAVIGATION ---
     st.subheader("⚓ Analyse Navigation")
     n1, n2, n3, n4 = st.columns(4) # Passage à 4 colonnes
@@ -640,69 +641,34 @@ if st.session_state.page == "STATS":
     
     n4.metric("⛽ Conso Moyenne", f"{conso_moy} L/h")
 
-# --- ANALYSE PAR SOCIÉTÉ (COULEURS FIXES & INTERFACE IPHONE SAFE) ---
-st.divider()
-st.subheader("🏢 Analyse par Société")
+# --- 3. AFFICHAGE TRÉSORERIE (VERSION IPHONE SAFE) ---
+st.subheader(f"💰 Finances {sel_y_stats}")
+c_pie1, c_pie2, c_sol = st.columns([1, 1, 1])
 
-if not df_c.empty:
-    df_soc = df_c.copy()
-    df_soc['dt'] = pd.to_datetime(df_soc['DateNav'], dayfirst=True, errors='coerce')
-    df_soc = df_soc[df_soc['dt'].dt.year == sel_y_stats].copy()
-    
-    # 1. Regroupement & Nettoyage
-    df_soc['Société'] = df_soc['Société'].replace(['', 'nan', None], 'PARTICULIER').str.upper().str.strip()
-    df_soc['Société'] = df_soc['Société'].replace({
-        'CLICK': 'CLICK & BOAT', 'CLICK AND BOAT': 'CLICK & BOAT', 'CLICK&BOAT': 'CLICK & BOAT'
-    })
+# Configuration commune pour bloquer le zoom/interaction
+config_iphone = {'staticPlot': True}
 
-    # 2. Calculs
-    df_soc['Prix_Num'] = pd.to_numeric(df_soc['Prix'].astype(str).str.replace('€','').str.strip(), errors='coerce').fillna(0.0)
-    df_soc['Jours_Num'] = pd.to_numeric(df_soc['Nbre de jours'], errors='coerce').fillna(0.0)
+with c_pie1:
+    st.caption("Revenus vs Frais")
+    fig1 = px.pie(names=['Charges', 'Recettes'], values=[total_charges, total_recettes],
+                  color_discrete_map={'Charges': '#ef553b', 'Recettes': '#00cc96'}, hole=0.4)
+    fig1.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=180, showlegend=False)
+    # AJOUT DU CONFIG ICI
+    st.plotly_chart(fig1, use_container_width=True, config=config_iphone)
 
-    stats_soc = df_soc.groupby('Société').agg({'Prix_Num': 'sum', 'Jours_Num': 'sum'}).reset_index()
-    stats_soc['Moy/Jour'] = (stats_soc['Prix_Num'] / stats_soc['Jours_Num']).round(0)
-    stats_soc.columns = ['Société', 'Total CA (€)', 'Total Jours', 'Moy/Jour (€)']
-    stats_soc = stats_soc.sort_values(by='Total CA (€)', ascending=False)
+with c_pie2:
+    st.caption("Répartition Frais")
+    if not df_charges_view.empty and total_charges > 0:
+        df_poste = df_charges_view.groupby('Type')['M_Num'].sum().reset_index()
+        if total_cout_gasoil > 0:
+            df_poste = pd.concat([df_poste, pd.DataFrame([{'Type': 'Gasoil', 'M_Num': total_cout_gasoil}])], ignore_index=True)
+        
+        fig2 = px.pie(df_poste, names='Type', values='M_Num', hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
+        fig2.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=180, showlegend=False)
+        # AJOUT DU CONFIG ICI
+        st.plotly_chart(fig2, use_container_width=True, config=config_iphone)
 
-    # 3. Création d'une palette de couleurs fixe pour la cohérence
-    unique_socs = stats_soc['Société'].unique()
-    # On utilise une palette de couleurs standardisée
-    colors = px.colors.qualitative.Safe
-    color_map = {soc: colors[i % len(colors)] for i, soc in enumerate(unique_socs)}
-    # Forçage pour CMN (bleu selon vos préférences)
-    if 'CMN' in color_map: color_map['CMN'] = '#0056b3'
-
-    # 4. Affichage des Graphiques (Configurés pour iPhone : pas de zoom, pas de barre d'outils)
-    config = {'staticPlot': True} # Désactive toute interaction (zoom/pan) pour faciliter le scroll
-    c_soc1, c_soc2, c_soc3 = st.columns(3)
-
-    with c_soc1:
-        st.caption("📈 Part du CA")
-        fig1 = px.pie(stats_soc, names='Société', values='Total CA (€)', hole=0.4,
-                      color='Société', color_discrete_map=color_map)
-        fig1.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=200, showlegend=False)
-        st.plotly_chart(fig1, use_container_width=True, config=config)
-
-    with c_soc2:
-        st.caption("⛵ Jours Nav")
-        fig2 = px.bar(stats_soc, x='Société', y='Total Jours', color='Société', 
-                      text_auto=True, color_discrete_map=color_map)
-        fig2.update_layout(margin=dict(t=20, b=0, l=0, r=0), height=200, showlegend=False, xaxis_title=None, yaxis_title=None)
-        st.plotly_chart(fig2, use_container_width=True, config=config)
-
-    with c_soc3:
-        st.caption("💰 Rendement/J")
-        fig3 = px.bar(stats_soc, y='Société', x='Moy/Jour (€)', orientation='h', 
-                      color='Société', text_auto='.0f', color_discrete_map=color_map)
-        fig3.update_layout(margin=dict(t=20, b=0, l=0, r=0), height=200, showlegend=False, xaxis_title=None, yaxis_title=None)
-        st.plotly_chart(fig3, use_container_width=True, config=config)
-
-    # 5. Tableau fixe (sans ascenseur)
-    # st.table est statique et s'adapte à la hauteur du contenu
-    st.table(stats_soc)
-
-else:
-    st.info("Aucune donnée disponible.")
+# ... (le reste de votre code pour le solde reste inchangé)
 
 
 # =================================================================
