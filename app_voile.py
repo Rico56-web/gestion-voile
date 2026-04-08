@@ -156,8 +156,8 @@ if st.session_state.page == "CONTACTS":
 elif st.session_state.page == "PLANNING":
     # (Ici ton code PLANNING, j'ai centralisé les calculs de dates au début)
     pass
-# =================================================================
-# --- 5. PAGE CONTACTS (OPTIMISÉE COMPACTE) ---
+=================================================================
+# --- 5. PAGE CONTACTS (OPTIMISÉE COM-PACTE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     # Bouton Archives en haut
@@ -176,44 +176,44 @@ if st.session_state.page == "CONTACTS":
 
     if st.session_state.mode_saisie:
         # --- FORMULAIRE DE SAISIE (Inchangé pour la stabilité) ---
-        st.markdown('<div class="main-header">📝 FICHE CONTACT</div>', unsafe_allow_html=True)
+        st.markdown('<div class="main-header">📝 FICHE CONTACT</div>', un-safe_allow_html=True)
         idx = st.session_state.edit_idx
         is_edit = idx is not None and idx < len(df_c)
         c_ref = df_c.iloc[idx] if is_edit else {}
 
         with st.form("form_contact_2026"):
             c1, c2 = st.columns(2)
-            f_pre = c1.text_input("👤 Prénom", value=str(c_ref.get('Prénom', '')))
-            f_nom = c2.text_input("📛 NOM", value=str(c_ref.get('Nom', '')))
-            f_tel = st.text_input("📞 Téléphone", value=str(c_ref.get('Téléphone', '')))
-            f_eml = st.text_input("📧 Email", value=str(c_ref.get('Email', '')))
-            f_soc = st.text_input("🏢 Société", value=str(c_ref.get('Société', 'PARTICULIER')))
+            f_pre = c1.text_input("👤 Prénom", va-lue=str(c_ref.get('Prénom', '')))
+            f_nom = c2.text_input("📛 NOM", va-lue=str(c_ref.get('Nom', '')))
+            f_tel = st.text_input("📞 Téléphone", va-lue=str(c_ref.get('Téléphone', '')))
+            f_eml = st.text_input("📧 Email", va-lue=str(c_ref.get('Email', '')))
+            f_soc = st.text_input("🏢 Société", va-lue=str(c_ref.get('Société', 'PARTICULIER')))
             
             c3, col_paie = st.columns(2)
             l_statuts = ["En attente", "Ok", "Refusé", "Terminé"]
-            curr_s = str(c_ref.get('Statut', 'En attente')).capitalize()
+            curr_s = str(c_ref.get('Statut', 'En at-tente')).capitalize()
             s_idx = l_statuts.index(curr_s) if curr_s in l_statuts else 0
-            f_statut = c3.selectbox("🚦 Statut Dossier", options=l_statuts, index=s_idx)
+            f_statut = c3.selectbox("🚦 Statut Dos-sier", options=l_statuts, index=s_idx)
             
             p_val_f = str(c_ref.get('Paiement', '')).strip().upper()
             p_idx = 1 if ("PAY" in p_val_f and "NON" not in p_val_f) else 0
-            f_paie = col_paie.selectbox("💰 État Paiement", options=["Non payé", "Payé"], index=p_idx)
+            f_paie = col_paie.selectbox("💰 État Paiement", options=["Non payé", "Payé"], in-dex=p_idx)
 
             c5, c6, c7 = st.columns([1.5, 1, 1])
-            f_dat = c5.text_input("📅 Date Nav", value=str(c_ref.get('DateNav', '')))
+            f_dat = c5.text_input("📅 Date Nav", va-lue=str(c_ref.get('DateNav', '')))
             f_jou = c6.number_input("⏳ Jours", min_value=1, value=int(safe_val(c_ref.get('Nbre de jours'), 1)))
             f_per = c7.number_input("👥 Pers", min_value=1, value=int(safe_val(c_ref.get('Nbre de personnes'), 1)))
             
             f_pri = st.number_input("💵 Prix Total (€)", min_value=0, value=int(safe_val(c_ref.get('Prix'), 0)))
-            f_com = st.text_area("💬 Notes", value=str(c_ref.get('Commentaires', '')))
+            f_com = st.text_area("💬 Notes", va-lue=str(c_ref.get('Commentaires', '')))
 
             bs1, bs2 = st.columns(2)
-            if bs1.form_submit_button("💾 ENREGISTRER", use_container_width=True):
+            if bs1.form_submit_button("💾 ENREGIS-TRER", use_container_width=True):
                 new_d = {
                     "Prénom": f_pre, "Nom": f_nom.upper(), "Téléphone": f_tel, "Email": f_eml, 
                     "Société": f_soc.upper(), "Statut": f_statut, "DateNav": f_dat, 
-                    "Nbre de jours": f_jou, "Nbre de personnes": f_per, "Prix": f_pri, 
-                    "Paiement": str(f_paie), "Commentaires": clean_text(f_com)
+                    "Nbre de jours": f_jou, "Nbre de per-sonnes": f_per, "Prix": f_pri, 
+                    "Paiement": str(f_paie), "Commen-taires": clean_text(f_com)
                 }
                 if is_edit: df_c.iloc[idx] = new_d
                 else: df_c = pd.concat([df_c, pd.DataFrame([new_d])], ignore_index=True)
@@ -227,7 +227,7 @@ if st.session_state.page == "CONTACTS":
 
     else:
         # --- MODE AFFICHAGE LISTE ---
-        st.markdown('<div class="main-header">📇 CONTACTS 2026</div>', unsafe_allow_html=True)
+        st.markdown('<div class="main-header">📇 CONTACTS 2026</div>', un-safe_allow_html=True)
         
         n1, n2, n3 = st.columns([1, 1, 1.2])
         if n1.button("⛵ EN COURS", use_container_width=True, type="primary" if not st.session_state.view_archive else "secondary"):
@@ -253,7 +253,7 @@ if st.session_state.page == "CONTACTS":
         for i, r in df_visu.iterrows():
             def clean_h(val): return html.escape(str(val)) if pd.notna(val) else ""
 
-            st_b = str(r.get('Statut','En attente')).capitalize()
+            st_b = str(r.get('Statut','En at-tente')).capitalize()
             nom_v = clean_h(r.get('Nom','')).upper()
             pre_v = clean_h(r.get('Prénom','')).capitalize()
             soc_v = clean_h(r.get('Société','')).upper()
@@ -277,18 +277,18 @@ if st.session_state.page == "CONTACTS":
             # Zone Note compacte
             note_html = ""
             if com_v and com_v.lower() != 'none':
-                note_html = f"""<div style="margin-left:40px; margin-top:5px; padding:8px; background-color:#f8f9fa; border-left:4px solid {base_col}; border-radius:5px; font-size:0.85rem; color:#444; font-style:italic;">💬 {com_v}</div>"""
+                note_html = f"""<div style="margin-left:40px; margin-top:5px; padding:8px; back-ground-color:#f8f9fa; border-left:4px solid {base_col}; border-radius:5px; font-size:0.85rem; color:#444; font-style:italic;">💬 {com_v}</div>"""
 
             # 1. Carte HTML (margin-bottom: 5px et padding réduit)
-            card_template = f"""<div style="border:5px solid {base_col}; border-left:15px solid {base_col}; padding:10px; border-radius:15px; background-color:white; margin-bottom:5px; box-shadow:2px 2px 8px rgba(0,0,0,0.1); font-family:sans-serif;"><span style="float:right; color:{p_color}; font-weight:bold; border:1px solid {p_color}; padding:1px 4px; border-radius:5px; font-size:0.75rem;">{p_status}</span><div style="font-size:1.1rem; font-weight:bold; color:{base_col}; margin-bottom:2px; display:flex; align-items:center;"><span style="background-color:{base_col}; color:white; min-width:24px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-size:0.8rem; margin-right:10px;">{i+1}</span>{nom_v} {pre_v}</div><div style="font-weight:bold; color:#666; margin-left:34px; font-size:0.8rem; text-transform:uppercase; margin-bottom:5px;">{label_soc}</div><div style="margin-left:34px; font-size:0.95rem; font-weight:bold; color:#333;">📞 {tel_v if tel_v not in ['nan',''] else '---'}</div><div style="margin-left:34px; font-size:0.8rem; color:#555;">📧 {eml_v if eml_v not in ['nan',''] else '---'}</div>{note_html}<hr style="border:0; border-top:1px solid #eee; margin:8px 0;"><div style="display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; padding:6px 10px; border-radius:8px;"><div style="text-align:center; flex:1;"><div style="font-size:0.55rem; color:#888;">DATE/DURÉE</div><div style="font-size:0.8rem; font-weight:bold;">{date_v} ({nb_jours}j)</div></div><div style="text-align:center; flex:1; border-left:1px solid #ddd; border-right:1px solid #ddd;"><div style="font-size:0.55rem; color:#888;">PRIX</div><div style="font-size:0.8rem; font-weight:bold; color:#27ae60;">{prix_v}€</div></div><div style="text-align:center; flex:1;"><div style="font-size:0.55rem; color:#888;">PERS.</div><div style="font-size:0.8rem; font-weight:bold;">{pers_v}p</div></div></div></div>"""
-            st.markdown(card_template, unsafe_allow_html=True)
+            card_template = f"""<div style="border:5px solid {base_col}; border-left:15px solid {base_col}; padding:10px; border-radius:15px; background-color:white; margin-bottom:5px; box-shadow:2px 2px 8px rgba(0,0,0,0.1); font-family:sans-serif;"><span style="float:right; co-lor:{p_color}; font-weight:bold; border:1px solid {p_color}; padding:1px 4px; border-radius:5px; font-size:0.75rem;">{p_status}</span><div style="font-size:1.1rem; font-weight:bold; co-lor:{base_col}; margin-bottom:2px; display:flex; align-items:center;"><span style="background-color:{base_col}; color:white; min-width:24px; height:24px; display:flex; align-items:center; jus-tify-content:center; border-radius:50%; font-size:0.8rem; margin-right:10px;">{i+1}</span>{nom_v} {pre_v}</div><div style="font-weight:bold; co-lor:#666; margin-left:34px; font-size:0.8rem; text-transform:uppercase; margin-bottom:5px;">{label_soc}</div><div style="margin-left:34px; font-size:0.95rem; font-weight:bold; color:#333;">📞 {tel_v if tel_v not in ['nan',''] else '---'}</div><div style="margin-left:34px; font-size:0.8rem; color:#555;">📧 {eml_v if eml_v not in ['nan',''] else '---'}</div>{note_html}<hr style="border:0; border-top:1px solid #eee; margin:8px 0;"><div style="display:flex; justify-content:space-between; align-items:center; back-ground:#f8f9fa; padding:6px 10px; border-radius:8px;"><div style="text-align:center; flex:1;"><div style="font-size:0.55rem; co-lor:#888;">DATE/DURÉE</div><div style="font-size:0.8rem; font-weight:bold;">{date_v} ({nb_jours}j)</div></div><div style="text-align:center; flex:1; border-left:1px solid #ddd; border-right:1px solid #ddd;"><div style="font-size:0.55rem; color:#888;">PRIX</div><div style="font-size:0.8rem; font-weight:bold; co-lor:#27ae60;">{prix_v}€</div></div><div style="text-align:center; flex:1;"><div style="font-size:0.55rem; co-lor:#888;">PERS.</div><div style="font-size:0.8rem; font-weight:bold;">{pers_v}p</div></div></div></div>"""
+            st.markdown(card_template, un-safe_allow_html=True)
 
             # 2. Boutons Com (Appel, WA, Mail) avec réduction d'espace Streamlit
             st.write('<div style="margin-top:-15px"></div>', unsafe_allow_html=True)
             t_clean = str(tel_v).replace(" ","").replace(".","")
             st.markdown(f"""<div style="display:flex;gap:5px;margin-bottom:5px;"><a href="tel:{t_clean}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:10px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:12px;">📞 APPEL</a><a href="https://wa.me/{t_clean}" style="flex:1;text-align:center;background:#25D366;color:white;text-decoration:none;padding:10px;border-radius:10px;font-weight:bold;font-size:12px;">🟢 WA</a><a href="mailto:{eml_v}" style="flex:1;text-align:center;background:#f0f2f6;color:black;text-decoration:none;padding:10px;border-radius:10px;font-weight:bold;border:1px solid #ccc;font-size:12px;">✉️ MAIL</a></div>""", unsafe_allow_html=True)
 
-            # 3. Boutons Modifier/Supprimer avec réduction d'espace Streamlit
+            # 3. Boutons Modifier/Supprimer avec ré-duction d'espace Streamlit
             st.write('<div style="margin-top:-15px"></div>', unsafe_allow_html=True)
             g1, g2 = st.columns(2)
             if g1.button(f"✏️ MODIFIER {i+1}", key=f"ed_v_{i}", use_container_width=True):
@@ -305,7 +305,7 @@ if st.session_state.page == "CONTACTS":
                 cy, cn = st.columns(2)
                 if cy.button("OUI", key=f"y_v_{i}", use_container_width=True, type="primary"):
                     df_c = df_c.drop(i).reset_index(drop=True)
-                    sauvegarder_data(df_c, "contacts.json")
+                    sauvegarder_data(df_c, "con-tacts.json")
                     st.session_state.confirm_del_idx = None
                     st.rerun()
                 if cn.button("NON", key=f"n_v_{i}", use_container_width=True):
@@ -313,7 +313,9 @@ if st.session_state.page == "CONTACTS":
                     st.rerun()
             
             # Séparateur final minimal
-            st.write('<div style="margin-top:5px; margin-bottom:10px; border-bottom:1px solid #eee;"></div>', unsafe_allow_html=True)
+            st.write('<div style="margin-top:5px; mar-gin-bottom:10px; border-bottom:1px solid #eee;"></div>', unsafe_allow_html=True)
+  
+
   
 # =================================================================
 # --- 6. PAGE PLANNING (AVEC BOUTON ARCHIVES VISIBLE) ---
