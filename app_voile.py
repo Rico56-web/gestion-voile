@@ -156,75 +156,111 @@ if st.session_state.page == "CONTACTS":
 elif st.session_state.page == "PLANNING":
     # (Ici ton code PLANNING, j'ai centralisé les calculs de dates au début)
     pass
-# =================================================================
-# --- 5. PAGE CONTACTS (PLANNING & ARCHIVES INTERNES) ---
+
+  # =================================================================
+# --- 5. PAGE CONTACTS (PLANNING COMPLET : GESTION & ARCHIVES) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("📅 Planning & Missions")
 
-    # --- A. CHARGEMENT ET FILTRAGE ---
+    # 1. États de sécurité
+    if 'confirm_del_idx' not in st.session_state: st.session_state.confirm_del_idx = None
+
+    # 2. Chargement des données
     df_c = charger_data('contacts.json')
 
     if not df_c.empty:
-        # Séparation des deux mondes : En cours vs Archivés
-        # On considère comme "Archivé" ce qui est marqué "Payé" ou "Terminé"
-        mask_archives = df_c['Statut'].str.contains("Payé|Terminé", case=False, na=False)
-        
-        df_en_cours = df_c[~mask_archives].copy()
-        df_archives = df_c[mask_archives].copy()
+        # Tri par date pour le planning
+        df_c['dt_tri'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+        df_c = df_c.sort_values('dt_tri', ascending=True)
 
-        # --- B. ONGLETS DE NAVIGATION ---
-        tab_active, tab_done = st.tabs(["🚀 MISSIONS EN COURS", "✅ MISSIONS ARCHIVÉES"])
+        # Séparation : ce qui est totalement "Terminé ET Payé" va dans l'onglet archives
+        # Si c'est "Unpaid", cela reste dans le planning actif même si la date est passée
+        mask_termine = (df_c['Statut'].str.contains("Payé|Terminé", case=False, na=False))
+        df_active = df_c[~mask_termine].copy()
+        df_archived = df_c[mask_termine].copy()
 
-        with tab_active:
-            if df_en_cours.empty:
-                st.info("Aucune mission en cours.")
+        tab1, tab2 = st.tabs(["🚀 PLANNING ACTIF", "✅ HISTORIQUE PAYÉ"])
+
+        with tab1:
+            if df_active.empty:
+                st.info("Aucune mission en cours ou en attente de paiement.")
             else:
-                for idx, row in df_en_cours.iterrows():
-                    # Logique de couleur CMN
+                for idx, row in df_active.iterrows():
+                    # --- LOGIQUE DE COULEUR ---
                     is_cmn = str(row.get('Société', '')).upper() == "CMN"
-                    border_color = "#01579b" if is_cmn else "#2e7d32"
-                    bg_color = "#e1f5fe" if is_cmn else "#e8f5e9"
+                    color = "#01579b" if is_cmn else "#2e7d32"
+                    bg = "#e1f5fe" if is_cmn else "#e8f5e9"
                     
+                    # Détection du statut de paiement pour l'affichage
+                    status_paye = row.get('Statut_Paye', 'Unpaid') # Récupération du champ spécifique
+                    badge_paye = "🔴 NON PAYÉ" if status_paye == "Unpaid" else "🟢 PAYÉ"
+
                     st.markdown(f"""
-                        <div style="border-left: 8px solid {border_color}; padding: 10px; border-radius: 10px; background-color: {bg_color}; margin-bottom: 10px;">
-                            <div style="display: flex; justify-content: space-between;">
-                                <b>{row['DateNav']}</b>
-                                <span style="font-size: 0.8rem; font-weight: bold;">{row['Statut']}</span>
+                        <div style="border-left: 10px solid {color}; padding: 12px; border-radius: 10px; background-color: {bg}; margin-bottom: 5px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <b style="font-size: 1rem;">{row['DateNav']}</b>
+                                <span style="font-size: 0.7rem; padding: 2px 6px; background: white; border-radius: 5px; border: 1px solid {color}; color: {color}; font-weight: bold;">{badge_paye}</span>
                             </div>
-                            <div style="font-size: 1.1rem; font-weight: 900;">{row['Nom']}</div>
-                            <div style="font-size: 0.85rem; color: #555;">{row['Société']} | {row['Prix']}</div>
+                            <div style="font-size: 1.2rem; font-weight: 900; margin: 5px 0;">{row['Nom']}</div>
+                            <div style="font-size: 0.9rem; display: flex; justify-content: space-between;">
+                                <span>🏢 {row['Société']}</span>
+                                <b>💰 {row['Prix']}</b>
+                            </div>
                         </div>
                     """, unsafe_allow_html=True)
+
+                    # --- BOUTONS D'ACTION ---
+                    col_ed, col_del, _ = st.columns([1, 1, 2])
                     
-                    if st.button(f"📝 Modifier {row['Nom']}", key=f"edit_{idx}"):
+                    if col_ed.button("✏️ Modifier", key=f"ed_{idx}", use_container_width=True):
                         st.session_state.edit_contact_idx = idx
+                        st.session_state.page = "MODIF_CONTACT"
                         st.rerun()
 
-        with tab_done:
-            if df_archives.empty:
-                st.write("Aucune mission archivée dans la liste active.")
+                    # Suppression avec confirmation
+                    if st.session_state.confirm_del_idx == idx:
+                        st.error("Confirmer la suppression ?")
+                        c_oui, c_non = st.columns(2)
+                        if c_oui.button("OUI", key=f"yes_{idx}", use_container_width=True):
+                            df_c = df_c.drop(idx)
+                            sauvegarder_data(df_c.drop(columns=['dt_tri'], errors='ignore'), 'contacts.json')
+                            st.session_state.confirm_del_idx = None
+                            st.rerun()
+                        if c_non.button("NON", key=f"no_{idx}", use_container_width=True):
+                            st.session_state.confirm_del_idx = None
+                            st.rerun()
+                    else:
+                        if col_del.button("🗑️", key=f"ask_{idx}", use_container_width=True):
+                            st.session_state.confirm_del_idx = idx
+                            st.rerun()
+
+        with tab2:
+            if df_archived.empty:
+                st.write("Aucun historique payé.")
             else:
-                # Affichage plus compact pour les archives
-                for idx, row in df_archives.iterrows():
+                for idx, row in df_archived.iterrows():
                     st.markdown(f"""
-                        <div style="border-left: 8px solid #9aa0a6; padding: 8px; border-radius: 8px; background-color: #f1f3f4; margin-bottom: 5px; opacity: 0.8;">
-                            <b>{row['DateNav']}</b> | {row['Nom']} | <b>{row['Prix']}</b> (Payé)
+                        <div style="border-left: 8px solid #9aa0a6; padding: 10px; border-radius: 8px; background-color: #f1f3f4; margin-bottom: 5px; opacity: 0.7;">
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem;">
+                                <b>{row['DateNav']}</b> <span>✅ PAYÉ</span>
+                            </div>
+                            <div>{row['Nom']} | <b>{row['Prix']}</b></div>
                         </div>
                     """, unsafe_allow_html=True)
-                    if st.button(f"👁️ Voir/Réactiver {idx}", key=f"rev_{idx}"):
+                    
+                    if st.button("👁️ Modifier / Voir", key=f"ed_arch_{idx}", use_container_width=True):
                         st.session_state.edit_contact_idx = idx
+                        st.session_state.page = "MODIF_CONTACT"
                         st.rerun()
 
     else:
-        st.warning("Aucun contact trouvé dans 'contacts.json'.")
+        st.info("Le carnet d'adresses est vide.")
 
-    # --- C. BOUTON D'AJOUT ---
     st.divider()
-    if st.button("➕ AJOUTER UNE NOUVELLE MISSION", use_container_width=True, type="primary"):
-        st.session_state.page = "AJOUT_CONTACT" # Assurez-vous que cette page existe
+    if st.button("➕ AJOUTER UNE MISSION", use_container_width=True, type="primary"):
+        st.session_state.page = "AJOUT_CONTACT"
         st.rerun()
-  
 
   
 # =================================================================
