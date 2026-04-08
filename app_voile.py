@@ -640,6 +640,50 @@ if st.session_state.page == "STATS":
     
     n4.metric("⛽ Conso Moyenne", f"{conso_moy} L/h")
 
+# --- NOUVELLE SECTION : ANALYSE PAR SOCIÉTÉ ---
+st.divider()
+st.subheader("🏢 Analyse par Société")
+
+if not df_c.empty:
+    # Préparation des données financières des contacts
+    df_soc = df_c.copy()
+    df_soc['dt'] = pd.to_datetime(df_soc['DateNav'], dayfirst=True, errors='coerce')
+    df_soc = df_soc[df_soc['dt'].dt.year == sel_y_stats].copy()
+    
+    # Nettoyage du prix (conversion en numérique)
+    df_soc['Prix_Num'] = pd.to_numeric(df_soc['Prix'].astype(str).str.replace('€','').str.strip(), errors='coerce').fillna(0.0)
+    # On s'assure que la société n'est pas vide
+    df_soc['Société'] = df_soc['Société'].replace(['', 'nan', None], 'PARTICULIER').str.upper()
+
+    # Groupement par société
+    stats_soc = df_soc.groupby('Société').agg({
+        'Prix_Num': 'sum',
+        'Nbre de jours': lambda x: pd.to_numeric(x, errors='coerce').sum()
+    }).reset_index()
+    stats_soc.columns = ['Société', 'Total CA (€)', 'Total Jours']
+    stats_soc = stats_soc.sort_values(by='Total CA (€)', ascending=False)
+
+    col_soc1, col_soc2 = st.columns([1, 1])
+
+    with col_soc1:
+        st.caption("📈 Part du Chiffre d'Affaires")
+        fig_ca = px.pie(stats_soc, names='Société', values='Total CA (€)', 
+                        hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig_ca.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250)
+        st.plotly_chart(fig_ca, use_container_width=True)
+
+    with col_soc2:
+        st.caption("⛵ Ratio Jours de Navigation")
+        fig_nav = px.bar(stats_soc, x='Société', y='Total Jours', 
+                         color='Société', text_auto=True)
+        fig_nav.update_layout(margin=dict(t=20, b=0, l=0, r=0), height=250, showlegend=False)
+        st.plotly_chart(fig_nav, use_container_width=True)
+
+    # Petit tableau récapitulatif
+    st.dataframe(stats_soc, use_container_width=True, hide_index=True)
+else:
+    st.info("Aucune donnée contact pour cette saison.")
+
 # =================================================================
 # --- 8. PAGE MAINTENANCE (OPTI IPHONE & AUTO-CLOSE) ---
 # =================================================================
