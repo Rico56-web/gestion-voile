@@ -146,101 +146,101 @@ if not df_c.empty and 'Paiement' in df_c.columns:
     df_c['Paiement'] = df_c['Paiement'].apply(lambda x: "Payé" if "pay" in str(x).lower() and "non" not in str(x).lower() else "Non payé")
 
 # =================================================================
-# --- 5. BLOC CONTACTS (RESTAURATION COMPLÈTE) ---
+# --- 5. BLOC CONTACTS (RESTAURATION EXACTE & TRI CHRONO) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("📅 Planning & Contacts")
 
-    # Initialisation des index dans la session
+    # Initialisation des index
     if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
     if 'delete_idx' not in st.session_state: st.session_state.delete_idx = None
+
+    # --- A. BOUTON AJOUTER EN HAUT ---
+    if st.button("➕ AJOUTER UN CONTACT", use_container_width=True, type="primary"):
+        new_row = {"DateNav": datetime.now().strftime("%d/%m/%Y"), "Nom": "Nouveau", "Société": "CMN", "Prix": "0 €", "Statut": "En cours", "Statut_Paye": "Unpaid"}
+        df_temp = charger_data('contacts.json')
+        df_temp = pd.concat([pd.DataFrame([new_row]), df_temp], ignore_index=True)
+        sauvegarder_data(df_temp, 'contacts.json')
+        st.session_state.edit_idx = 0  # On édite le nouveau qui est en haut
+        st.rerun()
+
+    st.divider()
 
     df_c = charger_data('contacts.json')
 
     if not df_c.empty:
-        # On affiche chaque contact un par un
-        for idx, row in df_c.iterrows():
-            
-            # --- MODE ÉDITION (Le formulaire de modification) ---
-            if st.session_state.edit_idx == idx:
-                with st.expander(f"📝 Modification de {row['Nom']}", expanded=True):
-                    with st.form(f"edit_form_{idx}"):
-                        new_date = st.text_input("Date", row['DateNav'])
-                        new_nom = st.text_input("Nom", row['Nom'])
-                        new_soc = st.selectbox("Société", ["CMN", "Particulier", "Autre"], 
-                                             index=0 if row['Société']=="CMN" else 1)
-                        new_prix = st.text_input("Prix", row['Prix'])
-                        
-                        col1, col2 = st.columns(2)
-                        new_st = col1.selectbox("Statut", ["En cours", "Terminé", "Payé"], 
-                                              index=["En cours", "Terminé", "Payé"].index(row['Statut']) if row['Statut'] in ["En cours", "Terminé", "Payé"] else 0)
-                        new_py = col2.selectbox("Paiement", ["Unpaid", "Paid"], 
-                                              index=0 if row.get('Statut_Paye') == "Unpaid" else 1)
+        # --- B. TRI CHRONOLOGIQUE (Les plus récents en haut) ---
+        df_c['dt_tri'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+        df_c = df_c.sort_values('dt_tri', ascending=False) # False pour avoir les plus récents en haut
 
-                        if st.form_submit_button("💾 SAUVEGARDER"):
-                            df_c.at[idx, 'DateNav'] = new_date
-                            df_c.at[idx, 'Nom'] = new_nom
-                            df_c.at[idx, 'Société'] = new_soc
-                            df_c.at[idx, 'Prix'] = new_prix
-                            df_c.at[idx, 'Statut'] = new_st
-                            df_c.at[idx, 'Statut_Paye'] = new_py
-                            
-                            sauvegarder_data(df_c, 'contacts.json')
+        # --- C. SÉPARATION DES LISTES ---
+        mask_passe = df_c['Statut'].str.contains("Payé|Terminé", case=False, na=False)
+        df_en_cours = df_c[~mask_passe].copy()
+        df_passes = df_c[mask_passe].copy()
+
+        # --- D. AFFICHAGE DES MISSIONS EN COURS ---
+        st.subheader("🚀 Missions en cours")
+        if df_en_cours.empty:
+            st.info("Aucune mission en cours.")
+        else:
+            for idx, row in df_en_cours.iterrows():
+                # --- MODE ÉDITION INTERNE ---
+                if st.session_state.edit_idx == idx:
+                    with st.form(f"edit_{idx}"):
+                        e_date = st.text_input("Date", row['DateNav'])
+                        e_nom = st.text_input("Nom", row['Nom'])
+                        e_prix = st.text_input("Prix", row['Prix'])
+                        c1, c2 = st.columns(2)
+                        e_st = c1.selectbox("Statut", ["En cours", "Terminé"], index=0)
+                        e_py = c2.selectbox("Paiement", ["Unpaid", "Paid"], index=0 if row.get('Statut_Paye') == "Unpaid" else 1)
+                        if st.form_submit_button("💾 Sauver"):
+                            df_c.at[idx, 'DateNav'] = e_date
+                            df_c.at[idx, 'Nom'] = e_nom
+                            df_c.at[idx, 'Prix'] = e_prix
+                            df_c.at[idx, 'Statut'] = e_st
+                            df_c.at[idx, 'Statut_Paye'] = e_py
+                            sauvegarder_data(df_c.drop(columns=['dt_tri'], errors='ignore'), 'contacts.json')
                             st.session_state.edit_idx = None
                             st.rerun()
-                        
-                        if st.form_submit_button("❌ ANNULER"):
-                            st.session_state.edit_idx = None
-                            st.rerun()
-
-            # --- MODE AFFICHAGE CLASSIQUE ---
-            else:
-                is_cmn = str(row.get('Société', '')).upper() == "CMN"
-                color = "#01579b" if is_cmn else "#2e7d32"
-                bg = "#e1f5fe" if is_cmn else "#e8f5e9"
-                paye_txt = "🔴 UNPAID" if row.get('Statut_Paye') == "Unpaid" else "🟢 PAID"
-
-                st.markdown(f"""
-                    <div style="border-left: 10px solid {color}; padding: 12px; border-radius: 10px; background-color: {bg}; margin-bottom: 5px;">
-                        <div style="display: flex; justify-content: space-between;">
-                            <b>{row['DateNav']}</b>
-                            <span style="font-size:0.7rem; font-weight:bold; color:{color};">{paye_txt}</span>
-                        </div>
-                        <div style="font-size: 1.2rem; font-weight: 900;">{row['Nom']}</div>
-                        <div style="font-size: 0.9rem;">{row['Société']} | {row['Prix']} | {row['Statut']}</div>
-                    </div>
-                """, unsafe_allow_html=True)
-
-                # Boutons Modifier / Supprimer
-                c1, c2, _ = st.columns([1, 1, 2])
-                if c1.button("✏️ Modifier", key=f"btn_ed_{idx}"):
-                    st.session_state.edit_idx = idx
-                    st.rerun()
-
-                # Confirmation de suppression
-                if st.session_state.delete_idx == idx:
-                    st.warning("Supprimer ?")
-                    if st.button("✅ OUI", key=f"conf_y_{idx}"):
-                        df_c = df_c.drop(idx)
-                        sauvegarder_data(df_c, 'contacts.json')
-                        st.session_state.delete_idx = None
-                        st.rerun()
-                    if st.button("❌ NON", key=f"conf_n_{idx}"):
-                        st.session_state.delete_idx = None
-                        st.rerun()
                 else:
-                    if c2.button("🗑️", key=f"btn_del_{idx}"):
+                    # AFFICHAGE CARTE BLEUE/VERTE
+                    is_cmn = str(row.get('Société', '')).upper() == "CMN"
+                    color = "#01579b" if is_cmn else "#2e7d32"
+                    bg = "#e1f5fe" if is_cmn else "#e8f5e9"
+                    paye_txt = "🔴 UNPAID" if row.get('Statut_Paye') == "Unpaid" else "🟢 PAID"
+                    
+                    st.markdown(f"""
+                        <div style="border-left: 10px solid {color}; padding: 12px; border-radius: 10px; background-color: {bg}; margin-bottom: 5px;">
+                            <div style="display: flex; justify-content: space-between;"><b>{row['DateNav']}</b><span>{paye_txt}</span></div>
+                            <div style="font-size: 1.2rem; font-weight: 900;">{row['Nom']}</div>
+                            <div style="font-size: 0.8rem;">{row['Société']} | {row['Prix']}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    col1, col2, _ = st.columns([1, 1, 2])
+                    if col1.button("✏️ Modifier", key=f"ed_{idx}"):
+                        st.session_state.edit_idx = idx
+                        st.rerun()
+                    if col2.button("🗑️", key=f"del_{idx}"):
                         st.session_state.delete_idx = idx
                         st.rerun()
 
-    st.divider()
-    if st.button("➕ AJOUTER UN CONTACT", use_container_width=True):
-        # Logique pour ajouter une ligne vide et passer en mode édition
-        new_row = {"DateNav": "01/01/2026", "Nom": "Nouveau", "Société": "CMN", "Prix": "0 €", "Statut": "En cours", "Statut_Paye": "Unpaid"}
-        df_c = pd.concat([df_c, pd.DataFrame([new_row])], ignore_index=True)
-        sauvegarder_data(df_c, 'contacts.json')
-        st.session_state.edit_idx = len(df_c) - 1
-        st.rerun()
+        st.divider()
+        
+        # --- E. AFFICHAGE DES MISSIONS PASSÉES ---
+        st.subheader("✅ Missions passées")
+        for idx, row in df_passes.iterrows():
+            st.markdown(f"""
+                <div style="padding: 8px; border-radius: 8px; background-color: #f1f3f4; margin-bottom: 5px; border-left: 5px solid #9aa0a6; opacity: 0.8;">
+                    <small>{row['DateNav']}</small> | <b>{row['Nom']}</b> | {row['Prix']} (Payé)
+                </div>
+            """, unsafe_allow_html=True)
+            if st.button("👁️ Modifier / Voir", key=f"rev_{idx}"):
+                st.session_state.edit_idx = idx
+                st.rerun()
+
+    else:
+        st.info("Aucun contact.")
 # =================================================================
 # --- 6. PAGE PLANNING (AVEC BOUTON ARCHIVES VISIBLE) ---
 # =================================================================
