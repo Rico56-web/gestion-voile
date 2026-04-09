@@ -563,13 +563,15 @@ html_solde = (
 )
 
 st.markdown(html_solde, unsafe_allow_html=True)
-    # 2. On affiche le bloc sans calculs complexes à l'intérieur
-    st.markdown(f"""
-        <div style="text-align:center; border:2px solid #ddd; padding:15px; border-radius:15px; background:#fff; margin:15px 0;">
-            <span style="color:#666; font-weight:bold;">SOLDE {label_solde}</span><br>
-            <b style="color:{couleur_solde}; font-size:1.8rem;">{txt_solde} &euro;</b>
-        </div>
-    """, unsafe_allow_html=True)
+   # --- Rendu visuel du solde (Correction Ligne 572) ---
+html_rendu = (
+    f'<div style="text-align:center; border:2px solid #ddd; padding:15px; border-radius:15px; background:#fff; margin:15px 0;">'
+    f'<span style="color:#666; font-weight:bold;">SOLDE {label_solde}</span><br>'
+    f'<b style="color:{couleur_solde}; font-size:1.8rem;">{txt_solde} &euro;</b>'
+    f'</div>'
+)
+
+st.markdown(html_rendu, unsafe_allow_html=True)
 
     # --- 6. ANALYSE PAR SOCIÉTÉ (GRAPHIQUES HORIZONTAUX OPTIMISÉS) ---
     st.divider()
