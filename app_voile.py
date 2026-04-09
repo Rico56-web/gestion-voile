@@ -892,53 +892,53 @@ if st.session_state.page == "ARCHIVES":
             )
         else:
             st.warning("Aucune donnée à exporter dans les archives.")
-
     # --- 4. AFFICHAGE DES TABLEAUX ---
     st.subheader("📜 Historique actuel")
     t1, t2, t3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Livre de Bord"])
     
     with t1:
-
-        # --- AFFICHAGE PEAUFINÉ DES FRAIS (AVEC DÉTECTION VIDANGE) ---
-    df_frais_arch = charger_data('archives_maintenance.json')
-    if not df_frais_arch.empty:
-        # Tri par date décroissante
-        df_frais_arch['dt_t'] = pd.to_datetime(df_frais_arch['Date'], dayfirst=True, errors='coerce')
-        df_frais_arch = df_frais_arch.sort_values('dt_t', ascending=False)
+        # TOUT CE BLOC DOIT ÊTRE INDENTÉ (4 espaces de plus que le 'with')
+        st.caption("Visualisation des archives de maintenance")
         
-        for idx, row in df_frais_arch.iterrows():
-            est_vidange = "VIDANGE" in str(row['Objet']).upper()
+        df_frais_arch = charger_data('archives_maintenance.json')
+        
+        if not df_frais_arch.empty:
+            # Tri par date décroissante
+            df_frais_arch['dt_t'] = pd.to_datetime(df_frais_arch['Date'], dayfirst=True, errors='coerce')
+            df_frais_arch = df_frais_arch.sort_values('dt_t', ascending=False)
             
-            # Style dynamique
-            bg_c = "#fff3e0" if est_vidange else "#f1f3f4"
-            brd_c = "#ef6c00" if est_vidange else "#9aa0a6"
-            icon = "🛠️" if est_vidange else "📄"
-            suffix = " <span style='color:#e65100; font-size:0.7rem; font-weight:bold;'>[MAINTENANCE]</span>" if est_vidange else ""
-            
-            # --- Logique de formatage (DANS LA BOUCLE) ---
-            try:
-                montant_val = float(row.get('M_Num', 0))
-            except:
-                montant_val = 0.0
+            for idx, row in df_frais_arch.iterrows():
+                est_vidange = "VIDANGE" in str(row['Objet']).upper()
                 
-            montant_display = f"{montant_val:.0f}"
-            # --- Rendu de la partie basse de la carte (Version Ultra-Stable) ---
-            # On utilise des parenthèses pour concaténer les lignes proprement
-            html_frais = (
-                f'<div style="border: 1px solid {brd_c}; border-left: 10px solid {brd_c}; padding: 12px; border-radius: 10px; margin-bottom: 8px; background-color: {bg_c};">'
-                f'<div style="display: flex; justify-content: space-between; align-items: center;">'
-                f'<div style="font-size: 0.85rem; font-weight: bold;">{icon} {row["Date"]} | {row["Objet"]}{suffix}</div>'
-                f'<div style="font-size: 1rem; font-weight: 900;">{montant_display} &euro;</div>'
-                f'</div>'
-                f'<div style="font-size: 0.7rem; color: #5f6368; border-top: 1px dashed {brd_c}; margin-top: 5px; padding-top: 3px;">'
-                f'&#128194; {row["Type"]} &bull; <b>{str(row["Statut"]).upper()}</b>'
-                f'</div>'
-                f'</div>'
-            )
-            
-            st.markdown(html_frais, unsafe_allow_html=True) 
-    else:
-        st.write("Aucun frais archivé.")
+                # Style dynamique
+                bg_c = "#fff3e0" if est_vidange else "#f1f3f4"
+                brd_c = "#ef6c00" if est_vidange else "#9aa0a6"
+                icon = "🛠️" if est_vidange else "📄"
+                suffix = " <span style='color:#e65100; font-size:0.7rem; font-weight:bold;'>[MAINTENANCE]</span>" if est_vidange else ""
+                
+                try:
+                    montant_val = float(row.get('M_Num', 0))
+                except:
+                    montant_val = 0.0
+                    
+                montant_display = f"{montant_val:.0f}"
+                
+                html_frais = (
+                    f'<div style="border: 1px solid {brd_c}; border-left: 10px solid {brd_c}; padding: 12px; border-radius: 10px; margin-bottom: 8px; background-color: {bg_c};">'
+                    f'<div style="display: flex; justify-content: space-between; align-items: center;">'
+                    f'<div style="font-size: 0.85rem; font-weight: bold;">{icon} {row["Date"]} | {row["Objet"]}{suffix}</div>'
+                    f'<div style="font-size: 1rem; font-weight: 900;">{montant_display} &euro;</div>'
+                    f'</div>'
+                    f'<div style="font-size: 0.7rem; color: #5f6368; border-top: 1px dashed {brd_c}; margin-top: 5px; padding-top: 3px;">'
+                    f'&#128194; {row["Type"]} &bull; <b>{str(row["Statut"]).upper()}</b>'
+                    f'</div>'
+                    f'</div>'
+                )
+                
+                st.markdown(html_frais, unsafe_allow_html=True) 
+        else:
+            st.write("Aucun frais archivé.")
+
 # =================================================================
 # --- 10. PAGE LOG (LIVRE DE BORD) ---
 # =================================================================
