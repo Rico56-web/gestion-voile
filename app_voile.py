@@ -231,6 +231,42 @@ if st.session_state.page == "CONTACTS":
                         st.session_state.edit_idx = None
                         st.rerun()
             # --- MODE AFFICHAGE (Logique de Couleurs personnalisée) ---
+            # --- 2. LÉGENDE DES COULEURS ---
+    st.markdown("""
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; padding: 10px; background: #f9f9f9; border-radius: 8px; border: 1px solid #ddd;">
+            <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #3498db; border-radius: 3px; margin-right: 5px;"></div><b>CMN</b></div>
+            <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #d4edda; border-radius: 3px; margin-right: 5px;"></div><b>OK (Validé)</b></div>
+            <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #e1bee7; border-radius: 3px; margin-right: 5px;"></div><b>En attente</b></div>
+            <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #e2e3e5; border-radius: 3px; margin-right: 5px;"></div><b>Terminé</b></div>
+            <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #f8d7da; border-radius: 3px; margin-right: 5px;"></div><b>Refusé</b></div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # --- 3. BOUCLE D'AFFICHAGE DES FICHES ---
+    if not df_c.empty:
+        # (Ton filtrage habituel ici...)
+        for idx, row in df_affichage.iterrows():
+            
+            # --- LOGIQUE DES COULEURS (Rappel) ---
+            statut_label = str(row.get('Statut', '')).strip().lower()
+            societe_label = str(row.get('Société', '')).strip().upper()
+            
+            bg_color = "#ffffff" 
+            text_color = "#333333"
+
+            if societe_label == "CMN":
+                bg_color = "#3498db"
+                text_color = "#ffffff"
+            elif statut_label == "ok":
+                bg_color = "#d4edda"
+            elif statut_label == "en attente":
+                bg_color = "#e1bee7"
+            elif statut_label == "refusé":
+                bg_color = "#f8d7da"
+            elif statut_label == "terminé":
+                bg_color = "#e2e3e5"
+
+            # (Reste du code d'affichage HTML déjà fourni précédemment...)
             else:
                 p_status = str(row.get('Paiement', 'Non payé'))
                 tel_clean = str(row.get('T\u00e9l\u00e9phone', '')).replace(" ", "")
