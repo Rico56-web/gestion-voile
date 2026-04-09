@@ -386,7 +386,7 @@ if st.session_state.page == "PLANNING":
                         total_mois += float(val_prix) if val_prix else 0
             except: continue
 
-    # --- RENDU CALENDRIER HTML ---
+        # --- RENDU CALENDRIER HTML (CORRIGÉ) ---
     css_calendar = """
     <style>
         .full-width-cal { 
@@ -395,12 +395,12 @@ if st.session_state.page == "PLANNING":
             table-layout: fixed; 
         } 
         .full-width-cal td { 
-        border: 0.5px solid #eeeeee; 
-        padding: 5px 0; 
-    }
-</style>
-"""
-st.markdown(css_calendar, unsafe_allow_html=True)
+            border: 1px solid #eeeeee; 
+            padding: 5px 0; 
+        }
+    </style>
+    """
+    st.markdown(css_calendar, unsafe_allow_html=True)
     
     h_cal = '<table class="full-width-cal" style="text-align:center; background:white;">'
     h_cal += '<tr style="background:#f1f3f5; font-size:10px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td style="color:#d9534f;">Sa</td><td style="color:#d9534f;">Di</td></tr>'
