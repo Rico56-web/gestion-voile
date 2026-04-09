@@ -230,28 +230,50 @@ if st.session_state.page == "CONTACTS":
                     if st.form_submit_button("Annuler"):
                         st.session_state.edit_idx = None
                         st.rerun()
-
-            # --- MODE AFFICHAGE (Fiche iPhone Ready) ---
+            # --- MODE AFFICHAGE (Logique de Couleurs personnalisée) ---
             else:
                 p_status = str(row.get('Paiement', 'Non payé'))
-                b_color = "#2e7d32" if p_status == "Payé" else "#d32f2f"
                 tel_clean = str(row.get('T\u00e9l\u00e9phone', '')).replace(" ", "")
                 
+                # Détermination de la couleur de fond
+                statut_label = str(row.get('Statut', '')).strip().lower()
+                societe_label = str(row.get('Société', '')).strip().upper()
+                
+                # Couleurs par défaut (Blanc)
+                bg_color = "#ffffff" 
+                text_color = "#333333"
+
+                if societe_label == "CMN":
+                    bg_color = "#3498db"  # Bleu plus foncé pour CMN
+                    text_color = "#ffffff" # Texte blanc pour lisibilité
+                elif statut_label == "ok":
+                    bg_color = "#d4edda"  # Vert clair
+                elif statut_label == "en attente":
+                    bg_color = "#e1bee7"  # Mauve clair (priorité sur le jaune selon ta demande)
+                elif statut_label == "refusé":
+                    bg_color = "#f8d7da"  # Rose / Rouge clair
+                elif statut_label == "terminé":
+                    bg_color = "#e2e3e5"  # Gris
+                
+                # Couleur du badge de paiement
+                badge_paye = "#2e7d32" if p_status == "Payé" else "#d32f2f"
+
                 st.markdown(f"""
-                    <div style="border: 5px solid #4A4A4A; padding: 15px; border-radius: 12px; margin-bottom: 15px; background: white;">
+                    <div style="border: 5px solid #4A4A4A; padding: 15px; border-radius: 12px; margin-bottom: 15px; background-color: {bg_color}; color: {text_color};">
                         <div style="display: flex; justify-content: space-between; align-items: start;">
-                            <div style="font-size: 1.3rem; font-weight: bold; color: #01579b;">{row.get('Prénom', '')} {row.get('Nom', '')}</div>
-                            <span style="background: {b_color}; color: white; padding: 3px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: bold;">{p_status.upper()}</span>
+                            <div style="font-size: 1.3rem; font-weight: bold;">{row.get('Prénom', '')} {row.get('Nom', '')}</div>
+                            <span style="background: {badge_paye}; color: white; padding: 3px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: bold;">{p_status.upper()}</span>
                         </div>
-                        <div style="margin: 10px 0; font-size: 0.95rem; color: #333; line-height: 1.5;">
+                        <div style="margin: 10px 0; font-size: 0.95rem; line-height: 1.5;">
                             📅 <b>{row.get('DateNav', '---')}</b> | 💰 <b>{row.get('Prix', 0)} €</b><br>
                             👥 {row.get('Nbre de personnes', 1)} pers. | ⏱️ {row.get('Nbre de jours', 1)} jours<br>
-                            📍 Statut : <i>{row.get('Statut', '---')}</i>
+                            🏢 Société : {row.get('Société', 'PERSO')}<br>
+                            📍 Statut : <b>{row.get('Statut', '---')}</b>
                         </div>
-                        <div style="display: flex; justify-content: space-around; border-top: 1px solid #eee; padding-top: 12px; margin-top: 5px;">
-                            <a href="tel:{tel_clean}" style="text-decoration:none; color:#007bff; font-weight:bold;">📞 Appel</a>
-                            <a href="mailto:{row.get('Email', '')}" style="text-decoration:none; color:#007bff; font-weight:bold;">📧 Email</a>
-                            <a href="https://wa.me/{tel_clean}" style="text-decoration:none; color:#25D366; font-weight:bold;">💬 WhatsApp</a>
+                        <div style="display: flex; justify-content: space-around; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 12px; margin-top: 5px;">
+                            <a href="tel:{tel_clean}" style="text-decoration:none; color: {'#ffffff' if societe_label == 'CMN' else '#007bff'}; font-weight:bold;">📞 Appel</a>
+                            <a href="mailto:{row.get('Email', '')}" style="text-decoration:none; color: {'#ffffff' if societe_label == 'CMN' else '#007bff'}; font-weight:bold;">📧 Email</a>
+                            <a href="https://wa.me/{tel_clean}" style="text-decoration:none; color: {'#ffffff' if societe_label == 'CMN' else '#25D366'}; font-weight:bold;">💬 WhatsApp</a>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
@@ -263,6 +285,7 @@ if st.session_state.page == "CONTACTS":
                 if col_d.button(f"🗑️", key=f"del_{idx}"):
                     st.session_state.delete_confirm = idx
                     st.rerun()
+           
     else:
         st.info("Liste vide.")
 # =================================================================
