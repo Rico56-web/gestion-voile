@@ -476,113 +476,244 @@ if st.session_state.page == "PLANNING":
     )
     st.markdown(html_solde, unsafe_allow_html=True)
 # =================================================================
-# --- 9. PAGE STATS (CORRECTION DE LA FAUTE DE FRAPPE) ---
+# --- 9. PAGE STATS (VERSION COMPLÈTE & HARMONISÉE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     import pandas as pd
     import plotly.express as px
+    import plotly.graph_objects as go
     import datetime
 
-    # --- 1. CHARGEMENT INDÉPENDANT ---
+    # --- 1. CHARGEMENT ÉTANCHE ---
     df_planning = charger_data('contacts.json')
     df_m_actif = charger_data('maintenance.json')
     df_m_arch = charger_data('archives_factures.json')
     df_m = pd.concat([df_m_actif, df_m_arch], ignore_index=True)
 
-    # --- 2. NAVIGATION ---
-    col_nav1, col_nav2 = st.columns([3, 1])
-    col_nav1.title("📊 Bilan Vesta")
-    sel_y = col_nav2.selectbox("Saison", [2025, 2026, 2027], index=1)
+    # --- 2. FONCTIONS UTILES (Dates Robustes & Nettoyage) ---
+    def conversion_date_robuste(date_str):
+        if pd.isna(date_str) or date_str == "":
+            return pd.NaT
+        date_str = str(date_str).strip()
+        # Liste des formats à tester (ISO, FR, FR-Année courte)
+        formats_a_tester = ['%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d-%m-%Y', '%d/%m/%y']
+        for fmt in formats_a_tester:
+            try:
+                return pd.to_datetime(date_str, format=fmt)
+            except:
+                continue
+        # En dernier recours
+        return pd.to_datetime(date_str, errors='coerce', dayfirst=True)
 
-    # --- 3. TRAITEMENT DES REVENUS (PLANNING) ---
-    total_rev = 0
-    df_soc_final = pd.DataFrame()
-
+    # --- 3. HARMONISATION DES CATÉGORIES (SOCIÉTÉS ET TYPE) ---
+    # Revenus
     if not df_planning.empty:
-        # --- LECTURE ROBUSTE DES DATES ---
-        # Cette fonction est cruciale pour votre fichier
-        def conversion_date_robuste(date_str):
-            if pd.isna(date_str) or date_str == "":
-                return pd.NaT
-            date_str = str(date_str).strip()
-            # Liste des formats à tester (ISO et FR)
-            formats_a_tester = ['%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d-%m-%Y']
-            for fmt in formats_a_tester:
-                try:
-                    return pd.to_datetime(date_str, format=fmt)
-                except:
-                    continue
-            return pd.to_datetime(date_str, errors='coerce', dayfirst=True)
-
-        # Application de la conversion
         df_planning['dt_vrai'] = df_planning['DateNav'].apply(conversion_date_robuste)
         
-        # Filtrage sur l'année choisie
-        df_planning_yr = df_planning[df_planning['dt_vrai'].dt.year == sel_y].copy()
+        # Harmonisation Société
+        df_planning['Société'] = df_planning['Société'].astype(str).str.upper().str.strip()
+        df_planning['Société'] = df_planning['Société'].replace({
+            'PARTICULIER': 'PERSO',
+            'NAN': 'PERSO',
+            '': 'PERSO',
+            'CLICK': 'CLICK & BOAT',
+            'CLICK&BOAT': 'CLICK & BOAT',
+            'CLICK AND BOAT': 'CLICK & BOAT',
+            'NONE': 'PERSO'
+        })
+        # Nettoyage prix
+        df_planning['P_Num'] = pd.to_numeric(df_planning['Prix'], errors='coerce').fillna(0)
 
-        if not df_planning_yr.empty:
-            # Nettoyage du prix
-            df_planning_yr['P_Num'] = pd.to_numeric(df_planning_yr['Prix'], errors='coerce').fillna(0)
-            total_rev = df_planning_yr['P_Num'].sum()
-
-            # Analyse par Société
-            df_planning_yr['Société'] = df_planning_yr['Société'].fillna('INCONNU').astype(str).str.upper().str.strip()
-            df_soc_final = df_planning_yr.groupby('Société')['P_Num'].sum().reset_index()
-            df_soc_final = df_soc_final.rename(columns={'P_Num':'CA €'}).sort_values('CA €', ascending=False)
-
-    # --- 4. TRAITEMENT DES FRAIS (MAINTENANCE) ---
-    total_frais = 0
-    df_frais_final = pd.DataFrame()
-
+    # Frais
     if not df_m.empty:
         df_m['dt_vrai'] = pd.to_datetime(df_m['Date'], errors='coerce', dayfirst=True)
-        df_m_yr = df_m[df_m['dt_vrai'].dt.year == sel_y].copy()
+        # Nettoyage frais
+        df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0)
         
-        if not df_m_yr.empty:
-            df_m_yr['M_Num'] = pd.to_numeric(df_m_yr['M_Num'], errors='coerce').fillna(0)
-            total_frais = df_m_yr['M_Num'].sum()
+        # Harmonisation Type
+        df_m['Type'] = df_m['Type'].astype(str).str.upper().str.strip()
+        df_m['Type'] = df_m['Type'].replace({
+            'NAN': 'AUTRES',
+            'NONE': 'AUTRES',
+            '': 'AUTRES',
+            'GUEULETON': 'PERSO',
+            'MAINTENANCE': 'ENTRETIEN'
+        })
+
+    # --- 4. NAVIGATION & SÉLECTEUR DE BILAN (RÉTABLI) ---
+    st.title("📊 Bilan Vesta")
+    
+    # Sélecteur principal
+    mode_bilan = st.radio("Type de bilan", ["A ce jour", "Par Saison"], horizontal=True, key="stats_mode_select")
+    today = datetime.date.today()
+    
+    sel_y = today.year # Année par défaut
+
+    if mode_bilan == "Par Saison":
+        ANNEES_STATS = [2025, 2026, 2027]
+        sel_y = st.selectbox("Saison à analyser", ANNEES_STATS, index=1, key="stats_year_select")
+        st.caption(f"📅 Analyse complète de l'année {sel_y}")
+    else:
+        st.caption(f"📅 Analyse au {today.strftime('%d/%m/%Y')} (Jan à Aujourd'hui)")
+
+    # --- 5. CALCULS DES DONNÉES FILTRÉES ---
+    total_rev, total_frais = 0, 0
+    df_soc_final, df_frais_final = pd.DataFrame(), pd.DataFrame()
+    
+    # Préparation des DataFrames de travail
+    df_r_yr, df_f_yr = pd.DataFrame(), pd.DataFrame()
+
+    # Filtrage Revenus (Planning)
+    if not df_planning.empty:
+        if mode_bilan == "A ce jour":
+            # Uniquement de Jan à Aujourd'hui (Année en cours)
+            mask = (df_planning['dt_vrai'].dt.year == today.year) & (df_planning['dt_vrai'].dt.date <= today)
+        else:
+            # Année complète sélectionnée
+            mask = (df_planning['dt_vrai'].dt.year == sel_y)
             
-            # --- CORRECTION DE LA FAUTE DE FRAPPE ICI ---
-            # df_frais_yr a été remplacé par df_m_yr
-            df_m_yr['Type'] = df_m_yr['Type'].fillna('AUTRES').astype(str).str.upper().str.strip()
-            df_frais_final = df_m_yr.groupby('Type')['M_Num'].sum().reset_index()
+        df_r_yr = df_planning[mask].copy()
+
+        if not df_r_yr.empty:
+            total_rev = df_r_yr['P_Num'].sum()
+            
+            # Groupement par Société
+            df_soc_final = df_r_yr.groupby('Société')['P_Num'].sum().reset_index()
+            df_soc_final = df_soc_final.rename(columns={'P_Num':'CA €'}).sort_values('CA €', ascending=False)
+
+    # Filtrage Frais (Maintenance)
+    if not df_m.empty:
+        if mode_bilan == "A ce jour":
+            mask = (df_m['dt_vrai'].dt.year == today.year) & (df_m['dt_vrai'].dt.date <= today)
+        else:
+            mask = (df_m['dt_vrai'].dt.year == sel_y)
+            
+        df_f_yr = df_m[mask].copy()
+        
+        if not df_f_yr.empty:
+            total_frais = df_f_yr['M_Num'].sum()
+            
+            # Groupement par Type
+            df_frais_final = df_f_yr.groupby('Type')['M_Num'].sum().reset_index()
             df_frais_final = df_frais_final.rename(columns={'M_Num':'Total €'}).sort_values('Total €', ascending=False)
 
-    # --- 5. AFFICHAGE DES INDICATEURS ---
-    st.subheader(f"💰 Finances {sel_y}")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Revenus (Missions)", f"{total_rev:,.0f} €".replace(',', ' '))
-    c2.metric("Frais (Entretien)", f"{total_frais:,.0f} €".replace(',', ' '))
+    # --- 6. AFFICHAGE DES CHIFFRES CLÉS & GRAPHIQUE CIRCULAIRE ---
+    st.subheader("💰 Synthèse Financière")
     
-    # Calcul du solde
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Revenus Missions", f"{total_rev:,.0f} €".replace(',', ' '))
+    c2.metric("Frais Entretien", f"{total_frais:,.0f} €".replace(',', ' '))
     solde = total_rev - total_frais
-    delta_color_val = "inverse" if solde < 0 else "normal"
-    c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color=delta_color_val)
+    c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color="normal" if solde >= 0 else "inverse")
 
-    # --- 6. TABLEAUX DE DÉTAIL ---
+    # Pie Chart
+    if total_rev > 0 or total_frais > 0:
+        fig = px.pie(names=['Frais', 'Revenus'], values=[total_frais, total_rev],
+                     color_discrete_map={'Frais': '#EF553B', 'Revenus': '#00CC96'}, hole=0.5)
+        # Ajustement mobile
+        fig.update_layout(margin=dict(t=10, b=10, l=10, r=10), height=300,
+                          legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
+        st.plotly_chart(fig, use_container_width=True)
+
+    # --- 7. COURBES D'ÉVOLUTION MENSUELLE (RÉTABLIES) ---
+    if total_rev > 0 or total_frais > 0:
+        st.divider()
+        st.subheader("📈 Évolution Mensuelle")
+        
+        mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+        data_evo = []
+        
+        # On boucle sur les 12 mois
+        for i in range(1, 13):
+            # Revenus du mois
+            if not df_r_yr.empty:
+                rev_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['P_Num'].sum()
+            else:
+                rev_m = 0
+                
+            # Frais du mois
+            if not df_f_yr.empty:
+                fra_m = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['M_Num'].sum()
+            else:
+                fra_m = 0
+            
+            # On ajoute si au moins une donnée existe
+            if rev_m > 0 or fra_m > 0:
+                data_evo.append({'Mois': mois_noms[i-1], 'Montant €': rev_m, 'Type': 'Revenus'})
+                data_evo.append({'Mois': mois_noms[i-1], 'Montant €': fra_m, 'Type': 'Frais'})
+        
+        # Création de la courbe Plotly
+        if data_evo:
+            df_evo = pd.DataFrame(data_evo)
+            fig_line = px.line(df_evo, x='Mois', y='Montant €', color='Type', markers=True,
+                                color_discrete_map={'Frais': '#EF553B', 'Revenus': '#00CC96'})
+            fig_line.update_layout(height=350, margin=dict(t=10, b=30, l=10, r=10),
+                                    xaxis_title=None, yaxis_title="Montant €",
+                                    legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"))
+            fig_line.update_xaxes(categoryorder='array', categoryarray=mois_noms) # Force l'ordre des mois
+            st.plotly_chart(fig_line, use_container_width=True)
+
+    # --- 8. TABLEAUX DE DÉTAIL & GESTION ARCHIVAGE ---
     st.divider()
     col_l, col_r = st.columns(2)
 
     with col_l:
-        st.write("### 🏢 Par Société")
+        st.write("### 🏢 Par Société (Recettes)")
         if not df_soc_final.empty:
             st.dataframe(df_soc_final, hide_index=True, use_container_width=True)
         else:
-            st.info("Aucune mission détectée.")
+            st.info("Aucun revenu trouvé.")
 
     with col_r:
         st.write("### 🛠️ Par Type de Frais")
         if not df_frais_final.empty:
             st.dataframe(df_frais_final, hide_index=True, use_container_width=True)
         else:
-            st.info("Aucun frais enregistré.")
+            st.info("Aucun frais trouvé.")
 
-    # --- 7. GRAPHIQUE RÉPARTITION (Pie Chart) ---
-    if total_rev > 0 or total_frais > 0:
-        fig = px.pie(names=['Frais', 'Revenus'], values=[total_frais, total_rev],
-                     color_discrete_map={'Frais': '#ef553b', 'Revenus': '#00cc96'}, hole=0.4)
-        fig.update_layout(margin=dict(t=20, b=20, l=20, r=20), height=300)
-        st.plotly_chart(fig, use_container_width=True)
+    # =================================================================
+    # --- 9. BOUTON ARCHIVAGE (INTÉGRÉ) ---
+    # =================================================================
+    if mode_bilan == "Par Saison":
+        st.divider()
+        st.subheader("⚙️ Outils de la Saison")
+        st.warning(f"Attention, cette action va archiver **toutes** les données de l'année **{sel_y}**.")
+        
+        with st.expander(f"⚙️ Archiver les données de la saison {sel_y}", expanded=False):
+            st.write(f"Voulez-vous archiver les frais (vers `archives_factures.json`) et les missions (vers `archives_planning.json`) de {sel_y} ?")
+            arch_btn = st.button(f"🚀 Lancer l'archivage de {sel_y}", key=f"arch_button_{sel_y}")
+            
+            if arch_btn:
+                import json
+                try:
+                    # A. ARCHIVAGE FRAIS (Maintenance)
+                    df_m_yr_raw = df_m_actif[pd.to_datetime(df_m_actif['Date'], dayfirst=True, errors='coerce').dt.year == sel_y]
+                    if not df_m_yr_raw.empty:
+                        # 1. Sauvegarder dans archive
+                        nouvelle_archive_m = pd.concat([df_m_arch, df_m_yr_raw], ignore_index=True)
+                        save_data('archives_factures.json', nouvelle_archive_m.to_dict(orient='records'))
+                        # 2. Supprimer de l'actif
+                        nouvelle_actif_m = df_m_actif.drop(df_m_yr_raw.index)
+                        save_data('maintenance.json', nouvelle_actif_m.to_dict(orient='records'))
+                        st.success(f"📦 Frais {sel_y} archivés !")
+
+                    # B. ARCHIVAGE REVENUS (Planning)
+                    df_c_yr_raw = df_planning_actif[pd.to_datetime(df_planning_actif['DateNav'], errors='coerce', dayfirst=True).dt.year == sel_y]
+                    if not df_c_yr_raw.empty:
+                        # 1. Sauvegarder dans archive (Crée le fichier si n'existe pas)
+                        try: df_c_arch = charger_data('archives_planning.json')
+                        except: df_c_arch = pd.DataFrame()
+                        nouvelle_archive_c = pd.concat([df_c_arch, df_c_yr_raw], ignore_index=True)
+                        save_data('archives_planning.json', nouvelle_archive_c.to_dict(orient='records'))
+                        # 2. Supprimer de l'actif
+                        nouvelle_actif_c = df_planning_actif.drop(df_c_yr_raw.index)
+                        save_data('contacts.json', nouvelle_actif_c.to_dict(orient='records'))
+                        st.success(f"📦 Missions {sel_y} archivées !")
+                        
+                    st.info("Le script va redémarrer pour appliquer les changements.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Une erreur est survenue lors de l'archivage : {e}")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (PERSISTANTE & CARNET DE SANTÉ) ---
 # =================================================================
