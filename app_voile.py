@@ -476,93 +476,86 @@ if st.session_state.page == "PLANNING":
     )
     st.markdown(html_solde, unsafe_allow_html=True)
 # =================================================================
-# --- 9. PAGE STATS (SÉPARATION ÉTANCHE & RÉPARATION) ---
+# --- 9. PAGE STATS (RÉTABLISSEMENT TOTAL) ---
 # =================================================================
 if st.session_state.page == "STATS":
     import plotly.express as px
     import pandas as pd
 
-    # 1. CHARGEMENT INDÉPENDANT (On ne mélange plus rien)
-    # On vide les variables pour être sûr
+    # 1. CHARGEMENT ÉTANCHE
     df_planning = charger_data('contacts.json')
     df_m_actif = charger_data('maintenance.json')
     df_m_arch = charger_data('archives_factures.json')
-    df_maintenance = pd.concat([df_m_actif, df_m_arch], ignore_index=True)
+    df_frais = pd.concat([df_m_actif, df_m_arch], ignore_index=True)
 
     # 2. NAVIGATION
     col_t1, col_t2 = st.columns([2, 1])
     col_t1.title("📊 Bilan Vesta")
     sel_y = col_t2.selectbox("Saison", [2025, 2026, 2027], index=1)
     
-    # 3. CALCULS DES REVENUS (UNIQUEMENT DEPUIS PLANNING)
+    # 3. TRAITEMENT REVENUS (PLANNING)
     total_recettes = 0
     df_soc_table = pd.DataFrame()
 
     if not df_planning.empty:
-        # Nettoyage date et filtrage année
+        # On force le format de date pour éviter les erreurs de filtrage
         df_planning['dt'] = pd.to_datetime(df_planning['DateNav'], dayfirst=True, errors='coerce')
-        df_planning_yr = df_planning[df_planning['dt'].dt.year == sel_y].copy()
+        # On filtre sur l'année
+        mask_rev = (df_planning['dt'].dt.year == sel_y)
+        df_rev_yr = df_planning[mask_rev].copy()
         
-        if not df_planning_yr.empty:
-            # Nettoyage du prix des missions
-            df_planning_yr['P_Num'] = pd.to_numeric(
-                df_planning_yr['Prix'].astype(str).str.replace('€','').str.replace(' ','').str.strip(), 
-                errors='coerce'
-            ).fillna(0.0)
+        if not df_rev_yr.empty:
+            df_rev_yr['P_Num'] = pd.to_numeric(df_rev_yr['Prix'].astype(str).str.replace('€','').str.replace(' ','').str.strip(), errors='coerce').fillna(0.0)
+            total_recettes = df_rev_yr['P_Num'].sum()
             
-            total_recettes = df_planning_yr['P_Num'].sum()
-            
-            # Préparation du tableau des sociétés (CMN, VOG, CLICK...)
-            df_soc = df_planning_yr.copy()
-            df_soc['Société'] = df_soc['Société'].astype(str).str.upper().str.strip().replace(['NAN','','NONE'], 'PARTICULIER')
-            df_soc_table = df_soc.groupby('Société')['P_Num'].sum().reset_index()
+            # Nettoyage des noms de sociétés
+            df_rev_yr['Société'] = df_rev_yr['Société'].astype(str).str.upper().str.strip().replace(['NAN','','NONE'], 'PARTICULIER')
+            df_soc_table = df_rev_yr.groupby('Société')['P_Num'].sum().reset_index()
 
-    # 4. CALCULS DES FRAIS (UNIQUEMENT DEPUIS MAINTENANCE)
+    # 4. TRAITEMENT FRAIS (MAINTENANCE)
     total_frais = 0
     df_frais_table = pd.DataFrame()
 
-    if not df_maintenance.empty:
-        df_maintenance['dt'] = pd.to_datetime(df_maintenance['Date'], dayfirst=True, errors='coerce')
-        df_maintenance_yr = df_maintenance[df_maintenance['dt'].dt.year == sel_y].copy()
+    if not df_frais.empty:
+        df_frais['dt'] = pd.to_datetime(df_frais['Date'], dayfirst=True, errors='coerce')
+        mask_frais = (df_frais['dt'].dt.year == sel_y)
+        df_frais_yr = df_frais[mask_frais].copy()
         
-        if not df_maintenance_yr.empty:
-            df_maintenance_yr['M_Num'] = pd.to_numeric(df_maintenance_yr['M_Num'], errors='coerce').fillna(0.0)
-            total_frais = df_maintenance_yr['M_Num'].sum()
-            
-            # Préparation du tableau des types (Port, Assurance, Sécurité...)
-            df_frais_table = df_maintenance_yr.groupby('Type')['M_Num'].sum().reset_index()
+        if not df_frais_yr.empty:
+            df_frais_yr['M_Num'] = pd.to_numeric(df_frais_yr['M_Num'], errors='coerce').fillna(0.0)
+            total_frais = df_frais_yr['M_Num'].sum()
+            df_frais_table = df_frais_yr.groupby('Type')['M_Num'].sum().reset_index()
 
-    # 5. AFFICHAGE DES RÉSULTATS
+    # 5. AFFICHAGE
     st.subheader(f"💰 Finances {sel_y}")
     c1, c2 = st.columns(2)
     c1.metric("Revenus (Missions)", f"{total_recettes:,.0f} €".replace(',',' '))
     c2.metric("Frais (Entretien)", f"{total_frais:,.0f} €".replace(',',' '))
 
-    # Graphique si données présentes
+    # Graphique Pie
     if total_recettes > 0 or total_frais > 0:
         fig = px.pie(names=['Frais', 'Revenus'], values=[total_frais, total_recettes],
                      color_discrete_map={'Frais': '#ef553b', 'Revenus': '#00cc96'}, hole=0.4)
         fig.update_layout(height=280, margin=dict(t=20, b=20, l=0, r=0))
         st.plotly_chart(fig, use_container_width=True)
 
-    # 6. TABLEAUX DE DÉTAIL
+    # 6. TABLEAUX
     st.divider()
     col_a, col_b = st.columns(2)
     
     with col_a:
-        st.write("### 🏢 Sociétés")
+        st.write("### 🏢 Missions")
         if not df_soc_table.empty:
             st.table(df_soc_table.sort_values('P_Num', ascending=False).rename(columns={'P_Num':'Total €'}))
         else:
-            st.info("Aucun revenu")
+            st.info("Aucune mission")
 
     with col_b:
-        st.write("### 🛠️ Charges")
+        st.write("### 🛠️ Dépenses")
         if not df_frais_table.empty:
             st.table(df_frais_table.sort_values('M_Num', ascending=False).rename(columns={'M_Num':'Total €'}))
         else:
-            st.info("Aucun frais")
-        
+            st.info("Aucune dépense")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (PERSISTANTE & CARNET DE SANTÉ) ---
 # =================================================================
