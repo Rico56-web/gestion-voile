@@ -569,29 +569,27 @@ if st.session_state.page == "STATS":
         )
         st.plotly_chart(fig2, use_container_width=True, config=config_static)
         
-    # --- Solde en gros pavé (CORRIGÉ) ---
+      # --- Solde en gros pavé (CORRIGÉ) ---
     solde = total_recettes - total_charges
     
-    # --- Affichage du Solde (Version Ultra-Stable) ---
-html_solde = (
-    f'<div style="text-align:center; padding:20px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6;">'
-    f'<span style="font-size:1.1rem; color:#6c757d;">Solde Théorique</span><br>'
-    f'<b style="color:{couleur_solde}; font-size:1.8rem;">'
-    f'{solde_formate} &euro;'
-    f'</b>'
-    f'</div>'
-)
+    # 1. ON DÉFINIT LES VARIABLES D'ABORD
+    couleur_solde = "#28a745" if solde >= 0 else "#dc3545"
+    label_solde = "POSITIF" if solde >= 0 else "NÉGATIF"
+    solde_formate = f"{solde:,.0f}".replace(",", " ")
+    txt_solde = f"{solde:,.0f}".replace(",", " ")
 
-st.markdown(html_solde, unsafe_allow_html=True)
-   # --- Rendu visuel du solde (Correction Ligne 572) ---
-html_rendu = (
-    f'<div style="text-align:center; border:2px solid #ddd; padding:15px; border-radius:15px; background:#fff; margin:15px 0;">'
-    f'<span style="color:#666; font-weight:bold;">SOLDE {label_solde}</span><br>'
-    f'<b style="color:{couleur_solde}; font-size:1.8rem;">{txt_solde} &euro;</b>'
-    f'</div>'
-)
+    # 2. ON GÉNÈRE LE HTML (BIEN INDENTÉ À DROITE)
+    html_solde = (
+        f'<div style="text-align:center; padding:20px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6; margin-bottom:15px;">'
+        f'<span style="font-size:1.1rem; color:#6c757d;">Solde Théorique {sel_y_stats}</span><br>'
+        f'<b style="color:{couleur_solde}; font-size:1.8rem;">'
+        f'{solde_formate} &euro;'
+        f'</b><br>'
+        f'<small style="color:{couleur_solde}; font-weight:bold;">SOLDE {label_solde}</small>'
+        f'</div>'
+    )
 
-st.markdown(html_rendu, unsafe_allow_html=True)
+    st.markdown(html_solde, unsafe_allow_html=True)
 
     # --- 6. ANALYSE PAR SOCIÉTÉ (GRAPHIQUES HORIZONTAUX OPTIMISÉS) ---
     st.divider()
