@@ -787,7 +787,7 @@ st.progress(percent_prog)
 # =================================================================
 if st.session_state.page == "FACTURES":
     st.title("📑 Facturation & Rapports")
- 
+
     # --- 1. SÉLECTION DU MOIS ---
     mois_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", 
                  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
@@ -796,16 +796,14 @@ if st.session_state.page == "FACTURES":
     col_m, col_a = st.columns(2)
     sel_mois = col_m.selectbox("Choisir le mois", mois_noms, index=maintenant.month - 1)
     sel_annee = col_a.selectbox("Année", [2025, 2026, 2027], index=1)
- 
+
     index_mois = mois_noms.index(sel_mois) + 1
- 
+
     # --- 2. FILTRAGE ET CALCULS ---
     if not df_c.empty:
-        # Conversion temporaire pour le filtrage
         df_fact = df_c.copy()
         df_fact['dt'] = pd.to_datetime(df_fact['DateNav'], format='%d/%m/%Y', errors='coerce')
         
-        # Filtre : Société CMN + Mois + Année
         mask_cmn = (df_fact['Société'].astype(str).str.upper() == "CMN") & \
                    (df_fact['dt'].dt.month == index_mois) & \
                    (df_fact['dt'].dt.year == sel_annee)
@@ -815,39 +813,32 @@ if st.session_state.page == "FACTURES":
         if not df_cmn_mois.empty:
             st.subheader(f"Missions CMN - {sel_mois} {sel_annee}")
             
-            # Nettoyage des prix pour le calcul
             def clean_prix(x):
                 try:
                     s = "".join(c for c in str(x) if c.isdigit() or c in ".,")
                     return float(s.replace(",", "."))
                 except: return 0.0
- 
+
             df_cmn_mois['PrixNum'] = df_cmn_mois['Prix'].apply(clean_prix)
             total_cmn = df_cmn_mois['PrixNum'].sum()
             
-            # Affichage du tableau de contrôle sur l'iPhone
             st.table(df_cmn_mois[['DateNav', 'Nom', 'Prix']].set_index('DateNav'))
             st.metric("Total à facturer", f"{total_cmn:.2f} €")
             
-        # --- Préparation des variables AVANT le mail ---
+            # --- Préparation des variables pour le mail ---
             total_txt = f"{total_cmn:.2f}".replace(".", ",")
             
-            # Utilisation de triples guillemets doubles SANS le 'f' au début pour le corps fixe
-            # On utilise .format() pour injecter les variables, c'est bien plus robuste sur Streamlit Cloud
-            modele_mail = """Bonjour,
+            # Construction de la liste des missions pour le corps du mail
+            lignes = []
+            for _, r in df_cmn_mois.iterrows():
+                lignes.append(f"- {r['DateNav']} : {r['Nom']} ({r['Prix']})")
+            texte_missions = "\n".join(lignes)
 
-J'espère que vous allez bien !
+            destinataire = "tresorier@cmn-asso.fr, aurelienfaucheux@gmail.com"
+            objet = f"Facturation Missions Vesta - {sel_mois} {sel_annee}"
 
-Voici le récapitulatif des navigations de la CMN concernant le mois de {mois} {annee} :
-
-{missions}
-
-Le montant total s'élève à {total} EUR.
-
-Merci d'avance pour le règlement et à très vite sur l'eau !
-
-Amicalement,
-Eric (Vesta)"""
+            # Modèle de mail (Nettoyé de tout caractère invisible)
+            modele_mail = "Bonjour,\n\nJ'espère que vous allez bien !\n\nVoici le récapitulatif des navigations de la CMN concernant le mois de {mois} {annee} :\n\n{missions}\n\nLe montant total s'élève à {total} EUR.\n\nMerci d'avance pour le règlement et à très vite sur l'eau !\n\nAmicalement,\nEric (Vesta)"
 
             corps_mail = modele_mail.format(
                 mois=sel_mois, 
@@ -855,22 +846,21 @@ Eric (Vesta)"""
                 missions=texte_missions, 
                 total=total_txt
             )
- 
+
             # --- 4. ZONE D'ENVOI ET COPIE ---
             st.text_area("Copier ce texte pour Gmail :", corps_mail, height=300)
-            
             st.info(f"**Destinataire :** {destinataire}\n\n**Objet :** {objet}")
             
             import urllib.parse
             mail_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
             
             st.link_button("🚀 TENTER L'ENVOI DIRECT (MAILTO)", mail_link, use_container_width=True)
-            st.caption("Note : Si le bouton bloque, utilise le copier-coller du texte ci-dessus dans ton appli Gmail.")
+            st.caption("Note : Utilisez le copier-coller si le bouton ne lance pas votre application de mail.")
             
         else:
             st.info(f"Aucune mission CMN trouvée pour {sel_mois} {sel_annee}.")
     else:
-        st.warning("La base de données 'Contacts' est vide.")
+        st.warning("La base de données est vide.")
 # =================================================================
 # --- 11. PAGE ARCHIVES (NETTOYAGE, EXPORT & CARTES VIDANGE) ---
 # =================================================================
