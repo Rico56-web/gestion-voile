@@ -744,7 +744,7 @@ if st.session_state.page == "MAINT":
         st.success("Vidange archivée !")
         st.rerun()
 
-      st.divider()
+        st.divider()
 
     # --- E. AFFICHAGE DES ENREGISTREMENTS (LE MORCEAU MANQUANT) ---
     st.subheader("📋 Historique des frais & interventions")
