@@ -518,10 +518,10 @@ if st.session_state.page == "STATS":
         return pd.concat([df_a, df_arc], ignore_index=True)
 
     # On charge tout pour que le bilan soit complet
-    df_m = charger_global('maintenance.json', 'archives_maintenance.json') 
+  
     df_c = charger_global('contacts.json', 'archives_planning.json')    
     df_log = charger_global('logbook.json', 'archives_logbook.json')   
-    
+    df_m = pd.concat([df_m_actif, df_m_archive], ignore_index=True)
     config_static = {'staticPlot': True, 'responsive': True}
 
     # --- 4. CALCULS (Navigation & Finances) ---
