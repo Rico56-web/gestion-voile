@@ -476,86 +476,87 @@ if st.session_state.page == "PLANNING":
     )
     st.markdown(html_solde, unsafe_allow_html=True)
 # =================================================================
-# --- 9. PAGE STATS (RÉTABLISSEMENT TOTAL) ---
+# --- 9. PAGE STATS (CORRECTION FORMATS MIXTES) ---
 # =================================================================
 if st.session_state.page == "STATS":
-    import plotly.express as px
     import pandas as pd
+    import plotly.express as px
 
-    # 1. CHARGEMENT ÉTANCHE
-    df_planning = charger_data('contacts.json')
+    # 1. Chargement des données
+    df_c = charger_data('contacts.json')
     df_m_actif = charger_data('maintenance.json')
     df_m_arch = charger_data('archives_factures.json')
-    df_frais = pd.concat([df_m_actif, df_m_arch], ignore_index=True)
+    df_m = pd.concat([df_m_actif, df_m_arch], ignore_index=True)
 
-    # 2. NAVIGATION
-    col_t1, col_t2 = st.columns([2, 1])
-    col_t1.title("📊 Bilan Vesta")
-    sel_y = col_t2.selectbox("Saison", [2025, 2026, 2027], index=1)
-    
-    # 3. TRAITEMENT REVENUS (PLANNING)
-    total_recettes = 0
-    df_soc_table = pd.DataFrame()
+    # 2. Sélection Saison
+    sel_y = st.sidebar.selectbox("Saison", [2025, 2026, 2027], index=1)
+    st.title(f"📊 Bilan {st.session_state.get('app_name', 'Vesta')} {sel_y}")
 
-    if not df_planning.empty:
-        # On force le format de date pour éviter les erreurs de filtrage
-        df_planning['dt'] = pd.to_datetime(df_planning['DateNav'], dayfirst=True, errors='coerce')
-        # On filtre sur l'année
-        mask_rev = (df_planning['dt'].dt.year == sel_y)
-        df_rev_yr = df_planning[mask_rev].copy()
+    # 3. Traitement des Revenus (Planning)
+    total_rev = 0
+    df_soc_final = pd.DataFrame()
+
+    if not df_c.empty:
+        # --- GESTION DES DATES MIXTES ---
+        # On force la conversion en gérant les deux formats (ISO et FR)
+        df_c['dt_vrai'] = pd.to_datetime(df_c['DateNav'], errors='coerce', dayfirst=True)
         
-        if not df_rev_yr.empty:
-            df_rev_yr['P_Num'] = pd.to_numeric(df_rev_yr['Prix'].astype(str).str.replace('€','').str.replace(' ','').str.strip(), errors='coerce').fillna(0.0)
-            total_recettes = df_rev_yr['P_Num'].sum()
-            
-            # Nettoyage des noms de sociétés
-            df_rev_yr['Société'] = df_rev_yr['Société'].astype(str).str.upper().str.strip().replace(['NAN','','NONE'], 'PARTICULIER')
-            df_soc_table = df_rev_yr.groupby('Société')['P_Num'].sum().reset_index()
+        # Filtrage sur l'année choisie
+        df_c_yr = df_c[df_c['dt_vrai'].dt.year == sel_y].copy()
 
-    # 4. TRAITEMENT FRAIS (MAINTENANCE)
+        if not df_c_yr.empty:
+            # --- GESTION DES PRIX MIXTES (Nombre et Texte) ---
+            df_c_yr['P_Num'] = pd.to_numeric(df_c_yr['Prix'], errors='coerce').fillna(0)
+            total_rev = df_c_yr['P_Num'].sum()
+
+            # Groupement par Société
+            df_c_yr['Société'] = df_c_yr['Société'].fillna('INCONNU').astype(str).str.upper().str.strip()
+            df_soc_final = df_c_yr.groupby('Société')['P_Num'].sum().reset_index()
+            df_soc_final = df_soc_final.rename(columns={'P_Num': 'CA €'}).sort_values('CA €', ascending=False)
+
+    # 4. Traitement des Frais (Maintenance)
     total_frais = 0
-    df_frais_table = pd.DataFrame()
+    df_frais_final = pd.DataFrame()
 
-    if not df_frais.empty:
-        df_frais['dt'] = pd.to_datetime(df_frais['Date'], dayfirst=True, errors='coerce')
-        mask_frais = (df_frais['dt'].dt.year == sel_y)
-        df_frais_yr = df_frais[mask_frais].copy()
+    if not df_m.empty:
+        df_m['dt_vrai'] = pd.to_datetime(df_m['Date'], errors='coerce', dayfirst=True)
+        df_m_yr = df_m[df_m['dt_vrai'].dt.year == sel_y].copy()
         
-        if not df_frais_yr.empty:
-            df_frais_yr['M_Num'] = pd.to_numeric(df_frais_yr['M_Num'], errors='coerce').fillna(0.0)
-            total_frais = df_frais_yr['M_Num'].sum()
-            df_frais_table = df_frais_yr.groupby('Type')['M_Num'].sum().reset_index()
+        if not df_m_yr.empty:
+            df_m_yr['M_Num'] = pd.to_numeric(df_m_yr['M_Num'], errors='coerce').fillna(0)
+            total_frais = df_m_yr['M_Num'].sum()
+            df_frais_final = df_m_yr.groupby('Type')['M_Num'].sum().reset_index()
+            df_frais_final = df_frais_final.rename(columns={'M_Num': 'Total €'}).sort_values('Total €', ascending=False)
 
-    # 5. AFFICHAGE
-    st.subheader(f"💰 Finances {sel_y}")
-    c1, c2 = st.columns(2)
-    c1.metric("Revenus (Missions)", f"{total_recettes:,.0f} €".replace(',',' '))
-    c2.metric("Frais (Entretien)", f"{total_frais:,.0f} €".replace(',',' '))
+    # 5. Affichage des Métriques
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Revenus Missions", f"{total_rev:,.0f} €".replace(',', ' '))
+    c2.metric("Frais Entretien", f"{total_frais:,.0f} €".replace(',', ' '))
+    c3.metric("Résultat Net", f"{total_rev - total_frais:,.0f} €".replace(',', ' '))
 
-    # Graphique Pie
-    if total_recettes > 0 or total_frais > 0:
-        fig = px.pie(names=['Frais', 'Revenus'], values=[total_frais, total_recettes],
-                     color_discrete_map={'Frais': '#ef553b', 'Revenus': '#00cc96'}, hole=0.4)
-        fig.update_layout(height=280, margin=dict(t=20, b=20, l=0, r=0))
-        st.plotly_chart(fig, use_container_width=True)
-
-    # 6. TABLEAUX
+    # 6. Tableaux de détails
     st.divider()
-    col_a, col_b = st.columns(2)
-    
-    with col_a:
-        st.write("### 🏢 Missions")
-        if not df_soc_table.empty:
-            st.table(df_soc_table.sort_values('P_Num', ascending=False).rename(columns={'P_Num':'Total €'}))
-        else:
-            st.info("Aucune mission")
+    col_l, col_r = st.columns(2)
 
-    with col_b:
-        st.write("### 🛠️ Dépenses")
-        if not df_frais_table.empty:
-            st.table(df_frais_table.sort_values('M_Num', ascending=False).rename(columns={'M_Num':'Total €'}))
+    with col_l:
+        st.subheader("🏢 Détail Missions")
+        if not df_soc_final.empty:
+            st.dataframe(df_soc_final, hide_index=True, use_container_width=True)
         else:
-            st.info("Aucune dépense")
+            st.info("Aucune mission enregistrée.")
+
+    with col_r:
+        st.subheader("🛠️ Détail Dépenses")
+        if not df_frais_final.empty:
+            st.dataframe(df_frais_final, hide_index=True, use_container_width=True)
+        else:
+            st.info("Aucun frais enregistré.")
+
+    # 7. Graphique optionnel
+    if total_rev > 0 or total_frais > 0:
+        fig = px.pie(names=['Frais', 'Revenus'], values=[total_frais, total_rev],
+                     color_discrete_map={'Frais': '#EF553B', 'Revenus': '#00CC96'}, hole=0.5)
+        st.plotly_chart(fig, use_container_width=True)
 # =================================================================
 # --- 8. PAGE MAINTENANCE (PERSISTANTE & CARNET DE SANTÉ) ---
 # =================================================================
