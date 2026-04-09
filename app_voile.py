@@ -238,8 +238,8 @@ with st.form(f"form_edit_{idx}"):
 
 # --- DANS LA PARTIE AFFICHAGE (Le HTML) ---
 # Utilisation de : .0f pour forcer l'affichage sans virgule si c'est un float
-st.markdown(f"""
-    <div style="border: 5px solid #4A4A4A; padding: 15px; border-radius: 12px; margin-bottom: 15px; background-color: {bg_color}; color: {text_color};">
+    st.markdown(f"""
+        <div style="border: 5px solid #4A4A4A; padding: 15px; border-radius: 12px; margin-bottom: 15px; background-color: {bg_color}; color: {text_color};">
         ...
         <div style="margin: 10px 0; font-size: 0.95rem; line-height: 1.5;">
             📅 <b>{row.get('DateNav', '---')}</b> | 💰 <b>{int(float(row.get('Prix', 0)))} €</b><br>
@@ -248,8 +248,8 @@ st.markdown(f"""
             📍 Statut : <b>{row.get('Statut', '---')}</b>
         </div>
         ...
-    </div>
-""", unsafe_allow_html=True)
+        </div>
+        """, unsafe_allow_html=True)
             # --- MODE AFFICHAGE (Logique de Couleurs personnalisée) ---
             # --- 2. LÉGENDE DES COULEURS ---
     st.markdown("""
