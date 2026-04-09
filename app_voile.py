@@ -195,41 +195,61 @@ if st.session_state.page == "CONTACTS":
                     st.session_state.delete_confirm = None
                     st.rerun()
                 continue
+        # --- DANS LA BOUCLE D'ÉDITION (st.form) ---
+with st.form(f"form_edit_{idx}"):
+    c1, c2 = st.columns(2)
+    e_pre = c1.text_input("Prénom", row.get('Prénom', ''))
+    e_nom = c2.text_input("Nom", row.get('Nom', ''))
+    
+    e_date = st.text_input("Date Navigation", row.get('DateNav', ''))
+    
+    c3, c4, c5 = st.columns(3)
+    # Conversion en entier pour l'affichage initial et la saisie
+    try:
+        val_prix = int(float(str(row.get('Prix', '0')).replace('€', '').strip()))
+    except:
+        val_prix = 0
+        
+    e_prix = c3.number_input("Prix (€)", value=val_prix, step=1)
+    e_jours = c4.number_input("Nbre Jours", value=int(float(row.get('Nbre de jours', 1))), step=1)
+    e_pers = c5.number_input("Nbre Pers", value=int(float(row.get('Nbre de personnes', 1))), step=1)
+    
+    e_tel = st.text_input("Téléphone", row.get('T\u00e9l\u00e9phone', ''))
+    e_mail = st.text_input("Email", row.get('Email', ''))
+    
+    # ... (reste des sélecteurs de statut)
 
-            # --- MODE ÉDITION ---
-            if st.session_state.edit_idx == idx:
-                with st.form(f"form_edit_{idx}"):
-                    c1, c2 = st.columns(2)
-                    e_pre = c1.text_input("Prénom", row.get('Prénom', ''))
-                    e_nom = c2.text_input("Nom", row.get('Nom', ''))
-                    e_date = st.text_input("Date Navigation", row.get('DateNav', ''))
-                    
-                    c3, c4, c5 = st.columns(3)
-                    e_prix = c3.text_input("Prix", str(row.get('Prix', '0')))
-                    e_jours = c4.number_input("Nbre Jours", value=float(row.get('Nbre de jours', 1.0)))
-                    e_pers = c5.number_input("Nbre Pers", value=float(row.get('Nbre de personnes', 1.0)))
-                    
-                    e_tel = st.text_input("Téléphone", row.get('T\u00e9l\u00e9phone', ''))
-                    e_mail = st.text_input("Email", row.get('Email', ''))
-                    
-                    c6, c7 = st.columns(2)
-                    opts_st = ["En attente", "Ok", "Terminé", "Refusé"]
-                    e_st = c6.selectbox("Statut", opts_st, index=opts_st.index(row['Statut']) if row['Statut'] in opts_st else 0)
-                    opts_pa = ["Non payé", "Payé"]
-                    e_pa = c7.selectbox("Paiement", opts_pa, index=opts_pa.index(row['Paiement']) if row['Paiement'] in opts_pa else 0)
-                    
-                    if st.form_submit_button("💾 ENREGISTRER"):
-                        df_c.at[idx, 'Prénom'], df_c.at[idx, 'Nom'] = e_pre, e_nom
-                        df_c.at[idx, 'DateNav'], df_c.at[idx, 'Prix'] = e_date, e_prix
-                        df_c.at[idx, 'Nbre de jours'], df_c.at[idx, 'Nbre de personnes'] = e_jours, e_pers
-                        df_c.at[idx, 'T\u00e9l\u00e9phone'], df_c.at[idx, 'Email'] = e_tel, e_mail
-                        df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'] = e_st, e_pa
-                        sauvegarder_data(df_c, 'contacts.json')
-                        st.session_state.edit_idx = None
-                        st.rerun()
-                    if st.form_submit_button("Annuler"):
-                        st.session_state.edit_idx = None
-                        st.rerun()
+    if st.form_submit_button("💾 ENREGISTRER"):
+        # Sauvegarde forcée en nombres entiers
+        df_c.at[idx, 'Prénom'] = e_pre
+        df_c.at[idx, 'Nom'] = e_nom
+        df_c.at[idx, 'DateNav'] = e_date
+        df_c.at[idx, 'Prix'] = int(e_prix)
+        df_c.at[idx, 'Nbre de jours'] = int(e_jours)
+        df_c.at[idx, 'Nbre de personnes'] = int(e_pers)
+        df_c.at[idx, 'T\u00e9l\u00e9phone'] = e_tel
+        df_c.at[idx, 'Email'] = e_mail
+        df_c.at[idx, 'Statut'] = e_st
+        df_c.at[idx, 'Paiement'] = e_pa
+        
+        sauvegarder_data(df_c, 'contacts.json')
+        st.session_state.edit_idx = None
+        st.rerun()
+
+# --- DANS LA PARTIE AFFICHAGE (Le HTML) ---
+# Utilisation de : .0f pour forcer l'affichage sans virgule si c'est un float
+st.markdown(f"""
+    <div style="border: 5px solid #4A4A4A; padding: 15px; border-radius: 12px; margin-bottom: 15px; background-color: {bg_color}; color: {text_color};">
+        ...
+        <div style="margin: 10px 0; font-size: 0.95rem; line-height: 1.5;">
+            📅 <b>{row.get('DateNav', '---')}</b> | 💰 <b>{int(float(row.get('Prix', 0)))} €</b><br>
+            👥 {int(float(row.get('Nbre de personnes', 1)))} pers. | ⏱️ {int(float(row.get('Nbre de jours', 1)))} jours<br>
+            🏢 Société : {row.get('Société', 'PERSO')}<br>
+            📍 Statut : <b>{row.get('Statut', '---')}</b>
+        </div>
+        ...
+    </div>
+""", unsafe_allow_html=True)
             # --- MODE AFFICHAGE (Logique de Couleurs personnalisée) ---
             # --- 2. LÉGENDE DES COULEURS ---
     st.markdown("""
