@@ -441,18 +441,15 @@ st.markdown(h_cal, unsafe_allow_html=True)
                 st.rerun()
 
     # Bloc CA (Couleur Or/Sombre)
-      st.markdown(f"""
-    <div style="display: flex; padding: 10px; border-bottom: 1px solid #eee; background: white; align-items: center;">
-        <div style="background: {c_line}; color: white; border-radius: 5px; padding: 4px; min-width: 85px; text-align: center; font-weight: bold; margin-right: 10px; line-height:1.2;">
-            <span style="font-size: 0.75rem;">{txt_d}</span><br>
-            <span style="font-size: 0.5rem;">{"JOURS" if m['n_j'] > 1 else "JOUR"}</span>
-        </div>
-        <div style="flex-grow: 1;">
-            <b>{icon} {str(r.get('Nom','')).upper()}</b><br>
-            <small>{soc} | {r.get('Prix','0')} &euro;</small>
-        </div>
+    # --- Ligne 553 corrigée ---
+st.markdown(f"""
+    <div style="text-align:center; padding:20px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6;">
+        <span style="font-size:1.1rem; color:#6c757d;">Solde Théorique</span><br>
+        <b style="color:{'#28a745' if solde >= 0 else '#dc3545'}; font-size:1.8rem;">
+            {solde:,.0f} &euro;
+        </b>
     </div>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 # =================================================================
 # --- 9. PAGE STATS (VERSION FINALE OPTIMISÉE IPHONE 16) ---
 # =================================================================
