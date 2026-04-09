@@ -953,8 +953,7 @@ if st.session_state.page == "ARCHIVES":
                 montant_val = 0.0
                 
             montant_display = f"{montant_val:.0f}"
-            
-            # Affichage de la carte
+            # --- Rendu de la partie basse de la carte ---
             st.markdown(f"""
             <div style="border: 1px solid {brd_c}; border-left: 10px solid {brd_c}; padding: 12px; border-radius: 10px; margin-bottom: 8px; background-color: {bg_c};">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -962,10 +961,11 @@ if st.session_state.page == "ARCHIVES":
                     <div style="font-size: 1rem; font-weight: 900;">{montant_display} &euro;</div>
                 </div>
                 <div style="font-size: 0.7rem; color: #5f6368; border-top: 1px dashed {brd_c}; margin-top: 5px; padding-top: 3px;">
-                    📂 {row['Type']} • <b>{str(row['Statut']).upper()}</b>
+                    &#128194; {row['Type']} &bull; <b>{str(row['Statut']).upper()}</b>
                 </div>
             </div>
-            """, unsafe_allow_html=True)     
+            """, unsafe_allow_html=True)
+           
     else:
         st.write("Aucun frais archivé.")
 # =================================================================
