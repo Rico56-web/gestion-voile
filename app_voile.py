@@ -511,16 +511,17 @@ if st.session_state.page == "STATS":
     if st.button("📂 ARCHIVES", use_container_width=True, key="stats_to_archives"):
         st.session_state.page = "ARCHIVES"; st.rerun()
         
-    # --- RÉCUPÉRATION SÉCURISÉE ---
-    # 1. On charge les données actives
+    # --- 3. RÉCUPÉRATION DES DONNÉES (ALIGNEMENT STRICT) ---
+    # Maintenance : Fusion Actif + Archive
     df_m_actif = charger_data('maintenance.json')
-
-    #  2. On charge les données archivées (avec le nouveau nom)
     df_m_archive = charger_data('archives_maintenance.json')
-
-    # 3. On fusionne les deux (LIGNE 524)
-    # On ajoute une sécurité : si l'un des deux est vide, concat fonctionnera quand même
     df_m = pd.concat([df_m_actif, df_m_archive], ignore_index=True)
+
+    # Planning et Logbook (C'est ici qu'il manquait df_log)
+    df_c = charger_data('contacts.json')    
+    df_log = charger_data('logbook.json')   
+    
+    config_static = {'staticPlot': True, 'responsive': True}
 
     # --- 4. CALCULS (Navigation & Finances) ---
     if not df_log.empty:
