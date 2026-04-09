@@ -929,52 +929,45 @@ if st.session_state.page == "ARCHIVES":
     t1, t2, t3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Livre de Bord"])
     
     with t1:
+
         # --- AFFICHAGE PEAUFINÉ DES FRAIS (AVEC DÉTECTION VIDANGE) ---
-        df_frais_arch = charger_data('archives_maintenance.json')
-        if not df_frais_arch.empty:
-            # Tri par date décroissante
-            df_frais_arch['dt_t'] = pd.to_datetime(df_frais_arch['Date'], dayfirst=True, errors='coerce')
-            df_frais_arch = df_frais_arch.sort_values('dt_t', ascending=False)
+    df_frais_arch = charger_data('archives_maintenance.json')
+    if not df_frais_arch.empty:
+        # Tri par date décroissante
+        df_frais_arch['dt_t'] = pd.to_datetime(df_frais_arch['Date'], dayfirst=True, errors='coerce')
+        df_frais_arch = df_frais_arch.sort_values('dt_t', ascending=False)
+        
+        for idx, row in df_frais_arch.iterrows():
+            est_vidange = "VIDANGE" in str(row['Objet']).upper()
             
-            for idx, row in df_frais_arch.iterrows():
-                est_vidange = "VIDANGE" in str(row['Objet']).upper()
+            # Style dynamique
+            bg_c = "#fff3e0" if est_vidange else "#f1f3f4"
+            brd_c = "#ef6c00" if est_vidange else "#9aa0a6"
+            icon = "🛠️" if est_vidange else "📄"
+            suffix = " <span style='color:#e65100; font-size:0.7rem; font-weight:bold;'>[MAINTENANCE]</span>" if est_vidange else ""
+            
+            # --- Logique de formatage (DANS LA BOUCLE) ---
+            try:
+                montant_val = float(row.get('M_Num', 0))
+            except:
+                montant_val = 0.0
                 
-                # Style dynamique
-                bg_c = "#fff3e0" if est_vidange else "#f1f3f4"
-                brd_c = "#ef6c00" if est_vidange else "#9aa0a6"
-                icon = "🛠️" if est_vidange else "📄"
-                suffix = " <span style='color:#e65100; font-size:0.7rem; font-weight:bold;'>[MAINTENANCE]</span>" if est_vidange else ""
-            # --- Extraction de la logique de formatage ---
-        montant_val = float(row.get('M_Num', 0))
-        # On prépare le texte du montant sans utiliser d'accidents de syntaxe dans le HTML
-        montant_display = f"{montant_val:.0f}"
-        
-        st.markdown(f"""
-        <div style="border: 1px solid {brd_c}; border-left: 10px solid {brd_c}; padding: 12px; border-radius: 10px; margin-bottom: 8px; background-color: {bg_c};">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="font-size: 0.85rem; font-weight: bold;">{icon} {row['Date']} | {row['Objet']}{suffix}</div>
-                <div style="font-size: 1rem; font-weight: 900;">{montant_display} &euro;</div>
+            montant_display = f"{montant_val:.0f}"
+            
+            # Affichage de la carte
+            st.markdown(f"""
+            <div style="border: 1px solid {brd_c}; border-left: 10px solid {brd_c}; padding: 12px; border-radius: 10px; margin-bottom: 8px; background-color: {bg_c};">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 0.85rem; font-weight: bold;">{icon} {row['Date']} | {row['Objet']}{suffix}</div>
+                    <div style="font-size: 1rem; font-weight: 900;">{montant_display} &euro;</div>
+                </div>
+                <div style="font-size: 0.7rem; color: #5f6368; border-top: 1px dashed {brd_c}; margin-top: 5px; padding-top: 3px;">
+                    📂 {row['Type']} • <b>{str(row['Statut']).upper()}</b>
+                </div>
             </div>
-            <div style="font-size: 0.7rem; color: #5f6368; border-top: 1px dashed {brd_c}; margin-top: 5px; padding-top: 3px;">
-                📂 {row['Type']} • <b>{str(row['Statut']).upper()}</b>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-              
-        else:
-            st.write("Aucun frais archivé.")
-    
-    with t2:
-        # Planning : Statuts Paid/Unpaid conservés
-        st.dataframe(charger_data('archives_planning.json'), use_container_width=True, hide_index=True)
-        
-    with t3:
-        # Livre de Bord : Navigations passées
-        df_log_arch = charger_data('archives_logbook.json')
-        if not df_log_arch.empty:
-            st.dataframe(df_log_arch, use_container_width=True, hide_index=True)
-        else:
-            st.write("Aucune navigation dans l'historique.")
+            """, unsafe_allow_html=True)     
+    else:
+        st.write("Aucun frais archivé.")
 # =================================================================
 # --- 10. PAGE LOG (LIVRE DE BORD) ---
 # =================================================================
