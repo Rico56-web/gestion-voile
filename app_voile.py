@@ -410,8 +410,7 @@ for sem in cal_mat:
 h_cal += '</table>'
 st.markdown(h_cal, unsafe_allow_html=True)
 
-
-    # --- LISTE DES MISSIONS & TOTAL ---
+# --- LISTE DES MISSIONS & TOTAL ---
     st.markdown(f"#### 📋 Détails {sel_m_nom}")
     if missions_list:
         missions_list.sort(key=lambda x: x['start'])
@@ -420,25 +419,37 @@ st.markdown(h_cal, unsafe_allow_html=True)
             soc = str(r.get('Société','')).upper()
             c_line = "#0047AB" if "CMN" in soc else "#27ae60"
             txt_d = f"{m['start'].day:02d}/{m['start'].month:02d}"
-            if m['n_j'] > 1: txt_d += f" ➔ {m['end'].day:02d}/{m['end'].month:02d}"
-            icon = "💰" if "PAY" in str(r.get('Paiement','')).upper() and "NON" not in str(r.get('Paiement','')).upper() else "⚠️"
-    st.markdown(f"""
-      <div style="display: flex; padding: 10px; border-bottom: 1px solid #eee; background: white; align-items: center;">
-        <div style="background: {c_line}; color: white; border-radius: 5px; padding: 4px; min-width: 85px; text-align: center; font-weight: bold; margin-right: 10px; line-height:1.2;">
-            <span style="font-size: 0.75rem;">{txt_d}</span><br>
-            <span style="font-size: 0.5rem;">{"JOURS" if m['n_j'] > 1 else "JOUR"}</span>
-        </div>
-        <div style="flex-grow: 1;">
-            <b>{icon} {str(r.get('Nom','')).upper()}</b><br>
-            <small>{soc} | {r.get('Prix','0')} &euro;</small>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+            if m['n_j'] > 1: 
+                txt_d += f" ➔ {m['end'].day:02d}/{m['end'].month:02d}"
+            
+            # Gestion de l'icône de paiement
+            pay_status = str(r.get('Paiement','')).upper()
+            icon = "💰" if "PAY" in pay_status and "NON" not in pay_status else "⚠️"
+            label_jours = "JOURS" if m['n_j'] > 1 else "JOUR"
+            prix_affiche = r.get('Prix','0')
+
+            # --- Rendu HTML sécurisé (BIEN INDENTÉ DANS LE FOR) ---
+            html_item = (
+                f'<div style="display: flex; padding: 10px; border-bottom: 1px solid #eee; background: white; align-items: center;">'
+                f'<div style="background: {c_line}; color: white; border-radius: 5px; padding: 4px; min-width: 85px; text-align: center; font-weight: bold; margin-right: 10px; line-height:1.2;">'
+                f'<span style="font-size: 0.75rem;">{txt_d}</span><br>'
+                f'<span style="font-size: 0.5rem;">{label_jours}</span>'
+                f'</div>'
+                f'<div style="flex-grow: 1;">'
+                f'<b>{icon} {str(r.get("Nom","")).upper()}</b><br>'
+                f'<small>{soc} | {prix_affiche} &euro;</small>'
+                f'</div>'
+                f'</div>'
+            )
+            st.markdown(html_item, unsafe_allow_html=True)
+
+            # Bouton de fiche
             if st.button(f"🔍 FICHE : {str(r.get('Nom',''))}", key=f"p_btn_{m['idx']}", use_container_width=True):
                 st.session_state.edit_idx = m['idx']
                 st.session_state.mode_saisie = True
                 st.session_state.page = "CONTACTS"
                 st.rerun()
+
     # 1. On prépare le texte formaté en dehors du HTML pour éviter toute erreur de syntaxe
 solde_formate = f"{solde:,.0f}".replace(",", " ") # Remplace la virgule par un espace pour le format français
 
