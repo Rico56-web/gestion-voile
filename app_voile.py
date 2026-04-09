@@ -493,8 +493,6 @@ if st.session_state.page == "STATS":
     # --- 2. NAVIGATION & FILTRES ---
     col_t1, col_t2 = st.columns([2, 1])
     col_t1.title("📊 Bilan Vesta")
-    
-    # Indicateur de fraîcheur pour vérifier le rafraîchissement sur iPhone 16
     col_t1.caption(f"🕒 Données actualisées à : {datetime.datetime.now().strftime('%H:%M:%S')}")
     
     ANNEES_STATS = [2025, 2026, 2027, 2028]
@@ -510,17 +508,17 @@ if st.session_state.page == "STATS":
     
     if st.button("📂 ARCHIVES", use_container_width=True, key="stats_to_archives"):
         st.session_state.page = "ARCHIVES"; st.rerun()
-        
-    # --- 3. RÉCUPÉRATION DES DONNÉES (ALIGNEMENT STRICT) ---
-    # Maintenance : Fusion Actif + Archive
-    df_m_actif = charger_data('maintenance.json')
-    df_m_archive = charger_data('archives_maintenance.json')
-    df_m = pd.concat([df_m_actif, df_m_archive], ignore_index=True)
 
-    # Planning et Logbook (C'est ici qu'il manquait df_log)
-    df_c = charger_data('contacts.json')    
-    df_log = charger_data('logbook.json')   
-    
+    # --- 3. RÉCUPÉRATION DES DONNÉES (FUSION ACTIF + ARCHIVES) ---
+    def charger_complet(actif, archive):
+        df_a = charger_data(actif)
+        df_arc = charger_data(archive)
+        return pd.concat([df_a, df_arc], ignore_index=True)
+
+    # Fusion des frais (Remplacez par 'archives_factures.json' si pas encore renommé)
+    df_m = charger_complet('maintenance.json', 'archives_maintenance.json') 
+    df_c = charger_complet('contacts.json', 'archives_planning.json')    
+    df_log = charger_complet('logbook.json', 'archives_logbook.json')   
     config_static = {'staticPlot': True, 'responsive': True}
 
     # --- 4. CALCULS (Navigation & Finances) ---
@@ -536,66 +534,49 @@ if st.session_state.page == "STATS":
         df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
         df_m['dt'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
         mask_m = (df_m['dt'].dt.year == sel_y_stats)
-        df_charges_view = df_m[mask_m].copy() if mode_previ else df_m[mask_m & (df_m['Statut'] == "Fait")].copy()
+        # Filtre : On affiche tout en prévi, sinon seulement ce qui est "Fait"
+        df_charges_view = df_m[mask_m].copy() if mode_previ else df_m[mask_m & (df_m['Statut'].str.upper().isin(["FAIT", "PAYÉ", "PAYE"]))].copy()
         total_charges = df_charges_view['M_Num'].sum() + total_cout_gasoil
 
     if not df_c.empty:
         df_c['dt'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         df_c_yr = df_c[df_c['dt'].dt.year == sel_y_stats].copy()
+        
+        # Nettoyage prix
         df_c_yr['P_Num'] = pd.to_numeric(df_c_yr['Prix'].astype(str).str.replace('€','').str.replace(' ','').str.strip(), errors='coerce').fillna(0.0)
-        def is_paye(v): return "PAY" in str(v).upper() and "NON" not in str(v).upper()
+        
+        # Filtre Revenus (Souple : PAY, OUI, ENCAISSÉ)
+        def is_paye(v): 
+            v_str = str(v).upper()
+            return any(x in v_str for x in ["PAY", "OUI", "FAIT", "ENCAISS"])
+            
         df_recettes_view = df_c_yr if mode_previ else df_c_yr[df_c_yr['Paiement'].apply(is_paye)].copy()
         total_recettes = df_recettes_view['P_Num'].sum()
 
-    # --- 5. TRÉSORERIE (AFFICHAGE VERTICAL POUR LÉGENDES IPHONE) ---
+    # --- 5. AFFICHAGE TRÉSORERIE ---
     st.subheader(f"💰 Finances {sel_y_stats}")
     
-    # Graphique 1 : Revenus vs Frais
-    st.caption("📈 Revenus vs Frais")
     fig1 = px.pie(names=['Frais', 'Revenus'], values=[total_charges, total_recettes],
                   color_discrete_map={'Frais': '#ef553b', 'Revenus': '#00cc96'}, hole=0.4)
-    fig1.update_layout(
-        margin=dict(t=10, b=60, l=10, r=10), height=300, showlegend=True,
-        legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5)
-    )
+    fig1.update_layout(margin=dict(t=10, b=60, l=10, r=10), height=300, showlegend=True,
+                       legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5))
     st.plotly_chart(fig1, use_container_width=True, config=config_static)
 
-    # Graphique 2 : Dépenses
-    if not df_charges_view.empty and total_charges > 0:
-        st.caption("🔍 Répartition des Dépenses")
-        df_p = df_charges_view.groupby('Type')['M_Num'].sum().reset_index()
-        if total_cout_gasoil > 0:
-            df_p = pd.concat([df_p, pd.DataFrame([{'Type': 'Gasoil', 'M_Num': total_cout_gasoil}])], ignore_index=True)
-        fig2 = px.pie(df_p, names='Type', values='M_Num', hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
-        fig2.update_layout(
-            margin=dict(t=10, b=60, l=10, r=10), height=300, showlegend=True,
-            legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5)
-        )
-        st.plotly_chart(fig2, use_container_width=True, config=config_static)
-        
-      # --- Solde en gros pavé (CORRIGÉ) ---
-        solde = total_recettes - total_charges
-    
-    # 1. ON DÉFINIT LES VARIABLES D'ABORD
+    # Solde Théorique
+    solde = total_recettes - total_charges
     couleur_solde = "#28a745" if solde >= 0 else "#dc3545"
     label_solde = "POSITIF" if solde >= 0 else "NÉGATIF"
     solde_formate = f"{solde:,.0f}".replace(",", " ")
-    txt_solde = f"{solde:,.0f}".replace(",", " ")
 
-    # 2. ON GÉNÈRE LE HTML (BIEN INDENTÉ À DROITE)
-    html_solde = (
-        f'<div style="text-align:center; padding:20px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6; margin-bottom:15px;">'
-        f'<span style="font-size:1.1rem; color:#6c757d;">Solde Théorique {sel_y_stats}</span><br>'
-        f'<b style="color:{couleur_solde}; font-size:1.8rem;">'
-        f'{solde_formate} &euro;'
-        f'</b><br>'
-        f'<small style="color:{couleur_solde}; font-weight:bold;">SOLDE {label_solde}</small>'
-        f'</div>'
-    )
+    st.markdown(f"""
+        <div style="text-align:center; padding:20px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6; margin-bottom:15px;">
+            <span style="font-size:1.1rem; color:#6c757d;">Solde Théorique {sel_y_stats}</span><br>
+            <b style="color:{couleur_solde}; font-size:1.8rem;">{solde_formate} &euro;</b><br>
+            <small style="color:{couleur_solde}; font-weight:bold;">SOLDE {label_solde}</small>
+        </div>
+    """, unsafe_allow_html=True)
 
-    st.markdown(html_solde, unsafe_allow_html=True)
-
-    # --- 6. ANALYSE PAR SOCIÉTÉ (GRAPHIQUES HORIZONTAUX OPTIMISÉS) ---
+    # --- 6. ANALYSE PAR SOCIÉTÉ ---
     st.divider()
     st.subheader("🏢 Analyse par Société")
     if not df_recettes_view.empty:
@@ -608,23 +589,11 @@ if st.session_state.page == "STATS":
         stats_soc['Moy_Jour'] = stats_soc.apply(lambda x: round(x['P_Num']/x['Jours_Num'],0) if x['Jours_Num']>0 else 0, axis=1)
         stats_soc = stats_soc.sort_values(by='P_Num', ascending=False)
 
-        st.caption("⛵ Jours de Navigation")
-        f_vol = px.bar(stats_soc, y='Société', x='Jours_Num', orientation='h', text_auto=True, 
-                       color='Société', color_discrete_sequence=px.colors.qualitative.Pastel)
-        f_vol.update_layout(margin=dict(t=0,b=0,l=0,r=0), height=180, showlegend=False, xaxis_visible=False, yaxis_title=None)
-        st.plotly_chart(f_vol, use_container_width=True, config=config_static)
-
-        st.caption("💰 Revenu / Jour (€)")
-        f_yield = px.bar(stats_soc, y='Société', x='Moy_Jour', orientation='h', text_auto='.0f', 
-                         color='Société', color_discrete_sequence=px.colors.qualitative.Safe)
-        f_yield.update_layout(margin=dict(t=0,b=0,l=0,r=0), height=180, showlegend=False, xaxis_visible=False, yaxis_title=None)
-        st.plotly_chart(f_yield, use_container_width=True, config=config_static)
-        
         st.table(stats_soc[['Société','P_Num','Jours_Num','Moy_Jour']].rename(columns={'P_Num':'CA €','Jours_Num':'Jours'}))
     else:
-        st.info("Aucune donnée disponible.")
+        st.info("Aucune donnée disponible pour cette saison.")
 
-    # --- 7. NAVIGATION & SYNTHÈSE MENSUELLE ---
+    # --- 7. NAVIGATION & SYNTHÈSE ---
     st.divider()
     st.subheader("⚓ Détails Navigation")
     n1, n2, n3, n4 = st.columns(4)
@@ -633,17 +602,6 @@ if st.session_state.page == "STATS":
     n3.metric("Gasoil", f"{total_cout_gasoil:.0f}€")
     conso = round(total_litres / total_h_moteur, 1) if total_h_moteur > 0 else 0
     n4.metric("Conso", f"{conso}L/h")
-
-    mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
-    syn = []
-    for i in range(1, 13):
-        r = df_recettes_view[df_recettes_view['dt'].dt.month == i]['P_Num'].sum() if not df_recettes_view.empty else 0
-        c = df_charges_view[df_charges_view['dt'].dt.month == i]['M_Num'].sum() if not df_charges_view.empty else 0
-        if r > 0 or c > 0:
-            syn.append({"Mois": mois_noms[i-1], "CA": f"{r:.0f}€", "Frais": f"{c:.0f}€", "Net": f"{r-c:.0f}€"})
-    
-    if syn:
-        st.table(pd.DataFrame(syn))
 # =================================================================
 # --- 8. PAGE MAINTENANCE (PERSISTANTE & CARNET DE SANTÉ) ---
 # =================================================================
