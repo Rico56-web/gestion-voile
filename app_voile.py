@@ -476,119 +476,125 @@ if st.session_state.page == "PLANNING":
     )
     st.markdown(html_solde, unsafe_allow_html=True)
 # =================================================================
-# --- 9. PAGE STATS (CORRECTION FINALE ÉTANCHE) ---
+# --- 9. PAGE STATS (RECONSTRUCTION FINALE DES DATES) ---
 # =================================================================
 if st.session_state.page == "STATS":
     import pandas as pd
     import plotly.express as px
+    import datetime
 
-    # --- 1. CHARGEMENT ÉTANCHE ---
-    # On vide les variables pour repartir à zéro
+    # --- 1. CHARGEMENT INDÉPENDANT (On repart de zéro) ---
+    # Pour s'assurer qu'aucune variable n'est polluée
     df_planning = pd.DataFrame()
-    df_frais_total = pd.DataFrame()
+    df_m = pd.DataFrame()
 
-    # Chargement
-    df_c_raw = charger_data('contacts.json')
+    # Chargement brut
+    df_planning = charger_data('contacts.json')
     df_m_actif = charger_data('maintenance.json')
-    df_m_arch = charger_data('archives_factures.json') # Votre fichier d'archive
-    
-    # Fusion des frais
-    df_frais_total = pd.concat([df_m_actif, df_m_arch], ignore_index=True)
+    df_m_arch = charger_data('archives_factures.json')
+    df_m = pd.concat([df_m_actif, df_m_arch], ignore_index=True)
 
-    # --- 2. SÉLECTION ANNÉE ---
-    ANNEES_STATS = [2025, 2026, 2027]
-    
-    # On crée des colonnes pour aligner le titre et le sélecteur
+    # --- 2. NAVIGATION ---
     col_nav1, col_nav2 = st.columns([3, 1])
     col_nav1.title("📊 Bilan Vesta")
-    sel_y = col_nav2.selectbox("Saison", ANNEES_STATS, index=1)
+    
+    # Sélection Saison
+    sel_y = col_nav2.selectbox("Saison", [2025, 2026, 2027], index=1, key="stats_year_select")
 
-    # --- 3. TRAITEMENT REVENUS (PLANNING) ---
+    # --- 3. TRAITEMENT DES REVENUS (PLANNING) ---
     total_rev = 0
     df_soc_final = pd.DataFrame()
 
-    if not df_c_raw.empty:
-        # --- GESTION DES DATES MIXTES (ISO et FR) ---
-        # Cette ligne est cruciale pour votre fichier
-        df_c_raw['dt_vrai'] = pd.to_datetime(df_c_raw['DateNav'], errors='coerce', dayfirst=True)
+    if not df_planning.empty:
+        # --- LECTURE ROBUSTE DES DATES MIXTES ---
+        # Cette fonction va essayer de lire la date quel que soit son format
+        def conversion_date_robuste(date_str):
+            if pd.isna(date_str) or date_str == "":
+                return pd.NaT
+            date_str = str(date_str).strip()
+            
+            # Liste des formats à tester (Ordre important)
+            formats_a_tester = ['%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d-%m-%Y']
+            
+            for fmt in formats_a_tester:
+                try:
+                    return pd.to_datetime(date_str, format=fmt)
+                except (ValueError, TypeError):
+                    continue
+            
+            # En dernier recours, on laisse Pandas deviner (dayfirst=True pour la France)
+            return pd.to_datetime(date_str, errors='coerce', dayfirst=True)
+
+        # Application de la conversion
+        df_planning['dt_vrai'] = df_planning['DateNav'].apply(conversion_date_robuste)
         
         # Filtrage sur l'année choisie
-        df_c_yr = df_c_raw[df_c_raw['dt_vrai'].dt.year == sel_y].copy()
+        df_planning_yr = df_planning[df_planning['dt_vrai'].dt.year == sel_y].copy()
 
-        if not df_c_yr.empty:
-            # Nettoyage du prix (gère nombres et textes "479.00")
-            df_c_yr['P_Num'] = pd.to_numeric(df_c_yr['Prix'], errors='coerce').fillna(0)
-            
-            # Nettoyage des noms de sociétés
-            df_c_yr['Société'] = df_c_yr['Société'].fillna('PARTICULIER').astype(str).str.upper().str.strip()
-            
-            # --- FILTRE ÉTANCHE (IMPORTANT) ---
-            # On exclut explicitement les catégories de maintenance qui polluent votre planning
-            EXCLURE_MAINTENANCE = ["AUTRES", "PERSO", "PORTE", "PORT", "ASSURANCE", "SÉCURITÉ"]
-            df_rev_propre = df_c_yr[~df_c_yr['Société'].isin(EXCLURE_MAINTENANCE)].copy()
-            
-            # Groupement par Société
-            if not df_rev_propre.empty:
-                df_soc_final = df_rev_propre.groupby('Société')['P_Num'].sum().reset_index()
-                df_soc_final = df_soc_final.rename(columns={'P_Num': 'CA €'}).sort_values('CA €', ascending=False)
-                total_rev = df_soc_final['CA €'].sum()
+        if not df_planning_yr.empty:
+            # Nettoyage du prix (gère nombres et textes)
+            df_planning_yr['P_Num'] = pd.to_numeric(df_planning_yr['Prix'], errors='coerce').fillna(0)
+            total_rev = df_planning_yr['P_Num'].sum()
 
-    # --- 4. TRAITEMENT FRAIS (MAINTENANCE) ---
+            # Analyse par Société (CMN, CLICK, etc.)
+            df_planning_yr['Société'] = df_planning_yr['Société'].fillna('PARTICULIER').astype(str).str.upper().str.strip()
+            
+            # Groupement
+            df_soc_final = df_planning_yr.groupby('Société')['P_Num'].sum().reset_index()
+            df_soc_final = df_soc_final.rename(columns={'P_Num':'CA €'}).sort_values('CA €', ascending=False)
+
+    # --- 4. TRAITEMENT DES FRAIS (MAINTENANCE) ---
     total_frais = 0
     df_frais_final = pd.DataFrame()
 
-    if not df_frais_total.empty:
-        # Conversion date maintenance (généralement dayfirst=True)
-        df_frais_total['dt_vrai'] = pd.to_datetime(df_frais_total['Date'], errors='coerce', dayfirst=True)
-        df_frais_yr = df_frais_total[df_frais_total['dt_vrai'].dt.year == sel_y].copy()
+    if not df_m.empty:
+        # Conversion date maintenance (standard dayfirst=True)
+        df_m['dt_vrai'] = pd.to_datetime(df_m['Date'], errors='coerce', dayfirst=True)
+        df_m_yr = df_m[df_m['dt_vrai'].dt.year == sel_y].copy()
         
-        if not df_frais_yr.empty:
-            df_frais_yr['M_Num'] = pd.to_numeric(df_frais_yr['M_Num'], errors='coerce').fillna(0)
-            total_frais = df_frais_yr['M_Num'].sum()
+        if not df_m_yr.empty:
+            df_m_yr['M_Num'] = pd.to_numeric(df_m_yr['M_Num'], errors='coerce').fillna(0)
+            total_frais = df_m_yr['M_Num'].sum()
             
-            # Groupement par Type de frais
+            # Groupement par Type
             df_frais_yr['Type'] = df_frais_yr['Type'].fillna('AUTRES').astype(str).str.upper().str.strip()
             df_frais_final = df_frais_yr.groupby('Type')['M_Num'].sum().reset_index()
-            df_frais_final = df_frais_final.rename(columns={'M_Num': 'Total €'}).sort_values('Total €', ascending=False)
+            df_frais_final = df_frais_final.rename(columns={'M_Num':'Total €'}).sort_values('Total €', ascending=False)
 
     # --- 5. AFFICHAGE DES INDICATEURS ---
     st.subheader(f"💰 Finances {sel_y}")
     c1, c2, c3 = st.columns(3)
     c1.metric("Revenus (Missions)", f"{total_rev:,.0f} €".replace(',', ' '))
     c2.metric("Frais (Entretien)", f"{total_frais:,.0f} €".replace(',', ' '))
+    
     # Calcul du solde
     solde = total_rev - total_frais
-    couleur_solde = "normal" if solde >= 0 else "inverse"
-    c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color=couleur_solde)
+    couleur_delta = "inverse" if solde < 0 else "normal"
+    c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color=couleur_delta)
 
-    # --- 6. TABLEAUX DÉTAILLÉS (Côte à Côte) ---
+    # --- 6. TABLEAUX DE DÉTAIL ---
     st.divider()
-    col_rev, col_frais = st.columns(2)
+    col_l, col_r = st.columns(2)
 
-    with col_rev:
-        st.subheader("🏢 Par Société")
-        if not df_soc_final.empty and total_rev > 0:
-            # On affiche le tableau des revenus (CMN, CLICK, VOG, etc.)
+    with col_l:
+        st.write("### 🏢 Par Société")
+        if not df_soc_final.empty:
             st.dataframe(df_soc_final, hide_index=True, use_container_width=True)
         else:
             st.info("Aucune mission de navigation détectée.")
 
-    with col_frais:
-        st.subheader("🛠️ Par Type de Frais")
+    with col_r:
+        st.write("### 🛠️ Par Type de Frais")
         if not df_frais_final.empty:
-            # On affiche le tableau des dépenses
             st.dataframe(df_frais_final, hide_index=True, use_container_width=True)
         else:
-            st.info("Aucun frais détecté.")
+            st.info("Aucun frais enregistré.")
 
-    # --- 7. GRAPHIQUE DE RÉPARTITION ---
+    # --- 7. GRAPHIQUE RÉPARTITION ---
     if total_rev > 0 or total_frais > 0:
-        st.divider()
         fig = px.pie(names=['Frais', 'Revenus'], values=[total_frais, total_rev],
-                     color_discrete_map={'Frais': '#EF553B', 'Revenus': '#00CC96'}, hole=0.5)
-        # Ajustement de la légende pour mobile
-        fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=300,
-                          legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
+                     color_discrete_map={'Frais': '#ef553b', 'Revenus': '#00cc96'}, hole=0.4)
+        fig.update_layout(margin=dict(t=10, b=10, l=10, r=10), height=300)
         st.plotly_chart(fig, use_container_width=True)
 # =================================================================
 # --- 8. PAGE MAINTENANCE (PERSISTANTE & CARNET DE SANTÉ) ---
