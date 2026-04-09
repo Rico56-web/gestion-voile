@@ -439,17 +439,22 @@ st.markdown(h_cal, unsafe_allow_html=True)
                 st.session_state.mode_saisie = True
                 st.session_state.page = "CONTACTS"
                 st.rerun()
+    # 1. On prépare le texte formaté en dehors du HTML pour éviter toute erreur de syntaxe
+solde_formate = f"{solde:,.0f}".replace(",", " ") # Remplace la virgule par un espace pour le format français
 
-    # Bloc CA (Couleur Or/Sombre)
-    # --- Ligne 553 corrigée ---
+# 2. On choisit la couleur
+couleur_solde = "#28a745" if solde >= 0 else "#dc3545"
+
+# 3. On affiche le HTML proprement
 st.markdown(f"""
     <div style="text-align:center; padding:20px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6;">
         <span style="font-size:1.1rem; color:#6c757d;">Solde Théorique</span><br>
-        <b style="color:{'#28a745' if solde >= 0 else '#dc3545'}; font-size:1.8rem;">
-            {solde:,.0f} &euro;
+        <b style="color:{couleur_solde}; font-size:1.8rem;">
+            {solde_formate} &euro;
         </b>
     </div>
 """, unsafe_allow_html=True)
+
 # =================================================================
 # --- 9. PAGE STATS (VERSION FINALE OPTIMISÉE IPHONE 16) ---
 # =================================================================
