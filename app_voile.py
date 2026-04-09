@@ -294,13 +294,14 @@ if st.session_state.page == "CONTACTS":
 if st.session_state.page == "PLANNING":
     from datetime import datetime, date, timedelta
     import calendar
-    # --- EN-TÊTE & NAVIGATION HAUT ---
-    # Utilisation de guillemets simples pour éviter toute confusion avec les accolades suivantes
+
+    # --- EN-TÊTE (Utilisation de guillemets simples pour 'fermer' le texte) ---
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>🗓️ PLANNING 2026</h1></div>', unsafe_allow_html=True)
     
     # Bouton Archives
     col_arch, col_vide = st.columns([1, 1])
     with col_arch:
+        # On utilise une chaîne simple sans 'f' devant pour être 100% sûr
         if st.button("📂 ACCÉDER AUX ARCHIVES", key="k_arch_p", use_container_width=True, type="primary"):
             st.session_state.last_page = "PLANNING"
             st.session_state.page = "ARCHIVES"
@@ -314,7 +315,10 @@ if st.session_state.page == "PLANNING":
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
 
     # --- CALCULS OCCUPATION ---
-    jours_occ = {} # <--- ICI, Python ne verra plus d'erreur de f-string
+    jours_occ = {} 
+    total_mois = 0
+    missions_list = []
+
 
     # Initialisation session_state
     if 'curr_month_idx' not in st.session_state:
