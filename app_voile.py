@@ -274,31 +274,23 @@ if st.session_state.page == "CONTACTS":
                         st.rerun()
 
             else:
-                # --- AFFICHAGE FICHE ÉPAISSE (IPHONE READY) ---
-                is_unpaid = row.get('Statut_Paye') == "Non payé"
-                badge_color = "#d32f2f" if is_unpaid else "#2e7d32"
-                
-                st.markdown(f"""
+               # --- AFFICHAGE FICHE ÉPAISSE (IPHONE READY) ---
+               # On sécurise la récupération des données avec .get() et str()
+              statut_paye_brut = str(row.get('Statut_Paye', 'Non payé'))
+              is_unpaid = statut_paye_brut == "Non payé"
+              badge_color = "#d32f2f" if is_unpaid else "#2e7d32"
+
+              st.markdown(f"""
                     <div class="contact-card">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="color: #666;">Fiche #{idx}</span>
-                            <span style="background: {badge_color}; color: white; padding: 2px 8px; border-radius: 5px; font-size: 0.8rem;">
-                                {row['Statut_Paye'].upper()}
-                            </span>
-                        </div>
-                        <div style="font-size: 1.3rem; font-weight: bold; color: #01579b;">{row.get('Prénom', '')} {row['Nom']}</div>
-                        <div style="font-size: 1rem; margin-top: 5px;">
-                            📅 {row['DateNav']} | 🏢 {row['Société']}<br>
-                            👥 {row.get('Nb_Pers', 1)} pers. | ⏱️ {row.get('Nb_Jours', 1)} j. | 💰 <b>{row['Prix']}</b><br>
-                            📝 <i>{row.get('Note', '')}</i>
-                        </div>
-                        <div style="border-top: 1px solid #ddd; margin-top: 10px; padding-top: 10px; display: flex; justify-content: space-around;">
-                            <a href="tel:{row['Téléphone']}" style="text-decoration:none;">📞 Appel</a>
-                            <a href="mailto:{row['Mail']}" style="text-decoration:none;">📧 Email</a>
-                            <a href="https://wa.me/{str(row['Téléphone']).replace(' ', '')}" style="text-decoration:none;">💬 WhatsApp</a>
-                        </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: #666;">Fiche #{idx}</span>
+                    <span style="background: {badge_color}; color: white; padding: 2px 8px; border-radius: 5px; font-size: 0.8rem;">
+                        {statut_paye_brut.upper()}
+                    </span>
                     </div>
-                """, unsafe_allow_html=True)
+                    <div style="font-size: 1.3rem; font-weight: bold; color: #01579b;">{row.get('Prénom', '')} {row.get('Nom', 'Sans nom')}</div>
+        ...
+""", unsafe_allow_html=True)
 
                 # --- GESTION ---
                 g1, g2, _ = st.columns([1, 1, 2])
