@@ -296,8 +296,6 @@ if st.session_state.page == "CONTACTS":
                     st.rerun()
 
 # =================================================================
-# --- 6. PAGE PLANNING ---
-# =================================================================
 # --- 6. PAGE PLANNING (AVEC BOUTON ARCHIVES VISIBLE) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
@@ -512,11 +510,16 @@ if st.session_state.page == "STATS":
     
     if st.button("📂 ARCHIVES", use_container_width=True, key="stats_to_archives"):
         st.session_state.page = "ARCHIVES"; st.rerun()
+        
+    # --- 3. RÉCUPÉRATION DES DONNÉES (ACTIF + ARCHIVES) ---
+    def charger_complet(actif, archive):
+        df_a = charger_data(actif)
+        df_arc = charger_data(archive)
+        return pd.concat([df_a, df_arc], ignore_index=True)
 
-    # --- 3. RÉCUPÉRATION DES DONNÉES ---
-    df_m = charger_data('maintenance.json') 
-    df_c = charger_data('contacts.json')    
-    df_log = charger_data('logbook.json')   
+    df_m = charger_complet('maintenance.json', 'archives_maintenance.json') 
+    df_c = charger_complet('contacts.json', 'archives_planning.json')    
+    df_log = charger_complet('logbook.json', 'archives_logbook.json')   
     config_static = {'staticPlot': True, 'responsive': True}
 
     # --- 4. CALCULS (Navigation & Finances) ---
@@ -570,7 +573,7 @@ if st.session_state.page == "STATS":
         st.plotly_chart(fig2, use_container_width=True, config=config_static)
         
       # --- Solde en gros pavé (CORRIGÉ) ---
-    solde = total_recettes - total_charges
+        solde = total_recettes - total_charges
     
     # 1. ON DÉFINIT LES VARIABLES D'ABORD
     couleur_solde = "#28a745" if solde >= 0 else "#dc3545"
