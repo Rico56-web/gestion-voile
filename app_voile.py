@@ -386,31 +386,31 @@ if st.session_state.page == "PLANNING":
                         total_mois += float(val_prix) if val_prix else 0
             except: continue
 
-    # --- RENDU CALENDRIER HTML ---
-st.markdown('<style>.full-width-cal{width:100%;border-collapse:collapse;table-layout:fixed;}.full-width-cal td{border:1px solid #cccccc !important;padding:5px 0;}</style>', unsafe_allow_html=True)
+     # --- RENDU CALENDRIER HTML (BIEN INDENTÉ) ---
+    st.markdown('<style>.full-width-cal{width:100%;border-collapse:collapse;table-layout:fixed;}.full-width-cal td{border:1px solid #cccccc !important;padding:5px 0;}</style>', unsafe_allow_html=True)
 
-h_cal = '<table class="full-width-cal" style="text-align:center; background:white;">'
-h_cal += '<tr style="background:#f1f3f5; font-size:10px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td style="color:#d9534f;">Sa</td><td style="color:#d9534f;">Di</td></tr>'
+    h_cal = '<table class="full-width-cal" style="text-align:center; background:white;">'
+    h_cal += '<tr style="background:#f1f3f5; font-size:10px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td style="color:#d9534f;">Sa</td><td style="color:#d9534f;">Di</td></tr>'
 
-cal_mat = calendar.monthcalendar(sel_y, sel_m)
-for sem in cal_mat:
-    h_cal += '<tr>'
-    for i, jour in enumerate(sem):
-        if jour == 0:
-            h_cal += '<td style="height:48px; background:#fdfdfd;"></td>'
-        else:
-            occ = jours_occ.get(jour, {})
-            bg_c = occ.get("c", "transparent")
-            is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == aujourdhui.year)
-            cell_bg = "background:#D2B48C;" if is_today else ("background:#f9f9f9;" if i >= 5 else "")
-            txt_c = "white" if bg_c != "transparent" else "black"
-            circle = f'<div style="background:{bg_c}; color:{txt_c}; border-radius:50%; width:28px; height:28px; line-height:28px; margin:auto; font-weight:bold; font-size:12px;">{jour}</div>'
-            h_cal += f'<td style="height:50px; {cell_bg}">{circle}</td>'
-    h_cal += '</tr>'
-h_cal += '</table>'
-st.markdown(h_cal, unsafe_allow_html=True)
+    cal_mat = calendar.monthcalendar(sel_y, sel_m)
+    for sem in cal_mat:
+        h_cal += '<tr>'
+        for i, jour in enumerate(sem):
+            if jour == 0:
+                h_cal += '<td style="height:48px; background:#fdfdfd;"></td>'
+            else:
+                occ = jours_occ.get(jour, {})
+                bg_c = occ.get("c", "transparent")
+                is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == aujourdhui.year)
+                cell_bg = "background:#D2B48C;" if is_today else ("background:#f9f9f9;" if i >= 5 else "")
+                txt_c = "white" if bg_c != "transparent" else "black"
+                circle = f'<div style="background:{bg_c}; color:{txt_c}; border-radius:50%; width:28px; height:28px; line-height:28px; margin:auto; font-weight:bold; font-size:12px;">{jour}</div>'
+                h_cal += f'<td style="height:50px; {cell_bg}">{circle}</td>'
+        h_cal += '</tr>'
+    h_cal += '</table>'
+    st.markdown(h_cal, unsafe_allow_html=True)
 
-# --- LISTE DES MISSIONS & TOTAL ---
+    # --- LISTE DES MISSIONS & TOTAL ---
     st.markdown(f"#### 📋 Détails {sel_m_nom}")
     if missions_list:
         missions_list.sort(key=lambda x: x['start'])
@@ -422,13 +422,11 @@ st.markdown(h_cal, unsafe_allow_html=True)
             if m['n_j'] > 1: 
                 txt_d += f" ➔ {m['end'].day:02d}/{m['end'].month:02d}"
             
-            # Gestion de l'icône de paiement
             pay_status = str(r.get('Paiement','')).upper()
             icon = "💰" if "PAY" in pay_status and "NON" not in pay_status else "⚠️"
             label_jours = "JOURS" if m['n_j'] > 1 else "JOUR"
             prix_affiche = r.get('Prix','0')
 
-            # --- Rendu HTML sécurisé (BIEN INDENTÉ DANS LE FOR) ---
             html_item = (
                 f'<div style="display: flex; padding: 10px; border-bottom: 1px solid #eee; background: white; align-items: center;">'
                 f'<div style="background: {c_line}; color: white; border-radius: 5px; padding: 4px; min-width: 85px; text-align: center; font-weight: bold; margin-right: 10px; line-height:1.2;">'
@@ -443,30 +441,27 @@ st.markdown(h_cal, unsafe_allow_html=True)
             )
             st.markdown(html_item, unsafe_allow_html=True)
 
-            # Bouton de fiche
             if st.button(f"🔍 FICHE : {str(r.get('Nom',''))}", key=f"p_btn_{m['idx']}", use_container_width=True):
                 st.session_state.edit_idx = m['idx']
                 st.session_state.mode_saisie = True
                 st.session_state.page = "CONTACTS"
                 st.rerun()
 
-    # 1. On prépare le texte formaté en dehors du HTML pour éviter toute erreur de syntaxe
-solde_formate = f"{solde:,.0f}".replace(",", " ") # Remplace la virgule par un espace pour le format français
+    # --- AFFICHAGE DU SOLDE (DANS LA PAGE PLANNING) ---
+    # On utilise total_mois calculé plus haut
+    couleur_solde = "#28a745" if total_mois >= 0 else "#dc3545"
+    solde_formate = f"{total_mois:,.0f}".replace(",", " ")
 
-# 2. On choisit la couleur
-couleur_solde = "#28a745" if solde >= 0 else "#dc3545"
+    html_solde = (
+        f'<div style="text-align:center; padding:20px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6; margin-top:20px;">'
+        f'<span style="font-size:1.1rem; color:#6c757d;">Total Honoraires Mois</span><br>'
+        f'<b style="color:{couleur_solde}; font-size:1.8rem;">'
+        f'{solde_formate} &euro;'
+        f'</b>'
+        f'</div>'
+    )
+    st.markdown(html_solde, unsafe_allow_html=True)
 
-# 3. On affiche le HTML proprement (Version ultra-stable)
-html_solde = (
-    f'<div style="text-align:center; padding:20px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6;">'
-    f'<span style="font-size:1.1rem; color:#6c757d;">Solde Théorique</span><br>'
-    f'<b style="color:{couleur_solde}; font-size:1.8rem;">'
-    f'{solde_formate} &euro;'
-    f'</b>'
-    f'</div>'
-)
-
-st.markdown(html_solde, unsafe_allow_html=True)
 
 # =================================================================
 # --- 9. PAGE STATS (VERSION FINALE OPTIMISÉE IPHONE 16) ---
