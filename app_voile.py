@@ -1103,23 +1103,24 @@ if st.session_state.page == "LOG":
         df_visu = df_log.sort_values('dt_tri', ascending=False)
         
         for idx, r in df_visu.iterrows():
-             # --- Carte visuelle sécurisée ---
-            # On prépare le carburant avant pour simplifier la f-string
+              # --- Carte visuelle sécurisée (Version ultra-stable) ---
             info_gasoil = f" | &#9981; <b>{r['Litre Gazoil']}L</b>" if r.get('Plein')=="Oui" else ""
             
-            st.markdown(f"""
-            <div style="border: 1px solid #ddd; padding: 12px; border-radius: 10px; background: #f1f8ff; margin-bottom: 5px; border-left: 8px solid #01579b;">
-                <div style="display:flex; justify-content:space-between;">
-                    <b style="color:#01579b;">&#128197; {r['Date']}</b> 
-                    <span style="font-size:0.8rem; background:white; padding:2px 8px; border-radius:10px;">&#128168; F{r.get('Vent',0)} | {r.get('Mouillage','Port')}</span>
-                </div>
-                <div style="font-weight:bold; margin:5px 0;">&#9875; {r['PortDep']} &rarr; {r['PortArr']}</div>
-                <div style="font-size:0.85rem; color:#444;">&#128101; {r.get('Equipage','-')}</div>
-                <div style="margin-top:5px; font-size:0.85rem; border-top:1px solid #eee; padding-top:5px;">
-                    &#9881; <b>{r['TotalMot']}h</b> moteur | &#128207; <b>{r['TotalMil']}mn</b> parcourus {info_gasoil}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            html_card = (
+                f'<div style="border: 1px solid #ddd; padding: 12px; border-radius: 10px; background: #f1f8ff; margin-bottom: 5px; border-left: 8px solid #01579b;">'
+                f'<div style="display:flex; justify-content:space-between;">'
+                f'<b style="color:#01579b;">&#128197; {r["Date"]}</b>'
+                f'<span style="font-size:0.8rem; background:white; padding:2px 8px; border-radius:10px;">&#128168; F{r.get("Vent",0)} | {r.get("Mouillage","Port")}</span>'
+                f'</div>'
+                f'<div style="font-weight:bold; margin:5px 0;">&#9875; {r["PortDep"]} &rarr; {r["PortArr"]}</div>'
+                f'<div style="font-size:0.85rem; color:#444;">&#128101; {r.get("Equipage","-")}</div>'
+                f'<div style="margin-top:5px; font-size:0.85rem; border-top:1px solid #eee; padding-top:5px;">'
+                f'&#9881; <b>{r["TotalMot"]}h</b> moteur | &#128207; <b>{r["TotalMil"]}mn</b> parcourus {info_gasoil}'
+                f'</div>'
+                f'</div>'
+            )
+            
+            st.markdown(html_card, unsafe_allow_html=True)
             
             # Boutons Actions
             c_a, c_b, c_c = st.columns([1, 1, 4])
