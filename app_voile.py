@@ -218,7 +218,37 @@ if st.session_state.page == "CONTACTS":
                         </div>
                         <div style="font-size: 0.9rem; margin-top: 8px;">
                             📅 <b>{row.get('DateNav', '---')}</b> | 💰 <b>{int(float(row.get('Prix', 0)))} €</b><br>
-                            👥 {int(float(row.get('Nbre de personnes', 1)))} pers. | ⏱️ {int(float(row.get('Nbre de jours', 1)))} jours<br>
+                           # --- Préparation sécurisée des valeurs numériques ---
+def clean_int(val):
+    try:
+        if val is None or str(val).strip() == "": return 0
+        return int(float(str(val).replace(',', '.').strip()))
+    except:
+        return 0
+
+nb_pers = clean_int(row.get('Nbre de personnes', 1))
+nb_jours = clean_int(row.get('Nbre de jours', 1))
+prix_total = clean_int(row.get('Prix', 0))
+
+# --- Nouveau bloc HTML sécurisé ---
+st.markdown(f"""
+    <div style="border: 2px solid #4A4A4A; padding: 15px; border-radius: 12px; margin-bottom: 10px; background-color: {bg_color}; color: {text_color};">
+        <div style="display: flex; justify-content: space-between;">
+            <b style="font-size: 1.2rem;">{row.get('Prénom', '')} {row.get('Nom', '')}</b>
+            <span style="background: {badge_paye}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem;">{p_status.upper()}</span>
+        </div>
+        <div style="font-size: 0.9rem; margin-top: 8px;">
+            📅 <b>{row.get('DateNav', '---')}</b> | 💰 <b>{prix_total} €</b><br>
+            👥 {nb_pers} pers. | ⏱️ {nb_jours} jours<br>
+            🏢 Société : {societe_label} | 📍 Statut : {statut_label.upper()}
+        </div>
+        <div style="display: flex; justify-content: space-around; margin-top: 10px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 8px;">
+            <a href="tel:{tel_clean}" style="text-decoration:none; color:inherit; font-weight:bold;">📞 Appel</a>
+            <a href="mailto:{row.get('Email', '')}" style="text-decoration:none; color:inherit; font-weight:bold;">📧 Email</a>
+            <a href="https://wa.me/{tel_clean}" style="text-decoration:none; color:inherit; font-weight:bold;">💬 WhatsApp</a>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
                             🏢 Société : {societe_label} | 📍 Statut : {statut_label.upper()}
                         </div>
                         <div style="display: flex; justify-content: space-around; margin-top: 10px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 8px;">
