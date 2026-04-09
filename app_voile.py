@@ -1065,53 +1065,66 @@ if st.session_state.page == "LOG":
                 sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
                 st.success("C'est enregistré ! Bon vent !")
                 st.rerun()
+        # --- 3. AFFICHAGE DES FICHES ---
+st.divider()
+if not df_log.empty:
+    # Tri temporaire pour l'affichage (plus récent en haut)
+    df_log['dt_tri'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+    df_visu = df_log.sort_values('dt_tri', ascending=False)
+    
+    # INITIALISATION DE SÉCURITÉ (Évite l'AttributeError)
+    if "log_confirm_del" not in st.session_state:
+        st.session_state.log_confirm_del = None
 
-    # --- 3. AFFICHAGE DES FICHES ---
-    st.divider()
-    if not df_log.empty:
-        # Tri temporaire pour l'affichage (plus récent en haut)
-        df_log['dt_tri'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
-        df_visu = df_log.sort_values('dt_tri', ascending=False)
+    for idx, r in df_visu.iterrows():
+        # --- Carte visuelle sécurisée ---
+        info_gasoil = f" | &#9981; <b>{r['Litre Gazoil']}L</b>" if r.get('Plein')=="Oui" else ""
         
-        for idx, r in df_visu.iterrows():
-              # --- Carte visuelle sécurisée (Version ultra-stable) ---
-            info_gasoil = f" | &#9981; <b>{r['Litre Gazoil']}L</b>" if r.get('Plein')=="Oui" else ""
-            
-            html_card = (
-                f'<div style="border: 1px solid #ddd; padding: 12px; border-radius: 10px; background: #f1f8ff; margin-bottom: 5px; border-left: 8px solid #01579b;">'
-                f'<div style="display:flex; justify-content:space-between;">'
-                f'<b style="color:#01579b;">&#128197; {r["Date"]}</b>'
-                f'<span style="font-size:0.8rem; background:white; padding:2px 8px; border-radius:10px;">&#128168; F{r.get("Vent",0)} | {r.get("Mouillage","Port")}</span>'
-                f'</div>'
-                f'<div style="font-weight:bold; margin:5px 0;">&#9875; {r["PortDep"]} &rarr; {r["PortArr"]}</div>'
-                f'<div style="font-size:0.85rem; color:#444;">&#128101; {r.get("Equipage","-")}</div>'
-                f'<div style="margin-top:5px; font-size:0.85rem; border-top:1px solid #eee; padding-top:5px;">'
-                f'&#9881; <b>{r["TotalMot"]}h</b> moteur | &#128207; <b>{r["TotalMil"]}mn</b> parcourus {info_gasoil}'
-                f'</div>'
-                f'</div>'
-            )
-            
-            st.markdown(html_card, unsafe_allow_html=True)
-            
-            # Boutons Actions
-            c_a, c_b, c_c = st.columns([1, 1, 4])
-            if c_a.button("✏️", key=f"edit_btn_{idx}"):
-                st.session_state.log_edit_idx = idx
+        html_card = (
+            f'<div style="border: 1px solid #ddd; padding: 12px; border-radius: 10px; background: #f1f8ff; margin-bottom: 5px; border-left: 8px solid #01579b;">'
+            f'<div style="display:flex; justify-content:space-between;">'
+            f'<b style="color:#01579b;">&#128197; {r["Date"]}</b>'
+            f'<span style="font-size:0.8rem; background:white; padding:2px 8px; border-radius:10px;">&#128168; F{r.get("Vent",0)} | {r.get("Mouillage","Port")}</span>'
+            f'</div>'
+            f'<div style="font-weight:bold; margin:5px 0;">&#9875; {r["PortDep"]} &rarr; {r["PortArr"]}</div>'
+            f'<div style="font-size:0.85rem; color:#444;">&#128101; {r.get("Equipage","-")}</div>'
+            f'<div style="margin-top:5px; font-size:0.85rem; border-top:1px solid #eee; padding-top:5px;">'
+            f'&#9881; <b>{r["TotalMot"]}h</b> moteur | &#128207; <b>{r["TotalMil"]}mn</b> parcourus {info_gasoil}'
+            f'</div>'
+            f'</div>'
+        )
+        
+        st.markdown(html_card, unsafe_allow_html=True)
+        
+        # Boutons Actions
+        c_a, c_b, c_c = st.columns([1, 1, 4])
+        
+        # Modifier
+        if c_a.button("✏️", key=f"edit_btn_{idx}"):
+            st.session_state.log_edit_idx = idx
+            st.rerun()
+        
+        # Logique de suppression sécurisée
+        # On vérifie si la clé existe ET si elle correspond à l'index actuel
+        is_confirming = st.session_state.get("log_confirm_del") == idx
+
+        if is_confirming:
+            if c_b.button("✅ OUI", key=f"conf_del_{idx}", type="primary"):
+                df_log = df_log.drop(idx)
+                # Sauvegarde sans la colonne temporaire de tri
+                df_to_save = df_log.drop(columns=['dt_tri'], errors='ignore')
+                sauvegarder_data(df_to_save, 'logbook.json')
+                st.session_state.log_confirm_del = None
                 st.rerun()
             
-            if st.session_state.log_confirm_del == idx:
-                if c_b.button("✅ OUI", key=f"conf_del_{idx}", type="primary"):
-                    df_log = df_log.drop(idx)
-                    sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
-                    st.session_state.log_confirm_del = None
-                    st.rerun()
-                if c_c.button("❌ NON", key=f"cancel_del_{idx}"):
-                    st.session_state.log_confirm_del = None
-                    st.rerun()
-            else:
-                if c_b.button("🗑️", key=f"ask_del_{idx}"):
-                    st.session_state.log_confirm_del = idx
-                    st.rerun()
+            if c_c.button("❌ NON", key=f"cancel_del_{idx}"):
+                st.session_state.log_confirm_del = None
+                st.rerun()
+        else:
+            if c_b.button("🗑️", key=f"ask_del_{idx}"):
+                st.session_state.log_confirm_del = idx
+                st.rerun()
+                
 # --- FIN DU FICHIER ---
 
 
