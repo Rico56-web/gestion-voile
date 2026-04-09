@@ -2,7 +2,7 @@
     {
         "Pr\u00e9nom":"PATRICK",
         "Nom":"BABIOCHE",
-        "Statut":"En attente",
+        "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
         "DateNav":"2026-04-09",
         "Soci\u00e9t\u00e9":"PERSO",
@@ -13,7 +13,7 @@
         "Email":"",
         "NbreJours":null,
         "NbrePers":null,
-        "Notes":null,
+        "Notes":"1er contact le 09\/04\/2026. il a un appartement \u00e0 Arzon",
         "NbJours":null,
         "Paye":null,
         "PrixJour":null,
