@@ -681,21 +681,22 @@ txt_restant = f"{heures_restantes:.1f}"
 txt_releve = f"{releve_h:.1f}"
 label_unite = "restantes"
 
-# 2. Rendu HTML sécurisé
-st.markdown(f"""
-    <div style="background-color: {bg_v}; border: 2px solid {color_v}; padding: 12px; border-radius: 12px; text-align: center; margin-top: 10px;">
-        <div style="color: {color_v}; font-weight: bold; font-size: 0.75rem; text-transform: uppercase;">
-            &#128712; État du Cycle
-        </div>
-        <div style="font-size: 1.6rem; font-weight: 900; color: {color_v}; margin: 5px 0;">
-            {txt_restant} h <span style="font-size:0.8rem; font-weight:normal;">{label_unite}</span>
-        </div>
-        <div style="font-size: 0.75rem; color: #555;">
-            Compteur actuel : <b>{txt_releve} h</b>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
+    # 2. Rendu HTML sécurisé (Version ultra-stable sans triples guillemets)
+html_cycle = (
+    f'<div style="background-color: {bg_v}; border: 2px solid {color_v}; padding: 12px; border-radius: 12px; text-align: center; margin-top: 10px;">'
+    f'<div style="color: {color_v}; font-weight: bold; font-size: 0.75rem; text-transform: uppercase;">'
+    f'&#128712; État du Cycle'
+    f'</div>'
+    f'<div style="font-size: 1.6rem; font-weight: 900; color: {color_v}; margin: 5px 0;">'
+    f'{txt_restant} h <span style="font-size:0.8rem; font-weight:normal;">{label_unite}</span>'
+    f'</div>'
+    f'<div style="font-size: 0.75rem; color: #555;">'
+    f'Compteur actuel : <b>{txt_releve} h</b>'
+    f'</div>'
+    f'</div>'
+)
 
+st.markdown(html_cycle, unsafe_allow_html=True)
 st.progress(percent_prog)
 
     if st.button("🔧 ENREGISTRER LA VIDANGE COMME FAITE", use_container_width=True, type="primary"):
