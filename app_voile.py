@@ -944,7 +944,12 @@ if st.session_state.page == "ARCHIVES":
 # =================================================================
 if st.session_state.page == "LOG":
     st.markdown('<div style="text-align:center; background-color:#01579b; color:white; padding:10px; border-radius:10px; margin-bottom:20px;"><h1>📖 LIVRE DE BORD</h1></div>', unsafe_allow_html=True)
-    
+    # --- INITIALISATION SÉCURISÉE ---
+df_log = charger_data('logbook.json')
+
+# Si charger_data renvoie None ou si df_log n'est pas créé
+if df_log is None or not isinstance(df_log, pd.DataFrame):
+    df_log = pd.DataFrame()
     # --- BOUTON ARCHIVES (Même style que sur les autres pages) ---
     if st.button("📂 ACCÉDER AUX ARCHIVES", use_container_width=True):
         st.session_state.page = "ARCHIVES"
