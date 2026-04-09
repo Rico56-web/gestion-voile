@@ -552,11 +552,17 @@ if st.session_state.page == "STATS":
     # --- Solde en gros pavé (CORRIGÉ) ---
     solde = total_recettes - total_charges
     
-    # 1. On prépare les variables AVANT le HTML
-    txt_solde = f"{solde:,.0f}".replace(",", " ")  # Formatage propre avec espace
-    couleur_solde = "#28a745" if solde >= 0 else "#dc3545"
-    label_solde = "PRÉVISIONNEL" if mode_previ else "RÉEL"
+    # --- Affichage du Solde (Version Ultra-Stable) ---
+html_solde = (
+    f'<div style="text-align:center; padding:20px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6;">'
+    f'<span style="font-size:1.1rem; color:#6c757d;">Solde Théorique</span><br>'
+    f'<b style="color:{couleur_solde}; font-size:1.8rem;">'
+    f'{solde_formate} &euro;'
+    f'</b>'
+    f'</div>'
+)
 
+st.markdown(html_solde, unsafe_allow_html=True)
     # 2. On affiche le bloc sans calculs complexes à l'intérieur
     st.markdown(f"""
         <div style="text-align:center; border:2px solid #ddd; padding:15px; border-radius:15px; background:#fff; margin:15px 0;">
