@@ -476,7 +476,7 @@ if st.session_state.page == "PLANNING":
     )
     st.markdown(html_solde, unsafe_allow_html=True)
 # =================================================================
-# --- 9. PAGE STATS (VERSION FONCTIONNELLE D'HIER) ---
+# --- 9. PAGE STATS (VERSION CORRIGÉE & SÉCURISÉE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     import plotly.express as px
@@ -484,7 +484,6 @@ if st.session_state.page == "STATS":
     import datetime
 
     # 1. CHARGEMENT SIMPLE
-    # On charge les revenus (Planning) et les frais (Maintenance + Archives)
     df_c = charger_data('contacts.json')
     df_m_actif = charger_data('maintenance.json')
     df_m_arch = charger_data('archives_factures.json')
@@ -497,14 +496,18 @@ if st.session_state.page == "STATS":
     ANNEES_STATS = [2025, 2026, 2027]
     sel_y_stats = col_t2.selectbox("Saison", ANNEES_STATS, index=1)
     
-    # 3. CALCULS REVENUS
+    # 3. CALCULS REVENUS (CORRECTION LIGNE 507)
     total_recettes = 0
     df_recettes_view = pd.DataFrame()
     if not df_c.empty:
         df_c['dt'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         df_c_yr = df_c[df_c['dt'].dt.year == sel_y_stats].copy()
         if not df_c_yr.empty:
-            df_c_yr['P_Num'] = pd.to_numeric(df_c_yr['Prix'].astype(str).str.replace('€','').str.replace(' ','').strip(), errors='coerce').fillna(0.0)
+            # NETTOYAGE SÉCURISÉ : On ajoute .str avant .strip()
+            df_c_yr['P_Num'] = pd.to_numeric(
+                df_c_yr['Prix'].astype(str).str.replace('€','').str.replace(' ','').str.strip(), 
+                errors='coerce'
+            ).fillna(0.0)
             df_recettes_view = df_c_yr
             total_recettes = df_recettes_view['P_Num'].sum()
 
@@ -518,31 +521,34 @@ if st.session_state.page == "STATS":
         df_charges_view = df_m[mask_m].copy()
         total_charges = df_charges_view['M_Num'].sum()
 
-    # 5. AFFICHAGE DES GRAPHIQUES (Ce qui manquait tout à l'heure)
+    # 5. AFFICHAGE DES GRAPHIQUES
     st.subheader(f"💰 Finances {sel_y_stats}")
     
-    # Graphique Circulaire global
-    fig1 = px.pie(names=['Frais', 'Revenus'], values=[total_charges, total_recettes],
-                  color_discrete_map={'Frais': '#ef553b', 'Revenus': '#00cc96'}, hole=0.4)
-    fig1.update_layout(height=300, margin=dict(t=0, b=0, l=0, r=0))
-    st.plotly_chart(fig1, use_container_width=True)
+    col_m1, col_m2 = st.columns(2)
+    col_m1.metric("Revenus", f"{total_recettes:,.0f} €".replace(',',' '))
+    col_m2.metric("Frais", f"{total_charges:,.0f} €".replace(',',' '))
 
-    # 6. TABLEAU DES SOCIÉTÉS (CMN, CLICK, etc.)
+    if total_recettes > 0 or total_charges > 0:
+        fig1 = px.pie(names=['Frais', 'Revenus'], values=[total_charges, total_recettes],
+                      color_discrete_map={'Frais': '#ef553b', 'Revenus': '#00cc96'}, hole=0.4)
+        fig1.update_layout(height=300, margin=dict(t=20, b=20, l=10, r=10))
+        st.plotly_chart(fig1, use_container_width=True)
+
+    # 6. TABLEAU DES SOCIÉTÉS
     st.divider()
     st.subheader("🏢 Analyse par Société")
     if not df_recettes_view.empty:
         df_soc = df_recettes_view.copy()
-        df_soc['Société'] = df_soc['Société'].astype(str).replace(['nan','','None'], 'PARTICULIER').str.upper()
+        df_soc['Société'] = df_soc['Société'].astype(str).str.upper().str.strip().replace(['NAN','','NONE'], 'PARTICULIER')
         stats_soc = df_soc.groupby('Société')['P_Num'].sum().reset_index()
         st.table(stats_soc.sort_values(by='P_Num', ascending=False).rename(columns={'P_Num':'Total €'}))
 
-    # 7. TABLEAU DES FRAIS PAR MOIS
+    # 7. TABLEAU DES FRAIS PAR TYPE
     st.divider()
-    st.subheader("📅 Détail des charges")
+    st.subheader("🛠️ Détail des charges")
     if not df_charges_view.empty:
-        df_charges_view['Mois'] = df_charges_view['dt'].dt.month
         res_m = df_charges_view.groupby('Type')['M_Num'].sum().reset_index()
-        st.table(res_m.rename(columns={'M_Num':'Montant €'}))
+        st.table(res_m.sort_values(by='M_Num', ascending=False).rename(columns={'M_Num':'Montant €'}))
         
 # =================================================================
 # --- 8. PAGE MAINTENANCE (PERSISTANTE & CARNET DE SANTÉ) ---
