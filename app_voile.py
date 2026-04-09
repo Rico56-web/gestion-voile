@@ -864,15 +864,16 @@ if st.session_state.page == "ARCHIVES":
             
             st.success(f"Archivage réussi : {nb_m} frais, {nb_p} missions et {nb_l} navigations déplacés.")
             st.rerun()
-
     # --- 3. EXPORT EXCEL COMPLET POUR PC ---
     with st.expander("📤 TRANSFÉRER VERS PC (Excel)", expanded=False):
+        # Toutes ces lignes sont maintenant indentées de 4 espaces
         df_arch_m = charger_data('archives_maintenance.json')
         df_arch_p = charger_data('archives_planning.json')
         df_arch_l = charger_data('archives_logbook.json')
         
         if not df_arch_m.empty or not df_arch_p.empty or not df_arch_l.empty:
             buffer = io.BytesIO()
+            # Utilisation de xlsxwriter pour gérer plusieurs onglets
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 if not df_arch_p.empty: 
                     df_arch_p.to_excel(writer, sheet_name='Planning', index=False)
@@ -881,12 +882,16 @@ if st.session_state.page == "ARCHIVES":
                 if not df_arch_l.empty: 
                     df_arch_l.to_excel(writer, sheet_name='Livre de Bord', index=False)
             
-            st.download_button("📊 TÉLÉCHARGER L'EXCEL GLOBAL", buffer.getvalue(), 
-                               file_name=f"Archives_Vesta_Total_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
-                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
-                               use_container_width=True)
-
-    st.divider()
+            # Le bouton de téléchargement doit aussi être dans le bloc 'if'
+            st.download_button(
+                label="📊 TÉLÉCHARGER L'EXCEL GLOBAL",
+                data=buffer.getvalue(),
+                file_name=f"Archives_Vesta_Total_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        else:
+            st.warning("Aucune donnée à exporter dans les archives.")
 
     # --- 4. AFFICHAGE DES TABLEAUX ---
     st.subheader("📜 Historique actuel")
