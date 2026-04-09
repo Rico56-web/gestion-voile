@@ -829,41 +829,32 @@ if st.session_state.page == "FACTURES":
             st.table(df_cmn_mois[['DateNav', 'Nom', 'Prix']].set_index('DateNav'))
             st.metric("Total à facturer", f"{total_cmn:.2f} €")
             
-            # --- 3. PRÉPARATION DU TEXTE ALIGNÉ (12 ET 3 ESPACES) ---
-            st.divider()
-            st.subheader("✉️ Rapport pour le Trésorier")
+        # --- Préparation des variables AVANT le mail ---
+            total_txt = f"{total_cmn:.2f}".replace(".", ",")
             
-            lignes_missions = []
-            esp12 = " " * 12
-            esp3  = " " * 3
-            
-            for _, row in df_cmn_mois.iterrows():
-                d_str = str(row['DateNav']).ljust(10)
-                n_str = str(row['Nom'])
-                p_str = f"{row['PrixNum']:.2f} €"
-                # Assemblage de la ligne demandée
-                lignes_missions.append(f"{d_str}{esp12}{n_str}{esp3}{p_str}")
-            
-            texte_missions = "\n".join(lignes_missions)
-            
-            destinataire = "tresorier@cmn-asso.fr, aurelienfaucheux@gmail.com"
-            objet = f"Facturation Missions Vesta - {sel_mois} {sel_annee}"
-            
-            # Utilisation des TRIPLES GUILLEMETS pour éviter la SyntaxError
-            corps_mail = f"""Bonjour,
- 
-J'espère que vous allez bien ! ⛵
- 
-Voici le récapitulatif des navigations de la CMN concernant le mois de {sel_mois} {sel_annee} :
- 
-{texte_missions}
- 
-Le montant total s'élève à {total_cmn:.2f} €.
- 
+            # Utilisation de triples guillemets doubles SANS le 'f' au début pour le corps fixe
+            # On utilise .format() pour injecter les variables, c'est bien plus robuste sur Streamlit Cloud
+            modele_mail = """Bonjour,
+
+J'espère que vous allez bien !
+
+Voici le récapitulatif des navigations de la CMN concernant le mois de {mois} {annee} :
+
+{missions}
+
+Le montant total s'élève à {total} EUR.
+
 Merci d'avance pour le règlement et à très vite sur l'eau !
- 
+
 Amicalement,
-Eric (vesta)"""
+Eric (Vesta)"""
+
+            corps_mail = modele_mail.format(
+                mois=sel_mois, 
+                annee=sel_annee, 
+                missions=texte_missions, 
+                total=total_txt
+            )
  
             # --- 4. ZONE D'ENVOI ET COPIE ---
             st.text_area("Copier ce texte pour Gmail :", corps_mail, height=300)
