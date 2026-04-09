@@ -944,18 +944,23 @@ if st.session_state.page == "ARCHIVES":
                 brd_c = "#ef6c00" if est_vidange else "#9aa0a6"
                 icon = "🛠️" if est_vidange else "📄"
                 suffix = " <span style='color:#e65100; font-size:0.7rem; font-weight:bold;'>[MAINTENANCE]</span>" if est_vidange else ""
-
-                st.markdown(f"""
-                <div style="border: 1px solid {brd_c}; border-left: 10px solid {brd_c}; padding: 12px; border-radius: 10px; margin-bottom: 8px; background-color: {bg_c};">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="font-size: 0.85rem; font-weight: bold;">{icon} {row['Date']} | {row['Objet']}{suffix}</div>
-                        <div style="font-size: 1rem; font-weight: 900;">{float(row.get('M_Num',0)):.0f} €</div>
-                    </div>
-                    <div style="font-size: 0.7rem; color: #5f6368; border-top: 1px dashed {brd_c}; margin-top: 5px; padding-top: 3px;">
-                        📂 {row['Type']} • <b>{str(row['Statut']).upper()}</b>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+            # --- Extraction de la logique de formatage ---
+        montant_val = float(row.get('M_Num', 0))
+        # On prépare le texte du montant sans utiliser d'accidents de syntaxe dans le HTML
+        montant_display = f"{montant_val:.0f}"
+        
+        st.markdown(f"""
+        <div style="border: 1px solid {brd_c}; border-left: 10px solid {brd_c}; padding: 12px; border-radius: 10px; margin-bottom: 8px; background-color: {bg_c};">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 0.85rem; font-weight: bold;">{icon} {row['Date']} | {row['Objet']}{suffix}</div>
+                <div style="font-size: 1rem; font-weight: 900;">{montant_display} &euro;</div>
+            </div>
+            <div style="font-size: 0.7rem; color: #5f6368; border-top: 1px dashed {brd_c}; margin-top: 5px; padding-top: 3px;">
+                📂 {row['Type']} • <b>{str(row['Statut']).upper()}</b>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+              
         else:
             st.write("Aucun frais archivé.")
     
