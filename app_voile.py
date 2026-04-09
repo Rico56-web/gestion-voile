@@ -145,7 +145,7 @@ df_c = charger_data("contacts.json")
 if not df_c.empty and 'Paiement' in df_c.columns:
     df_c['Paiement'] = df_c['Paiement'].apply(lambda x: "Payé" if "pay" in str(x).lower() and "non" not in str(x).lower() else "Non payé")
 # =================================================================
-# --- 5. BLOC CONTACTS (VERSION FINALE SÉCURISÉE) ---
+# --- 5. BLOC CONTACTS (COULEURS MAJ + FIX BOUTON NOUVEAU) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("📅 Gestion des Contacts")
@@ -156,11 +156,9 @@ if st.session_state.page == "CONTACTS":
     if 'vue_contact' not in st.session_state: st.session_state.vue_contact = "En cours"
 
     def clean_int(val):
-        """ Sécurité pour convertir les valeurs en entier sans planter """
         try:
             if val is None or str(val).strip() == "" or str(val).lower() == "nan": 
                 return 0
-            # On passe par float pour gérer les "1.0" puis int pour supprimer la virgule
             return int(float(str(val).replace(',', '.').replace('€', '').strip()))
         except:
             return 0
@@ -175,37 +173,50 @@ if st.session_state.page == "CONTACTS":
             st.session_state.vue_contact = "Archives"
             st.rerun()
     with c3:
+        # --- FIX ACTION BOUTON NOUVEAU ---
         if st.button("➕ NOUVEAU", use_container_width=True):
-            new_row = {"Prénom": "Nouveau", "Nom": "Contact", "Statut": "En attente", "Paiement": "Non payé", 
-                      "DateNav": datetime.now().strftime("%d/%m/%Y"), "Société": "PERSO", 
-                      "Prix": 0, "Nbre de personnes": 1, "Nbre de jours": 1}
+            from datetime import datetime
             df_temp = charger_data('contacts.json')
+            # Création d'une nouvelle ligne avec TOUTES les colonnes nécessaires
+            new_row = {
+                "Prénom": "Nouveau", 
+                "Nom": "Contact", 
+                "Statut": "En attente", 
+                "Paiement": "Non payé", 
+                "DateNav": datetime.now().strftime("%d/%m/%Y"), 
+                "Société": "PERSO", 
+                "Prix": 0, 
+                "Nbre de personnes": 1, 
+                "Nbre de jours": 1,
+                "T\u00e9l\u00e9phone": "",
+                "Email": ""
+            }
             df_temp = pd.concat([df_temp, pd.DataFrame([new_row])], ignore_index=True)
             sauvegarder_data(df_temp, 'contacts.json')
+            # On force l'édition de la nouvelle fiche immédiatement
+            st.session_state.edit_idx = len(df_temp) - 1
             st.rerun()
 
-    # --- 2. LÉGENDE ---
+    # --- 2. LÉGENDE (JAUNE CLAIR POUR ATTENTE) ---
     st.markdown("""
         <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; padding: 10px; background: #f9f9f9; border-radius: 8px; border: 1px solid #ddd;">
             <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #3498db; border-radius: 3px; margin-right: 5px;"></div><b>CMN</b></div>
             <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #d4edda; border-radius: 3px; margin-right: 5px;"></div><b>OK</b></div>
-            <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #e1bee7; border-radius: 3px; margin-right: 5px;"></div><b>Attente</b></div>
+            <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #fff9c4; border-radius: 3px; margin-right: 5px;"></div><b>Attente</b></div>
             <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #e2e3e5; border-radius: 3px; margin-right: 5px;"></div><b>Terminé</b></div>
             <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #f8d7da; border-radius: 3px; margin-right: 5px;"></div><b>Refusé</b></div>
         </div>
     """, unsafe_allow_html=True)
 
-    # --- 3. AFFICHAGE DES FICHES ---
+    # --- 3. AFFICHAGE ---
     df_c = charger_data('contacts.json')
 
     if not df_c.empty:
-        # Filtrage Archives : (Terminé ET Payé) OU Refusé
         mask_archives = (((df_c['Statut'] == "Terminé") & (df_c['Paiement'] == "Payé")) | (df_c['Statut'] == "Refusé"))
         df_affichage = df_c[mask_archives].copy() if st.session_state.vue_contact == "Archives" else df_c[~mask_archives].copy()
 
         for idx, row in df_affichage.iterrows():
             
-            # --- POPUP CONFIRMATION SUPPRESSION ---
             if st.session_state.delete_confirm == idx:
                 st.warning(f"⚠️ Supprimer {row.get('Prénom')} {row.get('Nom')} ?")
                 cy, cn = st.columns(2)
@@ -219,7 +230,7 @@ if st.session_state.page == "CONTACTS":
                     st.rerun()
                 continue
 
-            # --- GESTION DES COULEURS ---
+            # --- COULEURS (Jaune clair pour En attente) ---
             statut_label = str(row.get('Statut', '')).strip().lower()
             societe_label = str(row.get('Société', 'PERSO')).strip().upper()
             bg_color, text_color = "#ffffff", "#333333"
@@ -227,7 +238,7 @@ if st.session_state.page == "CONTACTS":
             if societe_label == "CMN":
                 bg_color, text_color = "#3498db", "#ffffff"
             elif statut_label == "ok": bg_color = "#d4edda"
-            elif statut_label == "en attente": bg_color = "#e1bee7"
+            elif statut_label == "en attente": bg_color = "#fff9c4" # Jaune clair
             elif statut_label == "refusé": bg_color = "#f8d7da"
             elif statut_label == "terminé": bg_color = "#e2e3e5"
 
@@ -238,7 +249,7 @@ if st.session_state.page == "CONTACTS":
                     e_pre = c1.text_input("Prénom", row.get('Prénom', ''))
                     e_nom = c2.text_input("Nom", row.get('Nom', ''))
                     e_date = st.text_input("Date Navigation", row.get('DateNav', ''))
-                    e_soc = st.text_input("Société (ex: CMN)", societe_label)
+                    e_soc = st.text_input("Société", societe_label)
                     
                     c3, c4, c5 = st.columns(3)
                     e_prix = c3.number_input("Prix (€)", value=clean_int(row.get('Prix', 0)), step=1)
@@ -274,11 +285,6 @@ if st.session_state.page == "CONTACTS":
                 badge_paye = "#2e7d32" if p_status == "Payé" else "#d32f2f"
                 tel_clean = str(row.get('T\u00e9l\u00e9phone', '')).replace(" ", "")
                 
-                # Calculs sécurisés pour l'affichage
-                val_prix = clean_int(row.get('Prix', 0))
-                val_pers = clean_int(row.get('Nbre de personnes', 1))
-                val_jours = clean_int(row.get('Nbre de jours', 1))
-
                 st.markdown(f"""
                     <div style="border: 2px solid #4A4A4A; padding: 15px; border-radius: 12px; margin-bottom: 10px; background-color: {bg_color}; color: {text_color};">
                         <div style="display: flex; justify-content: space-between;">
@@ -286,8 +292,8 @@ if st.session_state.page == "CONTACTS":
                             <span style="background: {badge_paye}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold;">{p_status.upper()}</span>
                         </div>
                         <div style="font-size: 0.95rem; margin-top: 8px; line-height: 1.4;">
-                            📅 <b>{row.get('DateNav', '---')}</b> | 💰 <b>{val_prix} €</b><br>
-                            👥 {val_pers} pers. | ⏱️ {val_jours} jours<br>
+                            📅 <b>{row.get('DateNav', '---')}</b> | 💰 <b>{clean_int(row.get('Prix', 0))} €</b><br>
+                            👥 {clean_int(row.get('Nbre de personnes', 1))} pers. | ⏱️ {clean_int(row.get('Nbre de jours', 1))} jours<br>
                             🏢 {societe_label} | 📍 {statut_label.upper()}
                         </div>
                         <div style="display: flex; justify-content: space-around; margin-top: 10px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 10px;">
