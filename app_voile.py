@@ -476,52 +476,41 @@ if st.session_state.page == "PLANNING":
     )
     st.markdown(html_solde, unsafe_allow_html=True)
 # =================================================================
-# --- 9. PAGE STATS (VERSION FINALE OPTIMISÉE IPHONE 16) ---
+# --- 9. PAGE STATS (VERSION COMPLÈTE & RÉPARÉE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     import plotly.express as px
     import pandas as pd
     import datetime
 
-    # --- 1. INITIALISATION SÉCURISÉE ---
+    # --- 1. INITIALISATION ---
     df_recettes_view = pd.DataFrame()
     df_charges_view = pd.DataFrame()
-    df_log_yr = pd.DataFrame()
     total_recettes, total_charges, total_h_moteur = 0, 0, 0
     total_milles, total_cout_gasoil, total_litres = 0, 0, 0
 
-    # --- 2. NAVIGATION & FILTRES ---
+    # --- 2. NAVIGATION ---
     col_t1, col_t2 = st.columns([2, 1])
     col_t1.title("📊 Bilan Vesta")
-    col_t1.caption(f"🕒 Données actualisées à : {datetime.datetime.now().strftime('%H:%M:%S')}")
     
     ANNEES_STATS = [2025, 2026, 2027, 2028]
-    sel_y_stats = col_t2.selectbox(
-        "Saison", ANNEES_STATS, index=1, 
-        label_visibility="collapsed", key="stats_year_select_final"
-    )
+    sel_y_stats = col_t2.selectbox("Saison", ANNEES_STATS, index=1, key="stats_year_select")
     
-    mode_previ = st.toggle(
-        "🔮 Voir le Prévisionnel (Toute l'année)", 
-        value=False, key="stats_previ_toggle_final"
-    )
+    mode_previ = st.toggle("🔮 Voir tout (inclus non-payé)", value=False)
     
-    if st.button("📂 ARCHIVES", use_container_width=True, key="stats_to_archives"):
-        st.session_state.page = "ARCHIVES"; st.rerun()
+    # --- 3. RÉCUPÉRATION AVEC FUSION (IMPORTANT) ---
+    def charger_fusion(actif, archive):
+        d1 = charger_data(actif)
+        d2 = charger_data(archive)
+        return pd.concat([d1, d2], ignore_index=True)
 
-    # --- 3. RÉCUPÉRATION DES DONNÉES (FUSION ACTIF + ARCHIVES) ---
-    def charger_complet(actif, archive):
-        df_a = charger_data(actif)
-        df_arc = charger_data(archive)
-        return pd.concat([df_a, df_arc], ignore_index=True)
-
-    # Fusion des frais (Remplacez par 'archives_factures.json' si pas encore renommé)
-    df_m = charger_complet('maintenance.json', 'archives_maintenance.json') 
-    df_c = charger_complet('contacts.json', 'archives_planning.json')    
-    df_log = charger_complet('logbook.json', 'archives_logbook.json')   
+    # Note : j'utilise 'archives_factures.json' ici car c'est le nom actuel de votre fichier
+    df_m = charger_fusion('maintenance.json', 'archives_factures.json') 
+    df_c = charger_fusion('contacts.json', 'archives_planning.json')    
+    df_log = charger_fusion('logbook.json', 'archives_logbook.json')   
     config_static = {'staticPlot': True, 'responsive': True}
 
-    # --- 4. CALCULS (Navigation & Finances) ---
+    # --- 4. CALCULS ---
     if not df_log.empty:
         df_log['dt'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
         df_log_yr = df_log[df_log['dt'].dt.year == sel_y_stats].copy()
@@ -534,74 +523,60 @@ if st.session_state.page == "STATS":
         df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
         df_m['dt'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
         mask_m = (df_m['dt'].dt.year == sel_y_stats)
-        # Filtre : On affiche tout en prévi, sinon seulement ce qui est "Fait"
         df_charges_view = df_m[mask_m].copy() if mode_previ else df_m[mask_m & (df_m['Statut'].str.upper().isin(["FAIT", "PAYÉ", "PAYE"]))].copy()
         total_charges = df_charges_view['M_Num'].sum() + total_cout_gasoil
 
     if not df_c.empty:
         df_c['dt'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         df_c_yr = df_c[df_c['dt'].dt.year == sel_y_stats].copy()
-        
-        # Nettoyage prix
         df_c_yr['P_Num'] = pd.to_numeric(df_c_yr['Prix'].astype(str).str.replace('€','').str.replace(' ','').str.strip(), errors='coerce').fillna(0.0)
         
-        # Filtre Revenus (Souple : PAY, OUI, ENCAISSÉ)
-        def is_paye(v): 
-            v_str = str(v).upper()
-            return any(x in v_str for x in ["PAY", "OUI", "FAIT", "ENCAISS"])
+        # Filtre souple pour inclure CMN, VOG, etc.
+        def is_paye(v):
+            v_s = str(v).upper()
+            return any(x in v_s for x in ["PAY", "OUI", "FAIT", "ENCAISS"])
             
         df_recettes_view = df_c_yr if mode_previ else df_c_yr[df_c_yr['Paiement'].apply(is_paye)].copy()
         total_recettes = df_recettes_view['P_Num'].sum()
 
-    # --- 5. AFFICHAGE TRÉSORERIE ---
+    # --- 5. AFFICHAGE DES GRAPHIQUES (RÉAPPARITION) ---
     st.subheader(f"💰 Finances {sel_y_stats}")
     
+    # Graphique 1 : Revenus vs Frais
     fig1 = px.pie(names=['Frais', 'Revenus'], values=[total_charges, total_recettes],
                   color_discrete_map={'Frais': '#ef553b', 'Revenus': '#00cc96'}, hole=0.4)
-    fig1.update_layout(margin=dict(t=10, b=60, l=10, r=10), height=300, showlegend=True,
-                       legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5))
+    fig1.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250, showlegend=True,
+                       legend=dict(orientation="h", y=-0.1))
     st.plotly_chart(fig1, use_container_width=True, config=config_static)
 
-    # Solde Théorique
+    # Graphique 2 : Répartition des Dépenses (COURBE/PIE)
+    if total_charges > 0:
+        st.caption("🔍 Répartition des Dépenses")
+        # On regroupe par Type pour le camembert des frais
+        df_p = df_charges_view.groupby('Type')['M_Num'].sum().reset_index()
+        fig2 = px.pie(df_p, names='Type', values='M_Num', hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
+        fig2.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250, showlegend=True,
+                           legend=dict(orientation="h", y=-0.1))
+        st.plotly_chart(fig2, use_container_width=True, config=config_static)
+
+    # Solde en gros pavé
     solde = total_recettes - total_charges
-    couleur_solde = "#28a745" if solde >= 0 else "#dc3545"
-    label_solde = "POSITIF" if solde >= 0 else "NÉGATIF"
-    solde_formate = f"{solde:,.0f}".replace(",", " ")
+    couleur = "#28a745" if solde >= 0 else "#dc3545"
+    st.markdown(f"""<div style="text-align:center; padding:15px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6;">
+        <small>Solde {sel_y_stats}</small><br><b style="color:{couleur}; font-size:1.5rem;">{solde:,.0f} €</b></div>""", unsafe_allow_html=True)
 
-    st.markdown(f"""
-        <div style="text-align:center; padding:20px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6; margin-bottom:15px;">
-            <span style="font-size:1.1rem; color:#6c757d;">Solde Théorique {sel_y_stats}</span><br>
-            <b style="color:{couleur_solde}; font-size:1.8rem;">{solde_formate} &euro;</b><br>
-            <small style="color:{couleur_solde}; font-weight:bold;">SOLDE {label_solde}</small>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # --- 6. ANALYSE PAR SOCIÉTÉ ---
+    # --- 6. TABLEAU DES SOCIÉTÉS (RETOUR DE CMN, VOG, CLICK) ---
     st.divider()
     st.subheader("🏢 Analyse par Société")
     if not df_recettes_view.empty:
         df_soc = df_recettes_view.copy()
-        df_soc['Société'] = df_soc['Société'].replace(['', 'nan', None], 'PARTICULIER').str.upper().str.strip()
-        df_soc['Société'] = df_soc['Société'].replace({'CLICK': 'CLICK & BOAT', 'CLICK AND BOAT': 'CLICK & BOAT', 'CLICK&BOAT': 'CLICK & BOAT'})
+        df_soc['Société'] = df_soc['Société'].replace(['', 'nan', None], 'PARTICULIER').str.upper().strip()
         df_soc['Jours_Num'] = pd.to_numeric(df_soc['Nbre de jours'], errors='coerce').fillna(0.0)
         
         stats_soc = df_soc.groupby('Société').agg({'P_Num': 'sum', 'Jours_Num': 'sum'}).reset_index()
-        stats_soc['Moy_Jour'] = stats_soc.apply(lambda x: round(x['P_Num']/x['Jours_Num'],0) if x['Jours_Num']>0 else 0, axis=1)
         stats_soc = stats_soc.sort_values(by='P_Num', ascending=False)
-
-        st.table(stats_soc[['Société','P_Num','Jours_Num','Moy_Jour']].rename(columns={'P_Num':'CA €','Jours_Num':'Jours'}))
-    else:
-        st.info("Aucune donnée disponible pour cette saison.")
-
-    # --- 7. NAVIGATION & SYNTHÈSE ---
-    st.divider()
-    st.subheader("⚓ Détails Navigation")
-    n1, n2, n3, n4 = st.columns(4)
-    n1.metric("Moteur", f"{total_h_moteur:.1f}h")
-    n2.metric("Milles", f"{total_milles:.0f}mn")
-    n3.metric("Gasoil", f"{total_cout_gasoil:.0f}€")
-    conso = round(total_litres / total_h_moteur, 1) if total_h_moteur > 0 else 0
-    n4.metric("Conso", f"{conso}L/h")
+        st.table(stats_soc.rename(columns={'P_Num':'Total €','Jours_Num':'Jours'}))
+        
 # =================================================================
 # --- 8. PAGE MAINTENANCE (PERSISTANTE & CARNET DE SANTÉ) ---
 # =================================================================
