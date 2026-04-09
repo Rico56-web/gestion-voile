@@ -476,201 +476,73 @@ if st.session_state.page == "PLANNING":
     )
     st.markdown(html_solde, unsafe_allow_html=True)
 # =================================================================
-# --- 9. PAGE STATS (VERSION COMPLÈTE & HARMONISÉE) ---
-# =================================================================
-if st.session_state.page == "STATS":
-    import pandas as pd
-    import plotly.express as px
-    import plotly.graph_objects as go
-    import datetime
-
-    # --- 1. CHARGEMENT ÉTANCHE ---
-    df_planning = charger_data('contacts.json')
-    df_m_actif = charger_data('maintenance.json')
-    df_m_arch = charger_data('archives_factures.json')
-    df_m = pd.concat([df_m_actif, df_m_arch], ignore_index=True)
-
-    # --- 2. FONCTIONS UTILES (Dates Robustes & Nettoyage) ---
-    def conversion_date_robuste(date_str):
-        if pd.isna(date_str) or date_str == "":
-            return pd.NaT
-        date_str = str(date_str).strip()
-        # Liste des formats à tester (ISO, FR, FR-Année courte)
-        formats_a_tester = ['%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d-%m-%Y', '%d/%m/%y']
-        for fmt in formats_a_tester:
-            try:
-                return pd.to_datetime(date_str, format=fmt)
-            except:
-                continue
-        # En dernier recours
-        return pd.to_datetime(date_str, errors='coerce', dayfirst=True)
-
-    # --- 3. HARMONISATION DES CATÉGORIES (SOCIÉTÉS ET TYPE) ---
-    # Revenus
-    if not df_planning.empty:
-        df_planning['dt_vrai'] = df_planning['DateNav'].apply(conversion_date_robuste)
-        
-        # Harmonisation Société
-        df_planning['Société'] = df_planning['Société'].astype(str).str.upper().str.strip()
-        df_planning['Société'] = df_planning['Société'].replace({
-            'PARTICULIER': 'PERSO',
-            'NAN': 'PERSO',
-            '': 'PERSO',
-            'CLICK': 'CLICK & BOAT',
-            'CLICK&BOAT': 'CLICK & BOAT',
-            'CLICK AND BOAT': 'CLICK & BOAT',
-            'NONE': 'PERSO'
-        })
-        # Nettoyage prix
-        df_planning['P_Num'] = pd.to_numeric(df_planning['Prix'], errors='coerce').fillna(0)
-
-    # Frais
-    if not df_m.empty:
-        df_m['dt_vrai'] = pd.to_datetime(df_m['Date'], errors='coerce', dayfirst=True)
-        # Nettoyage frais
-        df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0)
-        
-        # Harmonisation Type
-        df_m['Type'] = df_m['Type'].astype(str).str.upper().str.strip()
-        df_m['Type'] = df_m['Type'].replace({
-            'NAN': 'AUTRES',
-            'NONE': 'AUTRES',
-            '': 'AUTRES',
-            'GUEULETON': 'PERSO',
-            'MAINTENANCE': 'ENTRETIEN'
-        })
-
-    # --- 4. NAVIGATION & SÉLECTEUR DE BILAN (RÉTABLI) ---
-    st.title("📊 Bilan Vesta")
+    # --- 6. AFFICHAGE DES CHIFFRES CLÉS (AMÉLIORÉ) ---
+    # =================================================================
+    st.subheader(f"💰 Synthèse Financière {sel_y}")
     
-    # Sélecteur principal
-    mode_bilan = st.radio("Type de bilan", ["A ce jour", "Par Saison"], horizontal=True, key="stats_mode_select")
-    today = datetime.date.today()
-    
-    sel_y = today.year # Année par défaut
-
-    if mode_bilan == "Par Saison":
-        ANNEES_STATS = [2025, 2026, 2027]
-        sel_y = st.selectbox("Saison à analyser", ANNEES_STATS, index=1, key="stats_year_select")
-        st.caption(f"📅 Analyse complète de l'année {sel_y}")
-    else:
-        st.caption(f"📅 Analyse au {today.strftime('%d/%m/%Y')} (Jan à Aujourd'hui)")
-
-    # --- 5. CALCULS DES DONNÉES FILTRÉES ---
-    total_rev, total_frais = 0, 0
-    df_soc_final, df_frais_final = pd.DataFrame(), pd.DataFrame()
-    
-    # Préparation des DataFrames de travail
-    df_r_yr, df_f_yr = pd.DataFrame(), pd.DataFrame()
-
-    # Filtrage Revenus (Planning)
-    if not df_planning.empty:
-        if mode_bilan == "A ce jour":
-            # Uniquement de Jan à Aujourd'hui (Année en cours)
-            mask = (df_planning['dt_vrai'].dt.year == today.year) & (df_planning['dt_vrai'].dt.date <= today)
-        else:
-            # Année complète sélectionnée
-            mask = (df_planning['dt_vrai'].dt.year == sel_y)
-            
-        df_r_yr = df_planning[mask].copy()
-
-        if not df_r_yr.empty:
-            total_rev = df_r_yr['P_Num'].sum()
-            
-            # Groupement par Société
-            df_soc_final = df_r_yr.groupby('Société')['P_Num'].sum().reset_index()
-            df_soc_final = df_soc_final.rename(columns={'P_Num':'CA €'}).sort_values('CA €', ascending=False)
-
-    # Filtrage Frais (Maintenance)
-    if not df_m.empty:
-        if mode_bilan == "A ce jour":
-            mask = (df_m['dt_vrai'].dt.year == today.year) & (df_m['dt_vrai'].dt.date <= today)
-        else:
-            mask = (df_m['dt_vrai'].dt.year == sel_y)
-            
-        df_f_yr = df_m[mask].copy()
-        
-        if not df_f_yr.empty:
-            total_frais = df_f_yr['M_Num'].sum()
-            
-            # Groupement par Type
-            df_frais_final = df_f_yr.groupby('Type')['M_Num'].sum().reset_index()
-            df_frais_final = df_frais_final.rename(columns={'M_Num':'Total €'}).sort_values('Total €', ascending=False)
-
-    # --- 6. AFFICHAGE DES CHIFFRES CLÉS & GRAPHIQUE CIRCULAIRE ---
-    st.subheader("💰 Synthèse Financière")
-    
+    # --- Ligne 1 : Les Fondamentaux ---
     c1, c2, c3 = st.columns(3)
     c1.metric("Revenus Missions", f"{total_rev:,.0f} €".replace(',', ' '))
     c2.metric("Frais Entretien", f"{total_frais:,.0f} €".replace(',', ' '))
     solde = total_rev - total_frais
-    c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color="normal" if solde >= 0 else "inverse")
+    delta_color_val = "normal" if solde >= 0 else "inverse"
+    c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color=delta_color_val)
 
-    # Pie Chart
+    # --- Ligne 2 : Les Indicateurs de Pilotage (NOUVEAU) ---
+    st.divider()
+    st.write("### 🚀 Indicateurs de Pilotage")
+    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+
+    # KPI 1 : Marge Nette (en %)
+    if total_rev > 0:
+        marge_nette = (solde / total_rev) * 100
+        # Couleur : Vert si > 30%, Rouge si < 0, Orange entre les deux
+        couleur_marge = "green" if marge_nette > 30 else ("red" if marge_nette < 0 else "orange")
+        kpi1.markdown(f"<div style='text-align:center;'>Marge Nette<br><span style='font-size:30px; font-weight:bold; color:{couleur_marge};'>{marge_nette:.1f} %</span></div>", unsafe_allow_html=True)
+    else:
+        kpi1.metric("Marge Nette", "0 %")
+
+    # KPI 2 : CA Moyen / Jour (Si la colonne NbJours existe et est remplie)
+    ca_moyen_jour = 0
+    total_jours = 0
+    if not df_r_yr.empty:
+        # On essaie de trouver la colonne NbJours (orthographe variable dans JSON)
+        col_jours = next((c for c in ['Nbre de jours', 'NbJours', 'Nb jours'] if c in df_r_yr.columns), None)
+        if col_jours:
+            total_jours = pd.to_numeric(df_r_yr[col_jours], errors='coerce').sum()
+            if total_jours > 0:
+                ca_moyen_jour = total_rev / total_jours
+    
+    if ca_moyen_jour > 0:
+        kpi2.markdown(f"<div style='text-align:center;'>CA / Jour (Moy)<br><span style='font-size:30px; font-weight:bold; color:black;'>{ca_moyen_jour:.0f} €</span><br><span style='font-size:12px; color:gray;'>sur {total_jours:.0f} jours</span></div>", unsafe_allow_html=True)
+    else:
+        kpi2.metric("CA / Jour (Moy)", "0 €")
+
+    # KPI 3 : Nombre Total de Missions
+    nb_missions = len(df_r_yr) if not df_r_yr.empty else 0
+    kpi3.markdown(f"<div style='text-align:center;'>Missions<br><span style='font-size:30px; font-weight:bold; color:black;'>{nb_missions}</span></div>", unsafe_allow_html=True)
+
+    # KPI 4 : Taux de Dépendance (votre Risque Client)
+    if not df_soc_final.empty and total_rev > 0:
+        # On prend la ligne du haut (le plus gros client)
+        gros_client_ca = df_soc_final.iloc[0]['CA €']
+        nom_gros_client = df_soc_final.iloc[0]['Société']
+        taux_dep = (gros_client_ca / total_rev) * 100
+        # Couleur : Rouge si > 60% (trop dangereux), Vert si < 30% (bien diversifié)
+        couleur_dep = "red" if taux_dep > 60 else ("green" if taux_dep < 30 else "orange")
+        kpi4.markdown(f"<div style='text-align:center;'>Risque Client ({nom_gros_client})<br><span style='font-size:30px; font-weight:bold; color:{couleur_dep};'>{taux_dep:.0f} %</span></div>", unsafe_allow_html=True)
+    else:
+        kpi4.metric("Risque Client", "0 %")
+
+    # --- Ligne 3 : Le Graphique Camembert ---
+    st.divider()
     if total_rev > 0 or total_frais > 0:
         fig = px.pie(names=['Frais', 'Revenus'], values=[total_frais, total_rev],
                      color_discrete_map={'Frais': '#EF553B', 'Revenus': '#00CC96'}, hole=0.5)
-        # Ajustement mobile
         fig.update_layout(margin=dict(t=10, b=10, l=10, r=10), height=300,
                           legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
         st.plotly_chart(fig, use_container_width=True)
-
-    # --- 7. COURBES D'ÉVOLUTION MENSUELLE (RÉTABLIES) ---
-    if total_rev > 0 or total_frais > 0:
-        st.divider()
-        st.subheader("📈 Évolution Mensuelle")
-        
-        mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
-        data_evo = []
-        
-        # On boucle sur les 12 mois
-        for i in range(1, 13):
-            # Revenus du mois
-            if not df_r_yr.empty:
-                rev_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['P_Num'].sum()
-            else:
-                rev_m = 0
-                
-            # Frais du mois
-            if not df_f_yr.empty:
-                fra_m = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['M_Num'].sum()
-            else:
-                fra_m = 0
-            
-            # On ajoute si au moins une donnée existe
-            if rev_m > 0 or fra_m > 0:
-                data_evo.append({'Mois': mois_noms[i-1], 'Montant €': rev_m, 'Type': 'Revenus'})
-                data_evo.append({'Mois': mois_noms[i-1], 'Montant €': fra_m, 'Type': 'Frais'})
-        
-        # Création de la courbe Plotly
-        if data_evo:
-            df_evo = pd.DataFrame(data_evo)
-            fig_line = px.line(df_evo, x='Mois', y='Montant €', color='Type', markers=True,
-                                color_discrete_map={'Frais': '#EF553B', 'Revenus': '#00CC96'})
-            fig_line.update_layout(height=350, margin=dict(t=10, b=30, l=10, r=10),
-                                    xaxis_title=None, yaxis_title="Montant €",
-                                    legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"))
-            fig_line.update_xaxes(categoryorder='array', categoryarray=mois_noms) # Force l'ordre des mois
-            st.plotly_chart(fig_line, use_container_width=True)
-
-    # --- 8. TABLEAUX DE DÉTAIL & GESTION ARCHIVAGE ---
-    st.divider()
-    col_l, col_r = st.columns(2)
-
-    with col_l:
-        st.write("### 🏢 Par Société (Recettes)")
-        if not df_soc_final.empty:
-            st.dataframe(df_soc_final, hide_index=True, use_container_width=True)
-        else:
-            st.info("Aucun revenu trouvé.")
-
-    with col_r:
-        st.write("### 🛠️ Par Type de Frais")
-        if not df_frais_final.empty:
-            st.dataframe(df_frais_final, hide_index=True, use_container_width=True)
-        else:
-            st.info("Aucun frais trouvé.")
-
+    
     # =================================================================
     # --- 9. BOUTON ARCHIVAGE (INTÉGRÉ) ---
     # =================================================================
