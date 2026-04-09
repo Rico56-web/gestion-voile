@@ -744,7 +744,52 @@ if st.session_state.page == "MAINT":
         st.success("Vidange archivée !")
         st.rerun()
 
-    st.divider()
+      st.divider()
+
+    # --- E. AFFICHAGE DES ENREGISTREMENTS (LE MORCEAU MANQUANT) ---
+    st.subheader("📋 Historique des frais & interventions")
+
+    if not df_m.empty:
+        # Tri par date décroissante pour voir le plus récent en haut
+        df_m['dt_tri'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+        df_m_visu = df_m.sort_values('dt_tri', ascending=False)
+
+        for idx, row in df_m_visu.iterrows():
+            est_vidange = "VIDANGE" in str(row['Objet']).upper()
+            
+            # Style dynamique (Orange pour vidange, Gris pour le reste)
+            bg_c = "#fff3e0" if est_vidange else "#f8f9fa"
+            brd_c = "#ef6c00" if est_vidange else "#dee2e6"
+            icon = "🛠️" if est_vidange else "📄"
+            
+            # Gestion du montant sécurisée
+            try:
+                m_val = float(row.get('M_Num', 0))
+            except:
+                m_val = 0.0
+
+            html_maint = (
+                f'<div style="border: 1px solid {brd_c}; border-left: 8px solid {brd_c}; padding: 10px; border-radius: 8px; margin-bottom: 8px; background-color: {bg_c};">'
+                f'<div style="display: flex; justify-content: space-between; align-items: center;">'
+                f'<div style="font-size: 0.9rem; font-weight: bold;">{icon} {row["Date"]} | {row["Objet"]}</div>'
+                f'<div style="font-size: 1rem; font-weight: 900;">{m_val:.0f} &euro;</div>'
+                f'</div>'
+                f'<div style="font-size: 0.75rem; color: #666; margin-top: 4px;">'
+                f'Type: {row.get("Type", "N/A")} &bull; Statut: <b>{str(row.get("Statut", "N/A")).upper()}</b>'
+                f'</div>'
+                f'</div>'
+            )
+            st.markdown(html_maint, unsafe_allow_html=True)
+    else:
+        st.info("Aucun frais de maintenance enregistré dans le fichier actif.")
+
+    # --- F. OPTIONS D'EXPORTATION ---
+    with st.sidebar:
+        st.markdown("---")
+        if st.button("🗑️ Vider le cache maintenance"):
+            if os.path.exists('maintenance.json'):
+                os.remove('maintenance.json')
+                st.rerun()
 
 # ===============================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
