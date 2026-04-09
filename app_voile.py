@@ -477,7 +477,7 @@ if st.session_state.page == "PLANNING":
     st.markdown(html_solde, unsafe_allow_html=True)
 
 # =================================================================
-# --- 9. PAGE STATS (AVEC DÉTAIL DES OPÉRATIONS) ---
+# --- 9. PAGE STATS (AVEC DÉTAIL DES OPÉRATIONS - CORRIGÉ) ---
 # =================================================================
 if st.session_state.page == "STATS":
     import pandas as pd
@@ -502,42 +502,72 @@ if st.session_state.page == "STATS":
 
     # --- 3. NAVIGATION ---
     st.title("📊 Bilan Vesta")
-    mode_bilan = st.radio("Type de bilan", ["A ce jour", "Par Saison"], horizontal=True)
+    mode_bilan = st.radio("Type de bilan", ["A ce jour", "Par Saison"], horizontal=True, key="stats_mode_select")
     today = datetime.date.today()
     sel_y = today.year
 
     if mode_bilan == "Par Saison":
-        sel_y = st.selectbox("Saison", [2025, 2026, 2027], index=1)
+        ANNEES_STATS = [2025, 2026, 2027]
+        sel_y = st.selectbox("Saison", ANNEES_STATS, index=1, key="stats_year_select")
     
-    # --- 4. FILTRAGE ---
+    # --- 4. FILTRAGE & NETTOYAGE ---
     t_rev, t_fra = 0, 0
     df_r_y, df_f_y = pd.DataFrame(), pd.DataFrame()
 
+    # A. REVENUS (Planning)
     if not df_p_actif.empty:
         df_p = df_p_actif.copy()
+        # Conversion date
         df_p['dt_vrai'] = df_p['DateNav'].apply(conversion_date_robuste)
+        
+        # Filtre Année
         mask = (df_p['dt_vrai'].dt.year == sel_y) if mode_bilan == "Par Saison" else ((df_p['dt_vrai'].dt.year == today.year) & (df_p['dt_vrai'].dt.date <= today))
+        # Tri chronologique inverse (plus récent en haut)
         df_r_y = df_p[mask].sort_values('dt_vrai', ascending=False).copy()
+        
         if not df_r_y.empty:
+            # Nettoyage prix
             df_r_y['P_Num'] = pd.to_numeric(df_r_y['Prix'], errors='coerce').fillna(0)
             t_rev = df_r_y['P_Num'].sum()
 
+            # Harmonisation Société (Perso, Click & Boat)
+            df_r_y['Société'] = df_r_y['Société'].fillna('PERSO').astype(str).str.upper().str.strip()
+            df_r_y['Société'] = df_r_y['Société'].replace({
+                'PARTICULIER': 'PERSO', 'NAN': 'PERSO', '': 'PERSO', 'CLICK': 'CLICK & BOAT',
+                'CLICK&BOAT': 'CLICK & BOAT', 'CLICK AND BOAT': 'CLICK & BOAT', 'NONE': 'PERSO'
+            })
+
+    # B. FRAIS (Maintenance)
     if not df_m_full.empty:
         df_f = df_m_full.copy()
+        # Conversion date maintenance (standard FR)
         df_f['dt_vrai'] = pd.to_datetime(df_f['Date'], errors='coerce', dayfirst=True)
+        
+        # Filtre Année
         mask = (df_f['dt_vrai'].dt.year == sel_y) if mode_bilan == "Par Saison" else ((df_f['dt_vrai'].dt.year == today.year) & (df_f['dt_vrai'].dt.date <= today))
+        # Tri chronologique inverse
         df_f_y = df_f[mask].sort_values('dt_vrai', ascending=False).copy()
+        
         if not df_f_y.empty:
+            # Nettoyage frais
             df_f_y['M_Num'] = pd.to_numeric(df_f_y['M_Num'], errors='coerce').fillna(0)
             t_fra = df_f_y['M_Num'].sum()
 
-    # --- 5. RÉSUMÉ & KPIs ---
+    # --- 5. RÉSUMÉ FINANCIER ---
     st.subheader(f"💰 Synthèse {sel_y}")
     c1, c2, c3 = st.columns(3)
     solde = t_rev - t_fra
-    c1.metric("Revenus", f"{t_rev:,.0f} €".replace(',', ' '))
-    c2.metric("Dépenses", f"{t_fra:,.0f} €".replace(',', ' '))
-    c3.metric("Solde", f"{solde:,.0f} €".replace(',', ' '), delta_color="normal" if solde >= 0 else "inverse")
+    c1.metric("Revenus Missions", f"{t_rev:,.0f} €".replace(',', ' '))
+    c2.metric("Frais Entretien", f"{t_fra:,.0f} €".replace(',', ' '))
+    c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color="normal" if solde >= 0 else "inverse")
+
+    # Graphique Pie (Camembert)
+    if t_rev > 0 or t_fra > 0:
+        fig = px.pie(names=['Frais', 'Revenus'], values=[t_fra, t_rev],
+                     color_discrete_map={'Frais': '#EF553B', 'Revenus': '#00CC96'}, hole=0.5)
+        fig.update_layout(margin=dict(t=10, b=10, l=10, r=10), height=300,
+                          legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
+        st.plotly_chart(fig, use_container_width=True)
 
     # --- 6. BILAN MENSUEL ---
     if t_rev > 0 or t_fra > 0:
@@ -549,37 +579,70 @@ if st.session_state.page == "STATS":
             f = df_f_y[df_f_y['dt_vrai'].dt.month == i]['M_Num'].sum() if not df_f_y.empty else 0
             rs_m.append({'Mois': ms_n[i-1], 'Revenus €': round(r,0), 'Dépenses €': round(f,0), 'Solde €': round(r-f,0)})
         st.write("#### 📅 Tableau de bord Mensuel")
+        # Affichage du tableau mensuel, arrondis à l'euro
         st.dataframe(pd.DataFrame(rs_m), hide_index=True, use_container_width=True)
 
-    # --- 7. DÉTAIL DES OPÉRATIONS (L'AJOUT DEMANDÉ) ---
+    # --- 7. DÉTAIL DES OPÉRATIONS (CORRIGÉ SÉCURISÉ) ---
     st.divider()
     st.subheader("📝 Détail des opérations")
     
+    # A. DÉTAIL DES REVENUS (Missions)
     with st.expander("📥 Détail des Revenus (Missions)", expanded=False):
         if not df_r_y.empty:
-            # On sélectionne et renomme les colonnes pour la clarté
-            disp_rev = df_r_y[['DateNav', 'Client', 'Société', 'P_Num']].copy()
-            disp_rev.columns = ['Date', 'Client', 'Société', 'Montant €']
-            st.dataframe(disp_rev, hide_index=True, use_container_width=True)
-        else:
-            st.info("Aucun revenu sur cette période.")
+            # Sécurité : On vérifie quelles colonnes existent réellement pour le nom
+            df_disp = df_r_y.copy()
+            
+            # Reconstruction sécurisée de la colonne "Client"
+            nom_cols = []
+            if 'Prénom' in df_disp.columns: nom_cols.append('Prénom')
+            if 'Nom' in df_disp.columns: nom_cols.append('Nom')
+            
+            if nom_cols:
+                df_disp['Client'] = df_disp[nom_cols].fillna('').agg(' '.join, axis=1).str.title().str.strip()
+            else:
+                df_disp['Client'] = "Inconnu" # Si aucune colonne de nom n'existe
 
+            # Sélection sécurisée des colonnes à afficher
+            cols_to_show = []
+            if 'DateNav' in df_disp.columns: cols_to_show.append('DateNav')
+            if 'Client' in df_disp.columns: cols_to_show.append('Client')
+            if 'Société' in df_disp.columns: cols_to_show.append('Société')
+            if 'Nbre de jours' in df_disp.columns: cols_to_show.append('Nbre de jours')
+            if 'P_Num' in df_disp.columns: cols_to_show.append('P_Num')
+            
+            # Affichage
+            st.dataframe(df_disp[cols_to_show].rename(columns={'DateNav':'Date','Nbre de jours':'Jours','P_Num':'Montant €'}), hide_index=True, use_container_width=True)
+        else:
+            st.info("Aucun revenu enregistré sur cette période.")
+
+    # B. DÉTAIL DES DÉPENSES (Frais)
     with st.expander("📤 Détail des Dépenses (Frais)", expanded=False):
         if not df_f_y.empty:
-            # On sélectionne les colonnes utiles pour les frais
-            disp_fra = df_f_y[['Date', 'Type', 'Description', 'M_Num']].copy()
-            disp_fra.columns = ['Date', 'Catégorie', 'Détail', 'Montant €']
-            st.dataframe(disp_fra, hide_index=True, use_container_width=True)
+            # Sélection sécurisée des colonnes
+            df_disp_f = df_f_y.copy()
+            cols_f = []
+            if 'Date' in df_disp_f.columns: cols_f.append('Date')
+            if 'Type' in df_disp_f.columns: cols_f.append('Type')
+            if 'Description' in df_disp_f.columns: cols_f.append('Description')
+            if 'M_Num' in df_disp_f.columns: cols_f.append('M_Num')
+            
+            # Affichage
+            st.dataframe(df_disp_f[cols_f].rename(columns={'Type':'Catégorie','M_Num':'Montant €'}), hide_index=True, use_container_width=True)
         else:
-            st.info("Aucune dépense sur cette période.")
+            st.info("Aucune dépense enregistrée sur cette période.")
 
     # --- 8. ARCHIVAGE ---
     if mode_bilan == "Par Saison":
         st.divider()
-        if st.checkbox("Afficher les outils d'archivage"):
-            if st.button(f"🚀 Archiver définitivement {sel_y}"):
-                st.warning("Archivage en cours...")
-                # ... (logique d'archivage identique à la précédente)
+        if st.checkbox("Afficher les outils d'archivage", key="stats_arch_check"):
+            st.subheader("⚙️ Outils de la Saison")
+            st.warning(f"Attention, cette action va archiver **toutes** les données de l'année **{sel_y}**.")
+            st.write(f"Missions de `contacts.json` vers `archives_planning.json`.")
+            st.write(f"Frais de `maintenance.json` vers `archives_factures.json`.")
+            
+            if st.button(f"🚀 Archiver définitivement {sel_y}", key="stats_arch_btn"):
+                st.info("Lancement de l'archivage sécurisé...")
+                # ... (Logique d'archivage identique à la précédente, elle est déjà sécurisée)
 
     # =================================================================
     # --- 8. BOUTON ARCHIVAGE (CORRIGÉ & SÉCURISÉ) ---
