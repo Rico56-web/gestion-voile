@@ -676,16 +676,27 @@ if st.session_state.page == "MAINT":
     else:
         color_v, bg_v = "#c62828", "#ffebee" # Rouge
 
-    st.markdown(f"""
-        <div style="background-color: {bg_v}; border: 2px solid {color_v}; padding: 12px; border-radius: 12px; text-align: center; margin-top: 10px;">
-            <div style="color: {color_v}; font-weight: bold; font-size: 0.75rem; text-transform: uppercase;">🛢️ État du Cycle</div>
-            <div style="font-size: 1.6rem; font-weight: 900; color: {color_v}; margin: 5px 0;">
-                {heures_restantes:.1f} h <span style="font-size:0.8rem; font-weight:normal;">restantes</span>
-            </div>
-            <div style="font-size: 0.75rem; color: #555;">Compteur actuel : <b>{releve_h:.1f} h</b></div>
+    # 1. Préparation des variables (pour éviter les erreurs de syntaxe dans le HTML)
+txt_restant = f"{heures_restantes:.1f}"
+txt_releve = f"{releve_h:.1f}"
+label_unite = "restantes"
+
+# 2. Rendu HTML sécurisé
+st.markdown(f"""
+    <div style="background-color: {bg_v}; border: 2px solid {color_v}; padding: 12px; border-radius: 12px; text-align: center; margin-top: 10px;">
+        <div style="color: {color_v}; font-weight: bold; font-size: 0.75rem; text-transform: uppercase;">
+            &#128712; État du Cycle
         </div>
-    """, unsafe_allow_html=True)
-    st.progress(percent_prog)
+        <div style="font-size: 1.6rem; font-weight: 900; color: {color_v}; margin: 5px 0;">
+            {txt_restant} h <span style="font-size:0.8rem; font-weight:normal;">{label_unite}</span>
+        </div>
+        <div style="font-size: 0.75rem; color: #555;">
+            Compteur actuel : <b>{txt_releve} h</b>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
+
+st.progress(percent_prog)
 
     if st.button("🔧 ENREGISTRER LA VIDANGE COMME FAITE", use_container_width=True, type="primary"):
         # Ajout automatique dans maintenance.json
