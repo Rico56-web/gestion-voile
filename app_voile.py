@@ -565,17 +565,33 @@ if st.session_state.page == "STATS":
     st.markdown(f"""<div style="text-align:center; padding:15px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6;">
         <small>Solde {sel_y_stats}</small><br><b style="color:{couleur}; font-size:1.5rem;">{solde:,.0f} €</b></div>""", unsafe_allow_html=True)
 
-    # --- 6. TABLEAU DES SOCIÉTÉS (RETOUR DE CMN, VOG, CLICK) ---
+    # --- 6. ANALYSE PAR SOCIÉTÉ (VERSION SÉCURISÉE) ---
     st.divider()
     st.subheader("🏢 Analyse par Société")
     if not df_recettes_view.empty:
         df_soc = df_recettes_view.copy()
-        df_soc['Société'] = df_soc['Société'].replace(['', 'nan', None], 'PARTICULIER').str.upper().strip()
+        
+        # 1. On s'assure que tout est traité comme du texte avant le strip
+        df_soc['Société'] = df_soc['Société'].astype(str).replace(['', 'nan', 'None', 'None'], 'PARTICULIER')
+        df_soc['Société'] = df_soc['Société'].str.upper().str.strip()
+        
+        # 2. Harmonisation des noms (Optionnel mais recommandé pour Vesta)
+        df_soc['Société'] = df_soc['Société'].replace({
+            'CLICK': 'CLICK & BOAT', 
+            'CLICK AND BOAT': 'CLICK & BOAT', 
+            'CLICK&BOAT': 'CLICK & BOAT'
+        })
+        
         df_soc['Jours_Num'] = pd.to_numeric(df_soc['Nbre de jours'], errors='coerce').fillna(0.0)
         
+        # 3. Groupement
         stats_soc = df_soc.groupby('Société').agg({'P_Num': 'sum', 'Jours_Num': 'sum'}).reset_index()
         stats_soc = stats_soc.sort_values(by='P_Num', ascending=False)
+        
+        # 4. Affichage
         st.table(stats_soc.rename(columns={'P_Num':'Total €','Jours_Num':'Jours'}))
+    else:
+        st.info("Aucune donnée disponible pour cette saison.")
         
 # =================================================================
 # --- 8. PAGE MAINTENANCE (PERSISTANTE & CARNET DE SANTÉ) ---
