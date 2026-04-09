@@ -511,18 +511,16 @@ if st.session_state.page == "STATS":
     if st.button("📂 ARCHIVES", use_container_width=True, key="stats_to_archives"):
         st.session_state.page = "ARCHIVES"; st.rerun()
         
-    # --- 3. RÉCUPÉRATION DES DONNÉES (Fusion Actif + Archive) ---
-    def charger_global(fichier_actif, fichier_archive):
-        df_a = charger_data(fichier_actif)
-        df_arc = charger_data(fichier_archive)
-        return pd.concat([df_a, df_arc], ignore_index=True)
+     # --- RÉCUPÉRATION SÉCURISÉE ---
+# 1. On charge les données actives
+df_m_actif = charger_data('maintenance.json')
 
-    # On charge tout pour que le bilan soit complet
-  
-    df_c = charger_global('contacts.json', 'archives_planning.json')    
-    df_log = charger_global('logbook.json', 'archives_logbook.json')   
-    df_m = pd.concat([df_m_actif, df_m_archive], ignore_index=True)
-    config_static = {'staticPlot': True, 'responsive': True}
+# 2. On charge les données archivées (avec le nouveau nom)
+df_m_archive = charger_data('archives_maintenance.json')
+
+# 3. On fusionne les deux (LIGNE 524)
+# On ajoute une sécurité : si l'un des deux est vide, concat fonctionnera quand même
+df_m = pd.concat([df_m_actif, df_m_archive], ignore_index=True)
 
     # --- 4. CALCULS (Navigation & Finances) ---
     if not df_log.empty:
