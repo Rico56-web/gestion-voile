@@ -695,8 +695,7 @@ if st.session_state.page == "MAINT":
     # Calcul progression
     h_faites_dans_cycle = CYCLE_VIDANGE - heures_restantes
     percent_prog = max(0.0, min(1.0, h_faites_dans_cycle / CYCLE_VIDANGE))
-
-    # --- D. BANDEAU D'ALERTE & CARNET DE SANTÉ ---
+# --- D. BANDEAU D'ALERTE & CARNET DE SANTÉ ---
     if heures_restantes > 15:
         color_v, bg_v = "#2e7d32", "#e8f5e9" # Vert
     elif heures_restantes > 0:
@@ -704,31 +703,32 @@ if st.session_state.page == "MAINT":
     else:
         color_v, bg_v = "#c62828", "#ffebee" # Rouge
 
-    # 1. Préparation des variables (pour éviter les erreurs de syntaxe dans le HTML)
-txt_restant = f"{heures_restantes:.1f}"
-txt_releve = f"{releve_h:.1f}"
-label_unite = "restantes"
+    # 1. Préparation des variables (BIEN ALIGNÉES AVEC LE "if" CI-DESSUS)
+    txt_restant = f"{heures_restantes:.1f}"
+    txt_releve = f"{releve_h:.1f}"
+    label_unite = "restantes"
 
-    # 2. Rendu HTML sécurisé (Version ultra-stable sans triples guillemets)
-html_cycle = (
-    f'<div style="background-color: {bg_v}; border: 2px solid {color_v}; padding: 12px; border-radius: 12px; text-align: center; margin-top: 10px;">'
-    f'<div style="color: {color_v}; font-weight: bold; font-size: 0.75rem; text-transform: uppercase;">'
-    f'&#128712; État du Cycle'
-    f'</div>'
-    f'<div style="font-size: 1.6rem; font-weight: 900; color: {color_v}; margin: 5px 0;">'
-    f'{txt_restant} h <span style="font-size:0.8rem; font-weight:normal;">{label_unite}</span>'
-    f'</div>'
-    f'<div style="font-size: 0.75rem; color: #555;">'
-    f'Compteur actuel : <b>{txt_releve} h</b>'
-    f'</div>'
-    f'</div>'
-)
+    # 2. Rendu HTML sécurisé
+    html_cycle = (
+        f'<div style="background-color: {bg_v}; border: 2px solid {color_v}; padding: 12px; border-radius: 12px; text-align: center; margin-top: 10px;">'
+        f'<div style="color: {color_v}; font-weight: bold; font-size: 0.75rem; text-transform: uppercase;">'
+        f'&#128712; État du Cycle'
+        f'</div>'
+        f'<div style="font-size: 1.6rem; font-weight: 900; color: {color_v}; margin: 5px 0;">'
+        f'{txt_restant} h <span style="font-size:0.8rem; font-weight:normal;">{label_unite}</span>'
+        f'</div>'
+        f'<div style="font-size: 0.75rem; color: #555;">'
+        f'Compteur actuel : <b>{txt_releve} h</b>'
+        f'</div>'
+        f'</div>'
+    )
 
-st.markdown(html_cycle, unsafe_allow_html=True)
-st.progress(percent_prog)
+    st.markdown(html_cycle, unsafe_allow_html=True)
+    st.progress(percent_prog)
 
+    # LE BOUTON DOIT ÊTRE ALIGNÉ AVEC st.markdown CI-DESSUS
     if st.button("🔧 ENREGISTRER LA VIDANGE COMME FAITE", use_container_width=True, type="primary"):
-        # Ajout automatique dans maintenance.json
+        # Le contenu du bouton est décalé de 4 espaces supplémentaires
         new_v = {
             "Date": datetime.now().strftime("%d/%m/%Y"),
             "Objet": f"VIDANGE MOTEUR ({releve_h}h)",
@@ -739,78 +739,13 @@ st.progress(percent_prog)
         }
         df_m = pd.concat([df_m, pd.DataFrame([new_v])], ignore_index=True)
         sauvegarder_data(df_m, 'maintenance.json')
-        # On projette la prochaine à +100h
         params['cible_vidange'] = releve_h + 100.0
         sauver_params(params)
-        st.success("Vidange archivée ! Prochaine cible mise à jour.")
+        st.success("Vidange archivée !")
         st.rerun()
 
     st.divider()
 
-    # --- E. FILTRES & RÉCAPITULATIF FINANCIER ---
-    if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
-    
-    LISTE_TYPES = ["Assurances", "Port", "Maintenance, matériels", "Sécurité", "Autres frais"]
-    ANNEES_VUES = ["2026", "2027", "2028"]
-    
-    c_y1, c_y2 = st.columns([1, 2])
-    annee_choisie = c_y1.selectbox("📅", ANNEES_VUES, index=0, label_visibility="collapsed", key="maint_yr")
-    vue = c_y2.radio("Vue", ["✅ Payé", "📅 Tout"], horizontal=True, label_visibility="collapsed", key="maint_vue")
-
-    if not df_m.empty:
-        df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
-        df_annee = df_m[df_m['Date'].str.contains(annee_choisie, na=False)].copy()
-        df_view = df_annee[df_annee['Statut'] == "Fait"].copy() if "Payé" in vue else df_annee.copy()
-        df_view['dt_t'] = pd.to_datetime(df_view['Date'], dayfirst=True, errors='coerce')
-        df_view = df_view.sort_values('dt_t', ascending=False)
-    else:
-        df_view = pd.DataFrame()
-        
-    if not df_view.empty:
-        total_gen = df_view['M_Num'].sum()
-        def metric_card(label, value, color):
-            st.markdown(f'<div style="background-color: {color}; padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 10px;"><div style="font-size: 0.65rem; font-weight: bold; color: #555;">{label}</div><div style="font-size: 1rem; font-weight: bold;">{value:,.0f}€</div></div>', unsafe_allow_html=True)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            metric_card("⚓ Port", df_view[df_view['Type'] == 'Port']['M_Num'].sum(), "#e3f2fd")
-            metric_card("🛟 Sécurité", df_view[df_view['Type'] == 'Sécurité']['M_Num'].sum(), "#fff3e0")
-        with col2:
-            metric_card("🛡️ Assurances", df_view[df_view['Type'] == 'Assurances']['M_Num'].sum(), "#f3e5f5")
-            metric_card("🛠️ Maintenance", df_view[df_view['Type'] == 'Maintenance, matériels']['M_Num'].sum(), "#e8f5e9")
-
-        st.markdown(f'<div style="background-color: #01579b; padding: 12px; border-radius: 12px; text-align: center; color: white;"><b>TOTAL {annee_choisie} : {total_gen:,.0f}€</b></div>', unsafe_allow_html=True)
-
-    # --- F. LISTE & ÉDITION ---
-    for idx, row in df_view.iterrows():
-        if st.session_state.edit_idx == idx:
-            with st.container(border=True):
-                new_mt = st.number_input("Prix €", value=float(row['M_Num']), key=f"m_mt_{idx}")
-                new_st = st.selectbox("Statut", ["À prévoir", "Fait"], index=1 if row['Statut']=="Fait" else 0, key=f"m_st_{idx}")
-                if st.button("💾", key=f"s_{idx}"):
-                    df_m.at[idx, 'M_Num'] = new_mt; df_m.at[idx, 'Statut'] = new_st
-                    sauvegarder_data(df_m, 'maintenance.json'); st.session_state.edit_idx = None; st.rerun()
-        else:
-            status_icon = "🟢" if row['Statut'] == "Fait" else "⏳"
-            st.markdown(f'<div style="border-left: 8px solid #01579b; padding: 10px; border-radius: 10px; background-color: #e1f5fe; margin-bottom: 5px;"><b>{status_icon} {row["Date"][:5]}</b> | {row["Objet"][:25]} | <b>{row["M_Num"]:.0f}€</b></div>', unsafe_allow_html=True)
-            if st.button(f"✏️ Modifier {idx}", key=f"ed_{idx}", use_container_width=True):
-                st.session_state.edit_idx = idx; st.rerun()
-
-    # --- G. AJOUT & MODE HORS-LIGNE (SYNC) ---
-    with st.expander("➕ AJOUTER / 📥 SYNCHRO HORS-LIGNE"):
-        tab1, tab2 = st.tabs(["Dépense", "Sauvegarde iPhone"])
-        with tab1:
-            f_obj = st.text_input("Objet")
-            f_mt = st.number_input("Montant €", min_value=0.0)
-            if st.button("Enregistrer"):
-                new_r = {"Date": datetime.now().strftime("%d/%m/%Y"), "Objet": f_obj, "M_Num": f_mt, "Statut": "À prévoir", "Type": "Autres frais"}
-                df_m = pd.concat([df_m, pd.DataFrame([new_r])], ignore_index=True)
-                sauvegarder_data(df_m, 'maintenance.json'); st.rerun()
-        with tab2:
-            st.write("Téléchargez vos données avant de partir en mer :")
-            for f in ['logbook.json', 'maintenance.json', 'params_maint.json']:
-                data = preparer_download(f)
-                if data: st.download_button(f"📥 {f}", data, file_name=f, use_container_width=True)
 # ===============================================================================
 # --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
 # =================================================================
