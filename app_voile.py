@@ -145,7 +145,7 @@ df_c = charger_data("contacts.json")
 if not df_c.empty and 'Paiement' in df_c.columns:
     df_c['Paiement'] = df_c['Paiement'].apply(lambda x: "Payé" if "pay" in str(x).lower() and "non" not in str(x).lower() else "Non payé")
 # =================================================================
-# --- 5. BLOC CONTACTS (COULEURS MAJ + FIX BOUTON NOUVEAU) ---
+# --- 5. BLOC CONTACTS (NOUVEAU EN HAUT + COULEURS) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("📅 Gestion des Contacts")
@@ -173,31 +173,25 @@ if st.session_state.page == "CONTACTS":
             st.session_state.vue_contact = "Archives"
             st.rerun()
     with c3:
-        # --- FIX ACTION BOUTON NOUVEAU ---
+        # --- ACTION BOUTON NOUVEAU (INSERTION EN HAUT) ---
         if st.button("➕ NOUVEAU", use_container_width=True):
             from datetime import datetime
             df_temp = charger_data('contacts.json')
-            # Création d'une nouvelle ligne avec TOUTES les colonnes nécessaires
             new_row = {
-                "Prénom": "Nouveau", 
-                "Nom": "Contact", 
-                "Statut": "En attente", 
-                "Paiement": "Non payé", 
-                "DateNav": datetime.now().strftime("%d/%m/%Y"), 
-                "Société": "PERSO", 
-                "Prix": 0, 
-                "Nbre de personnes": 1, 
-                "Nbre de jours": 1,
-                "T\u00e9l\u00e9phone": "",
-                "Email": ""
+                "Prénom": "Nouveau", "Nom": "Contact", "Statut": "En attente", 
+                "Paiement": "Non payé", "DateNav": datetime.now().strftime("%d/%m/%Y"), 
+                "Société": "PERSO", "Prix": 0, "Nbre de personnes": 1, "Nbre de jours": 1,
+                "T\u00e9l\u00e9phone": "", "Email": ""
             }
-            df_temp = pd.concat([df_temp, pd.DataFrame([new_row])], ignore_index=True)
+            # Utilisation de ignore_index=True après avoir mis la nouvelle ligne en premier
+            df_temp = pd.concat([pd.DataFrame([new_row]), df_temp], ignore_index=True)
             sauvegarder_data(df_temp, 'contacts.json')
-            # On force l'édition de la nouvelle fiche immédiatement
-            st.session_state.edit_idx = len(df_temp) - 1
+            
+            # On active l'édition sur l'index 0 (la fiche tout en haut)
+            st.session_state.edit_idx = 0
             st.rerun()
 
-    # --- 2. LÉGENDE (JAUNE CLAIR POUR ATTENTE) ---
+    # --- 2. LÉGENDE ---
     st.markdown("""
         <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; padding: 10px; background: #f9f9f9; border-radius: 8px; border: 1px solid #ddd;">
             <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #3498db; border-radius: 3px; margin-right: 5px;"></div><b>CMN</b></div>
@@ -217,6 +211,7 @@ if st.session_state.page == "CONTACTS":
 
         for idx, row in df_affichage.iterrows():
             
+            # --- SUPPRESSION ---
             if st.session_state.delete_confirm == idx:
                 st.warning(f"⚠️ Supprimer {row.get('Prénom')} {row.get('Nom')} ?")
                 cy, cn = st.columns(2)
@@ -230,7 +225,7 @@ if st.session_state.page == "CONTACTS":
                     st.rerun()
                 continue
 
-            # --- COULEURS (Jaune clair pour En attente) ---
+            # --- COULEURS ---
             statut_label = str(row.get('Statut', '')).strip().lower()
             societe_label = str(row.get('Société', 'PERSO')).strip().upper()
             bg_color, text_color = "#ffffff", "#333333"
@@ -238,7 +233,7 @@ if st.session_state.page == "CONTACTS":
             if societe_label == "CMN":
                 bg_color, text_color = "#3498db", "#ffffff"
             elif statut_label == "ok": bg_color = "#d4edda"
-            elif statut_label == "en attente": bg_color = "#fff9c4" # Jaune clair
+            elif statut_label == "en attente": bg_color = "#fff9c4"
             elif statut_label == "refusé": bg_color = "#f8d7da"
             elif statut_label == "terminé": bg_color = "#e2e3e5"
 
