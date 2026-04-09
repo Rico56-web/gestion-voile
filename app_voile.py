@@ -145,7 +145,7 @@ df_c = charger_data("contacts.json")
 if not df_c.empty and 'Paiement' in df_c.columns:
     df_c['Paiement'] = df_c['Paiement'].apply(lambda x: "Payé" if "pay" in str(x).lower() and "non" not in str(x).lower() else "Non payé")
 # =================================================================
-# --- 5. BLOC CONTACTS (NOTES + FIX TEL + MAJUSCULES) ---
+# --- 5. BLOC CONTACTS (FORMULAIRES COLORÉS + NOTES) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("📅 Gestion des Contacts")
@@ -162,13 +162,13 @@ if st.session_state.page == "CONTACTS":
         except: return 0
 
     def format_tel_fr(tel):
-        """ Nettoie et formate en 0X XX XX XX XX """
         if tel is None: return ""
         digits = "".join(filter(str.isdigit, str(tel)))
         if len(digits) == 10:
             return f"{digits[0:2]} {digits[2:4]} {digits[4:6]} {digits[6:8]} {digits[8:10]}"
         return str(tel)
 
+    # --- NAVIGATION HAUT ---
     c1, c2, c3 = st.columns([1, 1, 1])
     with c1:
         if st.button("EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"):
@@ -193,16 +193,7 @@ if st.session_state.page == "CONTACTS":
             st.session_state.edit_idx = 0
             st.rerun()
 
-    # --- 2. LÉGENDE ---
-    st.markdown("""
-        <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; padding: 10px; background: #f9f9f9; border-radius: 8px; border: 1px solid #ddd;">
-            <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #3498db; border-radius: 3px; margin-right: 5px;"></div><b>CMN</b></div>
-            <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #d4edda; border-radius: 3px; margin-right: 5px;"></div><b>OK</b></div>
-            <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #fff9c4; border-radius: 3px; margin-right: 5px;"></div><b>Attente</b></div>
-            <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #e2e3e5; border-radius: 3px; margin-right: 5px;"></div><b>Terminé</b></div>
-            <div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background: #f8d7da; border-radius: 3px; margin-right: 5px;"></div><b>Refusé</b></div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown("---")
 
     df_c = charger_data('contacts.json')
 
@@ -212,7 +203,7 @@ if st.session_state.page == "CONTACTS":
 
         for idx, row in df_affichage.iterrows():
             
-            # --- COULEURS ---
+            # --- DÉTERMINATION COULEUR ---
             statut_label = str(row.get('Statut', '')).strip().lower()
             societe_label = str(row.get('Société', 'PERSO')).strip().upper()
             bg_color, text_color = "#ffffff", "#333333"
@@ -223,57 +214,66 @@ if st.session_state.page == "CONTACTS":
             elif statut_label == "refusé": bg_color = "#f8d7da"
             elif statut_label == "terminé": bg_color = "#e2e3e5"
 
-            # --- MODE ÉDITION ---
+            # --- MODE ÉDITION (COLORÉ) ---
             if st.session_state.edit_idx == idx:
-                with st.form(f"form_edit_{idx}"):
-                    c1, c2 = st.columns(2)
-                    e_pre = c1.text_input("Prénom", str(row.get('Prénom', '')).upper())
-                    e_nom = c2.text_input("Nom", str(row.get('Nom', '')).upper())
-                    
-                    e_date = st.date_input("Date Navigation", datetime.strptime(str(row.get('DateNav', datetime.now().strftime("%Y-%m-%d"))), "%Y-%m-%d"))
-                    
-                    soc_opts = ["PERSO", "CMN", "VOG", "CLICK", "Autres"]
-                    e_soc = st.selectbox("Société", soc_opts, index=soc_opts.index(societe_label) if societe_label in soc_opts else 0)
-                    
-                    c3, c4, c5 = st.columns(3)
-                    e_prix = c3.number_input("Prix (€)", value=clean_int(row.get('Prix', 0)), step=1)
-                    e_pers = c4.number_input("Pers.", value=clean_int(row.get('Nbre de personnes', 1)), step=1)
-                    e_jours = c5.number_input("Jours", value=clean_int(row.get('Nbre de jours', 1)), step=1)
-                    
-                    e_tel = st.text_input("Téléphone", row.get('Téléphone', ''))
-                    e_mail = st.text_input("Email", row.get('Email', ''))
-                    
-                    # --- CHAMP NOTES ---
-                    e_notes = st.text_area("Notes", row.get('Notes', ''))
-                    
-                    c6, c7 = st.columns(2)
-                    opts_s = ["En attente", "Ok", "Terminé", "Refusé"]
-                    e_st = c6.selectbox("Statut", opts_s, index=opts_s.index(row['Statut']) if row['Statut'] in opts_s else 0)
-                    opts_p = ["Non payé", "Payé"]
-                    e_pa = c7.selectbox("Paiement", opts_p, index=opts_p.index(row['Paiement']) if row['Paiement'] in opts_p else 0)
-                    
-                    if st.form_submit_button("💾 ENREGISTRER"):
-                        df_c.at[idx, 'Prénom'], df_c.at[idx, 'Nom'] = e_pre.upper(), e_nom.upper()
-                        df_c.at[idx, 'DateNav'] = e_date.strftime("%Y-%m-%d")
-                        df_c.at[idx, 'Société'] = e_soc
-                        df_c.at[idx, 'Prix'], df_c.at[idx, 'Nbre de personnes'] = int(e_prix), int(e_pers)
-                        df_c.at[idx, 'Nbre de jours'] = int(e_jours)
-                        df_c.at[idx, 'Téléphone'] = format_tel_fr(e_tel)
-                        df_c.at[idx, 'Email'], df_c.at[idx, 'Notes'] = e_mail, e_notes
-                        df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'] = e_st, e_pa
-                        sauvegarder_data(df_c, 'contacts.json')
-                        st.session_state.edit_idx = None
-                        st.rerun()
-                    if st.form_submit_button("Annuler"):
-                        st.session_state.edit_idx = None
-                        st.rerun()
+                with st.container():
+                    st.markdown(f"### ✏️ Modification : {row.get('Prénom')} {row.get('Nom')}")
+                    with st.form(f"form_edit_{idx}"):
+                        
+                        # Section Identité (Bleu)
+                        st.info("👤 **IDENTITÉ & SOCIÉTÉ**")
+                        c1, c2 = st.columns(2)
+                        e_pre = c1.text_input("Prénom", str(row.get('Prénom', '')).upper())
+                        e_nom = c2.text_input("Nom", str(row.get('Nom', '')).upper())
+                        
+                        soc_opts = ["PERSO", "CMN", "VOG", "CLICK", "Autres"]
+                        e_soc = st.selectbox("Société émettrice", soc_opts, index=soc_opts.index(societe_label) if societe_label in soc_opts else 0)
+                        
+                        # Section Détails Nav (Orange)
+                        st.warning("⛵ **DÉTAILS NAVIGATION**")
+                        c_date, c_prix = st.columns(2)
+                        e_date = c_date.date_input("Date Navigation", datetime.strptime(str(row.get('DateNav', datetime.now().strftime("%Y-%m-%d"))), "%Y-%m-%d"))
+                        e_prix = c_prix.number_input("Prix Total (€)", value=clean_int(row.get('Prix', 0)), step=1)
+                        
+                        c3, c4 = st.columns(2)
+                        e_pers = c3.number_input("Nombre de Personnes", value=clean_int(row.get('Nbre de personnes', 1)), step=1)
+                        e_jours = c4.number_input("Nombre de Jours", value=clean_int(row.get('Nbre de jours', 1)), step=1)
+                        
+                        # Section Contact (Vert)
+                        st.success("📞 **CONTACT & NOTES**")
+                        e_tel = st.text_input("Téléphone", row.get('Téléphone', ''))
+                        e_mail = st.text_input("Email", row.get('Email', ''))
+                        e_notes = st.text_area("📝 Notes particulières", row.get('Notes', ''))
+                        
+                        # Section Statut (Gris)
+                        st.write("---")
+                        c6, c7 = st.columns(2)
+                        opts_s = ["En attente", "Ok", "Terminé", "Refusé"]
+                        e_st = c6.selectbox("Statut Dossier", opts_s, index=opts_s.index(row['Statut']) if row['Statut'] in opts_s else 0)
+                        opts_p = ["Non payé", "Payé"]
+                        e_pa = c7.selectbox("État Paiement", opts_p, index=opts_p.index(row['Paiement']) if row['Paiement'] in opts_p else 0)
+                        
+                        col_save, col_annul = st.columns(2)
+                        if col_save.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True):
+                            df_c.at[idx, 'Prénom'], df_c.at[idx, 'Nom'] = e_pre.upper(), e_nom.upper()
+                            df_c.at[idx, 'DateNav'] = e_date.strftime("%Y-%m-%d")
+                            df_c.at[idx, 'Société'] = e_soc
+                            df_c.at[idx, 'Prix'], df_c.at[idx, 'Nbre de personnes'] = int(e_prix), int(e_pers)
+                            df_c.at[idx, 'Nbre de jours'] = int(e_jours)
+                            df_c.at[idx, 'Téléphone'] = format_tel_fr(e_tel)
+                            df_c.at[idx, 'Email'], df_c.at[idx, 'Notes'] = e_mail, e_notes
+                            df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'] = e_st, e_pa
+                            sauvegarder_data(df_c, 'contacts.json')
+                            st.session_state.edit_idx = None
+                            st.rerun()
+                        if col_annul.form_submit_button("❌ ANNULER", use_container_width=True):
+                            st.session_state.edit_idx = None
+                            st.rerun()
 
             # --- MODE AFFICHAGE ---
             else:
                 tel_val = format_tel_fr(row.get('Téléphone', ''))
-                # Correctif securité pour le lien de téléphone
                 tel_link = "".join(filter(str.isdigit, str(tel_val)))
-                
                 try: display_date = datetime.strptime(row.get('DateNav'), "%Y-%m-%d").strftime("%d/%m/%Y")
                 except: display_date = "---"
 
@@ -288,7 +288,7 @@ if st.session_state.page == "CONTACTS":
                             👥 {clean_int(row.get('Nbre de personnes', 1))} pers. | ⏱️ {clean_int(row.get('Nbre de jours', 1))} jours<br>
                             🏢 {societe_label} | 📍 {statut_label.upper()} | 📞 {tel_val}
                         </div>
-                        <div style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 6px; margin-top: 8px; font-style: italic; font-size: 0.9rem;">
+                        <div style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 6px; margin-top: 8px; font-style: italic; font-size: 0.9rem; color: {text_color}">
                             📝 {row.get('Notes', 'Pas de notes.')}
                         </div>
                         <div style="display: flex; justify-content: space-around; margin-top: 10px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 10px;">
