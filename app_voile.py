@@ -385,43 +385,43 @@ if st.session_state.page == "PLANNING":
                         val_prix = str(r.get('Prix', 0)).replace(',','.').replace('€','').strip()
                         total_mois += float(val_prix) if val_prix else 0
             except: continue
-# --- RENDU CALENDRIER HTML ---
-# UTILISE BIEN DES GUILLEMETS SIMPLES POUR LE STYLE CI-DESSOUS
-style_calendar = """
+
+# --- RENDU CALENDRIER HTML (NETTOYÉ) ---
+st.markdown("""
 <style>
-    .full-width-cal { 
-        width: 100%; 
-        border-collapse: collapse; 
-        table-layout: fixed; 
-    } 
-    .full-width-cal td { 
-        border: 1px solid #cccccc !important; 
-        padding: 5px 0; 
-    }
+.full-width-cal {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+.full-width-cal td {
+    border: 1px solid #cccccc !important;
+    padding: 5px 0;
+}
 </style>
-"""
-st.markdown(style_calendar, unsafe_allow_html=True)
-    
-    h_cal = '<table class="full-width-cal" style="text-align:center; background:white;">'
-    h_cal += '<tr style="background:#f1f3f5; font-size:10px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td style="color:#d9534f;">Sa</td><td style="color:#d9534f;">Di</td></tr>'
-    
-    cal_mat = calendar.monthcalendar(sel_y, sel_m)
-    for sem in cal_mat:
-        h_cal += '<tr>'
-        for i, jour in enumerate(sem):
-            if jour == 0:
-                h_cal += '<td style="height:48px; background:#fdfdfd;"></td>'
-            else:
-                occ = jours_occ.get(jour, {})
-                bg_c = occ.get("c", "transparent")
-                is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == aujourdhui.year)
-                cell_bg = "background:#D2B48C;" if is_today else ("background:#f9f9f9;" if i >= 5 else "")
-                txt_c = "white" if bg_c != "transparent" else "black"
-                circle = f'<div style="background:{bg_c}; color:{txt_c}; border-radius:50%; width:28px; height:28px; line-height:28px; margin:auto; font-weight:bold; font-size:12px;">{jour}</div>'
-                h_cal += f'<td style="height:50px; {cell_bg}">{circle}</td>'
-        h_cal += '</tr>'
-    h_cal += '</table>'
-    st.markdown(h_cal, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
+
+h_cal = '<table class="full-width-cal" style="text-align:center; background:white;">'
+h_cal += '<tr style="background:#f1f3f5; font-size:10px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td style="color:#d9534f;">Sa</td><td style="color:#d9534f;">Di</td></tr>'
+
+cal_mat = calendar.monthcalendar(sel_y, sel_m)
+for sem in cal_mat:
+    h_cal += '<tr>'
+    for i, jour in enumerate(sem):
+        if jour == 0:
+            h_cal += '<td style="height:48px; background:#fdfdfd;"></td>'
+        else:
+            occ = jours_occ.get(jour, {})
+            bg_c = occ.get("c", "transparent")
+            is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == aujourdhui.year)
+            cell_bg = "background:#D2B48C;" if is_today else ("background:#f9f9f9;" if i >= 5 else "")
+            txt_c = "white" if bg_c != "transparent" else "black"
+            circle = f'<div style="background:{bg_c}; color:{txt_c}; border-radius:50%; width:28px; height:28px; line-height:28px; margin:auto; font-weight:bold; font-size:12px;">{jour}</div>'
+            h_cal += f'<td style="height:50px; {cell_bg}">{circle}</td>'
+    h_cal += '</tr>'
+h_cal += '</table>'
+
+st.markdown(h_cal, unsafe_allow_html=True)
 
     # --- LISTE DES MISSIONS & TOTAL ---
     st.markdown(f"#### 📋 Détails {sel_m_nom}")
