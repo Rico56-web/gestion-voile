@@ -441,10 +441,16 @@ st.markdown(h_cal, unsafe_allow_html=True)
                 st.rerun()
 
     # Bloc CA (Couleur Or/Sombre)
-    st.markdown(f"""
-    <div style="background:#2c3e50; color:#f1c40f; padding:15px; border-radius:10px; text-align:center; margin-top:15px; border: 2px solid #f1c40f;">
-        <span style="font-size:0.8rem; color:white; text-transform:uppercase;">Estimation Chiffre d'Affaires</span><br>
-        <b style="font-size:1.4rem;">TOTAL : {total_mois:,.0f} €</b>
+      st.markdown(f"""
+    <div style="display: flex; padding: 10px; border-bottom: 1px solid #eee; background: white; align-items: center;">
+        <div style="background: {c_line}; color: white; border-radius: 5px; padding: 4px; min-width: 85px; text-align: center; font-weight: bold; margin-right: 10px; line-height:1.2;">
+            <span style="font-size: 0.75rem;">{txt_d}</span><br>
+            <span style="font-size: 0.5rem;">{"JOURS" if m['n_j'] > 1 else "JOUR"}</span>
+        </div>
+        <div style="flex-grow: 1;">
+            <b>{icon} {str(r.get('Nom','')).upper()}</b><br>
+            <small>{soc} | {r.get('Prix','0')} &euro;</small>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 # =================================================================
