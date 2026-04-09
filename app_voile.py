@@ -546,13 +546,20 @@ if st.session_state.page == "STATS":
             legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5)
         )
         st.plotly_chart(fig2, use_container_width=True, config=config_static)
-
-    # Solde en gros pavé
+        
+    # --- Solde en gros pavé (CORRIGÉ) ---
     solde = total_recettes - total_charges
+    
+    # 1. On prépare les variables AVANT le HTML
+    txt_solde = f"{solde:,.0f}".replace(",", " ")  # Formatage propre avec espace
+    couleur_solde = "#28a745" if solde >= 0 else "#dc3545"
+    label_solde = "PRÉVISIONNEL" if mode_previ else "RÉEL"
+
+    # 2. On affiche le bloc sans calculs complexes à l'intérieur
     st.markdown(f"""
         <div style="text-align:center; border:2px solid #ddd; padding:15px; border-radius:15px; background:#fff; margin:15px 0;">
-            <span style="color:#666; font-weight:bold;">SOLDE {"PRÉVISIONNEL" if mode_previ else "RÉEL"}</span><br>
-            <b style="color:{'#28a745' if solde>=0 else '#dc3545'}; font-size:1.8rem;">{solde:,.0f} €</b>
+            <span style="color:#666; font-weight:bold;">SOLDE {label_solde}</span><br>
+            <b style="color:{couleur_solde}; font-size:1.8rem;">{txt_solde} &euro;</b>
         </div>
     """, unsafe_allow_html=True)
 
