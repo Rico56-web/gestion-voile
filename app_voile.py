@@ -511,15 +511,17 @@ if st.session_state.page == "STATS":
     if st.button("📂 ARCHIVES", use_container_width=True, key="stats_to_archives"):
         st.session_state.page = "ARCHIVES"; st.rerun()
         
-    # --- 3. RÉCUPÉRATION DES DONNÉES (ACTIF + ARCHIVES) ---
-    def charger_complet(actif, archive):
-        df_a = charger_data(actif)
-        df_arc = charger_data(archive)
+    # --- 3. RÉCUPÉRATION DES DONNÉES (Fusion Actif + Archive) ---
+    def charger_global(fichier_actif, fichier_archive):
+        df_a = charger_data(fichier_actif)
+        df_arc = charger_data(fichier_archive)
         return pd.concat([df_a, df_arc], ignore_index=True)
 
-    df_m = charger_complet('maintenance.json', 'archives_maintenance.json') 
-    df_c = charger_complet('contacts.json', 'archives_planning.json')    
-    df_log = charger_complet('logbook.json', 'archives_logbook.json')   
+    # On charge tout pour que le bilan soit complet
+    df_m = charger_global('maintenance.json', 'archives_maintenance.json') 
+    df_c = charger_global('contacts.json', 'archives_planning.json')    
+    df_log = charger_global('logbook.json', 'archives_logbook.json')   
+    
     config_static = {'staticPlot': True, 'responsive': True}
 
     # --- 4. CALCULS (Navigation & Finances) ---
