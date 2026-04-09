@@ -476,80 +476,74 @@ if st.session_state.page == "PLANNING":
     )
     st.markdown(html_solde, unsafe_allow_html=True)
 # =================================================================
-# --- 9. PAGE STATS (DIAGNOSTIC & RÉTABLISSEMENT) ---
+# --- 9. PAGE STATS (VERSION FONCTIONNELLE D'HIER) ---
 # =================================================================
 if st.session_state.page == "STATS":
-    import pandas as pd
     import plotly.express as px
+    import pandas as pd
+    import datetime
 
-    # --- 1. CHARGEMENT TOUS FICHIERS ---
-    def load_and_merge(active, arch):
-        d1 = charger_data(active)
-        d2 = charger_data(arch)
-        return pd.concat([d1, d2], ignore_index=True).drop_duplicates()
+    # 1. CHARGEMENT SIMPLE
+    # On charge les revenus (Planning) et les frais (Maintenance + Archives)
+    df_c = charger_data('contacts.json')
+    df_m_actif = charger_data('maintenance.json')
+    df_m_arch = charger_data('archives_factures.json')
+    df_m = pd.concat([df_m_actif, df_m_arch], ignore_index=True)
 
-    df_m = load_and_merge('maintenance.json', 'archives_factures.json')
-    df_c = load_and_merge('contacts.json', 'archives_planning.json')
-    df_log = load_and_merge('logbook.json', 'archives_logbook.json')
-
-    # --- 2. SÉLECTEUR ANNÉE ---
-    ANNEES = [2025, 2026, 2027]
-    sel_y = st.selectbox("Choisir l'année à analyser", ANNEES, index=1)
-
-    # --- 3. TRAITEMENT REVENUS (LÀ OÙ ÇA BLOQUE) ---
-    st.subheader(f"💰 Bilan financier {sel_y}")
+    # 2. NAVIGATION
+    col_t1, col_t2 = st.columns([2, 1])
+    col_t1.title("📊 Bilan Vesta")
     
+    ANNEES_STATS = [2025, 2026, 2027]
+    sel_y_stats = col_t2.selectbox("Saison", ANNEES_STATS, index=1)
+    
+    # 3. CALCULS REVENUS
+    total_recettes = 0
+    df_recettes_view = pd.DataFrame()
     if not df_c.empty:
-        # On s'assure que la date est lisible
         df_c['dt'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
-        # On filtre sur l'année choisie
-        df_c_yr = df_c[df_c['dt'].dt.year == sel_y].copy()
-        
+        df_c_yr = df_c[df_c['dt'].dt.year == sel_y_stats].copy()
         if not df_c_yr.empty:
-            # NETTOYAGE STRICT DU PRIX
-            def clean_price(val):
-                s = str(val).replace('€','').replace(' ','').replace('\xa0','').strip()
-                return pd.to_numeric(s, errors='coerce') or 0.0
+            df_c_yr['P_Num'] = pd.to_numeric(df_c_yr['Prix'].astype(str).str.replace('€','').str.replace(' ','').strip(), errors='coerce').fillna(0.0)
+            df_recettes_view = df_c_yr
+            total_recettes = df_recettes_view['P_Num'].sum()
 
-            df_c_yr['P_Num'] = df_c_yr['Prix'].apply(clean_price)
-            
-            # --- CALCULS FINAUX ---
-            rev_total = df_c_yr['P_Num'].sum()
-            
-            # Affichage Metrics
-            st.metric("Total Recettes", f"{rev_total:,.0f} €".replace(',',' '))
-
-            # --- TABLEAU SOCIÉTÉS ---
-            st.write("### 🏢 Détail par Société")
-            df_soc = df_c_yr.copy()
-            df_soc['Société'] = df_soc['Société'].astype(str).replace(['nan','','None'], 'PARTICULIER').str.upper()
-            
-            # Groupement
-            res_soc = df_soc.groupby('Société')['P_Num'].sum().reset_index()
-            res_soc = res_soc.sort_values('P_Num', ascending=False)
-            st.table(res_soc.rename(columns={'P_Num':'Total €'}))
-            
-            # --- SYNTHÈSE MENSUELLE ---
-            st.write("### 📅 Revenus par Mois")
-            df_c_yr['Mois'] = df_c_yr['dt'].dt.month
-            mensuel = df_c_yr.groupby('Mois')['P_Num'].sum().reset_index()
-            # Mapping des noms de mois
-            noms = {1:'Jan', 2:'Fév', 3:'Mar', 4:'Avr', 5:'Mai', 6:'Jui', 7:'Juil', 8:'Août', 9:'Sept', 10:'Oct', 11:'Nov', 12:'Déc'}
-            mensuel['Mois'] = mensuel['Mois'].map(noms)
-            st.table(mensuel.rename(columns={'P_Num':'Revenu €'}))
-        else:
-            st.warning(f"Aucune donnée de navigation trouvée pour {sel_y} dans les fichiers.")
-    else:
-        st.error("Le fichier des revenus (contacts.json) semble vide ou introuvable.")
-
-    # --- 4. TRAITEMENT FRAIS ---
+    # 4. CALCULS FRAIS
+    total_charges = 0
+    df_charges_view = pd.DataFrame()
     if not df_m.empty:
         df_m['dt'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-        df_m_yr = df_m[df_m['dt'].dt.year == sel_y].copy()
-        if not df_m_yr.empty:
-            df_m_yr['M_Num'] = pd.to_numeric(df_m_yr['M_Num'], errors='coerce').fillna(0)
-            frais_total = df_m_yr['M_Num'].sum()
-            st.metric("Total Frais", f"{frais_total:,.0f} €".replace(',',' '))
+        df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
+        mask_m = (df_m['dt'].dt.year == sel_y_stats)
+        df_charges_view = df_m[mask_m].copy()
+        total_charges = df_charges_view['M_Num'].sum()
+
+    # 5. AFFICHAGE DES GRAPHIQUES (Ce qui manquait tout à l'heure)
+    st.subheader(f"💰 Finances {sel_y_stats}")
+    
+    # Graphique Circulaire global
+    fig1 = px.pie(names=['Frais', 'Revenus'], values=[total_charges, total_recettes],
+                  color_discrete_map={'Frais': '#ef553b', 'Revenus': '#00cc96'}, hole=0.4)
+    fig1.update_layout(height=300, margin=dict(t=0, b=0, l=0, r=0))
+    st.plotly_chart(fig1, use_container_width=True)
+
+    # 6. TABLEAU DES SOCIÉTÉS (CMN, CLICK, etc.)
+    st.divider()
+    st.subheader("🏢 Analyse par Société")
+    if not df_recettes_view.empty:
+        df_soc = df_recettes_view.copy()
+        df_soc['Société'] = df_soc['Société'].astype(str).replace(['nan','','None'], 'PARTICULIER').str.upper()
+        stats_soc = df_soc.groupby('Société')['P_Num'].sum().reset_index()
+        st.table(stats_soc.sort_values(by='P_Num', ascending=False).rename(columns={'P_Num':'Total €'}))
+
+    # 7. TABLEAU DES FRAIS PAR MOIS
+    st.divider()
+    st.subheader("📅 Détail des charges")
+    if not df_charges_view.empty:
+        df_charges_view['Mois'] = df_charges_view['dt'].dt.month
+        res_m = df_charges_view.groupby('Type')['M_Num'].sum().reset_index()
+        st.table(res_m.rename(columns={'M_Num':'Montant €'}))
+        
 # =================================================================
 # --- 8. PAGE MAINTENANCE (PERSISTANTE & CARNET DE SANTÉ) ---
 # =================================================================
