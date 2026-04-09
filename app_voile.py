@@ -476,19 +476,14 @@ if st.session_state.page == "PLANNING":
     )
     st.markdown(html_solde, unsafe_allow_html=True)
 # =================================================================
-# --- 9. PAGE STATS (RECONSTRUCTION FINALE DES DATES) ---
+# --- 9. PAGE STATS (CORRECTION DE LA FAUTE DE FRAPPE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     import pandas as pd
     import plotly.express as px
     import datetime
 
-    # --- 1. CHARGEMENT INDÉPENDANT (On repart de zéro) ---
-    # Pour s'assurer qu'aucune variable n'est polluée
-    df_planning = pd.DataFrame()
-    df_m = pd.DataFrame()
-
-    # Chargement brut
+    # --- 1. CHARGEMENT INDÉPENDANT ---
     df_planning = charger_data('contacts.json')
     df_m_actif = charger_data('maintenance.json')
     df_m_arch = charger_data('archives_factures.json')
@@ -497,32 +492,26 @@ if st.session_state.page == "STATS":
     # --- 2. NAVIGATION ---
     col_nav1, col_nav2 = st.columns([3, 1])
     col_nav1.title("📊 Bilan Vesta")
-    
-    # Sélection Saison
-    sel_y = col_nav2.selectbox("Saison", [2025, 2026, 2027], index=1, key="stats_year_select")
+    sel_y = col_nav2.selectbox("Saison", [2025, 2026, 2027], index=1)
 
     # --- 3. TRAITEMENT DES REVENUS (PLANNING) ---
     total_rev = 0
     df_soc_final = pd.DataFrame()
 
     if not df_planning.empty:
-        # --- LECTURE ROBUSTE DES DATES MIXTES ---
-        # Cette fonction va essayer de lire la date quel que soit son format
+        # --- LECTURE ROBUSTE DES DATES ---
+        # Cette fonction est cruciale pour votre fichier
         def conversion_date_robuste(date_str):
             if pd.isna(date_str) or date_str == "":
                 return pd.NaT
             date_str = str(date_str).strip()
-            
-            # Liste des formats à tester (Ordre important)
+            # Liste des formats à tester (ISO et FR)
             formats_a_tester = ['%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d-%m-%Y']
-            
             for fmt in formats_a_tester:
                 try:
                     return pd.to_datetime(date_str, format=fmt)
-                except (ValueError, TypeError):
+                except:
                     continue
-            
-            # En dernier recours, on laisse Pandas deviner (dayfirst=True pour la France)
             return pd.to_datetime(date_str, errors='coerce', dayfirst=True)
 
         # Application de la conversion
@@ -532,14 +521,12 @@ if st.session_state.page == "STATS":
         df_planning_yr = df_planning[df_planning['dt_vrai'].dt.year == sel_y].copy()
 
         if not df_planning_yr.empty:
-            # Nettoyage du prix (gère nombres et textes)
+            # Nettoyage du prix
             df_planning_yr['P_Num'] = pd.to_numeric(df_planning_yr['Prix'], errors='coerce').fillna(0)
             total_rev = df_planning_yr['P_Num'].sum()
 
-            # Analyse par Société (CMN, CLICK, etc.)
-            df_planning_yr['Société'] = df_planning_yr['Société'].fillna('PARTICULIER').astype(str).str.upper().str.strip()
-            
-            # Groupement
+            # Analyse par Société
+            df_planning_yr['Société'] = df_planning_yr['Société'].fillna('INCONNU').astype(str).str.upper().str.strip()
             df_soc_final = df_planning_yr.groupby('Société')['P_Num'].sum().reset_index()
             df_soc_final = df_soc_final.rename(columns={'P_Num':'CA €'}).sort_values('CA €', ascending=False)
 
@@ -548,7 +535,6 @@ if st.session_state.page == "STATS":
     df_frais_final = pd.DataFrame()
 
     if not df_m.empty:
-        # Conversion date maintenance (standard dayfirst=True)
         df_m['dt_vrai'] = pd.to_datetime(df_m['Date'], errors='coerce', dayfirst=True)
         df_m_yr = df_m[df_m['dt_vrai'].dt.year == sel_y].copy()
         
@@ -556,9 +542,10 @@ if st.session_state.page == "STATS":
             df_m_yr['M_Num'] = pd.to_numeric(df_m_yr['M_Num'], errors='coerce').fillna(0)
             total_frais = df_m_yr['M_Num'].sum()
             
-            # Groupement par Type
-            df_frais_yr['Type'] = df_frais_yr['Type'].fillna('AUTRES').astype(str).str.upper().str.strip()
-            df_frais_final = df_frais_yr.groupby('Type')['M_Num'].sum().reset_index()
+            # --- CORRECTION DE LA FAUTE DE FRAPPE ICI ---
+            # df_frais_yr a été remplacé par df_m_yr
+            df_m_yr['Type'] = df_m_yr['Type'].fillna('AUTRES').astype(str).str.upper().str.strip()
+            df_frais_final = df_m_yr.groupby('Type')['M_Num'].sum().reset_index()
             df_frais_final = df_frais_final.rename(columns={'M_Num':'Total €'}).sort_values('Total €', ascending=False)
 
     # --- 5. AFFICHAGE DES INDICATEURS ---
@@ -569,8 +556,8 @@ if st.session_state.page == "STATS":
     
     # Calcul du solde
     solde = total_rev - total_frais
-    couleur_delta = "inverse" if solde < 0 else "normal"
-    c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color=couleur_delta)
+    delta_color_val = "inverse" if solde < 0 else "normal"
+    c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color=delta_color_val)
 
     # --- 6. TABLEAUX DE DÉTAIL ---
     st.divider()
@@ -581,7 +568,7 @@ if st.session_state.page == "STATS":
         if not df_soc_final.empty:
             st.dataframe(df_soc_final, hide_index=True, use_container_width=True)
         else:
-            st.info("Aucune mission de navigation détectée.")
+            st.info("Aucune mission détectée.")
 
     with col_r:
         st.write("### 🛠️ Par Type de Frais")
@@ -590,11 +577,11 @@ if st.session_state.page == "STATS":
         else:
             st.info("Aucun frais enregistré.")
 
-    # --- 7. GRAPHIQUE RÉPARTITION ---
+    # --- 7. GRAPHIQUE RÉPARTITION (Pie Chart) ---
     if total_rev > 0 or total_frais > 0:
         fig = px.pie(names=['Frais', 'Revenus'], values=[total_frais, total_rev],
                      color_discrete_map={'Frais': '#ef553b', 'Revenus': '#00cc96'}, hole=0.4)
-        fig.update_layout(margin=dict(t=10, b=10, l=10, r=10), height=300)
+        fig.update_layout(margin=dict(t=20, b=20, l=20, r=20), height=300)
         st.plotly_chart(fig, use_container_width=True)
 # =================================================================
 # --- 8. PAGE MAINTENANCE (PERSISTANTE & CARNET DE SANTÉ) ---
