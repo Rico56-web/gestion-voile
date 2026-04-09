@@ -511,11 +511,11 @@ if st.session_state.page == "STATS":
     if st.button("📂 ARCHIVES", use_container_width=True, key="stats_to_archives"):
         st.session_state.page = "ARCHIVES"; st.rerun()
         
-     # --- RÉCUPÉRATION SÉCURISÉE ---
-     # 1. On charge les données actives
-     df_m_actif = charger_data('maintenance.json')
+    # --- RÉCUPÉRATION SÉCURISÉE ---
+    # 1. On charge les données actives
+    df_m_actif = charger_data('maintenance.json')
 
-    # 2. On charge les données archivées (avec le nouveau nom)
+    #  2. On charge les données archivées (avec le nouveau nom)
     df_m_archive = charger_data('archives_maintenance.json')
 
     # 3. On fusionne les deux (LIGNE 524)
