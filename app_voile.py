@@ -268,14 +268,15 @@ if st.session_state.page == "CONTACTS":
                                 sauvegarder_data(df_c, 'contacts.json')
                             st.session_state.edit_idx = None
                             st.rerun()
-
-            # --- MODE AFFICHAGE ---
+                # --- MODE AFFICHAGE ---
             else:
                 tel_val = format_tel_fr(row.get('Téléphone', ''))
-                tel_link = "".join(filter(str.isdigit, str(tel_val)))
-                try: display_date = datetime.strptime(row.get('DateNav'), "%Y-%m-%d").strftime("%d/%m/%Y")
-                except: display_date = "---"
+                try: 
+                    display_date = datetime.strptime(str(row.get('DateNav')), "%Y-%m-%d").strftime("%d/%m/%Y")
+                except: 
+                    display_date = "---"
 
+                # LE FIX EST ICI : On ferme bien la f-string et le DIV
                 st.markdown(f"""
                     <div style="border: 2px solid #4A4A4A; padding: 15px; border-radius: 12px; margin-bottom: 10px; background-color: {bg_color}; color: {text_color};">
                         <div style="display: flex; justify-content: space-between;">
@@ -287,7 +288,15 @@ if st.session_state.page == "CONTACTS":
                             👥 {clean_int(row.get('Nbre de personnes', 1))} pers. | ⏱️ {clean_int(row.get('Nbre de jours', 1))} jours<br>
                             🏢 {societe_label} | 📍 {statut_label.upper()} | 📞 {tel_val}
                         </div>
-                        <div style="background: rgba(0,0,0,0.05); padding: 8px; border-radius:
+                    </div>
+                """, unsafe_allow_html=True)
+
+                if st.button(f"✏️ MODIFIER : {row.get('Nom')}", key=f"edit_{idx}", use_container_width=True):
+                    st.session_state.edit_idx = idx
+                    st.rerun()
+
+# =================================================================
+# --- 6. PAGE PLANNING ---
 # =================================================================
 # --- 6. PAGE PLANNING (AVEC BOUTON ARCHIVES VISIBLE) ---
 # =================================================================
@@ -468,8 +477,6 @@ if st.session_state.page == "PLANNING":
         f'</div>'
     )
     st.markdown(html_solde, unsafe_allow_html=True)
-
-
 # =================================================================
 # --- 9. PAGE STATS (VERSION FINALE OPTIMISÉE IPHONE 16) ---
 # =================================================================
