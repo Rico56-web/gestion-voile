@@ -445,15 +445,17 @@ solde_formate = f"{solde:,.0f}".replace(",", " ") # Remplace la virgule par un e
 # 2. On choisit la couleur
 couleur_solde = "#28a745" if solde >= 0 else "#dc3545"
 
-# 3. On affiche le HTML proprement
-st.markdown(f"""
-    <div style="text-align:center; padding:20px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6;">
-        <span style="font-size:1.1rem; color:#6c757d;">Solde Théorique</span><br>
-        <b style="color:{couleur_solde}; font-size:1.8rem;">
-            {solde_formate} &euro;
-        </b>
-    </div>
-""", unsafe_allow_html=True)
+# 3. On affiche le HTML proprement (Version ultra-stable)
+html_solde = (
+    f'<div style="text-align:center; padding:20px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6;">'
+    f'<span style="font-size:1.1rem; color:#6c757d;">Solde Théorique</span><br>'
+    f'<b style="color:{couleur_solde}; font-size:1.8rem;">'
+    f'{solde_formate} &euro;'
+    f'</b>'
+    f'</div>'
+)
+
+st.markdown(html_solde, unsafe_allow_html=True)
 
 # =================================================================
 # --- 9. PAGE STATS (VERSION FINALE OPTIMISÉE IPHONE 16) ---
