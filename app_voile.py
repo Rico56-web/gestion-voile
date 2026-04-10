@@ -401,8 +401,6 @@ if 'missions_list' not in locals():
 
 # Ensuite ton bloc d'affichage peut tourner sans crash
 if missions_list:
-    # ... ton code existant ...
-if missions_list:
     missions_list.sort(key=lambda x: x['start'])
     for m in missions_list:
         r = m['r']
