@@ -146,7 +146,7 @@ if not df_c.empty and 'Paiement' in df_c.columns:
     df_c['Paiement'] = df_c['Paiement'].apply(lambda x: "Payé" if "pay" in str(x).lower() and "non" not in str(x).lower() else "Non payé")
 
 # =================================================================
-# --- 5. BLOC CONTACTS (V27 - COULEUR ATTENTE & FIX BOUTONS) ---
+# --- 5. BLOC CONTACTS (V28 - FIX COMPLET : CONTACTS & QUITTER) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👤 Gestion des Contacts")
@@ -165,6 +165,7 @@ if st.session_state.page == "CONTACTS":
 
     def format_tel_lien(tel):
         if not tel: return ""
+        # Garde uniquement les chiffres pour les liens tel: et wa.me
         return "".join(filter(str.isdigit, str(tel)))
 
     def formater_date_affichage(date_val):
@@ -180,7 +181,7 @@ if st.session_state.page == "CONTACTS":
         st.session_state.vue_contact = "Archives"; st.session_state.edit_idx = None; st.rerun()
     if c3.button("➕ NOUVEAU", use_container_width=True):
         df_t = charger_data('contacts.json')
-        new_r = {"Prénom": "NOUVEAU", "Nom": "CONTACT", "Statut": "En attente", "Paiement": "Non payé", "DateNav": datetime.now().strftime("%Y-%m-%d"), "Société": "PERSO"}
+        new_r = {"Prénom": "NOUVEAU", "Nom": "CONTACT", "Statut": "En attente", "Paiement": "Non payé", "DateNav": datetime.now().strftime("%Y-%m-%d"), "Société": "PERSO", "Prix": 0, "Acompte": 0}
         df_t = pd.concat([pd.DataFrame([new_r]), df_t], ignore_index=True)
         sauvegarder_data(df_t, 'contacts.json'); st.session_state.edit_idx = 0; st.rerun()
 
@@ -201,16 +202,19 @@ if st.session_state.page == "CONTACTS":
         if q_soc != "TOUTES": df_aff = df_aff[df_aff['Société'].str.upper() == q_soc]
         df_aff['dt_temp'] = pd.to_datetime(df_aff['DateNav'], errors='coerce')
         if q_year != "TOUTES": df_aff = df_aff[df_aff['dt_temp'].dt.year == int(q_year)]
+        
+        # TRI PAR DATE PLUS RÉCENTE
         df_aff = df_aff.sort_values('dt_temp', ascending=False)
 
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
             statut_l = str(row.get('Statut', 'En attente')).strip()
             soc_l = str(row.get('Société', 'PERSO')).strip().upper()
-            v_tel_clean = format_tel_lien(row.get('Téléphone', ''))
+            v_tel_raw = str(row.get('Téléphone', ''))
+            v_tel_clean = format_tel_lien(v_tel_raw)
             v_mail = str(row.get('Email', '')).strip()
 
-            # COULEURS DES FICHES
+            # --- COULEURS DES FICHES ---
             bg_card, txt_card = "#ffffff", "#333333"
             if soc_l == "CMN": bg_card, txt_card = "#3498db", "#ffffff"
             elif statut_l.lower() == "en attente": bg_card = "#fff9c4" # JAUNE CLAIR
@@ -219,56 +223,91 @@ if st.session_state.page == "CONTACTS":
 
             if st.session_state.edit_idx == idx:
                 with st.container():
-                    st.markdown(f"#### ✏️ Édition n°{idx} : {str(row.get('Nom','')).upper()}")
+                    st.markdown(f"### ✏️ Édition n°{idx} : {str(row.get('Nom','')).upper()}")
                     
-                    # 1. RACCOURCIS DE CONTACT (Visibles uniquement si fiche ouverte)
-                    if v_tel_clean or v_mail:
-                        c_a1, c_a2, c_a3 = st.columns(3)
-                        if v_tel_clean:
-                            c_a1.markdown(f'<a href="tel:{v_tel_clean}" style="text-decoration:none;"><div style="background:#2ecc71; color:white; padding:8px; border-radius:8px; text-align:center;">📞 Appel</div></a>', unsafe_allow_html=True)
-                            c_a2.markdown(f'<a href="https://wa.me/{v_tel_clean}" style="text-decoration:none;"><div style="background:#25d366; color:white; padding:8px; border-radius:8px; text-align:center;">💬 WhatsApp</div></a>', unsafe_allow_html=True)
-                        if v_mail:
-                            c_a3.markdown(f'<a href="mailto:{v_mail}" style="text-decoration:none;"><div style="background:#e74c3c; color:white; padding:8px; border-radius:8px; text-align:center;">📧 Email</div></a>', unsafe_allow_html=True)
-                        st.write("")
+                    # --- BOUTONS D'APPEL ET CONTACT (FORCÉS) ---
+                    st.write("📞 **ACTIONS DE CONTACT**")
+                    ca1, ca2, ca3 = st.columns(3)
+                    if v_tel_clean:
+                        ca1.markdown(f'<a href="tel:{v_tel_clean}" style="text-decoration:none;"><div style="background:#2ecc71; color:white; padding:10px; border-radius:10px; text-align:center; font-weight:bold;">📞 APPEL</div></a>', unsafe_allow_html=True)
+                        ca2.markdown(f'<a href="https://wa.me/{v_tel_clean}" style="text-decoration:none;"><div style="background:#25d366; color:white; padding:10px; border-radius:10px; text-align:center; font-weight:bold;">💬 WHATSAPP</div></a>', unsafe_allow_html=True)
+                    else:
+                        ca1.info("Pas de Tel")
+                    if v_mail:
+                        ca3.markdown(f'<a href="mailto:{v_mail}" style="text-decoration:none;"><div style="background:#e74c3c; color:white; padding:10px; border-radius:10px; text-align:center; font-weight:bold;">📧 EMAIL</div></a>', unsafe_allow_html=True)
+                    
+                    st.write("---")
 
-                    # 2. FORMULAIRE D'ÉDITION
+                    # --- FORMULAIRE D'ÉDITION ---
                     with st.form(f"f_edit_{idx}"):
                         c1, c2 = st.columns(2)
                         e_pre = c1.text_input("Prénom", str(row.get('Prénom', '')))
                         e_nom = c2.text_input("Nom", str(row.get('Nom', '')))
-                        e_tel = st.text_input("Téléphone", str(row.get('Téléphone', '')))
-                        e_mail = st.text_input("Email", str(row.get('Email', '')))
+                        e_tel = st.text_input("Téléphone", v_tel_raw)
+                        e_mail = st.text_input("Email", v_mail)
                         
-                        # [Champs navigation, prix, etc. identiques...]
-                        # ...
+                        st.write("⛵ **DÉTAILS**")
+                        d1, d2, d3 = st.columns(3)
+                        d_val = str(row.get('DateNav'))[:10]
+                        try: d_init = datetime.strptime(d_val, "%Y-%m-%d").date()
+                        except: d_init = datetime.now().date()
+                        e_date = d1.date_input("Date", d_init)
+                        e_pers = d2.number_input("Pers.", value=clean_int(row.get('Nbre de personnes', 1)), step=1)
+                        e_soc = d3.selectbox("Société", ["PERSO", "CMN", "VOG", "CLICK", "Autres"], index=0)
                         
-                        if st.form_submit_button("💾 ENREGISTRER"):
-                            # Logique sauvegarde...
-                            st.session_state.edit_idx = None; st.rerun()
+                        e_notes = st.text_area("Notes", str(row.get('Notes', '')))
+                        
+                        s1, s2 = st.columns(2)
+                        e_st = s1.selectbox("Statut", ["En attente", "Ok", "Terminé", "Refusé", "Annulé"], index=0)
+                        e_pa = s2.selectbox("Paiement", ["Non payé", "Payé"], index=0)
+                        
+                        # BOUTONS ENREGISTRER / QUITTER DANS LE FORMULAIRE
+                        b_col1, b_col2 = st.columns(2)
+                        if b_col1.form_submit_button("💾 ENREGISTRER", use_container_width=True):
+                            df_c.at[idx, 'Prénom'] = e_pre.upper()
+                            df_c.at[idx, 'Nom'] = e_nom.upper()
+                            df_c.at[idx, 'Téléphone'] = e_tel
+                            df_c.at[idx, 'Email'] = e_mail
+                            df_c.at[idx, 'DateNav'] = e_date.strftime("%Y-%m-%d")
+                            df_c.at[idx, 'Société'] = e_soc
+                            df_c.at[idx, 'Statut'] = e_st
+                            df_c.at[idx, 'Paiement'] = e_pa
+                            df_c.at[idx, 'Notes'] = e_notes
+                            sauvegarder_data(df_c, 'contacts.json')
+                            st.session_state.edit_idx = None
+                            st.rerun()
+                        
+                        if b_col2.form_submit_button("❌ QUITTER / FERMER", use_container_width=True):
+                            st.session_state.edit_idx = None
+                            st.rerun()
 
-                    # 3. ACTIONS SUPPRIMER/ARCHIVER
+                    # --- ACTIONS DE SUPPRESSION / ARCHIVAGE ---
                     st.write("---")
                     b_ar, b_de = st.columns(2)
-                    if b_ar.button("📦 ARCHIVER", key=f"arch_{idx}", use_container_width=True):
-                        # Action archive...
-                        st.rerun()
-                    if b_de.button("🗑️ SUPPRIMER", key=f"del_{idx}", use_container_width=True):
-                        # Action supprimer...
-                        st.rerun()
+                    if b_ar.button("📦 ARCHIVER CETTE FICHE", key=f"ar_{idx}", use_container_width=True):
+                        df_c.at[idx, 'Statut'] = "Annulé"
+                        sauvegarder_data(df_c, 'contacts.json')
+                        st.session_state.edit_idx = None; st.rerun()
+                    if b_de.button("🗑️ SUPPRIMER DÉFINITIVEMENT", key=f"de_{idx}", use_container_width=True):
+                        df_c = df_c.drop(idx)
+                        sauvegarder_data(df_c, 'contacts.json')
+                        st.session_state.edit_idx = None; st.rerun()
             else:
-                # MODE AFFICHAGE CARTE
+                # --- MODE AFFICHAGE CARTE ---
                 d_s = formater_date_affichage(row.get('DateNav'))
                 st.markdown(f"""
                     <div style="border: 2px solid #4A4A4A; padding: 10px; border-radius: 10px; margin-bottom: 6px; background-color: {bg_card}; color: {txt_card};">
                         <div style="display: flex; justify-content: space-between;">
                             <b>{str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</b>
-                            <span style="font-size: 0.7rem; font-weight: bold;">{str(row.get('Paiement','')).upper()}</span>
+                            <span style="font-size: 0.75rem; font-weight: bold; background:rgba(0,0,0,0.1); padding:2px 5px; border-radius:4px;">{str(row.get('Paiement','')).upper()}</span>
                         </div>
                         <div style="font-size: 0.85rem; margin-top: 4px;">📅 {d_s} | 🏢 {soc_l}</div>
                     </div>
                 """, unsafe_allow_html=True)
-                if st.button(f"✏️ MODIFIER n°{idx}", key=f"open_{idx}", use_container_width=True):
-                    st.session_state.edit_idx = idx; st.rerun()
+                if st.button(f"✏️ OUVRIR / MODIFIER n°{idx}", key=f"open_{idx}", use_container_width=True):
+                    st.session_state.edit_idx = idx
+                    st.rerun()
+
 # =================================================================
 # --- 6. PAGE PLANNING (V18 - DÉTAILS DATES & MONTANTS) ---
 # =================================================================
