@@ -451,18 +451,18 @@
         "Acompte":null
     },
     {
-        "Pr\u00e9nom":"Laurent",
+        "Pr\u00e9nom":"LAURENT",
         "Nom":"PELE",
         "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"18\/04\/2026",
+        "DateNav":"2026-04-18",
         "Soci\u00e9t\u00e9":"CMN",
         "Prix":450,
         "Nbre de personnes":1.0,
         "Nbre de jours":2.0,
         "T\u00e9l\u00e9phone":"",
         "Email":"",
-        "Notes":null,
+        "Notes":"nan",
         "NbreJours":null,
         "NbrePers":null,
         "NbJours":null,
@@ -489,7 +489,7 @@
         "Telephone":null,
         "Commentaires":"Ras",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0.0
     },
     {
         "Pr\u00e9nom":"Groupe espagne",
