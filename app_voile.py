@@ -170,15 +170,18 @@ for i, name in enumerate(menu):
 # Chargement des données partagées
 df_c = charger_data("contacts.json")
 
-# Harmonisation automatique des paiements
-if not df_c.empty and 'Paiement' in df_c.columns:
-    df_c['Paiement'] = df_c['Paiement'].apply(lambda x: "Payé" if "pay" in str(x).lower() and "non" not in str(x).lower() else "Non payé")
+  # 1. On prépare la chaîne de texte proprement AVANT le markdown
+# On utilise &euro; qui est le code universel pour le symbole Euro en HTML
+v_prix_val = m.get('prix', 0)
+prix_affichage = f"{v_prix_val:,.0f}".replace(",", " ") + " &euro;"
 
-File "/mount/src/gestion-voile/app_voile.py", line 472
-                      <span style='font-size:0.9rem;'>{prix_propre} €</span>
-                                                                    ^
-SyntaxError: invalid character '€' (U+20AC)
-                    
+# 2. On injecte la variable toute prête dans le HTML
+st.markdown(f"""
+    <div style='background:{m['color']}; color:white; border-radius:5px; text-align:center; padding:5px;'>
+        <span style='font-size:0.8rem; font-weight:bold;'>{plage_date}</span><br>
+        <span style='font-size:0.9rem;'>{prix_affichage}</span>
+    </div>
+""", unsafe_allow_html=True)                  
 
 # =================================================================
 # --- 6. PAGE PLANNING (V18 - DÉTAILS DATES & MONTANTS) ---
