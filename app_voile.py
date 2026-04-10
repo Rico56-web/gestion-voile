@@ -146,120 +146,130 @@ if not df_c.empty and 'Paiement' in df_c.columns:
     df_c['Paiement'] = df_c['Paiement'].apply(lambda x: "Payé" if "pay" in str(x).lower() and "non" not in str(x).lower() else "Non payé")
 
 # =================================================================
-# --- 2. PAGE CONTACTS (V19 - INDEX & FIX DATE) ---
+# --- 2. PAGE CONTACTS (V20 - VERSION COMPLÈTE & RÉPARÉE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div style="text-align:center; background-color:#34495e; color:white; padding:10px; border-radius:10px;"><h1>👤 GESTION CONTACTS</h1></div>', unsafe_allow_html=True)
 
-    # 1. Barre de recherche et Bouton Nouveau
+    # 1. Barre de recherche
     c1, c2 = st.columns([3, 1])
     recherche = c1.text_input("🔍 Rechercher un nom...", "").strip().upper()
     if c2.button("➕ NOUVEAU", use_container_width=True):
         st.session_state.edit_idx = -1
         st.rerun()
 
-    # 2. Logique d'édition
     if st.session_state.edit_idx is not None:
         idx = st.session_state.edit_idx
         
-        # --- INITIALISATION DES DONNÉES ---
+        # --- INITIALISATION & FIX BUG DATE ---
         if idx == -1:
-            # Nouvelle fiche : Valeurs par défaut
-            valeurs = {"Nom": "CONTACT", "Prénom": "", "DateNav": datetime.now().date(), "Statut": "Ok", "Société": "PERSO", "Prix": 0.0, "Acompte": 0.0, "Notes": ""}
+            r = {} # Fiche vide
+            date_fiche = datetime.now().date()
             st.subheader("🆕 Création d'une nouvelle fiche")
         else:
-            # Fiche existante : On récupère les données
             r = df_c.iloc[idx]
+            st.markdown(f"### 📄 Fiche n°{idx}")
             
-            # --- FIX BUG DATE : On récupère la date réelle de la fiche ---
+            # Détection de la date enregistrée (pour ne pas mettre la date du jour par défaut)
             d_brute = str(r.get('DateNav') or r.get('Date') or '').strip().split(' ')[0]
-            date_fiche = datetime.now().date() # Sécurité
+            date_fiche = datetime.now().date()
             for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%j/%m/%Y"):
                 try:
                     date_fiche = datetime.strptime(d_brute, fmt).date()
                     break
                 except: continue
-            
-            valeurs = {
-                "Nom": str(r.get('Nom', '')),
-                "Prénom": str(r.get('Prénom', '')),
-                "DateNav": date_fiche, # Utilise la date de la fiche !
-                "Statut": str(r.get('Statut', 'Ok')),
-                "Société": str(r.get('Société', 'PERSO')),
-                "Prix": float(str(r.get('Prix', 0)).replace('€','').strip() or 0),
-                "Acompte": float(str(r.get('Acompte', 0)).replace('€','').strip() or 0),
-                "Notes": str(r.get('Notes', ''))
-            }
-            # --- AFFICHAGE DE L'INDEX ---
-            st.markdown(f"### 📄 Fiche n°{idx}")
 
-        # --- FORMULAIRE D'ÉDITION ---
-        with st.form("form_contact"):
-            f_pre = st.text_input("Prénom", valeurs["Prénom"])
-            f_nom = st.text_input("Nom", valeurs["Nom"]).upper()
+        # --- FORMULAIRE COMPLET ---
+        with st.form("form_contact_complet"):
+            # Ligne 1 : Identité
+            c1, c2 = st.columns(2)
+            f_pre = c1.text_input("Prénom", str(r.get('Prénom', '')))
+            f_nom = c2.text_input("Nom", str(r.get('Nom', ''))).upper()
             
-            # Ici le widget utilise date_fiche, pas forcément aujourd'hui
-            f_date = st.date_input("Date Navigation", valeurs["DateNav"])
-            
-            f_statut = st.selectbox("Statut", ["Ok", "Terminé", "Annulé", "Acompte payé"], index=["Ok", "Terminé", "Annulé", "Acompte payé"].index(valeurs["Statut"]) if valeurs["Statut"] in ["Ok", "Terminé", "Annulé", "Acompte payé"] else 0)
-            f_soc = st.selectbox("Société", ["PERSO", "CMN", "CLICK", "GLOBE"], index=["PERSO", "CMN", "CLICK", "GLOBE"].index(valeurs["Société"]) if valeurs["Société"] in ["PERSO", "CMN", "CLICK", "GLOBE"] else 0)
-            
-            c_p1, c_p2 = st.columns(2)
-            f_prix = c_p1.number_input("Prix Total (€)", value=valeurs["Prix"], step=10.0)
-            f_acompte = c_p2.number_input("Acompte payé (€)", value=valeurs["Acompte"], step=10.0)
-            
-            f_notes = st.text_area("Notes", valeurs["Notes"])
+            # Ligne 2 : Navigation
+            c3, c4, c5 = st.columns([1.5, 1, 1])
+            f_date = c3.date_input("Date Navigation", date_fiche) # FIX : Utilise la date détectée
+            # On cherche le nombre de jours dans les différents alias possibles
+            duree_actuelle = r.get('Nbre de jours') or r.get('NbJours') or r.get('Jours') or 1.0
+            f_jours = c4.number_input("Nbre de jours", value=float(duree_actuelle), step=0.5)
+            f_pers = c5.number_input("Nbre personnes", value=float(r.get('Nbre de personnes') or 1.0), step=1.0)
 
-            # Boutons de validation
+            # Ligne 3 : Administratif
+            c6, c7, c8 = st.columns(3)
+            list_statut = ["Ok", "Terminé", "Annulé", "Acompte payé"]
+            cur_statut = str(r.get('Statut', 'Ok'))
+            f_statut = c6.selectbox("Statut", list_statut, index=list_statut.index(cur_statut) if cur_statut in list_statut else 0)
+            
+            list_soc = ["PERSO", "CMN", "CLICK", "GLOBE"]
+            cur_soc = str(r.get('Société', 'PERSO'))
+            f_soc = c7.selectbox("Société", list_soc, index=list_soc.index(cur_soc) if cur_soc in list_soc else 0)
+            
+            list_paye = ["Payé", "Non payé", "Acompte"]
+            cur_paye = str(r.get('Paiement', 'Non payé'))
+            f_paiement = c8.selectbox("État Paiement", list_paye, index=list_paye.index(cur_paye) if cur_paye in list_paye else 1)
+
+            # Ligne 4 : Finances
+            c9, c10 = st.columns(2)
+            f_prix = c9.number_input("Prix Total (€)", value=float(str(r.get('Prix', 0)).replace('€','').strip() or 0))
+            f_acompte = c10.number_input("Acompte reçu (€)", value=float(r.get('Acompte') or 0.0))
+
+            # Ligne 5 : Coordonnées
+            c11, c12 = st.columns(2)
+            f_tel = c11.text_input("Téléphone", str(r.get('Téléphone', '')))
+            f_mail = c12.text_input("Email", str(r.get('Email', '')))
+
+            # Ligne 6 : Technique (Milles / Moteur)
+            c13, c14 = st.columns(2)
+            f_milles = c13.text_input("Milles parcourus", str(r.get('Milles', '0')))
+            f_moteur = c14.text_input("Heures Moteur", str(r.get('HeuresMoteur', '0')))
+
+            # Notes et Historique
+            f_notes = st.text_area("Notes / Commentaires", str(r.get('Notes', '')))
+            f_histo = st.text_area("Historique (Interne)", str(r.get('Historique', '')))
+
+            # Boutons
             b1, b2, b3 = st.columns([1, 1, 1])
             if b1.form_submit_button("💾 ENREGISTRER"):
-                # Création du dictionnaire de mise à jour
-                nouvelle_donnee = {
+                new_row = {
                     "Prénom": f_pre, "Nom": f_nom, "DateNav": str(f_date),
-                    "Statut": f_statut, "Société": f_soc, "Prix": f_prix,
-                    "Acompte": f_acompte, "Notes": f_notes
+                    "Nbre de jours": f_jours, "Nbre de personnes": f_pers,
+                    "Statut": f_statut, "Société": f_soc, "Paiement": f_paiement,
+                    "Prix": f_prix, "Acompte": f_acompte, "Téléphone": f_tel,
+                    "Email": f_mail, "Milles": f_milles, "HeuresMoteur": f_moteur,
+                    "Notes": f_notes, "Historique": f_histo
                 }
                 
                 if idx == -1:
-                    # Ajouter
-                    df_c = pd.concat([df_c, pd.DataFrame([nouvelle_donnee])], ignore_index=True)
+                    df_c = pd.concat([df_c, pd.DataFrame([new_row])], ignore_index=True)
                 else:
-                    # Modifier
-                    for cle, val in nouvelle_donnee.items():
-                        df_c.at[idx, cle] = val
+                    for k, v in new_row.items(): df_c.at[idx, k] = v
                 
                 sauver_data(df_c, 'contacts.json')
-                st.success("Fiche mise à jour !")
+                st.success("Enregistré !")
                 st.session_state.edit_idx = None
                 st.rerun()
 
             if b2.form_submit_button("❌ ANNULER"):
                 st.session_state.edit_idx = None
                 st.rerun()
-            
-            # Bouton de suppression (Ménage dont on a parlé)
-            if idx != -1:
-                if b3.form_submit_button("🗑️ SUPPRIMER"):
-                    df_c = df_c.drop(idx).reset_index(drop=True)
-                    sauver_data(df_c, 'contacts.json')
-                    st.warning("Fiche supprimée.")
-                    st.session_state.edit_idx = None
-                    st.rerun()
 
-    # 3. Liste des contacts (si pas en mode édition)
+            if idx != -1 and b3.form_submit_button("🗑️ SUPPRIMER"):
+                df_c = df_c.drop(idx).reset_index(drop=True)
+                sauver_data(df_c, 'contacts.json')
+                st.session_state.edit_idx = None
+                st.rerun()
+
+    # --- LISTE D'AFFICHAGE ---
     else:
         st.divider()
-        df_tri = df_c.copy()
+        df_tri = df_c.copy().sort_index(ascending=False)
         if recherche:
             df_tri = df_tri[df_tri['Nom'].str.contains(recherche, na=False)]
-        
-        # Tri par date décroissante
-        df_tri = df_tri.sort_index(ascending=False)
 
-        for i, r in df_tri.iterrows():
-            with st.expander(f"📌 {r.get('Nom', 'SANS NOM')} {r.get('Prénom', '')} - {r.get('DateNav', '')}"):
-                st.write(f"**Index :** {i} | **Statut :** {r.get('Statut')} | **Société :** {r.get('Société')}")
-                if st.button("📝 Modifier / Voir", key=f"edit_{i}"):
+        for i, row in df_tri.iterrows():
+            with st.expander(f"📌 {row.get('Nom')} {row.get('Prénom')} - {row.get('DateNav')}"):
+                st.write(f"**Index:** {i} | **Société:** {row.get('Société')} | **Prix:** {row.get('Prix')}€")
+                if st.button("📝 MODIFIER", key=f"ed_{i}"):
                     st.session_state.edit_idx = i
                     st.rerun()
 
