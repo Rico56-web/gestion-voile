@@ -166,22 +166,170 @@ for i, name in enumerate(menu):
                           type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name
         st.rerun()
+# =================================================================
+# --- 5. BLOC CONTACTS (V34 - VERSION FINALE STABLE) ---
+# =================================================================
+if st.session_state.page == "CONTACTS":
+    st.title("👤 Gestion des Contacts")
 
-# Chargement des données partagées
-df_c = charger_data("contacts.json")
+    # --- INITIALISATION ---
+    if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
+    if 'confirm_del_idx_c' not in st.session_state: st.session_state.confirm_del_idx_c = None
+    if 'vue_contact' not in st.session_state: st.session_state.vue_contact = "En cours"
 
-  # 1. On prépare la chaîne de texte proprement AVANT le markdown
-# On utilise &euro; qui est le code universel pour le symbole Euro en HTML
-v_prix_val = m.get('prix', 0)
-prix_affichage = f"{v_prix_val:,.0f}".replace(",", " ") + " &euro;"
+    # --- CHARGEMENT ET TRI ---
+    df_c = charger_data('contacts.json')
 
-# 2. On injecte la variable toute prête dans le HTML
-st.markdown(f"""
-    <div style='background:{m['color']}; color:white; border-radius:5px; text-align:center; padding:5px;'>
-        <span style='font-size:0.8rem; font-weight:bold;'>{plage_date}</span><br>
-        <span style='font-size:0.9rem;'>{prix_affichage}</span>
-    </div>
-""", unsafe_allow_html=True)                  
+    if not df_c.empty:
+        df_c['orig_idx'] = df_c.index 
+        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], errors='coerce')
+        
+        # Filtre En cours / Archives
+        mask_arch = (df_c['Statut'].str.lower().isin(["terminé", "refusé", "annulé"]))
+        df_aff = df_c[mask_arch].copy() if st.session_state.vue_contact == "Archives" else df_c[~mask_arch].copy()
+        
+        # Tri : Plus récent en haut
+        df_aff = df_aff.sort_values('dt_sort', ascending=False, na_position='last')
+
+        # --- NAVIGATION ---
+        c1, c2, c3 = st.columns([1, 1, 1])
+        if c1.button("👤 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"):
+            st.session_state.vue_contact = "En cours"; st.session_state.edit_idx = None; st.rerun()
+        if c2.button("📂 ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"):
+            st.session_state.vue_contact = "Archives"; st.session_state.edit_idx = None; st.rerun()
+        if c3.button("➕ NOUVEAU", use_container_width=True):
+            df_temp = charger_data('contacts.json')
+            new_r = {"Prénom": "NOUVEAU", "Nom": "CONTACT", "Statut": "En attente", "Paiement": "Non payé", "DateNav": datetime.now().strftime("%Y-%m-%d"), "Société": "PERSO", "Prix": 0, "Acompte": 0}
+            df_temp = pd.concat([pd.DataFrame([new_r]), df_temp], ignore_index=True)
+            sauvegarder_data(df_temp, 'contacts.json'); st.session_state.edit_idx = 0; st.rerun()
+
+        st.markdown("---")
+
+        # --- FILTRES DE RECHERCHE ---
+        f1, f2, f3 = st.columns([2, 1, 1])
+        q_search = f1.text_input("🔍 Rechercher Nom/Prénom", "").strip().upper()
+        q_soc = f2.selectbox("🏢 Société", ["TOUTES", "PERSO", "CMN", "VOG", "CLICK", "Autres"])
+        q_year = f3.selectbox("📅 Année", ["TOUTES", 2026, 2027, 2028])
+
+        if q_search:
+            df_aff = df_aff[df_aff['Nom'].str.contains(q_search, na=False) | df_aff['Prénom'].str.contains(q_search, na=False, case=False)]
+        if q_soc != "TOUTES":
+            df_aff = df_aff[df_aff['Société'].str.upper() == q_soc]
+        if q_year != "TOUTES":
+            df_aff = df_aff[df_aff['dt_sort'].dt.year == int(q_year)]
+
+        # --- BOUCLE D'AFFICHAGE DES FICHES ---
+        for _, row in df_aff.iterrows():
+            idx = row['orig_idx']
+            statut_l = str(row.get('Statut', 'En attente')).strip()
+            soc_l = str(row.get('Société', 'PERSO')).strip().upper()
+            v_tel = str(row.get('Téléphone', '')).strip()
+            v_tel_link = format_tel_lien(v_tel)
+            v_mail = str(row.get('Email', '')).strip()
+            
+            # Pré-formatage des données pour l'affichage HTML (Sécurité Anti-Crash)
+            p_val = clean_int(row.get('Prix', 0))
+            a_val = clean_int(row.get('Acompte', 0))
+            s_val = p_val - a_val
+            txt_prix = f"{p_val} &euro;"
+            txt_reste = f"{s_val} &euro;"
+            d_aff = formater_date_affichage(row.get('DateNav'))
+
+            # Couleur de la carte
+            bg_card = "#ffffff"
+            if soc_l == "CMN": bg_card = "#3498db" # Bleu CMN
+            elif statut_l.lower() == "en attente": bg_card = "#fff9c4" # Jaune
+            elif statut_l.lower() == "ok": bg_card = "#d4edda" # Vert
+
+            if st.session_state.edit_idx == idx:
+                # --- MODE ÉDITION (FORMULAIRE) ---
+                with st.container():
+                    st.markdown(f"### ✏️ Édition n°{idx}")
+                    
+                    if st.session_state.confirm_del_idx_c == idx:
+                        st.error("⚠️ SUPPRIMER DÉFINITIVEMENT ?")
+                        if st.button("✔️ OUI, SUPPRIMER", key=f"y_{idx}", use_container_width=True):
+                            df_db = charger_data('contacts.json').drop(idx); sauvegarder_data(df_db, 'contacts.json')
+                            st.session_state.edit_idx = None; st.session_state.confirm_del_idx_c = None; st.rerun()
+                        if st.button("❌ NON", key=f"n_{idx}", use_container_width=True): st.session_state.confirm_del_idx_c = None; st.rerun()
+
+                    with st.form(f"f_edit_{idx}"):
+                        c1, c2 = st.columns(2)
+                        e_pre = c1.text_input("Prénom", str(row.get('Prénom', '')))
+                        e_nom = c2.text_input("Nom", str(row.get('Nom', '')))
+                        e_tel = c1.text_input("Téléphone", v_tel)
+                        e_mail = c2.text_input("Email", v_mail)
+                        
+                        st.write("⛵ **INFOS NAVIGATION**")
+                        d1, d2, d3 = st.columns(3)
+                        d_str = str(row.get('DateNav'))[:10]
+                        try: d_in = datetime.strptime(d_str, "%Y-%m-%d").date()
+                        except: d_in = datetime.now().date()
+                        e_date = d1.date_input("Date", d_in)
+                        e_pers = d2.number_input("Pers.", value=clean_int(row.get('Nbre de personnes', 1)), step=1)
+                        e_jours = d3.number_input("Jours", value=clean_int(row.get('Nbre de jours', 1)), step=1)
+                        
+                        st.write("💰 **FINANCES**")
+                        f1, f2, f3 = st.columns(3)
+                        e_prix = f1.number_input("Prix Total (€)", value=p_val, step=1)
+                        e_acompte = f2.number_input("Acompte (€)", value=a_val, step=1)
+                        f3.markdown(f"<br>Reste : <b>{e_prix - e_acompte} €</b>", unsafe_allow_html=True)
+                        
+                        st.write("⚙️ **STATUT**")
+                        s1, s2, s3 = st.columns(3)
+                        e_soc = s1.selectbox("Société", ["PERSO", "CMN", "VOG", "CLICK", "Autres"], index=0)
+                        e_st = s2.selectbox("Statut", ["En attente", "Ok", "Terminé", "Refusé", "Annulé"], index=0)
+                        e_pa = s3.selectbox("Paiement", ["Non payé", "Payé"], index=1 if str(row.get('Paiement'))=="Payé" else 0)
+                        
+                        e_notes = st.text_area("Notes", str(row.get('Notes', '')))
+                        
+                        if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
+                            df_all = charger_data('contacts.json')
+                            df_all.at[idx, 'Prénom'], df_all.at[idx, 'Nom'] = e_pre.upper(), e_nom.upper()
+                            df_all.at[idx, 'Téléphone'], df_all.at[idx, 'Email'] = e_tel, e_mail
+                            df_all.at[idx, 'DateNav'] = e_date.strftime("%Y-%m-%d")
+                            df_all.at[idx, 'Société'], df_all.at[idx, 'Statut'] = e_soc, e_st
+                            df_all.at[idx, 'Prix'], df_all.at[idx, 'Acompte'] = int(e_prix), int(e_acompte)
+                            df_all.at[idx, 'Nbre de personnes'], df_all.at[idx, 'Nbre de jours'] = int(e_pers), int(e_jours)
+                            df_all.at[idx, 'Paiement'], df_all.at[idx, 'Notes'] = e_pa, e_notes
+                            sauvegarder_data(df_all, 'contacts.json')
+                            st.session_state.edit_idx = None; st.rerun()
+                        if st.form_submit_button("❌ QUITTER", use_container_width=True):
+                            st.session_state.edit_idx = None; st.rerun()
+
+            else:
+                # --- MODE AFFICHAGE DIRECT (CARTE COMPLÈTE) ---
+                st.markdown(f"""
+                <div style="border: 2px solid #4A4A4A; padding: 12px; border-radius: 12px; margin-bottom: 10px; background-color: {bg_card}; color: #333333;">
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 5px;">
+                        <b style="font-size: 1.1rem;">{str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</b>
+                        <b style="color: {'green' if str(row.get('Paiement'))=='Payé' else 'red'}; font-size: 0.85rem;">{str(row.get('Paiement','')).upper()}</b>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; font-size: 0.9rem;">
+                        <div>📅 <b>{d_aff}</b></div>
+                        <div>🏢 <b>{soc_l}</b></div>
+                        <div>👥 Pers: <b>{row.get('Nbre de personnes', 1)}</b></div>
+                        <div>⏱️ Jours: <b>{row.get('Nbre de jours', 1)}</b></div>
+                        <div>💰 Total: <b>{txt_prix}</b></div>
+                        <div>🧾 Reste: <b style="color:red;">{txt_reste}</b></div>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 0.85rem; background: rgba(0,0,0,0.05); padding: 5px; border-radius: 5px;">
+                        📝 <i>{str(row.get('Notes', '...'))[:100]}</i>
+                    </div>
+                    <div style="margin-top: 10px; display: flex; gap: 5px;">
+                        <a href="tel:{v_tel_link}" style="flex:1; text-decoration:none;"><div style="background:#2ecc71; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📞 APPEL</div></a>
+                        <a href="https://wa.me/{v_tel_link}" style="flex:1; text-decoration:none;"><div style="background:#25d366; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">💬 WA</div></a>
+                        <a href="mailto:{v_mail}" style="flex:1; text-decoration:none;"><div style="background:#e74c3c; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📧 MAIL</div></a>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                c_mod, c_sup = st.columns([4, 1])
+                if c_mod.button(f"✏️ MODIFIER n°{idx}", key=f"btn_{idx}", use_container_width=True):
+                    st.session_state.edit_idx = idx; st.rerun()
+                if c_sup.button("🗑️", key=f"del_{idx}", use_container_width=True):
+                    st.session_state.confirm_del_idx_c = idx; st.session_state.edit_idx = idx; st.rerun()
+             
 
 # =================================================================
 # --- 6. PAGE PLANNING (V18 - DÉTAILS DATES & MONTANTS) ---
