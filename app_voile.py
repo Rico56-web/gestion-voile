@@ -173,8 +173,38 @@ for i, name in enumerate(menu):
 if st.session_state.page == "CONTACTS":
     st.title("👤 Gestion des Contacts")
 
-    # [Garder ici ton code d'initialisation et de tri de la V35...]
-    # (Chargement df_c, filtres, navigation, etc.)
+  # =================================================================
+# --- 5. BLOC CONTACTS (V37 - FIX NAMEERROR df_aff) ---
+# =================================================================
+if st.session_state.page == "CONTACTS":
+    st.title("👤 Gestion des Contacts")
+
+    # 1. INITIALISATION DE SÉCURITÉ
+    df_c = charger_data('contacts.json')
+    df_aff = pd.DataFrame() # <--- ON CRÉE df_aff VIDE ICI POUR ÉVITER L'ERREUR
+
+    if not df_c.empty:
+        df_c['orig_idx'] = df_c.index 
+        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], errors='coerce')
+        
+        # 2. DÉFINITION DE df_aff (Logique En cours / Archives)
+        mask_arch = (df_c['Statut'].str.lower().isin(["terminé", "refusé", "annulé"]))
+        
+        if st.session_state.get('vue_contact') == "Archives":
+            df_aff = df_c[mask_arch].copy()
+        else:
+            df_aff = df_c[~mask_arch].copy()
+
+        # 3. TRI ET FILTRES (On travaille sur df_aff qui existe maintenant)
+        df_aff = df_aff.sort_values('dt_sort', ascending=False, na_position='last')
+        
+        # ... (Vos colonnes de recherche et filtres ici) ...
+
+        # 4. LA BOUCLE (Ligne 180)
+        # Maintenant df_aff est forcément défini, l'erreur NameError disparaît.
+        for _, row in df_aff.iterrows():
+            # ... (votre code d'affichage des fiches V36) ...
+            pass
 
     # --- BOUCLE D'AFFICHAGE ---
     for _, row in df_aff.iterrows():
