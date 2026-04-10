@@ -313,14 +313,13 @@ if st.session_state.page == "CONTACTS":
                     st.session_state.edit_idx = idx; st.rerun()
 
 # =================================================================
-# --- 6. PAGE PLANNING (V17 - SYNTHÈSE TOTALE RÉPARÉE) ---
+# --- 6. PAGE PLANNING (V18 - DÉTAILS DATES & MONTANTS) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
     from datetime import datetime, date, timedelta
     import calendar
     import pandas as pd
 
-    # 1. On utilise df_c qui est la source principale de l'app
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>🗓️ PLANNING 2026</h1></div>', unsafe_allow_html=True)
     
     if st.button("📂 ACCÉDER AUX ARCHIVES", key="k_arch_p", use_container_width=True):
@@ -328,7 +327,7 @@ if st.session_state.page == "PLANNING":
 
     st.divider()
 
-    # --- NAVIGATION (MOIS / ANNÉE) ---
+    # --- NAVIGATION ---
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
@@ -340,7 +339,6 @@ if st.session_state.page == "PLANNING":
     sel_m_nom = c_m.selectbox("Mois", m_noms, index=st.session_state.curr_month_idx)
     sel_m = m_noms.index(sel_m_nom) + 1
     st.session_state.curr_month_idx = sel_m - 1
-    
     sel_y = c_y.selectbox("Année", [2026, 2027, 2028], index=[2026, 2027, 2028].index(st.session_state.curr_year))
     st.session_state.curr_year = sel_y
 
@@ -357,11 +355,10 @@ if st.session_state.page == "PLANNING":
     if df_c is not None and not df_c.empty:
         for idx, r in df_c.iterrows():
             try:
-                # A. FILTRE DE SÉCURITÉ : On ignore les fiches vides/temporaires
                 nom_brut = str(r.get('Nom', '')).strip().upper()
                 if nom_brut in ["", "CONTACT", "NAN", "NONE"]: continue
 
-                # B. EXTRACTION DATE (ISO "2026-04-11" ou FR "01/03/2026")
+                # Extraction Date
                 d_val = str(r.get('DateNav') or r.get('Date') or '').strip().split(' ')[0]
                 dt_start = None
                 for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%j/%m/%Y"):
@@ -371,7 +368,7 @@ if st.session_state.page == "PLANNING":
                     except: continue
                 if not dt_start: continue
 
-                # C. EXTRACTION DURÉE (Cherche dans tous les alias de colonnes)
+                # Extraction Durée
                 n_j = 1
                 for k in ['Nbre de jours', 'NbJours', 'Jours', 'Nb jours', 'NbreJours']:
                     val_j = r.get(k)
@@ -382,35 +379,37 @@ if st.session_state.page == "PLANNING":
                 statut = str(r.get('Statut', 'Ok')).strip().lower()
                 soc = str(r.get('Société', 'PERSO')).strip().upper()
                 dt_end = dt_start + timedelta(days=n_j-1)
+                
+                # Récupération Prix
+                try:
+                    prix_val = float(str(r.get('Prix', '0')).replace('€','').strip())
+                except:
+                    prix_val = 0.0
 
-                # D. CALCUL COULEUR & OCCUPATION CALENDRIER
+                # Marquage Calendrier
                 for i in range(n_j):
                     curr = dt_start + timedelta(days=i)
                     if curr.month == sel_m and curr.year == sel_y:
-                        if "CMN" in soc: color = "#3498db" # Bleu
-                        elif "annul" in statut or "refus" in statut: color = "#bdc3c7" # Gris
-                        elif curr < aujourdhui: color = "#34495e" # Bleu Foncé (Passé)
-                        else: color = "#27ae60" # Vert (Ok / Futur)
+                        if "CMN" in soc: color = "#3498db"
+                        elif "annul" in statut or "refus" in statut: color = "#bdc3c7"
+                        elif curr < aujourdhui: color = "#34495e"
+                        else: color = "#27ae60"
                         jours_occ[curr.day] = {"c": color}
 
-                # E. AJOUT À LA LISTE SI TOUCHE LE MOIS SÉLECTIONNÉ
-                touche_le_mois = (dt_start.year == sel_y and dt_start.month == sel_m) or \
-                                 (dt_end.year == sel_y and dt_end.month == sel_m)
-                
-                if touche_le_mois:
-                    missions_list.append({'r': r, 'idx': idx, 'start': dt_start, 'end': dt_end, 'color': color if 'color' in locals() else "#27ae60"})
-                    # Finance (on compte les revenus du mois si pas annulé)
+                # Ajout Liste
+                if (dt_start.year == sel_y and dt_start.month == sel_m) or (dt_end.year == sel_y and dt_end.month == sel_m):
+                    missions_list.append({
+                        'r': r, 'idx': idx, 'start': dt_start, 'end': dt_end, 
+                        'n_j': n_j, 'color': color if 'color' in locals() else "#27ae60",
+                        'prix': prix_val, 'statut': statut
+                    })
                     if dt_start.month == sel_m and "annul" not in statut:
-                        try:
-                            px = str(r.get('Prix', '0')).replace('€','').strip()
-                            total_mois += float(px)
-                        except: pass
+                        total_mois += prix_val
             except: continue
 
-    # --- AFFICHAGE DU CALENDRIER ---
+    # --- CALENDRIER ---
     h_cal = '<table style="width:100%; text-align:center; border-collapse:collapse; background:white; border:1px solid #ddd;">'
     h_cal += '<tr style="background:#f1f3f5; font-size:12px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td>Sa</td><td>Di</td></tr>'
-    
     for sem in calendar.monthcalendar(sel_y, sel_m):
         h_cal += '<tr>'
         for i, jour in enumerate(sem):
@@ -426,25 +425,39 @@ if st.session_state.page == "PLANNING":
     h_cal += '</table>'
     st.markdown(h_cal, unsafe_allow_html=True)
 
-    # --- LISTE DES MISSIONS ---
-    st.markdown(f"### 📋 Missions {sel_m_nom} {sel_y}")
+    # --- LISTE DES MISSIONS AVEC DÉTAILS ---
+    st.markdown(f"### 📋 Détails des Missions")
     if missions_list:
         missions_list.sort(key=lambda x: x['start'])
         for m in missions_list:
             r = m['r']
-            col1, col2 = st.columns([1, 4])
+            # Formatage de la plage de dates
+            if m['n_j'] > 1:
+                plage_date = f"{m['start'].strftime('%d/%m')} au {m['end'].strftime('%d/%m')}"
+            else:
+                plage_date = f"Le {m['start'].strftime('%d/%m')}"
+
+            col1, col2 = st.columns([1, 3.5])
             with col1:
-                st.markdown(f"<div style='background:{m['color']}; color:white; border-radius:5px; text-align:center; padding:5px; font-weight:bold; font-size:0.9rem;'>{m['start'].strftime('%d/%m')}</div>", unsafe_allow_html=True)
+                # Bloc date et prix à gauche
+                st.markdown(f"""
+                    <div style='background:{m['color']}; color:white; border-radius:5px; text-align:center; padding:5px;'>
+                        <span style='font-size:0.8rem; font-weight:bold;'>{plage_date}</span><br>
+                        <span style='font-size:0.9rem;'>{m['prix']:,.0f} €</span>
+                    </div>
+                """, unsafe_allow_html=True)
             with col2:
+                # Infos client et bouton d'accès à droite
                 label = f"{str(r.get('Prénom','')).upper()} {str(r.get('Nom','')).upper()} ({str(r.get('Société','')).upper()})"
-                if st.button(label, key=f"btn_p_v17_{m['idx']}"):
+                sub_label = f"{m['n_j']} jour(s) | Statut: {m['statut'].upper()}"
+                if st.button(f"{label}\n{sub_label}", key=f"btn_p_v18_{m['idx']}", use_container_width=True):
                     st.session_state.edit_idx = m['idx']
                     st.session_state.page = "CONTACTS"
                     st.rerun()
     else:
-        st.info("Aucune mission à afficher pour ce mois.")
+        st.info("Aucune mission détectée.")
 
-    st.success(f"**Total Honoraires : {total_mois:,.0f} €**")
+    st.success(f"**Total prévisionnel du mois : {total_mois:,.0f} €**")
 
 # =================================================================
 # --- 9. PAGE STATS (VERSION FINALE COMPLÈTE & COMPTABLEMENT JUSTE) ---
