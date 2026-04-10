@@ -145,14 +145,14 @@ df_c = charger_data("contacts.json")
 if not df_c.empty and 'Paiement' in df_c.columns:
     df_c['Paiement'] = df_c['Paiement'].apply(lambda x: "Payé" if "pay" in str(x).lower() and "non" not in str(x).lower() else "Non payé")
 # =================================================================
-# --- 5. BLOC CONTACTS (V4 - AVEC ACOMPTE ET SOLDE) ---
+# --- 5. BLOC CONTACTS (V5 - SÉCURISÉ CONTRE LES ERREURS DE DATE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👤 Gestion des Contacts")
 
+    # --- INITIALISATION & FONCTIONS ---
     if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
     if 'confirm_del_idx_c' not in st.session_state: st.session_state.confirm_del_idx_c = None
-    if 'confirm_arch_idx_c' not in st.session_state: st.session_state.confirm_arch_idx_c = None
     if 'vue_contact' not in st.session_state: st.session_state.vue_contact = "En cours"
 
     def clean_int(val):
@@ -164,9 +164,19 @@ if st.session_state.page == "CONTACTS":
     def format_tel_fr(tel):
         if tel is None: return ""
         digits = "".join(filter(str.isdigit, str(tel)))
-        if len(digits) == 10:
-            return f"{digits[0:2]} {digits[2:4]} {digits[4:6]} {digits[6:8]} {digits[8:10]}"
-        return str(tel)
+        return f"{digits[0:2]} {digits[2:4]} {digits[4:6]} {digits[6:8]} {digits[8:10]}" if len(digits) == 10 else str(tel)
+
+    def formater_date_affichage(date_val):
+        """Transforme n'importe quel format de date en JJ/MM/AAAA sans planter."""
+        if pd.isna(date_val) or str(date_val).strip() in ["", "None", "nan"]: return "---"
+        try:
+            # Si c'est déjà un objet datetime
+            if isinstance(date_val, datetime): return date_val.strftime("%d/%m/%Y")
+            # Sinon, tentative de conversion depuis string YYYY-MM-DD
+            return datetime.strptime(str(date_val)[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
+        except:
+            # En cas d'échec (format exotique), on renvoie la string brute pour ne pas crash
+            return str(date_val)
 
     # --- NAVIGATION HAUT ---
     c1, c2, c3 = st.columns([1, 1, 1])
@@ -190,31 +200,32 @@ if st.session_state.page == "CONTACTS":
     df_c = charger_data('contacts.json')
 
     if not df_c.empty:
-        mask_archives = ((df_c['Statut'] == "Terminé") & (df_c['Paiement'] == "Payé")) | (df_c['Statut'] == "Refusé") | (df_c['Statut'] == "Annulé")
+        mask_archives = ((df_c['Statut'].str.lower() == "terminé") & (df_c['Paiement'].str.lower() == "payé")) | (df_c['Statut'].str.lower() == "refusé") | (df_c['Statut'].str.lower() == "annulé")
         df_affichage = df_c[mask_archives].copy() if st.session_state.vue_contact == "Archives" else df_c[~mask_archives].copy()
 
         for idx, row in df_affichage.iterrows():
-            statut_label = str(row.get('Statut', '')).strip().lower()
+            statut_label = str(row.get('Statut', 'En attente')).strip()
             societe_label = str(row.get('Société', 'PERSO')).strip().upper()
             
-            # Calcul du solde
+            # Calcul finances
             v_prix = clean_int(row.get('Prix', 0))
             v_acompte = clean_int(row.get('Acompte', 0))
             v_solde = v_prix - v_acompte
 
+            # Couleurs
             bg_color, text_color = "#ffffff", "#333333"
             if societe_label == "CMN": bg_color, text_color = "#3498db", "#ffffff"
-            elif statut_label == "ok": bg_color = "#d4edda"
-            elif statut_label == "en attente": bg_color = "#fff9c4"
-            elif statut_label == "annulé" or statut_label == "terminé": bg_color = "#e2e3e5"
+            elif statut_label.lower() == "ok": bg_color = "#d4edda"
+            elif statut_label.lower() == "en attente": bg_color = "#fff9c4"
+            elif statut_label.lower() in ["annulé", "terminé"]: bg_color = "#e2e3e5"
 
             # --- MODE ÉDITION ---
             if st.session_state.edit_idx == idx:
                 with st.container():
-                    st.markdown(f"### ✏️ Édition : {str(row.get('Prénom',''))} {str(row.get('Nom',''))}")
+                    st.markdown(f"### ✏️ Édition : {str(row.get('Nom',''))}")
                     
                     if st.session_state.confirm_del_idx_c == idx:
-                        st.error(f"⚠️ SUPPRIMER DÉFINITIVEMENT {str(row.get('Nom',''))} ?")
+                        st.error("⚠️ SUPPRIMER DÉFINITIVEMENT ?")
                         ca1, ca2 = st.columns(2)
                         if ca1.button("✔️ OUI", key=f"del_y_{idx}", use_container_width=True):
                             df_curr = charger_data('contacts.json'); df_curr = df_curr.drop(idx); sauvegarder_data(df_curr, 'contacts.json')
@@ -222,37 +233,39 @@ if st.session_state.page == "CONTACTS":
                         if ca2.button("❌ NON", key=f"del_n_{idx}", use_container_width=True): st.session_state.confirm_del_idx_c = None; st.rerun()
 
                     with st.form(f"form_edit_{idx}"):
-                        st.info("👤 **IDENTITÉ & SOCIÉTÉ**")
                         c1, c2 = st.columns(2)
-                        e_pre = c1.text_input("Prénom", str(row.get('Prénom', '')).upper())
-                        e_nom = c2.text_input("Nom", str(row.get('Nom', '')).upper())
-                        soc_opts = ["PERSO", "CMN", "VOG", "CLICK", "Autres"]
-                        e_soc = st.selectbox("Société", soc_opts, index=soc_opts.index(societe_label) if societe_label in soc_opts else 0)
+                        e_pre = c1.text_input("Prénom", str(row.get('Prénom', '')))
+                        e_nom = c2.text_input("Nom", str(row.get('Nom', '')))
                         
-                        st.warning("💰 **FINANCES & NAVIGATION**")
+                        st.write("💰 **FINANCES**")
                         f1, f2, f3 = st.columns(3)
-                        e_prix = f1.number_input("Prix Total (€)", value=v_prix, step=1)
-                        e_acompte = f2.number_input("Acompte versé (€)", value=v_acompte, step=1)
-                        # Affichage du solde calculé (informatif)
-                        f3.markdown(f"<br><b>Reste à payer :</b><br><span style='font-size:20px; color:red;'>{e_prix - e_acompte} €</span>", unsafe_allow_html=True)
+                        e_prix = f1.number_input("Prix (€)", value=v_prix, step=1)
+                        e_acompte = f2.number_input("Acompte (€)", value=v_acompte, step=1)
+                        f3.markdown(f"<br>Reste : <b style='color:red;'>{e_prix - e_acompte} €</b>", unsafe_allow_html=True)
                         
+                        st.write("⛵ **NAVIGATION**")
                         c_date, c_pers, c_jours = st.columns(3)
-                        e_date = c_date.date_input("Date", datetime.strptime(str(row.get('DateNav', datetime.now().strftime("%Y-%m-%d"))), "%Y-%m-%d"))
+                        # Sécurisation de la date pour le sélecteur
+                        try:
+                            d_init = datetime.strptime(str(row.get('DateNav'))[:10], "%Y-%m-%d")
+                        except:
+                            d_init = datetime.now()
+                        e_date = c_date.date_input("Date", d_init)
                         e_pers = c_pers.number_input("Pers.", value=clean_int(row.get('Nbre de personnes', 1)), step=1)
                         e_jours = c_jours.number_input("Jours", value=clean_int(row.get('Nbre de jours', 1)), step=1)
                         
-                        st.success("📞 **CONTACT & STATUT**")
                         e_tel = st.text_input("Téléphone", row.get('Téléphone', ''))
                         e_notes = st.text_area("Notes", row.get('Notes', ''))
                         
-                        s1, s2 = st.columns(2)
+                        s1, s2, s3 = st.columns(3)
+                        opts_soc = ["PERSO", "CMN", "VOG", "CLICK", "Autres"]
+                        e_soc = s1.selectbox("Société", opts_soc, index=opts_soc.index(societe_label) if societe_label in opts_soc else 0)
                         opts_s = ["En attente", "Ok", "Terminé", "Refusé", "Annulé"]
-                        e_st = s1.selectbox("Statut", opts_s, index=opts_s.index(row.get('Statut', 'En attente')) if row.get('Statut') in opts_s else 0)
+                        e_st = s2.selectbox("Statut", opts_s, index=opts_s.index(statut_label) if statut_label in opts_s else 0)
                         opts_p = ["Non payé", "Payé"]
-                        e_pa = s2.selectbox("Paiement", opts_p, index=opts_p.index(row.get('Paiement', 'Non payé')) if row.get('Paiement') in opts_p else 0)
+                        e_pa = s3.selectbox("Paiement", opts_p, index=opts_p.index(row.get('Paiement', 'Non payé')) if row.get('Paiement') in opts_p else 0)
                         
-                        save, annul = st.columns(2)
-                        if save.form_submit_button("💾 ENREGISTRER", use_container_width=True):
+                        if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
                             df_c.at[idx, 'Prénom'], df_c.at[idx, 'Nom'] = e_pre.upper(), e_nom.upper()
                             df_c.at[idx, 'DateNav'] = e_date.strftime("%Y-%m-%d")
                             df_c.at[idx, 'Société'], df_c.at[idx, 'Prix'] = e_soc, int(e_prix)
@@ -262,27 +275,20 @@ if st.session_state.page == "CONTACTS":
                             df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'] = e_st, e_pa
                             sauvegarder_data(df_c, 'contacts.json'); st.session_state.edit_idx = None; st.rerun()
 
-                        if annul.form_submit_button("❌ QUITTER", use_container_width=True):
-                            if str(row.get('Nom')) == "CONTACT": df_c = df_c.drop(idx); sauvegarder_data(df_c, 'contacts.json')
-                            st.session_state.edit_idx = None; st.rerun()
-                    
-                    col_arch, col_del = st.columns(2)
-                    if col_arch.button("📦 ARCHIVER", key=f"arch_{idx}", use_container_width=True):
-                        df_c.at[idx, 'Statut'] = "Annulé"; sauvegarder_data(df_c, 'contacts.json')
+                    if st.button("❌ QUITTER SANS SAUVER", use_container_width=True):
                         st.session_state.edit_idx = None; st.rerun()
-                    if col_del.button("🗑️ SUPPRIMER", key=f"del_{idx}", use_container_width=True):
-                        st.session_state.confirm_del_idx_c = idx; st.rerun()
 
             # --- MODE AFFICHAGE ---
             else:
+                date_str = formater_date_affichage(row.get('DateNav'))
                 st.markdown(f"""
                     <div style="border: 2px solid #4A4A4A; padding: 12px; border-radius: 12px; margin-bottom: 8px; background-color: {bg_color}; color: {text_color};">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <b style="font-size: 1.1rem;">{str(row.get('Prénom', '')).upper()} {str(row.get('Nom', '')).upper()}</b>
-                            <span style="background: {'#2e7d32' if row.get('Paiement') == 'Payé' else '#d32f2f'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold;">{str(row.get('Paiement')).upper()}</span>
+                            <span style="background: {'#2e7d32' if str(row.get('Paiement')).lower() == 'payé' else '#d32f2f'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold;">{str(row.get('Paiement')).upper()}</span>
                         </div>
                         <div style="font-size: 0.9rem; margin-top: 6px; line-height: 1.3;">
-                            📅 <b>{datetime.strptime(str(row.get('DateNav')), "%Y-%m-%d").strftime("%d/%m/%Y") if row.get('DateNav') else '---'}</b> | 🏢 {societe_label}<br>
+                            📅 <b>{date_str}</b> | 🏢 {societe_label}<br>
                             💰 Total: <b>{v_prix}€</b> | Acc: <b>{v_acompte}€</b> | <span style="color:{'red' if v_solde > 0 else 'green'}; font-weight:bold;">Reste: {v_solde}€</span><br>
                             👥 {row.get('Nbre de personnes', 1)} pers. | ⏱️ {row.get('Nbre de jours', 1)} j. | 📞 {format_tel_fr(row.get('Téléphone', ''))}
                         </div>
