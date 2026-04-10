@@ -246,18 +246,18 @@
         "Acompte":null
     },
     {
-        "Pr\u00e9nom":"Aurelien",
+        "Pr\u00e9nom":"AURELIEN",
         "Nom":"FAUCHEUX ",
-        "Statut":"Termin\u00e9",
-        "Paiement":"Pay\u00e9",
-        "DateNav":"04\/04\/2026",
-        "Soci\u00e9t\u00e9":"PARTICULIER",
+        "Statut":"Ok",
+        "Paiement":"Non pay\u00e9",
+        "DateNav":"2026-04-10",
+        "Soci\u00e9t\u00e9":"PERSO",
         "Prix":540,
         "Nbre de personnes":4.0,
         "Nbre de jours":3.0,
-        "T\u00e9l\u00e9phone":"0648470438",
+        "T\u00e9l\u00e9phone":"06 48 47 04 38",
         "Email":"aurelienfaucheux@gmail.com",
-        "Notes":null,
+        "Notes":"nan",
         "NbreJours":null,
         "NbrePers":null,
         "NbJours":null,
@@ -284,7 +284,7 @@
         "Telephone":null,
         "Commentaires":"Vent vendredi \u26a0\ufe0ftroph\u00e9e Ouest France ce we Pb sur bouton poussoir verrouillage plage arriere",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0.0
     },
     {
         "Pr\u00e9nom":"BENOIT",
