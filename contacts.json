@@ -330,16 +330,16 @@
     {
         "Pr\u00e9nom":"",
         "Nom":"B\u00c9ATRICE ET SA FILLE",
-        "Statut":"En attente",
+        "Statut":"Annul\u00e9",
         "Paiement":"Non pay\u00e9",
         "DateNav":"2026-04-09",
-        "Soci\u00e9t\u00e9":"Autres",
+        "Soci\u00e9t\u00e9":"PERSO",
         "Prix":70,
         "Nbre de personnes":1.0,
         "Nbre de jours":1.0,
         "T\u00e9l\u00e9phone":"06 21 18 30 69",
         "Email":"",
-        "Notes":null,
+        "Notes":"nan",
         "NbreJours":null,
         "NbrePers":null,
         "NbJours":null,
@@ -366,7 +366,7 @@
         "Telephone":null,
         "Commentaires":"",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0.0
     },
     {
         "Pr\u00e9nom":"GILDAS",
