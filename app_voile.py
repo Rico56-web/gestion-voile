@@ -167,120 +167,87 @@ for i, name in enumerate(menu):
         st.session_state.page = name
         st.rerun()
 
-  # =================================================================
-# --- 5. BLOC CONTACTS (V35 - VISIBILITÉ TOTALE TEL/MAIL) ---
+# =================================================================
+# --- 5. BLOC CONTACTS (V36 - FIX AFFICHAGE HTML) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👤 Gestion des Contacts")
 
-    # --- INITIALISATION ---
-    if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
-    if 'confirm_del_idx_c' not in st.session_state: st.session_state.confirm_del_idx_c = None
-    if 'vue_contact' not in st.session_state: st.session_state.vue_contact = "En cours"
+    # [Garder ici ton code d'initialisation et de tri de la V35...]
+    # (Chargement df_c, filtres, navigation, etc.)
 
-    # --- CHARGEMENT ET TRI ---
-    df_c = charger_data('contacts.json')
-
-    if not df_c.empty:
-        df_c['orig_idx'] = df_c.index 
-        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], errors='coerce')
+    # --- BOUCLE D'AFFICHAGE ---
+    for _, row in df_aff.iterrows():
+        idx = row['orig_idx']
+        statut_l = str(row.get('Statut', 'En attente')).strip()
+        soc_l = str(row.get('Société', 'PERSO')).strip().upper()
         
-        mask_arch = (df_c['Statut'].str.lower().isin(["terminé", "refusé", "annulé"]))
-        df_aff = df_c[mask_arch].copy() if st.session_state.vue_contact == "Archives" else df_c[~mask_arch].copy()
-        df_aff = df_aff.sort_values('dt_sort', ascending=False, na_position='last')
+        # --- PRÉPARATION DES DONNÉES ---
+        raw_tel = str(row.get('Téléphone', '')).strip()
+        raw_mail = str(row.get('Email', '')).strip()
+        v_tel_display = raw_tel if raw_tel and raw_tel.lower() != "nan" else "NON RENSEIGNÉ"
+        v_mail_display = raw_mail if raw_mail and raw_mail.lower() != "nan" else "NON RENSEIGNÉ"
+        v_tel_link = format_tel_lien(raw_tel)
 
-        # --- NAVIGATION ---
-        c1, c2, c3 = st.columns([1, 1, 1])
-        if c1.button("👤 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"):
-            st.session_state.vue_contact = "En cours"; st.session_state.edit_idx = None; st.rerun()
-        if c2.button("📂 ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"):
-            st.session_state.vue_contact = "Archives"; st.session_state.edit_idx = None; st.rerun()
-        if c3.button("➕ NOUVEAU", use_container_width=True):
-            df_temp = charger_data('contacts.json')
-            new_r = {"Prénom": "NOUVEAU", "Nom": "CONTACT", "Statut": "En attente", "Paiement": "Non payé", "DateNav": datetime.now().strftime("%Y-%m-%d"), "Société": "PERSO", "Prix": 0, "Acompte": 0}
-            df_temp = pd.concat([pd.DataFrame([new_r]), df_temp], ignore_index=True)
-            sauvegarder_data(df_temp, 'contacts.json'); st.session_state.edit_idx = 0; st.rerun()
+        p_val = clean_int(row.get('Prix', 0))
+        a_val = clean_int(row.get('Acompte', 0))
+        txt_prix = f"{p_val} &euro;"
+        txt_reste = f"{(p_val - a_val)} &euro;"
+        d_aff = formater_date_affichage(row.get('DateNav'))
 
-        st.markdown("---")
+        bg_card = "#ffffff"
+        if soc_l == "CMN": bg_card = "#3498db"
+        elif statut_l.lower() == "en attente": bg_card = "#fff9c4"
+        elif statut_l.lower() == "ok": bg_card = "#d4edda"
 
-        # --- BOUCLE D'AFFICHAGE ---
-        for _, row in df_aff.iterrows():
-            idx = row['orig_idx']
-            statut_l = str(row.get('Statut', 'En attente')).strip()
-            soc_l = str(row.get('Société', 'PERSO')).strip().upper()
-            
-            # --- GESTION TEL / MAIL (AFFICHAGE FORCÉ) ---
-            raw_tel = str(row.get('Téléphone', '')).strip()
-            raw_mail = str(row.get('Email', '')).strip()
-            
-            v_tel_display = raw_tel if raw_tel and raw_tel.lower() != "nan" else "📞 NON RENSEIGNÉ"
-            v_mail_display = raw_mail if raw_mail and raw_mail.lower() != "nan" else "📧 NON RENSEIGNÉ"
-            v_tel_link = format_tel_lien(raw_tel)
-
-            # Pré-formatage financier
-            p_val = clean_int(row.get('Prix', 0))
-            a_val = clean_int(row.get('Acompte', 0))
-            txt_prix = f"{p_val} &euro;"
-            txt_reste = f"{(p_val - a_val)} &euro;"
-
-            bg_card = "#ffffff"
-            if soc_l == "CMN": bg_card = "#3498db"
-            elif statut_l.lower() == "en attente": bg_card = "#fff9c4"
-            elif statut_l.lower() == "ok": bg_card = "#d4edda"
-
-            if st.session_state.edit_idx == idx:
-                # --- MODE ÉDITION (Inchangé mais vérifié) ---
-                with st.form(f"f_edit_{idx}"):
-                    st.write(f"### Édition n°{idx}")
-                    e_pre = st.text_input("Prénom", str(row.get('Prénom', '')))
-                    e_nom = st.text_input("Nom", str(row.get('Nom', '')))
-                    e_tel = st.text_input("Téléphone", raw_tel)
-                    e_mail = st.text_input("Email", raw_mail)
-                    # ... (reste du formulaire identique à la V34)
-                    if st.form_submit_button("💾 ENREGISTRER"):
-                        # Logique de sauvegarde...
-                        st.session_state.edit_idx = None; st.rerun()
-            else:
-                # --- MODE AFFICHAGE CARTE (CORRIGÉ) ---
-                st.markdown(f"""
-                <div style="border: 2px solid #4A4A4A; padding: 12px; border-radius: 12px; margin-bottom: 10px; background-color: {bg_card}; color: #333333;">
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 5px;">
-                        <b style="font-size: 1.1rem;">{str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</b>
-                        <b style="color: {'green' if str(row.get('Paiement'))=='Payé' else 'red'}; font-size: 0.85rem;">{str(row.get('Paiement','')).upper()}</b>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; font-size: 0.9rem;">
-                        <div>📅 <b>{formater_date_affichage(row.get('DateNav'))}</b></div>
-                        <div>🏢 <b>{soc_l}</b></div>
-                        <div>👥 Pers: <b>{row.get('Nbre de personnes', 1)}</b></div>
-                        <div>⏱️ Jours: <b>{row.get('Nbre de jours', 1)}</b></div>
-                        <div>💰 Total: <b>{txt_prix}</b></div>
-                        <div>🧾 Reste: <b style="color:red;">{txt_reste}</b></div>
-                    </div>
-
-                    <div style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 6px; font-size: 0.85rem; border: 1px dashed rgba(0,0,0,0.1);">
-                        <div style="margin-bottom: 3px;">📱 {v_tel_display}</div>
-                        <div>✉️ {v_mail_display}</div>
-                    </div>
-
-                    <div style="margin-top: 8px; font-size: 0.8rem; font-style: italic;">
-                        📝 <i>{str(row.get('Notes', ''))[:80]}...</i>
-                    </div>
-
-                    <div style="margin-top: 10px; display: flex; gap: 5px;">
-                        <a href="tel:{v_tel_link}" style="flex:1; text-decoration:none;"><div style="background:#2ecc71; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📞 APPEL</div></a>
-                        <a href="https://wa.me/{v_tel_link}" style="flex:1; text-decoration:none;"><div style="background:#25d366; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">💬 WA</div></a>
-                        <a href="mailto:{raw_mail}" style="flex:1; text-decoration:none;"><div style="background:#e74c3c; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📧 MAIL</div></a>
-                    </div>
+        if st.session_state.edit_idx == idx:
+            # --- MODE ÉDITION (Ton formulaire existant) ---
+            st.info(f"Édition de la fiche n°{idx}")
+            # ... [Ton code de formulaire ici] ...
+            if st.button("Fermer l'édition"): 
+                st.session_state.edit_idx = None; st.rerun()
+        else:
+            # --- MODE AFFICHAGE CARTE (CORRIGÉ) ---
+            # IMPORTANT : Bien vérifier que tout est dans le f-string ci-dessous
+            st.markdown(f"""
+            <div style="border: 2px solid #4A4A4A; padding: 12px; border-radius: 12px; margin-bottom: 10px; background-color: {bg_card}; color: #333333;">
+                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 5px;">
+                    <b style="font-size: 1.1rem;">{str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</b>
+                    <b style="color: {'green' if str(row.get('Paiement'))=='Payé' else 'red'}; font-size: 0.85rem;">{str(row.get('Paiement','')).upper()}</b>
                 </div>
-                """, unsafe_allow_html=True)
                 
-                c_mod, c_sup = st.columns([4, 1])
-                if c_mod.button(f"✏️ MODIFIER n°{idx}", key=f"btn_{idx}", use_container_width=True):
-                    st.session_state.edit_idx = idx; st.rerun()
-                if c_sup.button("🗑️", key=f"del_{idx}", use_container_width=True):
-                    st.session_state.confirm_del_idx_c = idx; st.session_state.edit_idx = idx; st.rerun()           
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; font-size: 0.9rem;">
+                    <div>📅 <b>{d_aff}</b></div>
+                    <div>🏢 <b>{soc_l}</b></div>
+                    <div>👥 Pers: <b>{row.get('Nbre de personnes', 1)}</b></div>
+                    <div>⏱️ Jours: <b>{row.get('Nbre de jours', 1)}</b></div>
+                    <div>💰 Total: <b>{txt_prix}</b></div>
+                    <div>🧾 Reste: <b style="color:red;">{txt_reste}</b></div>
+                </div>
 
+                <div style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 6px; font-size: 0.85rem; border: 1px dashed rgba(0,0,0,0.1);">
+                    <div style="margin-bottom: 3px;">📱 {v_tel_display}</div>
+                    <div>✉️ {v_mail_display}</div>
+                </div>
+
+                <div style="margin-top: 8px; font-size: 0.8rem; font-style: italic;">
+                    📝 <i>{str(row.get('Notes', '...'))[:80]}</i>
+                </div>
+
+                <div style="margin-top: 10px; display: flex; gap: 5px;">
+                    <a href="tel:{v_tel_link}" style="flex:1; text-decoration:none;"><div style="background:#2ecc71; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📞 APPEL</div></a>
+                    <a href="https://wa.me/{v_tel_link}" style="flex:1; text-decoration:none;"><div style="background:#25d366; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">💬 WA</div></a>
+                    <a href="mailto:{raw_mail}" style="flex:1; text-decoration:none;"><div style="background:#e74c3c; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📧 MAIL</div></a>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Boutons de contrôle sous la fiche
+            c_mod, c_sup = st.columns([4, 1])
+            if c_mod.button(f"✏️ MODIFIER n°{idx}", key=f"btn_{idx}", use_container_width=True):
+                st.session_state.edit_idx = idx; st.rerun()
+            if c_sup.button("🗑️", key=f"del_{idx}", use_container_width=True):
+                st.session_state.confirm_del_idx_c = idx; st.session_state.edit_idx = idx; st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (V18 - DÉTAILS DATES & MONTANTS) ---
 # =================================================================
