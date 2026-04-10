@@ -313,19 +313,17 @@ if st.session_state.page == "CONTACTS":
                     st.session_state.edit_idx = idx; st.rerun()
 
 # =================================================================
-# --- 6. PAGE PLANNING (AVEC BOUTON ARCHIVES VISIBLE) ---
+# --- 6. PAGE PLANNING (V8 - AVEC HISTORIQUE COMPLET) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
     from datetime import datetime, date, timedelta
     import calendar
 
-    # --- EN-TÊTE (Utilisation de guillemets simples pour 'fermer' le texte) ---
+    # --- EN-TÊTE ---
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>🗓️ PLANNING 2026</h1></div>', unsafe_allow_html=True)
     
-    # Bouton Archives
     col_arch, col_vide = st.columns([1, 1])
     with col_arch:
-        # On utilise une chaîne simple sans 'f' devant pour être 100% sûr
         if st.button("📂 ACCÉDER AUX ARCHIVES", key="k_arch_p", use_container_width=True, type="primary"):
             st.session_state.last_page = "PLANNING"
             st.session_state.page = "ARCHIVES"
@@ -338,21 +336,10 @@ if st.session_state.page == "PLANNING":
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
 
-    # --- CALCULS OCCUPATION ---
-    jours_occ = {} 
-    total_mois = 0
-    missions_list = []
+    if 'curr_month_idx' not in st.session_state: st.session_state.curr_month_idx = aujourdhui.month - 1
+    if 'curr_year' not in st.session_state: st.session_state.curr_year = aujourdhui.year
+    if 'nav_key' not in st.session_state: st.session_state.nav_key = 0
 
-
-    # Initialisation session_state
-    if 'curr_month_idx' not in st.session_state:
-        st.session_state.curr_month_idx = aujourdhui.month - 1
-    if 'curr_year' not in st.session_state:
-        st.session_state.curr_year = aujourdhui.year
-    if 'nav_key' not in st.session_state:
-        st.session_state.nav_key = 0
-
-    # Sélecteurs de date
     col_m, col_y, col_now = st.columns([1.5, 1, 0.8])
     with col_m:
         sel_m_nom = st.selectbox("Mois", m_noms, index=st.session_state.curr_month_idx, key=f"m_{st.session_state.nav_key}")
@@ -370,7 +357,7 @@ if st.session_state.page == "PLANNING":
             st.session_state.nav_key += 1
             st.rerun()
 
-    # --- CALCULS OCCUPATION ---
+    # --- CALCULS OCCUPATION (SANS FILTRE SUR ARCHIVES) ---
     jours_occ = {}
     total_mois = 0
     missions_list = []
@@ -378,48 +365,48 @@ if st.session_state.page == "PLANNING":
     if df_c is not None and not df_c.empty:
         for idx, r in df_c.iterrows():
             try:
+                # FILTRE DE SÉCURITÉ UNIQUEMENT : On ignore les fiches vraiment vides
+                nom_client = str(r.get('Nom', '')).upper()
+                if nom_client in ["", "CONTACT", "NAN"]: continue
+
                 d_val = r.get('DateNav', '')
                 if pd.isna(d_val) or str(d_val).strip() == "": continue
+                
+                # Conversion Date
                 d_str = str(d_val).strip().split(' ')[0]
-                # Formatage date
-                if '/' in d_str:
-                    parts = d_str.split('/')
-                    dv, mv, yv = int(parts[0]), int(parts[1]), int(parts[2])
-                    if yv < 100: yv += 2000
-                    date_debut = date(yv, mv, dv)
-                else: continue
+                date_debut = datetime.strptime(d_str, "%Y-%m-%d").date()
                 
-                n_j = int(float(safe_val(r.get('Nbre de jours'), 1)))
+                n_j = int(float(r.get('Nbre de jours', 1)))
                 soc_v = str(r.get('Société','')).upper()
+                s_val = str(r.get('Statut', 'Ok')).lower()
                 
+                # Remplissage Calendrier
                 for i in range(n_j):
                     date_courante = date_debut + timedelta(days=i)
                     if date_courante.month == sel_m and date_courante.year == sel_y:
                         p_val = str(r.get('Paiement', '')).upper()
-                        s_val = str(r.get('Statut', '')).lower()
                         is_paye = "PAY" in p_val and "NON" not in p_val
                         
-                        # Couleur CMN Prioritaire
-                        color = "transparent"
-                        if "CMN" in soc_v: color = "#0047AB"
+                        # Couleurs
+                        if "CMN" in soc_v: color = "#3498db"
+                        elif s_val in ["annulé", "refusé"]: color = "#e2e3e5" # Gris pour le passé annulé
                         elif date_courante < aujourdhui: color = "#34495e" if is_paye else "#e74c3c"
-                        elif "ok" in s_val: color = "#27ae60"
-                        elif "attente" in s_val: color = "#f39c12"
+                        elif "ok" in s_val or "terminé" in s_val: color = "#27ae60"
+                        else: color = "#f1c40f" # Attente
                         
                         jours_occ[date_courante.day] = {"c": color}
 
-                # Ajout à la liste pour affichage sous calendrier
+                # Liste détaillée (Missions qui touchent au mois sélectionné)
                 date_fin = date_debut + timedelta(days=n_j-1)
                 if (date_debut.year == sel_y and date_debut.month == sel_m) or (date_fin.year == sel_y and date_fin.month == sel_m):
                     missions_list.append({'data': r, 'idx': idx, 'start': date_debut, 'end': date_fin, 'n_j': n_j})
-                    if date_debut.month == sel_m:
-                        val_prix = str(r.get('Prix', 0)).replace(',','.').replace('€','').strip()
-                        total_mois += float(val_prix) if val_prix else 0
+                    # On ne compte dans le total que les missions non annulées
+                    if date_debut.month == sel_m and s_val not in ["annulé", "refusé"]:
+                        total_mois += int(float(str(r.get('Prix', 0)).replace('€','').strip() or 0))
             except: continue
 
-     # --- RENDU CALENDRIER HTML (BIEN INDENTÉ) ---
+    # --- RENDU CALENDRIER HTML ---
     st.markdown('<style>.full-width-cal{width:100%;border-collapse:collapse;table-layout:fixed;}.full-width-cal td{border:1px solid #cccccc !important;padding:5px 0;}</style>', unsafe_allow_html=True)
-
     h_cal = '<table class="full-width-cal" style="text-align:center; background:white;">'
     h_cal += '<tr style="background:#f1f3f5; font-size:10px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td style="color:#d9534f;">Sa</td><td style="color:#d9534f;">Di</td></tr>'
 
@@ -433,7 +420,7 @@ if st.session_state.page == "PLANNING":
                 occ = jours_occ.get(jour, {})
                 bg_c = occ.get("c", "transparent")
                 is_today = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == aujourdhui.year)
-                cell_bg = "background:#D2B48C;" if is_today else ("background:#f9f9f9;" if i >= 5 else "")
+                cell_bg = "background:#f3e5ab;" if is_today else ("background:#f9f9f9;" if i >= 5 else "")
                 txt_c = "white" if bg_c != "transparent" else "black"
                 circle = f'<div style="background:{bg_c}; color:{txt_c}; border-radius:50%; width:28px; height:28px; line-height:28px; margin:auto; font-weight:bold; font-size:12px;">{jour}</div>'
                 h_cal += f'<td style="height:50px; {cell_bg}">{circle}</td>'
@@ -441,57 +428,51 @@ if st.session_state.page == "PLANNING":
     h_cal += '</table>'
     st.markdown(h_cal, unsafe_allow_html=True)
 
-    # --- LISTE DES MISSIONS & TOTAL ---
-    st.markdown(f"#### 📋 Détails {sel_m_nom}")
+    # --- LISTE DES MISSIONS ---
+    st.markdown(f"#### 📋 Missions {sel_m_nom}")
     if missions_list:
         missions_list.sort(key=lambda x: x['start'])
         for m in missions_list:
             r = m['data']
+            statut = str(r.get('Statut','')).lower()
             soc = str(r.get('Société','')).upper()
-            c_line = "#0047AB" if "CMN" in soc else "#27ae60"
-            txt_d = f"{m['start'].day:02d}/{m['start'].month:02d}"
-            if m['n_j'] > 1: 
-                txt_d += f" ➔ {m['end'].day:02d}/{m['end'].month:02d}"
             
-            pay_status = str(r.get('Paiement','')).upper()
-            icon = "💰" if "PAY" in pay_status and "NON" not in pay_status else "⚠️"
-            label_jours = "JOURS" if m['n_j'] > 1 else "JOUR"
-            prix_affiche = r.get('Prix','0')
-
-            html_item = (
-                f'<div style="display: flex; padding: 10px; border-bottom: 1px solid #eee; background: white; align-items: center;">'
-                f'<div style="background: {c_line}; color: white; border-radius: 5px; padding: 4px; min-width: 85px; text-align: center; font-weight: bold; margin-right: 10px; line-height:1.2;">'
-                f'<span style="font-size: 0.75rem;">{txt_d}</span><br>'
-                f'<span style="font-size: 0.5rem;">{label_jours}</span>'
-                f'</div>'
-                f'<div style="flex-grow: 1;">'
-                f'<b>{icon} {str(r.get("Nom","")).upper()}</b><br>'
-                f'<small>{soc} | {prix_affiche} &euro;</small>'
-                f'</div>'
-                f'</div>'
-            )
-            st.markdown(html_item, unsafe_allow_html=True)
+            # Couleur de la barre latérale selon le statut
+            if statut in ["annulé", "refusé"]: c_line = "#bdc3c7"
+            elif "CMN" in soc: c_line = "#3498db"
+            else: c_line = "#27ae60"
+            
+            txt_d = m['start'].strftime("%d/%m")
+            if m['n_j'] > 1: txt_d += f" ➔ {m['end'].strftime('%d/%m')}"
+            
+            v_p = int(float(r.get('Prix',0))); v_a = int(float(r.get('Acompte',0)))
+            icon = "💰" if str(r.get('Paiement','')).upper() == "PAYÉ" else "⚠️"
+            
+            st.markdown(f"""
+                <div style="display: flex; padding: 10px; border-bottom: 1px solid #eee; background: white; align-items: center; opacity: {0.6 if statut in ['annulé', 'refusé'] else 1};">
+                    <div style="background: {c_line}; color: white; border-radius: 5px; padding: 4px; min-width: 85px; text-align: center; font-weight: bold; margin-right: 10px; line-height:1.2;">
+                        <span style="font-size: 0.75rem;">{txt_d}</span><br>
+                        <span style="font-size: 0.5rem;">{m['n_j']} JOURS</span>
+                    </div>
+                    <div style="flex-grow: 1;">
+                        <b>{icon} {str(r.get("Nom","")).upper()}</b> <small>({statut.upper()})</small><br>
+                        <small>{soc} | Total: {v_p}€ | Solde: {v_p - v_a}€</small>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
             if st.button(f"🔍 FICHE : {str(r.get('Nom',''))}", key=f"p_btn_{m['idx']}", use_container_width=True):
                 st.session_state.edit_idx = m['idx']
-                st.session_state.mode_saisie = True
                 st.session_state.page = "CONTACTS"
                 st.rerun()
 
-    # --- AFFICHAGE DU SOLDE (DANS LA PAGE PLANNING) ---
-    # On utilise total_mois calculé plus haut
-    couleur_solde = "#28a745" if total_mois >= 0 else "#dc3545"
-    solde_formate = f"{total_mois:,.0f}".replace(",", " ")
-
-    html_solde = (
-        f'<div style="text-align:center; padding:20px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6; margin-top:20px;">'
-        f'<span style="font-size:1.1rem; color:#6c757d;">Total Honoraires Mois</span><br>'
-        f'<b style="color:{couleur_solde}; font-size:1.8rem;">'
-        f'{solde_formate} &euro;'
-        f'</b>'
-        f'</div>'
-    )
-    st.markdown(html_solde, unsafe_allow_html=True)
+    # --- TOTAL ---
+    st.markdown(f"""
+        <div style="text-align:center; padding:15px; background:#f8f9fa; border-radius:10px; border:1px solid #dee2e6; margin-top:20px;">
+            <span style="font-size:1rem; color:#6c757d;">Honoraires (Missions non-annulées)</span><br>
+            <b style="color:#28a745; font-size:1.6rem;">{total_mois:,.0f} €</b>
+        </div>
+    """, unsafe_allow_html=True)
 
 # =================================================================
 # --- 9. PAGE STATS (VERSION FINALE COMPLÈTE & COMPTABLEMENT JUSTE) ---
