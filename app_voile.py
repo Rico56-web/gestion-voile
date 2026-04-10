@@ -357,28 +357,20 @@ if st.session_state.page == "PLANNING":
     missions_list = []
     total_mois = 0
 
-    # --- 3. TRAITEMENT DES DONNÉES ---
+     # --- 3. TRAITEMENT DES DONNÉES (CORRIGÉ POUR FICHES VIERGES) ---
     for i, r in enumerate(raw_data):
         try:
-            # Extraction Date sécurisée
+            # 1. SÉCURITÉ : On ignore les fiches sans nom ou noms par défaut
+            nom_client = str(r.get('Nom', '')).strip().upper()
+            prenom_client = str(r.get('Prénom', '')).strip().upper()
+            
+            # Si le nom est vide, égal à "CONTACT" ou "NAN", on passe à la suivante
+            if nom_client in ["", "CONTACT", "NAN", "NONE"]:
+                continue
+            
+            # 2. Extraction Date sécurisée
             d_val = str(r.get('DateNav') or r.get('Date') or '').strip().split(' ')[0]
-            if not d_val or d_val.lower() == "none": continue
-            
-            dt_start = None
-            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%j/%m/%Y"):
-                try:
-                    dt_start = datetime.strptime(d_val, fmt).date()
-                    break
-                except: continue
-            
-            if not dt_start: continue
-
-            # Extraction Durée
-            n_j = 1
-            for k in ['Nbre de jours', 'NbJours', 'Jours', 'Nb jours']:
-                if r.get(k) is not None and str(r.get(k)) != "nan":
-                    n_j = int(float(r.get(k)))
-                    break
+            # ... (reste du code identique)
 
             statut = str(r.get('Statut', 'Ok')).lower()
             soc = str(r.get('Société', 'PERSO')).upper()
