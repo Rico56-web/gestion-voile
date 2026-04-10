@@ -410,18 +410,18 @@
         "Acompte":0.0
     },
     {
-        "Pr\u00e9nom":"Camille",
+        "Pr\u00e9nom":"CAMILLE",
         "Nom":"VARREL",
         "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"12\/04\/2026",
-        "Soci\u00e9t\u00e9":"CLICK & BOAT",
+        "DateNav":"2026-04-12",
+        "Soci\u00e9t\u00e9":"PERSO",
         "Prix":281,
         "Nbre de personnes":2.0,
         "Nbre de jours":2.0,
-        "T\u00e9l\u00e9phone":"0769297505",
+        "T\u00e9l\u00e9phone":"07 69 29 75 05",
         "Email":"",
-        "Notes":null,
+        "Notes":"nan",
         "NbreJours":null,
         "NbrePers":null,
         "NbJours":null,
@@ -448,7 +448,7 @@
         "Telephone":null,
         "Commentaires":"Camille et son ami",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0.0
     },
     {
         "Pr\u00e9nom":"LAURENT",
