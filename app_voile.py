@@ -446,40 +446,48 @@ if st.session_state.page == "PLANNING":
         h_cal += '</tr>'
     h_cal += '</table>'
     st.markdown(h_cal, unsafe_allow_html=True)
+# --- LISTE DES MISSIONS AVEC DÉTAILS ---
+st.markdown(f"### 📋 Détails des Missions")
+if missions_list:
+    missions_list.sort(key=lambda x: x['start'])
+    for m in missions_list:
+        r = m['r']
+        
+        # 1. Formatage de la plage de dates
+        if m['n_j'] > 1:
+            plage_date = f"{m['start'].strftime('%d/%m')} au {m['end'].strftime('%d/%m')}"
+        else:
+            plage_date = f"Le {m['start'].strftime('%d/%m')}"
 
-    # --- LISTE DES MISSIONS AVEC DÉTAILS ---
-    st.markdown(f"### 📋 Détails des Missions")
-    if missions_list:
-        missions_list.sort(key=lambda x: x['start'])
-        for m in missions_list:
-            r = m['r']
-            # Formatage de la plage de dates
-            if m['n_j'] > 1:
-                plage_date = f"{m['start'].strftime('%d/%m')} au {m['end'].strftime('%d/%m')}"
-            else:
-                plage_date = f"Le {m['start'].strftime('%d/%m')}"
+        # 2. PRÉ-FORMATAGE DU PRIX (Correction de l'erreur SyntaxError)
+        v_prix = m.get('prix', 0)
+        prix_propre = f"{v_prix:,.0f}".replace(",", " ")  # Remplace la virgule par un espace pour le format FR
 
-            col1, col2 = st.columns([1, 3.5])
-            with col1:
-                # Bloc date et prix à gauche
-                st.markdown(f"""
-                    <div style='background:{m['color']}; color:white; border-radius:5px; text-align:center; padding:5px;'>
-                        <span style='font-size:0.8rem; font-weight:bold;'>{plage_date}</span><br>
-                        <span style='font-size:0.9rem;'>{m['prix']:,.0f} €</span>
-                    </div>
-                """, unsafe_allow_html=True)
-            with col2:
-                # Infos client et bouton d'accès à droite
-                label = f"{str(r.get('Prénom','')).upper()} {str(r.get('Nom','')).upper()} ({str(r.get('Société','')).upper()})"
-                sub_label = f"{m['n_j']} jour(s) | Statut: {m['statut'].upper()}"
-                if st.button(f"{label}\n{sub_label}", key=f"btn_p_v18_{m['idx']}", use_container_width=True):
-                    st.session_state.edit_idx = m['idx']
-                    st.session_state.page = "CONTACTS"
-                    st.rerun()
-    else:
-        st.info("Aucune mission détectée.")
+        col1, col2 = st.columns([1, 3.5])
+        with col1:
+            # Bloc date et prix à gauche
+            st.markdown(f"""
+                <div style='background:{m['color']}; color:white; border-radius:5px; text-align:center; padding:5px;'>
+                    <span style='font-size:0.8rem; font-weight:bold;'>{plage_date}</span><br>
+                    <span style='font-size:0.9rem;'>{prix_propre} €</span>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        with col2:
+            # Infos client et bouton d'accès à droite
+            label = f"{str(r.get('Prénom','')).upper()} {str(r.get('Nom','')).upper()} ({str(r.get('Société','')).upper()})"
+            sub_label = f"{m['n_j']} jour(s) | Statut: {m['statut'].upper()}"
+            if st.button(f"{label}\n{sub_label}", key=f"btn_p_v18_{m['idx']}", use_container_width=True):
+                st.session_state.edit_idx = m['idx']
+                st.session_state.page = "CONTACTS"
+                st.rerun()
+else:
+    st.info("Aucune mission détectée.")
 
-    st.success(f"**Total prévisionnel du mois : {total_mois:,.0f} €**")
+# Formatage aussi pour le total final
+total_mois_propre = f"{total_mois:,.0f}".replace(",", " ")
+st.success(f"**Total prévisionnel du mois : {total_mois_propre} €**")
+
 
 # =================================================================
 # --- 9. PAGE STATS (VERSION FINALE COMPLÈTE & COMPTABLEMENT JUSTE) ---
