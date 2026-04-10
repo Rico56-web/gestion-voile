@@ -146,7 +146,7 @@ if not df_c.empty and 'Paiement' in df_c.columns:
     df_c['Paiement'] = df_c['Paiement'].apply(lambda x: "Payé" if "pay" in str(x).lower() and "non" not in str(x).lower() else "Non payé")
 
 # =================================================================
-# --- 5. BLOC CONTACTS (V21 - TRI CHRONO, RECHERCHE & ANNÉE) ---
+# --- 5. BLOC CONTACTS (V22 - FIX OUVERTURE & RECHERCHE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👤 Gestion des Contacts")
@@ -155,7 +155,6 @@ if st.session_state.page == "CONTACTS":
     if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
     if 'vue_contact' not in st.session_state: st.session_state.vue_contact = "En cours"
     
-    # --- FONCTIONS UTILITAIRES ---
     def clean_int(val):
         try:
             if val is None or str(val).strip() == "" or str(val).lower() == "nan": return 0
@@ -164,8 +163,7 @@ if st.session_state.page == "CONTACTS":
 
     def formater_date_affichage(date_val):
         if pd.isna(date_val) or str(date_val).strip() in ["", "None", "nan"]: return "---"
-        try:
-            return datetime.strptime(str(date_val)[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
+        try: return datetime.strptime(str(date_val)[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
         except: return str(date_val)
 
     # --- NAVIGATION HAUT ---
@@ -183,75 +181,89 @@ if st.session_state.page == "CONTACTS":
 
     st.markdown("---")
     
-    # --- FILTRES DE RECHERCHE (NOM, SOCIÉTÉ, ANNÉE) ---
+    # --- FILTRES ---
     search_col1, search_col2, search_col3 = st.columns([2, 1, 1])
     query = search_col1.text_input("🔍 Nom ou Prénom", "").strip().upper()
     filter_soc = search_col2.selectbox("🏢 Société", ["TOUTES", "PERSO", "CMN", "VOG", "CLICK", "Autres"])
     filter_year = search_col3.selectbox("📅 Année", ["TOUTES", 2026, 2027, 2028])
 
-    df_c = charger_data('contacts.json')
+    df_full = charger_data('contacts.json')
 
-    if not df_c.empty:
-        # 1. Séparation Archives / En cours (selon ton bloc Archives)
-        mask_archives = (df_c['Statut'].str.lower().isin(["terminé", "refusé", "annulé"]))
-        df_affichage = df_c[mask_archives].copy() if st.session_state.vue_contact == "Archives" else df_c[~mask_archives].copy()
+    if not df_full.empty:
+        # On garde l'index original dans une colonne pour ne pas le perdre au tri
+        df_full['original_index'] = df_full.index
 
-        # 2. Application des filtres de recherche
+        # 1. Séparation Archives / En cours
+        mask_arch = (df_full['Statut'].str.lower().isin(["terminé", "refusé", "annulé"]))
+        df_view = df_full[mask_arch].copy() if st.session_state.vue_contact == "Archives" else df_full[~mask_arch].copy()
+
+        # 2. Application des filtres
         if query:
-            df_affichage = df_affichage[df_affichage['Nom'].str.contains(query, na=False) | df_affichage['Prénom'].str.contains(query, na=False, case=False)]
+            df_view = df_view[df_view['Nom'].str.contains(query, na=False) | df_view['Prénom'].str.contains(query, na=False, case=False)]
         if filter_soc != "TOUTES":
-            df_affichage = df_affichage[df_affichage['Société'].str.upper() == filter_soc]
+            df_view = df_view[df_view['Société'].str.upper() == filter_soc]
         
-        # 3. Conversion Date pour Tri et Filtre Année
-        df_affichage['dt_t'] = pd.to_datetime(df_affichage['DateNav'], errors='coerce')
-        
+        df_view['dt_t'] = pd.to_datetime(df_view['DateNav'], errors='coerce')
         if filter_year != "TOUTES":
-            df_affichage = df_affichage[df_affichage['dt_t'].dt.year == filter_year]
+            df_view = df_view[df_view['dt_t'].dt.year == int(filter_year)]
 
-        # 4. TRI CHRONOLOGIQUE (Du plus récent au plus ancien)
-        df_affichage = df_affichage.sort_values('dt_t', ascending=False)
+        # 3. Tri Chronologique Inverse
+        df_view = df_view.sort_values('dt_t', ascending=False)
 
-        # --- BOUCLE D'AFFICHAGE ---
-        for idx, row in df_affichage.iterrows():
-            # (Logique d'édition identique à ta V6 pour ne pas casser tes formulaires)
-            if st.session_state.edit_idx == idx:
-                # [Ici ton bloc formulaire d'édition complet avec le fix de date d_init]
-                # ... (code formulaire omis pour lisibilité, garder celui de la réponse précédente)
-                pass 
+        # --- LOGIQUE D'AFFICHAGE / ÉDITION ---
+        if st.session_state.edit_idx is not None:
+            # On récupère la ligne exacte via l'index sauvegardé
+            real_idx = st.session_state.edit_idx
+            row = df_full.loc[real_idx]
             
-            else:
-                # MODE AFFICHAGE CARTE
-                statut_l = str(row.get('Statut', 'En attente')).lower()
-                soc_l = str(row.get('Société', 'PERSO')).upper()
+            with st.container():
+                st.markdown(f"### ✏️ Édition Fiche n°{real_idx} : {row.get('Nom')}")
+                # [REPRENDRE ICI VOTRE FORMULAIRE COMPLET e_pre, e_nom, e_date, etc.]
+                # IMPORTANT : Dans le bouton "ENREGISTRER", utilisez df_full.at[real_idx, ...]
                 
-                # Couleurs de fond
-                bg_card = "#ffffff"
-                if soc_l == "CMN": bg_card = "#3498db"; txt_card = "white"
-                elif statut_l == "ok": bg_card = "#d4edda"; txt_card = "#333"
-                else: bg_card = "#f8f9fa"; txt_card = "#333"
+                with st.form("form_edit_v22"):
+                    # (Exemple court, remettez vos champs ici)
+                    e_pre = st.text_input("Prénom", str(row.get('Prénom', '')))
+                    e_nom = st.text_input("Nom", str(row.get('Nom', '')))
+                    
+                    # Fix Date
+                    d_str = str(row.get('DateNav', ''))[:10]
+                    try: d_init = datetime.strptime(d_str, "%Y-%m-%d").date()
+                    except: d_init = datetime.now().date()
+                    e_date = st.date_input("Date", d_init)
+                    
+                    if st.form_submit_button("💾 ENREGISTRER"):
+                        df_full.at[real_idx, 'Prénom'] = e_pre.upper()
+                        df_full.at[real_idx, 'Nom'] = e_nom.upper()
+                        df_full.at[real_idx, 'DateNav'] = str(e_date)
+                        sauvegarder_data(df_full, 'contacts.json')
+                        st.session_state.edit_idx = None
+                        st.rerun()
+                    if st.form_submit_button("❌ QUITTER"):
+                        st.session_state.edit_idx = None
+                        st.rerun()
 
-                date_str = formater_date_affichage(row.get('DateNav'))
-                v_prix = clean_int(row.get('Prix', 0))
-                v_acompte = clean_int(row.get('Acompte', 0))
+        else:
+            # AFFICHAGE DE LA LISTE
+            for _, row in df_view.iterrows():
+                orig_idx = row['original_index']
+                date_disp = formater_date_affichage(row.get('DateNav'))
+                
+                # Couleur carte
+                soc_l = str(row.get('Société', 'PERSO')).upper()
+                bg = "#3498db" if soc_l == "CMN" else "#ffffff"
+                tc = "white" if soc_l == "CMN" else "#333"
 
                 st.markdown(f"""
-                    <div style="border: 1px solid #ddd; padding: 12px; border-radius: 10px; margin-bottom: 5px; background-color: {bg_card}; color: {txt_card};">
-                        <b>{idx} | {str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</b><br>
-                        <small>📅 {date_str} | 🏢 {soc_l} | 💰 {v_prix}€ (Reste: {v_prix-v_acompte}€)</small>
+                    <div style="border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-bottom: 5px; background-color: {bg}; color: {tc};">
+                        <b>INDEX {orig_idx} | {str(row.get('Nom')).upper()}</b><br>
+                        <small>📅 {date_disp} | 🏢 {soc_l}</small>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                if st.button(f"📝 Ouvrir n°{idx}", key=f"btn_op_{idx}", use_container_width=True):
-                    st.session_state.edit_idx = idx
+                if st.button(f"🔎 OUVRIR FICHE {orig_idx}", key=f"open_{orig_idx}", use_container_width=True):
+                    st.session_state.edit_idx = orig_idx
                     st.rerun()
-
-    # --- LIAISON BAS DE PAGE ARCHIVES ---
-    if st.session_state.vue_contact == "Archives":
-        st.info("💡 Note : Ces fiches sont marquées comme 'Terminé', 'Refusé' ou 'Annulé'.")
-        if st.button("⚙️ ALLER AU CENTRE D'ARCHIVAGE (EXPORT/NETTOYAGE)", use_container_width=True):
-            st.session_state.last_page = "CONTACTS"
-            st.session_state.page = "ARCHIVES"
-            st.rerun()
 
 # =================================================================
 # --- 6. PAGE PLANNING (V18 - DÉTAILS DATES & MONTANTS) ---
