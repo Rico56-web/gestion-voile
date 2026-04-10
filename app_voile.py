@@ -145,14 +145,15 @@ df_c = charger_data("contacts.json")
 if not df_c.empty and 'Paiement' in df_c.columns:
     df_c['Paiement'] = df_c['Paiement'].apply(lambda x: "Payé" if "pay" in str(x).lower() and "non" not in str(x).lower() else "Non payé")
 # =================================================================
-# --- 5. BLOC CONTACTS (V5 - SÉCURISÉ CONTRE LES ERREURS DE DATE) ---
+# --- 5. BLOC CONTACTS (V6 - COMPLET & SÉCURISÉ) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👤 Gestion des Contacts")
 
-    # --- INITIALISATION & FONCTIONS ---
+    # --- INITIALISATION ---
     if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
     if 'confirm_del_idx_c' not in st.session_state: st.session_state.confirm_del_idx_c = None
+    if 'confirm_arch_idx_c' not in st.session_state: st.session_state.confirm_arch_idx_c = None
     if 'vue_contact' not in st.session_state: st.session_state.vue_contact = "En cours"
 
     def clean_int(val):
@@ -167,16 +168,10 @@ if st.session_state.page == "CONTACTS":
         return f"{digits[0:2]} {digits[2:4]} {digits[4:6]} {digits[6:8]} {digits[8:10]}" if len(digits) == 10 else str(tel)
 
     def formater_date_affichage(date_val):
-        """Transforme n'importe quel format de date en JJ/MM/AAAA sans planter."""
         if pd.isna(date_val) or str(date_val).strip() in ["", "None", "nan"]: return "---"
         try:
-            # Si c'est déjà un objet datetime
-            if isinstance(date_val, datetime): return date_val.strftime("%d/%m/%Y")
-            # Sinon, tentative de conversion depuis string YYYY-MM-DD
             return datetime.strptime(str(date_val)[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
-        except:
-            # En cas d'échec (format exotique), on renvoie la string brute pour ne pas crash
-            return str(date_val)
+        except: return str(date_val)
 
     # --- NAVIGATION HAUT ---
     c1, c2, c3 = st.columns([1, 1, 1])
@@ -200,37 +195,50 @@ if st.session_state.page == "CONTACTS":
     df_c = charger_data('contacts.json')
 
     if not df_c.empty:
-        mask_archives = ((df_c['Statut'].str.lower() == "terminé") & (df_c['Paiement'].str.lower() == "payé")) | (df_c['Statut'].str.lower() == "refusé") | (df_c['Statut'].str.lower() == "annulé")
+        # Filtre intelligent pour les archives
+        mask_archives = (df_c['Statut'].str.lower().isin(["terminé", "refusé", "annulé"]))
         df_affichage = df_c[mask_archives].copy() if st.session_state.vue_contact == "Archives" else df_c[~mask_archives].copy()
 
         for idx, row in df_affichage.iterrows():
             statut_label = str(row.get('Statut', 'En attente')).strip()
             societe_label = str(row.get('Société', 'PERSO')).strip().upper()
-            
-            # Calcul finances
             v_prix = clean_int(row.get('Prix', 0))
             v_acompte = clean_int(row.get('Acompte', 0))
             v_solde = v_prix - v_acompte
 
-            # Couleurs
             bg_color, text_color = "#ffffff", "#333333"
             if societe_label == "CMN": bg_color, text_color = "#3498db", "#ffffff"
             elif statut_label.lower() == "ok": bg_color = "#d4edda"
             elif statut_label.lower() == "en attente": bg_color = "#fff9c4"
             elif statut_label.lower() in ["annulé", "terminé"]: bg_color = "#e2e3e5"
 
+            # =========================================================
             # --- MODE ÉDITION ---
+            # =========================================================
             if st.session_state.edit_idx == idx:
                 with st.container():
                     st.markdown(f"### ✏️ Édition : {str(row.get('Nom',''))}")
                     
+                    # --- Zone de confirmation SUPPRESSION ---
                     if st.session_state.confirm_del_idx_c == idx:
-                        st.error("⚠️ SUPPRIMER DÉFINITIVEMENT ?")
-                        ca1, ca2 = st.columns(2)
-                        if ca1.button("✔️ OUI", key=f"del_y_{idx}", use_container_width=True):
+                        st.error(f"⚠️ SUPPRIMER DÉFINITIVEMENT {str(row.get('Nom',''))} ?")
+                        cd1, cd2 = st.columns(2)
+                        if cd1.button("✔️ OUI, SUPPRIMER", key=f"del_confirm_{idx}", use_container_width=True, type="primary"):
                             df_curr = charger_data('contacts.json'); df_curr = df_curr.drop(idx); sauvegarder_data(df_curr, 'contacts.json')
                             st.session_state.edit_idx = None; st.session_state.confirm_del_idx_c = None; st.rerun()
-                        if ca2.button("❌ NON", key=f"del_n_{idx}", use_container_width=True): st.session_state.confirm_del_idx_c = None; st.rerun()
+                        if cd2.button("❌ NON", key=f"del_cancel_{idx}", use_container_width=True): 
+                            st.session_state.confirm_del_idx_c = None; st.rerun()
+
+                    # --- Zone de confirmation ARCHIVAGE ---
+                    if st.session_state.confirm_arch_idx_c == idx:
+                        st.warning(f"📦 ARCHIVER {str(row.get('Nom',''))} ?")
+                        ca1, ca2 = st.columns(2)
+                        if ca1.button("✔️ OUI, ARCHIVER", key=f"arch_confirm_{idx}", use_container_width=True, type="primary"):
+                            df_curr = charger_data('contacts.json'); df_curr.at[idx, 'Statut'] = "Annulé"
+                            sauvegarder_data(df_curr, 'contacts.json'); st.session_state.edit_idx = None
+                            st.session_state.confirm_arch_idx_c = None; st.rerun()
+                        if ca2.button("❌ NON", key=f"arch_cancel_{idx}", use_container_width=True):
+                            st.session_state.confirm_arch_idx_c = None; st.rerun()
 
                     with st.form(f"form_edit_{idx}"):
                         c1, c2 = st.columns(2)
@@ -239,17 +247,14 @@ if st.session_state.page == "CONTACTS":
                         
                         st.write("💰 **FINANCES**")
                         f1, f2, f3 = st.columns(3)
-                        e_prix = f1.number_input("Prix (€)", value=v_prix, step=1)
+                        e_prix = f1.number_input("Prix Total (€)", value=v_prix, step=1)
                         e_acompte = f2.number_input("Acompte (€)", value=v_acompte, step=1)
                         f3.markdown(f"<br>Reste : <b style='color:red;'>{e_prix - e_acompte} €</b>", unsafe_allow_html=True)
                         
                         st.write("⛵ **NAVIGATION**")
                         c_date, c_pers, c_jours = st.columns(3)
-                        # Sécurisation de la date pour le sélecteur
-                        try:
-                            d_init = datetime.strptime(str(row.get('DateNav'))[:10], "%Y-%m-%d")
-                        except:
-                            d_init = datetime.now()
+                        try: d_init = datetime.strptime(str(row.get('DateNav'))[:10], "%Y-%m-%d")
+                        except: d_init = datetime.now()
                         e_date = c_date.date_input("Date", d_init)
                         e_pers = c_pers.number_input("Pers.", value=clean_int(row.get('Nbre de personnes', 1)), step=1)
                         e_jours = c_jours.number_input("Jours", value=clean_int(row.get('Nbre de jours', 1)), step=1)
@@ -265,7 +270,8 @@ if st.session_state.page == "CONTACTS":
                         opts_p = ["Non payé", "Payé"]
                         e_pa = s3.selectbox("Paiement", opts_p, index=opts_p.index(row.get('Paiement', 'Non payé')) if row.get('Paiement') in opts_p else 0)
                         
-                        if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
+                        btn_save, btn_quit = st.columns(2)
+                        if btn_save.form_submit_button("💾 ENREGISTRER", use_container_width=True):
                             df_c.at[idx, 'Prénom'], df_c.at[idx, 'Nom'] = e_pre.upper(), e_nom.upper()
                             df_c.at[idx, 'DateNav'] = e_date.strftime("%Y-%m-%d")
                             df_c.at[idx, 'Société'], df_c.at[idx, 'Prix'] = e_soc, int(e_prix)
@@ -275,8 +281,17 @@ if st.session_state.page == "CONTACTS":
                             df_c.at[idx, 'Statut'], df_c.at[idx, 'Paiement'] = e_st, e_pa
                             sauvegarder_data(df_c, 'contacts.json'); st.session_state.edit_idx = None; st.rerun()
 
-                    if st.button("❌ QUITTER SANS SAUVER", use_container_width=True):
-                        st.session_state.edit_idx = None; st.rerun()
+                        if btn_quit.form_submit_button("❌ QUITTER", use_container_width=True):
+                            if str(row.get('Nom')) == "CONTACT": df_c = df_c.drop(idx); sauvegarder_data(df_c, 'contacts.json')
+                            st.session_state.edit_idx = None; st.rerun()
+                    
+                    # --- BOUTONS D'ACTION (HORS FORMULAIRE) ---
+                    st.write("---")
+                    b_arch, b_del = st.columns(2)
+                    if b_arch.button("📦 ARCHIVER", key=f"btn_arch_init_{idx}", use_container_width=True):
+                        st.session_state.confirm_arch_idx_c = idx; st.session_state.confirm_del_idx_c = None; st.rerun()
+                    if b_del.button("🗑️ SUPPRIMER", key=f"btn_del_init_{idx}", use_container_width=True):
+                        st.session_state.confirm_del_idx_c = idx; st.session_state.confirm_arch_idx_c = None; st.rerun()
 
             # --- MODE AFFICHAGE ---
             else:
@@ -294,7 +309,7 @@ if st.session_state.page == "CONTACTS":
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
-                if st.button(f"✏️ MODIFIER : {row.get('Nom')}", key=f"btn_{idx}", use_container_width=True):
+                if st.button(f"✏️ MODIFIER : {row.get('Nom')}", key=f"btn_open_{idx}", use_container_width=True):
                     st.session_state.edit_idx = idx; st.rerun()
 
 # =================================================================
