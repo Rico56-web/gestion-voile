@@ -5,28 +5,57 @@ import plotly.express as px
 from datetime import datetime, date, timedelta
 import calendar
 
+# =================================================================
+# --- TON CODE ACTUEL (PRÉSERVER SANS CHANGEMENT) ---
+# =================================================================
+
 def preparer_log_safe(df):
     """Nettoie et sécurise les données du logbook pour éviter les plantages d'affichage."""
     if df.empty:
-        # Retourne un DataFrame vide avec les colonnes minimales attendues
         return pd.DataFrame(columns=[
             'Date', 'PortDep', 'PortArr', 'MotDep', 'MotArr', 
             'TotalMot', 'MilDep', 'MilArr', 'TotalMil', 'Equipage'
         ])
     
-    # Conversion forcée en numérique pour les calculs (évite les erreurs de type)
     cols_num = ['MotDep', 'MotArr', 'MilDep', 'MilArr', 'TotalMot', 'TotalMil']
     for col in cols_num:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
     
-    # S'assurer que les colonnes de texte existent pour l'affichage
     cols_texte = ['PortDep', 'PortArr', 'Equipage', 'Mouillage', 'Date']
     for col in cols_texte:
         if col not in df.columns:
             df[col] = ""
             
     return df
+
+# =================================================================
+# --- NOUVELLES FONCTIONS UTILES (À AJOUTER À LA SUITE) ---
+# =================================================================
+
+def clean_int(val):
+    """Nettoie les valeurs financières (Prix, Acompte) pour le calcul du Solde."""
+    try:
+        if val is None or str(val).strip() == "" or str(val).lower() == "nan": 
+            return 0
+        clean_val = str(val).replace(',', '.').replace('€', '').replace(' ', '').strip()
+        return int(float(clean_val))
+    except: 
+        return 0
+
+def format_tel_lien(tel):
+    """Nettoie le téléphone pour les boutons d'appel/WhatsApp."""
+    if not tel: return ""
+    return "".join(filter(str.isdigit, str(tel)))
+
+def formater_date_affichage(date_val):
+    """Affiche la date au format FR (JJ/MM/AAAA)."""
+    if pd.isna(date_val) or str(date_val).strip() in ["", "None", "nan"]: 
+        return "---"
+    try: 
+        return datetime.strptime(str(date_val)[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
+    except: 
+        return str(date_val)
 # =================================================================
 # --- 1. CONFIGURATION & STYLE (IPHONE FIRST) ---
 # =================================================================
