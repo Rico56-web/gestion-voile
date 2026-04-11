@@ -211,31 +211,22 @@ if st.session_state.page == "CONTACTS":
     else:
         st.info("Aucun contact trouvé.")
 # =================================================================
-# --- 6. PAGE MODIFIER CONTACT (V75 - CORRECTIF SYNTAXE) ---
+# --- 6. PAGE MODIFIER CONTACT (V77 - FORMULAIRE COMPLET) ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
-    st.markdown('<div style="background-color:#5DADE2; padding:10px; border-radius:10px; color:white; text-align:center;"><h3>&#9998; Modification de la Fiche</h3></div>', unsafe_allow_html=True)
+    st.markdown('<div style="background-color:#5DADE2; padding:10px; border-radius:10px; color:white; text-align:center;"><h3>✏️ Modification Contact</h3></div>', unsafe_allow_html=True)
     
     idx_to_edit = st.session_state.get('edit_idx')
-    
-    # 1. Chargement et conversion des types pour éviter le TypeError Pandas
     df_m = charger_data('contacts.json')
     
     if not df_m.empty:
         for col in ['Jours', 'Pers', 'Prix', 'Acompte']:
-            if col in df_m.columns:
-                df_m[col] = df_m[col].astype(object)
+            if col in df_m.columns: df_m[col] = df_m[col].astype(object)
 
     if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
         row = df_m.loc[idx_to_edit]
         
-        # Sécurisation des valeurs pour les widgets numériques
-        v_j = int(safe_int(row.get('Jours', 1)))
-        v_p = int(safe_int(row.get('Pers', 1)))
-        if v_j < 1: v_j = 1
-        if v_p < 1: v_p = 1
-
-        with st.form("form_edit_v75"):
+        with st.form("form_final_v77"):
             c1, c2 = st.columns(2)
             new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
             new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
@@ -248,10 +239,12 @@ if st.session_state.page == "MODIFIER_CONTACT":
             new_tel = c5.text_input("Téléphone", value=str(row.get('Téléphone', '')))
             new_mail = c6.text_input("Email", value=str(row.get('Email', '')))
             
+            # --- LOGISTIQUE ---
             cl1, cl2 = st.columns(2)
-            new_jours = cl1.number_input("Nombre de jours", value=v_j, min_value=1)
-            new_pers = cl2.number_input("Nombre de personnes", value=v_p, min_value=1)
+            new_jours = cl1.number_input("Nombre de jours", value=int(safe_int(row.get('Jours', 1))), min_value=1)
+            new_pers = cl2.number_input("Nombre de personnes", value=int(safe_int(row.get('Pers', 1))), min_value=1)
             
+            # --- STATUTS ---
             col_a, col_b = st.columns(2)
             statut_list = ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé"]
             curr_s = str(row.get('Statut', 'En attente'))
@@ -259,19 +252,18 @@ if st.session_state.page == "MODIFIER_CONTACT":
             new_statut = col_a.selectbox("Statut Mission", statut_list, index=s_idx)
             
             curr_pay = str(row.get('Paiement', 'Unpaid'))
-            new_pay = col_b.radio("État du Paiement", ["Unpaid", "Paid"], 
-                                 index=1 if curr_pay.upper() == "PAID" else 0, horizontal=True)
+            new_pay = col_b.radio("État du Paiement", ["Unpaid", "Paid"], index=1 if curr_pay.upper() == "PAID" else 0, horizontal=True)
             
+            # --- FINANCES ---
             f1, f2 = st.columns(2)
             new_prix = f1.number_input("Prix Total (€)", value=int(safe_int(row.get('Prix', 0))))
             new_aco = f2.number_input("Acompte (€)", value=int(safe_int(row.get('Acompte', 0))))
             
             new_notes = st.text_area("Notes", value=str(row.get('Notes', '')).replace('nan',''))
 
-            submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
+            submitted = st.form_submit_button("💾 ENREGISTRER", use_container_width=True)
             
             if submitted:
-                # Mise à jour avec conversion forcée pour éviter les conflits Pandas/Arrow
                 df_m.at[idx_to_edit, 'Prénom'] = str(new_pre).upper().strip()
                 df_m.at[idx_to_edit, 'Nom'] = str(new_nom).upper().strip()
                 df_m.at[idx_to_edit, 'DateNav'] = str(new_date)
@@ -287,13 +279,11 @@ if st.session_state.page == "MODIFIER_CONTACT":
                 df_m.at[idx_to_edit, 'Notes'] = str(new_notes)
                 
                 sauvegarder_data(df_m, 'contacts.json')
-                st.success("Données enregistrées !")
-                st.session_state.page = "CONTACTS"
-                st.rerun()
+                st.success("C'est enregistré !")
+                st.session_state.page = "CONTACTS"; st.rerun()
 
-    if st.button("⬅️ ANNULER (Retour)", use_container_width=True):
-        st.session_state.page = "CONTACTS"
-        st.rerun()
+    if st.button("⬅️ RETOUR", use_container_width=True):
+        st.session_state.page = "CONTACTS"; st.rerun()
 
 # ===============================================================
 # --- 6. PAGE PLANNING (V18.3 - SÉCURITÉ DATE TOTALE) ---
