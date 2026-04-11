@@ -38,7 +38,8 @@
         "Telephone":null,
         "Commentaires":null,
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"ELISABETH",
@@ -79,7 +80,8 @@
         "Telephone":null,
         "Commentaires":null,
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"CMN",
@@ -120,7 +122,8 @@
         "Telephone":null,
         "Commentaires":"",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"PEDRO",
@@ -161,7 +164,8 @@
         "Telephone":null,
         "Commentaires":"nan",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"CMN",
@@ -202,7 +206,8 @@
         "Telephone":null,
         "Commentaires":"nan",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"AURELIEN",
@@ -243,7 +248,8 @@
         "Telephone":null,
         "Commentaires":"Vent vendredi \u26a0\ufe0ftroph\u00e9e Ouest France ce we Pb sur bouton poussoir verrouillage plage arriere",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"BENOIT",
@@ -284,7 +290,8 @@
         "Telephone":null,
         "Commentaires":"Appel le 26\/03\/ pour reserver",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"",
@@ -325,7 +332,8 @@
         "Telephone":null,
         "Commentaires":"",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"GILDAS",
@@ -366,7 +374,8 @@
         "Telephone":null,
         "Commentaires":"nan",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"CAMILLE",
@@ -407,7 +416,8 @@
         "Telephone":null,
         "Commentaires":"Camille et son ami",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"LAURENT",
@@ -448,7 +458,8 @@
         "Telephone":null,
         "Commentaires":"Ras",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"GROUPE ESPAGNE",
@@ -489,21 +500,22 @@
         "Telephone":null,
         "Commentaires":"Test du groupe avant l\u2019espagne",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"ELISABETH",
         "Nom":"ET MAELYS",
         "Statut":"En attente",
-        "Paiement":"Non pay\u00e9",
-        "DateNav":null,
+        "Paiement":"Unpaid",
+        "DateNav":"26\/04\/1956",
         "Soci\u00e9t\u00e9":"PARTICULIER",
         "Prix":140,
         "Nbre de personnes":2.0,
         "Nbre de jours":2.0,
         "T\u00e9l\u00e9phone":"",
         "Email":"",
-        "Notes":null,
+        "Notes":"",
         "NbreJours":null,
         "NbrePers":null,
         "NbJours":null,
@@ -518,7 +530,7 @@
         "dt":null,
         "Mail":null,
         "Date":null,
-        "Jours":null,
+        "Jours":2,
         "Date Nav":null,
         "Nb jours":null,
         "Heures moteur":null,
@@ -530,7 +542,8 @@
         "Telephone":null,
         "Commentaires":"",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":2.0
     },
     {
         "Pr\u00e9nom":"JULIEN",
@@ -571,7 +584,8 @@
         "Telephone":null,
         "Commentaires":null,
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"LAURENT",
@@ -612,7 +626,8 @@
         "Telephone":null,
         "Commentaires":"nan",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"BRIGITTE",
@@ -653,7 +668,8 @@
         "Telephone":null,
         "Commentaires":"nan",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"FLORENCE ET DOMINIQUE ET SONIA",
@@ -694,7 +710,8 @@
         "Telephone":null,
         "Commentaires":"Ras",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"LAURENT",
@@ -735,7 +752,8 @@
         "Telephone":null,
         "Commentaires":"None",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"JEAN LOUIS",
@@ -776,7 +794,8 @@
         "Telephone":null,
         "Commentaires":"",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"FRANCOISE",
@@ -817,7 +836,8 @@
         "Telephone":null,
         "Commentaires":"None",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"PHILIPPE",
@@ -858,7 +878,8 @@
         "Telephone":null,
         "Commentaires":"nan",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"YANNICK",
@@ -899,7 +920,8 @@
         "Telephone":null,
         "Commentaires":"\u00c0 voir",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     },
     {
         "Pr\u00e9nom":"AURELIEN",
@@ -940,6 +962,7 @@
         "Telephone":null,
         "Commentaires":"nan",
         "Statut_Paye":null,
-        "Acompte":0
+        "Acompte":0,
+        "Pers":null
     }
 ]
