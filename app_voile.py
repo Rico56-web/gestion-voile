@@ -22,7 +22,16 @@ def clean_text(val):
 
 def safe_int(val): # Au cas où vous l'utilisez ailleurs
     return clean_num(val)
-    
+  # --- FONCTION DE SÉCURITÉ POUR LES LOGS ---
+def preparer_log_safe(df):
+    """S'assure que le DataFrame des logs est prêt sans crash"""
+    if df is None or df.empty:
+        return pd.DataFrame(columns=['Date', 'Action', 'Utilisateur', 'Details'])
+    # On s'assure que les colonnes nécessaires existent
+    for col in ['Date', 'Action', 'Utilisateur', 'Details']:
+        if col not in df.columns:
+            df[col] = ""
+    return df  
 # --- FONCTIONS DE NETTOYAGE ---
 def safe_int(val):
     try:
