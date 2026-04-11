@@ -4,7 +4,11 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime, date, timedelta
 import calendar
-
+def safe_int(val):
+    try:
+        if val is None or str(val).lower() == 'nan' or str(val).strip() == '': return 0
+        return int(float(str(val).replace('€','').strip()))
+    except: return 0
 # =================================================================
 # --- TON CODE ACTUEL (PRÉSERVER SANS CHANGEMENT) ---
 # =================================================================
@@ -301,7 +305,7 @@ if st.session_state.page == "CONTACTS":
         st.info("Aucun contact trouvé.")
 
 # =================================================================
-# --- 6. PAGE MODIFIER CONTACT (ANTI-PAGE BLANCHE) ---
+# --- 6. PAGE MODIFIER CONTACT (CORRIGÉE) ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
     st.markdown("### ✏️ Modification du Contact")
@@ -312,7 +316,8 @@ if st.session_state.page == "MODIFIER_CONTACT":
     if idx_to_edit is not None and idx_to_edit in df_m.index:
         row = df_m.loc[idx_to_edit]
         
-        with st.form("edit_form"):
+        # ON OUVRE LE FORMULAIRE
+        with st.form("edit_form_unique"):
             c1, c2 = st.columns(2)
             prenom = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
             nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
@@ -330,7 +335,10 @@ if st.session_state.page == "MODIFIER_CONTACT":
             new_prix = st.number_input("Prix", value=int(safe_int(row.get('Prix', 0))))
             new_acompte = st.number_input("Acompte", value=int(safe_int(row.get('Acompte', 0))))
             
-            if st.form_submit_button("💾 ENREGISTRER"):
+            # LE BOUTON DOIT ÊTRE UN form_submit_button
+            submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
+            
+            if submitted:
                 df_m.at[idx_to_edit, 'Prénom'] = prenom.upper().strip()
                 df_m.at[idx_to_edit, 'Nom'] = nom.upper().strip()
                 df_m.at[idx_to_edit, 'DateNav'] = date_nav
@@ -344,11 +352,12 @@ if st.session_state.page == "MODIFIER_CONTACT":
                 st.session_state.page = "CONTACTS"
                 st.rerun()
 
-        if st.button("⬅️ ANNULER"):
+        # LE BOUTON ANNULER EST EN DEHORS DU FORMULAIRE
+        if st.button("⬅️ ANNULER ET RETOUR"):
             st.session_state.page = "CONTACTS"
             st.rerun()
     else:
-        st.error("Index de contact introuvable.")
+        st.error("Index introuvable.")
         if st.button("Retour"):
             st.session_state.page = "CONTACTS"
             st.rerun()
