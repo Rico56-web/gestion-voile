@@ -297,134 +297,147 @@ if st.session_state.page == "CONTACTS":
                     st.session_state.confirm_del_idx_c = idx; st.session_state.edit_idx = idx; st.rerun()
 
 # =================================================================
-# --- 5. BLOC CONTACTS (V42 - RÉPARÉ & STABILISÉ) ---
+# --- 6. PAGE PLANNING (V18.3 - SÉCURITÉ DATE TOTALE) ---
 # =================================================================
-if st.session_state.page == "CONTACTS":
-    st.title("👤 Gestion des Contacts")
+if st.session_state.page == "PLANNING":
+    from datetime import datetime, date, timedelta
+    import calendar
+    import pandas as pd
 
-    # Initialisation
-    if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
-    if 'confirm_del_idx_c' not in st.session_state: st.session_state.confirm_del_idx_c = None
-    if 'vue_contact' not in st.session_state: st.session_state.vue_contact = "En cours"
-
-    df_raw = charger_data('contacts.json')
+    st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>🗓️ PLANNING 2026</h1></div>', unsafe_allow_html=True)
     
-    if df_raw.empty:
-        st.info("Aucun contact dans la base.")
-        if st.button("➕ CRÉER LE PREMIER CONTACT"):
-            new_r = {"Prénom": "NOUVEAU", "Nom": "CONTACT", "Statut": "En attente", "Paiement": "Non payé", "DateNav": datetime.now().strftime("%Y-%m-%d"), "Société": "PERSO", "Prix": 0, "Acompte": 0}
-            df_db = pd.DataFrame([new_r])
-            sauvegarder_data(df_db, 'contacts.json')
-            st.rerun()
-    else:
-        df_c = df_raw.copy()
-        df_c['orig_idx'] = df_c.index 
-        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], errors='coerce')
-        
-        mask_arch = (df_c['Statut'].str.lower().isin(["terminé", "refusé", "annulé"]))
-        df_aff = df_c[mask_arch].copy() if st.session_state.vue_contact == "Archives" else df_c[~mask_arch].copy()
-        df_aff = df_aff.sort_values('dt_sort', ascending=False, na_position='last')
+    # Bouton Archives
+    if st.button("📂 ACCÉDER AUX ARCHIVES", key="k_arch_p", use_container_width=True):
+        st.session_state.last_page = "PLANNING"; st.session_state.page = "ARCHIVES"; st.rerun()
 
-        # Navigation
-        c1, c2, c3 = st.columns(3)
-        if c1.button("👤 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"):
-            st.session_state.vue_contact = "En cours"; st.session_state.edit_idx = None; st.rerun()
-        if c2.button("📂 ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"):
-            st.session_state.vue_contact = "Archives"; st.session_state.edit_idx = None; st.rerun()
-        if c3.button("➕ NOUVEAU", use_container_width=True):
-            new_r = {"Prénom": "NOUVEAU", "Nom": "CONTACT", "Statut": "En attente", "Paiement": "Non payé", "DateNav": datetime.now().strftime("%Y-%m-%d"), "Société": "PERSO", "Prix": 0, "Acompte": 0}
-            df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
-            sauvegarder_data(df_new, 'contacts.json')
-            st.session_state.edit_idx = 0; st.rerun()
+    st.divider()
 
-        st.markdown("---")
+    # Initialisation temporelle
+    m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+    maintenant = datetime.now()
+    aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
+    
+    # RESET DES VARIABLES DE CALCUL
+    jours_occ = {}
+    total_mois = 0
+    missions_list = []
 
-        for _, row in df_aff.iterrows():
-            idx = row['orig_idx']
+    if 'curr_month_idx' not in st.session_state: st.session_state.curr_month_idx = aujourdhui.month - 1
+    if 'curr_year' not in st.session_state: st.session_state.curr_year = aujourdhui.year
 
-            if st.session_state.edit_idx == idx:
-                st.markdown(f"### ✏️ Modification n°{idx}")
+    # Menu de sélection
+    c_m, c_y, c_n = st.columns([1.5, 1, 0.8])
+    sel_m_nom = c_m.selectbox("Mois", m_noms, index=st.session_state.curr_month_idx)
+    sel_m = m_noms.index(sel_m_nom) + 1
+    st.session_state.curr_month_idx = sel_m - 1
+    sel_y = c_y.selectbox("Année", [2026, 2027, 2028], index=[2026, 2027, 2028].index(st.session_state.curr_year))
+    st.session_state.curr_year = sel_y
+
+    if c_n.button("📍 ICI", use_container_width=True):
+        st.session_state.curr_month_idx = aujourdhui.month - 1
+        st.session_state.curr_year = aujourdhui.year
+        st.rerun()
+
+    # CHARGEMENT DES DONNÉES
+    df_p = charger_data('contacts.json')
+
+    if not df_p.empty:
+        for idx, r in df_p.iterrows():
+            try:
+                # 1. Nettoyage Nom
+                nom_client = str(r.get('Nom', '')).strip().upper()
+                if nom_client in ["", "CONTACT", "NAN"]: continue
                 
-                if st.session_state.get('confirm_del_idx_c') == idx:
-                    st.error("⚠️ SUPPRIMER DÉFINITIVEMENT ?")
-                    col_y, col_n = st.columns(2)
-                    if col_y.button("✔️ OUI", key=f"y_{idx}", use_container_width=True):
-                        df_db = charger_data('contacts.json').drop(idx).reset_index(drop=True)
-                        sauvegarder_data(df_db, 'contacts.json')
-                        st.session_state.edit_idx = None; st.session_state.confirm_del_idx_c = None; st.rerun()
-                    if col_n.button("❌ NON", key=f"n_{idx}", use_container_width=True):
-                        st.session_state.confirm_del_idx_c = None; st.rerun()
+                # 2. PARSEUR DE DATE MULTI-FORMAT (Le cœur du problème)
+                d_brute = str(r.get('DateNav') or r.get('Date') or '').strip().split(' ')[0]
+                dt_start = None
+                # On teste tous les formats possibles stockés dans le JSON
+                for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y"):
+                    try:
+                        dt_start = datetime.strptime(d_brute, fmt).date()
+                        break
+                    except: continue
+                
+                if not dt_start: continue # Si on ne comprend pas la date, on saute
 
-                with st.form(f"f_edit_{idx}"):
-                    ca, cb = st.columns(2)
-                    e_pre = ca.text_input("Prénom", str(row.get('Prénom', '')))
-                    e_nom = cb.text_input("Nom", str(row.get('Nom', '')))
-                    e_tel = ca.text_input("Téléphone", str(row.get('Téléphone', '')).replace("nan", ""))
-                    e_mail = cb.text_input("Email", str(row.get('Email', '')).replace("nan", ""))
-                    
-                    d1, d2, d3 = st.columns(3)
-                    d_str = str(row.get('DateNav', ''))[:10]
-                    try: d_in = datetime.strptime(d_str, "%Y-%m-%d").date()
-                    except: d_in = datetime.now().date()
-                    e_date = d1.date_input("Date", d_in)
-                    e_pers = d2.number_input("Pers.", value=clean_int(row.get('Nbre de personnes', 1)), step=1)
-                    e_jours = d3.number_input("Jours", value=clean_int(row.get('Nbre de jours', 1)), step=1)
-                    
-                    f1, f2, f3 = st.columns(3)
-                    e_prix = f1.number_input("Prix Total (€)", value=clean_int(row.get('Prix', 0)), step=1)
-                    e_acompte = f2.number_input("Acompte (€)", value=clean_int(row.get('Acompte', 0)), step=1)
-                    liste_soc = ["PERSO", "CMN", "VOG", "CLICK", "Autres"]
-                    e_soc = f3.selectbox("Société", liste_soc, index=liste_soc.index(str(row.get('Société','PERSO')).upper()) if str(row.get('Société','PERSO')).upper() in liste_soc else 0)
-                    
-                    s1, s2 = st.columns(2)
-                    e_st = s1.selectbox("Statut", ["En attente", "Ok", "Terminé", "Refusé", "Annulé"])
-                    e_pa = s2.selectbox("Paiement", ["Non payé", "Payé"], index=1 if str(row.get('Paiement'))=="Payé" else 0)
-                    e_notes = st.text_area("Notes", str(row.get('Notes', '')).replace("nan", ""))
-                    
-                    if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
-                        df_save = charger_data('contacts.json')
-                        df_save.at[idx, 'Prénom'] = e_pre.upper()
-                        df_save.at[idx, 'Nom'] = e_nom.upper()
-                        df_save.at[idx, 'Téléphone'] = e_tel
-                        df_save.at[idx, 'Email'] = e_mail
-                        df_save.at[idx, 'DateNav'] = e_date.strftime("%Y-%m-%d")
-                        df_save.at[idx, 'Société'] = e_soc
-                        df_save.at[idx, 'Statut'] = e_st
-                        df_save.at[idx, 'Prix'] = int(e_prix)
-                        df_save.at[idx, 'Acompte'] = int(e_acompte)
-                        df_save.at[idx, 'Nbre de personnes'] = int(e_pers)
-                        df_save.at[idx, 'Nbre de jours'] = int(e_jours)
-                        df_save.at[idx, 'Paiement'] = e_pa
-                        df_save.at[idx, 'Notes'] = e_notes
-                        sauvegarder_data(df_save, 'contacts.json')
-                        st.session_state.edit_idx = None; st.rerun()
-                    if st.form_submit_button("❌ ANNULER", use_container_width=True):
-                        st.session_state.edit_idx = None; st.rerun()
+                # 3. Récupération Durée & Infos
+                n_j = clean_int(r.get('Nbre de jours', 1))
+                statut = str(r.get('Statut', 'Ok')).lower()
+                soc = str(r.get('Société', 'PERSO')).upper()
+                dt_end = dt_start + timedelta(days=max(0, n_j-1))
+                prix_val = float(str(r.get('Prix', '0')).replace('€','').replace(' ','').strip() or 0)
+
+                # 4. Attribution Couleur
+                if "CMN" in soc: color = "#3498db"
+                elif "annul" in statut or "refus" in statut: color = "#bdc3c7"
+                elif dt_start < aujourdhui: color = "#34495e"
+                else: color = "#27ae60"
+
+                # 5. Remplissage Calendrier (Si le jour tombe dans le mois sélectionné)
+                for i in range(n_j):
+                    curr = dt_start + timedelta(days=i)
+                    if curr.month == sel_m and curr.year == sel_y:
+                        jours_occ[curr.day] = {"c": color}
+
+                # 6. Ajout à la liste si la mission touche au mois sélectionné
+                if (dt_start.year == sel_y and dt_start.month == sel_m) or (dt_end.year == sel_y and dt_end.month == sel_m):
+                    missions_list.append({
+                        'r': r, 'idx': idx, 'start': dt_start, 'end': dt_end, 
+                        'n_j': n_j, 'color': color, 'prix': prix_val, 'statut': statut
+                    })
+                    # On ajoute au total uniquement si le DÉBUT est dans ce mois
+                    if dt_start.month == sel_m and "annul" not in statut:
+                        total_mois += prix_val
+            except Exception as e:
+                continue
+
+    # AFFICHAGE CALENDRIER
+    h_cal = '<table style="width:100%; text-align:center; border-collapse:collapse; background:white; border:1px solid #ddd;">'
+    h_cal += '<tr style="background:#f8f9fa; font-size:12px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td>Sa</td><td>Di</td></tr>'
+    
+    for sem in calendar.monthcalendar(sel_y, sel_m):
+        h_cal += '<tr>'
+        for jour in sem:
+            if jour == 0:
+                h_cal += '<td style="height:40px; border:1px solid #eee;"></td>'
             else:
-                # Affichage Carte HTML
-                soc = str(row.get('Société','PERSO')).upper()
-                bg = "#3498db" if soc == "CMN" else "#ffffff"
-                tx = "#ffffff" if soc == "CMN" else "#333333"
-                p_v, a_v = clean_int(row.get('Prix',0)), clean_int(row.get('Acompte',0))
+                occ = jours_occ.get(jour, {})
+                bg = occ.get("c", "transparent")
+                txt_c = "white" if bg != "transparent" else "black"
+                is_t = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == aujourdhui.year)
+                st_cell = "background:#fff9c4;" if is_t else "" # Jaune clair pour aujourd'hui
                 
-                html_card = f"""
-                <div style='border:2px solid #4A4A4A; padding:12px; border-radius:10px; margin-bottom:10px; background:{bg}; color:{tx}; font-family:sans-serif;'>
-                    <div style='display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:5px;'>
-                        <b>{str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</b>
-                        <small>{str(row.get('Paiement','')).upper()}</small>
-                    </div>
-                    <div style='display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-top:10px; font-size:0.85rem;'>
-                        <div>📅 {row.get('DateNav')}</div><div>🏢 {soc}</div>
-                        <div>👥 Pers: {row.get('Nbre de personnes', 1)}</div><div>⏱️ Jours: {row.get('Nbre de jours', 1)}</div>
-                        <div>💰 Total: {p_v} €</div><div>🧾 Reste: <b style='color:{"#ffcccc" if soc=="CMN" else "red"};'>{p_v - a_v} €</b></div>
-                    </div>
-                </div>"""
-                st.components.v1.html(html_card, height=160)
-                c_edit, c_del = st.columns([4, 1])
-                if c_edit.button(f"✏️ Modifier {idx}", key=f"ed_{idx}", use_container_width=True):
-                    st.session_state.edit_idx = idx; st.rerun()
-                if c_del.button("🗑️", key=f"del_{idx}", use_container_width=True):
-                    st.session_state.confirm_del_idx_c = idx; st.session_state.edit_idx = idx; st.rerun()
+                h_cal += f'''<td style="{st_cell} border:1px solid #eee;">
+                                <div style="background:{bg}; color:{txt_c}; border-radius:50%; width:26px; height:26px; line-height:26px; margin:auto; font-weight:bold; font-size:12px;">
+                                    {jour}
+                                </div>
+                            </td>'''
+        h_cal += '</tr>'
+    st.markdown(h_cal + '</table>', unsafe_allow_html=True)
+
+    # AFFICHAGE DÉTAILS
+    st.markdown("### 📋 Détails des Missions")
+    if missions_list:
+        missions_list.sort(key=lambda x: x['start'])
+        for m in missions_list:
+            prix_p = f"{m['prix']:,.0f}".replace(",", " ")
+            col1, col2 = st.columns([1, 3.5])
+            with col1:
+                st.markdown(f"""<div style='background:{m['color']}; color:white; border-radius:5px; text-align:center; padding:5px;'>
+                    <span style='font-size:0.8rem;'>{m['start'].strftime('%d/%m')}</span><br><b>{prix_p} €</b>
+                </div>""", unsafe_allow_html=True)
+            with col2:
+                label = f"{str(m['r'].get('Prénom','')).upper()} {str(m['r'].get('Nom','')).upper()}"
+                if st.button(f"{label} ({m['statut'].upper()})", key=f"btn_p_{m['idx']}", use_container_width=True):
+                    st.session_state.edit_idx = m['idx']
+                    st.session_state.page = "CONTACTS"
+                    st.rerun()
+    else:
+        st.info(f"Aucune mission enregistrée pour {sel_m_nom} {sel_y}.")
+
+    # TOTAL FINAL
+    total_txt = f"{total_mois:,.0f}".replace(",", " ")
+    st.success(f"**💰 Total prévisionnel : {total_txt} €**")
 
 # =================================================================
 # --- 9. PAGE STATS (VERSION FINALE COMPLÈTE & COMPTABLEMENT JUSTE) ---
