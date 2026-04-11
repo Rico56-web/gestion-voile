@@ -220,7 +220,7 @@ if st.session_state.page == "CONTACTS":
                 df_db = charger_data('contacts.json').drop(idx)
                 sauvegarder_data(df_db, 'contacts.json'); st.rerun()
 # =================================================================
-# --- 6. PAGE MODIFIER CONTACT (V72 - CHAMPS COMPLETS) ---
+# --- 6. PAGE MODIFIER CONTACT (V73 - FIX ERROR MIN_VALUE) ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
     st.markdown('<div style="background-color:#5DADE2; padding:10px; border-radius:10px; color:white; text-align:center;"><h3>&#9998; Modification de la Fiche</h3></div>', unsafe_allow_html=True)
@@ -231,28 +231,33 @@ if st.session_state.page == "MODIFIER_CONTACT":
     if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
         row = df_m.loc[idx_to_edit]
         
-        with st.form("form_edition_vesta_2026"):
-            # Ligne 1 : Identité
+        # On sécurise les valeurs AVANT de créer le widget pour éviter le crash min_value
+        val_jours = int(safe_int(row.get('Jours', 1)))
+        val_pers = int(safe_int(row.get('Pers', 1)))
+        
+        # Si la valeur est 0, on force 1 pour le widget
+        if val_jours < 1: val_jours = 1
+        if val_pers < 1: val_pers = 1
+
+        with st.form("form_edition_vesta_final"):
             c1, c2 = st.columns(2)
             new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
             new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
             
-            # Ligne 2 : Date et Société
             c3, c4 = st.columns(2)
             new_date = c3.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav', '')))
             new_soc = c4.text_input("Société", value=str(row.get('Société', 'PERSO')))
             
-            # Ligne 3 : Coordonnées
             c5, c6 = st.columns(2)
             new_tel = c5.text_input("Téléphone", value=str(row.get('Téléphone', '')))
             new_mail = c6.text_input("Email", value=str(row.get('Email', '')))
             
-            # Ligne 4 : Logistique (NOUVEAU)
+            # --- Logistique ---
             cl1, cl2 = st.columns(2)
-            new_jours = cl1.number_input("Nombre de jours", value=int(safe_int(row.get('Jours', 1))), min_value=1)
-            new_pers = cl2.number_input("Nombre de personnes", value=int(safe_int(row.get('Pers', 1))), min_value=1)
+            new_jours = cl1.number_input("Nombre de jours", value=val_jours, min_value=1)
+            new_pers = cl2.number_input("Nombre de personnes", value=val_pers, min_value=1)
             
-            # Ligne 5 : Statuts et Paiement
+            # --- Statuts ---
             col_a, col_b = st.columns(2)
             statut_list = ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé"]
             curr_s = str(row.get('Statut', 'En attente'))
@@ -263,26 +268,25 @@ if st.session_state.page == "MODIFIER_CONTACT":
             new_pay = col_b.radio("État du Paiement", ["Unpaid", "Paid"], 
                                  index=1 if curr_pay.upper() == "PAID" else 0, horizontal=True)
             
-            # Ligne 6 : Finances
+            # --- Finances ---
             f1, f2 = st.columns(2)
             new_prix = f1.number_input("Prix Total (€)", value=int(safe_int(row.get('Prix', 0))))
-            new_aco = f2.number_input("Acompte versé (€)", value=int(safe_int(row.get('Acompte', 0))))
+            new_aco = f2.number_input("Acompte (€)", value=int(safe_int(row.get('Acompte', 0))))
             
-            # Ligne 7 : Notes
             new_notes = st.text_area("Notes", value=str(row.get('Notes', '')).replace('nan',''))
 
+            # BOUTON CRITIQUE
             submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
             
             if submitted:
-                # Enregistrement de TOUS les champs
                 df_m.at[idx_to_edit, 'Prénom'] = new_pre.upper().strip()
                 df_m.at[idx_to_edit, 'Nom'] = new_nom.upper().strip()
                 df_m.at[idx_to_edit, 'DateNav'] = new_date
                 df_m.at[idx_to_edit, 'Société'] = new_soc.upper().strip()
                 df_m.at[idx_to_edit, 'Téléphone'] = new_tel.strip()
                 df_m.at[idx_to_edit, 'Email'] = new_mail.strip()
-                df_m.at[idx_to_edit, 'Jours'] = new_jours  # Sauvegarde Jours
-                df_m.at[idx_to_edit, 'Pers'] = new_pers    # Sauvegarde Pers
+                df_m.at[idx_to_edit, 'Jours'] = new_jours
+                df_m.at[idx_to_edit, 'Pers'] = new_pers
                 df_m.at[idx_to_edit, 'Statut'] = new_statut
                 df_m.at[idx_to_edit, 'Paiement'] = new_pay
                 df_m.at[idx_to_edit, 'Prix'] = new_prix
@@ -290,11 +294,11 @@ if st.session_state.page == "MODIFIER_CONTACT":
                 df_m.at[idx_to_edit, 'Notes'] = new_notes
                 
                 sauvegarder_data(df_m, 'contacts.json')
-                st.success("Fiche mise à jour !")
+                st.success("Enregistré !")
                 st.session_state.page = "CONTACTS"
                 st.rerun()
 
-    if st.button("⬅️ ANNULER (Retour)", use_container_width=True):
+    if st.button("⬅️ ANNULER", use_container_width=True):
         st.session_state.page = "CONTACTS"
         st.rerun()
 # =================================================================
