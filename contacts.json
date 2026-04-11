@@ -380,8 +380,8 @@
     {
         "Pr\u00e9nom":"CAMILLE",
         "Nom":"VARREL",
-        "Statut":"En attente",
-        "Paiement":"Unpaid",
+        "Statut":"Confirm\u00e9",
+        "Paiement":"Paid",
         "DateNav":"12\/04\/2026",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":281,
