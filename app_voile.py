@@ -198,28 +198,32 @@ if st.session_state.page == "CONTACTS":
             mail = clean_text(row.get('Email', ''))
             note = clean_text(row.get('Notes', ''))
             
-            # --- FINANCES & STATUT ---
+         # --- FINANCES & STATUT (Version Spéciale Archives) ---
             prix = clean_num(row.get('Prix', 0))
             aco = clean_num(row.get('Acompte', 0))
             reste = prix - aco
             
-            # Nettoyage du statut et du paiement
+            # Nettoyage des textes
             sta_clean = str(row.get('Statut', '')).upper()
+            # On récupère le paiement, par défaut on considère "UNPAID" si c'est vide
             val_paye = str(row.get('Paiement', 'UNPAID')).strip().upper()
 
-            # 1. On définit d'abord si on doit afficher le paiement
-            # On ignore le paiement si c'est ANNULÉ ou REFUSÉ
-            ignore_paiement = any(x in sta_clean for x in ["ANNUL", "REFUS"])
-
-            if ignore_paiement:
+            # --- LA LOGIQUE DE COULEUR ---
+            
+            # 1. Cas des fiches "Mortes" (Annulé / Refusé)
+            if any(x in sta_clean for x in ["ANNUL", "REFUS"]):
                 p_label = "---"
-                p_color = "#666" # Gris neutre
-            elif val_paye == "PAID" and reste <= 0:
+                p_color = "#95A5A6" # Gris
+            
+            # 2. Cas des fiches Payées (soit coché PAID, soit reste à 0)
+            elif val_paye == "PAID" or reste <= 0:
                 p_label = "PAYÉ"
                 p_color = "green"
+            
+            # 3. Cas des fiches en cours ou archives non soldées
             else:
                 p_label = "NON PAYÉ"
-                p_color = "red"
+                p_color = "#E74C3C" # Rouge
             
             # Nettoyage total de la valeur (suppression espaces, majuscules)
             raw_pay = str(row.get('Paiement', 'UNPAID')).strip().upper()
