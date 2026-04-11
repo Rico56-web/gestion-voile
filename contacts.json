@@ -627,21 +627,21 @@
         "Commentaires":"nan",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":4
+        "Pers":4.0
     },
     {
         "Pr\u00e9nom":"BRIGITTE",
         "Nom":"LEBAS",
-        "Statut":"Ok",
-        "Paiement":"Non pay\u00e9",
-        "DateNav":null,
+        "Statut":"Confirm\u00e9",
+        "Paiement":"Unpaid",
+        "DateNav":"04\/05\/2026",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":140,
         "Nbre de personnes":1.0,
         "Nbre de jours":2.0,
         "T\u00e9l\u00e9phone":"0683202156",
         "Email":"",
-        "Notes":null,
+        "Notes":"",
         "NbreJours":null,
         "NbrePers":null,
         "NbJours":null,
@@ -656,7 +656,7 @@
         "dt":null,
         "Mail":null,
         "Date":null,
-        "Jours":null,
+        "Jours":2,
         "Date Nav":null,
         "Nb jours":null,
         "Heures moteur":null,
@@ -669,7 +669,7 @@
         "Commentaires":"nan",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":null
+        "Pers":2
     },
     {
         "Pr\u00e9nom":"FLORENCE ET DOMINIQUE ET SONIA",
