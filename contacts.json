@@ -87,8 +87,8 @@
         "Pr\u00e9nom":"CMN",
         "Nom":"CMN",
         "Statut":"Termin\u00e9",
-        "Paiement":"Unpaid",
-        "DateNav":"nan",
+        "Paiement":"Paid",
+        "DateNav":"21\/03\/2026",
         "Soci\u00e9t\u00e9":"CMN",
         "Prix":450,
         "Nbre de personnes":4.0,
@@ -110,7 +110,7 @@
         "dt":null,
         "Mail":null,
         "Date":null,
-        "Jours":0.0,
+        "Jours":2.0,
         "Date Nav":null,
         "Nb jours":null,
         "Heures moteur":null,
@@ -123,7 +123,7 @@
         "Commentaires":"",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":0.0
+        "Pers":4.0
     },
     {
         "Pr\u00e9nom":"PEDRO",
