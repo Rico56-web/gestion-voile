@@ -292,6 +292,83 @@ if st.session_state.page == "CONTACTS":
                 sauvegarder_data(df_db, 'contacts.json'); st.rerun()
     else:
         st.info("Aucune fiche trouvée pour cette sélection.")
+    # =================================================================
+# --- 6. PAGE MODIFIER CONTACT (V57 - SÉCURISÉ) ---
+# =================================================================
+if st.session_state.page == "MODIFIER_CONTACT":
+    st.markdown(f'<div style="background-color:#5DADE2; padding:10px; border-radius:10px; color:white; text-align:center;"><h3>✏️ Modification de la Fiche #{st.session_state.get("edit_idx")}</h3></div>', unsafe_allow_html=True)
+    
+    # 1. Rechargement des données pour être à jour
+    df_m = charger_data('contacts.json')
+    idx_to_edit = st.session_state.get('edit_idx')
+
+    # 2. Vérification de l'existence de la fiche
+    if idx_to_edit is not None and idx_to_edit in df_m.index:
+        row = df_m.loc[idx_to_edit]
+        
+        # 3. Formulaire de saisie
+        with st.form("form_edit_contact_v57"):
+            c1, c2 = st.columns(2)
+            new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
+            new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
+            
+            c3, c4 = st.columns(2)
+            new_date = c3.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav', '')))
+            new_soc = c4.text_input("Société (ex: CMN, PERSO)", value=str(row.get('Société', 'PERSO')))
+            
+            c5, c6 = st.columns(2)
+            new_tel = c5.text_input("Téléphone", value=str(row.get('Téléphone', '')))
+            new_mail = c6.text_input("Email", value=str(row.get('Email', '')))
+            
+            # Statuts et Paiement
+            col_a, col_b = st.columns(2)
+            statut_list = ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé"]
+            curr_statut = str(row.get('Statut', 'En attente'))
+            s_idx = statut_list.index(curr_statut) if curr_statut in statut_list else 0
+            new_statut = col_a.selectbox("Statut Mission", statut_list, index=s_idx)
+            
+            new_pay = col_b.radio("Paiement", ["Unpaid", "Paid"], 
+                                 index=0 if row.get('Paiement') == "Unpaid" else 1, horizontal=True)
+            
+            # Finances
+            f1, f2 = st.columns(2)
+            new_prix = f1.number_input("Prix Total (€)", value=int(safe_int(row.get('Prix', 0))))
+            new_aco = f2.number_input("Acompte versé (€)", value=int(safe_int(row.get('Acompte', 0))))
+            
+            # Notes
+            new_notes = st.text_area("Notes / Commentaires", value=str(row.get('Notes', '')).replace('nan',''))
+
+            # BOUTON DE SAUVEGARDE (Obligatoire dans un formulaire)
+            submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
+            
+            if submitted:
+                # Mise à jour des valeurs
+                df_m.at[idx_to_edit, 'Prénom'] = new_pre.upper().strip()
+                df_m.at[idx_to_edit, 'Nom'] = new_nom.upper().strip()
+                df_m.at[idx_to_edit, 'DateNav'] = new_date
+                df_m.at[idx_to_edit, 'Société'] = new_soc.upper().strip()
+                df_m.at[idx_to_edit, 'Téléphone'] = new_tel.strip()
+                df_m.at[idx_to_edit, 'Email'] = new_mail.strip()
+                df_m.at[idx_to_edit, 'Statut'] = new_statut
+                df_m.at[idx_to_edit, 'Paiement'] = new_pay
+                df_m.at[idx_to_edit, 'Prix'] = new_prix
+                df_m.at[idx_to_edit, 'Acompte'] = new_aco
+                df_m.at[idx_to_edit, 'Notes'] = new_notes
+                
+                sauvegarder_data(df_m, 'contacts.json')
+                st.success(f"Fiche #{idx_to_edit} mise à jour avec succès !")
+                st.session_state.page = "CONTACTS"
+                st.rerun()
+
+        # Bouton Annuler (hors formulaire)
+        if st.button("⬅️ ANNULER (Retour sans sauvegarder)", use_container_width=True):
+            st.session_state.page = "CONTACTS"
+            st.rerun()
+    else:
+        st.error(f"Erreur : La fiche #{idx_to_edit} est introuvable dans la base.")
+        if st.button("Retour aux Contacts"):
+            st.session_state.page = "CONTACTS"
+            st.rerun()    
 # =================================================================
 # --- 6. PAGE PLANNING (V18.3 - SÉCURITÉ DATE TOTALE) ---
 # =================================================================
