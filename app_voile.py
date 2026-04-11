@@ -204,7 +204,7 @@ if st.session_state.page == "CONTACTS":
             reste = prix - aco
 
             # On récupère la valeur propre
-v            al_paye = str(row.get('Paiement','')).strip().upper()
+            val_paye = str(row.get('Paiement','')).strip().upper()
 
             # Vérification d'égalité stricte au lieu de "in"
             if val_paye == "PAID":
