@@ -167,7 +167,7 @@ for i, name in enumerate(menu):
         st.session_state.page = name
         st.rerun()
 # =================================================================
-# --- 5. BLOC CONTACTS (V50 - FORCE BRUTE & TRI ABSOLU) ---
+# --- 5. BLOC CONTACTS (V52 - TRI CHRONO RÉEL & NETTOYAGE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div style="text-align:center; background-color:#f4f7f6; padding:10px; border-radius:10px;"><h2>👤 Vesta Skipper - Contacts</h2></div>', unsafe_allow_html=True)
@@ -178,12 +178,10 @@ if st.session_state.page == "CONTACTS":
             return int(float(str(val).replace('€','').strip()))
         except: return 0
 
-    # Initialisation des états
     if 'vue_contact' not in st.session_state: st.session_state.vue_contact = "En cours"
     if 'filtre_annee' not in st.session_state: st.session_state.filtre_annee = 2026
     if 'confirm_del_idx' not in st.session_state: st.session_state.confirm_del_idx = None
 
-    # Chargement SANS CACHE pour forcer la lecture réelle
     df_raw = charger_data('contacts.json')
 
     # --- 1. FILTRES ---
@@ -196,19 +194,17 @@ if st.session_state.page == "CONTACTS":
         df_c = df_raw.copy()
         df_c['orig_idx'] = df_c.index 
         
-        # --- NETTOYAGE ET TRI CHRONO INVERSÉ ---
-        # On force le format de date pour éviter les erreurs de tri
-        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], errors='coerce')
-        # Si une date est invalide, on met une date très ancienne pour la mettre en bas
-        df_c['dt_sort'] = df_c['dt_sort'].fillna(pd.Timestamp('2020-01-01'))
+        # --- NETTOYAGE DES DATES (Format flexible) ---
+        # On force la lecture jour en premier pour le format FR (JJ/MM/AAAA)
+        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         
-        # TRI : Plus récent en HAUT (descending=False pour ascending=False)
-        df_c = df_c.sort_values(by='dt_sort', ascending=False)
-
-        # Filtrage par Année
+        # --- FILTRAGE PAR ANNÉE (AVANT LE TRI) ---
         df_c = df_c[df_c['dt_sort'].dt.year == annee_sel]
 
-        # Filtre Recherche (Nom, Prénom, Société)
+        # --- TRI CHRONO INVERSÉ (Plus récent en haut) ---
+        df_c = df_c.sort_values(by='dt_sort', ascending=False)
+
+        # Filtre Recherche
         if search:
             mask = df_c['Nom'].astype(str).str.upper().str.contains(search) | \
                    df_c['Prénom'].astype(str).str.upper().str.contains(search) | \
@@ -223,12 +219,15 @@ if st.session_state.page == "CONTACTS":
 
         # --- 2. NAVIGATION ---
         n1, n2, n3 = st.columns(3)
-        if n1.button(f"👤 EN COURS ({len(df_c[~mask_arch])})", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"):
-            st.session_state.vue_contact = "En cours"; st.rerun()
-        if n2.button(f"📂 ARCHIVES ({len(df_c[mask_arch])})", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"):
-            st.session_state.vue_contact = "Archives"; st.rerun()
+        # Affichage dynamique du nombre de fiches trouvées
+        n1.button(f"👤 EN COURS ({len(df_c[~mask_arch])})", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary")
+        if n1: st.session_state.vue_contact = "En cours"; st.rerun()
+        
+        n2.button(f"📂 ARCHIVES ({len(df_c[mask_arch])})", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary")
+        if n2: st.session_state.vue_contact = "Archives"; st.rerun()
+        
         if n3.button("➕ NOUVEAU", use_container_width=True):
-            new_r = {"Prénom": "PRÉNOM", "Nom": "NOM", "Statut": "En attente", "Paiement": "Non payé", "DateNav": f"{annee_sel}-06-01", "Société": "PERSO", "Prix": 0, "Acompte": 0, "Nbre de personnes": 1, "Nbre de jours": 1}
+            new_r = {"Prénom": "PRÉNOM", "Nom": "NOM", "Statut": "En attente", "Paiement": "Non payé", "DateNav": f"01/06/{annee_sel}", "Société": "PERSO", "Prix": 0, "Acompte": 0, "Nbre de personnes": 1, "Nbre de jours": 1}
             df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
             sauvegarder_data(df_new, 'contacts.json'); st.rerun()
 
@@ -237,23 +236,23 @@ if st.session_state.page == "CONTACTS":
         # --- 3. AFFICHAGE DES CARTES ---
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
-            
-            # Paramètres Visuels
             statut = str(row.get('Statut', 'Ok')).lower()
             soc = str(row.get('Société','PERSO')).upper()
             
-            # Couleurs Pastel
-            if soc == "CMN": bg = "#D6EAF8" # Bleu pastel
-            elif any(x in statut for x in ["annul", "refus"]): bg = "#EBEDEF" # Gris
-            elif "attente" in statut: bg = "#FCF3CF" # Jaune
-            else: bg = "#D5F5E3" # Vert
+            # Pastel
+            if soc == "CMN": bg = "#D6EAF8"
+            elif any(x in statut for x in ["annul", "refus"]): bg = "#EBEDEF"
+            elif "attente" in statut: bg = "#FCF3CF"
+            else: bg = "#D5F5E3"
             
             p_tot = safe_int(row.get('Prix', 0))
             p_aco = safe_int(row.get('Acompte', 0))
-            tel = str(row.get('Téléphone', '')).replace("nan", "")
-            mail = str(row.get('Email', '')).replace("nan", "")
+            tel = str(row.get('Téléphone', '')).replace("nan", "").strip()
+            mail = str(row.get('Email', '')).replace("nan", "").strip()
+            
+            # Affichage propre de la date
+            d_prev = row['dt_sort'].strftime('%d/%m/%Y') if pd.notnull(row['dt_sort']) else row['DateNav']
 
-            # HTML CARD avec hauteur iPhone adaptée
             html_card = f"""
             <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; font-family:sans-serif; border:1px solid rgba(0,0,0,0.08); margin-bottom:5px;">
                 <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:5px;">
@@ -261,7 +260,7 @@ if st.session_state.page == "CONTACTS":
                     <span style="font-size:0.75rem; background:white; padding:2px 6px; border-radius:4px; font-weight:bold; border:1px solid #ccc;">{soc}</span>
                 </div>
                 <div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; gap:8px;">
-                    <div>📅 <b>{row.get('DateNav')}</b></div>
+                    <div>📅 <b>{d_prev}</b></div>
                     <div>⏱️ Durée : <b>{row.get('Nbre de jours', 1)} j.</b></div>
                     <div>👥 Pers. : <b>{row.get('Nbre de personnes', 1)}</b></div>
                     <div>📊 Statut : <b>{statut.upper()}</b></div>
@@ -277,7 +276,6 @@ if st.session_state.page == "CONTACTS":
             """
             st.components.v1.html(html_card, height=230)
             
-            # --- ACTIONS SOUS LA CARTE ---
             c_ed, c_del = st.columns([3, 2])
             if c_ed.button(f"✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx; st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
@@ -285,8 +283,9 @@ if st.session_state.page == "CONTACTS":
             if st.session_state.confirm_del_idx == idx:
                 col1, col2 = c_del.columns(2)
                 if col1.button("✅", key=f"y_{idx}", use_container_width=True):
-                    df_raw = df_raw.drop(idx)
-                    sauvegarder_data(df_raw, 'contacts.json'); st.session_state.confirm_del_idx = None; st.rerun()
+                    df_db = charger_data('contacts.json')
+                    df_db = df_db.drop(idx)
+                    sauvegarder_data(df_db, 'contacts.json'); st.session_state.confirm_del_idx = None; st.rerun()
                 if col2.button("❌", key=f"n_{idx}", use_container_width=True):
                     st.session_state.confirm_del_idx = None; st.rerun()
             else:
