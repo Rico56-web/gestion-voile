@@ -832,7 +832,6 @@ def maintenance_donnees():
 maintenance_donnees()
     # --- C. INTERFACE DE RÉGLAGE (DYNAMIQUE) ---
     st.title("🛠️ MAINTENANCE")
-    
     col_target, col_info = st.columns([2, 1])
     with col_target:
         new_target = st.number_input("Prochaine vidange à (h) :", 
