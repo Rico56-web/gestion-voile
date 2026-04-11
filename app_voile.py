@@ -217,8 +217,8 @@ CMN
 
 <div style="margin-top:12px; display:flex; gap:8px;">
     <a href="tel:" style="flex:1; text-decorat
-  # =================================================================
-# --- 5. BLOC CONTACTS (V61 - TRADUCTION & NETTOYAGE NAN) ---
+# =================================================================
+# --- 5. BLOC CONTACTS (V62 - FIX SYNTAX EMOJI) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div style="text-align:center; background-color:#f4f7f6; padding:10px; border-radius:10px;"><h2>👤 Vesta Skipper 2026 - Contacts</h2></div>', unsafe_allow_html=True)
@@ -244,12 +244,7 @@ if st.session_state.page == "CONTACTS":
                    df_c['Notes'].astype(str).str.upper().str.contains(search)
             df_c = df_c[mask]
 
-    arch_list = ["terminé", "refusé", "annulé", "termine", "refuse", "annule"]
-    if not df_c.empty:
-        mask_arch = df_c['Statut'].astype(str).str.lower().isin(arch_list)
-        df_aff = df_c[mask_arch].copy() if st.session_state.get('vue_contact') == "Archives" else df_c[~mask_arch].copy()
-    
-    # Boutons Navigation
+    # Navigation
     n1, n2, n3 = st.columns(3)
     if n1.button("👤 EN COURS", use_container_width=True): st.session_state.vue_contact = "En cours"; st.rerun()
     if n2.button("📂 ARCHIVES", use_container_width=True): st.session_state.vue_contact = "Archives"; st.rerun()
@@ -260,12 +255,18 @@ if st.session_state.page == "CONTACTS":
 
     st.divider()
 
+    # Logique d'affichage
+    arch_list = ["terminé", "refusé", "annulé", "termine", "refuse", "annule"]
+    if not df_c.empty:
+        mask_arch = df_c['Statut'].astype(str).str.lower().isin(arch_list)
+        df_aff = df_c[mask_arch].copy() if st.session_state.get('vue_contact') == "Archives" else df_c[~mask_arch].copy()
+
     for _, row in df_aff.iterrows():
         idx = row['orig_idx']
         soc = str(row.get('Société','PERSO')).upper()
         statut = str(row.get('Statut', 'Ok')).upper()
         
-        # --- NETTOYAGE & TRADUCTION ---
+        # Nettoyage des données
         pay_raw = str(row.get('Paiement', 'Non payé')).upper()
         paiement_fr = "PAYÉ" if pay_raw in ["PAID", "PAYÉ"] else "NON PAYÉ"
         pay_c = "#27AE60" if paiement_fr == "PAYÉ" else "#E74C3C"
@@ -275,13 +276,11 @@ if st.session_state.page == "CONTACTS":
         mail = str(row.get('Email', '')).replace('nan', '').strip()
         d_str = str(row.get('DateNav', '')).replace('nan', 'À SAISIR')
         
-        # Couleur CMN
         bg = "#D6EAF8" if soc == "CMN" else ("#EBEDEF" if any(x in statut.lower() for x in ["annul", "refus"]) else ("#FCF3CF" if "ATTENTE" in statut else "#D5F5E3"))
-        
         p_tot, p_aco = safe_int(row.get('Prix', 0)), safe_int(row.get('Acompte', 0))
 
-        # --- CARTE HTML ---
-        st.markdown(f"""
+        # Construction de la carte en une seule chaîne propre
+        card_html = f"""
         <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; border:1px solid rgba(0,0,0,0.1); margin-bottom:10px;">
             <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:8px;">
                 <span style="font-size:1.1rem; font-weight:bold;">#{idx} | {str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</span>
@@ -308,15 +307,18 @@ if st.session_state.page == "CONTACTS":
                 <a href="mailto:{mail}" style="flex:1; text-decoration:none; background:#EC7063; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">✉️ MAIL</a>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """
+        st.markdown(card_html, unsafe_allow_html=True)
         
-        # --- BOUTONS ACTIONS ---
         c_ed, c_del = st.columns(2)
         if c_ed.button(f"✏️ ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
-            st.session_state.edit_idx = idx; st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
+            st.session_state.edit_idx = idx
+            st.session_state.page = "MODIFIER_CONTACT"
+            st.rerun()
         if c_del.button(f"🗑️ SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
             df_db = charger_data('contacts.json').drop(idx)
-            sauvegarder_data(df_db, 'contacts.json'); st.rerun()
+            sauvegarder_data(df_db, 'contacts.json')
+            st.rerun()
 
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT (V57 - SÉCURISÉ) ---
