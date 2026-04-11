@@ -288,6 +288,14 @@ if st.session_state.page == "CONTACTS":
 
         # --- CARTE HTML (EMOJIS REMPLACÉS PAR CODES HTML) ---
         # Calendrier: &#128197; | Graphique: &#128202; | Sac Argent: &#128176; | Telephone: &#128222; | Note: &#128221;
+        # Utilisation de codes Unicode \Uxxxxxxxx pour éviter le SyntaxError
+        ico_date = "\U0001F4C5"  # Calendrier
+        ico_statut = "\U0001F4CA" # Graphique
+        ico_money = "\U0001F4B0"  # Sac d'argent
+        ico_tel = "\U0001F4DE"    # Téléphone
+        ico_mail = "\U00002709"   # Enveloppe
+        ico_note = "\U0001F4DD"   # Note
+
         card_html = f"""
         <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; border:1px solid rgba(0,0,0,0.1); margin-bottom:10px;">
             <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:8px;">
@@ -295,19 +303,19 @@ if st.session_state.page == "CONTACTS":
                 <span style="font-size:0.75rem; background:white; padding:3px 8px; border-radius:15px; font-weight:bold; border:1px solid #ccc;">{soc}</span>
             </div>
             <div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; gap:10px;">
-                <div>&#128197; Date : <b>{d_str}</b></div>
-                <div>&#128202; Statut : <b>{statut}</b></div>
-                <div>&#128176; Total : <b>{p_tot}€</b></div>
+                <div>{ico_date} Date : <b>{d_str}</b></div>
+                <div>{ico_statut} Statut : <b>{statut}</b></div>
+                <div>{ico_money} Total : <b>{p_tot}€</b></div>
                 <div>💸 Acompte : <b>{p_aco}€</b></div>
                 <div>💳 Reste : <b style="color:#C0392B;">{p_tot - p_aco}€</b></div>
                 <div style="color:{pay_c}; font-weight:bold;">🏷️ {paiement_fr}</div>
             </div>
             <div style="margin-top:10px; font-size:0.85rem; background:rgba(255,255,255,0.4); padding:8px; border-radius:6px;">
-                &#128222; Tel : <b>{tel if tel else "NON RENSEIGNE"}</b><br>
-                ✉️ Mail : <b>{mail if mail else "NON RENSEIGNE"}</b>
+                {ico_tel} Tel : <b>{tel if tel else "NON RENSEIGNE"}</b><br>
+                {ico_mail} Mail : <b>{mail if mail else "NON RENSEIGNE"}</b>
             </div>
             <div style="margin-top:10px; font-size:0.8rem; background:rgba(0,0,0,0.05); padding:8px; border-radius:6px; border-left:3px solid #34495E;">
-                &#128221; <i>{notes if notes else "Pas de notes..."}</i>
+                {ico_note} <i>{notes if notes else "Pas de notes..."}</i>
             </div>
             <div style="margin-top:12px; display:flex; gap:8px;">
                 <a href="tel:{tel}" style="flex:1; text-decoration:none; background:#5DADE2; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">APPEL</a>
