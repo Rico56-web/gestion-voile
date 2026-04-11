@@ -194,7 +194,7 @@
         "dt":null,
         "Mail":null,
         "Date":null,
-        "Jours":0,
+        "Jours":2,
         "Date Nav":null,
         "Nb jours":null,
         "Heures moteur":null,
@@ -207,7 +207,7 @@
         "Commentaires":"nan",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":0.0
+        "Pers":4.0
     },
     {
         "Pr\u00e9nom":"AURELIEN",
