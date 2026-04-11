@@ -249,7 +249,7 @@ if st.session_state.page == "CONTACTS":
                     <div>👥 Pers: <b>{row.get('Pers', 0)}</b></div>
                     <div>⏳ Jours: <b>{row.get('Jours', 0)}</b></div>
                     <div>💰 Total: <b>{prix} €</b></div>
-                    <div>📉 Reste: <b style="color:#C0392B;">{reste} €</b></div>
+                    <div>📉 Reste: <b style="color:{'#666' if ignore_paiement else '#C0392B'};">{reste} €</b></div>
                     <div style="color:{'green' if 'PAYÉ' in p_label else 'red'}; font-weight:bold;">🏷️ {p_label}</div>
                 </div>
                 <div style="margin-top:10px; padding:8px; background:rgba(255,255,255,0.4); border-radius:5px; font-size:0.8rem;">
