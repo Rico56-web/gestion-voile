@@ -200,8 +200,9 @@ if st.session_state.page == "CONTACTS":
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         
         # Filtrage par Année
-        df_c = df_c[df_c['dt_sort'].dt.year == annee_sel]
-        
+        # df_c = df_c[df_c['dt_sort'].dt.year == annee_sel]
+        # À la place, utilise ceci pour tout voir :
+        df_c = df_c.copy()
         # Tri descendant
         df_c = df_c.sort_values(by='dt_sort', ascending=False)
 
