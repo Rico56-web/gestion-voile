@@ -225,7 +225,77 @@ if st.session_state.page == "CONTACTS":
                 sauvegarder_data(df_db, 'contacts.json'); st.rerun()
     else:
         st.info("Aucun contact à afficher dans cette vue.")
+# =================================================================
+# --- 6. PAGE MODIFIER CONTACT (SÉCURISÉE & COMPLÈTE) ---
+# =================================================================
+if st.session_state.page == "MODIFIER_CONTACT":
+    st.markdown('<div style="background-color:#5DADE2; padding:10px; border-radius:10px; color:white; text-align:center;"><h3>✏️ Modification de la Fiche</h3></div>', unsafe_allow_html=True)
+    
+    # 1. Récupération de l'index
+    idx_to_edit = st.session_state.get('edit_idx')
+    
+    # 2. Rechargement frais des données
+    df_m = charger_data('contacts.json')
 
+    if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
+        row = df_m.loc[idx_to_edit]
+        
+        # 3. Formulaire
+        with st.form("form_edition_vesta"):
+            c1, c2 = st.columns(2)
+            new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
+            new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
+            
+            c3, c4 = st.columns(2)
+            new_date = c3.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav', '')))
+            new_soc = c4.text_input("Société", value=str(row.get('Société', 'PERSO')))
+            
+            c5, c6 = st.columns(2)
+            new_tel = c5.text_input("Téléphone", value=str(row.get('Téléphone', '')))
+            new_mail = c6.text_input("Email", value=str(row.get('Email', '')))
+            
+            col_a, col_b = st.columns(2)
+            statut_list = ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé"]
+            curr_s = str(row.get('Statut', 'En attente'))
+            s_idx = statut_list.index(curr_s) if curr_s in statut_list else 0
+            new_statut = col_a.selectbox("Statut Mission", statut_list, index=s_idx)
+            
+            # Gestion du Paiement (Stocké en Unpaid/Paid)
+            curr_pay = str(row.get('Paiement', 'Unpaid'))
+            new_pay = col_b.radio("Paiement", ["Unpaid", "Paid"], 
+                                 index=1 if curr_pay.upper() == "PAID" else 0, horizontal=True)
+            
+            f1, f2 = st.columns(2)
+            # Utilisation de safe_int pour éviter les erreurs de calcul
+            new_prix = f1.number_input("Prix Total (€)", value=int(safe_int(row.get('Prix', 0))))
+            new_aco = f2.number_input("Acompte (€)", value=int(safe_int(row.get('Acompte', 0))))
+            
+            new_notes = st.text_area("Notes", value=str(row.get('Notes', '')).replace('nan',''))
+
+            submitted = st.form_submit_button("💾 ENREGISTRER", use_container_width=True)
+            
+            if submitted:
+                df_m.at[idx_to_edit, 'Prénom'] = new_pre.upper().strip()
+                df_m.at[idx_to_edit, 'Nom'] = new_nom.upper().strip()
+                df_m.at[idx_to_edit, 'DateNav'] = new_date
+                df_m.at[idx_to_edit, 'Société'] = new_soc.upper().strip()
+                df_m.at[idx_to_edit, 'Téléphone'] = new_tel.strip()
+                df_m.at[idx_to_edit, 'Email'] = new_mail.strip()
+                df_m.at[idx_to_edit, 'Statut'] = new_statut
+                df_m.at[idx_to_edit, 'Paiement'] = new_pay
+                df_m.at[idx_to_edit, 'Prix'] = new_prix
+                df_m.at[idx_to_edit, 'Acompte'] = new_aco
+                df_m.at[idx_to_edit, 'Notes'] = new_notes
+                
+                sauvegarder_data(df_m, 'contacts.json')
+                st.success("Modifications enregistrées !")
+                st.session_state.page = "CONTACTS"
+                st.rerun()
+
+    # Bouton de secours pour sortir de la page blanche
+    if st.button("⬅️ Retour aux Contacts", use_container_width=True):
+        st.session_state.page = "CONTACTS"
+        st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (V18.3 - SÉCURITÉ DATE TOTALE) ---
 # =================================================================
