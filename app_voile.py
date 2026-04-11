@@ -803,7 +803,34 @@ if st.session_state.page == "MAINT":
     if not df_log.empty:
         df_log['MotArr'] = pd.to_numeric(df_log['MotArr'], errors='coerce').fillna(0)
         releve_h = df_log['MotArr'].max()
+        
+# =================================================================
+# --- BLOC MAINTENANCE : NETTOYAGE AUTOMATIQUE DES DONNÉES ---
+# =================================================================
+def maintenance_donnees():
+    df = charger_data('contacts.json')
+    if not df.empty:
+        # 1. Redressement des dates : transforme tout en format ISO (AAAA-MM-JJ)
+        # Gère les formats 01/01/2026, 2026-01-01, etc.
+        df['DateNav'] = pd.to_datetime(df['DateNav'], dayfirst=True, errors='coerce').dt.strftime('%Y-%m-%d')
+        
+        # 2. Remplissage des valeurs manquantes pour éviter les erreurs de calcul
+        df['Prix'] = pd.to_numeric(df['Prix'], errors='coerce').fillna(0).astype(int)
+        df['Acompte'] = pd.to_numeric(df['Acompte'], errors='coerce').fillna(0).astype(int)
+        df['Nbre de personnes'] = pd.to_numeric(df['Nbre de personnes'], errors='coerce').fillna(1).astype(int)
+        df['Nbre de jours'] = pd.to_numeric(df['Nbre de jours'], errors='coerce').fillna(1).astype(int)
+        
+        # 3. Standardisation des textes (Majuscules pour les noms)
+        df['Nom'] = df['Nom'].astype(str).str.upper().str.strip()
+        df['Prénom'] = df['Prénom'].astype(str).str.upper().str.strip()
+        df['Société'] = df['Société'].astype(str).str.upper().str.strip().replace('NAN', 'PERSO')
+        df['Statut'] = df['Statut'].fillna('En attente')
 
+        sauvegarder_data(df, 'contacts.json')
+
+
+# Exécution silencieuse de la maintenance au lancement
+maintenance_donnees()
     # --- C. INTERFACE DE RÉGLAGE (DYNAMIQUE) ---
     st.title("🛠️ MAINTENANCE")
     
