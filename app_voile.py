@@ -220,79 +220,81 @@ if st.session_state.page == "CONTACTS":
                 df_db = charger_data('contacts.json').drop(idx)
                 sauvegarder_data(df_db, 'contacts.json'); st.rerun()
 # =================================================================
-# --- 6. PAGE MODIFIER CONTACT (RÉINSTALLÉE & OPTIMISÉE) ---
+# --- 6. PAGE MODIFIER CONTACT (V72 - CHAMPS COMPLETS) ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
     st.markdown('<div style="background-color:#5DADE2; padding:10px; border-radius:10px; color:white; text-align:center;"><h3>&#9998; Modification de la Fiche</h3></div>', unsafe_allow_html=True)
     
-    # 1. Récupération de l'index sauvegardé lors du clic sur "EDITER"
     idx_to_edit = st.session_state.get('edit_idx')
-    
-    # 2. Rechargement des données pour être certain d'avoir le dernier état
     df_m = charger_data('contacts.json')
 
     if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
         row = df_m.loc[idx_to_edit]
         
-        # 3. Formulaire de modification
         with st.form("form_edition_vesta_2026"):
+            # Ligne 1 : Identité
             c1, c2 = st.columns(2)
             new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
             new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
             
+            # Ligne 2 : Date et Société
             c3, c4 = st.columns(2)
             new_date = c3.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav', '')))
-            new_soc = c4.text_input("Société (ex: CMN, PERSO)", value=str(row.get('Société', 'PERSO')))
+            new_soc = c4.text_input("Société", value=str(row.get('Société', 'PERSO')))
             
+            # Ligne 3 : Coordonnées
             c5, c6 = st.columns(2)
             new_tel = c5.text_input("Téléphone", value=str(row.get('Téléphone', '')))
             new_mail = c6.text_input("Email", value=str(row.get('Email', '')))
             
-            # --- Statuts et Paiement ---
+            # Ligne 4 : Logistique (NOUVEAU)
+            cl1, cl2 = st.columns(2)
+            new_jours = cl1.number_input("Nombre de jours", value=int(safe_int(row.get('Jours', 1))), min_value=1)
+            new_pers = cl2.number_input("Nombre de personnes", value=int(safe_int(row.get('Pers', 1))), min_value=1)
+            
+            # Ligne 5 : Statuts et Paiement
             col_a, col_b = st.columns(2)
             statut_list = ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé"]
             curr_s = str(row.get('Statut', 'En attente'))
             s_idx = statut_list.index(curr_s) if curr_s in statut_list else 0
             new_statut = col_a.selectbox("Statut Mission", statut_list, index=s_idx)
             
-            # Suivi des paiements : Paid / Unpaid
             curr_pay = str(row.get('Paiement', 'Unpaid'))
             new_pay = col_b.radio("État du Paiement", ["Unpaid", "Paid"], 
                                  index=1 if curr_pay.upper() == "PAID" else 0, horizontal=True)
             
-            # --- Finances ---
+            # Ligne 6 : Finances
             f1, f2 = st.columns(2)
-            # Utilisation de safe_int définie au début de ton code
             new_prix = f1.number_input("Prix Total (€)", value=int(safe_int(row.get('Prix', 0))))
             new_aco = f2.number_input("Acompte versé (€)", value=int(safe_int(row.get('Acompte', 0))))
             
-            new_notes = st.text_area("Notes / Commentaires", value=str(row.get('Notes', '')).replace('nan',''))
+            # Ligne 7 : Notes
+            new_notes = st.text_area("Notes", value=str(row.get('Notes', '')).replace('nan',''))
 
-            # Bouton de validation interne au formulaire
             submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
             
             if submitted:
-                # Mise à jour du DataFrame
+                # Enregistrement de TOUS les champs
                 df_m.at[idx_to_edit, 'Prénom'] = new_pre.upper().strip()
                 df_m.at[idx_to_edit, 'Nom'] = new_nom.upper().strip()
                 df_m.at[idx_to_edit, 'DateNav'] = new_date
                 df_m.at[idx_to_edit, 'Société'] = new_soc.upper().strip()
                 df_m.at[idx_to_edit, 'Téléphone'] = new_tel.strip()
                 df_m.at[idx_to_edit, 'Email'] = new_mail.strip()
+                df_m.at[idx_to_edit, 'Jours'] = new_jours  # Sauvegarde Jours
+                df_m.at[idx_to_edit, 'Pers'] = new_pers    # Sauvegarde Pers
                 df_m.at[idx_to_edit, 'Statut'] = new_statut
                 df_m.at[idx_to_edit, 'Paiement'] = new_pay
                 df_m.at[idx_to_edit, 'Prix'] = new_prix
                 df_m.at[idx_to_edit, 'Acompte'] = new_aco
                 df_m.at[idx_to_edit, 'Notes'] = new_notes
                 
-                # Sauvegarde sur GitHub
                 sauvegarder_data(df_m, 'contacts.json')
-                st.success(f"Fiche #{idx_to_edit} mise à jour !")
+                st.success("Fiche mise à jour !")
                 st.session_state.page = "CONTACTS"
                 st.rerun()
 
-    # Bouton Annuler / Retour (toujours visible si bug d'index)
-    if st.button("⬅️ ANNULER (Retour aux contacts)", use_container_width=True):
+    if st.button("⬅️ ANNULER (Retour)", use_container_width=True):
         st.session_state.page = "CONTACTS"
         st.rerun()
 # =================================================================
