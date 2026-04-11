@@ -171,127 +171,158 @@ for i, name in enumerate(menu):
         st.session_state.page = name
         st.rerun()
 # =================================================================
-# --- 5. BLOC CONTACTS (V57 - FINAL SÉCURISÉ) ---
+# --- 5. BLOC CONTACTS (V59 - FINAL COMPLET & FRANÇAIS) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div style="text-align:center; background-color:#f4f7f6; padding:10px; border-radius:10px;"><h2>👤 Vesta Skipper 2026 - Contacts</h2></div>', unsafe_allow_html=True)
 
-    # 1. INITIALISATION CRITIQUE (Évite le NameError de ce matin)
     df_raw = charger_data('contacts.json')
-    df_c = pd.DataFrame() 
+    df_c = pd.DataFrame()
     df_aff = pd.DataFrame()
-    nb_cours, nb_arch = 0, 0
 
-    # 2. FILTRES DE HAUT DE PAGE
+    # Filtres
     c_search, c_yr = st.columns([2, 1])
-    search = c_search.text_input("🔍 Rechercher (Nom, Notes...)", "").upper()
-    
-    # Gestion de la saison (S'assure que l'année est en session_state)
-    annee_sel = c_yr.selectbox("📅 Saison", [2026, 2027, 2028], 
-                               index=[2026, 2027, 2028].index(st.session_state.get('filtre_annee', 2026)))
-    st.session_state.filtre_annee = annee_sel
+    search = c_search.text_input("🔍 Rechercher (Nom, Notes, Société...)", "").upper()
+    annee_sel = c_yr.selectbox("📅 Saison", [2026, 2027, 2028], index=0)
 
-    # 3. TRAITEMENT DES DONNÉES (Seulement si le fichier n'est pas vide)
     if not df_raw.empty:
         df_c = df_raw.copy()
         df_c['orig_idx'] = df_c.index 
-        
-        # Tri Chronologique réel
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         
-        # Filtre Saison + Erreurs de saisie (pour ne rien perdre)
+        # Filtre Année + Tri Chronologique
         mask_annee = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna())
         df_c = df_c[mask_annee].copy()
         df_c = df_c.sort_values(by='dt_sort', ascending=False)
 
-        # Filtre Recherche
         if search:
             mask = df_c['Nom'].astype(str).str.upper().str.contains(search) | \
                    df_c['Prénom'].astype(str).str.upper().str.contains(search) | \
                    df_c['Notes'].astype(str).str.upper().str.contains(search)
             df_c = df_c[mask]
 
-    # 4. NAVIGATION ARCHIVES / EN COURS
+    # Navigation
     arch_list = ["terminé", "refusé", "annulé", "termine", "refuse", "annule"]
     if not df_c.empty:
         mask_arch = df_c['Statut'].astype(str).str.lower().isin(arch_list)
-        nb_cours = len(df_c[~mask_arch])
-        nb_arch = len(df_c[mask_arch])
-        
-        if st.session_state.get('vue_contact') == "Archives":
-            df_aff = df_c[mask_arch].copy()
-        else:
-            df_aff = df_c[~mask_arch].copy()
+        nb_cours = len(df_c[~mask_arch]); nb_arch = len(df_c[mask_arch])
+        df_aff = df_c[mask_arch].copy() if st.session_state.get('vue_contact') == "Archives" else df_c[~mask_arch].copy()
+    else:
+        nb_cours, nb_arch = 0, 0
 
     n1, n2, n3 = st.columns(3)
-    if n1.button(f"👤 EN COURS ({nb_cours})", use_container_width=True, type="primary" if st.session_state.get('vue_contact') != "Archives" else "secondary"):
-        st.session_state.vue_contact = "En cours"; st.rerun()
-    if n2.button(f"📂 ARCHIVES ({nb_arch})", use_container_width=True, type="primary" if st.session_state.get('vue_contact') == "Archives" else "secondary"):
-        st.session_state.vue_contact = "Archives"; st.rerun()
+    if n1.button(f"👤 EN COURS ({nb_cours})", use_container_width=True): st.session_state.vue_contact = "En cours"; st.rerun()
+    if n2.button(f"📂 ARCHIVES ({nb_arch})", use_container_width=True): st.session_state.vue_contact = "Archives"; st.rerun()
     if n3.button("➕ NOUVEAU", use_container_width=True):
-        new_r = {"Prénom": "PRÉNOM", "Nom": "NOM", "Statut": "En attente", "Paiement": "Unpaid", "DateNav": f"01/06/{annee_sel}", "Société": "PERSO", "Prix": 0, "Acompte": 0, "Notes": "", "Téléphone": "", "Email": ""}
+        new_r = {"Prénom": "PRÉNOM", "Nom": "NOM", "Statut": "En attente", "Paiement": "Non payé", "DateNav": f"01/06/{annee_sel}", "Société": "PERSO", "Prix": 0, "Acompte": 0, "Notes": "", "Téléphone": "", "Email": ""}
         df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
         sauvegarder_data(df_new, 'contacts.json'); st.rerun()
 
     st.divider()
 
-    # 5. BOUCLE D'AFFICHAGE (Zéro erreur si vide)
-    if not df_aff.empty:
-        for _, row in df_aff.iterrows():
-            idx = row['orig_idx']
-            soc = str(row.get('Société','PERSO')).upper()
-            statut = str(row.get('Statut', 'Ok')).upper()
-            paiement = str(row.get('Paiement', 'Unpaid'))
-            notes = str(row.get('Notes', '')).replace('nan', '')
-            tel = str(row.get('Téléphone', '')).replace('nan', '').strip()
-            mail = str(row.get('Email', '')).replace('nan', '').strip()
-            
-            # Couleur Bleue pour CMN
-            if soc == "CMN": bg = "#D6EAF8"
-            elif any(x in statut.lower() for x in ["annul", "refus"]): bg = "#EBEDEF"
-            elif "ATTENTE" in statut: bg = "#FCF3CF"
-            else: bg = "#D5F5E3"
-            
-            p_tot = safe_int(row.get('Prix', 0))
-            p_aco = safe_int(row.get('Acompte', 0))
-            d_str = row['dt_sort'].strftime('%d/%m/%Y') if pd.notnull(row['dt_sort']) else row.get('DateNav', 'DATE ?')
-            pay_color = "#27AE60" if paiement == "Paid" else "#E74C3C"
+    # Affichage des fiches
+    for _, row in df_aff.iterrows():
+        idx = row['orig_idx']
+        soc = str(row.get('Société','PERSO')).upper()
+        statut = str(row.get('Statut', 'Ok')).upper()
+        paiement = str(row.get('Paiement', 'Non payé'))
+        notes = str(row.get('Notes', '')).replace('nan', '')
+        tel = str(row.get('Téléphone', '')).replace('nan', '').strip()
+        mail = str(row.get('Email', '')).replace('nan', '').strip()
+        
+        # Couleurs : CMN en Bleu
+        bg = "#D6EAF8" if soc == "CMN" else ("#EBEDEF" if any(x in statut.lower() for x in ["annul", "refus"]) else ("#FCF3CF" if "ATTENTE" in statut else "#D5F5E3"))
+        
+        p_tot, p_aco = safe_int(row.get('Prix', 0)), safe_int(row.get('Acompte', 0))
+        d_str = row['dt_sort'].strftime('%d/%m/%Y') if pd.notnull(row['dt_sort']) else row.get('DateNav', 'À COMPLÉTER')
+        
+        # Couleur Paiement (Français)
+        pay_c = "#27AE60" if paiement == "Payé" else "#E74C3C"
 
-            st.markdown(f"""
-            <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; border:1px solid rgba(0,0,0,0.1); margin-bottom:10px;">
-                <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:8px;">
-                    <span style="font-size:1.1rem; font-weight:bold;">#{idx} | {str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</span>
-                    <span style="font-size:0.75rem; background:white; padding:3px 8px; border-radius:15px; font-weight:bold; border:1px solid #ccc;">{soc}</span>
-                </div>
-                <div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; gap:10px;">
-                    <div>📅 Date : <b>{d_str}</b></div>
-                    <div>📊 Statut : <b>{statut}</b></div>
-                    <div>💰 Total : <b>{p_tot}€</b></div>
-                    <div>💸 Acompte : <b>{p_aco}€</b></div>
-                    <div>💳 Reste : <b style="color:#C0392B;">{p_tot - p_aco}€</b></div>
-                    <div style="color:{pay_color}; font-weight:bold;">🏷️ {paiement}</div>
-                </div>
-                <div style="margin-top:10px; font-size:0.8rem; background:rgba(255,255,255,0.5); padding:8px; border-radius:6px;">
-                    📝 <i>{notes if notes else "..."}</i>
-                </div>
-                <div style="margin-top:12px; display:flex; gap:8px;">
-                    <a href="tel:{tel}" style="flex:1; text-decoration:none; background:#5DADE2; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📞 APPEL</a>
-                    <a href="https://wa.me/{tel.replace(' ','')}" style="flex:1; text-decoration:none; background:#52BE80; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">💬 WA</a>
-                    <a href="mailto:{mail}" style="flex:1; text-decoration:none; background:#EC7063; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">✉️ MAIL</a>
-                </div>
+        st.markdown(f"""
+        <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; border:1px solid rgba(0,0,0,0.1); margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:8px;">
+                <span style="font-size:1.1rem; font-weight:bold;">#{idx} | {str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</span>
+                <span style="font-size:0.75rem; background:white; padding:3px 8px; border-radius:15px; font-weight:bold; border:1px solid #ccc;">{soc}</span>
             </div>
-            """, unsafe_allow_html=True)
             
-            c_ed, c_del = st.columns([1, 1])
-            if c_ed.button(f"✏️ ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
-                st.session_state.edit_idx = idx; st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
+            <div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; gap:10px;">
+                <div>📅 Date : <b>{d_str}</b></div>
+                <div>📊 Statut : <b>{statut}</b></div>
+                <div>💰 Total : <b>{p_tot}€</b></div>
+                <div>💸 Acompte : <b>{p_aco}€</b></div>
+                <div>💳 Reste : <b style="color:#C0392B;">{p_tot - p_aco}€</b></div>
+                <div style="color:{pay_c}; font-weight:bold;">🏷️ {paiement.upper()}</div>
+            </div>
+
+            <div style="margin-top:10px; font-size:0.85rem; background:rgba(255,255,255,0.4); padding:8px; border-radius:6px;">
+                📞 Tel : <b>{tel if tel else "NON RENSEIGNÉ"}</b><br>
+                📧 Mail : <b>{mail if mail else "NON RENSEIGNÉ"}</b>
+            </div>
+
+            <div style="margin-top:10px; font-size:0.8rem; background:rgba(0,0,0,0.05); padding:8px; border-radius:6px; border-left:3px solid #34495E;">
+                📝 <i>{notes if notes else "Pas de notes..."}</i>
+            </div>
+
+            <div style="margin-top:12px; display:flex; gap:8px;">
+                <a href="tel:{tel}" style="flex:1; text-decoration:none; background:#5DADE2; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📞 APPEL</a>
+                <a href="https://wa.me/{tel.replace(' ','')}" style="flex:1; text-decoration:none; background:#52BE80; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">💬 WA</a>
+                <a href="mailto:{mail}" style="flex:1; text-decoration:none; background:#EC7063; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">✉️ MAIL</a>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        c_ed, c_del = st.columns(2)
+        if c_ed.button(f"✏️ ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
+            st.session_state.edit_idx = idx; st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
+        if c_del.button(f"🗑️ SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
+            df_db = charger_data('contacts.json').drop(idx)
+            sauvegarder_data(df_db, 'contacts.json'); st.rerun()
+
+# --- BLOC MODIFICATION (SÉCURISÉ & FRANÇAIS) ---
+if st.session_state.page == "MODIFIER_CONTACT":
+    st.markdown(f"### ✏️ Modification Fiche #{st.session_state.get('edit_idx')}")
+    df_m = charger_data('contacts.json')
+    idx_m = st.session_state.get('edit_idx')
+
+    if idx_m is not None and idx_m in df_m.index:
+        row = df_m.loc[idx_m]
+        with st.form("form_edit_final"):
+            col1, col2 = st.columns(2)
+            p = col1.text_input("Prénom", value=str(row.get('Prénom','')))
+            n = col2.text_input("Nom", value=str(row.get('Nom','')))
+            d = st.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav','')))
             
-            if c_del.button(f"🗑️ SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
-                df_db = charger_data('contacts.json')
-                df_db = df_db.drop(idx)
-                sauvegarder_data(df_db, 'contacts.json'); st.rerun()
-    else:
-        st.info("Aucune fiche trouvée pour cette sélection.")
+            col3, col4 = st.columns(2)
+            tel_m = col3.text_input("Téléphone", value=str(row.get('Téléphone','')))
+            mail_m = col4.text_input("Email", value=str(row.get('Email','')))
+            
+            st_m = st.selectbox("Statut Mission", ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé"], index=0)
+            pay_m = st.radio("Paiement", ["Non payé", "Payé"], index=0 if row.get('Paiement')=="Non payé" else 1, horizontal=True)
+            
+            soc_m = st.text_input("Société", value=str(row.get('Société','PERSO')))
+            prix_m = st.number_input("Prix Total (€)", value=int(safe_int(row.get('Prix',0))))
+            aco_m = st.number_input("Acompte (€)", value=int(safe_int(row.get('Acompte',0))))
+            note_m = st.text_area("Notes", value=str(row.get('Notes','')).replace('nan',''))
+
+            if st.form_submit_button("💾 SAUVEGARDER LES MODIFICATIONS"):
+                # On met à jour les données
+                df_m.at[idx_m, 'Prénom'] = p.upper().strip()
+                df_m.at[idx_m, 'Nom'] = n.upper().strip()
+                df_m.at[idx_m, 'DateNav'] = d
+                df_m.at[idx_m, 'Statut'] = st_m
+                df_m.at[idx_m, 'Société'] = soc_m.upper().strip()
+                df_m.at[idx_m, 'Notes'] = note_m
+                df_m.at[idx_m, 'Téléphone'] = tel_m
+                df_m.at[idx_m, 'Email'] = mail_m
+                df_m.at[idx_m, 'Paiement'] = pay_m
+                df_m.at[idx_m, 'Prix'] = prix_m
+                df_m.at[idx_m, 'Acompte'] = aco_m
+                
+                sauvegarder_data(df_m, 'contacts.json')
+                st.session_state.page = "CONTACTS"; st.rerun()
+        
+        if st.button("⬅️ ANNULER"): st.session_state.page = "CONTACTS"; st.rerun()
     # =================================================================
 # --- 6. PAGE MODIFIER CONTACT (V57 - SÉCURISÉ) ---
 # =================================================================
