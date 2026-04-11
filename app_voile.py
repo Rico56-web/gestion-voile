@@ -198,17 +198,23 @@ if st.session_state.page == "CONTACTS":
             mail = clean_text(row.get('Email', ''))
             note = clean_text(row.get('Notes', ''))
             
-             # --- FINANCES & DÉTECTION INTELLIGENTE ---
+            # --- FINANCES & STATUT ---
             prix = clean_num(row.get('Prix', 0))
             aco = clean_num(row.get('Acompte', 0))
             reste = prix - aco
             
-            # Récupération du choix manuel (Paid/Unpaid)
+            # Nettoyage du statut et du paiement
+            sta_clean = str(row.get('Statut', '')).upper()
             val_paye = str(row.get('Paiement', 'UNPAID')).strip().upper()
-            
-            # LOGIQUE : On affiche "PAYÉ" seulement si c'est marqué "PAID" 
-            # ET que le reste est bien à 0 (ou moins).
-            if val_paye == "PAID" and reste <= 0:
+
+            # 1. On définit d'abord si on doit afficher le paiement
+            # On ignore le paiement si c'est ANNULÉ ou REFUSÉ
+            ignore_paiement = any(x in sta_clean for x in ["ANNUL", "REFUS"])
+
+            if ignore_paiement:
+                p_label = "---"
+                p_color = "#666" # Gris neutre
+            elif val_paye == "PAID" and reste <= 0:
                 p_label = "PAYÉ"
                 p_color = "green"
             else:
