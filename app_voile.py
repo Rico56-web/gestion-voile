@@ -168,116 +168,105 @@ for i, name in enumerate(menu):
         st.rerun()
 
 # =================================================================
-# --- 5. BLOC CONTACTS (V36 - FIX AFFICHAGE HTML) ---
+# --- 5. BLOC CONTACTS (V38 - REPRISE DU DESIGN VISUEL) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👤 Gestion des Contacts")
 
-  # =================================================================
-# --- 5. BLOC CONTACTS (V37 - FIX NAMEERROR df_aff) ---
-# =================================================================
-if st.session_state.page == "CONTACTS":
-    st.title("👤 Gestion des Contacts")
-
-    # 1. INITIALISATION DE SÉCURITÉ
+    # --- INITIALISATION ET SÉCURITÉ ---
     df_c = charger_data('contacts.json')
-    df_aff = pd.DataFrame() # <--- ON CRÉE df_aff VIDE ICI POUR ÉVITER L'ERREUR
+    df_aff = pd.DataFrame() 
 
     if not df_c.empty:
         df_c['orig_idx'] = df_c.index 
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], errors='coerce')
         
-        # 2. DÉFINITION DE df_aff (Logique En cours / Archives)
         mask_arch = (df_c['Statut'].str.lower().isin(["terminé", "refusé", "annulé"]))
-        
-        if st.session_state.get('vue_contact') == "Archives":
-            df_aff = df_c[mask_arch].copy()
-        else:
-            df_aff = df_c[~mask_arch].copy()
-
-        # 3. TRI ET FILTRES (On travaille sur df_aff qui existe maintenant)
+        df_aff = df_c[mask_arch].copy() if st.session_state.get('vue_contact') == "Archives" else df_c[~mask_arch].copy()
         df_aff = df_aff.sort_values('dt_sort', ascending=False, na_position='last')
-        
-        # ... (Vos colonnes de recherche et filtres ici) ...
 
-        # 4. LA BOUCLE (Ligne 180)
-        # Maintenant df_aff est forcément défini, l'erreur NameError disparaît.
+        # --- NAVIGATION HAUT ---
+        c1, c2, c3 = st.columns(3)
+        if c1.button("👤 EN COURS", use_container_width=True): st.session_state.vue_contact = "En cours"; st.rerun()
+        if c2.button("📂 ARCHIVES", use_container_width=True): st.session_state.vue_contact = "Archives"; st.rerun()
+        if c3.button("➕ NOUVEAU", use_container_width=True):
+            # ... (logique nouveau contact)
+            st.rerun()
+
+        st.markdown("---")
+
+        # --- BOUCLE D'AFFICHAGE ---
         for _, row in df_aff.iterrows():
-            # ... (votre code d'affichage des fiches V36) ...
-            pass
-
-    # --- BOUCLE D'AFFICHAGE ---
-    for _, row in df_aff.iterrows():
-        idx = row['orig_idx']
-        statut_l = str(row.get('Statut', 'En attente')).strip()
-        soc_l = str(row.get('Société', 'PERSO')).strip().upper()
-        
-        # --- PRÉPARATION DES DONNÉES ---
-        raw_tel = str(row.get('Téléphone', '')).strip()
-        raw_mail = str(row.get('Email', '')).strip()
-        v_tel_display = raw_tel if raw_tel and raw_tel.lower() != "nan" else "NON RENSEIGNÉ"
-        v_mail_display = raw_mail if raw_mail and raw_mail.lower() != "nan" else "NON RENSEIGNÉ"
-        v_tel_link = format_tel_lien(raw_tel)
-
-        p_val = clean_int(row.get('Prix', 0))
-        a_val = clean_int(row.get('Acompte', 0))
-        txt_prix = f"{p_val} &euro;"
-        txt_reste = f"{(p_val - a_val)} &euro;"
-        d_aff = formater_date_affichage(row.get('DateNav'))
-
-        bg_card = "#ffffff"
-        if soc_l == "CMN": bg_card = "#3498db"
-        elif statut_l.lower() == "en attente": bg_card = "#fff9c4"
-        elif statut_l.lower() == "ok": bg_card = "#d4edda"
-
-        if st.session_state.edit_idx == idx:
-            # --- MODE ÉDITION (Ton formulaire existant) ---
-            st.info(f"Édition de la fiche n°{idx}")
-            # ... [Ton code de formulaire ici] ...
-            if st.button("Fermer l'édition"): 
-                st.session_state.edit_idx = None; st.rerun()
-        else:
-            # --- MODE AFFICHAGE CARTE (CORRIGÉ) ---
-            # IMPORTANT : Bien vérifier que tout est dans le f-string ci-dessous
-            st.markdown(f"""
-            <div style="border: 2px solid #4A4A4A; padding: 12px; border-radius: 12px; margin-bottom: 10px; background-color: {bg_card}; color: #333333;">
-                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 5px;">
-                    <b style="font-size: 1.1rem;">{str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</b>
-                    <b style="color: {'green' if str(row.get('Paiement'))=='Payé' else 'red'}; font-size: 0.85rem;">{str(row.get('Paiement','')).upper()}</b>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; font-size: 0.9rem;">
-                    <div>📅 <b>{d_aff}</b></div>
-                    <div>🏢 <b>{soc_l}</b></div>
-                    <div>👥 Pers: <b>{row.get('Nbre de personnes', 1)}</b></div>
-                    <div>⏱️ Jours: <b>{row.get('Nbre de jours', 1)}</b></div>
-                    <div>💰 Total: <b>{txt_prix}</b></div>
-                    <div>🧾 Reste: <b style="color:red;">{txt_reste}</b></div>
-                </div>
-
-                <div style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 6px; font-size: 0.85rem; border: 1px dashed rgba(0,0,0,0.1);">
-                    <div style="margin-bottom: 3px;">📱 {v_tel_display}</div>
-                    <div>✉️ {v_mail_display}</div>
-                </div>
-
-                <div style="margin-top: 8px; font-size: 0.8rem; font-style: italic;">
-                    📝 <i>{str(row.get('Notes', '...'))[:80]}</i>
-                </div>
-
-                <div style="margin-top: 10px; display: flex; gap: 5px;">
-                    <a href="tel:{v_tel_link}" style="flex:1; text-decoration:none;"><div style="background:#2ecc71; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📞 APPEL</div></a>
-                    <a href="https://wa.me/{v_tel_link}" style="flex:1; text-decoration:none;"><div style="background:#25d366; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">💬 WA</div></a>
-                    <a href="mailto:{raw_mail}" style="flex:1; text-decoration:none;"><div style="background:#e74c3c; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📧 MAIL</div></a>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            idx = row['orig_idx']
             
-            # Boutons de contrôle sous la fiche
-            c_mod, c_sup = st.columns([4, 1])
-            if c_mod.button(f"✏️ MODIFIER n°{idx}", key=f"btn_{idx}", use_container_width=True):
-                st.session_state.edit_idx = idx; st.rerun()
-            if c_sup.button("🗑️", key=f"del_{idx}", use_container_width=True):
-                st.session_state.confirm_del_idx_c = idx; st.session_state.edit_idx = idx; st.rerun()
+            # Préparation des variables
+            p_val = clean_int(row.get('Prix', 0))
+            a_val = clean_int(row.get('Acompte', 0))
+            txt_prix = f"{p_val} &euro;"
+            txt_reste = f"{(p_val - a_val)} &euro;"
+            
+            tel_raw = str(row.get('Téléphone', '')).replace("nan", "").strip()
+            mail_raw = str(row.get('Email', '')).replace("nan", "").strip()
+            tel_display = tel_raw if tel_raw else "NON RENSEIGNÉ"
+            mail_display = mail_raw if mail_raw else "NON RENSEIGNÉ"
+            tel_link = format_tel_lien(tel_raw)
+            
+            notes = str(row.get('Notes', '')).replace("nan", "...")
+            bg_color = "#3498db" if str(row.get('Société')).upper() == "CMN" else "#ffffff"
+
+            if st.session_state.edit_idx == idx:
+                # --- MODE ÉDITION (Formulaire) ---
+                with st.form(f"edit_{idx}"):
+                    st.write(f"Modification Fiche n°{idx}")
+                    # ... tes inputs ici
+                    if st.form_submit_button("Enregistrer"):
+                        st.session_state.edit_idx = None; st.rerun()
+            else:
+                # --- MODE CARTE (FORÇAGE DU HTML) ---
+                # On utilise une seule f-string très propre
+                carte_html = f"""
+                <div style="border: 2px solid #4A4A4A; padding: 12px; border-radius: 12px; margin-bottom: 10px; background-color: {bg_color}; color: #333333;">
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 5px;">
+                        <b style="font-size: 1.1rem;">{str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</b>
+                        <b style="color: {'green' if str(row.get('Paiement'))=='Payé' else 'red'}; font-size: 0.85rem;">{str(row.get('Paiement','')).upper()}</b>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; font-size: 0.9rem;">
+                        <div>📅 <b>{formater_date_affichage(row.get('DateNav'))}</b></div>
+                        <div>🏢 <b>{str(row.get('Société','PERSO')).upper()}</b></div>
+                        <div>👥 Pers: <b>{row.get('Nbre de personnes', 1)}</b></div>
+                        <div>⏱️ Jours: <b>{row.get('Nbre de jours', 1)}</b></div>
+                        <div>💰 Total: <b>{txt_prix}</b></div>
+                        <div>🧾 Reste: <b style="color:red;">{txt_reste}</b></div>
+                    </div>
+
+                    <div style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 6px; font-size: 0.85rem; border: 1px dashed rgba(0,0,0,0.1);">
+                        <div style="margin-bottom: 3px;">📱 {tel_display}</div>
+                        <div>✉️ {mail_display}</div>
+                    </div>
+
+                    <div style="margin-top: 8px; font-size: 0.8rem; font-style: italic;">
+                        📝 <i>{notes[:80]}</i>
+                    </div>
+
+                    <div style="margin-top: 10px; display: flex; gap: 5px;">
+                        <a href="tel:{tel_link}" style="flex:1; text-decoration:none;"><div style="background:#2ecc71; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📞 APPEL</div></a>
+                        <a href="https://wa.me/{tel_link}" style="flex:1; text-decoration:none;"><div style="background:#25d366; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">💬 WA</div></a>
+                        <a href="mailto:{mail_raw}" style="flex:1; text-decoration:none;"><div style="background:#e74c3c; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📧 MAIL</div></a>
+                    </div>
+                </div>
+                """
+                # C'EST CETTE LIGNE QUI FAIT LE DESSIN :
+                st.markdown(carte_html, unsafe_allow_html=True)
+                
+                # Boutons de gestion
+                c_mod, c_sup = st.columns([4, 1])
+                if c_mod.button(f"✏️ MODIFIER n°{idx}", key=f"btn_{idx}"):
+                    st.session_state.edit_idx = idx; st.rerun()
+                if c_sup.button("🗑️", key=f"del_{idx}"):
+                    st.session_state.confirm_del_idx_c = idx; st.rerun()
+
+
 # =================================================================
 # --- 6. PAGE PLANNING (V18 - DÉTAILS DATES & MONTANTS) ---
 # =================================================================
