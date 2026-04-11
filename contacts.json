@@ -515,7 +515,7 @@
         "Nbre de jours":2.0,
         "T\u00e9l\u00e9phone":"",
         "Email":"",
-        "Notes":"",
+        "Notes":"ras",
         "NbreJours":null,
         "NbrePers":null,
         "NbJours":null,
@@ -543,7 +543,7 @@
         "Commentaires":"",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":2.0
+        "Pers":2
     },
     {
         "Pr\u00e9nom":"JULIEN",
@@ -669,7 +669,7 @@
         "Commentaires":"nan",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":2
+        "Pers":2.0
     },
     {
         "Pr\u00e9nom":"FLORENCE ET DOMINIQUE ET SONIA",
