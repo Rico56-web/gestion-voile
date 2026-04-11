@@ -5,6 +5,24 @@ import plotly.express as px
 from datetime import datetime, date, timedelta
 import calendar
 
+# --- FONCTIONS DE SÉCURITÉ UNIVERSELLES ---
+def clean_num(val, default=0):
+    try:
+        if pd.isna(val) or val == "nan" or val == "" or val is None or val == "None": 
+            return default
+        return int(float(val))
+    except:
+        return default
+
+def clean_text(val):
+    v = str(val).replace('nan', '').replace('None', '').strip()
+    if "<div" in v or "<a " in v: 
+        return "Note à corriger"
+    return v if v else "---"
+
+def safe_int(val): # Au cas où vous l'utilisez ailleurs
+    return clean_num(val)
+    
 # --- FONCTIONS DE NETTOYAGE ---
 def safe_int(val):
     try:
@@ -230,10 +248,10 @@ if st.session_state.page == "CONTACTS":
         st.info("Aucun contact à afficher.")
 
 # =================================================================
-# --- 6. PAGE MODIFIER CONTACT (V88 - FIX LIGNE 272) ---
+# --- 6. PAGE MODIFIER CONTACT (V90 - VERSION FINALE GROUPÉE) ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
-    st.markdown('<h3 style="text-align:center;">✏️ Modifier Contact</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="text-align:center;">✏️ Modifier le Contact</h3>', unsafe_allow_html=True)
     
     idx_to_edit = st.session_state.get('edit_idx')
     df_m = charger_data('contacts.json')
@@ -241,62 +259,74 @@ if st.session_state.page == "MODIFIER_CONTACT":
     if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
         row = df_m.loc[idx_to_edit]
         
-        with st.form("form_edit_final"):
+        with st.form("form_edit_v90"):
+            # Ligne 1 : Identité
             c1, c2 = st.columns(2)
             new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
             new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
             
+            # Ligne 2 : Date et Société
             c3, c4 = st.columns(2)
             new_date = c3.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav', '')))
             new_soc = c4.text_input("Société", value=str(row.get('Société', 'PERSO')))
             
+            # Ligne 3 : Contacts
             c5, c6 = st.columns(2)
             new_tel = c5.text_input("Téléphone", value=str(row.get('Téléphone', '')))
             new_mail = c6.text_input("Email", value=str(row.get('Email', '')))
             
-            # --- LOGISTIQUE (LIGNE 272 CORRIGÉE : min_value=0) ---
+            # Ligne 4 : Logistique (Sécurisée contre le crash ligne 272)
             cl1, cl2 = st.columns(2)
-            val_j = clean_num(row.get('Jours', 0))
-            val_p = clean_num(row.get('Pers', 0))
+            new_jours = cl1.number_input("Nombre de jours", value=clean_num(row.get('Jours', 0)), min_value=0)
+            new_pers = cl2.number_input("Nombre de personnes", value=clean_num(row.get('Pers', 0)), min_value=0)
             
-            new_jours = cl1.number_input("Nombre de jours", value=val_j, min_value=0)
-            new_pers = cl2.number_input("Nombre de personnes", value=val_p, min_value=0)
-            
-            # --- FINANCES & STATUTS ---
+            # Ligne 5 : Finances
             f1, f2 = st.columns(2)
             new_prix = f1.number_input("Prix Total (€)", value=clean_num(row.get('Prix', 0)))
             new_aco = f2.number_input("Acompte (€)", value=clean_num(row.get('Acompte', 0)))
             
+            # Ligne 6 : Statuts
+            s1, s2 = st.columns(2)
             s_list = ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé"]
             curr_s = str(row.get('Statut', 'En attente')).capitalize()
             s_idx = s_list.index(curr_s) if curr_s in s_list else 0
-            new_statut = st.selectbox("Statut", s_list, index=s_idx)
+            new_statut = s1.selectbox("Statut Mission", s_list, index=s_idx)
             
-            new_pay = st.radio("Paiement", ["Unpaid", "Paid"], index=1 if "PAID" in str(row.get('Paiement','')).upper() else 0, horizontal=True)
+            new_pay = s2.radio("Paiement", ["Unpaid", "Paid"], index=1 if "PAID" in str(row.get('Paiement','')).upper() else 0, horizontal=True)
             
             new_notes = st.text_area("Notes", value=str(row.get('Notes', '')).replace('nan',''))
 
-            submitted = st.form_submit_button("💾 ENREGISTRER")
+            # BOUTON DE VALIDATION
+            submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
+            
             if submitted:
-                # Nettoyage anti-HTML dans les notes
-                note_final = str(new_notes).strip()
-                if "<div" in note_final: note_final = "Note nettoyée (erreur format)"
+                # 1. Nettoyage final
+                note_propre = str(new_notes).strip()
+                if "<div" in note_propre: note_propre = "Note réinitialisée"
 
-                df_m.at[idx_to_edit, 'Prénom'] = new_pre.upper()
-                df_m.at[idx_to_edit, 'Nom'] = new_nom.upper()
-                df_m.at[idx_to_edit, 'DateNav'] = new_date
-                df_m.at[idx_to_edit, 'Société'] = new_soc.upper()
-                df_m.at[idx_to_edit, 'Téléphone'] = new_tel
-                df_m.at[idx_to_edit, 'Email'] = new_mail
-                df_m.at[idx_to_edit, 'Jours'] = new_jours
-                df_m.at[idx_to_edit, 'Pers'] = new_pers
-                df_m.at[idx_to_edit, 'Prix'] = new_prix
-                df_m.at[idx_to_edit, 'Acompte'] = new_aco
-                df_m.at[idx_to_edit, 'Statut'] = new_statut
-                df_m.at[idx_to_edit, 'Paiement'] = new_pay
-                df_m.at[idx_to_edit, 'Notes'] = note_final
+                # 2. Mise à jour groupée (TOUS les éléments sont ici)
+                maj = {
+                    'Prénom': new_pre.upper(),
+                    'Nom': new_nom.upper(),
+                    'DateNav': new_date,
+                    'Société': new_soc.upper(),
+                    'Téléphone': new_tel.strip(),
+                    'Email': new_mail.strip(),
+                    'Jours': int(new_jours),
+                    'Pers': int(new_pers),
+                    'Prix': int(new_prix),
+                    'Acompte': int(new_aco),
+                    'Statut': new_statut,
+                    'Paiement': new_pay,
+                    'Notes': note_propre
+                }
                 
+                # Injection dans le DataFrame
+                df_m.loc[idx_to_edit, maj.keys()] = list(maj.values())
+                
+                # 3. Sauvegarde et redirection
                 sauvegarder_data(df_m, 'contacts.json')
+                st.success("Fiche mise à jour !")
                 st.session_state.page = "CONTACTS"
                 st.rerun()
 
