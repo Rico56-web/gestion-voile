@@ -105,127 +105,95 @@ for i, name in enumerate(menu):
                           type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name
         st.rerun()
-
-   # =================================================================
-# --- 5. BLOC CONTACTS (V84 - NETTOYAGE RADICAL) ---
 # =================================================================
-if st.session_state.page == "CONTACTS":
-    st.markdown('<h2 style="text-align:center;">Vesta Skipper 2026 - Contacts</h2>', unsafe_allow_html=True)
-
-    df_raw = charger_data('contacts.json')
+# --- 6. PAGE MODIFIER CONTACT (V85 - ANTI-CRASH) ---
+# =================================================================
+if st.session_state.page == "MODIFIER_CONTACT":
+    st.markdown('<div style="background-color:#5DADE2; padding:10px; border-radius:10px; color:white; text-align:center;"><h3>✏️ Modification Contact</h3></div>', unsafe_allow_html=True)
     
-    # --- FONCTION DE NETTOYAGE INTERNE ---
-    def clean_text(val):
-        v = str(val).strip().replace('nan', '').replace('None', '')
-        return v if v else "---"
+    idx_to_edit = st.session_state.get('edit_idx')
+    df_m = charger_data('contacts.json')
+    
+    # Sécurité pour les colonnes numériques
+    if not df_m.empty:
+        for col in ['Jours', 'Pers', 'Prix', 'Acompte']:
+            if col in df_m.columns: df_m[col] = df_m[col].astype(object)
 
-    def clean_num(val):
-        try:
-            if pd.isna(val) or val == "nan" or val == "None" or val == "": return 0
-            return int(float(val))
-        except: return 0
-
-    if not df_raw.empty:
-        df_c = df_raw.copy()
-        df_c['orig_idx'] = df_c.index 
-        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+    if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
+        row = df_m.loc[idx_to_edit]
         
-        # Filtres
-        c_search, c_yr = st.columns([2, 1])
-        search = c_search.text_input("Rechercher...", "").upper()
-        annee_sel = c_yr.selectbox("Saison", [2026, 2027, 2028], index=0)
-        
-        mask = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna())
-        df_c = df_c[mask].copy()
-        if search:
-            mask_s = df_c['Nom'].astype(str).str.upper().str.contains(search) | \
-                     df_c['Prénom'].astype(str).str.upper().str.contains(search)
-            df_c = df_c[mask_s]
-        df_c = df_c.sort_values(by='dt_sort', ascending=False)
-
-        # Onglets
-        if 'vue_contact' not in st.session_state: st.session_state.vue_contact = "En cours"
-        n1, n2, n3 = st.columns(3)
-        if n1.button("EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
-            st.session_state.vue_contact = "En cours"; st.rerun()
-        if n2.button("ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
-            st.session_state.vue_contact = "Archives"; st.rerun()
-        if n3.button("NOUVEAU", use_container_width=True):
-            new_r = {"Prénom":"PRENOM","Nom":"NOM","Statut":"En attente","Paiement":"Unpaid","DateNav":f"01/06/{annee_sel}","Société":"PERSO","Jours":1,"Pers":1,"Notes":"","Téléphone":"","Email":""}
-            df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
-            sauvegarder_data(df_new, 'contacts.json'); st.rerun()
-
-        st.divider()
-
-        # Filtrage Archives/En cours
-        arch_list = ["termine", "refuse", "annule", "terminé", "refusé", "annulé"]
-        mask_arch = df_c['Statut'].astype(str).str.lower().str.contains('|'.join(arch_list))
-        df_aff = df_c[mask_arch].copy() if st.session_state.vue_contact == "Archives" else df_c[~mask_arch].copy()
-
-        for _, row in df_aff.iterrows():
-            idx = row['orig_idx']
+        # OUVERTURE DU FORMULAIRE
+        with st.form("form_edit_v85"):
+            c1, c2 = st.columns(2)
+            new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
+            new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
             
-            # --- NETTOYAGE AVANT INJECTION HTML ---
-            pre = clean_text(row.get('Prénom', '')).upper()
-            nom = clean_text(row.get('Nom', '')).upper()
-            soc = clean_text(row.get('Société', 'PERSO')).upper()
-            sta = clean_text(row.get('Statut', 'EN ATTENTE')).upper()
-            dat = clean_text(row.get('DateNav', '--/--/----'))
-            tel = clean_text(row.get('Téléphone', ''))
-            mail = clean_text(row.get('Email', ''))
-            note = clean_text(row.get('Notes', 'Aucune note'))
+            c3, c4 = st.columns(2)
+            new_date = c3.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav', '')))
+            new_soc = c4.text_input("Société", value=str(row.get('Société', 'PERSO')))
             
-            # Nombres
-            n_p = clean_num(row.get('Pers', 1))
-            n_j = clean_num(row.get('Jours', 1))
-            prix = clean_num(row.get('Prix', 0))
-            aco = clean_num(row.get('Acompte', 0))
-            reste = prix - aco
+            c5, c6 = st.columns(2)
+            new_tel = c5.text_input("Téléphone", value=str(row.get('Téléphone', '')))
+            new_mail = c6.text_input("Email", value=str(row.get('Email', '')))
             
-            pay_label = "PAYÉ" if "PAID" in str(row.get('Paiement','')).upper() else "NON PAYÉ"
-            bg = "#D6EAF8" if soc == "CMN" else ("#FCF3CF" if "ATTENTE" in sta else "#D5F5E3")
-            t_url = tel.replace(' ', '').replace('+', '')
+            # --- LOGISTIQUE (On enlève le min_value=1 pour éviter le crash) ---
+            cl1, cl2 = st.columns(2)
+            val_j = int(safe_int(row.get('Jours', 1)))
+            val_p = int(safe_int(row.get('Pers', 1)))
+            
+            new_jours = cl1.number_input("Nombre de jours", value=val_j) # Retrait de min_value
+            new_pers = cl2.number_input("Nombre de personnes", value=val_p) # Retrait de min_value
+            
+            # --- STATUTS ---
+            col_a, col_b = st.columns(2)
+            statut_list = ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé"]
+            curr_s = str(row.get('Statut', 'En attente'))
+            # Nettoyage pour correspondance exacte
+            curr_s = curr_s.capitalize() if curr_s.lower() in [s.lower() for s in statut_list] else "En attente"
+            try:
+                s_idx = [s.lower() for s in statut_list].index(curr_s.lower())
+            except:
+                s_idx = 0
+                
+            new_statut = col_a.selectbox("Statut Mission", statut_list, index=s_idx)
+            
+            curr_pay = str(row.get('Paiement', 'Unpaid')).upper()
+            new_pay = col_b.radio("État du Paiement", ["Unpaid", "Paid"], index=1 if "PAID" in curr_pay else 0, horizontal=True)
+            
+            # --- FINANCES ---
+            f1, f2 = st.columns(2)
+            new_prix = f1.number_input("Prix Total (€)", value=int(safe_int(row.get('Prix', 0))))
+            new_aco = f2.number_input("Acompte (€)", value=int(safe_int(row.get('Acompte', 0))))
+            
+            new_notes = st.text_area("Notes", value=str(row.get('Notes', '')).replace('nan',''))
 
-            # --- LE BLOC HTML (SÉCURISÉ) ---
-            card_html = f"""
-            <div style="background-color:{bg}; padding:15px; border-radius:10px; border:1px solid #ccc; margin-bottom:10px; color:#2C3E50;">
-                <div style="display:flex; justify-content:space-between; font-weight:bold; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:5px;">
-                    <span>#{idx} | {pre} {nom}</span>
-                    <span style="background:white; padding:0 5px; border-radius:5px; font-size:0.75rem; border:1px solid #ddd;">{soc}</span>
-                </div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; margin-top:10px; gap:5px;">
-                    <div>📅 Date: <b>{dat}</b></div>
-                    <div>📊 Statut: <b>{sta}</b></div>
-                    <div>👥 Pers: <b>{n_p}</b></div>
-                    <div>⏳ Jours: <b>{n_j}</b></div>
-                    <div>💰 Total: <b>{prix} €</b></div>
-                    <div>📉 Reste: <b style="color:#C0392B;">{reste} €</b></div>
-                    <div style="color:{'green' if 'PAYÉ' in pay_label else 'red'}; font-weight:bold;">🏷️ {pay_label}</div>
-                </div>
-                <div style="margin-top:10px; padding:8px; background:rgba(255,255,255,0.4); border-radius:5px; font-size:0.8rem;">
-                    📞 Tel: <b>{tel}</b><br>
-                    ✉️ Mail: <b>{mail}</b>
-                </div>
-                <div style="font-size:0.8rem; margin-top:8px; border-left:3px solid #666; padding-left:8px; color:#555;">
-                    <i>{note}</i>
-                </div>
-                <div style="margin-top:12px; display:flex; gap:10px;">
-                    <a href="tel:{t_url}" style="flex:1; background:#5DADE2; color:white !important; text-align:center; padding:10px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:0.75rem;">📞 APPEL</a>
-                    <a href="https://wa.me/{t_url}" style="flex:1; background:#52BE80; color:white !important; text-align:center; padding:10px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:0.75rem;">💬 WHATSAPP</a>
-                </div>
-            </div>
-            """
-            st.markdown(card_html, unsafe_allow_html=True)
+            # LE BOUTON DOIT ÊTRE DANS LE "WITH" DU FORMULAIRE
+            submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
             
-            c_ed, c_del = st.columns(2)
-            if c_ed.button(f"EDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
-                st.session_state.edit_idx = idx
-                st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
-            if c_del.button(f"SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
-                df_db = charger_data('contacts.json').drop(idx)
-                sauvegarder_data(df_db, 'contacts.json'); st.rerun()
-    else:
-        st.info("Aucun contact.") 
+            if submitted:
+                df_m.at[idx_to_edit, 'Prénom'] = str(new_pre).upper().strip()
+                df_m.at[idx_to_edit, 'Nom'] = str(new_nom).upper().strip()
+                df_m.at[idx_to_edit, 'DateNav'] = str(new_date)
+                df_m.at[idx_to_edit, 'Société'] = str(new_soc).upper().strip()
+                df_m.at[idx_to_edit, 'Téléphone'] = str(new_tel).strip()
+                df_m.at[idx_to_edit, 'Email'] = str(new_mail).strip()
+                df_m.at[idx_to_edit, 'Jours'] = int(new_jours)
+                df_m.at[idx_to_edit, 'Pers'] = int(new_pers)
+                df_m.at[idx_to_edit, 'Statut'] = str(new_statut)
+                df_m.at[idx_to_edit, 'Paiement'] = str(new_pay)
+                df_m.at[idx_to_edit, 'Prix'] = int(new_prix)
+                df_m.at[idx_to_edit, 'Acompte'] = int(new_aco)
+                df_m.at[idx_to_edit, 'Notes'] = str(new_notes)
+                
+                sauvegarder_data(df_m, 'contacts.json')
+                st.success("Modifications enregistrées !")
+                st.session_state.page = "CONTACTS"
+                st.rerun()
+
+    if st.button("⬅️ RETOUR SANS SAUVEGARDER", use_container_width=True):
+        st.session_state.page = "CONTACTS"
+        st.rerun()
+
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT (V77 - FORMULAIRE COMPLET) ---
 # =================================================================
