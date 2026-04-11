@@ -267,10 +267,16 @@ if st.session_state.page == "MODIFIER_CONTACT":
             new_tel = c5.text_input("Téléphone", value=str(row.get('Téléphone', '')))
             new_mail = c6.text_input("Email", value=str(row.get('Email', '')))
             
-            # --- LOGISTIQUE ---
-            cl1, cl2 = st.columns(2)
-            new_jours = cl1.number_input("Nombre de jours", value=int(safe_int(row.get('Jours', 1))), min_value=1)
-            new_pers = cl2.number_input("Nombre de personnes", value=int(safe_int(row.get('Pers', 1))), min_value=1)
+             # --- LOGISTIQUE (Ligne 272 et suivantes) ---
+             cl1, cl2 = st.columns(2)
+
+             # On récupère la valeur, si c'est 0 ou vide, on met 0 par défaut
+             val_j = int(safe_int(row.get('Jours', 0)))
+             val_p = int(safe_int(row.get('Pers', 0)))
+
+             # IMPORTANT : On enlève "min_value=1" ou on met "min_value=0"
+             new_jours = cl1.number_input("Nombre de jours", value=val_j, min_value=0)
+             new_pers = cl2.number_input("Nombre de personnes", value=val_p, min_value=0)
             
             # --- STATUTS ---
             col_a, col_b = st.columns(2)
