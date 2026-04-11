@@ -268,8 +268,9 @@ if st.session_state.page == "CONTACTS":
                         df_save.at[idx, 'Acompte'] = int(e_acompte)
                         df_save.at[idx, 'Nbre de personnes'] = int(e_pers)
                         df_save.at[idx, 'Nbre de jours'] = int(e_jours)
+
 # =================================================================
-# --- 6. PAGE PLANNING (V18 - DÉTAILS DATES & MONTANTS) ---
+# --- 6. PAGE PLANNING (V18.1 - CORRECTIF NAMEERROR) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
     from datetime import datetime, date, timedelta
@@ -283,14 +284,20 @@ if st.session_state.page == "PLANNING":
 
     st.divider()
 
-    # --- NAVIGATION ---
+    # --- INITIALISATION DES VARIABLES ---
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
+    
+    # Sécurité pour éviter les NameError plus bas
+    jours_occ = {}
+    total_mois = 0
+    missions_list = []
 
     if 'curr_month_idx' not in st.session_state: st.session_state.curr_month_idx = aujourdhui.month - 1
     if 'curr_year' not in st.session_state: st.session_state.curr_year = aujourdhui.year
 
+    # --- NAVIGATION ---
     c_m, c_y, c_n = st.columns([1.5, 1, 0.8])
     sel_m_nom = c_m.selectbox("Mois", m_noms, index=st.session_state.curr_month_idx)
     sel_m = m_noms.index(sel_m_nom) + 1
@@ -303,67 +310,60 @@ if st.session_state.page == "PLANNING":
         st.session_state.curr_year = aujourdhui.year
         st.rerun()
 
-    jours_occ = {}
-    total_mois = 0
-    missions_list = []
-
-    # --- TRAITEMENT DES DONNÉES ---
-    if df_c is not None and not df_c.empty:
-        for idx, r in df_c.iterrows():
-            try:
-                nom_brut = str(r.get('Nom', '')).strip().upper()
-                if nom_brut in ["", "CONTACT", "NAN", "NONE"]: continue
-
-                # Extraction Date
-                d_val = str(r.get('DateNav') or r.get('Date') or '').strip().split(' ')[0]
-                dt_start = None
-                for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%j/%m/%Y"):
-                    try:
-                        dt_start = datetime.strptime(d_val, fmt).date()
-                        break
-                    except: continue
-                if not dt_start: continue
-
-                # Extraction Durée
-                n_j = 1
-                for k in ['Nbre de jours', 'NbJours', 'Jours', 'Nb jours', 'NbreJours']:
-                    val_j = r.get(k)
-                    if val_j is not None and str(val_j).lower() != 'nan' and str(val_j).strip() != "":
-                        n_j = int(float(val_j))
-                        break
-
-                statut = str(r.get('Statut', 'Ok')).strip().lower()
-                soc = str(r.get('Société', 'PERSO')).strip().upper()
-                dt_end = dt_start + timedelta(days=n_j-1)
-                
-                # Récupération Prix
+    # --- TRAITEMENT DES DONNÉES (df_c doit être chargé globalement) ---
+    if 'df_c' in locals() or 'df_c' in globals():
+        if df_c is not None and not df_c.empty:
+            for idx, r in df_c.iterrows():
                 try:
-                    prix_val = float(str(r.get('Prix', '0')).replace('€','').strip())
-                except:
-                    prix_val = 0.0
+                    nom_brut = str(r.get('Nom', '')).strip().upper()
+                    if nom_brut in ["", "CONTACT", "NAN", "NONE"]: continue
 
-                # Marquage Calendrier
-                for i in range(n_j):
-                    curr = dt_start + timedelta(days=i)
-                    if curr.month == sel_m and curr.year == sel_y:
-                        if "CMN" in soc: color = "#3498db"
-                        elif "annul" in statut or "refus" in statut: color = "#bdc3c7"
-                        elif curr < aujourdhui: color = "#34495e"
-                        else: color = "#27ae60"
-                        jours_occ[curr.day] = {"c": color}
+                    d_val = str(r.get('DateNav') or r.get('Date') or '').strip().split(' ')[0]
+                    dt_start = None
+                    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%j/%m/%Y"):
+                        try:
+                            dt_start = datetime.strptime(d_val, fmt).date()
+                            break
+                        except: continue
+                    if not dt_start: continue
 
-                # Ajout Liste
-                if (dt_start.year == sel_y and dt_start.month == sel_m) or (dt_end.year == sel_y and dt_end.month == sel_m):
-                    missions_list.append({
-                        'r': r, 'idx': idx, 'start': dt_start, 'end': dt_end, 
-                        'n_j': n_j, 'color': color if 'color' in locals() else "#27ae60",
-                        'prix': prix_val, 'statut': statut
-                    })
-                    if dt_start.month == sel_m and "annul" not in statut:
-                        total_mois += prix_val
-            except: continue
+                    n_j = 1
+                    for k in ['Nbre de jours', 'NbJours', 'Jours', 'Nb jours', 'NbreJours']:
+                        val_j = r.get(k)
+                        if val_j is not None and str(val_j).lower() != 'nan' and str(val_j).strip() != "":
+                            n_j = int(float(val_j))
+                            break
 
-    # --- CALENDRIER ---
+                    statut = str(r.get('Statut', 'Ok')).strip().lower()
+                    soc = str(r.get('Société', 'PERSO')).strip().upper()
+                    dt_end = dt_start + timedelta(days=n_j-1)
+                    
+                    try: prix_val = float(str(r.get('Prix', '0')).replace('€','').replace(' ','').strip())
+                    except: prix_val = 0.0
+
+                    # Couleur
+                    if "CMN" in soc: color = "#3498db"
+                    elif "annul" in statut or "refus" in statut: color = "#bdc3c7"
+                    elif dt_start < aujourdhui: color = "#34495e"
+                    else: color = "#27ae60"
+
+                    # Marquage Calendrier
+                    for i in range(n_j):
+                        curr = dt_start + timedelta(days=i)
+                        if curr.month == sel_m and curr.year == sel_y:
+                            jours_occ[curr.day] = {"c": color}
+
+                    # Ajout Liste si dans le mois sélectionné
+                    if (dt_start.year == sel_y and dt_start.month == sel_m) or (dt_end.year == sel_y and dt_end.month == sel_m):
+                        missions_list.append({
+                            'r': r, 'idx': idx, 'start': dt_start, 'end': dt_end, 
+                            'n_j': n_j, 'color': color, 'prix': prix_val, 'statut': statut
+                        })
+                        if dt_start.month == sel_m and "annul" not in statut:
+                            total_mois += prix_val
+                except: continue
+
+    # --- AFFICHAGE CALENDRIER HTML ---
     h_cal = '<table style="width:100%; text-align:center; border-collapse:collapse; background:white; border:1px solid #ddd;">'
     h_cal += '<tr style="background:#f1f3f5; font-size:12px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td>Sa</td><td>Di</td></tr>'
     for sem in calendar.monthcalendar(sel_y, sel_m):
@@ -371,8 +371,7 @@ if st.session_state.page == "PLANNING":
         for i, jour in enumerate(sem):
             if jour == 0: h_cal += '<td style="height:45px; border:1px solid #eee;"></td>'
             else:
-                occ = jours_occ.get(jour, {})
-                bg = occ.get("c", "transparent")
+                bg = jours_occ.get(jour, {}).get("c", "transparent")
                 is_t = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == aujourdhui.year)
                 st_cell = "background:#f3e5ab;" if is_t else ""
                 txt_c = "white" if bg != "transparent" else "black"
@@ -380,53 +379,33 @@ if st.session_state.page == "PLANNING":
         h_cal += '</tr>'
     h_cal += '</table>'
     st.markdown(h_cal, unsafe_allow_html=True)
-# --- LISTE DES MISSIONS AVEC DÉTAILS ---
-st.markdown(f"### 📋 Détails des Missions")
-# --- SÉCURITÉ : On initialise la liste pour éviter le NameError ---
-if 'missions_list' not in locals(): 
-    missions_list = []
 
-# Ensuite ton bloc d'affichage peut tourner sans crash
-if missions_list:
-    missions_list.sort(key=lambda x: x['start'])
-    for m in missions_list:
-        r = m['r']
-        
-        # 1. Formatage de la plage de dates
-        if m['n_j'] > 1:
-            plage_date = f"{m['start'].strftime('%d/%m')} au {m['end'].strftime('%d/%m')}"
-        else:
-            plage_date = f"Le {m['start'].strftime('%d/%m')}"
+    # --- LISTE DES MISSIONS ---
+    st.markdown(f"### 📋 Détails des Missions")
+    
+    if missions_list:
+        missions_list.sort(key=lambda x: x['start'])
+        for m in missions_list:
+            r = m['r']
+            plage_date = f"{m['start'].strftime('%d/%m')} au {m['end'].strftime('%d/%m')}" if m['n_j'] > 1 else f"Le {m['start'].strftime('%d/%m')}"
+            prix_propre = f"{m['prix']:,.0f}".replace(",", " ")
 
-        # 2. PRÉ-FORMATAGE DU PRIX (Correction de l'erreur SyntaxError)
-        v_prix = m.get('prix', 0)
-        prix_propre = f"{v_prix:,.0f}".replace(",", " ")  # Remplace la virgule par un espace pour le format FR
+            col1, col2 = st.columns([1, 3.5])
+            with col1:
+                st.markdown(f"<div style='background:{m['color']}; color:white; border-radius:5px; text-align:center; padding:5px;'><span style='font-size:0.8rem; font-weight:bold;'>{plage_date}</span><br><span style='font-size:0.9rem;'>{prix_propre} €</span></div>", unsafe_allow_html=True)
+            with col2:
+                label = f"{str(r.get('Prénom','')).upper()} {str(r.get('Nom','')).upper()} ({str(r.get('Société','')).upper()})"
+                sub_label = f"{m['n_j']} jour(s) | {m['statut'].upper()}"
+                if st.button(f"{label}\n{sub_label}", key=f"p_v18_{m['idx']}", use_container_width=True):
+                    st.session_state.edit_idx = m['idx']
+                    st.session_state.page = "CONTACTS"
+                    st.rerun()
+    else:
+        st.info("Aucune mission détectée.")
 
-        col1, col2 = st.columns([1, 3.5])
-        with col1:
-            # Bloc date et prix à gauche
-            st.markdown(f"""
-                <div style='background:{m['color']}; color:white; border-radius:5px; text-align:center; padding:5px;'>
-                    <span style='font-size:0.8rem; font-weight:bold;'>{plage_date}</span><br>
-                    <span style='font-size:0.9rem;'>{prix_propre} €</span>
-                </div>
-            """, unsafe_allow_html=True)
-            
-        with col2:
-            # Infos client et bouton d'accès à droite
-            label = f"{str(r.get('Prénom','')).upper()} {str(r.get('Nom','')).upper()} ({str(r.get('Société','')).upper()})"
-            sub_label = f"{m['n_j']} jour(s) | Statut: {m['statut'].upper()}"
-            if st.button(f"{label}\n{sub_label}", key=f"btn_p_v18_{m['idx']}", use_container_width=True):
-                st.session_state.edit_idx = m['idx']
-                st.session_state.page = "CONTACTS"
-                st.rerun()
-else:
-    st.info("Aucune mission détectée.")
-
-# Formatage aussi pour le total final
-total_mois_propre = f"{total_mois:,.0f}".replace(",", " ")
-st.success(f"**Total prévisionnel du mois : {total_mois_propre} €**")
-
+    # --- AFFICHAGE DU TOTAL (BIEN INDENTÉ DANS LE PLANNING) ---
+    total_mois_propre = f"{total_mois:,.0f}".replace(",", " ")
+    st.success(f"**Total prévisionnel du mois : {total_mois_propre} €**")
 
 # =================================================================
 # --- 9. PAGE STATS (VERSION FINALE COMPLÈTE & COMPTABLEMENT JUSTE) ---
