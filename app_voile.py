@@ -219,64 +219,42 @@ if st.session_state.page == "CONTACTS":
         sauvegarder_data(df_new, 'contacts.json'); st.rerun()
 
     st.divider()
-
-   # --- BOUCLE D'AFFICHAGE DES CARTES (V60 - AVEC TRADUCTION AUTO) ---
-for _, row in df_aff.iterrows():
-    idx = row['orig_idx']
-    soc = str(row.get('Société','PERSO')).upper()
-    statut = str(row.get('Statut', 'Ok')).upper()
     
-    # TRADUCTION AUTOMATIQUE DU PAIEMENT POUR L'AFFICHAGE
-    pay_raw = str(row.get('Paiement', 'Non payé')).upper()
-    if pay_raw in ["UNPAID", "NON PAYÉ"]:
-        paiement_fr = "NON PAYÉ"
-        pay_c = "#E74C3C" # Rouge
-    else:
-        paiement_fr = "PAYÉ"
-        pay_c = "#27AE60" # Vert
-    
-    notes = str(row.get('Notes', '')).replace('nan', '')
-    tel = str(row.get('Téléphone', '')).replace('nan', '').strip()
-    mail = str(row.get('Email', '')).replace('nan', '').strip()
-    
-    # Couleurs de fond selon société/statut
-    bg = "#D6EAF8" if soc == "CMN" else ("#EBEDEF" if any(x in statut.lower() for x in ["annul", "refus"]) else ("#FCF3CF" if "ATTENTE" in statut else "#D5F5E3"))
-    
-    p_tot, p_aco = safe_int(row.get('Prix', 0)), safe_int(row.get('Acompte', 0))
-    d_str = row['dt_sort'].strftime('%d/%m/%Y') if pd.notnull(row['dt_sort']) else row.get('DateNav', 'À COMPLÉTER')
-
-    st.markdown(f"""
-    <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; border:1px solid rgba(0,0,0,0.1); margin-bottom:10px;">
-        <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:8px;">
-            <span style="font-size:1.1rem; font-weight:bold;">#{idx} | {str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</span>
-            <span style="font-size:0.75rem; background:white; padding:3px 8px; border-radius:15px; font-weight:bold; border:1px solid #ccc;">{soc}</span>
+    # --- AFFICHAGE DE LA CARTE ---
+        st.markdown(f"""
+        <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; border:1px solid rgba(0,0,0,0.1); margin-bottom:10px;">
+            ... (le contenu de ta carte HTML) ...
         </div>
+        """, unsafe_allow_html=True)
         
-        <div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; gap:10px;">
-            <div>📅 Date : <b>{d_str}</b></div>
-            <div>📊 Statut : <b>{statut}</b></div>
-            <div>💰 Total : <b>{p_tot}€</b></div>
-            <div>💸 Acompte : <b>{p_aco}€</b></div>
-            <div>💳 Reste : <b style="color:#C0392B;">{p_tot - p_aco}€</b></div>
-            <div style="color:{pay_c}; font-weight:bold;">🏷️ {paiement_fr}</div>
+        # --- LES BOUTONS (DOIVENT ÊTRE ALIGNÉS SUR LE "st.markdown" CI-DESSUS) ---
+        c_ed, c_del = st.columns(2)
+        if c_ed.button(f"✏️ ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
+            st.session_state.edit_idx = idx
+            st.session_state.page = "MODIFIER_CONTACT"
+            st.rerun()
+            
+        if c_del.button(f"🗑️ SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
+            df_db = charger_data('contacts.json').drop(idx)
+            sauvegarder_data(df_db, 'contacts.json')
+            st.rerun()# --- AFFICHAGE DE LA CARTE ---
+        st.markdown(f"""
+        <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; border:1px solid rgba(0,0,0,0.1); margin-bottom:10px;">
+            ... (le contenu de ta carte HTML) ...
         </div>
-
-        <div style="margin-top:10px; font-size:0.85rem; background:rgba(255,255,255,0.4); padding:8px; border-radius:6px;">
-            📞 Tel : <b>{tel if tel else "NON RENSEIGNÉ"}</b><br>
-            📧 Mail : <b>{mail if mail else "NON RENSEIGNÉ"}</b>
-        </div>
-
-        <div style="margin-top:10px; font-size:0.8rem; background:rgba(0,0,0,0.05); padding:8px; border-radius:6px; border-left:3px solid #34495E;">
-            📝 <i>{notes if notes else "Pas de notes..."}</i>
-        </div>
-
-        <div style="margin-top:12px; display:flex; gap:8px;">
-            <a href="tel:{tel}" style="flex:1; text-decoration:none; background:#5DADE2; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📞 APPEL</a>
-            <a href="https://wa.me/{tel.replace(' ','')}" style="flex:1; text-decoration:none; background:#52BE80; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">💬 WA</a>
-            <a href="mailto:{mail}" style="flex:1; text-decoration:none; background:#EC7063; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">✉️ MAIL</a>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+        
+        # --- LES BOUTONS (DOIVENT ÊTRE ALIGNÉS SUR LE "st.markdown" CI-DESSUS) ---
+        c_ed, c_del = st.columns(2)
+        if c_ed.button(f"✏️ ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
+            st.session_state.edit_idx = idx
+            st.session_state.page = "MODIFIER_CONTACT"
+            st.rerun()
+            
+        if c_del.button(f"🗑️ SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
+            df_db = charger_data('contacts.json').drop(idx)
+            sauvegarder_data(df_db, 'contacts.json')
+            st.rerun()
         
         c_ed, c_del = st.columns(2)
         if c_ed.button(f"✏️ ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
