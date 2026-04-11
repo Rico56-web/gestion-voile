@@ -217,7 +217,108 @@ CMN
 
 <div style="margin-top:12px; display:flex; gap:8px;">
     <a href="tel:" style="flex:1; text-decorat
-    # =================================================================
+  # =================================================================
+# --- 5. BLOC CONTACTS (V61 - TRADUCTION & NETTOYAGE NAN) ---
+# =================================================================
+if st.session_state.page == "CONTACTS":
+    st.markdown('<div style="text-align:center; background-color:#f4f7f6; padding:10px; border-radius:10px;"><h2>👤 Vesta Skipper 2026 - Contacts</h2></div>', unsafe_allow_html=True)
+
+    df_raw = charger_data('contacts.json')
+    df_c = pd.DataFrame()
+    df_aff = pd.DataFrame()
+
+    c_search, c_yr = st.columns([2, 1])
+    search = c_search.text_input("🔍 Rechercher...", "").upper()
+    annee_sel = c_yr.selectbox("📅 Saison", [2026, 2027, 2028], index=0)
+
+    if not df_raw.empty:
+        df_c = df_raw.copy()
+        df_c['orig_idx'] = df_c.index 
+        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+        mask_annee = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna())
+        df_c = df_c[mask_annee].copy()
+        df_c = df_c.sort_values(by='dt_sort', ascending=False)
+        if search:
+            mask = df_c['Nom'].astype(str).str.upper().str.contains(search) | \
+                   df_c['Prénom'].astype(str).str.upper().str.contains(search) | \
+                   df_c['Notes'].astype(str).str.upper().str.contains(search)
+            df_c = df_c[mask]
+
+    arch_list = ["terminé", "refusé", "annulé", "termine", "refuse", "annule"]
+    if not df_c.empty:
+        mask_arch = df_c['Statut'].astype(str).str.lower().isin(arch_list)
+        df_aff = df_c[mask_arch].copy() if st.session_state.get('vue_contact') == "Archives" else df_c[~mask_arch].copy()
+    
+    # Boutons Navigation
+    n1, n2, n3 = st.columns(3)
+    if n1.button("👤 EN COURS", use_container_width=True): st.session_state.vue_contact = "En cours"; st.rerun()
+    if n2.button("📂 ARCHIVES", use_container_width=True): st.session_state.vue_contact = "Archives"; st.rerun()
+    if n3.button("➕ NOUVEAU", use_container_width=True):
+        new_r = {"Prénom": "PRÉNOM", "Nom": "NOM", "Statut": "En attente", "Paiement": "Non payé", "DateNav": f"01/06/{annee_sel}", "Société": "PERSO"}
+        df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
+        sauvegarder_data(df_new, 'contacts.json'); st.rerun()
+
+    st.divider()
+
+    for _, row in df_aff.iterrows():
+        idx = row['orig_idx']
+        soc = str(row.get('Société','PERSO')).upper()
+        statut = str(row.get('Statut', 'Ok')).upper()
+        
+        # --- NETTOYAGE & TRADUCTION ---
+        pay_raw = str(row.get('Paiement', 'Non payé')).upper()
+        paiement_fr = "PAYÉ" if pay_raw in ["PAID", "PAYÉ"] else "NON PAYÉ"
+        pay_c = "#27AE60" if paiement_fr == "PAYÉ" else "#E74C3C"
+        
+        notes = str(row.get('Notes', '')).replace('nan', '').strip()
+        tel = str(row.get('Téléphone', '')).replace('nan', '').strip()
+        mail = str(row.get('Email', '')).replace('nan', '').strip()
+        d_str = str(row.get('DateNav', '')).replace('nan', 'À SAISIR')
+        
+        # Couleur CMN
+        bg = "#D6EAF8" if soc == "CMN" else ("#EBEDEF" if any(x in statut.lower() for x in ["annul", "refus"]) else ("#FCF3CF" if "ATTENTE" in statut else "#D5F5E3"))
+        
+        p_tot, p_aco = safe_int(row.get('Prix', 0)), safe_int(row.get('Acompte', 0))
+
+        # --- CARTE HTML ---
+        st.markdown(f"""
+        <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; border:1px solid rgba(0,0,0,0.1); margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:8px;">
+                <span style="font-size:1.1rem; font-weight:bold;">#{idx} | {str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</span>
+                <span style="font-size:0.75rem; background:white; padding:3px 8px; border-radius:15px; font-weight:bold; border:1px solid #ccc;">{soc}</span>
+            </div>
+            <div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; gap:10px;">
+                <div>📅 Date : <b>{d_str}</b></div>
+                <div>📊 Statut : <b>{statut}</b></div>
+                <div>💰 Total : <b>{p_tot}€</b></div>
+                <div>💸 Acompte : <b>{p_aco}€</b></div>
+                <div>💳 Reste : <b style="color:#C0392B;">{p_tot - p_aco}€</b></div>
+                <div style="color:{pay_c}; font-weight:bold;">🏷️ {paiement_fr}</div>
+            </div>
+            <div style="margin-top:10px; font-size:0.85rem; background:rgba(255,255,255,0.4); padding:8px; border-radius:6px;">
+                📞 Tel : <b>{tel if tel else "NON RENSEIGNÉ"}</b><br>
+                📧 Mail : <b>{mail if mail else "NON RENSEIGNÉ"}</b>
+            </div>
+            <div style="margin-top:10px; font-size:0.8rem; background:rgba(0,0,0,0.05); padding:8px; border-radius:6px; border-left:3px solid #34495E;">
+                📝 <i>{notes if notes else "Pas de notes..."}</i>
+            </div>
+            <div style="margin-top:12px; display:flex; gap:8px;">
+                <a href="tel:{tel}" style="flex:1; text-decoration:none; background:#5DADE2; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📞 APPEL</a>
+                <a href="https://wa.me/{tel.replace(' ','')}" style="flex:1; text-decoration:none; background:#52BE80; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">💬 WA</a>
+                <a href="mailto:{mail}" style="flex:1; text-decoration:none; background:#EC7063; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">✉️ MAIL</a>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # --- BOUTONS ACTIONS ---
+        c_ed, c_del = st.columns(2)
+        if c_ed.button(f"✏️ ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
+            st.session_state.edit_idx = idx; st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
+        if c_del.button(f"🗑️ SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
+            df_db = charger_data('contacts.json').drop(idx)
+            sauvegarder_data(df_db, 'contacts.json'); st.rerun()
+
+# =================================================================
 # --- 6. PAGE MODIFIER CONTACT (V57 - SÉCURISÉ) ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
