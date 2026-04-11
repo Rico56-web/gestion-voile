@@ -173,43 +173,50 @@ if st.session_state.page == "CONTACTS":
 
             bg = "#D6EAF8" if soc == "CMN" else ("#FCF3CF" if "ATTENTE" in statut else "#D5F5E3")
             if any(x in statut.lower() for x in ["annul", "refus"]): bg = "#EBEDEF"
+        # --- Préparation des données (juste avant card_html) ---
+            tel_clean = tel.replace(' ', '').replace('+', '')
+            
+            # Bloc Notes : on le prépare à part pour plus de clarté
+            html_notes = ""
+            if notes and notes != "nan":
+                html_notes = f"""
+                <div style="margin-top:10px; font-size:0.8rem; background:rgba(0,0,0,0.05); padding:8px; border-radius:6px; border-left:3px solid #34495E;">
+                    &#128221; <i>{notes}</i>
+                </div>
+                """
 
+            # --- Construction de la carte ---
             card_html = f"""
             <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; margin-bottom:10px; border:1px solid rgba(0,0,0,0.1);">
                 <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:8px; margin-bottom:10px;">
                     <span style="font-weight:bold; font-size:1.1rem;">#{idx} | {str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</span>
                     <span style="background:white; padding:2px 8px; border-radius:10px; font-weight:bold; font-size:0.8rem; border:1px solid #ccc;">{soc}</span>
                 </div>
+                
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; font-size:0.85rem;">
                     <div>📅 Date: <b>{row.get('DateNav','')}</b></div>
                     <div>📊 Statut: <b>{statut}</b></div>
-                    <div>👥 Pers: <b>{row.get('Pers', 1)}</b></div>
-                    <div>⏳ Jours: <b>{row.get('Jours', 1)}</b></div>
+                    <div>👥 Pers: <b>{nb_pers}</b></div>
+                    <div>⏳ Jours: <b>{nb_jours}</b></div>
                     <div>💰 Total: <b>{p_tot} €</b></div>
                     <div style="color:{'#27AE60' if p_label == 'PAYE' else '#E74C3C'}; font-weight:bold;">🏷️ {p_label}</div>
                 </div>
+
                 <div style="margin-top:10px; font-size:0.85rem; background:rgba(255,255,255,0.4); padding:8px; border-radius:6px;">
                     📞 Tel: <b>{tel if tel else "---"}</b><br>
                     ✉️ Mail: <b>{mail if mail else "---"}</b>
                 </div>
-                {f'<div style="margin-top:8px; font-size:0.75rem; font-style:italic; border-left:3px solid #34495E; padding-left:8px;">{notes}</div>' if notes else ''}
+
+                {html_notes}
+
                 <div style="margin-top:12px; display:flex; gap:8px;">
-                    <a href="tel:{tel.replace(' ','')}" style="flex:1; text-decoration:none; background:#5DADE2; color:white; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:0.7rem;">📞 APPEL</a>
-                    <a href="https://wa.me/{tel.replace(' ','').replace('+','')}" style="flex:1; text-decoration:none; background:#52BE80; color:white; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:0.7rem;">💬 WHATSAPP</a>
+                    <a href="tel:{tel_clean}" style="flex:1; text-decoration:none; background:#5DADE2; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📞 APPEL</a>
+                    <a href="https://wa.me/{tel_clean}" style="flex:1; text-decoration:none; background:#52BE80; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">💬 WHATSAPP</a>
                 </div>
             </div>
             """
             st.markdown(card_html, unsafe_allow_html=True)
-            
-            c_ed, c_del = st.columns(2)
-            if c_ed.button(f"ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
-                st.session_state.edit_idx = idx
-                st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
-            if c_del.button(f"SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
-                df_db = charger_data('contacts.json').drop(idx)
-                sauvegarder_data(df_db, 'contacts.json'); st.rerun()
-    else:
-        st.info("Aucun contact trouvé.")
+    
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT (V77 - FORMULAIRE COMPLET) ---
 # =================================================================
