@@ -198,11 +198,21 @@ if st.session_state.page == "CONTACTS":
             mail = clean_text(row.get('Email', ''))
             note = clean_text(row.get('Notes', ''))
             
-            # Finances
+            # --- Finances (Correction de la logique de détection) ---
             prix = clean_num(row.get('Prix', 0))
             aco = clean_num(row.get('Acompte', 0))
             reste = prix - aco
-            p_label = "PAYÉ" if "PAID" in str(row.get('Paiement','')).upper() else "NON PAYÉ"
+
+            # On récupère la valeur propre
+v            al_paye = str(row.get('Paiement','')).strip().upper()
+
+            # Vérification d'égalité stricte au lieu de "in"
+            if val_paye == "PAID":
+                p_label = "PAYÉ"
+                p_color = "green"
+            else:
+                p_label = "NON PAYÉ"
+                p_color = "red"
             
             # Style et Rendu
             bg = "#D6EAF8" if soc == "CMN" else ("#FCF3CF" if "ATTENTE" in sta else "#D5F5E3")
