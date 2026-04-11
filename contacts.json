@@ -4,7 +4,7 @@
         "Nom":"BABIOCHE",
         "Statut":"Annul\u00e9",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"2026-04-11",
+        "DateNav":"2026-11-04",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":35,
         "Nbre de personnes":1.0,
@@ -38,16 +38,16 @@
         "Telephone":null,
         "Commentaires":null,
         "Statut_Paye":null,
-        "Acompte":0.0
+        "Acompte":0
     },
     {
-        "Pr\u00e9nom":"Elisabeth",
+        "Pr\u00e9nom":"ELISABETH",
         "Nom":"PHILIPPE",
         "Statut":"Termin\u00e9",
         "Paiement":"Pay\u00e9",
-        "DateNav":"01\/03\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"CLICK",
-        "Prix":"479.00",
+        "Prix":479,
         "Nbre de personnes":null,
         "Nbre de jours":null,
         "T\u00e9l\u00e9phone":"0602468634",
@@ -79,14 +79,14 @@
         "Telephone":null,
         "Commentaires":null,
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
-        "Pr\u00e9nom":"Cmn",
+        "Pr\u00e9nom":"CMN",
         "Nom":"CMN",
         "Statut":"Termin\u00e9",
         "Paiement":"Pay\u00e9",
-        "DateNav":"7\/03\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"CMN",
         "Prix":450,
         "Nbre de personnes":4.0,
@@ -120,14 +120,14 @@
         "Telephone":null,
         "Commentaires":"",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
-        "Pr\u00e9nom":"Pedro",
+        "Pr\u00e9nom":"PEDRO",
         "Nom":"BANDIM FAUSTINO",
         "Statut":"Termin\u00e9",
         "Paiement":"Pay\u00e9",
-        "DateNav":"14\/03\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":70,
         "Nbre de personnes":1.0,
@@ -161,14 +161,14 @@
         "Telephone":null,
         "Commentaires":"nan",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
         "Pr\u00e9nom":"CMN",
         "Nom":"CMN",
         "Statut":"Termin\u00e9",
         "Paiement":"Pay\u00e9",
-        "DateNav":"21\/03\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"CMN",
         "Prix":450,
         "Nbre de personnes":4.0,
@@ -202,11 +202,11 @@
         "Telephone":null,
         "Commentaires":"nan",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
         "Pr\u00e9nom":"AURELIEN",
-        "Nom":"FAUCHEUX ",
+        "Nom":"FAUCHEUX",
         "Statut":"Termin\u00e9",
         "Paiement":"Pay\u00e9",
         "DateNav":"2026-04-04",
@@ -243,14 +243,14 @@
         "Telephone":null,
         "Commentaires":"Vent vendredi \u26a0\ufe0ftroph\u00e9e Ouest France ce we Pb sur bouton poussoir verrouillage plage arriere",
         "Statut_Paye":null,
-        "Acompte":0.0
+        "Acompte":0
     },
     {
         "Pr\u00e9nom":"BENOIT",
         "Nom":"COURONNE",
         "Statut":"Annul\u00e9",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"2026-04-09",
+        "DateNav":"2026-09-04",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":30,
         "Nbre de personnes":1.0,
@@ -284,14 +284,14 @@
         "Telephone":null,
         "Commentaires":"Appel le 26\/03\/ pour reserver",
         "Statut_Paye":null,
-        "Acompte":0.0
+        "Acompte":0
     },
     {
         "Pr\u00e9nom":"",
         "Nom":"B\u00c9ATRICE ET SA FILLE",
         "Statut":"Annul\u00e9",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"2026-04-09",
+        "DateNav":"2026-09-04",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":70,
         "Nbre de personnes":1.0,
@@ -325,14 +325,14 @@
         "Telephone":null,
         "Commentaires":"",
         "Statut_Paye":null,
-        "Acompte":0.0
+        "Acompte":0
     },
     {
         "Pr\u00e9nom":"GILDAS",
         "Nom":"INCONNU",
         "Statut":"Annul\u00e9",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"2026-04-09",
+        "DateNav":"2026-09-04",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":30,
         "Nbre de personnes":1.0,
@@ -366,14 +366,14 @@
         "Telephone":null,
         "Commentaires":"nan",
         "Statut_Paye":null,
-        "Acompte":0.0
+        "Acompte":0
     },
     {
         "Pr\u00e9nom":"CAMILLE",
         "Nom":"VARREL",
         "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"2026-04-12",
+        "DateNav":"2026-12-04",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":281,
         "Nbre de personnes":2.0,
@@ -407,14 +407,14 @@
         "Telephone":null,
         "Commentaires":"Camille et son ami",
         "Statut_Paye":null,
-        "Acompte":0.0
+        "Acompte":0
     },
     {
         "Pr\u00e9nom":"LAURENT",
         "Nom":"PELE",
         "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"2026-04-18",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"CMN",
         "Prix":450,
         "Nbre de personnes":1.0,
@@ -448,14 +448,14 @@
         "Telephone":null,
         "Commentaires":"Ras",
         "Statut_Paye":null,
-        "Acompte":0.0
+        "Acompte":0
     },
     {
-        "Pr\u00e9nom":"Groupe espagne",
-        "Nom":"FRANSOIZ, PHILLIPE, YANNICK, ET JEAN LOUIS ",
+        "Pr\u00e9nom":"GROUPE ESPAGNE",
+        "Nom":"FRANSOIZ, PHILLIPE, YANNICK, ET JEAN LOUIS",
         "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"20\/04\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"PARTICULIER",
         "Prix":0,
         "Nbre de personnes":4.0,
@@ -489,14 +489,14 @@
         "Telephone":null,
         "Commentaires":"Test du groupe avant l\u2019espagne",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
-        "Pr\u00e9nom":"Elisabeth ",
+        "Pr\u00e9nom":"ELISABETH",
         "Nom":"ET MAELYS",
         "Statut":"En attente",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"26\/04\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"PARTICULIER",
         "Prix":140,
         "Nbre de personnes":2.0,
@@ -530,16 +530,16 @@
         "Telephone":null,
         "Commentaires":"",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
-        "Pr\u00e9nom":"Julien",
+        "Pr\u00e9nom":"JULIEN",
         "Nom":"PIMMEL",
         "Statut":"OK",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"28\/04\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"CLICK",
-        "Prix":"159.00",
+        "Prix":159,
         "Nbre de personnes":null,
         "Nbre de jours":null,
         "T\u00e9l\u00e9phone":"0660614772",
@@ -571,14 +571,14 @@
         "Telephone":null,
         "Commentaires":null,
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
-        "Pr\u00e9nom":"Laurent",
+        "Pr\u00e9nom":"LAURENT",
         "Nom":"MEHUT",
         "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"02\/05\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"CMN",
         "Prix":450,
         "Nbre de personnes":1.0,
@@ -612,14 +612,14 @@
         "Telephone":null,
         "Commentaires":"nan",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
-        "Pr\u00e9nom":"Brigitte",
+        "Pr\u00e9nom":"BRIGITTE",
         "Nom":"LEBAS",
         "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"4\/05\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":140,
         "Nbre de personnes":1.0,
@@ -653,14 +653,14 @@
         "Telephone":null,
         "Commentaires":"nan",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
-        "Pr\u00e9nom":"Florence et Dominique et sonia",
+        "Pr\u00e9nom":"FLORENCE ET DOMINIQUE ET SONIA",
         "Nom":"INCONNU",
         "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"08\/05\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"VOG",
         "Prix":105,
         "Nbre de personnes":3.0,
@@ -694,14 +694,14 @@
         "Telephone":null,
         "Commentaires":"Ras",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
-        "Pr\u00e9nom":"Laurent",
+        "Pr\u00e9nom":"LAURENT",
         "Nom":"PELE",
         "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"14\/05\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"CMN",
         "Prix":450,
         "Nbre de personnes":1.0,
@@ -735,14 +735,14 @@
         "Telephone":null,
         "Commentaires":"None",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
-        "Pr\u00e9nom":"Jean louis",
+        "Pr\u00e9nom":"JEAN LOUIS",
         "Nom":"DUGAVE",
         "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"31\/05\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":900,
         "Nbre de personnes":1.0,
@@ -776,14 +776,14 @@
         "Telephone":null,
         "Commentaires":"",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
-        "Pr\u00e9nom":"Francoise",
+        "Pr\u00e9nom":"FRANCOISE",
         "Nom":"RIOU",
         "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"31\/05\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":900,
         "Nbre de personnes":1.0,
@@ -817,14 +817,14 @@
         "Telephone":null,
         "Commentaires":"None",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
-        "Pr\u00e9nom":"Philippe",
+        "Pr\u00e9nom":"PHILIPPE",
         "Nom":"DESGAGNY",
         "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"31\/05\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":450,
         "Nbre de personnes":1.0,
@@ -858,14 +858,14 @@
         "Telephone":null,
         "Commentaires":"nan",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
-        "Pr\u00e9nom":"Yannick",
+        "Pr\u00e9nom":"YANNICK",
         "Nom":"BAILLY",
         "Statut":"Ok",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"31\/05\/2026",
+        "DateNav":null,
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":900,
         "Nbre de personnes":1.0,
@@ -899,14 +899,14 @@
         "Telephone":null,
         "Commentaires":"\u00c0 voir",
         "Statut_Paye":null,
-        "Acompte":null
+        "Acompte":0
     },
     {
         "Pr\u00e9nom":"AURELIEN",
         "Nom":"FAUCHEUX",
         "Statut":"En attente",
         "Paiement":"Non pay\u00e9",
-        "DateNav":"2026-04-11",
+        "DateNav":"2026-11-04",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":2400,
         "Nbre de personnes":1.0,
@@ -940,6 +940,6 @@
         "Telephone":null,
         "Commentaires":"nan",
         "Statut_Paye":null,
-        "Acompte":0.0
+        "Acompte":0
     }
 ]
