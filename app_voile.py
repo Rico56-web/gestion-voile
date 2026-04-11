@@ -170,143 +170,53 @@ for i, name in enumerate(menu):
                           type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name
         st.rerun()
-# =================================================================
-# --- 5. BLOC CONTACTS (V59 - FINAL COMPLET & FRANÇAIS) ---
-# =================================================================
-if st.session_state.page == "CONTACTS":
-    st.markdown('<div style="text-align:center; background-color:#f4f7f6; padding:10px; border-radius:10px;"><h2>👤 Vesta Skipper 2026 - Contacts</h2></div>', unsafe_allow_html=True)
+div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; gap:10px;">
+    <div>📅 Date : <b>12/04/2026</b></div>
+    <div>📊 Statut : <b>EN ATTENTE</b></div>
+    <div>💰 Total : <b>281€</b></div>
+    <div>💸 Acompte : <b>0€</b></div>
+    <div>💳 Reste : <b style="color:#C0392B;">281€</b></div>
+    <div style="color:#E74C3C; font-weight:bold;">🏷️ UNPAID</div>
+</div>
 
-    df_raw = charger_data('contacts.json')
-    df_c = pd.DataFrame()
-    df_aff = pd.DataFrame()
+<div style="margin-top:10px; font-size:0.85rem; background:rgba(255,255,255,0.4); padding:8px; border-radius:6px;">
+    📞 Tel : <b>07 69 29 75 05</b><br>
+    📧 Mail : <b>NON RENSEIGNÉ</b>
+</div>
 
-    # Filtres
-    c_search, c_yr = st.columns([2, 1])
-    search = c_search.text_input("🔍 Rechercher (Nom, Notes, Société...)", "").upper()
-    annee_sel = c_yr.selectbox("📅 Saison", [2026, 2027, 2028], index=0)
+<div style="margin-top:10px; font-size:0.8rem; background:rgba(0,0,0,0.05); padding:8px; border-radius:6px; border-left:3px solid #34495E;">
+    📝 <i>Pas de notes...</i>
+</div>
 
-    if not df_raw.empty:
-        df_c = df_raw.copy()
-        df_c['orig_idx'] = df_c.index 
-        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
-        
-        # Filtre Année + Tri Chronologique
-        mask_annee = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna())
-        df_c = df_c[mask_annee].copy()
-        df_c = df_c.sort_values(by='dt_sort', ascending=False)
+<div style="margin-top:12px; display:flex; gap:8px;">
+    <a href="tel:07 69 29 75 05" style="flex:1; text-decoration:none; background:#5DADE2; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📞 APPEL</a>
+    <a href="https://wa.me/0769297505" style="flex:1; text-decoration:none; background:#52BE80; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">💬 WA</a>
+    <a href="mailto:" style="flex:1; text-decoration:none; background:#EC7063; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">✉️ MAIL</a>
+</div>
 
-        if search:
-            mask = df_c['Nom'].astype(str).str.upper().str.contains(search) | \
-                   df_c['Prénom'].astype(str).str.upper().str.contains(search) | \
-                   df_c['Notes'].astype(str).str.upper().str.contains(search)
-            df_c = df_c[mask]
 
-    # Navigation
-    arch_list = ["terminé", "refusé", "annulé", "termine", "refuse", "annule"]
-    if not df_c.empty:
-        mask_arch = df_c['Statut'].astype(str).str.lower().isin(arch_list)
-        nb_cours = len(df_c[~mask_arch]); nb_arch = len(df_c[mask_arch])
-        df_aff = df_c[mask_arch].copy() if st.session_state.get('vue_contact') == "Archives" else df_c[~mask_arch].copy()
-    else:
-        nb_cours, nb_arch = 0, 0
+#10 | LAURENT PELE
+CMN
+<div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; gap:10px;">
+    <div>📅 Date : <b>nan</b></div>
+    <div>📊 Statut : <b>OK</b></div>
+    <div>💰 Total : <b>450€</b></div>
+    <div>💸 Acompte : <b>0€</b></div>
+    <div>💳 Reste : <b style="color:#C0392B;">450€</b></div>
+    <div style="color:#E74C3C; font-weight:bold;">🏷️ NON PAYÉ</div>
+</div>
 
-    n1, n2, n3 = st.columns(3)
-    if n1.button(f"👤 EN COURS ({nb_cours})", use_container_width=True): st.session_state.vue_contact = "En cours"; st.rerun()
-    if n2.button(f"📂 ARCHIVES ({nb_arch})", use_container_width=True): st.session_state.vue_contact = "Archives"; st.rerun()
-    if n3.button("➕ NOUVEAU", use_container_width=True):
-        new_r = {"Prénom": "PRÉNOM", "Nom": "NOM", "Statut": "En attente", "Paiement": "Non payé", "DateNav": f"01/06/{annee_sel}", "Société": "PERSO", "Prix": 0, "Acompte": 0, "Notes": "", "Téléphone": "", "Email": ""}
-        df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
-        sauvegarder_data(df_new, 'contacts.json'); st.rerun()
+<div style="margin-top:10px; font-size:0.85rem; background:rgba(255,255,255,0.4); padding:8px; border-radius:6px;">
+    📞 Tel : <b>NON RENSEIGNÉ</b><br>
+    📧 Mail : <b>NON RENSEIGNÉ</b>
+</div>
 
-    st.divider()
-    
-    # --- AFFICHAGE DE LA CARTE ---
-        st.markdown(f"""
-        <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; border:1px solid rgba(0,0,0,0.1); margin-bottom:10px;">
-            ... (le contenu de ta carte HTML) ...
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # --- LES BOUTONS (DOIVENT ÊTRE ALIGNÉS SUR LE "st.markdown" CI-DESSUS) ---
-        c_ed, c_del = st.columns(2)
-        if c_ed.button(f"✏️ ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
-            st.session_state.edit_idx = idx
-            st.session_state.page = "MODIFIER_CONTACT"
-            st.rerun()
-            
-        if c_del.button(f"🗑️ SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
-            df_db = charger_data('contacts.json').drop(idx)
-            sauvegarder_data(df_db, 'contacts.json')
-            st.rerun()# --- AFFICHAGE DE LA CARTE ---
-        st.markdown(f"""
-        <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; border:1px solid rgba(0,0,0,0.1); margin-bottom:10px;">
-            ... (le contenu de ta carte HTML) ...
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # --- LES BOUTONS (DOIVENT ÊTRE ALIGNÉS SUR LE "st.markdown" CI-DESSUS) ---
-        c_ed, c_del = st.columns(2)
-        if c_ed.button(f"✏️ ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
-            st.session_state.edit_idx = idx
-            st.session_state.page = "MODIFIER_CONTACT"
-            st.rerun()
-            
-        if c_del.button(f"🗑️ SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
-            df_db = charger_data('contacts.json').drop(idx)
-            sauvegarder_data(df_db, 'contacts.json')
-            st.rerun()
-        
-        c_ed, c_del = st.columns(2)
-        if c_ed.button(f"✏️ ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
-            st.session_state.edit_idx = idx; st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
-        if c_del.button(f"🗑️ SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
-            df_db = charger_data('contacts.json').drop(idx)
-            sauvegarder_data(df_db, 'contacts.json'); st.rerun()
+<div style="margin-top:10px; font-size:0.8rem; background:rgba(0,0,0,0.05); padding:8px; border-radius:6px; border-left:3px solid #34495E;">
+    📝 <i>Pas de notes...</i>
+</div>
 
-# --- BLOC MODIFICATION (SÉCURISÉ & FRANÇAIS) ---
-if st.session_state.page == "MODIFIER_CONTACT":
-    st.markdown(f"### ✏️ Modification Fiche #{st.session_state.get('edit_idx')}")
-    df_m = charger_data('contacts.json')
-    idx_m = st.session_state.get('edit_idx')
-
-    if idx_m is not None and idx_m in df_m.index:
-        row = df_m.loc[idx_m]
-        with st.form("form_edit_final"):
-            col1, col2 = st.columns(2)
-            p = col1.text_input("Prénom", value=str(row.get('Prénom','')))
-            n = col2.text_input("Nom", value=str(row.get('Nom','')))
-            d = st.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav','')))
-            
-            col3, col4 = st.columns(2)
-            tel_m = col3.text_input("Téléphone", value=str(row.get('Téléphone','')))
-            mail_m = col4.text_input("Email", value=str(row.get('Email','')))
-            
-            st_m = st.selectbox("Statut Mission", ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé"], index=0)
-            pay_m = st.radio("Paiement", ["Non payé", "Payé"], index=0 if row.get('Paiement')=="Non payé" else 1, horizontal=True)
-            
-            soc_m = st.text_input("Société", value=str(row.get('Société','PERSO')))
-            prix_m = st.number_input("Prix Total (€)", value=int(safe_int(row.get('Prix',0))))
-            aco_m = st.number_input("Acompte (€)", value=int(safe_int(row.get('Acompte',0))))
-            note_m = st.text_area("Notes", value=str(row.get('Notes','')).replace('nan',''))
-
-            if st.form_submit_button("💾 SAUVEGARDER LES MODIFICATIONS"):
-                # On met à jour les données
-                df_m.at[idx_m, 'Prénom'] = p.upper().strip()
-                df_m.at[idx_m, 'Nom'] = n.upper().strip()
-                df_m.at[idx_m, 'DateNav'] = d
-                df_m.at[idx_m, 'Statut'] = st_m
-                df_m.at[idx_m, 'Société'] = soc_m.upper().strip()
-                df_m.at[idx_m, 'Notes'] = note_m
-                df_m.at[idx_m, 'Téléphone'] = tel_m
-                df_m.at[idx_m, 'Email'] = mail_m
-                df_m.at[idx_m, 'Paiement'] = pay_m
-                df_m.at[idx_m, 'Prix'] = prix_m
-                df_m.at[idx_m, 'Acompte'] = aco_m
-                
-                sauvegarder_data(df_m, 'contacts.json')
-                st.session_state.page = "CONTACTS"; st.rerun()
-        
-        if st.button("⬅️ ANNULER"): st.session_state.page = "CONTACTS"; st.rerun()
+<div style="margin-top:12px; display:flex; gap:8px;">
+    <a href="tel:" style="flex:1; text-decorat
     # =================================================================
 # --- 6. PAGE MODIFIER CONTACT (V57 - SÉCURISÉ) ---
 # =================================================================
