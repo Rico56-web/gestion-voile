@@ -111,7 +111,10 @@ for i, name in enumerate(menu):
 if st.session_state.page == "CONTACTS":
     st.markdown('<div style="text-align:center; background-color:#f4f7f6; padding:10px; border-radius:10px;"><h2>Vesta Skipper 2026 - Contacts</h2></div>', unsafe_allow_html=True)
 
-    df_raw = charger_data('contacts.json')
+    df_m = charger_data('contacts.json')
+    # Cette ligne autorise la colonne à recevoir n'importe quel type (texte ou nombre)
+    df_m['Jours'] = df_m['Jours'].astype(object)
+    df_m['Pers'] = df_m['Pers'].astype(object)
     df_c = pd.DataFrame()
     df_aff = pd.DataFrame()
 
