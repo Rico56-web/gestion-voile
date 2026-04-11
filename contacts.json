@@ -3,7 +3,7 @@
         "Pr\u00e9nom":"PATRICK",
         "Nom":"BABIOCHE",
         "Statut":"Annul\u00e9",
-        "Paiement":"Non pay\u00e9",
+        "Paiement":"Unpaid",
         "DateNav":"2026-04-11",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":35,
@@ -26,7 +26,7 @@
         "dt":null,
         "Mail":null,
         "Date":null,
-        "Jours":null,
+        "Jours":1,
         "Date Nav":null,
         "Nb jours":null,
         "Heures moteur":null,
@@ -39,7 +39,7 @@
         "Commentaires":null,
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":null
+        "Pers":1.0
     },
     {
         "Pr\u00e9nom":"ELISABETH",
