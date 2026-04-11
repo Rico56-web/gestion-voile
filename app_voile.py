@@ -105,8 +105,9 @@ for i, name in enumerate(menu):
                           type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name
         st.rerun()
+
 # =================================================================
-# --- 6. PAGE MODIFIER CONTACT (V85 - ANTI-CRASH) ---
+# --- 6. PAGE MODIFIER CONTACT (V86 - SÉCURITÉ MAX) ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
     st.markdown('<div style="background-color:#5DADE2; padding:10px; border-radius:10px; color:white; text-align:center;"><h3>✏️ Modification Contact</h3></div>', unsafe_allow_html=True)
@@ -114,16 +115,26 @@ if st.session_state.page == "MODIFIER_CONTACT":
     idx_to_edit = st.session_state.get('edit_idx')
     df_m = charger_data('contacts.json')
     
-    # Sécurité pour les colonnes numériques
-    if not df_m.empty:
-        for col in ['Jours', 'Pers', 'Prix', 'Acompte']:
-            if col in df_m.columns: df_m[col] = df_m[col].astype(object)
-
+    # On s'assure que l'index existe pour éviter un KeyError
     if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
         row = df_m.loc[idx_to_edit]
         
-        # OUVERTURE DU FORMULAIRE
-        with st.form("form_edit_v85"):
+        # --- PRÉPARATION DES VALEURS NUMÉRIQUES ---
+        # On utilise safe_int et on s'assure qu'on ne descend pas en dessous de 0
+        def get_val_safe(key, default=0):
+            try:
+                val = row.get(key, default)
+                if pd.isna(val) or val == "nan" or val == "None": return default
+                return int(float(val))
+            except: return default
+
+        val_jours = get_val_safe('Jours', 1)
+        val_pers = get_val_safe('Pers', 1)
+        val_prix = get_val_safe('Prix', 0)
+        val_aco = get_val_safe('Acompte', 0)
+
+        # DEBUT DU FORMULAIRE
+        with st.form("form_v86_final"):
             c1, c2 = st.columns(2)
             new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
             new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
@@ -136,20 +147,16 @@ if st.session_state.page == "MODIFIER_CONTACT":
             new_tel = c5.text_input("Téléphone", value=str(row.get('Téléphone', '')))
             new_mail = c6.text_input("Email", value=str(row.get('Email', '')))
             
-            # --- LOGISTIQUE (On enlève le min_value=1 pour éviter le crash) ---
+            # --- LOGISTIQUE (SANS MIN_VALUE POUR ÉVITER LE CRASH) ---
             cl1, cl2 = st.columns(2)
-            val_j = int(safe_int(row.get('Jours', 1)))
-            val_p = int(safe_int(row.get('Pers', 1)))
-            
-            new_jours = cl1.number_input("Nombre de jours", value=val_j) # Retrait de min_value
-            new_pers = cl2.number_input("Nombre de personnes", value=val_p) # Retrait de min_value
+            new_jours = cl1.number_input("Nombre de jours", value=val_jours)
+            new_pers = cl2.number_input("Nombre de personnes", value=val_pers)
             
             # --- STATUTS ---
             col_a, col_b = st.columns(2)
             statut_list = ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé"]
-            curr_s = str(row.get('Statut', 'En attente'))
-            # Nettoyage pour correspondance exacte
-            curr_s = curr_s.capitalize() if curr_s.lower() in [s.lower() for s in statut_list] else "En attente"
+            curr_s = str(row.get('Statut', 'En attente')).capitalize()
+            
             try:
                 s_idx = [s.lower() for s in statut_list].index(curr_s.lower())
             except:
@@ -162,15 +169,16 @@ if st.session_state.page == "MODIFIER_CONTACT":
             
             # --- FINANCES ---
             f1, f2 = st.columns(2)
-            new_prix = f1.number_input("Prix Total (€)", value=int(safe_int(row.get('Prix', 0))))
-            new_aco = f2.number_input("Acompte (€)", value=int(safe_int(row.get('Acompte', 0))))
+            new_prix = f1.number_input("Prix Total (€)", value=val_prix)
+            new_aco = f2.number_input("Acompte (€)", value=val_aco)
             
             new_notes = st.text_area("Notes", value=str(row.get('Notes', '')).replace('nan',''))
 
-            # LE BOUTON DOIT ÊTRE DANS LE "WITH" DU FORMULAIRE
+            # BOUTON OBLIGATOIRE DANS LE FORMULAIRE
             submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
             
             if submitted:
+                # Mise à jour des données
                 df_m.at[idx_to_edit, 'Prénom'] = str(new_pre).upper().strip()
                 df_m.at[idx_to_edit, 'Nom'] = str(new_nom).upper().strip()
                 df_m.at[idx_to_edit, 'DateNav'] = str(new_date)
@@ -186,14 +194,13 @@ if st.session_state.page == "MODIFIER_CONTACT":
                 df_m.at[idx_to_edit, 'Notes'] = str(new_notes)
                 
                 sauvegarder_data(df_m, 'contacts.json')
-                st.success("Modifications enregistrées !")
+                st.success("Fiche mise à jour !")
                 st.session_state.page = "CONTACTS"
                 st.rerun()
 
-    if st.button("⬅️ RETOUR SANS SAUVEGARDER", use_container_width=True):
+    if st.button("⬅️ RETOUR", use_container_width=True):
         st.session_state.page = "CONTACTS"
         st.rerun()
-
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT (V77 - FORMULAIRE COMPLET) ---
 # =================================================================
