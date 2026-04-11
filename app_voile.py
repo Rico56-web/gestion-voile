@@ -167,7 +167,7 @@ for i, name in enumerate(menu):
         st.session_state.page = name
         st.rerun()
 # =================================================================
-# --- 5. BLOC CONTACTS (V53 - SÉCURISÉ & TRI CHRONO) ---
+# --- 5. BLOC CONTACTS (V54 - SÉCURISÉ & TRI CHRONO) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div style="text-align:center; background-color:#f4f7f6; padding:10px; border-radius:10px;"><h2>👤 Vesta Skipper - Contacts</h2></div>', unsafe_allow_html=True)
@@ -184,7 +184,7 @@ if st.session_state.page == "CONTACTS":
 
     # --- 1. CHARGEMENT ET INITIALISATION ---
     df_raw = charger_data('contacts.json')
-    df_c = pd.DataFrame() # <--- CRUCIAL : Empêche l'erreur NameError
+    df_c = pd.DataFrame() 
 
     # --- 2. FILTRES DE NAVIGATION ---
     c_search, c_yr = st.columns([2, 1])
@@ -196,14 +196,14 @@ if st.session_state.page == "CONTACTS":
         df_c = df_raw.copy()
         df_c['orig_idx'] = df_c.index 
         
-        # --- NETTOYAGE ET TRI (Plus récent en haut) ---
+        # --- NETTOYAGE ET TRI ---
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         
-        # Filtrage par Année
-        # df_c = df_c[df_c['dt_sort'].dt.year == annee_sel]
-        # À la place, utilise ceci pour tout voir :
-        df_c = df_c.copy()
-        # Tri descendant
+        # FILTRE INTELLIGENT : Saison choisie OU date illisible (NaT) pour correction
+        mask_annee = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna())
+        df_c = df_c[mask_annee].copy()
+        
+        # Tri descendant (Plus récent en haut)
         df_c = df_c.sort_values(by='dt_sort', ascending=False)
 
         # Filtre Recherche
@@ -214,7 +214,6 @@ if st.session_state.page == "CONTACTS":
             df_c = df_c[mask]
 
     # --- 3. LOGIQUE D'AFFICHAGE ---
-    # On définit les listes même si df_c est vide pour éviter les erreurs de boutons
     arch_list = ["terminé", "refusé", "annulé", "termine", "refuse", "annule"]
     
     if not df_c.empty:
@@ -246,7 +245,7 @@ if st.session_state.page == "CONTACTS":
             statut = str(row.get('Statut', 'Ok')).lower()
             soc = str(row.get('Société','PERSO')).upper()
             
-            # Pastel logic
+            # Couleurs Pastel
             if soc == "CMN": bg = "#D6EAF8"
             elif any(x in statut for x in ["annul", "refus"]): bg = "#EBEDEF"
             elif "attente" in statut: bg = "#FCF3CF"
@@ -272,33 +271,87 @@ if st.session_state.page == "CONTACTS":
                     <div>💰 Total : <b>{p_tot}€</b></div>
                     <div>💳 Reste : <b style="color:#C0392B;">{p_tot - p_aco}€</b></div>
                 </div>
-                <div style="margin-top:12px; display:flex; gap:8px;">
-                    <a href="tel:{tel}" style="flex:1; text-decoration:none; background:#5DADE2; color:white; padding:12px; border-radius:10px; text-align:center; font-weight:bold; font-size:0.8rem;">📞 APPEL</a>
-                    <a href="https://wa.me/{tel.replace(' ','')}" style="flex:1; text-decoration:none; background:#52BE80; color:white; padding:12px; border-radius:10px; text-align:center; font-weight:bold; font-size:0.8rem;">💬 WA</a>
-                    <a href="mailto:{mail}" style="flex:1; text-decoration:none; background:#EC7063; color:white; padding:12px; border-radius:10px; text-align:center; font-weight:bold; font-size:0.8rem;">✉️ MAIL</a>
-                </div>
             </div>
             """
-            st.components.v1.html(html_card, height=230)
+            st.markdown(html_card, unsafe_allow_html=True)
             
             # --- ACTIONS ---
             c_ed, c_del = st.columns([3, 2])
             if c_ed.button(f"✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
-                st.session_state.edit_idx = idx; st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
+                st.session_state.edit_idx = idx
+                st.session_state.page = "MODIFIER_CONTACT"
+                st.rerun()
 
             if st.session_state.confirm_del_idx == idx:
                 col1, col2 = c_del.columns(2)
                 if col1.button("✅", key=f"y_{idx}", use_container_width=True):
                     df_db = charger_data('contacts.json')
                     df_db = df_db.drop(idx)
-                    sauvegarder_data(df_db, 'contacts.json'); st.session_state.confirm_del_idx = None; st.rerun()
+                    sauvegarder_data(df_db, 'contacts.json')
+                    st.session_state.confirm_del_idx = None
+                    st.rerun()
                 if col2.button("❌", key=f"n_{idx}", use_container_width=True):
-                    st.session_state.confirm_del_idx = None; st.rerun()
+                    st.session_state.confirm_del_idx = None
+                    st.rerun()
             else:
                 if c_del.button("🗑️ SUPPRIMER", key=f"del_{idx}", use_container_width=True):
-                    st.session_state.confirm_del_idx = idx; st.rerun()
+                    st.session_state.confirm_del_idx = idx
+                    st.rerun()
     else:
-        st.info("Aucun contact trouvé pour cette saison.")
+        st.info("Aucun contact trouvé.")
+
+# =================================================================
+# --- 6. PAGE MODIFIER CONTACT (ANTI-PAGE BLANCHE) ---
+# =================================================================
+if st.session_state.page == "MODIFIER_CONTACT":
+    st.markdown("### ✏️ Modification du Contact")
+    
+    df_m = charger_data('contacts.json')
+    idx_to_edit = st.session_state.get('edit_idx')
+
+    if idx_to_edit is not None and idx_to_edit in df_m.index:
+        row = df_m.loc[idx_to_edit]
+        
+        with st.form("edit_form"):
+            c1, c2 = st.columns(2)
+            prenom = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
+            nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
+            
+            date_nav = st.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav', '')))
+            
+            c3, c4 = st.columns(2)
+            statut_opts = ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé"]
+            curr_st = str(row.get('Statut', 'En attente'))
+            st_idx = statut_opts.index(curr_st) if curr_st in statut_opts else 0
+            
+            new_statut = c3.selectbox("Statut", statut_opts, index=st_idx)
+            new_soc = c4.text_input("Société", value=str(row.get('Société', 'PERSO')))
+            
+            new_prix = st.number_input("Prix", value=int(safe_int(row.get('Prix', 0))))
+            new_acompte = st.number_input("Acompte", value=int(safe_int(row.get('Acompte', 0))))
+            
+            if st.form_submit_button("💾 ENREGISTRER"):
+                df_m.at[idx_to_edit, 'Prénom'] = prenom.upper().strip()
+                df_m.at[idx_to_edit, 'Nom'] = nom.upper().strip()
+                df_m.at[idx_to_edit, 'DateNav'] = date_nav
+                df_m.at[idx_to_edit, 'Statut'] = new_statut
+                df_m.at[idx_to_edit, 'Société'] = new_soc.upper().strip()
+                df_m.at[idx_to_edit, 'Prix'] = new_prix
+                df_m.at[idx_to_edit, 'Acompte'] = new_acompte
+                
+                sauvegarder_data(df_m, 'contacts.json')
+                st.success("Modifications enregistrées !")
+                st.session_state.page = "CONTACTS"
+                st.rerun()
+
+        if st.button("⬅️ ANNULER"):
+            st.session_state.page = "CONTACTS"
+            st.rerun()
+    else:
+        st.error("Index de contact introuvable.")
+        if st.button("Retour"):
+            st.session_state.page = "CONTACTS"
+            st.rerun()
 # =================================================================
 # --- 6. PAGE PLANNING (V18.3 - SÉCURITÉ DATE TOTALE) ---
 # =================================================================
