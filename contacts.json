@@ -879,13 +879,13 @@
         "Commentaires":"\u00c0 voir",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":1
+        "Pers":1.0
     },
     {
         "Pr\u00e9nom":"AURELIEN",
         "Nom":"FAUCHEUX",
         "Statut":"En attente",
-        "Paiement":"Non pay\u00e9",
+        "Paiement":"Unpaid",
         "DateNav":"01\/08\/2026",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":2400,
@@ -893,7 +893,7 @@
         "Nbre de jours":15.0,
         "T\u00e9l\u00e9phone":"06 48 47 04 38",
         "Email":"",
-        "Notes":null,
+        "Notes":"",
         "NbreJours":null,
         "NbrePers":null,
         "NbJours":null,
@@ -908,7 +908,7 @@
         "dt":null,
         "Mail":null,
         "Date":null,
-        "Jours":null,
+        "Jours":15,
         "Date Nav":null,
         "Nb jours":null,
         "Heures moteur":null,
@@ -921,6 +921,6 @@
         "Commentaires":"nan",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":null
+        "Pers":4
     }
 ]
