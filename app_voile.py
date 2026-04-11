@@ -167,7 +167,7 @@ for i, name in enumerate(menu):
         st.session_state.page = name
         st.rerun()
 # =================================================================
-# --- 5. BLOC CONTACTS (V52 - TRI CHRONO RÉEL & NETTOYAGE) ---
+# --- 5. BLOC CONTACTS (V53 - SÉCURISÉ & TRI CHRONO) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div style="text-align:center; background-color:#f4f7f6; padding:10px; border-radius:10px;"><h2>👤 Vesta Skipper - Contacts</h2></div>', unsafe_allow_html=True)
@@ -182,9 +182,11 @@ if st.session_state.page == "CONTACTS":
     if 'filtre_annee' not in st.session_state: st.session_state.filtre_annee = 2026
     if 'confirm_del_idx' not in st.session_state: st.session_state.confirm_del_idx = None
 
+    # --- 1. CHARGEMENT ET INITIALISATION ---
     df_raw = charger_data('contacts.json')
+    df_c = pd.DataFrame() # <--- CRUCIAL : Empêche l'erreur NameError
 
-    # --- 1. FILTRES ---
+    # --- 2. FILTRES DE NAVIGATION ---
     c_search, c_yr = st.columns([2, 1])
     search = c_search.text_input("🔍 Rechercher...", "").upper()
     annee_sel = c_yr.selectbox("📅 Saison", [2026, 2027, 2028], index=[2026, 2027, 2028].index(st.session_state.filtre_annee))
@@ -194,14 +196,13 @@ if st.session_state.page == "CONTACTS":
         df_c = df_raw.copy()
         df_c['orig_idx'] = df_c.index 
         
-        # --- NETTOYAGE DES DATES (Format flexible) ---
-        # On force la lecture jour en premier pour le format FR (JJ/MM/AAAA)
+        # --- NETTOYAGE ET TRI (Plus récent en haut) ---
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         
-        # --- FILTRAGE PAR ANNÉE (AVANT LE TRI) ---
+        # Filtrage par Année
         df_c = df_c[df_c['dt_sort'].dt.year == annee_sel]
-
-        # --- TRI CHRONO INVERSÉ (Plus récent en haut) ---
+        
+        # Tri descendant
         df_c = df_c.sort_values(by='dt_sort', ascending=False)
 
         # Filtre Recherche
@@ -211,35 +212,40 @@ if st.session_state.page == "CONTACTS":
                    df_c['Société'].astype(str).str.upper().str.contains(search)
             df_c = df_c[mask]
 
-        # Séparation Archives / En cours
-        arch_list = ["terminé", "refusé", "annulé", "termine", "refuse", "annule"]
+    # --- 3. LOGIQUE D'AFFICHAGE ---
+    # On définit les listes même si df_c est vide pour éviter les erreurs de boutons
+    arch_list = ["terminé", "refusé", "annulé", "termine", "refuse", "annule"]
+    
+    if not df_c.empty:
         mask_arch = df_c['Statut'].astype(str).str.lower().isin(arch_list)
-        
         df_aff = df_c[mask_arch].copy() if st.session_state.vue_contact == "Archives" else df_c[~mask_arch].copy()
+        nb_cours = len(df_c[~mask_arch])
+        nb_arch = len(df_c[mask_arch])
+    else:
+        df_aff = pd.DataFrame()
+        nb_cours, nb_arch = 0, 0
 
-        # --- 2. NAVIGATION ---
-        n1, n2, n3 = st.columns(3)
-        # Affichage dynamique du nombre de fiches trouvées
-        n1.button(f"👤 EN COURS ({len(df_c[~mask_arch])})", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary")
-        if n1: st.session_state.vue_contact = "En cours"; st.rerun()
-        
-        n2.button(f"📂 ARCHIVES ({len(df_c[mask_arch])})", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary")
-        if n2: st.session_state.vue_contact = "Archives"; st.rerun()
-        
-        if n3.button("➕ NOUVEAU", use_container_width=True):
-            new_r = {"Prénom": "PRÉNOM", "Nom": "NOM", "Statut": "En attente", "Paiement": "Non payé", "DateNav": f"01/06/{annee_sel}", "Société": "PERSO", "Prix": 0, "Acompte": 0, "Nbre de personnes": 1, "Nbre de jours": 1}
-            df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
-            sauvegarder_data(df_new, 'contacts.json'); st.rerun()
+    # --- 4. BOUTONS NAVIGATION ---
+    n1, n2, n3 = st.columns(3)
+    if n1.button(f"👤 EN COURS ({nb_cours})", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"):
+        st.session_state.vue_contact = "En cours"; st.rerun()
+    if n2.button(f"📂 ARCHIVES ({nb_arch})", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"):
+        st.session_state.vue_contact = "Archives"; st.rerun()
+    if n3.button("➕ NOUVEAU", use_container_width=True):
+        new_r = {"Prénom": "PRÉNOM", "Nom": "NOM", "Statut": "En attente", "Paiement": "Non payé", "DateNav": f"01/06/{annee_sel}", "Société": "PERSO", "Prix": 0, "Acompte": 0, "Nbre de personnes": 1, "Nbre de jours": 1}
+        df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
+        sauvegarder_data(df_new, 'contacts.json'); st.rerun()
 
-        st.divider()
+    st.divider()
 
-        # --- 3. AFFICHAGE DES CARTES ---
+    # --- 5. BOUCLE D'AFFICHAGE DES CARTES ---
+    if not df_aff.empty:
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
             statut = str(row.get('Statut', 'Ok')).lower()
             soc = str(row.get('Société','PERSO')).upper()
             
-            # Pastel
+            # Pastel logic
             if soc == "CMN": bg = "#D6EAF8"
             elif any(x in statut for x in ["annul", "refus"]): bg = "#EBEDEF"
             elif "attente" in statut: bg = "#FCF3CF"
@@ -249,8 +255,6 @@ if st.session_state.page == "CONTACTS":
             p_aco = safe_int(row.get('Acompte', 0))
             tel = str(row.get('Téléphone', '')).replace("nan", "").strip()
             mail = str(row.get('Email', '')).replace("nan", "").strip()
-            
-            # Affichage propre de la date
             d_prev = row['dt_sort'].strftime('%d/%m/%Y') if pd.notnull(row['dt_sort']) else row['DateNav']
 
             html_card = f"""
@@ -276,6 +280,7 @@ if st.session_state.page == "CONTACTS":
             """
             st.components.v1.html(html_card, height=230)
             
+            # --- ACTIONS ---
             c_ed, c_del = st.columns([3, 2])
             if c_ed.button(f"✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx; st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
@@ -291,6 +296,8 @@ if st.session_state.page == "CONTACTS":
             else:
                 if c_del.button("🗑️ SUPPRIMER", key=f"del_{idx}", use_container_width=True):
                     st.session_state.confirm_del_idx = idx; st.rerun()
+    else:
+        st.info("Aucun contact trouvé pour cette saison.")
 # =================================================================
 # --- 6. PAGE PLANNING (V18.3 - SÉCURITÉ DATE TOTALE) ---
 # =================================================================
