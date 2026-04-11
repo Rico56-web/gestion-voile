@@ -106,26 +106,25 @@ for i, name in enumerate(menu):
         st.session_state.page = name
         st.rerun()
 # =================================================================
-# --- 5. BLOC CONTACTS (UNIFIÉ & SÉCURISÉ) ---
+# --- 5. BLOC CONTACTS (V70 - NAVIGATION VERTE & DESIGN FINAL) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div style="text-align:center; background-color:#f4f7f6; padding:10px; border-radius:10px;"><h2>Vesta Skipper 2026 - Contacts</h2></div>', unsafe_allow_html=True)
 
-    # 1. Chargement des données
+    # 1. Chargement et Préparation des données
     df_raw = charger_data('contacts.json')
     df_c = pd.DataFrame()
     df_aff = pd.DataFrame()
 
-    # 2. Barre de recherche et filtres
+    # Barre de filtres (Recherche + Année)
     c_search, c_yr = st.columns([2, 1])
-    search = c_search.text_input("Rechercher...", "").upper()
+    search = c_search.text_input("Rechercher (Nom, Note, Societe...)", "").upper()
     annee_sel = c_yr.selectbox("Saison", [2026, 2027, 2028], index=0)
 
     if not df_raw.empty:
         df_c = df_raw.copy()
         df_c['orig_idx'] = df_c.index 
-        
-        # Conversion date sécurisée pour le tri
+        # Tri chronologique sécurisé
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         mask_annee = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna())
         df_c = df_c[mask_annee].copy()
@@ -134,15 +133,36 @@ if st.session_state.page == "CONTACTS":
         if search:
             mask = (df_c['Nom'].astype(str).str.upper().str.contains(search)) | \
                    (df_c['Prénom'].astype(str).str.upper().str.contains(search)) | \
-                   (df_c['Notes'].astype(str).str.upper().str.contains(search))
+                   (df_c['Notes'].astype(str).str.upper().str.contains(search)) | \
+                   (df_c['Société'].astype(str).str.upper().str.contains(search))
             df_c = df_c[mask]
 
-    # 3. Sous-navigation (En cours / Archives / Nouveau)
+    # 2. Sous-Navigation avec mise en couleur du bouton actif
+    if 'vue_contact' not in st.session_state: 
+        st.session_state.vue_contact = "En cours"
+
+    # Style CSS pour le bouton actif (Vert clair)
+    st.markdown("""
+        <style>
+            div[data-testid="stColumn"] button[kind="primary"] {
+                background-color: #D5F5E3 !important; 
+                color: #117864 !important; 
+                border: 2px solid #ABEBC6 !important;
+                font-weight: bold !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
     n1, n2, n3 = st.columns(3)
-    if n1.button("EN COURS", use_container_width=True): 
+    
+    if n1.button("EN COURS", use_container_width=True, 
+                 type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
         st.session_state.vue_contact = "En cours"; st.rerun()
-    if n2.button("ARCHIVES", use_container_width=True): 
+        
+    if n2.button("ARCHIVES", use_container_width=True, 
+                 type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
         st.session_state.vue_contact = "Archives"; st.rerun()
+        
     if n3.button("NOUVEAU", use_container_width=True):
         new_r = {"Prénom": "PRENOM", "Nom": "NOM", "Statut": "En attente", "Paiement": "Unpaid", "DateNav": f"01/06/{annee_sel}", "Société": "PERSO"}
         df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
@@ -150,44 +170,38 @@ if st.session_state.page == "CONTACTS":
 
     st.divider()
 
-    # 4. Filtrage de la vue
+    # 3. Logique de filtrage Archives
     arch_list = ["termine", "refuse", "annule", "terminé", "refusé", "annulé"]
     if not df_c.empty:
-        # On définit par défaut la vue si elle n'existe pas
-        if 'vue_contact' not in st.session_state: st.session_state.vue_contact = "En cours"
-        
         mask_arch = df_c['Statut'].astype(str).str.lower().str.contains('|'.join(arch_list))
-        if st.session_state.vue_contact == "Archives":
-            df_aff = df_c[mask_arch].copy()
-        else:
-            df_aff = df_c[~mask_arch].copy()
+        df_aff = df_c[mask_arch].copy() if st.session_state.vue_contact == "Archives" else df_c[~mask_arch].copy()
 
-    # 5. Boucle d'affichage des cartes
+    # 4. Affichage des fiches (Cartes HTML)
     if not df_aff.empty:
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
             soc = str(row.get('Société','PERSO')).upper()
             statut = str(row.get('Statut', 'Ok')).upper()
             
-            # Gestion Paiement
+            # Gestion Paiement & Couleur
             pay_raw = str(row.get('Paiement', 'Unpaid')).upper()
             p_label = "PAYE" if "PAID" in pay_raw or "PAYE" in pay_raw else "NON PAYE"
             p_color = "#27AE60" if p_label == "PAYE" else "#E74C3C"
             
-            # Nettoyage textes
+            # Nettoyage des champs
             notes = str(row.get('Notes', '')).replace('nan', '').strip()
             tel = str(row.get('Téléphone', '')).replace('nan', '').strip()
             mail = str(row.get('Email', '')).replace('nan', '').strip()
             d_str = str(row.get('DateNav', '')).replace('nan', '---')
             
-            # Couleurs de fond
+            # Design : CMN en bleu, Attente en jaune, Reste en vert
             bg = "#D6EAF8" if soc == "CMN" else ("#FCF3CF" if "ATTENTE" in statut else "#D5F5E3")
             if any(x in statut.lower() for x in ["annul", "refus"]): bg = "#EBEDEF"
 
-            p_tot = clean_int(row.get('Prix', 0))
-            p_aco = clean_int(row.get('Acompte', 0))
+            p_tot = safe_int(row.get('Prix', 0))
+            p_aco = safe_int(row.get('Acompte', 0))
 
-            # HTML sécurisé (Codes Unicode pour éviter SyntaxError)
+            # HTML avec codes Unicode pour éviter SyntaxError
             card_html = f"""
             <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; border:1px solid rgba(0,0,0,0.1); margin-bottom:10px;">
                 <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:8px;">
@@ -216,17 +230,14 @@ if st.session_state.page == "CONTACTS":
             """
             st.markdown(card_html, unsafe_allow_html=True)
             
+            # Boutons d'Action (Édition / Suppression)
             c_ed, c_del = st.columns(2)
             if c_ed.button(f"EDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx
                 st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
             if c_del.button(f"SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
-                df_db = charger_data('contacts.json')
-                if idx in df_db.index:
-                    df_db = df_db.drop(idx)
-                    sauvegarder_data(df_db, 'contacts.json')
-                    st.success(f"Contact #{idx} supprimé")
-                    st.rerun()   
+                df_db = charger_data('contacts.json').drop(idx)
+                sauvegarder_data(df_db, 'contacts.json'); st.rerun()
     else:
         st.info("Aucun contact à afficher dans cette vue.")
 # =================================================================
