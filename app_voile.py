@@ -124,26 +124,13 @@ for i, name in enumerate(menu):
         st.session_state.page = name
         st.rerun()
 # =================================================================
-# --- 5. BLOC CONTACTS (V88 - RÉPARATION FINALE & TOTALE) ---
+# --- 5. BLOC CONTACTS (V91 - NETTOYAGE & FIX FINAL) ---
 # =================================================================
 if 'page' not in st.session_state:
     st.session_state.page = "PLANNING"
 
 if st.session_state.page == "CONTACTS":
     st.markdown('<h2 style="text-align:center;">Vesta Skipper 2026 - Contacts</h2>', unsafe_allow_html=True)
-
-    # --- FONCTIONS DE NETTOYAGE (Anti-crash et Anti-nan) ---
-    def clean_text(val):
-        v = str(val).replace('nan', '').replace('None', '').strip()
-        # Sécurité : Si la note contient du code HTML par erreur, on le neutralise
-        if "<div" in v or "<a " in v: return "Note à corriger (HTML détecté)"
-        return v if v else "---"
-
-    def clean_num(val, default=0):
-        try:
-            if pd.isna(val) or val == "nan" or val == "" or val is None: return default
-            return int(float(val))
-        except: return default
 
     # 1. Chargement des données
     df_raw = charger_data('contacts.json')
@@ -180,7 +167,7 @@ if st.session_state.page == "CONTACTS":
 
     st.divider()
 
-    # 3. Affichage des fiches cliquables
+    # 3. Affichage des fiches
     if not df_c.empty:
         arch_list = ["termine", "refuse", "annule", "terminé", "refusé", "annulé"]
         mask_arch = df_c['Statut'].astype(str).str.lower().str.contains('|'.join(arch_list))
@@ -189,110 +176,48 @@ if st.session_state.page == "CONTACTS":
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
             
-            # Récupération propre
+            # --- A. PRÉPARATION DES DONNÉES (Nettoyage) ---
             pre = clean_text(row.get('Prénom', '')).upper()
             nom = clean_text(row.get('Nom', '')).upper()
-            sta = clean_text(row.get('Statut', 'EN ATTENTE')).upper()
+            sta_clean = str(row.get('Statut', 'EN ATTENTE')).upper()
             soc = clean_text(row.get('Société', 'PERSO')).upper()
             tel = clean_text(row.get('Téléphone', ''))
             mail = clean_text(row.get('Email', ''))
             note = clean_text(row.get('Notes', ''))
             
-         # --- FINANCES & STATUT (Version Spéciale Archives) ---
             prix = clean_num(row.get('Prix', 0))
             aco = clean_num(row.get('Acompte', 0))
             reste = prix - aco
-            
-            # Nettoyage des textes
-            sta_clean = str(row.get('Statut', '')).upper()
-            # On récupère le paiement, par défaut on considère "UNPAID" si c'est vide
             val_paye = str(row.get('Paiement', 'UNPAID')).strip().upper()
 
-            # --- LA LOGIQUE DE COULEUR ---
-            
-            # 1. Cas des fiches "Mortes" (Annulé / Refusé)
-            if any(x in sta_clean for x in ["ANNUL", "REFUS"]):
-                p_label = "---"
-                p_color = "#95A5A6" # Gris
-            
-            # 2. Cas des fiches Payées (soit coché PAID, soit reste à 0)
+            # --- B. LOGIQUE DE COULEUR (Paiement & Statut) ---
+            ignore_paiement = any(x in sta_clean for x in ["ANNUL", "REFUS"])
+
+            if ignore_paiement:
+                p_label, p_color, reste_color = "---", "#95A5A6", "#95A5A6"
             elif val_paye == "PAID" or reste <= 0:
-                p_label = "PAYÉ"
-                p_color = "green"
-            
-            # 3. Cas des fiches en cours ou archives non soldées
+                p_label, p_color, reste_color = "PAYÉ", "green", "green"
             else:
-                p_label = "NON PAYÉ"
-                p_color = "#E74C3C" # Rouge
-            
-            # Nettoyage total de la valeur (suppression espaces, majuscules)
-            raw_pay = str(row.get('Paiement', 'UNPAID')).strip().upper()
-            
-            # Condition stricte : SEULEMENT si c'est "PAID", sinon c'est "NON PAYÉ"
-            if raw_pay == "PAID":
-                p_label = "PAYÉ"
-                p_color = "green"
-            else:
-                p_label = "NON PAYÉ"
-                p_color = "red"
-            
-            # Style et Rendu
-            bg = "#D6EAF8" if soc == "CMN" else ("#FCF3CF" if "ATTENTE" in sta else "#D5F5E3")
+                p_label, p_color, reste_color = "NON PAYÉ", "#E74C3C", "#C0392B"
+
+            # --- C. RENDU HTML ---
+            bg = "#D6EAF8" if soc == "CMN" else ("#FCF3CF" if "ATTENTE" in sta_clean else "#D5F5E3")
             t_url = tel.replace(' ', '').replace('+', '')
-            # 1. --- LOGIQUE DE DÉTECTION (AVANT LE HTML) ---
-sta_clean = str(row.get('Statut', '')).upper()
-val_paye = str(row.get('Paiement', 'UNPAID')).strip().upper()
-prix = clean_num(row.get('Prix', 0))
-aco = clean_num(row.get('Acompte', 0))
-reste = prix - aco
 
-# On détermine si la fiche est une archive "morte"
-ignore_paiement = any(x in sta_clean for x in ["ANNUL", "REFUS"])
-
-# Définition des couleurs et labels
-if ignore_paiement:
-    p_label = "---"
-    p_color = "#95A5A6" # Gris pour le label
-    reste_color = "#95A5A6" # Gris pour le montant reste
-elif val_paye == "PAID" or reste <= 0:
-    p_label = "PAYÉ"
-    p_color = "green"
-    reste_color = "green"
-else:
-    p_label = "NON PAYÉ"
-    p_color = "#E74C3C" # Rouge
-    reste_color = "#C0392B" # Rouge foncé pour le montant
-
-# 2. --- RENDU HTML (Utilise les variables préparées) ---
-card_html = f"""
-<div style="background-color:{bg}; padding:15px; border-radius:12px; border:1px solid #ccc; margin-bottom:10px; color:#2C3E50;">
-    ... (le reste de votre entête HTML) ...
-    <div style="display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; margin-top:10px; gap:5px;">
-        <div>📅 Date: <b>{row.get('DateNav','')}</b></div>
-        <div>📊 Statut: <b>{sta_clean}</b></div>
-        <div>💰 Total: <b>{prix} €</b></div>
-        <div>📉 Reste: <b style="color:{reste_color};">{reste} €</b></div>
-        <div style="color:{p_color}; font-weight:bold;">🏷️ {p_label}</div>
-    </div>
-    ...
-</div>
-"""
-st.markdown(card_html, unsafe_allow_html=True)
             card_html = f"""
             <div style="background-color:{bg}; padding:15px; border-radius:12px; border:1px solid #ccc; margin-bottom:10px; color:#2C3E50;">
                 <div style="display:flex; justify-content:space-between; font-weight:bold; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:5px;">
                     <span>#{idx} | {pre} {nom}</span>
                     <span style="background:white; padding:0 8px; border-radius:5px; font-size:0.75rem; border:1px solid #ddd;">{soc}</span>
-                <div style="color:{p_color}; font-weight:bold;">🏷️ {p_label}</div>
                 </div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; margin-top:10px; gap:5px;">
                     <div>📅 Date: <b>{row.get('DateNav','')}</b></div>
-                    <div>📊 Statut: <b>{sta}</b></div>
+                    <div>📊 Statut: <b>{sta_clean}</b></div>
                     <div>👥 Pers: <b>{row.get('Pers', 0)}</b></div>
                     <div>⏳ Jours: <b>{row.get('Jours', 0)}</b></div>
                     <div>💰 Total: <b>{prix} €</b></div>
-                    <div>📉 Reste: <b style="color:{'#666' if ignore_paiement else '#C0392B'};">{reste} €</b></div>
-                    <div style="color:{'green' if 'PAYÉ' in p_label else 'red'}; font-weight:bold;">🏷️ {p_label}</div>
+                    <div>📉 Reste: <b style="color:{reste_color};">{reste} €</b></div>
+                    <div style="color:{p_color}; font-weight:bold;">🏷️ {p_label}</div>
                 </div>
                 <div style="margin-top:10px; padding:8px; background:rgba(255,255,255,0.4); border-radius:5px; font-size:0.8rem;">
                     📞 Tel: <b>{tel}</b><br>
@@ -307,7 +232,7 @@ st.markdown(card_html, unsafe_allow_html=True)
             """
             st.markdown(card_html, unsafe_allow_html=True)
             
-            # Boutons de gestion
+            # --- D. BOUTONS ---
             c1, c2 = st.columns(2)
             if c1.button(f"EDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx
