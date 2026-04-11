@@ -217,35 +217,39 @@ CMN
 
 <div style="margin-top:12px; display:flex; gap:8px;">
     <a href="tel:" style="flex:1; text-decorat
-
 # =================================================================
-# --- 5. BLOC CONTACTS (V65 - SÉCURITÉ ABSOLUE) ---
+# --- 5. BLOC CONTACTS (V67 - SÉCURITÉ TOTALE ENCODAGE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    st.markdown('<div style="text-align:center; background-color:#f4f7f6; padding:10px; border-radius:10px;"><h2>👤 Vesta Skipper 2026 - Contacts</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align:center; background-color:#f4f7f6; padding:10px; border-radius:10px;"><h2>Vesta Skipper 2026 - Contacts</h2></div>', unsafe_allow_html=True)
 
     df_raw = charger_data('contacts.json')
     df_c = pd.DataFrame()
     df_aff = pd.DataFrame()
 
+    # Filtres
     c_search, c_yr = st.columns([2, 1])
-    search = c_search.text_input("Rechercher...", "").upper()
+    search = c_search.text_input("Rechercher (Nom, Note, Societe...)", "").upper()
     annee_sel = c_yr.selectbox("Saison", [2026, 2027, 2028], index=0)
 
     if not df_raw.empty:
         df_c = df_raw.copy()
         df_c['orig_idx'] = df_c.index 
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+        
+        # Filtre Annee + Tri Chronologique
         mask_annee = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna())
         df_c = df_c[mask_annee].copy()
         df_c = df_c.sort_values(by='dt_sort', ascending=False)
+
         if search:
             mask = df_c['Nom'].astype(str).str.upper().str.contains(search) | \
                    df_c['Prénom'].astype(str).str.upper().str.contains(search) | \
-                   df_c['Notes'].astype(str).str.upper().str.contains(search)
+                   df_c['Notes'].astype(str).str.upper().str.contains(search) | \
+                   df_c['Société'].astype(str).str.upper().str.contains(search)
             df_c = df_c[mask]
 
-    # --- NAVIGATION ---
+    # Navigation
     n1, n2, n3 = st.columns(3)
     if n1.button("EN COURS", use_container_width=True): 
         st.session_state.vue_contact = "En cours"; st.rerun()
@@ -258,44 +262,35 @@ if st.session_state.page == "CONTACTS":
 
     st.divider()
 
-    # --- FILTRAGE ARCHIVES ---
+    # Filtrage Archives
     arch_list = ["termine", "refuse", "annule", "terminé", "refusé", "annulé"]
     if not df_c.empty:
         mask_arch = df_c['Statut'].astype(str).str.lower().str.contains('|'.join(arch_list))
         df_aff = df_c[mask_arch].copy() if st.session_state.get('vue_contact') == "Archives" else df_c[~mask_arch].copy()
 
+    # Affichage des fiches
     for _, row in df_aff.iterrows():
         idx = row['orig_idx']
         soc = str(row.get('Société','PERSO')).upper()
         statut = str(row.get('Statut', 'Ok')).upper()
         
-        # Nettoyage et Traduction (Zéro accent dans les tests de logique)
+        # Nettoyage & Traduction automatique
         pay_raw = str(row.get('Paiement', 'Non paye')).upper()
-        if "PAID" in pay_raw or "PAY" in pay_raw:
-            paiement_fr = "PAYE"
-            pay_c = "#27AE60"
-        else:
-            paiement_fr = "NON PAYE"
-            pay_c = "#E74C3C"
+        paiement_fr = "PAYE" if "PAID" in pay_raw or "PAYE" in pay_raw else "NON PAYE"
+        pay_c = "#27AE60" if paiement_fr == "PAYE" else "#E74C3C"
         
         notes = str(row.get('Notes', '')).replace('nan', '').strip()
         tel = str(row.get('Téléphone', '')).replace('nan', '').strip()
         mail = str(row.get('Email', '')).replace('nan', '').strip()
         d_str = str(row.get('DateNav', '')).replace('nan', 'A SAISIR')
         
+        # Design & Couleur (CMN en bleu)
         bg = "#D6EAF8" if soc == "CMN" else ("#EBEDEF" if any(x in statut.lower() for x in ["annul", "refus"]) else ("#FCF3CF" if "ATTENTE" in statut else "#D5F5E3"))
+        
         p_tot, p_aco = safe_int(row.get('Prix', 0)), safe_int(row.get('Acompte', 0))
 
-        # --- CARTE HTML (EMOJIS REMPLACÉS PAR CODES HTML) ---
-        # Calendrier: &#128197; | Graphique: &#128202; | Sac Argent: &#128176; | Telephone: &#128222; | Note: &#128221;
-        # Utilisation de codes Unicode \Uxxxxxxxx pour éviter le SyntaxError
-        ico_date = "\U0001F4C5"  # Calendrier
-        ico_statut = "\U0001F4CA" # Graphique
-        ico_money = "\U0001F4B0"  # Sac d'argent
-        ico_tel = "\U0001F4DE"    # Téléphone
-        ico_mail = "\U00002709"   # Enveloppe
-        ico_note = "\U0001F4DD"   # Note
-
+        # CONSTRUCTION HTML (Utilisation de codes HTML pour les emojis pour eviter le SyntaxError)
+        # &#128197; = Calendrier | &#128202; = Graphique | &#128176; = Argent | &#128222; = Tel | &#9993; = Mail | &#128221; = Note
         card_html = f"""
         <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; border:1px solid rgba(0,0,0,0.1); margin-bottom:10px;">
             <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:8px;">
@@ -303,19 +298,19 @@ if st.session_state.page == "CONTACTS":
                 <span style="font-size:0.75rem; background:white; padding:3px 8px; border-radius:15px; font-weight:bold; border:1px solid #ccc;">{soc}</span>
             </div>
             <div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; gap:10px;">
-                <div>{ico_date} Date : <b>{d_str}</b></div>
-                <div>{ico_statut} Statut : <b>{statut}</b></div>
-                <div>{ico_money} Total : <b>{p_tot}€</b></div>
-                <div>💸 Acompte : <b>{p_aco}€</b></div>
-                <div>💳 Reste : <b style="color:#C0392B;">{p_tot - p_aco}€</b></div>
-                <div style="color:{pay_c}; font-weight:bold;">🏷️ {paiement_fr}</div>
+                <div>&#128197; Date : <b>{d_str}</b></div>
+                <div>&#128202; Statut : <b>{statut}</b></div>
+                <div>&#128176; Total : <b>{p_tot} EUR</b></div>
+                <div>&#128184; Acompte : <b>{p_aco} EUR</b></div>
+                <div>&#128179; Reste : <b style="color:#C0392B;">{p_tot - p_aco} EUR</b></div>
+                <div style="color:{pay_c}; font-weight:bold;">&#127991; {paiement_fr}</div>
             </div>
             <div style="margin-top:10px; font-size:0.85rem; background:rgba(255,255,255,0.4); padding:8px; border-radius:6px;">
-                {ico_tel} Tel : <b>{tel if tel else "NON RENSEIGNE"}</b><br>
-                {ico_mail} Mail : <b>{mail if mail else "NON RENSEIGNE"}</b>
+                &#128222; Tel : <b>{tel if tel else "NON RENSEIGNE"}</b><br>
+                &#9993; Mail : <b>{mail if mail else "NON RENSEIGNE"}</b>
             </div>
             <div style="margin-top:10px; font-size:0.8rem; background:rgba(0,0,0,0.05); padding:8px; border-radius:6px; border-left:3px solid #34495E;">
-                {ico_note} <i>{notes if notes else "Pas de notes..."}</i>
+                &#128221; <i>{notes if notes else "Pas de notes..."}</i>
             </div>
             <div style="margin-top:12px; display:flex; gap:8px;">
                 <a href="tel:{tel}" style="flex:1; text-decoration:none; background:#5DADE2; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">APPEL</a>
@@ -324,7 +319,8 @@ if st.session_state.page == "CONTACTS":
         </div>
         """
         st.markdown(card_html, unsafe_allow_html=True)
-
+        
+        # Boutons d'action (Bien alignes)
         c_ed, c_del = st.columns(2)
         if c_ed.button(f"EDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
             st.session_state.edit_idx = idx
@@ -332,6 +328,7 @@ if st.session_state.page == "CONTACTS":
         if c_del.button(f"SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
             df_db = charger_data('contacts.json').drop(idx)
             sauvegarder_data(df_db, 'contacts.json'); st.rerun()
+
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT (V57 - SÉCURISÉ) ---
 # =================================================================
