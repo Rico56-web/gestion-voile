@@ -222,96 +222,70 @@ if st.session_state.page == "CONTACTS":
             if c_del.button(f"SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
                 df_db = charger_data('contacts.json').drop(idx)
                 sauvegarder_data(df_db, 'contacts.json'); st.rerun()
-# =================================================================
-# --- 6. PAGE MODIFIER CONTACT (V73 - FIX ERROR MIN_VALUE) ---
+
+# ==# =================================================================
+# --- 6. PAGE MODIFIER CONTACT (V74 - FIX TYPEERROR PANDAS) ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
     st.markdown('<div style="background-color:#5DADE2; padding:10px; border-radius:10px; color:white; text-align:center;"><h3>&#9998; Modification de la Fiche</h3></div>', unsafe_allow_html=True)
     
     idx_to_edit = st.session_state.get('edit_idx')
+    
+    # CHARGEMENT ET NETTOYAGE DES TYPES
     df_m = charger_data('contacts.json')
+    
+    if not df_m.empty:
+        # On force ces colonnes en type 'object' pour éviter le crash TypeError
+        cols_a_fixer = ['Jours', 'Pers', 'Prix', 'Acompte']
+        for col in cols_a_fixer:
+            if col in df_m.columns:
+                df_m[col] = df_m[col].astype(object)
 
     if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
         row = df_m.loc[idx_to_edit]
         
-        # On sécurise les valeurs AVANT de créer le widget pour éviter le crash min_value
+        # Sécurisation des valeurs pour le widget
         val_jours = int(safe_int(row.get('Jours', 1)))
         val_pers = int(safe_int(row.get('Pers', 1)))
-        
-        # Si la valeur est 0, on force 1 pour le widget
         if val_jours < 1: val_jours = 1
         if val_pers < 1: val_pers = 1
 
-        with st.form("form_edition_vesta_final"):
-            c1, c2 = st.columns(2)
-            new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
-            new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
+        with st.form("form_edition_vesta_v74"):
+            # ... (Gardez tous vos champs text_input et number_input ici) ...
             
-            c3, c4 = st.columns(2)
-            new_date = c3.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav', '')))
-            new_soc = c4.text_input("Société", value=str(row.get('Société', 'PERSO')))
-            
-            c5, c6 = st.columns(2)
-            new_tel = c5.text_input("Téléphone", value=str(row.get('Téléphone', '')))
-            new_mail = c6.text_input("Email", value=str(row.get('Email', '')))
-            
-            # --- Logistique ---
+            # --- LES CHAMPS LOGISTIQUE ---
             cl1, cl2 = st.columns(2)
             new_jours = cl1.number_input("Nombre de jours", value=val_jours, min_value=1)
             new_pers = cl2.number_input("Nombre de personnes", value=val_pers, min_value=1)
             
-            # --- Statuts ---
-            col_a, col_b = st.columns(2)
-            statut_list = ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé"]
-            curr_s = str(row.get('Statut', 'En attente'))
-            s_idx = statut_list.index(curr_s) if curr_s in statut_list else 0
-            new_statut = col_a.selectbox("Statut Mission", statut_list, index=s_idx)
-            
-            curr_pay = str(row.get('Paiement', 'Unpaid'))
-            new_pay = col_b.radio("État du Paiement", ["Unpaid", "Paid"], 
-                                 index=1 if curr_pay.upper() == "PAID" else 0, horizontal=True)
-            
-            # --- Finances ---
-            f1, f2 = st.columns(2)
-            new_prix = f1.number_input("Prix Total (€)", value=int(safe_int(row.get('Prix', 0))))
-            new_aco = f2.number_input("Acompte (€)", value=int(safe_int(row.get('Acompte', 0))))
-            
-            new_notes = st.text_area("Notes", value=str(row.get('Notes', '')).replace('nan',''))
+            # ... (Gardez le reste du formulaire : Statut, Paiement, Prix, Acompte, Notes) ...
 
-            # BOUTON CRITIQUE
             submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
             
             if submitted:
-                # On s'assure que l'index existe toujours
-                if idx_to_edit in df_m.index:
-                    # Pour éviter le TypeError, on convertit les nombres en texte 
-                    # ou on utilise .at avec une conversion explicite
-                    df_m.at[idx_to_edit, 'Prénom'] = str(new_pre).upper().strip()
-                    df_m.at[idx_to_edit, 'Nom'] = str(new_nom).upper().strip()
-                    df_m.at[idx_to_edit, 'DateNav'] = str(new_date)
-                    df_m.at[idx_to_edit, 'Société'] = str(new_soc).upper().strip()
-                    df_m.at[idx_to_edit, 'Téléphone'] = str(new_tel).strip()
-                    df_m.at[idx_to_edit, 'Email'] = str(new_mail).strip()
-                    
-                    # FORCE LE TYPE POUR LES CHIFFRES
-                    df_m.at[idx_to_edit, 'Jours'] = int(new_jours)
-                    df_m.at[idx_to_edit, 'Pers'] = int(new_pers)
-                    
-                    df_m.at[idx_to_edit, 'Statut'] = str(new_statut)
-                    df_m.at[idx_to_edit, 'Paiement'] = str(new_pay)
-                    df_m.at[idx_to_edit, 'Prix'] = int(new_prix)
-                    df_m.at[idx_to_edit, 'Acompte'] = int(new_aco)
-                    df_m.at[idx_to_edit, 'Notes'] = str(new_notes)
-                    
-                    sauvegarder_data(df_m, 'contacts.json')
-                    st.success("Enregistré avec succès !")
-                    st.session_state.page = "CONTACTS"
-                    st.rerun()
-
-    if st.button("⬅️ ANNULER", use_container_width=True):
-        st.session_state.page = "CONTACTS"
-        st.rerun()
-# =================================================================
+                # MISE À JOUR SÉCURISÉE
+                # On utilise .loc avec une conversion explicite en float ou int
+                df_m.at[idx_to_edit, 'Prénom'] = str(new_pre).upper().strip()
+                df_m.at[idx_to_edit, 'Nom'] = str(new_nom).upper().strip()
+                df_m.at[idx_to_edit, 'DateNav'] = str(new_date)
+                df_m.at[idx_to_edit, 'Société'] = str(new_soc).upper().strip()
+                df_m.at[idx_to_edit, 'Téléphone'] = str(new_tel).strip()
+                df_m.at[idx_to_edit, 'Email'] = str(new_mail).strip()
+                
+                # Sauvegarde en tant que nombres
+                df_m.at[idx_to_edit, 'Jours'] = int(new_jours)
+                df_m.at[idx_to_edit, 'Pers'] = int(new_pers)
+                df_m.at[idx_to_edit, 'Prix'] = int(new_prix)
+                df_m.at[idx_to_edit, 'Acompte'] = int(new_aco)
+                
+                df_m.at[idx_to_edit, 'Statut'] = str(new_statut)
+                df_m.at[idx_to_edit, 'Paiement'] = str(new_pay)
+                df_m.at[idx_to_edit, 'Notes'] = str(new_notes)
+                
+                sauvegarder_data(df_m, 'contacts.json')
+                st.success("Données synchronisées sur GitHub !")
+                st.session_state.page = "CONTACTS"
+                st.rerun()===============================================================
 # --- 6. PAGE PLANNING (V18.3 - SÉCURITÉ DATE TOTALE) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
