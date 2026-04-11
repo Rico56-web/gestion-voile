@@ -221,8 +221,12 @@ if st.session_state.page == "CONTACTS":
                 st.session_state.edit_idx = idx
                 st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
             if c_del.button(f"SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
-                df_db = charger_data('contacts.json').drop(idx)
-                sauvegarder_data(df_db, 'contacts.json'); st.rerun()
+                df_db = charger_data('contacts.json')
+                if idx in df_db.index:
+                    df_db = df_db.drop(idx)
+                    sauvegarder_data(df_db, 'contacts.json')
+                    st.success(f"Contact #{idx} supprimé")
+                    st.rerun()   
     else:
         st.info("Aucun contact à afficher dans cette vue.")
 # =================================================================
