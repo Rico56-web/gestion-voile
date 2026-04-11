@@ -223,6 +223,7 @@ v            al_paye = str(row.get('Paiement','')).strip().upper()
                 <div style="display:flex; justify-content:space-between; font-weight:bold; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:5px;">
                     <span>#{idx} | {pre} {nom}</span>
                     <span style="background:white; padding:0 8px; border-radius:5px; font-size:0.75rem; border:1px solid #ddd;">{soc}</span>
+                <div style="color:{p_color}; font-weight:bold;">🏷️ {p_label}</div>
                 </div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; margin-top:10px; gap:5px;">
                     <div>📅 Date: <b>{row.get('DateNav','')}</b></div>
