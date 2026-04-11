@@ -106,26 +106,22 @@ for i, name in enumerate(menu):
         st.session_state.page = name
         st.rerun()
 # =================================================================
-# --- 5. BLOC CONTACTS (V76 - FIX PAGE BLANCHE TYPE SAFETY) ---
+# --- 5. BLOC CONTACTS (V78 - VISU COMPLÈTE & APPELS) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div style="text-align:center; background-color:#f4f7f6; padding:10px; border-radius:10px;"><h2>Vesta Skipper 2026 - Contacts</h2></div>', unsafe_allow_html=True)
 
-    # 1. Chargement et Sécurisation immédiate des types
     df_raw = charger_data('contacts.json')
     df_c = pd.DataFrame()
     
     if not df_raw.empty:
         df_c = df_raw.copy()
-        # FORCE LE TYPE OBJECT pour éviter les conflits Arrow/Pandas à l'affichage
-        for col in ['Jours', 'Pers', 'Prix', 'Acompte', 'Société', 'Statut', 'Paiement']:
-            if col in df_c.columns:
-                df_c[col] = df_c[col].astype(object)
+        for col in ['Jours', 'Pers', 'Prix', 'Acompte', 'Paiement', 'Statut', 'Société']:
+            if col in df_c.columns: df_c[col] = df_c[col].astype(object)
         
         df_c['orig_idx'] = df_c.index 
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         
-        # Filtre Année
         c_search, c_yr = st.columns([2, 1])
         search = c_search.text_input("Rechercher...", "").upper()
         annee_sel = c_yr.selectbox("Saison", [2026, 2027, 2028], index=0)
@@ -140,9 +136,8 @@ if st.session_state.page == "CONTACTS":
                    (df_c['Notes'].astype(str).str.upper().str.contains(search))
             df_c = df_c[mask]
 
-    # 2. Navigation
     if 'vue_contact' not in st.session_state: st.session_state.vue_contact = "En cours"
-    st.markdown("<style>div[data-testid='stColumn'] button[kind='primary'] {background-color:#D5F5E3!important;color:#117864!important;font-weight:bold!important;}</style>", unsafe_allow_html=True)
+    st.markdown("<style>div[data-testid='stColumn'] button[kind='primary'] {background-color:#D5F5E3!important;color:#117864!important;font-weight:bold!important;border:2px solid #ABEBC6!important;}</style>", unsafe_allow_html=True)
     
     n1, n2, n3 = st.columns(3)
     if n1.button("EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
@@ -150,62 +145,71 @@ if st.session_state.page == "CONTACTS":
     if n2.button("ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
         st.session_state.vue_contact = "Archives"; st.rerun()
     if n3.button("NOUVEAU", use_container_width=True):
-        new_r = {"Prénom":"PRENOM","Nom":"NOM","Statut":"En attente","Paiement":"Unpaid","DateNav":f"01/06/{annee_sel}","Société":"PERSO","Jours":1,"Pers":1}
+        new_r = {"Prénom":"PRENOM","Nom":"NOM","Statut":"En attente","Paiement":"Unpaid","DateNav":f"01/06/{annee_sel}","Société":"PERSO","Jours":1,"Pers":1,"Prix":0,"Acompte":0,"Notes":"","Téléphone":"","Email":""}
         df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
         sauvegarder_data(df_new, 'contacts.json'); st.rerun()
 
     st.divider()
 
-    # 3. Filtrage Archives
     df_aff = pd.DataFrame()
     if not df_c.empty:
         arch_list = ["termine", "refuse", "annule", "terminé", "refusé", "annulé"]
         mask_arch = df_c['Statut'].astype(str).str.lower().str.contains('|'.join(arch_list))
         df_aff = df_c[mask_arch].copy() if st.session_state.vue_contact == "Archives" else df_c[~mask_arch].copy()
 
-    # 4. Boucle d'affichage sécurisée
     if not df_aff.empty:
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
-            # Utilisation systématique de str() et safe_int() pour éviter tout TypeError
             soc = str(row.get('Société','PERSO')).upper()
-            statut = str(row.get('Statut', 'Ok')).upper()
-            p_label = "PAYE" if "PAID" in str(row.get('Paiement','')).upper() else "NON PAYE"
+            statut = str(row.get('Statut', 'EN ATTENTE')).upper()
+            pay_val = str(row.get('Paiement', 'UNPAID')).upper()
+            p_label = "PAYE" if "PAID" in pay_val or "PAYÉ" in pay_val else "NON PAYE"
             
-            nb_jours = int(safe_int(row.get('Jours', 1)))
-            nb_pers = int(safe_int(row.get('Pers', 1)))
             p_tot = int(safe_int(row.get('Prix', 0)))
             p_aco = int(safe_int(row.get('Acompte', 0)))
+            tel = str(row.get('Téléphone','')).strip().replace('nan','')
+            mail = str(row.get('Email','')).strip().replace('nan','')
+            notes = str(row.get('Notes','')).strip().replace('nan','')
 
             bg = "#D6EAF8" if soc == "CMN" else ("#FCF3CF" if "ATTENTE" in statut else "#D5F5E3")
-            
+            if any(x in statut.lower() for x in ["annul", "refus"]): bg = "#EBEDEF"
+
             card_html = f"""
-            <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; margin-bottom:10px; border:1px solid #ddd;">
-                <div style="display:flex; justify-content:space-between; border-bottom:1px solid #ccc; padding-bottom:5px;">
-                    <b>#{idx} | {str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</b>
-                    <span style="background:white; padding:2px 6px; border-radius:10px; font-size:0.8rem;">{soc}</span>
+            <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; margin-bottom:10px; border:1px solid rgba(0,0,0,0.1);">
+                <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:8px; margin-bottom:10px;">
+                    <span style="font-weight:bold; font-size:1.1rem;">#{idx} | {str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</span>
+                    <span style="background:white; padding:2px 8px; border-radius:10px; font-weight:bold; font-size:0.8rem; border:1px solid #ccc;">{soc}</span>
                 </div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; margin-top:10px;">
-                    <div>📅 {str(row.get('DateNav',''))}</div>
-                    <div>👥 {nb_pers} Pers.</div>
-                    <div>⏳ {nb_jours} Jours</div>
-                    <div>📊 {statut}</div>
-                    <div>💰 {p_tot} €</div>
-                    <div style="color:{'green' if p_label=='PAYE' else 'red'};">🏷️ {p_label}</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; font-size:0.85rem;">
+                    <div>📅 Date: <b>{row.get('DateNav','')}</b></div>
+                    <div>📊 Statut: <b>{statut}</b></div>
+                    <div>👥 Pers: <b>{row.get('Pers', 1)}</b></div>
+                    <div>⏳ Jours: <b>{row.get('Jours', 1)}</b></div>
+                    <div>💰 Total: <b>{p_tot} €</b></div>
+                    <div style="color:{'#27AE60' if p_label == 'PAYE' else '#E74C3C'}; font-weight:bold;">🏷️ {p_label}</div>
+                </div>
+                <div style="margin-top:10px; font-size:0.85rem; background:rgba(255,255,255,0.4); padding:8px; border-radius:6px;">
+                    📞 Tel: <b>{tel if tel else "---"}</b><br>
+                    ✉️ Mail: <b>{mail if mail else "---"}</b>
+                </div>
+                {f'<div style="margin-top:8px; font-size:0.75rem; font-style:italic; border-left:3px solid #34495E; padding-left:8px;">{notes}</div>' if notes else ''}
+                <div style="margin-top:12px; display:flex; gap:8px;">
+                    <a href="tel:{tel.replace(' ','')}" style="flex:1; text-decoration:none; background:#5DADE2; color:white; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:0.7rem;">📞 APPEL</a>
+                    <a href="https://wa.me/{tel.replace(' ','').replace('+','')}" style="flex:1; text-decoration:none; background:#52BE80; color:white; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:0.7rem;">💬 WHATSAPP</a>
                 </div>
             </div>
             """
             st.markdown(card_html, unsafe_allow_html=True)
             
             c_ed, c_del = st.columns(2)
-            if c_ed.button(f"EDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
+            if c_ed.button(f"ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx
                 st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
             if c_del.button(f"SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
                 df_db = charger_data('contacts.json').drop(idx)
                 sauvegarder_data(df_db, 'contacts.json'); st.rerun()
     else:
-        st.info("Aucun contact à afficher.")
+        st.info("Aucun contact trouvé.")
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT (V75 - CORRECTIF SYNTAXE) ---
 # =================================================================
