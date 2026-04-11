@@ -167,10 +167,19 @@ for i, name in enumerate(menu):
         st.session_state.page = name
         st.rerun()
 # =================================================================
-# --- 5. BLOC CONTACTS (V44 - COULEURS PAR STATUT & RACCOURCIS) ---
+# --- 5. BLOC CONTACTS (V45 - SÉCURISÉ ANTI-PLANTAGE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👤 Gestion des Contacts")
+
+    # --- FONCTION DE NETTOYAGE LOCALE ---
+    def safe_int(val):
+        try:
+            if val is None or str(val).lower() == 'nan' or str(val).strip() == '':
+                return 0
+            return int(float(str(val).replace('€','').strip()))
+        except:
+            return 0
 
     # --- INITIALISATION ---
     if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
@@ -193,7 +202,7 @@ if st.session_state.page == "CONTACTS":
         df_aff = df_c[mask_arch].copy() if st.session_state.vue_contact == "Archives" else df_c[~mask_arch].copy()
         df_aff = df_aff.sort_values('dt_sort', ascending=False, na_position='last')
 
-        # NAVIGATION
+        # --- NAVIGATION ---
         c1, c2, c3 = st.columns(3)
         if c1.button("👤 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"):
             st.session_state.vue_contact = "En cours"; st.session_state.edit_idx = None; st.rerun()
@@ -223,12 +232,12 @@ if st.session_state.page == "CONTACTS":
                     try: d_in = datetime.strptime(str(row.get('DateNav'))[:10], "%Y-%m-%d").date()
                     except: d_in = datetime.now().date()
                     e_date = d1.date_input("Date", d_in)
-                    e_pers = d2.number_input("Pers.", value=int(row.get('Nbre de personnes', 1)))
-                    e_jours = d3.number_input("Jours", value=int(row.get('Nbre de jours', 1)))
+                    e_pers = d2.number_input("Pers.", value=safe_int(row.get('Nbre de personnes', 1)))
+                    e_jours = d3.number_input("Jours", value=safe_int(row.get('Nbre de jours', 1)))
                     
                     p1, p2, p3 = st.columns(3)
-                    e_prix = p1.number_input("Prix Total (€)", value=int(row.get('Prix', 0)))
-                    e_acompte = p2.number_input("Acompte (€)", value=int(row.get('Acompte', 0)))
+                    e_prix = p1.number_input("Prix Total (€)", value=safe_int(row.get('Prix', 0)))
+                    e_acompte = p2.number_input("Acompte (€)", value=safe_int(row.get('Acompte', 0)))
                     e_soc = p3.selectbox("Société", ["PERSO", "CMN", "VOG", "CLICK", "Autres"], index=0)
                     
                     s1, s2 = st.columns(2)
@@ -253,19 +262,18 @@ if st.session_state.page == "CONTACTS":
                         st.session_state.edit_idx = None; st.rerun()
 
             else:
-                # --- LOGIQUE DE COULEUR ---
+                # --- LOGIQUE VISUELLE ---
                 statut = str(row.get('Statut', 'Ok')).lower()
                 soc = str(row.get('Société','PERSO')).upper()
                 
-                # Détermination de la couleur de fond
-                if soc == "CMN": bg = "#3498db" # Bleu CMN
-                elif "annul" in statut or "refus" in statut: bg = "#95a5a6" # Gris
-                elif "attente" in statut: bg = "#f39c12" # Orange
-                elif "terminé" in statut: bg = "#34495e" # Bleu nuit
-                else: bg = "#27ae60" # Vert (Ok)
+                if soc == "CMN": bg = "#3498db"
+                elif "annul" in statut or "refus" in statut: bg = "#95a5a6"
+                elif "attente" in statut: bg = "#f39c12"
+                elif "terminé" in statut: bg = "#34495e"
+                else: bg = "#27ae60"
 
-                p_tot = int(row.get('Prix', 0))
-                p_aco = int(row.get('Acompte', 0))
+                p_tot = safe_int(row.get('Prix', 0))
+                p_aco = safe_int(row.get('Acompte', 0))
                 reste = p_tot - p_aco
                 tel = str(row.get('Téléphone', '')).replace("nan", "").strip()
 
