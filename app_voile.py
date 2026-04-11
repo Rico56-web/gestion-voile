@@ -218,7 +218,7 @@ CMN
 <div style="margin-top:12px; display:flex; gap:8px;">
     <a href="tel:" style="flex:1; text-decorat
 # =================================================================
-# --- 5. BLOC CONTACTS (V62 - FIX SYNTAX EMOJI) ---
+# --- 5. BLOC CONTACTS (V63 - SÉCURISÉ) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<div style="text-align:center; background-color:#f4f7f6; padding:10px; border-radius:10px;"><h2>👤 Vesta Skipper 2026 - Contacts</h2></div>', unsafe_allow_html=True)
@@ -255,7 +255,6 @@ if st.session_state.page == "CONTACTS":
 
     st.divider()
 
-    # Logique d'affichage
     arch_list = ["terminé", "refusé", "annulé", "termine", "refuse", "annule"]
     if not df_c.empty:
         mask_arch = df_c['Statut'].astype(str).str.lower().isin(arch_list)
@@ -266,7 +265,7 @@ if st.session_state.page == "CONTACTS":
         soc = str(row.get('Société','PERSO')).upper()
         statut = str(row.get('Statut', 'Ok')).upper()
         
-        # Nettoyage des données
+        # Traduction & Nettoyage
         pay_raw = str(row.get('Paiement', 'Non payé')).upper()
         paiement_fr = "PAYÉ" if pay_raw in ["PAID", "PAYÉ"] else "NON PAYÉ"
         pay_c = "#27AE60" if paiement_fr == "PAYÉ" else "#E74C3C"
@@ -274,12 +273,12 @@ if st.session_state.page == "CONTACTS":
         notes = str(row.get('Notes', '')).replace('nan', '').strip()
         tel = str(row.get('Téléphone', '')).replace('nan', '').strip()
         mail = str(row.get('Email', '')).replace('nan', '').strip()
-        d_str = str(row.get('DateNav', '')).replace('nan', 'À SAISIR')
+        d_str = str(row.get('DateNav', '')).replace('nan', 'À COMPLÉTER')
         
         bg = "#D6EAF8" if soc == "CMN" else ("#EBEDEF" if any(x in statut.lower() for x in ["annul", "refus"]) else ("#FCF3CF" if "ATTENTE" in statut else "#D5F5E3"))
         p_tot, p_aco = safe_int(row.get('Prix', 0)), safe_int(row.get('Acompte', 0))
 
-        # Construction de la carte en une seule chaîne propre
+        # --- DÉBUT DE LA CHAÎNE HTML SÉCURISÉE ---
         card_html = f"""
         <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; border:1px solid rgba(0,0,0,0.1); margin-bottom:10px;">
             <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:8px;">
@@ -309,7 +308,8 @@ if st.session_state.page == "CONTACTS":
         </div>
         """
         st.markdown(card_html, unsafe_allow_html=True)
-        
+        # --- FIN DE LA CHAÎNE HTML ---
+
         c_ed, c_del = st.columns(2)
         if c_ed.button(f"✏️ ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
             st.session_state.edit_idx = idx
