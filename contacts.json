@@ -431,7 +431,7 @@
         "Nbre de jours":2.0,
         "T\u00e9l\u00e9phone":"",
         "Email":"",
-        "Notes":"",
+        "Notes":"ras",
         "NbreJours":null,
         "NbrePers":null,
         "NbJours":null,
@@ -446,7 +446,7 @@
         "dt":null,
         "Mail":null,
         "Date":null,
-        "Jours":null,
+        "Jours":2,
         "Date Nav":null,
         "Nb jours":null,
         "Heures moteur":null,
@@ -459,7 +459,7 @@
         "Commentaires":"Ras",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":null
+        "Pers":4
     },
     {
         "Pr\u00e9nom":"GROUPE ESPAGNE",
@@ -543,7 +543,7 @@
         "Commentaires":"",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":2
+        "Pers":2.0
     },
     {
         "Pr\u00e9nom":"JULIEN",
