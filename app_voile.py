@@ -106,186 +106,91 @@ for i, name in enumerate(menu):
         st.session_state.page = name
         st.rerun()
 # =================================================================
-# --- 5. BLOC CONTACTS (V71 - AVEC JOURS ET PERSONNES) ---
-# =================================================================
-if st.session_state.page == "CONTACTS":
-    st.markdown('<div style="text-align:center; background-color:#f4f7f6; padding:10px; border-radius:10px;"><h2>Vesta Skipper 2026 - Contacts</h2></div>', unsafe_allow_html=True)
-
-    df_m = charger_data('contacts.json')
-    # Cette ligne autorise la colonne à recevoir n'importe quel type (texte ou nombre)
-    df_m['Jours'] = df_m['Jours'].astype(object)
-    df_m['Pers'] = df_m['Pers'].astype(object)
-    df_c = pd.DataFrame()
-    df_aff = pd.DataFrame()
-
-    c_search, c_yr = st.columns([2, 1])
-    search = c_search.text_input("Rechercher...", "").upper()
-    annee_sel = c_yr.selectbox("Saison", [2026, 2027, 2028], index=0)
-
-    if not df_raw.empty:
-        df_c = df_raw.copy()
-        df_c['orig_idx'] = df_c.index 
-        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
-        mask_annee = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna())
-        df_c = df_c[mask_annee].copy()
-        df_c = df_c.sort_values(by='dt_sort', ascending=False)
-
-        if search:
-            mask = (df_c['Nom'].astype(str).str.upper().str.contains(search)) | \
-                   (df_c['Prénom'].astype(str).str.upper().str.contains(search)) | \
-                   (df_c['Notes'].astype(str).str.upper().str.contains(search))
-            df_c = df_c[mask]
-
-    if 'vue_contact' not in st.session_state: 
-        st.session_state.vue_contact = "En cours"
-
-    st.markdown("""
-        <style>
-            div[data-testid="stColumn"] button[kind="primary"] {
-                background-color: #D5F5E3 !important; 
-                color: #117864 !important; 
-                border: 2px solid #ABEBC6 !important;
-                font-weight: bold !important;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
-    n1, n2, n3 = st.columns(3)
-    if n1.button("EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
-        st.session_state.vue_contact = "En cours"; st.rerun()
-    if n2.button("ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
-        st.session_state.vue_contact = "Archives"; st.rerun()
-    if n3.button("NOUVEAU", use_container_width=True):
-        new_r = {"Prénom": "PRENOM", "Nom": "NOM", "Statut": "En attente", "Paiement": "Unpaid", "DateNav": f"01/06/{annee_sel}", "Société": "PERSO", "Jours": 1, "Pers": 1}
-        df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
-        sauvegarder_data(df_new, 'contacts.json'); st.rerun()
-
-    st.divider()
-
-    arch_list = ["termine", "refuse", "annule", "terminé", "refusé", "annulé"]
-    if not df_c.empty:
-        mask_arch = df_c['Statut'].astype(str).str.lower().str.contains('|'.join(arch_list))
-        df_aff = df_c[mask_arch].copy() if st.session_state.vue_contact == "Archives" else df_c[~mask_arch].copy()
-
-    if not df_aff.empty:
-        for _, row in df_aff.iterrows():
-            idx = row['orig_idx']
-            soc = str(row.get('Société','PERSO')).upper()
-            statut = str(row.get('Statut', 'Ok')).upper()
-            pay_raw = str(row.get('Paiement', 'Unpaid')).upper()
-            p_label = "PAYE" if "PAID" in pay_raw or "PAYE" in pay_raw else "NON PAYE"
-            p_color = "#27AE60" if p_label == "PAYE" else "#E74C3C"
-            
-            # Récupération Jours et Personnes (avec safe_int pour la sécurité)
-            nb_jours = safe_int(row.get('Jours', 1))
-            nb_pers = safe_int(row.get('Pers', 1))
-            
-            d_str = str(row.get('DateNav', '')).replace('nan', '---')
-            bg = "#D6EAF8" if soc == "CMN" else ("#FCF3CF" if "ATTENTE" in statut else "#D5F5E3")
-            if any(x in statut.lower() for x in ["annul", "refus"]): bg = "#EBEDEF"
-
-            p_tot = safe_int(row.get('Prix', 0))
-            p_aco = safe_int(row.get('Acompte', 0))
-
-            card_html = f"""
-            <div style="background-color:{bg}; color:#2C3E50; padding:15px; border-radius:12px; border:1px solid rgba(0,0,0,0.1); margin-bottom:10px;">
-                <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:8px;">
-                    <span style="font-size:1.1rem; font-weight:bold;">#{idx} | {str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</span>
-                    <span style="font-size:0.75rem; background:white; padding:3px 8px; border-radius:15px; font-weight:bold; border:1px solid #ccc;">{soc}</span>
-                </div>
-                <div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; gap:10px;">
-                    <div>&#128197; Date : <b>{d_str}</b></div>
-                    <div>&#128101; Pers. : <b>{nb_pers}</b></div>
-                    <div>&#9203; Jours : <b>{nb_jours}</b></div>
-                    <div>&#128202; Statut : <b>{statut}</b></div>
-                    <div>&#128176; Total : <b>{p_tot} EUR</b></div>
-                    <div style="color:{p_color}; font-weight:bold;">&#127991; {p_label}</div>
-                </div>
-                <div style="margin-top:10px; font-size:0.85rem; background:rgba(255,255,255,0.4); padding:8px; border-radius:6px;">
-                    &#128222; Tel : <b>{str(row.get('Téléphone','')).replace('nan','')}</b> | &#9993; Mail : <b>{str(row.get('Email','')).replace('nan','')}</b>
-                </div>
-                <div style="margin-top:10px; font-size:0.8rem; background:rgba(0,0,0,0.05); padding:8px; border-radius:6px; border-left:3px solid #34495E;">
-                    &#128221; <i>{str(row.get('Notes','')).replace('nan','')}</i>
-                </div>
-                <div style="margin-top:12px; display:flex; gap:8px;">
-                    <a href="tel:{str(row.get('Téléphone',''))}" style="flex:1; text-decoration:none; background:#5DADE2; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">APPEL</a>
-                    <a href="https://wa.me/{str(row.get('Téléphone','')).replace(' ','')}" style="flex:1; text-decoration:none; background:#52BE80; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">WHATSAPP</a>
-                </div>
-            </div>
-            """
-            st.markdown(card_html, unsafe_allow_html=True)
-            
-            c_ed, c_del = st.columns(2)
-            if c_ed.button(f"EDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
-                st.session_state.edit_idx = idx
-                st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
-            if c_del.button(f"SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
-                df_db = charger_data('contacts.json').drop(idx)
-                sauvegarder_data(df_db, 'contacts.json'); st.rerun()
-
-# ==# =================================================================
-# --- 6. PAGE MODIFIER CONTACT (V74 - FIX TYPEERROR PANDAS) ---
+# --- 6. PAGE MODIFIER CONTACT (V75 - CORRECTIF SYNTAXE) ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
     st.markdown('<div style="background-color:#5DADE2; padding:10px; border-radius:10px; color:white; text-align:center;"><h3>&#9998; Modification de la Fiche</h3></div>', unsafe_allow_html=True)
     
     idx_to_edit = st.session_state.get('edit_idx')
     
-    # CHARGEMENT ET NETTOYAGE DES TYPES
+    # 1. Chargement et conversion des types pour éviter le TypeError Pandas
     df_m = charger_data('contacts.json')
     
     if not df_m.empty:
-        # On force ces colonnes en type 'object' pour éviter le crash TypeError
-        cols_a_fixer = ['Jours', 'Pers', 'Prix', 'Acompte']
-        for col in cols_a_fixer:
+        for col in ['Jours', 'Pers', 'Prix', 'Acompte']:
             if col in df_m.columns:
                 df_m[col] = df_m[col].astype(object)
 
     if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
         row = df_m.loc[idx_to_edit]
         
-        # Sécurisation des valeurs pour le widget
-        val_jours = int(safe_int(row.get('Jours', 1)))
-        val_pers = int(safe_int(row.get('Pers', 1)))
-        if val_jours < 1: val_jours = 1
-        if val_pers < 1: val_pers = 1
+        # Sécurisation des valeurs pour les widgets numériques
+        v_j = int(safe_int(row.get('Jours', 1)))
+        v_p = int(safe_int(row.get('Pers', 1)))
+        if v_j < 1: v_j = 1
+        if v_p < 1: v_p = 1
 
-        with st.form("form_edition_vesta_v74"):
-            # ... (Gardez tous vos champs text_input et number_input ici) ...
+        with st.form("form_edit_v75"):
+            c1, c2 = st.columns(2)
+            new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
+            new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
             
-            # --- LES CHAMPS LOGISTIQUE ---
+            c3, c4 = st.columns(2)
+            new_date = c3.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav', '')))
+            new_soc = c4.text_input("Société", value=str(row.get('Société', 'PERSO')))
+            
+            c5, c6 = st.columns(2)
+            new_tel = c5.text_input("Téléphone", value=str(row.get('Téléphone', '')))
+            new_mail = c6.text_input("Email", value=str(row.get('Email', '')))
+            
             cl1, cl2 = st.columns(2)
-            new_jours = cl1.number_input("Nombre de jours", value=val_jours, min_value=1)
-            new_pers = cl2.number_input("Nombre de personnes", value=val_pers, min_value=1)
+            new_jours = cl1.number_input("Nombre de jours", value=v_j, min_value=1)
+            new_pers = cl2.number_input("Nombre de personnes", value=v_p, min_value=1)
             
-            # ... (Gardez le reste du formulaire : Statut, Paiement, Prix, Acompte, Notes) ...
+            col_a, col_b = st.columns(2)
+            statut_list = ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé"]
+            curr_s = str(row.get('Statut', 'En attente'))
+            s_idx = statut_list.index(curr_s) if curr_s in statut_list else 0
+            new_statut = col_a.selectbox("Statut Mission", statut_list, index=s_idx)
+            
+            curr_pay = str(row.get('Paiement', 'Unpaid'))
+            new_pay = col_b.radio("État du Paiement", ["Unpaid", "Paid"], 
+                                 index=1 if curr_pay.upper() == "PAID" else 0, horizontal=True)
+            
+            f1, f2 = st.columns(2)
+            new_prix = f1.number_input("Prix Total (€)", value=int(safe_int(row.get('Prix', 0))))
+            new_aco = f2.number_input("Acompte (€)", value=int(safe_int(row.get('Acompte', 0))))
+            
+            new_notes = st.text_area("Notes", value=str(row.get('Notes', '')).replace('nan',''))
 
             submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
             
             if submitted:
-                # MISE À JOUR SÉCURISÉE
-                # On utilise .loc avec une conversion explicite en float ou int
+                # Mise à jour avec conversion forcée pour éviter les conflits Pandas/Arrow
                 df_m.at[idx_to_edit, 'Prénom'] = str(new_pre).upper().strip()
                 df_m.at[idx_to_edit, 'Nom'] = str(new_nom).upper().strip()
                 df_m.at[idx_to_edit, 'DateNav'] = str(new_date)
                 df_m.at[idx_to_edit, 'Société'] = str(new_soc).upper().strip()
                 df_m.at[idx_to_edit, 'Téléphone'] = str(new_tel).strip()
                 df_m.at[idx_to_edit, 'Email'] = str(new_mail).strip()
-                
-                # Sauvegarde en tant que nombres
                 df_m.at[idx_to_edit, 'Jours'] = int(new_jours)
                 df_m.at[idx_to_edit, 'Pers'] = int(new_pers)
-                df_m.at[idx_to_edit, 'Prix'] = int(new_prix)
-                df_m.at[idx_to_edit, 'Acompte'] = int(new_aco)
-                
                 df_m.at[idx_to_edit, 'Statut'] = str(new_statut)
                 df_m.at[idx_to_edit, 'Paiement'] = str(new_pay)
+                df_m.at[idx_to_edit, 'Prix'] = int(new_prix)
+                df_m.at[idx_to_edit, 'Acompte'] = int(new_aco)
                 df_m.at[idx_to_edit, 'Notes'] = str(new_notes)
                 
                 sauvegarder_data(df_m, 'contacts.json')
-                st.success("Données synchronisées sur GitHub !")
+                st.success("Données enregistrées !")
                 st.session_state.page = "CONTACTS"
-                st.rerun()===============================================================
+                st.rerun()
+
+    if st.button("⬅️ ANNULER (Retour)", use_container_width=True):
+        st.session_state.page = "CONTACTS"
+        st.rerun()
+
+# ===============================================================
 # --- 6. PAGE PLANNING (V18.3 - SÉCURITÉ DATE TOTALE) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
