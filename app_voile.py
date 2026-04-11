@@ -239,7 +239,45 @@ if st.session_state.page == "CONTACTS":
             # Style et Rendu
             bg = "#D6EAF8" if soc == "CMN" else ("#FCF3CF" if "ATTENTE" in sta else "#D5F5E3")
             t_url = tel.replace(' ', '').replace('+', '')
+            # 1. --- LOGIQUE DE DÉTECTION (AVANT LE HTML) ---
+sta_clean = str(row.get('Statut', '')).upper()
+val_paye = str(row.get('Paiement', 'UNPAID')).strip().upper()
+prix = clean_num(row.get('Prix', 0))
+aco = clean_num(row.get('Acompte', 0))
+reste = prix - aco
 
+# On détermine si la fiche est une archive "morte"
+ignore_paiement = any(x in sta_clean for x in ["ANNUL", "REFUS"])
+
+# Définition des couleurs et labels
+if ignore_paiement:
+    p_label = "---"
+    p_color = "#95A5A6" # Gris pour le label
+    reste_color = "#95A5A6" # Gris pour le montant reste
+elif val_paye == "PAID" or reste <= 0:
+    p_label = "PAYÉ"
+    p_color = "green"
+    reste_color = "green"
+else:
+    p_label = "NON PAYÉ"
+    p_color = "#E74C3C" # Rouge
+    reste_color = "#C0392B" # Rouge foncé pour le montant
+
+# 2. --- RENDU HTML (Utilise les variables préparées) ---
+card_html = f"""
+<div style="background-color:{bg}; padding:15px; border-radius:12px; border:1px solid #ccc; margin-bottom:10px; color:#2C3E50;">
+    ... (le reste de votre entête HTML) ...
+    <div style="display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; margin-top:10px; gap:5px;">
+        <div>📅 Date: <b>{row.get('DateNav','')}</b></div>
+        <div>📊 Statut: <b>{sta_clean}</b></div>
+        <div>💰 Total: <b>{prix} €</b></div>
+        <div>📉 Reste: <b style="color:{reste_color};">{reste} €</b></div>
+        <div style="color:{p_color}; font-weight:bold;">🏷️ {p_label}</div>
+    </div>
+    ...
+</div>
+"""
+st.markdown(card_html, unsafe_allow_html=True)
             card_html = f"""
             <div style="background-color:{bg}; padding:15px; border-radius:12px; border:1px solid #ccc; margin-bottom:10px; color:#2C3E50;">
                 <div style="display:flex; justify-content:space-between; font-weight:bold; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:5px;">
