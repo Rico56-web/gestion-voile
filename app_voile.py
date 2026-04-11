@@ -279,24 +279,31 @@ if st.session_state.page == "MODIFIER_CONTACT":
             submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
             
             if submitted:
-                df_m.at[idx_to_edit, 'Prénom'] = new_pre.upper().strip()
-                df_m.at[idx_to_edit, 'Nom'] = new_nom.upper().strip()
-                df_m.at[idx_to_edit, 'DateNav'] = new_date
-                df_m.at[idx_to_edit, 'Société'] = new_soc.upper().strip()
-                df_m.at[idx_to_edit, 'Téléphone'] = new_tel.strip()
-                df_m.at[idx_to_edit, 'Email'] = new_mail.strip()
-                df_m.at[idx_to_edit, 'Jours'] = new_jours
-                df_m.at[idx_to_edit, 'Pers'] = new_pers
-                df_m.at[idx_to_edit, 'Statut'] = new_statut
-                df_m.at[idx_to_edit, 'Paiement'] = new_pay
-                df_m.at[idx_to_edit, 'Prix'] = new_prix
-                df_m.at[idx_to_edit, 'Acompte'] = new_aco
-                df_m.at[idx_to_edit, 'Notes'] = new_notes
-                
-                sauvegarder_data(df_m, 'contacts.json')
-                st.success("Enregistré !")
-                st.session_state.page = "CONTACTS"
-                st.rerun()
+                # On s'assure que l'index existe toujours
+                if idx_to_edit in df_m.index:
+                    # Pour éviter le TypeError, on convertit les nombres en texte 
+                    # ou on utilise .at avec une conversion explicite
+                    df_m.at[idx_to_edit, 'Prénom'] = str(new_pre).upper().strip()
+                    df_m.at[idx_to_edit, 'Nom'] = str(new_nom).upper().strip()
+                    df_m.at[idx_to_edit, 'DateNav'] = str(new_date)
+                    df_m.at[idx_to_edit, 'Société'] = str(new_soc).upper().strip()
+                    df_m.at[idx_to_edit, 'Téléphone'] = str(new_tel).strip()
+                    df_m.at[idx_to_edit, 'Email'] = str(new_mail).strip()
+                    
+                    # FORCE LE TYPE POUR LES CHIFFRES
+                    df_m.at[idx_to_edit, 'Jours'] = int(new_jours)
+                    df_m.at[idx_to_edit, 'Pers'] = int(new_pers)
+                    
+                    df_m.at[idx_to_edit, 'Statut'] = str(new_statut)
+                    df_m.at[idx_to_edit, 'Paiement'] = str(new_pay)
+                    df_m.at[idx_to_edit, 'Prix'] = int(new_prix)
+                    df_m.at[idx_to_edit, 'Acompte'] = int(new_aco)
+                    df_m.at[idx_to_edit, 'Notes'] = str(new_notes)
+                    
+                    sauvegarder_data(df_m, 'contacts.json')
+                    st.success("Enregistré avec succès !")
+                    st.session_state.page = "CONTACTS"
+                    st.rerun()
 
     if st.button("⬅️ ANNULER", use_container_width=True):
         st.session_state.page = "CONTACTS"
