@@ -404,7 +404,7 @@
         "dt":null,
         "Mail":null,
         "Date":null,
-        "Jours":null,
+        "Jours":2,
         "Date Nav":null,
         "Nb jours":null,
         "Heures moteur":null,
@@ -417,7 +417,7 @@
         "Commentaires":"Camille et son ami",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":null
+        "Pers":2
     },
     {
         "Pr\u00e9nom":"LAURENT",
@@ -459,7 +459,7 @@
         "Commentaires":"Ras",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":4
+        "Pers":4.0
     },
     {
         "Pr\u00e9nom":"GROUPE ESPAGNE",
