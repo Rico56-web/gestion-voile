@@ -266,17 +266,17 @@ if st.session_state.page == "MODIFIER_CONTACT":
             c5, c6 = st.columns(2)
             new_tel = c5.text_input("Téléphone", value=str(row.get('Téléphone', '')))
             new_mail = c6.text_input("Email", value=str(row.get('Email', '')))
+            # --- LOGISTIQUE (Ligne 272 corrigée) ---
+            cl1, cl2 = st.columns(2)
+
+            # Récupération sécurisée : si la donnée est 0, on garde 0
+            val_j = int(safe_int(row.get('Jours', 0)))
+            val_p = int(safe_int(row.get('Pers', 0)))
+
+            # On change min_value à 0 pour autoriser les fiches vides/à zéro
+            new_jours = cl1.number_input("Nombre de jours", value=val_j, min_value=0)
+            new_pers = cl2.number_input("Nombre de personnes", value=val_p, min_value=0)    
             
-             # --- LOGISTIQUE (Ligne 272 et suivantes) ---
-             cl1, cl2 = st.columns(2)
-
-             # On récupère la valeur, si c'est 0 ou vide, on met 0 par défaut
-             val_j = int(safe_int(row.get('Jours', 0)))
-             val_p = int(safe_int(row.get('Pers', 0)))
-
-             # IMPORTANT : On enlève "min_value=1" ou on met "min_value=0"
-             new_jours = cl1.number_input("Nombre de jours", value=val_j, min_value=0)
-             new_pers = cl2.number_input("Nombre de personnes", value=val_p, min_value=0)
             
             # --- STATUTS ---
             col_a, col_b = st.columns(2)
