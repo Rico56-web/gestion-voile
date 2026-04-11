@@ -166,105 +166,101 @@ for i, name in enumerate(menu):
                           type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name
         st.rerun()
-
 # =================================================================
-# --- 5. BLOC CONTACTS (V38 - REPRISE DU DESIGN VISUEL) ---
+# --- 5. BLOC CONTACTS (V39 - FORÇAGE RENDU HTML) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.title("👤 Gestion des Contacts")
 
-    # --- INITIALISATION ET SÉCURITÉ ---
-    df_c = charger_data('contacts.json')
-    df_aff = pd.DataFrame() 
-
-    if not df_c.empty:
+    # --- 1. SÉCURITÉ ET CHARGEMENT ---
+    df_raw = charger_data('contacts.json')
+    if df_raw.empty:
+        st.info("Aucun contact trouvé.")
+    else:
+        df_c = df_raw.copy()
         df_c['orig_idx'] = df_c.index 
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], errors='coerce')
         
+        # Filtre Archives / En cours
         mask_arch = (df_c['Statut'].str.lower().isin(["terminé", "refusé", "annulé"]))
         df_aff = df_c[mask_arch].copy() if st.session_state.get('vue_contact') == "Archives" else df_c[~mask_arch].copy()
         df_aff = df_aff.sort_values('dt_sort', ascending=False, na_position='last')
 
-        # --- NAVIGATION HAUT ---
+        # --- 2. NAVIGATION ---
         c1, c2, c3 = st.columns(3)
         if c1.button("👤 EN COURS", use_container_width=True): st.session_state.vue_contact = "En cours"; st.rerun()
         if c2.button("📂 ARCHIVES", use_container_width=True): st.session_state.vue_contact = "Archives"; st.rerun()
         if c3.button("➕ NOUVEAU", use_container_width=True):
-            # ... (logique nouveau contact)
+            # Logique création...
             st.rerun()
 
         st.markdown("---")
 
-        # --- BOUCLE D'AFFICHAGE ---
+        # --- 3. BOUCLE D'AFFICHAGE ---
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
             
-            # Préparation des variables
-            p_val = clean_int(row.get('Prix', 0))
-            a_val = clean_int(row.get('Acompte', 0))
-            txt_prix = f"{p_val} &euro;"
-            txt_reste = f"{(p_val - a_val)} &euro;"
-            
-            tel_raw = str(row.get('Téléphone', '')).replace("nan", "").strip()
-            mail_raw = str(row.get('Email', '')).replace("nan", "").strip()
-            tel_display = tel_raw if tel_raw else "NON RENSEIGNÉ"
-            mail_display = mail_raw if mail_raw else "NON RENSEIGNÉ"
-            tel_link = format_tel_lien(tel_raw)
-            
-            notes = str(row.get('Notes', '')).replace("nan", "...")
-            bg_color = "#3498db" if str(row.get('Société')).upper() == "CMN" else "#ffffff"
-
             if st.session_state.edit_idx == idx:
-                # --- MODE ÉDITION (Formulaire) ---
-                with st.form(f"edit_{idx}"):
-                    st.write(f"Modification Fiche n°{idx}")
-                    # ... tes inputs ici
-                    if st.form_submit_button("Enregistrer"):
-                        st.session_state.edit_idx = None; st.rerun()
+                # [BLOC ÉDITION SIMPLIFIÉ POUR LE TEST]
+                st.warning(f"Mode Édition - Fiche {idx}")
+                if st.button("Annuler", key=f"can_{idx}"): st.session_state.edit_idx = None; st.rerun()
             else:
-                # --- MODE CARTE (FORÇAGE DU HTML) ---
-                # On utilise une seule f-string très propre
-                carte_html = f"""
-                <div style="border: 2px solid #4A4A4A; padding: 12px; border-radius: 12px; margin-bottom: 10px; background-color: {bg_color}; color: #333333;">
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 5px;">
-                        <b style="font-size: 1.1rem;">{str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</b>
-                        <b style="color: {'green' if str(row.get('Paiement'))=='Payé' else 'red'}; font-size: 0.85rem;">{str(row.get('Paiement','')).upper()}</b>
+                # --- PRÉPARATION DES VARIABLES ---
+                p_val = clean_int(row.get('Prix', 0))
+                a_val = clean_int(row.get('Acompte', 0))
+                s_val = p_val - a_val
+                
+                tel = str(row.get('Téléphone', '')).replace("nan", "").strip()
+                mail = str(row.get('Email', '')).replace("nan", "").strip()
+                tel_disp = tel if tel else "NON RENSEIGNÉ"
+                mail_disp = mail if mail else "NON RENSEIGNÉ"
+                
+                # Couleur dynamique (Loi CMN : Bleu)
+                soc_name = str(row.get('Société','PERSO')).upper()
+                bg_color = "#3498db" if soc_name == "CMN" else "#ffffff"
+                text_color = "#ffffff" if soc_name == "CMN" else "#333333"
+
+                # CONSTRUCTION DE LA CHAÎNE HTML
+                # Note: On utilise des guillemets simples à l'intérieur pour éviter les conflits
+                html_code = f"""
+                <div style='border: 2px solid #4A4A4A; padding: 15px; border-radius: 12px; margin-bottom: 15px; background-color: {bg_color}; color: {text_color};'>
+                    <div style='display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 5px;'>
+                        <b style='font-size: 1.2rem;'>{str(row.get('Prénom','')).upper()} {str(row.get('Nom','')).upper()}</b>
+                        <b style='font-size: 0.9rem;'>{str(row.get('Paiement','')).upper()}</b>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; font-size: 0.9rem;">
+                    <div style='display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; font-size: 0.95rem;'>
                         <div>📅 <b>{formater_date_affichage(row.get('DateNav'))}</b></div>
-                        <div>🏢 <b>{str(row.get('Société','PERSO')).upper()}</b></div>
+                        <div>🏢 <b>{soc_name}</b></div>
                         <div>👥 Pers: <b>{row.get('Nbre de personnes', 1)}</b></div>
                         <div>⏱️ Jours: <b>{row.get('Nbre de jours', 1)}</b></div>
-                        <div>💰 Total: <b>{txt_prix}</b></div>
-                        <div>🧾 Reste: <b style="color:red;">{txt_reste}</b></div>
+                        <div>💰 Total: <b>{p_val} &euro;</b></div>
+                        <div>🧾 Reste: <b style='color: {"#ffcccc" if soc_name=="CMN" else "red"};'>{s_val} &euro;</b></div>
                     </div>
 
-                    <div style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 6px; font-size: 0.85rem; border: 1px dashed rgba(0,0,0,0.1);">
-                        <div style="margin-bottom: 3px;">📱 {tel_display}</div>
-                        <div>✉️ {mail_display}</div>
+                    <div style='margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.08); border-radius: 8px; font-size: 0.9rem;'>
+                        <div style='margin-bottom: 4px;'>📱 {tel_disp}</div>
+                        <div>✉️ {mail_disp}</div>
                     </div>
 
-                    <div style="margin-top: 8px; font-size: 0.8rem; font-style: italic;">
-                        📝 <i>{notes[:80]}</i>
-                    </div>
-
-                    <div style="margin-top: 10px; display: flex; gap: 5px;">
-                        <a href="tel:{tel_link}" style="flex:1; text-decoration:none;"><div style="background:#2ecc71; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📞 APPEL</div></a>
-                        <a href="https://wa.me/{tel_link}" style="flex:1; text-decoration:none;"><div style="background:#25d366; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">💬 WA</div></a>
-                        <a href="mailto:{mail_raw}" style="flex:1; text-decoration:none;"><div style="background:#e74c3c; color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:0.75rem;">📧 MAIL</div></a>
+                    <div style='margin-top: 10px; display: flex; gap: 8px;'>
+                        <a href='tel:{format_tel_lien(tel)}' style='flex:1; text-decoration:none;'><div style='background:#2ecc71; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold;'>APPEL</div></a>
+                        <a href='https://wa.me/{format_tel_lien(tel)}' style='flex:1; text-decoration:none;'><div style='background:#25d366; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold;'>WA</div></a>
+                        <a href='mailto:{mail}' style='flex:1; text-decoration:none;'><div style='background:#e74c3c; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold;'>MAIL</div></a>
                     </div>
                 </div>
                 """
-                # C'EST CETTE LIGNE QUI FAIT LE DESSIN :
-                st.markdown(carte_html, unsafe_allow_html=True)
                 
-                # Boutons de gestion
-                c_mod, c_sup = st.columns([4, 1])
-                if c_mod.button(f"✏️ MODIFIER n°{idx}", key=f"btn_{idx}"):
+                # RENDU SÉCURISÉ
+                st.components.v1.html(html_code, height=280)
+
+                # BOUTONS DE CONTRÔLE (Hors du HTML pour qu'ils fonctionnent)
+                c_m, c_s = st.columns([4, 1])
+                if c_m.button(f"✏️ Modifier {idx}", key=f"edit_btn_{idx}", use_container_width=True):
                     st.session_state.edit_idx = idx; st.rerun()
-                if c_sup.button("🗑️", key=f"del_{idx}"):
-                    st.session_state.confirm_del_idx_c = idx; st.rerun()
+                if c_s.button("🗑️", key=f"del_btn_{idx}", use_container_width=True):
+                    # Logique suppression...
+                    pass
 
 
 # =================================================================
