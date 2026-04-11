@@ -307,6 +307,13 @@ if st.session_state.page == "MODIFIER_CONTACT":
                 df_m.at[idx_to_edit, 'Notes'] = str(new_notes)
                 
                 sauvegarder_data(df_m, 'contacts.json')
+                # Sécurité anti-pollution HTML dans les notes
+                note_a_sauver = str(new_notes).strip()
+                if "<a href=" in note_a_sauver or "<div" in note_a_sauver:
+                    # Si on détecte du code de bouton, on ne garde que le texte brut ou on nettoie
+                    note_a_sauver = "Note nettoyée (code détecté)"
+
+                df_m.at[idx_to_edit, 'Notes'] = note_a_sauver
                 st.success("C'est enregistré !")
                 st.session_state.page = "CONTACTS"; st.rerun()
 
