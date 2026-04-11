@@ -198,10 +198,22 @@ if st.session_state.page == "CONTACTS":
             mail = clean_text(row.get('Email', ''))
             note = clean_text(row.get('Notes', ''))
             
-            # --- FINANCES & DÉTECTION PAIEMENT ---
+             # --- FINANCES & DÉTECTION INTELLIGENTE ---
             prix = clean_num(row.get('Prix', 0))
             aco = clean_num(row.get('Acompte', 0))
             reste = prix - aco
+            
+            # Récupération du choix manuel (Paid/Unpaid)
+            val_paye = str(row.get('Paiement', 'UNPAID')).strip().upper()
+            
+            # LOGIQUE : On affiche "PAYÉ" seulement si c'est marqué "PAID" 
+            # ET que le reste est bien à 0 (ou moins).
+            if val_paye == "PAID" and reste <= 0:
+                p_label = "PAYÉ"
+                p_color = "green"
+            else:
+                p_label = "NON PAYÉ"
+                p_color = "red"
             
             # Nettoyage total de la valeur (suppression espaces, majuscules)
             raw_pay = str(row.get('Paiement', 'UNPAID')).strip().upper()
