@@ -167,84 +167,107 @@ for i, name in enumerate(menu):
         st.session_state.page = name
         st.rerun()
 # =================================================================
-# --- 6. PAGE CONTACTS(V40 - ) ---
+# --- 5. BLOC CONTACTS (V41 - VERSION INTEGRALE CORRIGÉE) ---
 # =================================================================
-if st.session_state.edit_idx == idx:
-                # --- MODE ÉDITION COMPLET ---
-                st.markdown(f"### ✏️ Modification du Contact n°{idx}")
+if st.session_state.page == "CONTACTS":
+    st.title("👤 Gestion des Contacts")
+
+    # --- 1. INITIALISATION & CHARGEMENT ---
+    if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
+    if 'confirm_del_idx_c' not in st.session_state: st.session_state.confirm_del_idx_c = None
+    if 'vue_contact' not in st.session_state: st.session_state.vue_contact = "En cours"
+
+    df_raw = charger_data('contacts.json')
+    df_aff = pd.DataFrame() 
+
+    if df_raw.empty:
+        st.info("Aucun contact dans la base.")
+        if st.button("➕ CRÉER LE PREMIER CONTACT"):
+            new_r = {"Prénom": "NOUVEAU", "Nom": "CONTACT", "Statut": "En attente", "Paiement": "Non payé", "DateNav": datetime.now().strftime("%Y-%m-%d"), "Société": "PERSO", "Prix": 0, "Acompte": 0}
+            df_raw = pd.DataFrame([new_r])
+            sauvegarder_data(df_raw, 'contacts.json')
+            st.rerun()
+    else:
+        # Préparation des données
+        df_c = df_raw.copy()
+        df_c['orig_idx'] = df_c.index 
+        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], errors='coerce')
+        
+        # Filtre Archives / En cours
+        mask_arch = (df_c['Statut'].str.lower().isin(["terminé", "refusé", "annulé"]))
+        df_aff = df_c[mask_arch].copy() if st.session_state.vue_contact == "Archives" else df_c[~mask_arch].copy()
+        df_aff = df_aff.sort_values('dt_sort', ascending=False, na_position='last')
+
+        # --- 2. NAVIGATION & RECHERCHE ---
+        c1, c2, c3 = st.columns(3)
+        if c1.button("👤 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"):
+            st.session_state.vue_contact = "En cours"; st.session_state.edit_idx = None; st.rerun()
+        if c2.button("📂 ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"):
+            st.session_state.vue_contact = "Archives"; st.session_state.edit_idx = None; st.rerun()
+        if c3.button("➕ NOUVEAU", use_container_width=True):
+            new_r = {"Prénom": "NOUVEAU", "Nom": "CONTACT", "Statut": "En attente", "Paiement": "Non payé", "DateNav": datetime.now().strftime("%Y-%m-%d"), "Société": "PERSO", "Prix": 0, "Acompte": 0}
+            df_db = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
+            sauvegarder_data(df_db, 'contacts.json')
+            st.session_state.edit_idx = 0; st.rerun()
+
+        st.markdown("---")
+
+        # --- 3. BOUCLE D'AFFICHAGE PRINCIPALE ---
+        for _, row in df_aff.iterrows():
+            idx = row['orig_idx'] # DÉFINITION DE IDX POUR TOUT LE BLOC
+
+            if st.session_state.edit_idx == idx:
+                # --- MODE ÉDITION ---
+                st.markdown(f"### ✏️ Modification n°{idx}")
                 
-                # Zone de danger pour suppression
                 if st.session_state.get('confirm_del_idx_c') == idx:
-                    st.error("⚠️ SUPPRIMER DÉFINITIVEMENT CETTE FICHE ?")
+                    st.error("⚠️ SUPPRIMER DÉFINITIVEMENT ?")
                     col_y, col_n = st.columns(2)
-                    if col_y.button("✔️ OUI, SUPPRIMER", key=f"y_{idx}", use_container_width=True):
+                    if col_y.button("✔️ OUI", key=f"y_{idx}", use_container_width=True):
                         df_db = charger_data('contacts.json').drop(idx)
                         sauvegarder_data(df_db, 'contacts.json')
-                        st.session_state.edit_idx = None
-                        st.session_state.confirm_del_idx_c = None
-                        st.rerun()
-                    if col_n.button("❌ NON, ANNULER", key=f"n_{idx}", use_container_width=True):
-                        st.session_state.confirm_del_idx_c = None
-                        st.rerun()
+                        st.session_state.edit_idx = None; st.session_state.confirm_del_idx_c = None; st.rerun()
+                    if col_n.button("❌ NON", key=f"n_{idx}", use_container_width=True):
+                        st.session_state.confirm_del_idx_c = None; st.rerun()
 
-                # Formulaire d'édition
-                with st.form(f"form_edit_{idx}"):
-                    c1, c2 = st.columns(2)
-                    e_pre = c1.text_input("Prénom", str(row.get('Prénom', '')))
-                    e_nom = c2.text_input("Nom", str(row.get('Nom', '')))
-                    e_tel = c1.text_input("Téléphone", str(row.get('Téléphone', '')).replace("nan", ""))
-                    e_mail = c2.text_input("Email", str(row.get('Email', '')).replace("nan", ""))
+                with st.form(f"f_edit_{idx}"):
+                    ca, cb = st.columns(2)
+                    e_pre = ca.text_input("Prénom", str(row.get('Prénom', '')))
+                    e_nom = cb.text_input("Nom", str(row.get('Nom', '')))
+                    e_tel = ca.text_input("Téléphone", str(row.get('Téléphone', '')).replace("nan", ""))
+                    e_mail = cb.text_input("Email", str(row.get('Email', '')).replace("nan", ""))
                     
-                    st.write("⛵ **Détails Navigation**")
                     d1, d2, d3 = st.columns(3)
                     d_str = str(row.get('DateNav'))[:10]
                     try: d_in = datetime.strptime(d_str, "%Y-%m-%d").date()
                     except: d_in = datetime.now().date()
-                    
                     e_date = d1.date_input("Date", d_in)
                     e_pers = d2.number_input("Pers.", value=clean_int(row.get('Nbre de personnes', 1)), step=1)
                     e_jours = d3.number_input("Jours", value=clean_int(row.get('Nbre de jours', 1)), step=1)
                     
-                    st.write("💰 **Finances & Statut**")
                     f1, f2, f3 = st.columns(3)
                     e_prix = f1.number_input("Prix Total (€)", value=clean_int(row.get('Prix', 0)), step=1)
                     e_acompte = f2.number_input("Acompte (€)", value=clean_int(row.get('Acompte', 0)), step=1)
+                    e_soc = f3.selectbox("Société", ["PERSO", "CMN", "VOG", "CLICK", "Autres"], index=0)
                     
-                    s1, s2, s3 = st.columns(3)
-                    # On s'assure que les listes de choix correspondent à tes besoins
-                    e_soc = s1.selectbox("Société", ["PERSO", "CMN", "VOG", "CLICK", "Autres"], 
-                                         index=["PERSO", "CMN", "VOG", "CLICK", "Autres"].index(str(row.get('Société','PERSO')).upper()) if str(row.get('Société','PERSO')).upper() in ["PERSO", "CMN", "VOG", "CLICK", "Autres"] else 0)
-                    e_st = s2.selectbox("Statut", ["En attente", "Ok", "Terminé", "Refusé", "Annulé"], 
-                                        index=["En attente", "Ok", "Terminé", "Refusé", "Annulé"].index(str(row.get('Statut','En attente'))) if str(row.get('Statut','En attente')) in ["En attente", "Ok", "Terminé", "Refusé", "Annulé"] else 0)
-                    e_pa = s3.selectbox("Paiement", ["Non payé", "Payé"], index=1 if str(row.get('Paiement'))=="Payé" else 0)
-                    
+                    s1, s2 = st.columns(2)
+                    e_st = s1.selectbox("Statut", ["En attente", "Ok", "Terminé", "Refusé", "Annulé"])
+                    e_pa = s2.selectbox("Paiement", ["Non payé", "Payé"], index=1 if str(row.get('Paiement'))=="Payé" else 0)
                     e_notes = st.text_area("Notes", str(row.get('Notes', '')).replace("nan", ""))
                     
-                    b1, b2 = st.columns(2)
-                    if b1.form_submit_button("💾 ENREGISTRER", use_container_width=True):
-                        df_all = charger_data('contacts.json')
-                        df_all.at[idx, 'Prénom'] = e_pre.upper()
-                        df_all.at[idx, 'Nom'] = e_nom.upper()
-                        df_all.at[idx, 'Téléphone'] = e_tel
-                        df_all.at[idx, 'Email'] = e_mail
-                        df_all.at[idx, 'DateNav'] = e_date.strftime("%Y-%m-%d")
-                        df_all.at[idx, 'Société'] = e_soc
-                        df_all.at[idx, 'Statut'] = e_st
-                        df_all.at[idx, 'Prix'] = int(e_prix)
-                        df_all.at[idx, 'Acompte'] = int(e_acompte)
-                        df_all.at[idx, 'Nbre de personnes'] = int(e_pers)
-                        df_all.at[idx, 'Nbre de jours'] = int(e_jours)
-                        df_all.at[idx, 'Paiement'] = e_pa
-                        df_all.at[idx, 'Notes'] = e_notes
-                        
-                        sauvegarder_data(df_all, 'contacts.json')
-                        st.session_state.edit_idx = None
-                        st.rerun()
-                        
-                    if b2.form_submit_button("❌ ANNULER", use_container_width=True):
-                        st.session_state.edit_idx = None
-                        st.rerun()
-
+                    if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
+                        df_save = charger_data('contacts.json')
+                        df_save.at[idx, 'Prénom'] = e_pre.upper()
+                        df_save.at[idx, 'Nom'] = e_nom.upper()
+                        df_save.at[idx, 'Téléphone'] = e_tel
+                        df_save.at[idx, 'Email'] = e_mail
+                        df_save.at[idx, 'DateNav'] = e_date.strftime("%Y-%m-%d")
+                        df_save.at[idx, 'Société'] = e_soc
+                        df_save.at[idx, 'Statut'] = e_st
+                        df_save.at[idx, 'Prix'] = int(e_prix)
+                        df_save.at[idx, 'Acompte'] = int(e_acompte)
+                        df_save.at[idx, 'Nbre de personnes'] = int(e_pers)
+                        df_save.at[idx, 'Nbre de jours'] = int(e_jours)
 # =================================================================
 # --- 6. PAGE PLANNING (V18 - DÉTAILS DATES & MONTANTS) ---
 # =================================================================
