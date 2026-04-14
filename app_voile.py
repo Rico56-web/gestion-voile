@@ -201,19 +201,23 @@ if st.session_state.page == "CONTACTS":
 
         st.divider()
         
-        # 3. Filtrage par onglet
-        statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
-        relance_clean = df_c['Relancer'].str.upper()
-
+       # --- NOUVELLE LOGIQUE DE TRI DES ONGLETS ---
         if st.session_state.vue_contact == "Archives":
+            # ARCHIVES : Terminé, Annulé, Refusé (et pas de relance OUI)
             mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
-            tri_ordre = False # Dans les archives, on veut le plus récent en haut
+            tri_ordre = False 
+
         elif st.session_state.vue_contact == "Attente":
-            mask_aff = statut_clean.str.contains("liste|attente") | ((statut_clean.str.contains("termine")) & (relance_clean == "OUI"))
-            tri_ordre = True  # En attente, ordre chronologique
+            # ATTENTE : Uniquement "Liste d'attente" OU (Terminé + Relance Oui)
+            # On exclut le "En attente" simple ici
+            mask_aff = (statut_clean == "liste d'attente") | ((statut_clean.str.contains("termine")) & (relance_clean == "OUI"))
+            tri_ordre = True  
+
         else:
-            mask_aff = ~statut_clean.str.contains("termine|annule|refuse|liste|attente")
-            tri_ordre = True  # En cours, ordre chronologique
+            # EN COURS : Tout le reste, incluant désormais "En attente"
+            # On retire les archives et la liste d'attente
+            mask_aff = ~(statut_clean.str.contains("termine|annule|refuse")) & (statut_clean != "liste d'attente")
+            tri_ordre = True
 
         # On applique le filtre
         df_aff = df_c[mask_aff].copy()
