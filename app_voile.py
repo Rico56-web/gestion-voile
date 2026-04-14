@@ -670,7 +670,8 @@ if st.session_state.page == "STATS":
         couleur_dep = "red" if taux_dep > 60 else ("green" if taux_dep < 30 else "orange")
         kpi4.markdown(f"<div style='text-align:center;'>Risque ({nom_gros_client})<br><span style='font-size:30px; font-weight:bold; color:{couleur_dep};'>{taux_dep:.0f} %</span></div>", unsafe_allow_html=True)
     else: kpi4.metric("Risque Client", "0 %")
-    # --- 7. BILAN MENSUEL DE TRÉSORERIE (CORRIGÉ) ---
+        
+        # --- 7. BILAN MENSUEL DE TRÉSORERIE (CORRIGÉ) ---
         mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
         rs_m = []
         for i in range(1, 13):
