@@ -603,11 +603,23 @@ if st.session_state.page == "STATS":
         if not df_r_yr.empty:
             # 4. Calcul simple : Si PAID -> Prix, sinon Acompte
             # On utilise .str.contains pour être moins strict sur le texte
+            # Logique comptable stricte :
             def check_money(row):
-                pay_val = str(row.get('Paiement', '')).upper()
-                if "PAID" in pay_val or "PAYE" in pay_val:
+                # On récupère le statut et on le met en majuscules
+                status = str(row.get('Paiement', '')).upper()
+                
+                # 1. Si c'est marqué "PAID" -> On prend le prix total
+                if "PAID" in status or "PAYE" in status:
                     return row['Prix']
-                return row['Acompte']
+                
+                # 2. Si ce n'est PAS payé, on ne prend QUE l'acompte s'il existe
+                # (On s'assure que c'est bien un chiffre positif)
+                val_acompte = row.get('Acompte', 0)
+                if val_acompte > 0:
+                    return val_acompte
+                
+                # 3. Sinon, c'est 0€ encaissé
+                return 0
 
             df_r_yr['Encaissé_Reel'] = df_r_yr.apply(check_money, axis=1)
             total_rev = df_r_yr['Encaissé_Reel'].sum()
