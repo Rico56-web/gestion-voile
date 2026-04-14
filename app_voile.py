@@ -571,57 +571,48 @@ if st.session_state.page == "STATS":
     df_r_yr = pd.DataFrame()
     df_f_yr = pd.DataFrame()
     df_soc_final = pd.DataFrame()
-
-    # A. CALCUL DES REVENUS
+    # A. CALCUL DES REVENUS (SÉCURITÉ MAXIMUM)
     if not df_planning_actif.empty:
         df_p = df_planning_actif.copy()
         
-        # Nettoyage prix et acomptes
+        # 1. Nettoyage strict
         for col in ['Prix', 'Acompte']:
-            if col in df_p.columns:
-                df_p[col] = df_p[col].astype(str).str.replace(r'[^0-9.,]', '', regex=True).str.replace(',', '.')
-                df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0)
+            df_p[col] = pd.to_numeric(df_p[col].astype(str).str.replace(r'[^0-9.,]', '', regex=True).str.replace(',', '.'), errors='coerce').fillna(0)
         
-        # Dates
         df_p['dt_vrai'] = pd.to_datetime(df_p['DateNav'], dayfirst=True, errors='coerce')
         
-        # Application du filtre de période (Saison ou À ce jour)
+        # 2. Filtre de période
         if mode_bilan == "Par Saison":
             mask_p = (df_p['dt_vrai'].dt.year == sel_y)
         else:
-            # Mode "À ce jour" : Année 2026 jusqu'à aujourd'hui inclus
             mask_p = (df_p['dt_vrai'].dt.year == 2026) & (df_p['dt_vrai'].dt.date <= today)
         
+        # On crée un tableau temporaire avec uniquement les bonnes dates
         df_temp = df_p[mask_p].copy()
 
         if not df_temp.empty:
-            # LOGIQUE STRICTE : On encaisse uniquement si c'est payé ou solde complet
-            def check_money_strict(row):
-                # Nettoyage du statut
+            # 3. La règle d'or pour Camille
+            def calcul_final(row):
                 status = str(row.get('Paiement', '')).upper().strip()
-                p_tot = row.get('Prix', 0)
-                a_ver = row.get('Acompte', 0)
-
-                # CONDITIONS D'ENCAISSEMENT
-                est_paye = any(x in status for x in ["PAID", "PAYÉ", "PAYE"])
-                solde_complet = (a_ver >= p_tot and p_tot > 0)
-
-                if est_paye or solde_complet:
-                    return p_tot
+                p = row['Prix']
+                a = row['Acompte']
+                
+                # SI c'est payé OU si l'acompte a tout couvert
+                if ("PAID" in status or "PAYÉ" in status or "PAYE" in status) or (a >= p and p > 0):
+                    return p
                 return 0
 
-            df_temp['Encaissé_Reel'] = df_temp.apply(check_money_strict, axis=1)
+            df_temp['Encaissé_Reel'] = df_temp.apply(calcul_final, axis=1)
             
-            # --- FILTRE RADICAL ---
-            # On ne garde que ceux qui ont payé (Encaissé > 0)
-            # C'est ici que Camille disparaît si elle est à 0€
+            # --- L'ÉTAPPE CRUCIALE ---
+            # On SUPPRIME toutes les lignes où l'encaissement est 0
+            # Si Camille n'a pas payé, elle est éjectée ici.
             df_r_yr = df_temp[df_temp['Encaissé_Reel'] > 0].copy()
+            
             total_rev = df_r_yr['Encaissé_Reel'].sum()
             
-            # Groupement Société pour le KPI Risque Client
             if 'Société' in df_r_yr.columns and not df_r_yr.empty:
-                df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'}).sort_values('CA €', ascending=False)
-
+                df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'})
     # B. CALCUL DES FRAIS
     if not df_frais_full.empty:
         df_f = df_frais_full.copy()
