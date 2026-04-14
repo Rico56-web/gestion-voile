@@ -560,9 +560,6 @@ if st.session_state.page == "STATS":
     if mode_bilan == "Par Saison":
         sel_y = st.selectbox("Saison", [2025, 2026, 2027], index=1)
     
-    total_rev, total_frais = 0, 0
-    df_r_yr = pd.DataFrame()
-    df_f_yr = pd.DataFrame()
     
     # --- 4. TRAITEMENT DES DONNÉES (Vesta Skipper 2026 - Version Finale) ---
     # 1. Initialisation unique
