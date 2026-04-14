@@ -134,28 +134,41 @@ for i, name in enumerate(menu):
                           type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name
         st.rerun()
-
 # =================================================================
-# --- 5. BLOC CONTACTS (V96 - PROTECTION TOTALE ANTI-NAN) ---
+# --- 5. BLOC CONTACTS (V97 - RÉPARATION BOUTON NOUVEAU) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<h2 style="text-align:center;">⚓ Gestion des Clients Vesta</h2>', unsafe_allow_html=True)
 
-    # 1. Chargement et Nettoyage de sécurité
+    # 1. Chargement
     df_raw = charger_data('contacts.json')
-    df_c = df_raw.copy() if not df_raw.empty else pd.DataFrame()
+    
+    # --- ACTION NOUVEAU (SORTIE DU BLOC IF POUR ÊTRE TOUJOURS ACTIVE) ---
+    # On crée les colonnes des onglets pour le bouton
+    n1, n2, n3, n4 = st.columns(4)
+    
+    if n4.button("➕ NOUVEAU", use_container_width=True):
+        new_r = {
+            "Prénom": "NOUVEAU", "Nom": "CLIENT", "Statut": "En attente", 
+            "Paiement": "Unpaid", "Relancer": "Non", "DateNav": "01/06/2026", 
+            "Société": "PERSO", "Jours": 1, "Prix": 0, "Acompte": 0,
+            "Notes": "", "Téléphone": "", "Email": "", "Pers": 1
+        }
+        df_actuel = charger_data('contacts.json')
+        df_new = pd.concat([pd.DataFrame([new_r]), df_actuel], ignore_index=True)
+        sauvegarder_data(df_new, 'contacts.json')
+        st.success("Fiche créée !")
+        st.rerun()
 
-    if not df_c.empty:
-        # --- LE BOUCLIER ANTI-NAN ---
-        # On remplace TOUS les types de vides par une chaîne vide pour l'affichage
+    # 2. Nettoyage et Filtrage
+    if not df_raw.empty:
+        df_c = df_raw.copy()
         df_c = df_c.fillna("")
-        for col in df_c.columns:
-            # On ne remplace par du vide QUE si c'est vraiment une erreur technique "nan"
-            df_c['DateNav'] = df_c['DateNav'].apply(lambda x: "" if str(x).lower() in ['nan', 'none', 'nat'] else str(x))
         
-            df_c['orig_idx'] = df_c.index
-        # dt_sort sert uniquement au tri, on ne l'affiche jamais
-            df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+        # Nettoyage global une seule fois (pas de boucle inutile)
+        df_c['DateNav'] = df_c['DateNav'].apply(lambda x: "" if str(x).lower() in ['nan', 'none', 'nat'] else str(x))
+        df_c['orig_idx'] = df_c.index
+        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         
         if 'Relancer' not in df_c.columns: df_c['Relancer'] = "Non"
         
@@ -163,138 +176,47 @@ if st.session_state.page == "CONTACTS":
         search = c_search.text_input("🔍 Rechercher...", "").upper()
         annee_sel = c_yr.selectbox("Saison", [2026, 2027, 2028], index=0)
         
+        # Filtre saison
         mask = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna()) | (df_c['DateNav'] == "")
         df_c = df_c[mask].copy()
+        
         if search:
-            mask_s = df_c['Nom'].str.upper().contains(search) | df_c['Prénom'].str.upper().contains(search)
+            mask_s = df_c['Nom'].astype(str).str.upper().str.contains(search) | df_c['Prénom'].astype(str).str.upper().str.contains(search)
             df_c = df_c[mask_s]
+        
         df_c = df_c.sort_values(by='dt_sort', ascending=False)
 
-    # 2. Onglets
-    n1, n2, n3, n4 = st.columns(4)
-    if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
-        st.session_state.vue_contact = "En cours"; st.rerun()
-    if n2.button("⌛ ATTENTE", use_container_width=True, type="primary" if st.session_state.vue_contact == "Attente" else "secondary"): 
-        st.session_state.vue_contact = "Attente"; st.rerun()
-    if n3.button("📁 ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
-        st.session_state.vue_contact = "Archives"; st.rerun()
-    if n4.button("➕ NOUVEAU", use_container_width=True):
-         # On crée une date par défaut propre pour l'année sélectionnée
-         date_defaut = f"01/06/{annee_sel}"
-        
-         new_r = {
-             "Prénom": "NOUVEAU", 
-             "Nom": "CLIENT", 
-             "Statut": "En attente", 
-             "Paiement": "Unpaid", 
-             "Relancer": "Non", 
-             "DateNav": date_defaut, 
-             "Société": "PERSO", 
-             "Jours": 1, 
-             "Pers": 1, 
-             "Notes": "", 
-             "Téléphone": "", 
-             "Email": "", 
-             "Prix": 0, 
-             "Acompte": 0
-         }
-        
-         # On l'ajoute AU DÉBUT du fichier pour la voir tout de suite
-         df_raw = charger_data('contacts.json')
-         df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
-         sauvegarder_data(df_new, 'contacts.json')
-        
-         st.success("Fiche créée ! Elle apparaît en haut de la liste.")
-         st.rerun()
-    st.divider()
+        # Gestion des onglets (affichage uniquement)
+        if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
+            st.session_state.vue_contact = "En cours"; st.rerun()
+        if n2.button("⌛ ATTENTE", use_container_width=True, type="primary" if st.session_state.vue_contact == "Attente" else "secondary"): 
+            st.session_state.vue_contact = "Attente"; st.rerun()
+        if n3.button("📁 ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
+            st.session_state.vue_contact = "Archives"; st.rerun()
 
-    # 3. Filtrage Robuste
-    if not df_c.empty:
-        # On ignore les accents et majuscules pour le filtrage
+        st.divider()
+
+        # 3. Filtrage par onglet
         statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
         relance_clean = df_c['Relancer'].str.upper()
 
         if st.session_state.vue_contact == "Archives":
             mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
         elif st.session_state.vue_contact == "Attente":
-            mask_att = statut_clean.str.contains("liste|attente")
-            mask_rel = (statut_clean.str.contains("termine")) & (relance_clean == "OUI")
-            mask_aff = mask_att | mask_rel
+            mask_aff = statut_clean.str.contains("liste|attente") | ((statut_clean.str.contains("termine")) & (relance_clean == "OUI"))
         else:
             mask_aff = ~statut_clean.str.contains("termine|annule|refuse|liste|attente")
 
         df_aff = df_c[mask_aff].copy()
 
-        # 4. Affichage des fiches
+        # 4. Boucle d'affichage (Le reste de votre code de cartes HTML ici...)
         for _, row in df_aff.iterrows():
-            idx = row['orig_idx']
-            
-            # Données propres pour l'affichage
-            pre = clean_text(row.get('Prénom', '')).upper()
-            nom = clean_text(row.get('Nom', '')).upper()
-            sta_clean = str(row.get('Statut', 'EN ATTENTE')).upper()
-            soc = clean_text(row.get('Société', 'PERSO')).upper()
-            tel = clean_text(row.get('Téléphone', ''))
-            note = clean_text(row.get('Notes', ''))
-            date_aff = str(row.get('DateNav', '')).strip()
-            if not date_aff or date_aff.lower() == "nan": date_aff = "---"
-            
-            prix = clean_num(row.get('Prix', 0))
-            aco = clean_num(row.get('Acompte', 0))
-            reste = prix - aco
-            val_paye = str(row.get('Paiement', 'UNPAID')).strip().upper()
-
-            # --- CORRECTION PAIEMENT ---
-            if val_paye == "PAID":
-                p_label, p_color = "PAYÉ", "green"
-            elif prix > 0 and reste <= 0:
-                p_label, p_color = "PAYÉ", "green"
-            else:
-                p_label, p_color = "NON PAYÉ", "#E74C3C"
-
-            # Couleurs Background
-            rel_val = str(row.get('Relancer', 'NON')).upper()
-            if rel_val == "OUI" or "LISTE" in sta_clean: bg = "#F5EEF8" 
-            elif soc == "CMN": bg = "#D6EAF8"
-            elif "ATTENTE" in sta_clean: bg = "#FCF3CF"
-            else: bg = "#D5F5E3"
-
-            etoile = " ⭐ <small>TOP CLIENT</small>" if rel_val == "OUI" else ""
-            t_url = tel.replace(' ', '').replace('+', '')
-
-            card_html = f"""
-            <div style="background-color:{bg}; padding:15px; border-radius:12px; border:1px solid #ccc; margin-bottom:10px; color:#2C3E50;">
-                <div style="display:flex; justify-content:space-between; font-weight:bold; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:5px;">
-                    <span>#{idx} | {pre} {nom} {etoile}</span>
-                    <span style="background:white; padding:0 8px; border-radius:5px; font-size:0.75rem; border:1px solid #ddd;">{soc}</span>
-                </div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; margin-top:10px; gap:5px;">
-                    <div>📅 Date: <b>{date_aff}</b></div>
-                    <div>📊 Statut: <b>{sta_clean}</b></div>
-                    <div>💰 Prix: <b>{prix} €</b></div>
-                    <div style="color:{p_color}; font-weight:bold;">🏷️ {p_label} ({reste}€)</div>
-                </div>
-                <div style="margin-top:10px; padding:8px; background:rgba(255,255,255,0.4); border-radius:5px; font-size:0.8rem;">
-                    📞 Tel: <b>{tel}</b> | ✉️ {row.get('Email','')}
-                </div>
-                {f'<div style="font-size:0.8rem; margin-top:8px; border-left:3px solid #666; padding-left:8px; color:#555;"><i>{note}</i></div>' if note and note != '---' else ''}
-                <div style="margin-top:12px; display:flex; gap:10px;">
-                    <a href="tel:{t_url}" style="flex:1; background:#5DADE2; color:white !important; text-align:center; padding:8px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:0.75rem;">📞 APPEL</a>
-                    <a href="https://wa.me/{t_url}" style="flex:1; background:#52BE80; color:white !important; text-align:center; padding:8px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:0.75rem;">💬 WHATSAPP</a>
-                </div>
-            </div>
-            """
-            st.markdown(card_html, unsafe_allow_html=True)
-            
-            c1, c2 = st.columns(2)
-            if c1.button(f"ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
-                st.session_state.edit_idx = idx
-                st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
-            if c2.button(f"SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
-                df_db = charger_data('contacts.json').drop(idx)
-                sauvegarder_data(df_db, 'contacts.json'); st.rerun()
+            # ... gardez votre code de card_html et boutons éditer/supprimer ...
+            # (Assurez-vous d'utiliser idx = row['orig_idx'])
+            pass 
     else:
-        st.info("Aucun contact à afficher.")
+        st.info("La base de données est vide. Cliquez sur + NOUVEAU pour commencer.")
+
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT (V95 - AVEC RELANCE & FIX PAIEMENT) ---
 # =================================================================
