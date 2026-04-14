@@ -5,46 +5,57 @@ import plotly.express as px
 from datetime import datetime, date, timedelta
 import calendar
 
-# --- FONCTIONS DE SÉCURITÉ UNIVERSELLES ---
-keys_to_init = {
-    'authenticated': False, 
-    'page': "CONTACTS", 
-    'edit_idx': None, 
-    'vue_contact': "En cours",
-    'log_edit_idx': None,      # Indispensable pour la page LOG
-    'log_confirm_del': None    # Indispensable pour la suppression de LOG
-}
-for key, val in keys_to_init.items():
-    if key not in st.session_state: 
-        st.session_state[key] = val
+# =================================================================
+# --- 1. FONCTIONS DE SÉCURITÉ UNIVERSELLES ---
+# =================================================================
+
 def clean_num(val, default=0):
+    """Nettoie les prix et nombres (gère €, espaces et nan)"""
     try:
         if pd.isna(val) or str(val).lower() in ["nan", "", "none"]: 
             return default
-        return int(float(str(val).replace('€','').replace(' ','').strip()))
+        # Nettoyage des caractères parasites
+        clean_val = str(val).replace('€','').replace(' ','').replace(',','.').strip()
+        return int(float(clean_val))
     except:
         return default
 
 def clean_text(val):
+    """Nettoie les textes et évite les injections HTML dans les notes"""
     if val is None or pd.isna(val): return ""
     v = str(val).replace('nan', '').replace('None', '').strip()
-    if "<div" in v or "<a " in v: return "Note à corriger"
+    if "<div" in v or "<a " in v: 
+        return "Note à corriger (HTML détecté)"
     return v if v else "---"
 
 def preparer_log_safe(df):
-    """S'assure que le DataFrame des logs possède les colonnes minimales"""
-    cols = ['Date', 'PortDep', 'PortArr', 'Bateau', 'Skipper', 'Action', 'Details']
+    """Garantit que le DataFrame des logs possède les colonnes minimales pour éviter les crashs"""
+    cols_requises = ['Date', 'PortDep', 'PortArr', 'Bateau', 'Skipper', 'Action', 'Details']
     if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        return pd.DataFrame(columns=cols)
-    for col in cols:
-        if col not in df.columns: df[col] = ""
+        return pd.DataFrame(columns=cols_requises)
+    for col in cols_requises:
+        if col not in df.columns: 
+            df[col] = ""
     return df
 
 def format_tel_lien(tel):
+    """Prépare le numéro pour les liens cliquables tel:"""
     if not tel: return ""
     return "".join(filter(str.isdigit, str(tel)))
 
-# --- GESTION GITHUB ---
+def formater_date_affichage(date_val):
+    """Convertit les dates ISO en format français JJ/MM/AAAA"""
+    if pd.isna(date_val) or str(date_val).strip() in ["", "None", "nan"]: 
+        return "---"
+    try: 
+        return datetime.strptime(str(date_val)[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
+    except: 
+        return str(date_val)
+
+# =================================================================
+# --- 2. GESTION GITHUB (BASE DE DONNÉES) ---
+# =================================================================
+
 def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
@@ -54,7 +65,8 @@ def charger_data(file):
             content = base64.b64decode(res.json()['content']).decode('utf-8')
             return pd.DataFrame(json.loads(content))
         return pd.DataFrame()
-    except: return pd.DataFrame()
+    except: 
+        return pd.DataFrame()
 
 def sauvegarder_data(df, file):
     try:
@@ -62,10 +74,15 @@ def sauvegarder_data(df, file):
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
         res = requests.get(url, headers={"Authorization": f"token {token}"})
         sha = res.json().get('sha') if res.status_code == 200 else None
-        content = base64.b64encode(df.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
+        
+        # Nettoyage du DataFrame avant export JSON
+        df_export = df.copy()
+        content = base64.b64encode(df_export.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
+        
         requests.put(url, headers={"Authorization": f"token {token}"}, 
                      json={"message": f"Update {file}", "content": content, "sha": sha})
-    except Exception as e: st.error(f"Erreur sauvegarde {file} : {e}")
+    except Exception as e: 
+        st.error(f"Erreur sauvegarde {file} : {e}")
 
 # =================================================================
 # --- CONFIGURATION & STYLE ---
