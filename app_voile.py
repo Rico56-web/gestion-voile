@@ -338,10 +338,12 @@ if st.session_state.page == "MODIFIER_CONTACT":
             # Sous-colonnes pour Paiement et Relance
             sub1, sub2 = s2.columns(2)
             
-            # FIX PAIEMENT : Utilisation de selectbox au lieu de radio pour plus de stabilité
-            val_p = str(row.get('Paiement', 'Unpaid')).strip().upper()
+            # --- FIX PAIEMENT DANS LE FORMULAIRE ---
+            val_p_brute = str(row.get('Paiement', 'Unpaid')).strip()
             p_list = ["Unpaid", "Paid"]
-            p_idx = 1 if "PAID" in val_p else 0
+
+            # On force l'index 1 uniquement si c'est écrit "Paid" exactement
+            p_idx = 1 if val_p_brute.upper() == "PAID" else 0
             new_pay = sub1.selectbox("Paiement", p_list, index=p_idx)
             
             # Option Relance
