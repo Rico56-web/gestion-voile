@@ -155,7 +155,7 @@ if st.session_state.page == "CONTACTS":
         
             df_c['orig_idx'] = df_c.index
         # dt_sort sert uniquement au tri, on ne l'affiche jamais
-        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+            df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         
         if 'Relancer' not in df_c.columns: df_c['Relancer'] = "Non"
         
