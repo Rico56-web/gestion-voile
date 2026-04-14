@@ -238,7 +238,7 @@ if st.session_state.page == "CONTACTS":
                     <span style="background:white; padding:0 8px; border-radius:5px; font-size:0.75rem; border:1px solid #ddd;">{soc}</span>
                 </div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; margin-top:10px; gap:5px;">
-                    <div>📅 Date: <b>{row.get('DateNav','')}</b></div>
+                    <div>📅 Date: <b>{row.get('DateNav', '---')}</b></div>
                     <div>📊 Statut: <b>{sta_clean}</b></div>
                     <div>💰 Prix: <b>{prix} €</b></div>
                     <div style="color:{p_color}; font-weight:bold;">🏷️ {p_label} ({reste}€)</div>
