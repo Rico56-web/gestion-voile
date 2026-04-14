@@ -527,6 +527,9 @@ if st.session_state.page == "PLANNING":
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 
+    # =================================================================
+    # --- 9 STATS
+    # =================================================================
 if st.session_state.page == "STATS":
     import pandas as pd
     import plotly.express as px
@@ -569,43 +572,40 @@ if st.session_state.page == "STATS":
     df_f_yr = pd.DataFrame()
     df_soc_final = pd.DataFrame() # Initialisation vitale
 
-    # A. REVENUS (Calcul dynamique selon le mode)
-    if not df_planning_actif.empty:
-        df_p = df_planning_actif.copy()
-        
-        # Nettoyage des colonnes numériques
-        for col in ['Prix', 'Acompte']:
-            if col in df_p.columns:
-                df_p[col] = df_p[col].astype(str).str.replace(r'[^0-9.,]', '', regex=True).str.replace(',', '.')
-                df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0)
-        
-        # Conversion des dates
-        df_p['dt_vrai'] = df_p['DateNav'].apply(conversion_date_robuste)
-        
-        # FILTRE DE PÉRIODE
-        if mode_bilan == "Par Saison":
-            mask_p = (df_p['dt_vrai'].dt.year == sel_y)
-        else:
-            # Mode "A ce jour" : Année actuelle ET date passée ou égale à aujourd'hui
-            mask_p = (df_p['dt_vrai'].dt.year == today.year) & (df_p['dt_vrai'].dt.date <= today)
-        
-        df_r_yr = df_p[mask_p].copy()
-
+    # A. DÉTAIL DES REVENUS (V104 - UNIQUE & NOMINATIF)
+    with st.expander("📥 Détail des Revenus Encaissés", expanded=False):
         if not df_r_yr.empty:
-            # Logique comptable : Prix si payé, sinon Acompte
-            def check_money(row):
-                status = str(row.get('Paiement', '')).upper()
-                if "PAID" in status:
-                    return row['Prix']
-                return row['Acompte']
+            df_disp = df_r_yr.copy()
 
-            df_r_yr['Encaissé_Reel'] = df_r_yr.apply(check_money, axis=1)
-            total_rev = df_r_yr['Encaissé_Reel'].sum()
+            # 1. Création du Nom Complet (Prénom + Nom)
+            def format_nom(row):
+                p = str(row.get('Prénom', '')).strip()
+                n = str(row.get('Nom', '')).strip()
+                full = f"{p} {n}".strip()
+                return full if full else "Client Inconnu"
+
+            df_disp['Client'] = df_disp.apply(format_nom, axis=1)
+
+            # 2. Sélection des colonnes utiles uniquement
+            # On garde 'Client' à la place de 'Société' pour plus de clarté
+            colonnes_finales = ['DateNav', 'Client', 'Encaissé_Reel']
             
-            # Création du groupement par société (pour éviter le NameError plus bas)
-            if 'Société' in df_r_yr.columns:
-                df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'})
-
+            # On s'assure que les colonnes existent avant de filtrer
+            cols_existantes = [c for c in colonnes_finales if c in df_disp.columns]
+            
+            # 3. Affichage d'UN SEUL tableau propre
+            st.dataframe(
+                df_disp[cols_existantes].rename(columns={
+                    'DateNav': 'Date',
+                    'Encaissé_Reel': 'Montant Encaissé (€)'
+                }),
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            st.info(f"💡 Ce tableau liste uniquement les missions de la période sélectionnée ({mode_bilan}).")
+        else:
+            st.info("Aucun revenu perçu sur cette période.")
     # B. FRAIS (Indépendant du mode revenus)
     if not df_frais_full.empty:
         df_f = df_frais_full.copy()
