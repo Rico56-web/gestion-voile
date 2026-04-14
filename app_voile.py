@@ -581,16 +581,17 @@ if st.session_state.page == "STATS":
         else:
             mask_p = (df_p['dt_vrai'].dt.year == 2026) & (df_p['dt_vrai'].dt.date <= today)
         
+        # --- 4.A CALCUL DES REVENUS (Version 111 - Anti-Refus) ---
         df_temp = df_p[mask_p].copy()
 
         if not df_temp.empty:
-           def calcul_final(row):
+            def calcul_final(row):
                 # 1. On récupère et on nettoie les textes
                 status = str(row.get('Paiement', '')).upper().strip()
                 p = row.get('Prix', 0)
                 a = row.get('Acompte', 0)
 
-                # --- LISTE NOIRE (Si un de ces mots est là, c'est 0€ direct) ---
+                # --- LISTE NOIRE (Exclusion immédiate) ---
                 mots_interdits = ["REFUS", "ANNUL", "NON", "UNPAID", "DEVIS"]
                 if any(mot in status for mot in mots_interdits):
                     return 0
@@ -604,10 +605,14 @@ if st.session_state.page == "STATS":
                     
                     if est_paye or est_solde:
                         return p
-                
                 return 0
 
+            # --- ATTENTION : Ces lignes doivent être alignées avec le 'def' au-dessus ---
             df_temp['Encaissé_Reel'] = df_temp.apply(calcul_final, axis=1)
+            
+            # On ne garde que les dossiers avec un encaissement réel
+            df_r_yr = df_temp[df_temp['Encaissé_Reel'] > 0].copy()
+            total_rev = df_r_yr['Encaissé_Reel'].sum()
             
             # --- FILTRE DE SORTIE ---
             # On ne garde que les dossiers qui ont généré un encaissement réel
