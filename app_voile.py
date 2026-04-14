@@ -689,17 +689,19 @@ if st.session_state.page == "STATS":
     st.divider()
     st.subheader("📝 Détail des opérations réelles")
     
-    # A. DÉTAIL DES REVENUS (Missions déjà encaissées)
+    # A. DÉTAIL DES REVENUS
     with st.expander("📥 Détail des Revenus Encaissés", expanded=False):
         if not df_r_yr.empty:
             df_disp = df_r_yr.copy()
-            # Reconstruction sécurisée de la colonne "Client"
-            nom_cols = [c for c in ['Prénom', 'Nom'] if c in df_disp.columns]
-            if nom_cols:
-                df_disp['Client'] = df_disp[nom_cols].fillna('').agg(' '.join, axis=1).str.title().str.strip()
-            else:
-                df_disp['Client'] = "Inconnu"
-
+            # On vérifie les colonnes présentes pour l'affichage
+            # Utilisation de 'Encaissé_Reel' ici aussi
+            cols_to_show = [c for c in ['DateNav', 'Client', 'Société', 'Encaissé_Reel'] if c in df_disp.columns]
+            
+            st.dataframe(
+                df_disp[cols_to_show].rename(columns={'DateNav':'Date','Encaissé_Reel':'Montant €'}), 
+                hide_index=True, 
+                use_container_width=True
+            )
             # Sélection sécurisée des colonnes à afficher
             cols_to_show = [c for c in ['DateNav', 'Client', 'Société', 'P_Num'] if c in df_disp.columns]
             
