@@ -188,7 +188,8 @@ if st.session_state.page == "CONTACTS":
         # TRI CHRONOLOGIQUE INVERSE (Le plus récent/futur en haut)
         # On utilise 'ascending=False' pour que 2027 soit avant 2026, 
         # et que Décembre soit avant Janvier.
-        df_c = df_c.sort_values(by='dt_sort', ascending=False)
+        df_c = df_c.sort_values(by='dt_sort', ascending=True)
+        
 
         # Onglets
         if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
