@@ -177,27 +177,29 @@ if st.session_state.page == "CONTACTS":
         sauvegarder_data(df_new, 'contacts.json'); st.rerun()
 
     st.divider()
-
-    # 3. Logique de Filtrage des Onglets
-    if not df_c.empty:
-        statut_l = df_c['Statut'].astype(str).str.lower()
-        relance_l = df_c['Relancer'].astype(str).str.upper()
+        # 3. Logique de Filtrage des Onglets (Version robuste)
+        if not df_c.empty:
+        # On prépare des versions "propres" pour le filtrage sans modifier les données réelles
+        statut_clean = df_c['Statut'].astype(str).str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').decode('utf-8')
+        relance_clean = df_c.get('Relancer', 'Non')
+        relance_clean = relance_clean.astype(str).str.upper().fillna("NON")
 
         if st.session_state.vue_contact == "Archives":
-            # Uniquement terminé/annulé ET pas de relance prévue
-            mask_aff = statut_l.str.contains("termine|annule|refuse") & (relance_l != "OUI")
+            # On affiche si c'est fini/annulé ET que ce n'est PAS un client à relancer
+            mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
         
         elif st.session_state.vue_contact == "Attente":
-            # Statut spécifique "Liste d'attente" OU "Terminé" avec relance OUI
-            mask_att = statut_l.str.contains("liste|attente")
-            mask_rel = statut_l.str.contains("termine") & (relance_l == "OUI")
+            # On affiche si statut "attente" OU si c'est un "Terminé" à relancer
+            mask_att = statut_clean.str.contains("liste|attente")
+            mask_rel = (statut_clean.str.contains("termine")) & (relance_clean == "OUI")
             mask_aff = mask_att | mask_rel
             
         else: # "En cours"
-            # Tout ce qui n'est pas archivé ou en attente
-            mask_aff = ~statut_l.str.contains("termine|annule|refuse|liste|attente")
+            # Par défaut : tout ce qui n'est pas dans les deux autres
+            mask_aff = ~statut_clean.str.contains("termine|annule|refuse|liste|attente")
 
         df_aff = df_c[mask_aff].copy()
+      
 
         # 4. Affichage des fiches
         for _, row in df_aff.iterrows():
