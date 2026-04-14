@@ -560,81 +560,79 @@ if st.session_state.page == "STATS":
     total_rev, total_frais = 0, 0
     df_r_yr = pd.DataFrame()
     df_f_yr = pd.DataFrame()
-# --- 4. TRAITEMENT DES DONNÉES (V102 - COMPTABILITÉ EXACTE) ---
-    total_rev, total_frais = 0, 0
+    
+    # --- 4. TRAITEMENT DES DONNÉES (V103) ---
+    # Initialisation systématique pour éviter les NameError
+    total_rev = 0
+    total_frais = 0
     df_r_yr = pd.DataFrame()
     df_f_yr = pd.DataFrame()
+    df_soc_final = pd.DataFrame() # Initialisation vitale
 
-    # A. REVENUS
+    # A. REVENUS (Calcul dynamique selon le mode)
     if not df_planning_actif.empty:
         df_p = df_planning_actif.copy()
         
-        # Nettoyage strict des nombres
+        # Nettoyage des colonnes numériques
         for col in ['Prix', 'Acompte']:
-            df_p[col] = df_p[col].astype(str).str.replace(r'[^0-9.,]', '', regex=True).str.replace(',', '.')
-            df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0)
+            if col in df_p.columns:
+                df_p[col] = df_p[col].astype(str).str.replace(r'[^0-9.,]', '', regex=True).str.replace(',', '.')
+                df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0)
         
-        # Dates et Filtres
+        # Conversion des dates
         df_p['dt_vrai'] = df_p['DateNav'].apply(conversion_date_robuste)
         
-        # --- APPLICATION DU FILTRE DE NAVIGATION (SAISON OU A CE JOUR) ---
+        # FILTRE DE PÉRIODE
         if mode_bilan == "Par Saison":
-            mask_periode = (df_p['dt_vrai'].dt.year == sel_y)
+            mask_p = (df_p['dt_vrai'].dt.year == sel_y)
         else:
-            # "A ce jour" : Année en cours ET date passée ou aujourd'hui
-            mask_periode = (df_p['dt_vrai'].dt.year == today.year) & (df_p['dt_vrai'].dt.date <= today)
-
-        # On applique le filtre de période AVANT de calculer les sommes
-        df_r_yr = df_p[mask_periode].copy()
+            # Mode "A ce jour" : Année actuelle ET date passée ou égale à aujourd'hui
+            mask_p = (df_p['dt_vrai'].dt.year == today.year) & (df_p['dt_vrai'].dt.date <= today)
+        
+        df_r_yr = df_p[mask_p].copy()
 
         if not df_r_yr.empty:
-            # LOGIQUE COMPTABLE STRICTE
-            def calcul_encaissement(row):
+            # Logique comptable : Prix si payé, sinon Acompte
+            def check_money(row):
                 status = str(row.get('Paiement', '')).upper()
-                # 1. Si c'est marqué PAID -> On prend le prix total
                 if "PAID" in status:
                     return row['Prix']
-                # 2. Si c'est UNPAID mais qu'il y a un acompte -> On prend l'acompte
-                elif row['Acompte'] > 0:
-                    return row['Acompte']
-                # 3. Sinon (Unpaid sans acompte) -> 0€
-                return 0
+                return row['Acompte']
 
-            df_r_yr['Encaissé_Reel'] = df_r_yr.apply(calcul_encaissement, axis=1)
+            df_r_yr['Encaissé_Reel'] = df_r_yr.apply(check_money, axis=1)
             total_rev = df_r_yr['Encaissé_Reel'].sum()
+            
+            # Création du groupement par société (pour éviter le NameError plus bas)
+            if 'Société' in df_r_yr.columns:
+                df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'})
 
-    # --- 4. CALCUL DES FRAIS ---
+    # B. FRAIS (Indépendant du mode revenus)
     if not df_frais_full.empty:
         df_f = df_frais_full.copy()
         df_f['dt_vrai'] = pd.to_datetime(df_f['Date'], errors='coerce', dayfirst=True)
         df_f['M_Num'] = pd.to_numeric(df_f['M_Num'], errors='coerce').fillna(0)
         
-        mask_f = (df_f['dt_vrai'].dt.year == sel_y)
+        if mode_bilan == "Par Saison":
+            mask_f = (df_f['dt_vrai'].dt.year == sel_y)
+        else:
+            mask_f = (df_f['dt_vrai'].dt.year == today.year) & (df_f['dt_vrai'].dt.date <= today)
+            
         df_f_yr = df_f[mask_f].copy()
         total_frais = df_f_yr['M_Num'].sum()
 
-    # --- 5. AFFICHAGE DES RÉSULTATS ---
+    # --- 5. RÉSUMÉ ET INDICATEURS (SÉCURISÉS) ---
     solde = total_rev - total_frais
+    st.subheader(f"💰 Synthèse Trésorerie : {mode_bilan} ({sel_y if mode_bilan == 'Par Saison' else '2026'})")
+    
     c1, c2, c3 = st.columns(3)
-    c1.metric("Encaissé", f"{total_rev:,.0f} €")
-    c2.metric("Décaissé", f"{total_frais:,.0f} €")
-    c3.metric("Solde", f"{solde:,.0f} €")
+    c1.metric("Encaissé", f"{total_rev:,.0f} €".replace(',', ' '))
+    c2.metric("Décaissé", f"{total_frais:,.0f} €".replace(',', ' '))
+    c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color="normal" if solde >= 0 else "inverse")
 
-    if total_rev > 0 or total_frais > 0:
-        fig = px.pie(names=['Frais', 'Revenus'], values=[total_frais, total_rev],
-                     color_discrete_map={'Frais': '#EF553B', 'Revenus': '#00CC96'}, hole=0.5)
-        st.plotly_chart(fig, use_container_width=True)
-
-    # --- 6. TABLEAU MENSUEL ---
-    if not df_r_yr.empty or not df_f_yr.empty:
-        st.subheader("📊 Tableau Mensuel")
-        mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
-        data_mois = []
-        for i in range(1, 13):
-            r = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['Encaissé_Reel'].sum() if not df_r_yr.empty else 0
-            f = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['M_Num'].sum() if not df_f_yr.empty else 0
-            data_mois.append({'Mois': mois_noms[i-1], 'Encaissé': r, 'Décaissé': f, 'Solde': r-f})
-        st.dataframe(pd.DataFrame(data_mois), hide_index=True, use_container_width=True)
+    # On ne lance les calculs de KPI que si df_soc_final existe et n'est pas vide
+    if not df_soc_final.empty and total_rev > 0:
+        # Ici tes indicateurs de pilotage (Marge, Risque client, etc.)
+        pass
 
     # =================================================================
     # --- 6. INDICATEURS DE PILOTAGE STRATÉGIQUES (RÉ-INTÉGRÉS) ---
