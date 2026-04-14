@@ -671,20 +671,20 @@ if st.session_state.page == "STATS":
         kpi4.markdown(f"<div style='text-align:center;'>Risque ({nom_gros_client})<br><span style='font-size:30px; font-weight:bold; color:{couleur_dep};'>{taux_dep:.0f} %</span></div>", unsafe_allow_html=True)
     else: kpi4.metric("Risque Client", "0 %")
         
-        # --- 7. BILAN MENSUEL DE TRÉSORERIE (CORRIGÉ) ---
-        mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
-        rs_m = []
-        for i in range(1, 13):
-            # ON UTILISE 'Encaissé_Reel' au lieu de 'P_Num'
-            r_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['Encaissé_Reel'].sum() if not df_r_yr.empty else 0
-            f_m = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['M_Num'].sum() if not df_f_yr.empty else 0
+    # --- 7. BILAN MENSUEL DE TRÉSORERIE (CORRIGÉ) ---
+    mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+    rs_m = []
+    for i in range(1, 13):
+        # ON UTILISE 'Encaissé_Reel' au lieu de 'P_Num'
+        r_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['Encaissé_Reel'].sum() if not df_r_yr.empty else 0
+        f_m = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['M_Num'].sum() if not df_f_yr.empty else 0
             
-            rs_m.append({
-                'Mois': mois_noms[i-1], 
-                'Encaissé €': round(r_m, 0), 
-                'Décaissé €': round(f_m, 0), 
-                'Solde €': round(r_m - f_m, 0)
-            })
+        rs_m.append({
+            'Mois': mois_noms[i-1], 
+            'Encaissé €': round(r_m, 0), 
+            'Décaissé €': round(f_m, 0), 
+            'Solde €': round(r_m - f_m, 0)
+        })
 
     # --- 8. DÉTAIL DES OPÉRATIONS DE TRÉSORERIE RÉELLES ---
     st.divider()
