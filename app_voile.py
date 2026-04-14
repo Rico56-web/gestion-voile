@@ -564,77 +564,65 @@ if st.session_state.page == "STATS":
     df_r_yr = pd.DataFrame()
     df_f_yr = pd.DataFrame()
     
-    # --- 4. TRAITEMENT DES DONNÉES (V103) ---
-    # Initialisation systématique pour éviter les NameError
+    # --- 4. TRAITEMENT DES DONNÉES (Vesta Skipper 2026 - Version Finale) ---
+    # 1. Initialisation unique
     total_rev = 0
     total_frais = 0
     df_r_yr = pd.DataFrame()
     df_f_yr = pd.DataFrame()
-    df_soc_final = pd.DataFrame() # Initialisation vitale
-    
-# --- 4. TRAITEMENT DES DONNÉES (V105 - DIAGNOSTIC) ---
-    total_rev = 0
-    df_r_yr = pd.DataFrame()
     df_soc_final = pd.DataFrame()
 
+    # A. CALCUL DES REVENUS
     if not df_planning_actif.empty:
         df_p = df_planning_actif.copy()
         
-        # 1. Nettoyage prix (on enlève tout sauf chiffres et points)
+        # Nettoyage prix et acomptes
         for col in ['Prix', 'Acompte']:
-            df_p[col] = df_p[col].astype(str).str.replace(r'[^0-9.,]', '', regex=True).str.replace(',', '.')
-            df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0)
+            if col in df_p.columns:
+                df_p[col] = df_p[col].astype(str).str.replace(r'[^0-9.,]', '', regex=True).str.replace(',', '.')
+                df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0)
         
-        # 2. Conversion Date (On force le format jour/mois/année)
+        # Dates
         df_p['dt_vrai'] = pd.to_datetime(df_p['DateNav'], dayfirst=True, errors='coerce')
         
-        # --- TEST DE SÉCURITÉ : On affiche les 3 premières dates lues pour vérifier ---
-        # st.write(df_p[['DateNav', 'dt_vrai']].head(3)) 
-
-        # 3. Application du filtre de période
+        # Application du filtre de période (Saison ou À ce jour)
         if mode_bilan == "Par Saison":
             mask_p = (df_p['dt_vrai'].dt.year == sel_y)
         else:
-            # Pour "A ce jour", on prend tout 2026 jusqu'à aujourd'hui
+            # Mode "À ce jour" : Année 2026 jusqu'à aujourd'hui inclus
             mask_p = (df_p['dt_vrai'].dt.year == 2026) & (df_p['dt_vrai'].dt.date <= today)
         
-        df_r_yr = df_p[mask_p].copy()
+        df_temp = df_p[mask_p].copy()
 
-        if not df_r_yr.empty:
-            # 4. Calcul simple : Si PAID -> Prix, sinon Acompte
-            # On utilise .str.contains pour être moins strict sur le texte
-            # Logique comptable stricte :
+        if not df_temp.empty:
+            # LOGIQUE STRICTE : On encaisse uniquement si c'est payé ou solde complet
             def check_money_strict(row):
-                    # 1. Nettoyage des données
-                    status = str(row.get('Paiement', '')).upper().strip()
-                    prix_total = row.get('Prix', 0)
-                    acompte_verse = row.get('Acompte', 0)
+                # Nettoyage du statut
+                status = str(row.get('Paiement', '')).upper().strip()
+                p_tot = row.get('Prix', 0)
+                a_ver = row.get('Acompte', 0)
 
-                    # --- RÈGLE STRICTE ---
-                    # On encaisse SI c'est marqué PAID 
-                    # OU SI l'acompte est égal au prix (et que le prix n'est pas 0)
-                    est_paye = ("PAID" in status or "PAYÉ" in status or "PAYE" in status)
-                    solde_complet = (acompte_verse >= prix_total and prix_total > 0)
+                # CONDITIONS D'ENCAISSEMENT
+                est_paye = any(x in status for x in ["PAID", "PAYÉ", "PAYE"])
+                solde_complet = (a_ver >= p_tot and p_tot > 0)
 
-                    if est_paye or solde_complet:
-                        return prix_total
-                
-                    # Dans tous les autres cas (même s'il y a un petit acompte), on compte 0€
-                    return 0
+                if est_paye or solde_complet:
+                    return p_tot
+                return 0
 
-            # Application de la règle
-            df_r_yr['Encaissé_Reel'] = df_r_yr.apply(check_money_strict, axis=1)
+            df_temp['Encaissé_Reel'] = df_temp.apply(check_money_strict, axis=1)
             
-            # --- NETTOYAGE DU TABLEAU ---
-            # On ne garde que les lignes qui ont réellement généré un encaissement
-            df_r_yr = df_r_yr[df_r_yr['Encaissé_Reel'] > 0].copy()
-            
+            # --- FILTRE RADICAL ---
+            # On ne garde que ceux qui ont payé (Encaissé > 0)
+            # C'est ici que Camille disparaît si elle est à 0€
+            df_r_yr = df_temp[df_temp['Encaissé_Reel'] > 0].copy()
             total_rev = df_r_yr['Encaissé_Reel'].sum()
             
-            # Groupement Société pour les graphiques
-            if 'Société' in df_r_yr.columns:
-                df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'})
-    # B. FRAIS (Indépendant du mode revenus)
+            # Groupement Société pour le KPI Risque Client
+            if 'Société' in df_r_yr.columns and not df_r_yr.empty:
+                df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'}).sort_values('CA €', ascending=False)
+
+    # B. CALCUL DES FRAIS
     if not df_frais_full.empty:
         df_f = df_frais_full.copy()
         df_f['dt_vrai'] = pd.to_datetime(df_f['Date'], errors='coerce', dayfirst=True)
@@ -643,7 +631,7 @@ if st.session_state.page == "STATS":
         if mode_bilan == "Par Saison":
             mask_f = (df_f['dt_vrai'].dt.year == sel_y)
         else:
-            mask_f = (df_f['dt_vrai'].dt.year == today.year) & (df_f['dt_vrai'].dt.date <= today)
+            mask_f = (df_f['dt_vrai'].dt.year == 2026) & (df_f['dt_vrai'].dt.date <= today)
             
         df_f_yr = df_f[mask_f].copy()
         total_frais = df_f_yr['M_Num'].sum()
