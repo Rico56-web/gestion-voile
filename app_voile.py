@@ -604,23 +604,23 @@ if st.session_state.page == "STATS":
             # 4. Calcul simple : Si PAID -> Prix, sinon Acompte
             # On utilise .str.contains pour être moins strict sur le texte
             # Logique comptable stricte :
-        def check_money_strict(row):
-                # 1. Nettoyage des données
-                status = str(row.get('Paiement', '')).upper().strip()
-                prix_total = row.get('Prix', 0)
-                acompte_verse = row.get('Acompte', 0)
+            def check_money_strict(row):
+                    # 1. Nettoyage des données
+                    status = str(row.get('Paiement', '')).upper().strip()
+                    prix_total = row.get('Prix', 0)
+                    acompte_verse = row.get('Acompte', 0)
 
-                # --- RÈGLE STRICTE ---
-                # On encaisse SI c'est marqué PAID 
-                # OU SI l'acompte est égal au prix (et que le prix n'est pas 0)
-                est_paye = ("PAID" in status or "PAYÉ" in status or "PAYE" in status)
-                solde_complet = (acompte_verse >= prix_total and prix_total > 0)
+                    # --- RÈGLE STRICTE ---
+                    # On encaisse SI c'est marqué PAID 
+                    # OU SI l'acompte est égal au prix (et que le prix n'est pas 0)
+                    est_paye = ("PAID" in status or "PAYÉ" in status or "PAYE" in status)
+                    solde_complet = (acompte_verse >= prix_total and prix_total > 0)
 
-                if est_paye or solde_complet:
-                    return prix_total
+                    if est_paye or solde_complet:
+                        return prix_total
                 
-                # Dans tous les autres cas (même s'il y a un petit acompte), on compte 0€
-                return 0
+                    # Dans tous les autres cas (même s'il y a un petit acompte), on compte 0€
+                    return 0
 
             # Application de la règle
             df_r_yr['Encaissé_Reel'] = df_r_yr.apply(check_money_strict, axis=1)
