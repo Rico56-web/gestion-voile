@@ -148,16 +148,26 @@ if st.session_state.page == "CONTACTS":
     n1, n2, n3, n4 = st.columns(4)
     
     if n4.button("➕ NOUVEAU", use_container_width=True):
+        # 1. Préparation de la nouvelle fiche
         new_r = {
-            "Prénom": "NOUVEAU", "Nom": "CLIENT", "Statut": "En attente", 
+            "Prénom": "NOUVEAU", "Nom": "CLIENT", "Statut": "Ok", 
             "Paiement": "Unpaid", "Relancer": "Non", "DateNav": "01/06/2026", 
             "Société": "PERSO", "Jours": 1, "Prix": 0, "Acompte": 0,
             "Notes": "", "Téléphone": "", "Email": "", "Pers": 1
         }
+        
+        # 2. Chargement et ajout
         df_actuel = charger_data('contacts.json')
+        # On ajoute la fiche au début (index 0)
         df_new = pd.concat([pd.DataFrame([new_r]), df_actuel], ignore_index=True)
         sauvegarder_data(df_new, 'contacts.json')
-        st.success("Fiche créée !")
+        
+        # 3. REDIRECTION IMMÉDIATE
+        # Puisqu'on l'a ajoutée en haut, son index est 0
+        st.session_state.edit_idx = 0 
+        st.session_state.page = "MODIFIER_CONTACT"
+        
+        st.success("Création en cours...")
         st.rerun()
 
     # 2. Nettoyage et Filtrage
