@@ -546,24 +546,31 @@ if st.session_state.page == "PLANNING":
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 # =================================================================
-# --- 7. PAGE STATS (V102 - FIX PRÉVISIONS & INDENTATION) ---
+# --- 7. PAGE STATS (V103 - FIX DATE & PRÉVISIONS) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Statistiques Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # --- 1. DÉFINITION UNIVERSELLE (Évite le NameError) ---
+    # --- 1. CHARGEMENT ET PRÉPARATION DES DONNÉES ---
     mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     
-    # On s'assure que les DataFrames de base existent
-    df_r_yr = charger_data('archives_factures.json') # Ou ta source de revenus
-    df_f_yr = charger_data('maintenance.json')        # Ou ta source de frais
+    # Chargement des fichiers
+    df_r_yr = charger_data('archives_factures.json') 
+    df_f_yr = charger_data('maintenance.json')
     
+    # SÉCURITÉ : Création de 'dt_vrai' pour éviter le KeyError
+    if not df_r_yr.empty:
+        df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
+    if not df_f_yr.empty:
+        # On utilise 'Date' pour la maintenance
+        df_f_yr['dt_vrai'] = pd.to_datetime(df_f_yr['Date'], dayfirst=True, errors='coerce')
+
     rs_m = []     # Liste pour le Réel
     prev_m = []   # Liste pour le Prévisionnel
 
     # --- 2. BOUCLE DE CALCUL UNIQUE ---
     for i in range(1, 13):
-        # CALCUL DU RÉEL (Encaissé)
+        # A. CALCUL DU RÉEL (Ce qui est marqué comme payé / encaissé)
         r_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['Encaissé_Reel'].sum() if not df_r_yr.empty else 0
         f_m = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['M_Num'].sum() if not df_f_yr.empty else 0
         
@@ -574,9 +581,8 @@ if st.session_state.page == "STATS":
             'Solde €': round(r_m - f_m, 0)
         })
 
-        # CALCUL DU PRÉVISIONNEL (Potentiel total)
+        # B. CALCUL DU PRÉVISIONNEL (CA Total potentiel hors annulations)
         if not df_r_yr.empty:
-            # On prend le 'Prix' total et on exclut Annulé/Refusé
             mask_p = (df_r_yr['dt_vrai'].dt.month == i) & (~df_r_yr['Statut'].str.lower().str.contains("annule|refuse"))
             r_prev = df_r_yr[mask_p]['Prix'].sum()
         else:
@@ -591,7 +597,7 @@ if st.session_state.page == "STATS":
             'Solde Prévu €': round(r_prev - f_prev, 0)
         })
 
-    # Conversion en DataFrames
+    # Conversion finale
     df_reel = pd.DataFrame(rs_m)
     df_prev = pd.DataFrame(prev_m)
 
@@ -600,13 +606,13 @@ if st.session_state.page == "STATS":
     c1, c2 = st.columns(2)
 
     with c1:
-        st.subheader("📈 Évolution Réelle")
+        st.subheader("📈 Évolution Réelle (Encaissé)")
         fig_r = px.bar(df_reel, x='Mois', y=['Encaissé €', 'Décaissé €'], barmode='group',
                        color_discrete_map={'Encaissé €': '#2ecc71', 'Décaissé €': '#e74c3c'}, height=350)
         st.plotly_chart(fig_r, use_container_width=True)
 
     with c2:
-        st.subheader("🔮 Prévisions Saison")
+        st.subheader("🔮 Prévisions Saison (Potentiel)")
         fig_p = px.line(df_prev, x='Mois', y=['CA Prévu €', 'Frais Prévus €'], markers=True,
                         color_discrete_map={'CA Prévu €': '#3498DB', 'Frais Prévus €': '#F39C12'}, height=350)
         st.plotly_chart(fig_p, use_container_width=True)
@@ -614,6 +620,8 @@ if st.session_state.page == "STATS":
     # --- 4. TABLEAU DE DÉTAIL ---
     with st.expander("📊 Voir le détail des prévisions mensuelles"):
         st.table(df_prev.set_index('Mois'))
+        total_ca_prev = df_prev['CA Prévu €'].sum()
+        st.info(f"Objectif CA Total Saison : **{total_ca_prev:,.0f} €**".replace(',', ' '))
 # =================================================================
     # --- 7. BILAN MENSUEL DE TRÉSORERIE (RÉEL & PRÉVISIONNEL) ---
     # =================================================================
