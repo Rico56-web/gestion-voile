@@ -281,7 +281,7 @@ if st.session_state.page == "CONTACTS":
     else:
         st.info("La base de données est vide.")
 # =================================================================
-# --- 6. PAGE MODIFIER CONTACT (V95 - AVEC RELANCE & FIX PAIEMENT) ---
+# --- 6. PAGE MODIFIER CONTACT (V96 - FIX SOCIÉTÉ & PAIEMENT) ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
     st.markdown('<h3 style="text-align:center;">✏️ Modifier le Contact</h3>', unsafe_allow_html=True)
@@ -292,16 +292,24 @@ if st.session_state.page == "MODIFIER_CONTACT":
     if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
         row = df_m.loc[idx_to_edit]
         
-        with st.form("form_edit_v95"):
+        with st.form("form_edit_v96"):
             # Ligne 1 : Identité
             c1, c2 = st.columns(2)
             new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
             new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
             
-            # Ligne 2 : Date et Société
+            # Ligne 2 : Date et Société (MODIFIÉ : Menu Déroulant)
             c3, c4 = st.columns(2)
             new_date = c3.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav', '')))
-            new_soc = c4.text_input("Société", value=str(row.get('Société', 'PERSO')))
+            
+            # --- LOGIQUE SOCIÉTÉ ---
+            liste_soc = ["PERSO", "CLICK", "CMN", "VOG"]
+            curr_soc = str(row.get('Société', 'PERSO')).upper().strip()
+            # Si la société en base n'est pas dans la liste, on l'ajoute temporairement pour ne pas perdre l'info
+            if curr_soc not in liste_soc and curr_soc != "":
+                liste_soc.append(curr_soc)
+            soc_idx = liste_soc.index(curr_soc) if curr_soc in liste_soc else 0
+            new_soc = c4.selectbox("Société", liste_soc, index=soc_idx)
             
             # Ligne 3 : Contacts
             c5, c6 = st.columns(2)
@@ -318,7 +326,7 @@ if st.session_state.page == "MODIFIER_CONTACT":
             new_prix = f1.number_input("Prix Total (€)", value=clean_num(row.get('Prix', 0)))
             new_aco = f2.number_input("Acompte (€)", value=clean_num(row.get('Acompte', 0)))
             
-            # Ligne 6 : Statuts & Options (FIX PAIEMENT & RELANCE)
+            # Ligne 6 : Statuts & Options
             s1, s2 = st.columns(2)
             s_list = ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé", "Liste d'attente"]
             curr_s = str(row.get('Statut', 'En attente')).capitalize()
@@ -329,17 +337,18 @@ if st.session_state.page == "MODIFIER_CONTACT":
             # Sous-colonnes pour Paiement et Relance
             sub1, sub2 = s2.columns(2)
             
-            # Fix Paiement
+            # FIX PAIEMENT : Utilisation de selectbox au lieu de radio pour plus de stabilité
             val_p = str(row.get('Paiement', 'Unpaid')).strip().upper()
-            new_pay = sub1.radio("Paiement", ["Unpaid", "Paid"], index=1 if "PAID" in val_p else 0, horizontal=True)
+            p_list = ["Unpaid", "Paid"]
+            p_idx = 1 if "PAID" in val_p else 0
+            new_pay = sub1.selectbox("Paiement", p_list, index=p_idx)
             
-            # Option Relance (Nouveauté)
+            # Option Relance
             val_r = str(row.get('Relancer', 'Non')).strip().capitalize()
-            new_relance = sub2.radio("À recontacter ?", ["Non", "Oui"], index=1 if val_r == "Oui" else 0, horizontal=True)
+            new_relance = sub2.selectbox("À recontacter ?", ["Non", "Oui"], index=1 if val_r == "Oui" else 0)
             
             new_notes = st.text_area("Notes", value=str(row.get('Notes', '')).replace('nan',''))
 
-            # BOUTON DE VALIDATION
             submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
             
             if submitted:
@@ -347,7 +356,7 @@ if st.session_state.page == "MODIFIER_CONTACT":
                     'Prénom': new_pre.upper(),
                     'Nom': new_nom.upper(),
                     'DateNav': new_date,
-                    'Société': new_soc.upper(),
+                    'Société': new_soc.upper(), # Sauvegarde la sélection du menu
                     'Téléphone': new_tel.strip(),
                     'Email': new_mail.strip(),
                     'Jours': int(new_jours),
@@ -356,7 +365,7 @@ if st.session_state.page == "MODIFIER_CONTACT":
                     'Acompte': int(new_aco),
                     'Statut': new_statut,
                     'Paiement': new_pay,
-                    'Relancer': new_relance, # Sauvegarde de l'option relance
+                    'Relancer': new_relance,
                     'Notes': str(new_notes).strip()
                 }
                 
