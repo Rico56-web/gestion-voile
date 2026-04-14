@@ -527,10 +527,7 @@ if st.session_state.page == "PLANNING":
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 
-    # =================================================================
-    # --- 9 STATS
-    # =================================================================
-if st.session_state.page == "STATS":
+    if st.session_state.page == "STATS":
     import pandas as pd
     import plotly.express as px
     import datetime
@@ -551,7 +548,7 @@ if st.session_state.page == "STATS":
     df_m_arch = charger_data('archives_factures.json')
     df_frais_full = pd.concat([df_m_actif, df_m_arch], ignore_index=True)
 
-    st.title("📊 Bilan Vesta")
+    st.title("📊 Bilan Vesta Skipper")
     
     mode_bilan = st.radio("Type de bilan", ["A ce jour", "Par Saison"], horizontal=True)
     today = datetime.date.today()
@@ -560,84 +557,98 @@ if st.session_state.page == "STATS":
     if mode_bilan == "Par Saison":
         sel_y = st.selectbox("Saison", [2025, 2026, 2027], index=1)
     
-    
-    # --- 4. TRAITEMENT DES DONNÉES (Vesta Skipper 2026 - Version Finale) ---
-    # 1. Initialisation unique
+    # --- 4. TRAITEMENT DES DONNÉES (V110 - PROTECTION STRICTE) ---
     total_rev = 0
     total_frais = 0
     df_r_yr = pd.DataFrame()
     df_f_yr = pd.DataFrame()
     df_soc_final = pd.DataFrame()
-    # A. CALCUL DES REVENUS (SÉCURITÉ MAXIMUM)
+
     if not df_planning_actif.empty:
         df_p = df_planning_actif.copy()
         
-        # 1. Nettoyage strict
+        # Nettoyage numérique
         for col in ['Prix', 'Acompte']:
             df_p[col] = pd.to_numeric(df_p[col].astype(str).str.replace(r'[^0-9.,]', '', regex=True).str.replace(',', '.'), errors='coerce').fillna(0)
         
-        df_p['dt_vrai'] = pd.to_datetime(df_p['DateNav'], dayfirst=True, errors='coerce')
+        df_p['dt_vrai'] = df_p['DateNav'].apply(conversion_date_robuste)
         
-        # 2. Filtre de période
+        # Filtre de période
         if mode_bilan == "Par Saison":
             mask_p = (df_p['dt_vrai'].dt.year == sel_y)
         else:
             mask_p = (df_p['dt_vrai'].dt.year == 2026) & (df_p['dt_vrai'].dt.date <= today)
         
-        # On crée un tableau temporaire avec uniquement les bonnes dates
         df_temp = df_p[mask_p].copy()
 
         if not df_temp.empty:
-            # 3. La règle d'or pour Camille
             def calcul_final(row):
                 status = str(row.get('Paiement', '')).upper().strip()
-                p = row['Prix']
-                a = row['Acompte']
-                
-                # SI c'est payé OU si l'acompte a tout couvert
-                if ("PAID" in status or "PAYÉ" in status or "PAYE" in status) or (a >= p and p > 0):
-                    return p
+                p = row.get('Prix', 0)
+                a = row.get('Acompte', 0)
+
+                # RÈGLE : Prix doit être > 0 ET (Statut PAYÉ OU Acompte complet)
+                # Mais on exclut si le mot "NON" ou "UNPAID" est présent
+                if p > 0:
+                    if "NON" in status or "UNPAID" in status:
+                        return 0
+                    
+                    est_paye = any(x in status for x in ["PAID", "PAYÉ", "PAYE"])
+                    est_solde = (a >= p)
+                    
+                    if est_paye or est_solde:
+                        return p
                 return 0
 
             df_temp['Encaissé_Reel'] = df_temp.apply(calcul_final, axis=1)
             
-            # --- L'ÉTAPPE CRUCIALE ---
-            # On SUPPRIME toutes les lignes où l'encaissement est 0
-            # Si Camille n'a pas payé, elle est éjectée ici.
+            # FILTRE FINAL : On supprime les lignes à 0€ (Camille sort ici)
             df_r_yr = df_temp[df_temp['Encaissé_Reel'] > 0].copy()
-            
             total_rev = df_r_yr['Encaissé_Reel'].sum()
-            st.write(f"Nombre de lignes encaissées : {len(df_r_yr)}")
             
             if 'Société' in df_r_yr.columns and not df_r_yr.empty:
                 df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'})
+
     # B. CALCUL DES FRAIS
     if not df_frais_full.empty:
         df_f = df_frais_full.copy()
-        df_f['dt_vrai'] = pd.to_datetime(df_f['Date'], errors='coerce', dayfirst=True)
+        df_f['dt_vrai'] = df_f['Date'].apply(conversion_date_robuste)
         df_f['M_Num'] = pd.to_numeric(df_f['M_Num'], errors='coerce').fillna(0)
         
-        if mode_bilan == "Par Saison":
-            mask_f = (df_f['dt_vrai'].dt.year == sel_y)
-        else:
-            mask_f = (df_f['dt_vrai'].dt.year == 2026) & (df_f['dt_vrai'].dt.date <= today)
+        mask_f = (df_f['dt_vrai'].dt.year == (sel_y if mode_bilan == "Par Saison" else 2026))
+        if mode_bilan == "A ce jour":
+            mask_f &= (df_f['dt_vrai'].dt.date <= today)
             
         df_f_yr = df_f[mask_f].copy()
         total_frais = df_f_yr['M_Num'].sum()
 
-    # --- 5. RÉSUMÉ ET INDICATEURS (SÉCURISÉS) ---
+    # --- 5. RÉSUMÉ ET INDICATEURS ---
     solde = total_rev - total_frais
-    st.subheader(f"💰 Synthèse Trésorerie : {mode_bilan} ({sel_y if mode_bilan == 'Par Saison' else '2026'})")
+    st.subheader(f"💰 Synthèse Trésorerie : {mode_bilan}")
     
     c1, c2, c3 = st.columns(3)
     c1.metric("Encaissé", f"{total_rev:,.0f} €".replace(',', ' '))
     c2.metric("Décaissé", f"{total_frais:,.0f} €".replace(',', ' '))
     c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color="normal" if solde >= 0 else "inverse")
 
-    # On ne lance les calculs de KPI que si df_soc_final existe et n'est pas vide
-    if not df_soc_final.empty and total_rev > 0:
-        # Ici tes indicateurs de pilotage (Marge, Risque client, etc.)
-        pass
+    # --- 6. DÉTAIL DES OPÉRATIONS ---
+    st.divider()
+    with st.expander("📥 Détail des Revenus Encaissés (Payés ou Soldés)", expanded=True):
+        if not df_r_yr.empty:
+            df_disp = df_r_yr.copy()
+            df_disp['Client'] = (df_disp['Prénom'].fillna('') + " " + df_disp['Nom'].fillna('')).str.strip().str.title()
+            
+            cols_aff = ['DateNav', 'Client', 'Encaissé_Reel']
+            st.dataframe(
+                df_disp[cols_aff].rename(columns={'DateNav':'Date', 'Encaissé_Reel':'Montant €'}),
+                hide_index=True, use_container_width=True
+            )
+        else:
+            st.info("Aucun revenu encaissé sur cette période.")
+
+    with st.expander("📤 Détail des Dépenses", expanded=False):
+        if not df_f_yr.empty:
+            st.dataframe(df_f_yr[['Date', 'Type', 'Description', 'M_Num']].rename(columns={'M_Num':'Montant €'}), hide_index=True, use_container_width=True)
 
     # =================================================================
     # --- 6. INDICATEURS DE PILOTAGE STRATÉGIQUES (RÉ-INTÉGRÉS) ---
