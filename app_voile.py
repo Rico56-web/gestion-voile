@@ -670,23 +670,20 @@ if st.session_state.page == "STATS":
         couleur_dep = "red" if taux_dep > 60 else ("green" if taux_dep < 30 else "orange")
         kpi4.markdown(f"<div style='text-align:center;'>Risque ({nom_gros_client})<br><span style='font-size:30px; font-weight:bold; color:{couleur_dep};'>{taux_dep:.0f} %</span></div>", unsafe_allow_html=True)
     else: kpi4.metric("Risque Client", "0 %")
-
-    # --- 7. BILAN MENSUEL DE TRÉSORERIE ---
-    if total_rev > 0 or total_frais > 0:
-        st.divider()
-        st.subheader("📊 Tableau de bord Mensuel (Encaissé/Décaissé)")
-        
+    # --- 7. BILAN MENSUEL DE TRÉSORERIE (CORRIGÉ) ---
         mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
         rs_m = []
-        # On boucle sur les 12 mois
         for i in range(1, 13):
-            r_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['P_Num'].sum() if not df_r_yr.empty else 0
+            # Utilisation de 'Encaissé_Reel' au lieu de 'P_Num'
+            r_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['Encaissé_Reel'].sum() if not df_r_yr.empty else 0
             f_m = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['M_Num'].sum() if not df_f_yr.empty else 0
-            # J'arrondis à l'euro pour iPhone 16
-            rs_m.append({'Mois': mois_noms[i-1], 'Encaissé €': round(r_m,0), 'Décaissé €': round(f_m,0), 'Solde €': round(r_m-f_m,0)})
-        
-        # Affichage du tableau mensuel, arrondis à l'euro
-        st.dataframe(pd.DataFrame(rs_m), hide_index=True, use_container_width=True)
+            rs_m.append({
+                'Mois': mois_noms[i-1], 
+                'Encaissé €': round(r_m, 0), 
+                'Décaissé €': round(f_m, 0), 
+                'Solde €': round(r_m - f_m, 0)
+            })
+
 
     # --- 8. DÉTAIL DES OPÉRATIONS DE TRÉSORERIE RÉELLES ---
     st.divider()
