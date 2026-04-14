@@ -206,10 +206,23 @@ if st.session_state.page == "CONTACTS":
             note = clean_text(row.get('Notes', ''))
             rel_val = str(row.get('Relancer', 'Non')).upper()
             
+           # --- LOGIQUE PAIEMENT SÉCURISÉE ---
             prix = clean_num(row.get('Prix', 0))
             aco = clean_num(row.get('Acompte', 0))
             reste = prix - aco
             val_paye = str(row.get('Paiement', 'UNPAID')).strip().upper()
+
+            # On vérifie 1. Le texte "PAID" ou 2. Si un prix existe et est réglé
+            if val_paye == "PAID":
+                p_label, p_color = "PAYÉ", "green"
+            elif prix > 0 and reste <= 0:
+                p_label, p_color = "PAYÉ", "green"
+            else:
+                p_label, p_color = "NON PAYÉ", "#E74C3C"
+
+            # Récupération de la date propre
+            date_aff = str(row.get('DateNav', '---'))
+            if date_aff.lower() in ['nan', 'none', '']: date_aff = "---"
 
            # --- LOGIQUE PAIEMENT CORRIGÉE ---
             val_paye = str(row.get('Paiement', 'UNPAID')).strip().upper()
@@ -238,7 +251,7 @@ if st.session_state.page == "CONTACTS":
                     <span style="background:white; padding:0 8px; border-radius:5px; font-size:0.75rem; border:1px solid #ddd;">{soc}</span>
                 </div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; font-size:0.85rem; margin-top:10px; gap:5px;">
-                    <div>📅 Date: <b>{row.get('DateNav', '---')}</b></div>
+                    <div>📅 Date: <b>{date_aff}</b></div>
                     <div>📊 Statut: <b>{sta_clean}</b></div>
                     <div>💰 Prix: <b>{prix} €</b></div>
                     <div style="color:{p_color}; font-weight:bold;">🏷️ {p_label} ({reste}€)</div>
