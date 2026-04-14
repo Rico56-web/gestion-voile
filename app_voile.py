@@ -584,29 +584,34 @@ if st.session_state.page == "STATS":
         df_temp = df_p[mask_p].copy()
 
         if not df_temp.empty:
-            def calcul_final(row):
+           def calcul_final(row):
+                # 1. On récupère et on nettoie les textes
                 status = str(row.get('Paiement', '')).upper().strip()
                 p = row.get('Prix', 0)
                 a = row.get('Acompte', 0)
 
-                # RÈGLE : Prix doit être > 0 ET (Statut PAYÉ OU Acompte complet)
-                # Mais on exclut si le mot "NON" ou "UNPAID" est présent
+                # --- LISTE NOIRE (Si un de ces mots est là, c'est 0€ direct) ---
+                mots_interdits = ["REFUS", "ANNUL", "NON", "UNPAID", "DEVIS"]
+                if any(mot in status for mot in mots_interdits):
+                    return 0
+
+                # --- RÈGLE D'OR ---
                 if p > 0:
-                    if "NON" in status or "UNPAID" in status:
-                        return 0
-                    
+                    # On valide si c'est marqué "PAYÉ" 
                     est_paye = any(x in status for x in ["PAID", "PAYÉ", "PAYE"])
+                    # OU si l'acompte a couvert le prix
                     est_solde = (a >= p)
                     
                     if est_paye or est_solde:
                         return p
+                
                 return 0
 
             df_temp['Encaissé_Reel'] = df_temp.apply(calcul_final, axis=1)
             
-            # FILTRE FINAL : On supprime les lignes à 0€ (Camille sort ici)
+            # --- FILTRE DE SORTIE ---
+            # On ne garde que les dossiers qui ont généré un encaissement réel
             df_r_yr = df_temp[df_temp['Encaissé_Reel'] > 0].copy()
-            total_rev = df_r_yr['Encaissé_Reel'].sum()
             
             if 'Société' in df_r_yr.columns and not df_r_yr.empty:
                 df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'})
