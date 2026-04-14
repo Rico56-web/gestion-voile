@@ -607,6 +607,7 @@ if st.session_state.page == "STATS":
             df_r_yr = df_temp[df_temp['Encaissé_Reel'] > 0].copy()
             
             total_rev = df_r_yr['Encaissé_Reel'].sum()
+            st.write(f"Nombre de lignes encaissées : {len(df_r_yr)}")
             
             if 'Société' in df_r_yr.columns and not df_r_yr.empty:
                 df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'})
