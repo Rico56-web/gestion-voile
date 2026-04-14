@@ -657,7 +657,24 @@ if st.session_state.page == "STATS":
     c1.metric("Encaissé", f"{total_rev:,.0f} €".replace(',', ' '))
     c2.metric("Décaissé", f"{total_frais:,.0f} €".replace(',', ' '))
     c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color="normal" if solde >= 0 else "inverse")
-
+    
+    # --- CALCUL DES PRÉVISIONS (CA POTENTIEL) ---
+prev_m = []
+for i in range(1, 13):
+    # Revenus prévus : on prend tout (sauf Annulé/Refusé)
+    mask_r = (df_r_yr['dt_vrai'].dt.month == i) & (~df_r_yr['Statut'].str.lower().str.contains("annule|refuse"))
+    r_prev = df_r_yr[mask_r]['Prix'].sum() if not df_r_yr.empty else 0
+    
+    # Dépenses prévues : on prend tout ce qui est saisi pour ce mois
+    f_prev = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['M_Num'].sum() if not df_f_yr.empty else 0
+    
+    prev_m.append({
+        'Mois': mois_noms[i-1], 
+        'CA Prévu €': round(r_prev, 0), 
+        'Frais Prévus €': round(f_prev, 0),
+        'Solde Prévu €': round(r_prev - f_prev, 0)
+    })
+df_prev = pd.DataFrame(prev_m)
     # =================================================================
     # --- 6. INDICATEURS DE PILOTAGE STRATÉGIQUES (RÉ-INTÉGRÉS) ---
     # =================================================================
@@ -795,6 +812,25 @@ if st.session_state.page == "STATS":
         else:
             st.info("Aucune dépense enregistrée sur cette période.")
 
+    st.divider()
+st.subheader("🔮 Prévisions de Trésorerie (CA Total attendu)")
+
+# A. Le Graphique de Prévision
+fig_prev = px.line(
+    df_prev, x='Mois', y=['CA Prévu €', 'Frais Prévus €'],
+    markers=True,
+    title="Projection des flux (Confirmé + En attente)",
+    color_discrete_map={'CA Prévu €': '#3498DB', 'Frais Prévus €': '#F39C12'}
+)
+st.plotly_chart(fig_prev, use_container_width=True)
+
+# B. Le Tableau récapitulatif
+with st.expander("📊 Voir le tableau des prévisions mensuelles"):
+    # On affiche le tableau avec un style propre
+    st.table(df_prev.set_index('Mois'))
+    
+    total_ca_prev = df_prev['CA Prévu €'].sum()
+    st.info(f"Objectif de CA total pour la saison : **{total_ca_prev:,.0f} €**".replace(',', ' '))
     # --- 9. ARCHIVAGE (CORRIGÉ & SÉCURISÉ) ---
     if mode_bilan == "Par Saison":
         st.divider()
