@@ -176,7 +176,7 @@
         "Nom":"CMN",
         "Statut":"Termin\u00e9",
         "Paiement":"Paid",
-        "DateNav":null,
+        "DateNav":"21\/03\/2026",
         "Soci\u00e9t\u00e9":"CMN",
         "Prix":450,
         "Nbre de personnes":4.0,
@@ -212,7 +212,7 @@
         "Statut_Paye":null,
         "Acompte":450,
         "Pers":4.0,
-        "Relancer":null
+        "Relancer":"Non"
     },
     {
         "Pr\u00e9nom":"AURELIEN",
