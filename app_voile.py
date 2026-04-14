@@ -694,7 +694,39 @@ if st.session_state.page == "STATS":
             'Décaissé €': round(f_m, 0), 
             'Solde €': round(r_m - f_m, 0)
         })
+    # --- AJOUT DES GRAPHIQUES (LES FROMAGES & BARS) ---
+    st.divider()
+    col_chart1, col_chart2 = st.columns(2)
 
+    with col_chart1:
+        st.subheader("📈 Évolution Mensuelle")
+        if rs_m:
+            df_bar = pd.DataFrame(rs_m)
+            fig_bar = px.bar(
+                df_bar, x='Mois', y=['Encaissé €', 'Décaissé €'],
+                barmode='group',
+                color_discrete_map={'Encaissé €': '#2ecc71', 'Décaissé €': '#e74c3c'},
+                height=350
+            )
+            fig_bar.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+    with col_chart2:
+        st.subheader("🎯 Répartition par Société")
+        if not df_soc_final.empty:
+            fig_pie = px.pie(
+                df_soc_final, values='CA €', names='Société',
+                hole=0.4,
+                color_discrete_sequence=px.colors.qualitative.Pastel,
+                height=350
+            )
+            # Pour CMN en bleu comme demandé dans tes préférences
+            if "CMN" in df_soc_final['Société'].values:
+                fig_pie.update_traces(marker=dict(colors=['#0000FF' if n == 'CMN' else None for n in df_soc_final['Société']]))
+            
+            st.plotly_chart(fig_pie, use_container_width=True)
+        else:
+            st.info("Pas assez de données pour le graphique.")
     # --- 8. DÉTAIL DES OPÉRATIONS DE TRÉSORERIE RÉELLES ---
     st.divider()
     st.subheader("📝 Détail des opérations réelles")
