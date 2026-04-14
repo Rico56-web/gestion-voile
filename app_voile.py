@@ -550,7 +550,13 @@ if st.session_state.page == "PLANNING":
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Statistiques Vesta Skipper 2026</h2>', unsafe_allow_html=True)
-
+    
+    # --- ÉTAPE MANQUANTE : DÉFINITION DU MODE ET DE L'ANNÉE ---
+    col_sel1, col_sel2 = st.columns(2)
+    mode_bilan = col_sel1.radio("Mode de vue :", ["Global", "Par Saison"], horizontal=True)
+    
+    annu_list = [2025, 2026, 2027]
+    sel_y = col_sel2.selectbox("Choisir l'année :", annu_list, index=1)
     # --- 1. PRÉPARATION DES DONNÉES ---
     mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     
