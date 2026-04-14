@@ -526,8 +526,10 @@ if st.session_state.page == "PLANNING":
         st.info("Aucune mission ce mois-ci.")
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
-
-    if st.session_state.page == "STATS":
+# ===============================================================
+# --- 6. PAGE STATS ---
+# =================================================================
+if st.session_state.page == "STATS":
     import pandas as pd
     import plotly.express as px
     import datetime
