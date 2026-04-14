@@ -239,9 +239,10 @@ if st.session_state.page == "CONTACTS":
             prix = float(str(row.get('Prix', 0)).replace('€','').replace(' ','') or 0)
             aco = float(str(row.get('Acompte', 0)).replace('€','').replace(' ','') or 0)
             reste = prix - aco
+            # --- FIX AFFICHAGE : On écoute uniquement le statut enregistré ---
             val_paye = str(row.get('Paiement', 'UNPAID')).upper()
-            p_color = "green" if (val_paye == "PAID" or (prix > 0 and reste <= 0)) else "#E74C3C"
-            p_label = "PAYÉ" if p_color == "green" else "NON PAYÉ"
+            p_color = "green" if val_paye == "PAID" else "#E74C3C"
+            p_label = "PAYÉ" if val_paye == "PAID" else "NON PAYÉ"
 
             # Background selon société ou statut
             bg = "#D6EAF8" if soc == "CMN" else "#D5F5E3"
