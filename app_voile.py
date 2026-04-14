@@ -199,13 +199,13 @@ if st.session_state.page == "CONTACTS":
              "Acompte": 0
          }
         
-        # On l'ajoute AU DÉBUT du fichier pour la voir tout de suite
-        df_raw = charger_data('contacts.json')
-        df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
-        sauvegarder_data(df_new, 'contacts.json')
+         # On l'ajoute AU DÉBUT du fichier pour la voir tout de suite
+         df_raw = charger_data('contacts.json')
+         df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
+         sauvegarder_data(df_new, 'contacts.json')
         
-        st.success("Fiche créée ! Elle apparaît en haut de la liste.")
-        st.rerun()
+         st.success("Fiche créée ! Elle apparaît en haut de la liste.")
+         st.rerun()
     st.divider()
 
     # 3. Filtrage Robuste
