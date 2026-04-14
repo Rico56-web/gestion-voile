@@ -691,11 +691,11 @@ if st.session_state.page == "STATS":
     st.subheader("📝 Détail des opérations réelles")
     
     # A. DÉTAIL DES REVENUS
+    # A. DÉTAIL DES REVENUS
     with st.expander("📥 Détail des Revenus Encaissés", expanded=False):
         if not df_r_yr.empty:
             df_disp = df_r_yr.copy()
-            # On vérifie les colonnes présentes pour l'affichage
-            # Utilisation de 'Encaissé_Reel' ici aussi
+            # On remplace 'P_Num' par 'Encaissé_Reel'
             cols_to_show = [c for c in ['DateNav', 'Client', 'Société', 'Encaissé_Reel'] if c in df_disp.columns]
             
             st.dataframe(
