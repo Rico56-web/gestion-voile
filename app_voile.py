@@ -561,33 +561,41 @@ if st.session_state.page == "STATS":
     df_r_yr = pd.DataFrame()
     df_f_yr = pd.DataFrame()
 
-    # --- 3. CALCUL DES REVENUS (UN SEUL BLOC LOGIQUE) ---
+     # --- 3. CALCUL DES REVENUS ---
+    total_rev, total_frais = 0, 0
+    # INITIALISATION CRUCIALE POUR ÉVITER LE NAMEERROR
+    df_r_yr = pd.DataFrame()
+    df_f_yr = pd.DataFrame()
+    df_soc_final = pd.DataFrame() # <--- Ajoute cette ligne ici
+
     if not df_planning_actif.empty:
         df_p = df_planning_actif.copy()
         
-        # Nettoyage numérique des prix et acomptes
+        # Nettoyage numérique
         for col in ['Prix', 'Acompte']:
-            df_p[col] = df_p[col].astype(str).str.replace(r'[^0-9.,]', '', regex=True).str.replace(',', '.')
-            df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0)
+            if col in df_p.columns:
+                df_p[col] = df_p[col].astype(str).str.replace(r'[^0-9.,]', '', regex=True).str.replace(',', '.')
+                df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0)
         
-        # Identification du Paiement (Paid/Unpaid)
-        df_p['Pay_Str'] = df_p['Paiement'].fillna('').astype(str).str.upper()
+        # Identification du Paiement
+        df_p['Pay_Str'] = df_p['Paiement'].fillna('').astype(str).str.upper() if 'Paiement' in df_p.columns else ""
 
-        # LOGIQUE : Argent réellement en poche
         def calculer_caisse(row):
-            if any(x in row['Pay_Str'] for x in ['PAID', 'PAYÉ', 'PAYE']):
-                return row['Prix'] # Tout est payé
-            return row['Acompte'] # On ne compte que ce qu'on a reçu
+            if any(x in str(row['Pay_Str']) for x in ['PAID', 'PAYÉ', 'PAYE']):
+                return row['Prix']
+            return row['Acompte']
 
         df_p['Encaissé_Reel'] = df_p.apply(calculer_caisse, axis=1)
         df_p['dt_vrai'] = df_p['DateNav'].apply(conversion_date_robuste)
         
-        # Filtre année
+        # Filtre saison
         mask_y = (df_p['dt_vrai'].dt.year == sel_y)
         df_r_yr = df_p[mask_y].copy()
         
         if not df_r_yr.empty:
             total_rev = df_r_yr['Encaissé_Reel'].sum()
+            # CRÉATION DE LA VARIABLE POUR LE GRAPHIQUE ET LE KPI RISQUE CLIENT
+            df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'}).sort_values('CA €', ascending=False)
 
     # --- 4. CALCUL DES FRAIS ---
     if not df_frais_full.empty:
