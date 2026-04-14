@@ -178,7 +178,7 @@ if st.session_state.page == "CONTACTS":
 
     st.divider()
         # 3. Logique de Filtrage des Onglets (Version robuste)
-        if not df_c.empty:
+    if not df_c.empty:
             # On prépare des versions "propres" pour le filtrage sans modifier les données réelles
             statut_clean = df_c['Statut'].astype(str).str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').decode('utf-8')
             relance_clean = df_c.get('Relancer', 'Non')
