@@ -571,7 +571,7 @@ if st.session_state.page == "STATS":
             df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0)
         
         # Identification du Paiement (Paid/Unpaid)
-        df_p['Pay_Str'] = df_p['Paiement'].fillna('').astype(str).upper()
+        df_p['Pay_Str'] = df_p['Paiement'].fillna('').astype(str).str.upper()
 
         # LOGIQUE : Argent réellement en poche
         def calculer_caisse(row):
