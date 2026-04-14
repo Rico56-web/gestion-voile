@@ -361,14 +361,14 @@ if st.session_state.page == "MODIFIER_CONTACT":
         st.session_state.page = "CONTACTS"
         st.rerun()
 # ===============================================================
-# --- 6. PAGE PLANNING (V18.3 - SÉCURITÉ DATE TOTALE) ---
+# --- 6. PAGE PLANNING (V18.4 - RÉSILIENCE TOTALE) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
     from datetime import datetime, date, timedelta
     import calendar
     import pandas as pd
 
-    st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>🗓️ PLANNING 2026</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>🗓️ PLANNING</h1></div>', unsafe_allow_html=True)
     
     # Bouton Archives
     if st.button("📂 ACCÉDER AUX ARCHIVES", key="k_arch_p", use_container_width=True):
@@ -381,7 +381,7 @@ if st.session_state.page == "PLANNING":
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
     
-    # RESET DES VARIABLES DE CALCUL
+    # RESET DES VARIABLES
     jours_occ = {}
     total_mois = 0
     missions_list = []
@@ -406,56 +406,64 @@ if st.session_state.page == "PLANNING":
     df_p = charger_data('contacts.json')
 
     if not df_p.empty:
+        # Prétraitement pour éviter les erreurs de type sur tout le dataframe
+        df_p = df_p.fillna("")
+
         for idx, r in df_p.iterrows():
             try:
                 # 1. Nettoyage Nom
                 nom_client = str(r.get('Nom', '')).strip().upper()
                 if nom_client in ["", "CONTACT", "NAN"]: continue
                 
-                # 2. PARSEUR DE DATE MULTI-FORMAT (Le cœur du problème)
-                d_brute = str(r.get('DateNav') or r.get('Date') or '').strip().split(' ')[0]
+                # 2. PARSEUR DE DATE AMÉLIORÉ
+                d_brute = str(r.get('DateNav', '')).strip().split(' ')[0]
+                
+                # Sécurité anti-vide/nan
+                if d_brute.lower() in ["nan", "---", "", "none"]: 
+                    continue
+
                 dt_start = None
-                # On teste tous les formats possibles stockés dans le JSON
-                for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y"):
+                # Test des formats (ISO, Français, etc.)
+                for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
                     try:
                         dt_start = datetime.strptime(d_brute, fmt).date()
                         break
                     except: continue
                 
-                if not dt_start: continue # Si on ne comprend pas la date, on saute
+                if not dt_start: continue 
 
-                # 3. Récupération Durée & Infos
-                n_j = clean_int(r.get('Nbre de jours', 1))
-                statut = str(r.get('Statut', 'Ok')).lower()
+                # 3. Infos Mission
+                # Utilisation de clean_num pour éviter les erreurs de texte dans les nombres
+                n_j = int(float(str(r.get('Jours', 1) or 1))) 
+                statut = str(r.get('Statut', 'En attente')).lower()
                 soc = str(r.get('Société', 'PERSO')).upper()
                 dt_end = dt_start + timedelta(days=max(0, n_j-1))
                 prix_val = float(str(r.get('Prix', '0')).replace('€','').replace(' ','').strip() or 0)
 
-                # 4. Attribution Couleur
+                # 4. Couleur (CMN en bleu comme demandé)
                 if "CMN" in soc: color = "#3498db"
-                elif "annul" in statut or "refus" in statut: color = "#bdc3c7"
-                elif dt_start < aujourdhui: color = "#34495e"
-                else: color = "#27ae60"
+                elif any(x in statut for x in ["annul", "refus"]): color = "#bdc3c7"
+                elif dt_start < aujourdhui: color = "#34495e" # Passé
+                else: color = "#27ae60" # Futur
 
-                # 5. Remplissage Calendrier (Si le jour tombe dans le mois sélectionné)
+                # 5. Remplissage Calendrier
                 for i in range(n_j):
                     curr = dt_start + timedelta(days=i)
                     if curr.month == sel_m and curr.year == sel_y:
                         jours_occ[curr.day] = {"c": color}
 
-                # 6. Ajout à la liste si la mission touche au mois sélectionné
+                # 6. Liste des missions
                 if (dt_start.year == sel_y and dt_start.month == sel_m) or (dt_end.year == sel_y and dt_end.month == sel_m):
                     missions_list.append({
                         'r': r, 'idx': idx, 'start': dt_start, 'end': dt_end, 
                         'n_j': n_j, 'color': color, 'prix': prix_val, 'statut': statut
                     })
-                    # On ajoute au total uniquement si le DÉBUT est dans ce mois
-                    if dt_start.month == sel_m and "annul" not in statut:
+                    if dt_start.month == sel_m and not any(x in statut for x in ["annul", "refus"]):
                         total_mois += prix_val
-            except Exception as e:
+            except:
                 continue
 
-    # AFFICHAGE CALENDRIER
+    # AFFICHAGE CALENDRIER HTML
     h_cal = '<table style="width:100%; text-align:center; border-collapse:collapse; background:white; border:1px solid #ddd;">'
     h_cal += '<tr style="background:#f8f9fa; font-size:12px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td>Sa</td><td>Di</td></tr>'
     
@@ -469,9 +477,9 @@ if st.session_state.page == "PLANNING":
                 bg = occ.get("c", "transparent")
                 txt_c = "white" if bg != "transparent" else "black"
                 is_t = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == aujourdhui.year)
-                st_cell = "background:#fff9c4;" if is_t else "" # Jaune clair pour aujourd'hui
+                st_cell = "background:#fff9c4;" if is_t else "" 
                 
-                h_cal += f'''<td style="{st_cell} border:1px solid #eee;">
+                h_cal += f'''<td style="{st_cell} border:1px solid #eee; height:40px;">
                                 <div style="background:{bg}; color:{txt_c}; border-radius:50%; width:26px; height:26px; line-height:26px; margin:auto; font-weight:bold; font-size:12px;">
                                     {jour}
                                 </div>
@@ -479,29 +487,27 @@ if st.session_state.page == "PLANNING":
         h_cal += '</tr>'
     st.markdown(h_cal + '</table>', unsafe_allow_html=True)
 
-    # AFFICHAGE DÉTAILS
-    st.markdown("### 📋 Détails des Missions")
+    # DÉTAILS
+    st.markdown(f"### 📋 Missions de {sel_m_nom}")
     if missions_list:
         missions_list.sort(key=lambda x: x['start'])
         for m in missions_list:
-            prix_p = f"{m['prix']:,.0f}".replace(",", " ")
+            prix_p = f"{m['prix']:.0f} €"
             col1, col2 = st.columns([1, 3.5])
             with col1:
                 st.markdown(f"""<div style='background:{m['color']}; color:white; border-radius:5px; text-align:center; padding:5px;'>
-                    <span style='font-size:0.8rem;'>{m['start'].strftime('%d/%m')}</span><br><b>{prix_p} €</b>
+                    <span style='font-size:0.75rem;'>{m['start'].strftime('%d/%m')}</span><br><b>{prix_p}</b>
                 </div>""", unsafe_allow_html=True)
             with col2:
-                label = f"{str(m['r'].get('Prénom','')).upper()} {str(m['r'].get('Nom','')).upper()}"
-                if st.button(f"{label} ({m['statut'].upper()})", key=f"btn_p_{m['idx']}", use_container_width=True):
+                nom_affiche = f"{str(m['r'].get('Prénom','')).upper()} {str(m['r'].get('Nom','')).upper()}"
+                if st.button(f"{nom_affiche} ({m['statut'].upper()})", key=f"p_btn_{m['idx']}", use_container_width=True):
                     st.session_state.edit_idx = m['idx']
-                    st.session_state.page = "CONTACTS"
-                    st.rerun()
+                    st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
     else:
-        st.info(f"Aucune mission enregistrée pour {sel_m_nom} {sel_y}.")
+        st.info("Aucune mission ce mois-ci.")
 
-    # TOTAL FINAL
-    total_txt = f"{total_mois:,.0f}".replace(",", " ")
-    st.success(f"**💰 Total prévisionnel : {total_txt} €**")
+    # TOTAL
+    st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 
 # =================================================================
 # --- 9. PAGE STATS (VERSION FINALE COMPLÈTE & COMPTABLEMENT JUSTE) ---
