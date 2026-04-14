@@ -569,10 +569,44 @@ if st.session_state.page == "STATS":
         st.caption(f"📅 Analyse de la trésorerie réelle (encaissée) pour l'année {sel_y}")
     else:
         st.caption(f"📅 Analyse de la trésorerie réelle au {today.strftime('%d/%m/%Y')} (Jan à Aujourd'hui)")
-
-    # --- 4. TRAITEMENT DES DONNÉES & FILTRAGE STRICT (AMÉLIORÉ) ---
+        # --- 4. TRAITEMENT DES DONNÉES ---
     total_rev, total_frais = 0, 0
-    df_soc_final, df_frais_final, df_r_yr, df_f_yr = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+    if not df_planning_actif.empty:
+        df_p = df_planning_actif.copy()
+        
+        # 1. Conversion des prix en nombres (enlève les "€" et les espaces)
+        df_p['P_Num'] = pd.to_numeric(df_p['Prix'].astype(str).str.replace('€','').str.replace(' ',''), errors='coerce').fillna(0)
+        df_p['A_Num'] = pd.to_numeric(df_p['Acompte'].astype(str).str.replace('€','').str.replace(' ',''), errors='coerce').fillna(0)
+        
+        # 2. Identification de ce qui est REELLEMENT encaissé
+        # On considère encaissé : soit le statut est "PAID", soit il y a un acompte
+        df_p['Paiement'] = df_p['Paiement'].fillna('').astype(str).upper()
+        
+        # FILTRE : On prend les fiches marquées "PAID" OU celles où l'acompte > 0
+        mask_paye = (df_p['Paiement'].str.contains('PAID|PAYÉ|PAYE')) | (df_p['A_Num'] > 0)
+        df_encaissé = df_p[mask_paye].copy()
+
+        if not df_encaissé.empty:
+            # 3. Conversion Date et Filtre Année
+            df_encaissé['dt_vrai'] = df_encaissé['DateNav'].apply(conversion_date_robuste)
+            mask_y = (df_encaissé['dt_vrai'].dt.year == sel_y)
+            
+            df_r_yr = df_encaissé[mask_y].copy()
+            
+            # 4. Calcul du CA (Prix si payé, sinon juste l'Acompte si c'est tout ce qu'on a)
+            def calculer_reel(row):
+                if "PAID" in str(row['Paiement']):
+                    return row['P_Num']
+                return row['A_Num']
+
+            if not df_r_yr.empty:
+                df_r_yr['Encaissé_Reel'] = df_r_yr.apply(calculer_reel, axis=1)
+                total_rev = df_r_yr['Encaissé_Reel'].sum()
+                
+                # Groupement pour le camembert
+                df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index()
+
 
     # A. REVENUS (Planning) - FILTRAGE STRICT SUR "PAYÉ" (HORS "NON PAYÉ")
     if not df_planning_actif.empty:
