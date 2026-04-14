@@ -134,25 +134,23 @@ for i, name in enumerate(menu):
                           type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name
         st.rerun()
-    # =================================================================
-# --- 5. BLOC CONTACTS (V95 - AVEC LISTE D'ATTENTE & RELANCE) ---
+# =================================================================
+# --- 5. BLOC CONTACTS (V95 - VERSION COMPLÈTE AVEC HTML) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<h2 style="text-align:center;">⚓ Gestion des Clients Vesta</h2>', unsafe_allow_html=True)
 
-    # 1. Chargement des données
+    # 1. Chargement et préparation
     df_raw = charger_data('contacts.json')
     df_c = df_raw.copy() if not df_raw.empty else pd.DataFrame()
 
     if not df_c.empty:
         df_c['orig_idx'] = df_c.index
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
-        if 'Relancer' not in df_c.columns: 
-            df_c['Relancer'] = "Non"
+        if 'Relancer' not in df_c.columns: df_c['Relancer'] = "Non"
         
-        # Filtres de recherche
         c_search, c_yr = st.columns([2, 1])
-        search = c_search.text_input("🔍 Rechercher un nom...", "").upper()
+        search = c_search.text_input("🔍 Rechercher...", "").upper()
         annee_sel = c_yr.selectbox("Saison", [2026, 2027, 2028], index=0)
         
         mask = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna())
@@ -163,7 +161,7 @@ if st.session_state.page == "CONTACTS":
             df_c = df_c[mask_s]
         df_c = df_c.sort_values(by='dt_sort', ascending=False)
 
-    # 2. Navigation par Onglets (4 Boutons)
+    # 2. Onglets
     n1, n2, n3, n4 = st.columns(4)
     if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
         st.session_state.vue_contact = "En cours"; st.rerun()
@@ -178,11 +176,10 @@ if st.session_state.page == "CONTACTS":
 
     st.divider()
 
-    # 3. Logique de Filtrage des Onglets (Alignée avec st.divider)
+    # 3. Filtrage
     if not df_c.empty:
-        # Nettoyage pour filtrage robuste
         statut_clean = df_c['Statut'].astype(str).str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
-        relance_clean = df_c.get('Relancer', 'Non').astype(str).str.upper().fillna("NON")
+        relance_clean = df_c['Relancer'].astype(str).str.upper().fillna("NON")
 
         if st.session_state.vue_contact == "Archives":
             mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
@@ -190,42 +187,38 @@ if st.session_state.page == "CONTACTS":
             mask_att = statut_clean.str.contains("liste|attente")
             mask_rel = (statut_clean.str.contains("termine")) & (relance_clean == "OUI")
             mask_aff = mask_att | mask_rel
-        else: # En cours
+        else:
             mask_aff = ~statut_clean.str.contains("termine|annule|refuse|liste|attente")
 
         df_aff = df_c[mask_aff].copy()
 
-        # 4. Affichage des fiches
+        # 4. Affichage détaillé
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
-            # --- Le reste de votre code d'affichage (HTML + Boutons) ici ---
-            st.write(f"Fiche #{idx}: {row.get('Nom')} - {row.get('Statut')}") # Exemple simple pour tester
-            
-            # Nettoyage des données pour affichage
             pre = clean_text(row.get('Prénom', '')).upper()
             nom = clean_text(row.get('Nom', '')).upper()
             sta_clean = str(row.get('Statut', 'EN ATTENTE')).upper()
             soc = clean_text(row.get('Société', 'PERSO')).upper()
-            relance_val = str(row.get('Relancer', 'Non')).upper()
+            tel = clean_text(row.get('Téléphone', ''))
+            note = clean_text(row.get('Notes', ''))
+            rel_val = str(row.get('Relancer', 'Non')).upper()
             
             prix = clean_num(row.get('Prix', 0))
             aco = clean_num(row.get('Acompte', 0))
             reste = prix - aco
             val_paye = str(row.get('Paiement', 'UNPAID')).strip().upper()
 
-            # Logique couleur Paiement
-            ignore_p = any(x in sta_clean for x in ["ANNUL", "REFUS"])
-            if ignore_p: p_label, p_col = "---", "#95A5A6"
-            elif val_paye == "PAID" or reste <= 0: p_label, p_col = "PAYÉ", "green"
-            else: p_label, p_col = "NON PAYÉ", "#E74C3C"
+            # Couleurs
+            if val_paye == "PAID" or reste <= 0: p_label, p_color = "PAYÉ", "green"
+            else: p_label, p_color = "NON PAYÉ", "#E74C3C"
 
-            # Logique couleur Carte (Background)
-            if "LISTE" in sta_clean or relance_val == "OUI": bg = "#F5EEF8" # Violet clair (Attente/Top client)
-            elif soc == "CMN": bg = "#D6EAF8" # Bleu (CMN)
-            elif "ATTENTE" in sta_clean: bg = "#FCF3CF" # Jaune (Attente confirmation)
-            else: bg = "#D5F5E3" # Vert (Confirmé)
+            if rel_val == "OUI" or "LISTE" in sta_clean: bg = "#F5EEF8" 
+            elif soc == "CMN": bg = "#D6EAF8"
+            elif "ATTENTE" in sta_clean: bg = "#FCF3CF"
+            else: bg = "#D5F5E3"
 
-            etoile = " ⭐ <span style='color:#8E44AD; font-size:0.8rem;'>TOP CLIENT</span>" if relance_val == "OUI" else ""
+            etoile = " ⭐ <small>TOP CLIENT</small>" if rel_val == "OUI" else ""
+            t_url = tel.replace(' ', '').replace('+', '')
 
             card_html = f"""
             <div style="background-color:{bg}; padding:15px; border-radius:12px; border:1px solid #ccc; margin-bottom:10px; color:#2C3E50;">
@@ -237,13 +230,20 @@ if st.session_state.page == "CONTACTS":
                     <div>📅 Date: <b>{row.get('DateNav','')}</b></div>
                     <div>📊 Statut: <b>{sta_clean}</b></div>
                     <div>💰 Prix: <b>{prix} €</b></div>
-                    <div style="color:{p_col}; font-weight:bold;">🏷️ {p_label} ({reste}€)</div>
+                    <div style="color:{p_color}; font-weight:bold;">🏷️ {p_label} ({reste}€)</div>
+                </div>
+                <div style="margin-top:10px; padding:8px; background:rgba(255,255,255,0.4); border-radius:5px; font-size:0.8rem;">
+                    📞 Tel: <b>{tel}</b> | ✉️ {row.get('Email','')}
+                </div>
+                {f'<div style="font-size:0.8rem; margin-top:8px; border-left:3px solid #666; padding-left:8px; color:#555;"><i>{note}</i></div>' if note and note != '---' else ''}
+                <div style="margin-top:12px; display:flex; gap:10px;">
+                    <a href="tel:{t_url}" style="flex:1; background:#5DADE2; color:white !important; text-align:center; padding:8px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:0.75rem;">📞 APPEL</a>
+                    <a href="https://wa.me/{t_url}" style="flex:1; background:#52BE80; color:white !important; text-align:center; padding:8px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:0.75rem;">💬 WHATSAPP</a>
                 </div>
             </div>
             """
             st.markdown(card_html, unsafe_allow_html=True)
             
-            # Boutons Actions
             c1, c2 = st.columns(2)
             if c1.button(f"ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx
@@ -252,7 +252,7 @@ if st.session_state.page == "CONTACTS":
                 df_db = charger_data('contacts.json').drop(idx)
                 sauvegarder_data(df_db, 'contacts.json'); st.rerun()
     else:
-        st.info("Aucun contact dans cette catégorie.")
+        st.info("Aucun contact à afficher.")
 
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT (V95 - AVEC RELANCE & FIX PAIEMENT) ---
