@@ -47,7 +47,7 @@
         "Nom":"PHILIPPE",
         "Statut":"Termin\u00e9",
         "Paiement":"Paid",
-        "DateNav":null,
+        "DateNav":"03\/03\/2026",
         "Soci\u00e9t\u00e9":"CLICK",
         "Prix":479,
         "Nbre de personnes":null,
@@ -69,7 +69,7 @@
         "dt":1772323200000.0,
         "Mail":null,
         "Date":"25\/02\/2026",
-        "Jours":4.0,
+        "Jours":2.0,
         "Date Nav":null,
         "Nb jours":null,
         "Heures moteur":null,
@@ -82,8 +82,8 @@
         "Commentaires":null,
         "Statut_Paye":null,
         "Acompte":479,
-        "Pers":0.0,
-        "Relancer":null
+        "Pers":2.0,
+        "Relancer":"Oui"
     },
     {
         "Pr\u00e9nom":"CMN",
