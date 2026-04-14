@@ -600,37 +600,42 @@ if st.session_state.page == "STATS":
         df_temp = df_p[mask_p].copy()
 
         if not df_temp.empty:
-            def calcul_final(row):
-                status = str(row.get('Paiement', '')).upper().strip()
+           def calcul_final(row):
+                # 1. Récupération des deux colonnes critiques
+                paiement_txt = str(row.get('Paiement', '')).upper().strip()
+                statut_txt = str(row.get('Statut', '')).upper().strip()
+                
                 p = row.get('Prix', 0)
                 a = row.get('Acompte', 0)
 
-                # --- FILTRE 1 : EXCLUSION DES STATUTS NÉGATIFS OU EN ATTENTE ---
-                # Si le statut contient un de ces mots, on ne compte rien (0€)
-                mots_interdits = ["REFUS", "ANNUL", "NON", "UNPAID", "DEVIS", "ATTENTE", "OPTION"]
-                if any(mot in status for mot in mots_interdits):
+                # --- RÈGLE 1 : EXCLUSION PAR LE STATUT DE MISSION ---
+                # Si la mission est annulée ou refusée, on n'encaisse rien.
+                mots_annulations = ["ANNUL", "REFUS", "DEVIS", "OPTION", "ATTENTE"]
+                if any(m in statut_txt for m in mots_annulations):
                     return 0
 
-                # --- FILTRE 2 : VALIDATION DE L'ENCAISSEMENT ---
-                # On n'accepte que si le prix est réel (> 0)
+                # --- RÈGLE 2 : EXCLUSION PAR LE STATUT DE PAIEMENT ---
+                mots_impayes = ["NON", "UNPAID", "WAITING"]
+                if any(m in paiement_txt for m in mots_impayes):
+                    return 0
+
+                # --- RÈGLE 3 : VALIDATION DE L'ENCAISSEMENT ---
                 if p > 0:
-                    # Cas A : C'est explicitement marqué comme payé
-                    if any(x in status for x in ["PAID", "PAYÉ", "PAYE"]):
+                    # Cas A : Paiement confirmé
+                    if any(x in paiement_txt for x in ["PAID", "PAYÉ", "PAYE"]):
                         return p
                     
-                    # Cas B : L'acompte a couvert tout le prix (et l'acompte est > 0)
+                    # Cas B : Solde complet par acompte (sécurité > 0)
                     if a >= p and a > 0:
                         return p
                 
                 return 0
 
-            # Calcul de la colonne Encaissé_Reel
+            # Application du calcul
             df_temp['Encaissé_Reel'] = df_temp.apply(calcul_final, axis=1)
             
-            # --- FILTRE FINAL : On supprime les lignes à 0€ ---
-            # Camille et les "Attentes" tombent ici car leur Encaissé_Reel sera 0
+            # FILTRE FINAL : On éjecte physiquement les lignes à 0€
             df_r_yr = df_temp[df_temp['Encaissé_Reel'] > 0].copy()
-            total_rev = df_r_yr['Encaissé_Reel'].sum()
 
             if 'Société' in df_r_yr.columns and not df_r_yr.empty:
                 df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'})
