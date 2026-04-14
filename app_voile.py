@@ -409,6 +409,9 @@ if st.session_state.page == "PLANNING":
         # Prétraitement pour éviter les erreurs de type sur tout le dataframe
         df_p = df_p.fillna("")
 
+        # Force la conversion en texte pour éviter les erreurs de lecture
+        df_p['DateNav'] = df_p['DateNav'].astype(str)
+
         for idx, r in df_p.iterrows():
             try:
                 # 1. Nettoyage Nom
