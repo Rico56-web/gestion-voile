@@ -347,7 +347,7 @@
         "Pr\u00e9nom":"GILDAS",
         "Nom":"INCONNU",
         "Statut":"Annul\u00e9",
-        "Paiement":"Unpaid",
+        "Paiement":"Paid",
         "DateNav":"2026-04-09",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":30,
@@ -384,7 +384,7 @@
         "Statut_Paye":null,
         "Acompte":0,
         "Pers":0.0,
-        "Relancer":"Non"
+        "Relancer":"Oui"
     },
     {
         "Pr\u00e9nom":"CAMILLE",
