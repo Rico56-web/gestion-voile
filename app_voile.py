@@ -659,22 +659,22 @@ if st.session_state.page == "STATS":
     c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color="normal" if solde >= 0 else "inverse")
     
     # --- CALCUL DES PRÉVISIONS (CA POTENTIEL) ---
-prev_m = []
-for i in range(1, 13):
-    # Revenus prévus : on prend tout (sauf Annulé/Refusé)
-    mask_r = (df_r_yr['dt_vrai'].dt.month == i) & (~df_r_yr['Statut'].str.lower().str.contains("annule|refuse"))
-    r_prev = df_r_yr[mask_r]['Prix'].sum() if not df_r_yr.empty else 0
+    prev_m = []
+    for i in range(1, 13):
+        # Revenus prévus : on prend tout (sauf Annulé/Refusé)
+        mask_r = (df_r_yr['dt_vrai'].dt.month == i) & (~df_r_yr['Statut'].str.lower().str.contains("annule|refuse"))
+        r_prev = df_r_yr[mask_r]['Prix'].sum() if not df_r_yr.empty else 0
     
-    # Dépenses prévues : on prend tout ce qui est saisi pour ce mois
-    f_prev = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['M_Num'].sum() if not df_f_yr.empty else 0
+        # Dépenses prévues : on prend tout ce qui est saisi pour ce mois
+        f_prev = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['M_Num'].sum() if not df_f_yr.empty else 0
     
-    prev_m.append({
-        'Mois': mois_noms[i-1], 
-        'CA Prévu €': round(r_prev, 0), 
-        'Frais Prévus €': round(f_prev, 0),
-        'Solde Prévu €': round(r_prev - f_prev, 0)
-    })
-df_prev = pd.DataFrame(prev_m)
+        prev_m.append({
+            'Mois': mois_noms[i-1], 
+            'CA Prévu €': round(r_prev, 0), 
+            'Frais Prévus €': round(f_prev, 0),
+            'Solde Prévu €': round(r_prev - f_prev, 0)
+        })
+    df_prev = pd.DataFrame(prev_m)
     # =================================================================
     # --- 6. INDICATEURS DE PILOTAGE STRATÉGIQUES (RÉ-INTÉGRÉS) ---
     # =================================================================
