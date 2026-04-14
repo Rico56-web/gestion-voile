@@ -134,35 +134,40 @@ for i, name in enumerate(menu):
                           type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name
         st.rerun()
+
 # =================================================================
-# --- 5. BLOC CONTACTS (V95 - VERSION COMPLÈTE AVEC HTML) ---
+# --- 5. BLOC CONTACTS (V96 - PROTECTION TOTALE ANTI-NAN) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<h2 style="text-align:center;">⚓ Gestion des Clients Vesta</h2>', unsafe_allow_html=True)
 
-    # 1. Chargement et préparation robuste
+    # 1. Chargement et Nettoyage de sécurité
     df_raw = charger_data('contacts.json')
     df_c = df_raw.copy() if not df_raw.empty else pd.DataFrame()
 
     if not df_c.empty:
+        # --- LE BOUCLIER ANTI-NAN ---
+        # On remplace TOUS les types de vides par une chaîne vide pour l'affichage
+        df_c = df_c.fillna("")
+        for col in df_c.columns:
+            df_c[col] = df_c[col].astype(str).replace(['nan', 'NaN', 'None', 'NaT'], '')
+        
         df_c['orig_idx'] = df_c.index
-        
-        # --- FIX DATE : On nettoie avant de convertir ---
-        df_c['DateNav'] = df_c['DateNav'].astype(str).replace(['nan', 'None', 'NAT', 'NaN'], '---')
-        
-        # Création d'une colonne technique pour le tri (sans toucher à l'affichage)
+        # dt_sort sert uniquement au tri, on ne l'affiche jamais
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         
         if 'Relancer' not in df_c.columns: df_c['Relancer'] = "Non"
         
-        # Filtres (Saison / Recherche)
         c_search, c_yr = st.columns([2, 1])
         search = c_search.text_input("🔍 Rechercher...", "").upper()
         annee_sel = c_yr.selectbox("Saison", [2026, 2027, 2028], index=0)
         
-        mask = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna())
+        mask = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna()) | (df_c['DateNav'] == "")
         df_c = df_c[mask].copy()
-        # ... reste des filtres ...
+        if search:
+            mask_s = df_c['Nom'].str.upper().contains(search) | df_c['Prénom'].str.upper().contains(search)
+            df_c = df_c[mask_s]
+        df_c = df_c.sort_values(by='dt_sort', ascending=False)
 
     # 2. Onglets
     n1, n2, n3, n4 = st.columns(4)
@@ -179,10 +184,11 @@ if st.session_state.page == "CONTACTS":
 
     st.divider()
 
-    # 3. Filtrage
+    # 3. Filtrage Robuste
     if not df_c.empty:
-        statut_clean = df_c['Statut'].astype(str).str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
-        relance_clean = df_c['Relancer'].astype(str).str.upper().fillna("NON")
+        # On ignore les accents et majuscules pour le filtrage
+        statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
+        relance_clean = df_c['Relancer'].str.upper()
 
         if st.session_state.vue_contact == "Archives":
             mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
@@ -195,24 +201,26 @@ if st.session_state.page == "CONTACTS":
 
         df_aff = df_c[mask_aff].copy()
 
-        # 4. Affichage détaillé
+        # 4. Affichage des fiches
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
+            
+            # Données propres pour l'affichage
             pre = clean_text(row.get('Prénom', '')).upper()
             nom = clean_text(row.get('Nom', '')).upper()
             sta_clean = str(row.get('Statut', 'EN ATTENTE')).upper()
             soc = clean_text(row.get('Société', 'PERSO')).upper()
             tel = clean_text(row.get('Téléphone', ''))
             note = clean_text(row.get('Notes', ''))
-            rel_val = str(row.get('Relancer', 'Non')).upper()
+            date_aff = str(row.get('DateNav', '')).strip()
+            if not date_aff or date_aff.lower() == "nan": date_aff = "---"
             
-           # --- LOGIQUE PAIEMENT SÉCURISÉE ---
             prix = clean_num(row.get('Prix', 0))
             aco = clean_num(row.get('Acompte', 0))
             reste = prix - aco
             val_paye = str(row.get('Paiement', 'UNPAID')).strip().upper()
 
-            # On vérifie 1. Le texte "PAID" ou 2. Si un prix existe et est réglé
+            # --- CORRECTION PAIEMENT ---
             if val_paye == "PAID":
                 p_label, p_color = "PAYÉ", "green"
             elif prix > 0 and reste <= 0:
@@ -220,22 +228,8 @@ if st.session_state.page == "CONTACTS":
             else:
                 p_label, p_color = "NON PAYÉ", "#E74C3C"
 
-            # Récupération de la date propre
-            date_aff = str(row.get('DateNav', '---'))
-            if date_aff.lower() in ['nan', 'none', '']: date_aff = "---"
-
-           # --- LOGIQUE PAIEMENT CORRIGÉE ---
-            val_paye = str(row.get('Paiement', 'UNPAID')).strip().upper()
-            
-            # On ne marque "PAYÉ" que si c'est explicitement "PAID" 
-            # OU si le prix est supérieur à 0 ET que le reste est 0.
-            if val_paye == "PAID":
-                p_label, p_color = "PAYÉ", "green"
-            elif prix > 0 and reste <= 0:
-                p_label, p_color = "PAYÉ", "green"
-            else:
-                p_label, p_color = "NON PAYÉ", "#E74C3C"
-
+            # Couleurs Background
+            rel_val = str(row.get('Relancer', 'NON')).upper()
             if rel_val == "OUI" or "LISTE" in sta_clean: bg = "#F5EEF8" 
             elif soc == "CMN": bg = "#D6EAF8"
             elif "ATTENTE" in sta_clean: bg = "#FCF3CF"
@@ -277,7 +271,6 @@ if st.session_state.page == "CONTACTS":
                 sauvegarder_data(df_db, 'contacts.json'); st.rerun()
     else:
         st.info("Aucun contact à afficher.")
-
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT (V95 - AVEC RELANCE & FIX PAIEMENT) ---
 # =================================================================
