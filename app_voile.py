@@ -675,18 +675,18 @@ if st.session_state.page == "STATS":
             'Solde Prévu €': round(r_prev - f_prev, 0)
         })
     df_prev = pd.DataFrame(prev_m)
-    # =================================================================
+# =================================================================
     # --- 7. BILAN MENSUEL DE TRÉSORERIE (RÉEL & PRÉVISIONNEL) ---
     # =================================================================
-    # 1. DÉFINITION DES MOIS (Crucial pour éviter NameError)
-    mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     
-    rs_m = []     # Pour le Réel (Encaissé)
-    prev_m = []   # Pour le Prévisionnel (CA Total attendu)
+    # 1. INITIALISATION (Crucial pour éviter NameError)
+    mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+    rs_m = []     # Pour le graphique "Encaissé" (Réel)
+    prev_m = []   # Pour le graphique "Prévisions" (Potentiel)
 
+    # 2. BOUCLE DE CALCUL UNIQUE
     for i in range(1, 13):
-        # --- CALCUL DU RÉEL (Ce qui est déjà payé) ---
-        # On utilise 'Encaissé_Reel' au lieu de 'P_Num'
+        # --- CALCUL DU RÉEL (Paid uniquement) ---
         r_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['Encaissé_Reel'].sum() if not df_r_yr.empty else 0
         f_m = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['M_Num'].sum() if not df_f_yr.empty else 0
         
@@ -699,6 +699,7 @@ if st.session_state.page == "STATS":
 
         # --- CALCUL DU PRÉVISIONNEL (Tout sauf annulé/refusé) ---
         if not df_r_yr.empty:
+            # On prend le 'Prix' total pour voir ce qui devrait rentrer
             mask_r_prev = (df_r_yr['dt_vrai'].dt.month == i) & (~df_r_yr['Statut'].str.lower().str.contains("annule|refuse"))
             r_prev = df_r_yr[mask_r_prev]['Prix'].sum()
         else:
@@ -713,54 +714,37 @@ if st.session_state.page == "STATS":
             'Solde Prévu €': round(r_prev - f_prev, 0)
         })
 
-    # Conversion en DataFrames pour les graphiques
+    # Conversion en DataFrames
     df_reel = pd.DataFrame(rs_m)
     df_prev = pd.DataFrame(prev_m)
 
-    # --- AFFICHAGE DES GRAPHIQUES ---
+    # --- 3. AFFICHAGE DES GRAPHIQUES ---
     st.divider()
-    col_chart1, col_chart2 = st.columns(2)
+    col1, col2 = st.columns(2)
 
-    with col_chart1:
-        st.subheader("📈 Évolution Réelle (Encaissé)")
-        fig_bar = px.bar(
-            df_reel, x='Mois', y=['Encaissé €', 'Décaissé €'],
-            barmode='group',
-            color_discrete_map={'Encaissé €': '#2ecc71', 'Décaissé €': '#e74c3c'},
-            height=350
-        )
+    with col1:
+        st.subheader("📈 Évolution Réelle")
+        fig_bar = px.bar(df_reel, x='Mois', y=['Encaissé €', 'Décaissé €'], barmode='group',
+                         color_discrete_map={'Encaissé €': '#2ecc71', 'Décaissé €': '#e74c3c'}, height=350)
         st.plotly_chart(fig_bar, use_container_width=True)
 
-    with col_chart2:
-        st.subheader("🎯 Répartition par Société")
+    with col2:
+        st.subheader("🎯 Répartition Société")
         if not df_soc_final.empty:
-            fig_pie = px.pie(
-                df_soc_final, values='CA €', names='Société',
-                hole=0.4,
-                color_discrete_sequence=px.colors.qualitative.Pastel,
-                height=350
-            )
-            # Forcer CMN en bleu (préférence utilisateur)
+            fig_pie = px.pie(df_soc_final, values='CA €', names='Société', hole=0.4, height=350)
             if "CMN" in df_soc_final['Société'].values:
                 fig_pie.update_traces(marker=dict(colors=['#0000FF' if n == 'CMN' else None for n in df_soc_final['Société']]))
             st.plotly_chart(fig_pie, use_container_width=True)
 
-    # --- NOUVELLE SECTION PRÉVISIONS ---
+    # --- 4. SECTION PRÉVISIONS ---
     st.divider()
-    st.subheader("🔮 Prévisions de Trésorerie (Objectifs Saison)")
-    
-    fig_prev = px.line(
-        df_prev, x='Mois', y=['CA Prévu €', 'Frais Prévus €'],
-        markers=True,
-        color_discrete_map={'CA Prévu €': '#3498DB', 'Frais Prévus €': '#F39C12'},
-        height=350
-    )
+    st.subheader("🔮 Prévisions de la Saison (Objectifs)")
+    fig_prev = px.line(df_prev, x='Mois', y=['CA Prévu €', 'Frais Prévus €'], markers=True,
+                        color_discrete_map={'CA Prévu €': '#3498DB', 'Frais Prévus €': '#F39C12'}, height=350)
     st.plotly_chart(fig_prev, use_container_width=True)
 
     with st.expander("📊 Détail du tableau prévisionnel"):
         st.table(df_prev.set_index('Mois'))
-        total_prev = df_prev['CA Prévu €'].sum()
-        st.info(f"CA total potentiel pour la saison : **{total_prev:,.0f} €**".replace(',', ' '))
     # =================================================================
     # --- 8. BOUTON ARCHIVAGE (CORRIGÉ & SÉCURISÉ) ---
     # =================================================================
