@@ -545,136 +545,75 @@ if st.session_state.page == "PLANNING":
         st.info("Aucune mission ce mois-ci.")
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
-# ===============================================================
-# --- 6. PAGE STATS ---
+# =================================================================
+# --- 7. PAGE STATS (V102 - FIX PRÉVISIONS & INDENTATION) ---
 # =================================================================
 if st.session_state.page == "STATS":
-    import pandas as pd
-    import plotly.express as px
-    import datetime
+    st.markdown('<h2 style="text-align:center;">📊 Statistiques Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # --- 1. FONCTIONS ---
-    def conversion_date_robuste(date_str):
-        if pd.isna(date_str) or date_str == "": return pd.NaT
-        date_str = str(date_str).strip()
-        formats = ['%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d-%m-%Y', '%d/%m/%y']
-        for fmt in formats:
-            try: return pd.to_datetime(date_str, format=fmt)
-            except: continue
-        return pd.to_datetime(date_str, errors='coerce', dayfirst=True)
-
-    # --- 2. CHARGEMENT ---
-    df_planning_actif = charger_data('contacts.json')
-    df_m_actif = charger_data('maintenance.json')
-    df_m_arch = charger_data('archives_factures.json')
-    df_frais_full = pd.concat([df_m_actif, df_m_arch], ignore_index=True)
-
-    st.title("📊 Bilan Vesta Skipper")
+    # --- 1. DÉFINITION UNIVERSELLE (Évite le NameError) ---
+    mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     
-    mode_bilan = st.radio("Type de bilan", ["A ce jour", "Par Saison"], horizontal=True)
-    today = datetime.date.today()
-    sel_y = today.year
-
-    if mode_bilan == "Par Saison":
-        sel_y = st.selectbox("Saison", [2025, 2026, 2027], index=1)
+    # On s'assure que les DataFrames de base existent
+    df_r_yr = charger_data('archives_factures.json') # Ou ta source de revenus
+    df_f_yr = charger_data('maintenance.json')        # Ou ta source de frais
     
-    # --- 3. INITIALISATION ---
-    total_rev = 0
-    total_frais = 0
-    df_r_yr = pd.DataFrame()
-    df_f_yr = pd.DataFrame()
-    df_soc_final = pd.DataFrame()
+    rs_m = []     # Liste pour le Réel
+    prev_m = []   # Liste pour le Prévisionnel
 
-    # --- 4. TRAITEMENT DES REVENUS (V113 - Analyse Croisée) ---
-    if not df_planning_actif.empty:
-        df_p = df_planning_actif.copy()
-        
-        # Nettoyage numérique
-        for col in ['Prix', 'Acompte']:
-            df_p[col] = pd.to_numeric(df_p[col].astype(str).str.replace(r'[^0-9.,]', '', regex=True).str.replace(',', '.'), errors='coerce').fillna(0)
-        
-        df_p['dt_vrai'] = df_p['DateNav'].apply(conversion_date_robuste)
-        
-        # Filtre de période
-        if mode_bilan == "Par Saison":
-            mask_p = (df_p['dt_vrai'].dt.year == sel_y)
-        else:
-            mask_p = (df_p['dt_vrai'].dt.year == 2026) & (df_p['dt_vrai'].dt.date <= today)
-        
-        df_temp = df_p[mask_p].copy()
-
-        if not df_temp.empty:
-            def calcul_final(row):
-                paiement_txt = str(row.get('Paiement', '')).upper().strip()
-                statut_txt = str(row.get('Statut', '')).upper().strip()
-                p = row.get('Prix', 0)
-                a = row.get('Acompte', 0)
-
-                # RÈGLE 1 : Si Statut est Annulé/Refusé -> 0€ (Exclut Patrick)
-                if any(m in statut_txt for m in ["ANNUL", "REFUS", "DEVIS", "OPTION", "ATTENTE"]):
-                    return 0
-
-                # RÈGLE 2 : Si Paiement est Unpaid -> 0€ (Exclut Thomas/Camille)
-                if any(m in paiement_txt for m in ["NON", "UNPAID", "WAITING"]):
-                    return 0
-
-                # RÈGLE 3 : Validation du montant
-                if p > 0:
-                    if any(x in paiement_txt for x in ["PAID", "PAYÉ", "PAYE"]):
-                        return p
-                    if a >= p and a > 0:
-                        return p
-                return 0
-
-            df_temp['Encaissé_Reel'] = df_temp.apply(calcul_final, axis=1)
-            
-            # FILTRE FINAL : On ne garde que les lignes qui rapportent de l'argent
-            df_r_yr = df_temp[df_temp['Encaissé_Reel'] > 0].copy()
-            total_rev = df_r_yr['Encaissé_Reel'].sum()
-
-            if 'Société' in df_r_yr.columns and not df_r_yr.empty:
-                df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'})
-
-    # --- 5. TRAITEMENT DES FRAIS ---
-    if not df_frais_full.empty:
-        df_f = df_frais_full.copy()
-        df_f['dt_vrai'] = df_f['Date'].apply(conversion_date_robuste)
-        df_f['M_Num'] = pd.to_numeric(df_f.get('M_Num', 0), errors='coerce').fillna(0)
-        
-        annee_f = sel_y if mode_bilan == "Par Saison" else 2026
-        mask_f = (df_f['dt_vrai'].dt.year == annee_f)
-        if mode_bilan == "A ce jour":
-            mask_f &= (df_f['dt_vrai'].dt.date <= today)
-            
-        df_f_yr = df_f[mask_f].copy()
-        total_frais = df_f_yr['M_Num'].sum()
-
-    # --- 6. AFFICHAGE DES INDICATEURS ---
-    solde = total_rev - total_frais
-    st.subheader(f"💰 Synthèse Trésorerie : {mode_bilan}")
-    
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Encaissé", f"{total_rev:,.0f} €".replace(',', ' '))
-    c2.metric("Décaissé", f"{total_frais:,.0f} €".replace(',', ' '))
-    c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color="normal" if solde >= 0 else "inverse")
-    
-    # --- CALCUL DES PRÉVISIONS (CA POTENTIEL) ---
-    prev_m = []
+    # --- 2. BOUCLE DE CALCUL UNIQUE ---
     for i in range(1, 13):
-        # Revenus prévus : on prend tout (sauf Annulé/Refusé)
-        mask_r = (df_r_yr['dt_vrai'].dt.month == i) & (~df_r_yr['Statut'].str.lower().str.contains("annule|refuse"))
-        r_prev = df_r_yr[mask_r]['Prix'].sum() if not df_r_yr.empty else 0
-    
-        # Dépenses prévues : on prend tout ce qui est saisi pour ce mois
+        # CALCUL DU RÉEL (Encaissé)
+        r_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['Encaissé_Reel'].sum() if not df_r_yr.empty else 0
+        f_m = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['M_Num'].sum() if not df_f_yr.empty else 0
+        
+        rs_m.append({
+            'Mois': mois_noms[i-1],
+            'Encaissé €': round(r_m, 0), 
+            'Décaissé €': round(f_m, 0), 
+            'Solde €': round(r_m - f_m, 0)
+        })
+
+        # CALCUL DU PRÉVISIONNEL (Potentiel total)
+        if not df_r_yr.empty:
+            # On prend le 'Prix' total et on exclut Annulé/Refusé
+            mask_p = (df_r_yr['dt_vrai'].dt.month == i) & (~df_r_yr['Statut'].str.lower().str.contains("annule|refuse"))
+            r_prev = df_r_yr[mask_p]['Prix'].sum()
+        else:
+            r_prev = 0
+            
         f_prev = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['M_Num'].sum() if not df_f_yr.empty else 0
-    
+        
         prev_m.append({
             'Mois': mois_noms[i-1], 
             'CA Prévu €': round(r_prev, 0), 
             'Frais Prévus €': round(f_prev, 0),
             'Solde Prévu €': round(r_prev - f_prev, 0)
         })
+
+    # Conversion en DataFrames
+    df_reel = pd.DataFrame(rs_m)
     df_prev = pd.DataFrame(prev_m)
+
+    # --- 3. AFFICHAGE DES GRAPHIQUES ---
+    st.divider()
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.subheader("📈 Évolution Réelle")
+        fig_r = px.bar(df_reel, x='Mois', y=['Encaissé €', 'Décaissé €'], barmode='group',
+                       color_discrete_map={'Encaissé €': '#2ecc71', 'Décaissé €': '#e74c3c'}, height=350)
+        st.plotly_chart(fig_r, use_container_width=True)
+
+    with c2:
+        st.subheader("🔮 Prévisions Saison")
+        fig_p = px.line(df_prev, x='Mois', y=['CA Prévu €', 'Frais Prévus €'], markers=True,
+                        color_discrete_map={'CA Prévu €': '#3498DB', 'Frais Prévus €': '#F39C12'}, height=350)
+        st.plotly_chart(fig_p, use_container_width=True)
+
+    # --- 4. TABLEAU DE DÉTAIL ---
+    with st.expander("📊 Voir le détail des prévisions mensuelles"):
+        st.table(df_prev.set_index('Mois'))
 # =================================================================
     # --- 7. BILAN MENSUEL DE TRÉSORERIE (RÉEL & PRÉVISIONNEL) ---
     # =================================================================
