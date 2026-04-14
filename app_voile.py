@@ -140,29 +140,29 @@ for i, name in enumerate(menu):
 if st.session_state.page == "CONTACTS":
     st.markdown('<h2 style="text-align:center;">⚓ Gestion des Clients Vesta</h2>', unsafe_allow_html=True)
 
-    # 1. Chargement et préparation
+    # 1. Chargement et préparation robuste
     df_raw = charger_data('contacts.json')
     df_c = df_raw.copy() if not df_raw.empty else pd.DataFrame()
 
     if not df_c.empty:
         df_c['orig_idx'] = df_c.index
-        # Nettoyage des dates : on remplace les nan par une date vide pour l'affichage
-        df_c['DateNav'] = df_c['DateNav'].fillna("").replace("nan", "")
-        # Création d'une colonne technique pour le tri (sans casser l'affichage)
-        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')    
+        
+        # --- FIX DATE : On nettoie avant de convertir ---
+        df_c['DateNav'] = df_c['DateNav'].astype(str).replace(['nan', 'None', 'NAT', 'NaN'], '---')
+        
+        # Création d'une colonne technique pour le tri (sans toucher à l'affichage)
+        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+        
         if 'Relancer' not in df_c.columns: df_c['Relancer'] = "Non"
         
+        # Filtres (Saison / Recherche)
         c_search, c_yr = st.columns([2, 1])
         search = c_search.text_input("🔍 Rechercher...", "").upper()
         annee_sel = c_yr.selectbox("Saison", [2026, 2027, 2028], index=0)
         
         mask = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna())
         df_c = df_c[mask].copy()
-        if search:
-            mask_s = df_c['Nom'].astype(str).str.upper().str.contains(search) | \
-                     df_c['Prénom'].astype(str).str.upper().str.contains(search)
-            df_c = df_c[mask_s]
-        df_c = df_c.sort_values(by='dt_sort', ascending=False)
+        # ... reste des filtres ...
 
     # 2. Onglets
     n1, n2, n3, n4 = st.columns(4)
