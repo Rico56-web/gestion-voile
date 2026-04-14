@@ -6,58 +6,43 @@ from datetime import datetime, date, timedelta
 import calendar
 
 # --- FONCTIONS DE SÉCURITÉ UNIVERSELLES ---
+keys_to_init = {
+    'authenticated': False, 
+    'page': "CONTACTS", 
+    'edit_idx': None, 
+    'vue_contact': "En cours",
+    'log_edit_idx': None,      # Indispensable pour la page LOG
+    'log_confirm_del': None    # Indispensable pour la suppression de LOG
+}
+for key, val in keys_to_init.items():
+    if key not in st.session_state: 
+        st.session_state[key] = val
 def clean_num(val, default=0):
     try:
-        if pd.isna(val) or val == "nan" or val == "" or val is None or val == "None": 
+        if pd.isna(val) or str(val).lower() in ["nan", "", "none"]: 
             return default
-        return int(float(val))
+        return int(float(str(val).replace('€','').replace(' ','').strip()))
     except:
         return default
 
 def clean_text(val):
+    if val is None or pd.isna(val): return ""
     v = str(val).replace('nan', '').replace('None', '').strip()
-    if "<div" in v or "<a " in v: 
-        return "Note à corriger"
+    if "<div" in v or "<a " in v: return "Note à corriger"
     return v if v else "---"
 
-def safe_int(val): # Au cas où vous l'utilisez ailleurs
-    return clean_num(val)
-  # --- FONCTION DE SÉCURITÉ POUR LES LOGS ---
 def preparer_log_safe(df):
-    """S'assure que le DataFrame des logs est prêt sans crash"""
-    if df is None or df.empty:
-        return pd.DataFrame(columns=['Date', 'Action', 'Utilisateur', 'Details'])
-    # On s'assure que les colonnes nécessaires existent
-    for col in ['Date', 'Action', 'Utilisateur', 'Details']:
-        if col not in df.columns:
-            df[col] = ""
-    return df  
-# --- FONCTIONS DE NETTOYAGE ---
-def safe_int(val):
-    try:
-        if val is None or str(val).lower() == 'nan' or str(val).strip() == '': return 0
-        return int(float(str(val).replace('€','').strip()))
-    except: return 0
-
-def clean_int(val):
-    try:
-        if val is None or str(val).strip() == "" or str(val).lower() == "nan": return 0
-        clean_val = str(val).replace(',', '.').replace('€', '').replace(' ', '').strip()
-        return int(float(clean_val))
-    except: return 0
+    """S'assure que le DataFrame des logs possède les colonnes minimales"""
+    cols = ['Date', 'PortDep', 'PortArr', 'Bateau', 'Skipper', 'Action', 'Details']
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame(columns=cols)
+    for col in cols:
+        if col not in df.columns: df[col] = ""
+    return df
 
 def format_tel_lien(tel):
     if not tel: return ""
     return "".join(filter(str.isdigit, str(tel)))
-
-def formater_date_affichage(date_val):
-    if pd.isna(date_val) or str(date_val).strip() in ["", "None", "nan"]: return "---"
-    try: return datetime.strptime(str(date_val)[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
-    except: return str(date_val)
-
-def clean_text(text):
-    if text is None or pd.isna(text): return ""
-    return str(text).replace("\n", " ").replace('"', "'").strip()
 
 # --- GESTION GITHUB ---
 def charger_data(file):
