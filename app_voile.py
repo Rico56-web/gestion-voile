@@ -178,26 +178,26 @@ if st.session_state.page == "CONTACTS":
         st.session_state.vue_contact = "Attente"; st.rerun()
     if n3.button("📁 ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
         st.session_state.vue_contact = "Archives"; st.rerun()
-   if n4.button("➕ NOUVEAU", use_container_width=True):
-        # On crée une date par défaut propre pour l'année sélectionnée
-        date_defaut = f"01/06/{annee_sel}"
+    if n4.button("➕ NOUVEAU", use_container_width=True):
+         # On crée une date par défaut propre pour l'année sélectionnée
+         date_defaut = f"01/06/{annee_sel}"
         
-        new_r = {
-            "Prénom": "NOUVEAU", 
-            "Nom": "CLIENT", 
-            "Statut": "En attente", 
-            "Paiement": "Unpaid", 
-            "Relancer": "Non", 
-            "DateNav": date_defaut, 
-            "Société": "PERSO", 
-            "Jours": 1, 
-            "Pers": 1, 
-            "Notes": "", 
-            "Téléphone": "", 
-            "Email": "", 
-            "Prix": 0, 
-            "Acompte": 0
-        }
+         new_r = {
+             "Prénom": "NOUVEAU", 
+             "Nom": "CLIENT", 
+             "Statut": "En attente", 
+             "Paiement": "Unpaid", 
+             "Relancer": "Non", 
+             "DateNav": date_defaut, 
+             "Société": "PERSO", 
+             "Jours": 1, 
+             "Pers": 1, 
+             "Notes": "", 
+             "Téléphone": "", 
+             "Email": "", 
+             "Prix": 0, 
+             "Acompte": 0
+         }
         
         # On l'ajoute AU DÉBUT du fichier pour la voir tout de suite
         df_raw = charger_data('contacts.json')
