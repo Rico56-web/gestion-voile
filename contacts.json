@@ -3,7 +3,7 @@
         "Pr\u00e9nom":"PATRICK",
         "Nom":"BABIOCHE",
         "Statut":"Annul\u00e9",
-        "Paiement":"Unpaid",
+        "Paiement":"Paid",
         "DateNav":"2026-04-11",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":35,
@@ -40,7 +40,7 @@
         "Statut_Paye":null,
         "Acompte":0,
         "Pers":1.0,
-        "Relancer":null
+        "Relancer":"Oui"
     },
     {
         "Pr\u00e9nom":"ELISABETH",
