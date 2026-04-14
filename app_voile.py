@@ -639,21 +639,6 @@ if st.session_state.page == "STATS":
     c2.metric("Décaissé", f"{total_frais:,.0f} €".replace(',', ' '))
     c3.metric("Solde Net", f"{solde:,.0f} €".replace(',', ' '), delta_color="normal" if solde >= 0 else "inverse")
 
-    # --- 7. DÉTAILS (TABLEAUX) ---
-    st.divider()
-    with st.expander("📥 Détail des Revenus Encaissés", expanded=True):
-        if not df_r_yr.empty:
-            # On crée une colonne Client propre pour l'affichage
-            df_r_yr['Client'] = (df_r_yr['Prénom'].fillna('') + " " + df_r_yr['Nom'].fillna('')).str.strip().str.title()
-            cols_rev = [c for c in ['DateNav', 'Client', 'Encaissé_Reel'] if c in df_r_yr.columns]
-            st.dataframe(df_r_yr[cols_rev].rename(columns={'DateNav':'Date', 'Encaissé_Reel':'Montant €'}), hide_index=True, use_container_width=True)
-        else:
-            st.info("Aucun revenu encaissé.")
-
-    with st.expander("📤 Détail des Dépenses", expanded=False):
-        if not df_f_yr.empty:
-            cols_f = [c for c in ['Date', 'Type', 'Description', 'M_Num'] if c in df_f_yr.columns]
-            st.dataframe(df_f_yr[cols_f].rename(columns={'M_Num':'Montant €'}), hide_index=True, use_container_width=True)
     # =================================================================
     # --- 6. INDICATEURS DE PILOTAGE STRATÉGIQUES (RÉ-INTÉGRÉS) ---
     # =================================================================
