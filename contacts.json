@@ -39,7 +39,8 @@
         "Commentaires":null,
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":1.0
+        "Pers":1.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"ELISABETH",
@@ -81,7 +82,8 @@
         "Commentaires":null,
         "Statut_Paye":null,
         "Acompte":479,
-        "Pers":0.0
+        "Pers":0.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"CMN",
@@ -123,7 +125,8 @@
         "Commentaires":"",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":4.0
+        "Pers":4.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"PEDRO",
@@ -165,7 +168,8 @@
         "Commentaires":"nan",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":0.0
+        "Pers":0.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"CMN",
@@ -207,7 +211,8 @@
         "Commentaires":"nan",
         "Statut_Paye":null,
         "Acompte":450,
-        "Pers":4.0
+        "Pers":4.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"AURELIEN",
@@ -249,7 +254,8 @@
         "Commentaires":"Vent vendredi \u26a0\ufe0ftroph\u00e9e Ouest France ce we Pb sur bouton poussoir verrouillage plage arriere",
         "Statut_Paye":null,
         "Acompte":540,
-        "Pers":0.0
+        "Pers":0.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"BENOIT",
@@ -291,13 +297,14 @@
         "Commentaires":"Appel le 26\/03\/ pour reserver",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":1.0
+        "Pers":1.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"",
         "Nom":"B\u00c9ATRICE ET SA FILLE",
         "Statut":"Annul\u00e9",
-        "Paiement":"Non pay\u00e9",
+        "Paiement":"Unpaid",
         "DateNav":"2026-04-09",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":70,
@@ -305,7 +312,7 @@
         "Nbre de jours":1.0,
         "T\u00e9l\u00e9phone":"06 21 18 30 69",
         "Email":"",
-        "Notes":"nan",
+        "Notes":"ras",
         "NbreJours":null,
         "NbrePers":null,
         "NbJours":null,
@@ -320,7 +327,7 @@
         "dt":null,
         "Mail":null,
         "Date":null,
-        "Jours":null,
+        "Jours":0.0,
         "Date Nav":null,
         "Nb jours":null,
         "Heures moteur":null,
@@ -333,7 +340,8 @@
         "Commentaires":"",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":null
+        "Pers":0.0,
+        "Relancer":"Non"
     },
     {
         "Pr\u00e9nom":"GILDAS",
@@ -375,7 +383,8 @@
         "Commentaires":"nan",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":null
+        "Pers":null,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"CAMILLE",
@@ -417,7 +426,8 @@
         "Commentaires":"Camille et son ami",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":2.0
+        "Pers":2.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"LAURENT",
@@ -459,7 +469,8 @@
         "Commentaires":"Ras",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":4.0
+        "Pers":4.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"GROUPE ESPAGNE",
@@ -501,7 +512,8 @@
         "Commentaires":"Test du groupe avant l\u2019espagne",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":4.0
+        "Pers":4.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"ELISABETH",
@@ -543,7 +555,8 @@
         "Commentaires":"",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":2.0
+        "Pers":2.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"JULIEN",
@@ -585,7 +598,8 @@
         "Commentaires":null,
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":2.0
+        "Pers":2.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"LAURENT",
@@ -627,7 +641,8 @@
         "Commentaires":"nan",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":4.0
+        "Pers":4.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"BRIGITTE",
@@ -669,7 +684,8 @@
         "Commentaires":"nan",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":2.0
+        "Pers":2.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"FLORENCE ET DOMINIQUE ET SONIA",
@@ -711,7 +727,8 @@
         "Commentaires":"Ras",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":3.0
+        "Pers":3.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"JEAN LOUIS",
@@ -753,7 +770,8 @@
         "Commentaires":"",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":1.0
+        "Pers":1.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"FRANCOISE",
@@ -795,7 +813,8 @@
         "Commentaires":"None",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":1.0
+        "Pers":1.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"PHILIPPE",
@@ -837,7 +856,8 @@
         "Commentaires":"nan",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":1.0
+        "Pers":1.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"YANNICK",
@@ -879,7 +899,8 @@
         "Commentaires":"\u00c0 voir",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":1.0
+        "Pers":1.0,
+        "Relancer":null
     },
     {
         "Pr\u00e9nom":"AURELIEN",
@@ -921,6 +942,7 @@
         "Commentaires":"nan",
         "Statut_Paye":null,
         "Acompte":0,
-        "Pers":4.0
+        "Pers":4.0,
+        "Relancer":null
     }
 ]
