@@ -401,9 +401,32 @@ if st.session_state.page == "PLANNING":
         st.session_state.curr_month_idx = aujourdhui.month - 1
         st.session_state.curr_year = aujourdhui.year
         st.rerun()
-
+    # --- BLOC DE DIAGNOSTIC TEMPORAIRE ---
+    if not df_p.empty:
+        with st.expander("🔍 Diagnostic technique des dates (Mars)"):
+            erreurs = []
+            for i, r in df_p.iterrows():
+                d = str(r.get('DateNav', 'VIDE'))
+                if "/03/2026" in d or "-03-2026" in d:
+                    # Tentative de test de lecture
+                    valide = False
+                    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+                        try:
+                            datetime.strptime(d.strip().split(' ')[0], fmt)
+                            valide = True
+                            break
+                        except: continue
+                    if not valide:
+                        erreurs.append(f"Fiche #{i} ({r.get('Nom')}): Date illisible -> '{d}'")
+        
+            if erreurs:
+                for err in erreurs: st.error(err)
+            else:
+                st.success("Toutes les dates de Mars semblent lisibles par le système.")
+# -------------------------------------
     # CHARGEMENT DES DONNÉES
     df_p = charger_data('contacts.json')
+    
 
     if not df_p.empty:
         # Prétraitement pour éviter les erreurs de type sur tout le dataframe
