@@ -178,11 +178,34 @@ if st.session_state.page == "CONTACTS":
         st.session_state.vue_contact = "Attente"; st.rerun()
     if n3.button("📁 ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
         st.session_state.vue_contact = "Archives"; st.rerun()
-    if n4.button("➕ NOUVEAU", use_container_width=True):
-        new_r = {"Prénom":"PRÉNOM","Nom":"NOM","Statut":"En attente","Paiement":"Unpaid","Relancer":"Non","DateNav":f"01/06/{annee_sel}","Société":"PERSO","Jours":1,"Pers":1,"Notes":"","Téléphone":"","Email":"","Prix":0,"Acompte":0}
+   if n4.button("➕ NOUVEAU", use_container_width=True):
+        # On crée une date par défaut propre pour l'année sélectionnée
+        date_defaut = f"01/06/{annee_sel}"
+        
+        new_r = {
+            "Prénom": "NOUVEAU", 
+            "Nom": "CLIENT", 
+            "Statut": "En attente", 
+            "Paiement": "Unpaid", 
+            "Relancer": "Non", 
+            "DateNav": date_defaut, 
+            "Société": "PERSO", 
+            "Jours": 1, 
+            "Pers": 1, 
+            "Notes": "", 
+            "Téléphone": "", 
+            "Email": "", 
+            "Prix": 0, 
+            "Acompte": 0
+        }
+        
+        # On l'ajoute AU DÉBUT du fichier pour la voir tout de suite
+        df_raw = charger_data('contacts.json')
         df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
-        sauvegarder_data(df_new, 'contacts.json'); st.rerun()
-
+        sauvegarder_data(df_new, 'contacts.json')
+        
+        st.success("Fiche créée ! Elle apparaît en haut de la liste.")
+        st.rerun()
     st.divider()
 
     # 3. Filtrage Robuste
