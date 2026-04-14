@@ -200,22 +200,32 @@ if st.session_state.page == "CONTACTS":
             st.session_state.vue_contact = "Archives"; st.rerun()
 
         st.divider()
-
+        
         # 3. Filtrage par onglet
         statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
         relance_clean = df_c['Relancer'].str.upper()
 
         if st.session_state.vue_contact == "Archives":
             mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
+            tri_ordre = False # Dans les archives, on veut le plus récent en haut
         elif st.session_state.vue_contact == "Attente":
             mask_aff = statut_clean.str.contains("liste|attente") | ((statut_clean.str.contains("termine")) & (relance_clean == "OUI"))
+            tri_ordre = True  # En attente, ordre chronologique
         else:
             mask_aff = ~statut_clean.str.contains("termine|annule|refuse|liste|attente")
+            tri_ordre = True  # En cours, ordre chronologique
 
+        # On applique le filtre
         df_aff = df_c[mask_aff].copy()
 
-        # 4. BOUCLE D'AFFICHAGE RESTAURÉE
+        # --- LE FIX : ON TRIE ICI POUR QUE ÇA MARCHE DANS TOUS LES ONGLETS ---
+        if not df_aff.empty:
+            df_aff = df_aff.sort_values(by='dt_sort', ascending=tri_ordre)
+
+        # 4. BOUCLE D'AFFICHAGE
         for _, row in df_aff.iterrows():
+            # ... (Gardez ici tout votre code card_html identique à avant) ...
+    
             idx = row['orig_idx']
             pre = str(row.get('Prénom', '')).upper()
             nom = str(row.get('Nom', '')).upper()
