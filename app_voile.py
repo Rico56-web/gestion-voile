@@ -560,42 +560,48 @@ if st.session_state.page == "STATS":
     total_rev, total_frais = 0, 0
     df_r_yr = pd.DataFrame()
     df_f_yr = pd.DataFrame()
-
-     # --- 3. CALCUL DES REVENUS ---
+# --- 4. TRAITEMENT DES DONNÉES (V102 - COMPTABILITÉ EXACTE) ---
     total_rev, total_frais = 0, 0
-    # INITIALISATION CRUCIALE POUR ÉVITER LE NAMEERROR
     df_r_yr = pd.DataFrame()
     df_f_yr = pd.DataFrame()
-    df_soc_final = pd.DataFrame() # <--- Ajoute cette ligne ici
 
+    # A. REVENUS
     if not df_planning_actif.empty:
         df_p = df_planning_actif.copy()
         
-        # Nettoyage numérique
+        # Nettoyage strict des nombres
         for col in ['Prix', 'Acompte']:
-            if col in df_p.columns:
-                df_p[col] = df_p[col].astype(str).str.replace(r'[^0-9.,]', '', regex=True).str.replace(',', '.')
-                df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0)
+            df_p[col] = df_p[col].astype(str).str.replace(r'[^0-9.,]', '', regex=True).str.replace(',', '.')
+            df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0)
         
-        # Identification du Paiement
-        df_p['Pay_Str'] = df_p['Paiement'].fillna('').astype(str).str.upper() if 'Paiement' in df_p.columns else ""
-
-        def calculer_caisse(row):
-            if any(x in str(row['Pay_Str']) for x in ['PAID', 'PAYÉ', 'PAYE']):
-                return row['Prix']
-            return row['Acompte']
-
-        df_p['Encaissé_Reel'] = df_p.apply(calculer_caisse, axis=1)
+        # Dates et Filtres
         df_p['dt_vrai'] = df_p['DateNav'].apply(conversion_date_robuste)
         
-        # Filtre saison
-        mask_y = (df_p['dt_vrai'].dt.year == sel_y)
-        df_r_yr = df_p[mask_y].copy()
-        
+        # --- APPLICATION DU FILTRE DE NAVIGATION (SAISON OU A CE JOUR) ---
+        if mode_bilan == "Par Saison":
+            mask_periode = (df_p['dt_vrai'].dt.year == sel_y)
+        else:
+            # "A ce jour" : Année en cours ET date passée ou aujourd'hui
+            mask_periode = (df_p['dt_vrai'].dt.year == today.year) & (df_p['dt_vrai'].dt.date <= today)
+
+        # On applique le filtre de période AVANT de calculer les sommes
+        df_r_yr = df_p[mask_periode].copy()
+
         if not df_r_yr.empty:
+            # LOGIQUE COMPTABLE STRICTE
+            def calcul_encaissement(row):
+                status = str(row.get('Paiement', '')).upper()
+                # 1. Si c'est marqué PAID -> On prend le prix total
+                if "PAID" in status:
+                    return row['Prix']
+                # 2. Si c'est UNPAID mais qu'il y a un acompte -> On prend l'acompte
+                elif row['Acompte'] > 0:
+                    return row['Acompte']
+                # 3. Sinon (Unpaid sans acompte) -> 0€
+                return 0
+
+            df_r_yr['Encaissé_Reel'] = df_r_yr.apply(calcul_encaissement, axis=1)
             total_rev = df_r_yr['Encaissé_Reel'].sum()
-            # CRÉATION DE LA VARIABLE POUR LE GRAPHIQUE ET LE KPI RISQUE CLIENT
-            df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'}).sort_values('CA €', ascending=False)
 
     # --- 4. CALCUL DES FRAIS ---
     if not df_frais_full.empty:
