@@ -150,7 +150,8 @@ if st.session_state.page == "CONTACTS":
         # On remplace TOUS les types de vides par une chaîne vide pour l'affichage
         df_c = df_c.fillna("")
         for col in df_c.columns:
-            df_c[col] = df_c[col].astype(str).replace(['nan', 'NaN', 'None', 'NaT'], '')
+        # On ne remplace par du vide QUE si c'est vraiment une erreur technique "nan"
+        df_c['DateNav'] = df_c['DateNav'].apply(lambda x: "" if str(x).lower() in ['nan', 'none', 'nat'] else str(x))
         
         df_c['orig_idx'] = df_c.index
         # dt_sort sert uniquement au tri, on ne l'affiche jamais
