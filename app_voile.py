@@ -581,43 +581,57 @@ if st.session_state.page == "STATS":
         else:
             mask_p = (df_p['dt_vrai'].dt.year == 2026) & (df_p['dt_vrai'].dt.date <= today)
         
-        # --- 4.A CALCUL DES REVENUS (Version 111 - Anti-Refus) ---
+ # A. CALCUL DES REVENUS (Version 112 - Verrouillage Total)
+    if not df_planning_actif.empty:
+        df_p = df_planning_actif.copy()
+        
+        # 1. Nettoyage des colonnes numériques
+        for col in ['Prix', 'Acompte']:
+            df_p[col] = pd.to_numeric(df_p[col].astype(str).str.replace(r'[^0-9.,]', '', regex=True).str.replace(',', '.'), errors='coerce').fillna(0)
+        
+        df_p['dt_vrai'] = df_p['DateNav'].apply(conversion_date_robuste)
+        
+        # 2. Filtre de période
+        if mode_bilan == "Par Saison":
+            mask_p = (df_p['dt_vrai'].dt.year == sel_y)
+        else:
+            mask_p = (df_p['dt_vrai'].dt.year == 2026) & (df_p['dt_vrai'].dt.date <= today)
+        
         df_temp = df_p[mask_p].copy()
 
         if not df_temp.empty:
             def calcul_final(row):
-                # 1. On récupère et on nettoie les textes
                 status = str(row.get('Paiement', '')).upper().strip()
                 p = row.get('Prix', 0)
                 a = row.get('Acompte', 0)
 
-                # --- LISTE NOIRE (Exclusion immédiate) ---
-                mots_interdits = ["REFUS", "ANNUL", "NON", "UNPAID", "DEVIS"]
+                # --- FILTRE 1 : EXCLUSION DES STATUTS NÉGATIFS OU EN ATTENTE ---
+                # Si le statut contient un de ces mots, on ne compte rien (0€)
+                mots_interdits = ["REFUS", "ANNUL", "NON", "UNPAID", "DEVIS", "ATTENTE", "OPTION"]
                 if any(mot in status for mot in mots_interdits):
                     return 0
 
-                # --- RÈGLE D'OR ---
+                # --- FILTRE 2 : VALIDATION DE L'ENCAISSEMENT ---
+                # On n'accepte que si le prix est réel (> 0)
                 if p > 0:
-                    # On valide si c'est marqué "PAYÉ" 
-                    est_paye = any(x in status for x in ["PAID", "PAYÉ", "PAYE"])
-                    # OU si l'acompte a couvert le prix
-                    est_solde = (a >= p)
-                    
-                    if est_paye or est_solde:
+                    # Cas A : C'est explicitement marqué comme payé
+                    if any(x in status for x in ["PAID", "PAYÉ", "PAYE"]):
                         return p
+                    
+                    # Cas B : L'acompte a couvert tout le prix (et l'acompte est > 0)
+                    if a >= p and a > 0:
+                        return p
+                
                 return 0
 
-            # --- ATTENTION : Ces lignes doivent être alignées avec le 'def' au-dessus ---
+            # Calcul de la colonne Encaissé_Reel
             df_temp['Encaissé_Reel'] = df_temp.apply(calcul_final, axis=1)
             
-            # On ne garde que les dossiers avec un encaissement réel
+            # --- FILTRE FINAL : On supprime les lignes à 0€ ---
+            # Camille et les "Attentes" tombent ici car leur Encaissé_Reel sera 0
             df_r_yr = df_temp[df_temp['Encaissé_Reel'] > 0].copy()
             total_rev = df_r_yr['Encaissé_Reel'].sum()
-            
-            # --- FILTRE DE SORTIE ---
-            # On ne garde que les dossiers qui ont généré un encaissement réel
-            df_r_yr = df_temp[df_temp['Encaissé_Reel'] > 0].copy()
-            
+
             if 'Société' in df_r_yr.columns and not df_r_yr.empty:
                 df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'})
     # B. CALCUL DES FRAIS
