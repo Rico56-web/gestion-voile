@@ -600,7 +600,7 @@ if st.session_state.page == "STATS":
         df_temp = df_p[mask_p].copy()
 
         if not df_temp.empty:
-           def calcul_final(row):
+            def calcul_final(row):
                 # 1. Récupération des deux colonnes critiques
                 paiement_txt = str(row.get('Paiement', '')).upper().strip()
                 statut_txt = str(row.get('Statut', '')).upper().strip()
