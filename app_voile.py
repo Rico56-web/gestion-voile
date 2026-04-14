@@ -202,6 +202,9 @@ if st.session_state.page == "CONTACTS":
         st.divider()
         
        # --- NOUVELLE LOGIQUE DE TRI DES ONGLETS ---
+        statut_clean = df_c['Statut'].fillna("").str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
+        relance_clean = df_c['Relancer'].fillna("Non").str.upper()
+        
         if st.session_state.vue_contact == "Archives":
             # ARCHIVES : Terminé, Annulé, Refusé (et pas de relance OUI)
             mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
