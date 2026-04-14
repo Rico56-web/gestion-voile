@@ -571,6 +571,7 @@ if st.session_state.page == "STATS":
     df_r_yr = pd.DataFrame()
     df_f_yr = pd.DataFrame()
     df_soc_final = pd.DataFrame() # Initialisation vitale
+    
 # --- 4. TRAITEMENT DES DONNÉES (V105 - DIAGNOSTIC) ---
     total_rev = 0
     df_r_yr = pd.DataFrame()
@@ -702,26 +703,36 @@ if st.session_state.page == "STATS":
     st.divider()
     st.subheader("📝 Détail des opérations réelles")
     
-    # A. DÉTAIL DES REVENUS
-    # A. DÉTAIL DES REVENUS
-    with st.expander("📥 Détail des Revenus Encaissés", expanded=False):
+    # A. DÉTAIL DES REVENUS (AFFICHAGE NOM + PRÉNOM)
+    with st.expander("📥 Détail des Revenus Encaissés", expanded=True):
         if not df_r_yr.empty:
             df_disp = df_r_yr.copy()
-            # On remplace 'P_Num' par 'Encaissé_Reel'
-            cols_to_show = [c for c in ['DateNav', 'Client', 'Société', 'Encaissé_Reel'] if c in df_disp.columns]
+
+            # 1. Création de la colonne "Client" (Fusion Nom + Prénom)
+            # On gère les cases vides pour éviter les erreurs
+            df_disp['Client'] = (
+                df_disp['Prénom'].fillna('').astype(str).str.strip() + " " + 
+                df_disp['Nom'].fillna('').astype(str).str.strip()
+            ).str.title()
+
+            # 2. Si le nom est vide après fusion, on met "Client Inconnu"
+            df_disp['Client'] = df_disp['Client'].replace('', 'Client Inconnu')
+
+            # 3. Sélection et renommage des colonnes pour l'affichage
+            # On ne met PAS 'Société' ici, seulement Date, Client et Montant
+            cols_finales = ['DateNav', 'Client', 'Encaissé_Reel']
+            
+            # Vérification de sécurité des colonnes
+            cols_dispo = [c for c in cols_finales if c in df_disp.columns]
             
             st.dataframe(
-                df_disp[cols_to_show].rename(columns={'DateNav':'Date','Encaissé_Reel':'Montant €'}), 
-                hide_index=True, 
+                df_disp[cols_dispo].rename(columns={
+                    'DateNav': 'Date',
+                    'Encaissé_Reel': 'Montant Encaissé (€)'
+                }),
+                hide_index=True,
                 use_container_width=True
             )
-            # Sélection sécurisée des colonnes à afficher
-            cols_to_show = [c for c in ['DateNav', 'Client', 'Société', 'P_Num'] if c in df_disp.columns]
-            
-            # Affichage du détail avec renommage de "Prix" en "Montant €"
-            st.dataframe(df_disp[cols_to_show].rename(columns={'DateNav':'Date','P_Num':'Montant €'}), hide_index=True, use_container_width=True)
-            
-            st.caption(f"Total Encaissé (Missions Payées) : **{total_rev:,.0f} €**".replace(',', ' '))
         else:
             st.info("Aucun revenu perçu enregistré sur cette période.")
 
