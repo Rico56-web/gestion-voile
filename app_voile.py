@@ -362,7 +362,7 @@ if st.session_state.page == "MODIFIER_CONTACT":
         st.session_state.page = "CONTACTS"
         st.rerun()
 # ===============================================================
-# --- 6. PAGE PLANNING (V18.4 - RÉSILIENCE TOTALE) ---
+# --- 6. PAGE PLANNING (V18.5 - FIX ORDRE CHARGEMENT) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
     from datetime import datetime, date, timedelta
@@ -371,7 +371,6 @@ if st.session_state.page == "PLANNING":
 
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>🗓️ PLANNING</h1></div>', unsafe_allow_html=True)
     
-    # Bouton Archives
     if st.button("📂 ACCÉDER AUX ARCHIVES", key="k_arch_p", use_container_width=True):
         st.session_state.last_page = "PLANNING"; st.session_state.page = "ARCHIVES"; st.rerun()
 
@@ -382,7 +381,6 @@ if st.session_state.page == "PLANNING":
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
     
-    # RESET DES VARIABLES
     jours_occ = {}
     total_mois = 0
     missions_list = []
@@ -390,7 +388,6 @@ if st.session_state.page == "PLANNING":
     if 'curr_month_idx' not in st.session_state: st.session_state.curr_month_idx = aujourdhui.month - 1
     if 'curr_year' not in st.session_state: st.session_state.curr_year = aujourdhui.year
 
-    # Menu de sélection
     c_m, c_y, c_n = st.columns([1.5, 1, 0.8])
     sel_m_nom = c_m.selectbox("Mois", m_noms, index=st.session_state.curr_month_idx)
     sel_m = m_noms.index(sel_m_nom) + 1
@@ -402,14 +399,17 @@ if st.session_state.page == "PLANNING":
         st.session_state.curr_month_idx = aujourdhui.month - 1
         st.session_state.curr_year = aujourdhui.year
         st.rerun()
-    # --- BLOC DE DIAGNOSTIC TEMPORAIRE ---
-    if not df_p.empty:
+
+    # --- ÉTAPE 1 : CHARGEMENT (DÉPLACÉ ICI POUR FIXER L'ERREUR) ---
+    df_p = charger_data('contacts.json')
+
+    # --- ÉTAPE 2 : DIAGNOSTIC (UNIQUEMENT SI DONNÉES PRÉSENTES) ---
+    if df_p is not None and not df_p.empty:
         with st.expander("🔍 Diagnostic technique des dates (Mars)"):
             erreurs = []
             for i, r in df_p.iterrows():
                 d = str(r.get('DateNav', 'VIDE'))
                 if "/03/2026" in d or "-03-2026" in d:
-                    # Tentative de test de lecture
                     valide = False
                     for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
                         try:
@@ -419,38 +419,25 @@ if st.session_state.page == "PLANNING":
                         except: continue
                     if not valide:
                         erreurs.append(f"Fiche #{i} ({r.get('Nom')}): Date illisible -> '{d}'")
-        
+            
             if erreurs:
                 for err in erreurs: st.error(err)
             else:
-                st.success("Toutes les dates de Mars semblent lisibles par le système.")
-# -------------------------------------
-    # CHARGEMENT DES DONNÉES
-    df_p = charger_data('contacts.json')
-    
+                st.success("Toutes les dates de Mars semblent valides ou absentes.")
 
-    if not df_p.empty:
-        # Prétraitement pour éviter les erreurs de type sur tout le dataframe
+        # --- ÉTAPE 3 : TRAITEMENT POUR AFFICHAGE ---
         df_p = df_p.fillna("")
-
-        # Force la conversion en texte pour éviter les erreurs de lecture
         df_p['DateNav'] = df_p['DateNav'].astype(str)
 
         for idx, r in df_p.iterrows():
             try:
-                # 1. Nettoyage Nom
                 nom_client = str(r.get('Nom', '')).strip().upper()
                 if nom_client in ["", "CONTACT", "NAN"]: continue
                 
-                # 2. PARSEUR DE DATE AMÉLIORÉ
                 d_brute = str(r.get('DateNav', '')).strip().split(' ')[0]
-                
-                # Sécurité anti-vide/nan
-                if d_brute.lower() in ["nan", "---", "", "none"]: 
-                    continue
+                if d_brute.lower() in ["nan", "---", "", "none"]: continue
 
                 dt_start = None
-                # Test des formats (ISO, Français, etc.)
                 for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
                     try:
                         dt_start = datetime.strptime(d_brute, fmt).date()
@@ -459,27 +446,25 @@ if st.session_state.page == "PLANNING":
                 
                 if not dt_start: continue 
 
-                # 3. Infos Mission
-                # Utilisation de clean_num pour éviter les erreurs de texte dans les nombres
                 n_j = int(float(str(r.get('Jours', 1) or 1))) 
                 statut = str(r.get('Statut', 'En attente')).lower()
                 soc = str(r.get('Société', 'PERSO')).upper()
                 dt_end = dt_start + timedelta(days=max(0, n_j-1))
                 prix_val = float(str(r.get('Prix', '0')).replace('€','').replace(' ','').strip() or 0)
 
-                # 4. Couleur (CMN en bleu comme demandé)
+                # Couleurs
                 if "CMN" in soc: color = "#3498db"
                 elif any(x in statut for x in ["annul", "refus"]): color = "#bdc3c7"
-                elif dt_start < aujourdhui: color = "#34495e" # Passé
-                else: color = "#27ae60" # Futur
+                elif dt_start < aujourdhui: color = "#34495e"
+                else: color = "#27ae60"
 
-                # 5. Remplissage Calendrier
+                # Calendrier
                 for i in range(n_j):
                     curr = dt_start + timedelta(days=i)
                     if curr.month == sel_m and curr.year == sel_y:
                         jours_occ[curr.day] = {"c": color}
 
-                # 6. Liste des missions
+                # Liste
                 if (dt_start.year == sel_y and dt_start.month == sel_m) or (dt_end.year == sel_y and dt_end.month == sel_m):
                     missions_list.append({
                         'r': r, 'idx': idx, 'start': dt_start, 'end': dt_end, 
@@ -490,7 +475,7 @@ if st.session_state.page == "PLANNING":
             except:
                 continue
 
-    # AFFICHAGE CALENDRIER HTML
+    # --- ÉTAPE 4 : AFFICHAGE CALENDRIER ---
     h_cal = '<table style="width:100%; text-align:center; border-collapse:collapse; background:white; border:1px solid #ddd;">'
     h_cal += '<tr style="background:#f8f9fa; font-size:12px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td>Sa</td><td>Di</td></tr>'
     
@@ -505,7 +490,6 @@ if st.session_state.page == "PLANNING":
                 txt_c = "white" if bg != "transparent" else "black"
                 is_t = (jour == aujourdhui.day and sel_m == aujourdhui.month and sel_y == aujourdhui.year)
                 st_cell = "background:#fff9c4;" if is_t else "" 
-                
                 h_cal += f'''<td style="{st_cell} border:1px solid #eee; height:40px;">
                                 <div style="background:{bg}; color:{txt_c}; border-radius:50%; width:26px; height:26px; line-height:26px; margin:auto; font-weight:bold; font-size:12px;">
                                     {jour}
@@ -533,7 +517,6 @@ if st.session_state.page == "PLANNING":
     else:
         st.info("Aucune mission ce mois-ci.")
 
-    # TOTAL
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 
 # =================================================================
