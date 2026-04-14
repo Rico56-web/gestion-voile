@@ -134,7 +134,7 @@ for i, name in enumerate(menu):
                           type="primary" if st.session_state.page == name else "secondary"):
         st.session_state.page = name
         st.rerun()
-# =================================================================
+    # =================================================================
 # --- 5. BLOC CONTACTS (V95 - AVEC LISTE D'ATTENTE & RELANCE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
@@ -146,9 +146,9 @@ if st.session_state.page == "CONTACTS":
 
     if not df_c.empty:
         df_c['orig_idx'] = df_c.index
-        # Nettoyage des colonnes critiques pour éviter les erreurs de tri
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
-        if 'Relancer' not in df_c.columns: df_c['Relancer'] = "Non"
+        if 'Relancer' not in df_c.columns: 
+            df_c['Relancer'] = "Non"
         
         # Filtres de recherche
         c_search, c_yr = st.columns([2, 1])
@@ -177,33 +177,29 @@ if st.session_state.page == "CONTACTS":
         sauvegarder_data(df_new, 'contacts.json'); st.rerun()
 
     st.divider()
-        # 3. Logique de Filtrage des Onglets (Version robuste)
+
+    # 3. Logique de Filtrage des Onglets (Alignée avec st.divider)
     if not df_c.empty:
-            # On prépare des versions "propres" pour le filtrage sans modifier les données réelles
-            statut_clean = df_c['Statut'].astype(str).str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').decode('utf-8')
-            relance_clean = df_c.get('Relancer', 'Non')
-            relance_clean = relance_clean.astype(str).str.upper().fillna("NON")
+        # Nettoyage pour filtrage robuste
+        statut_clean = df_c['Statut'].astype(str).str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
+        relance_clean = df_c.get('Relancer', 'Non').astype(str).str.upper().fillna("NON")
 
-            if st.session_state.vue_contact == "Archives":
-                # On affiche si c'est fini/annulé ET que ce n'est PAS un client à relancer
-                mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
-        
-            elif st.session_state.vue_contact == "Attente":
-                # On affiche si statut "attente" OU si c'est un "Terminé" à relancer
-                mask_att = statut_clean.str.contains("liste|attente")
-                mask_rel = (statut_clean.str.contains("termine")) & (relance_clean == "OUI")
-                mask_aff = mask_att | mask_rel
-            
-            else: # "En cours"
-                # Par défaut : tout ce qui n'est pas dans les deux autres
-                mask_aff = ~statut_clean.str.contains("termine|annule|refuse|liste|attente")
+        if st.session_state.vue_contact == "Archives":
+            mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
+        elif st.session_state.vue_contact == "Attente":
+            mask_att = statut_clean.str.contains("liste|attente")
+            mask_rel = (statut_clean.str.contains("termine")) & (relance_clean == "OUI")
+            mask_aff = mask_att | mask_rel
+        else: # En cours
+            mask_aff = ~statut_clean.str.contains("termine|annule|refuse|liste|attente")
 
-            df_aff = df_c[mask_aff].copy()
-      
+        df_aff = df_c[mask_aff].copy()
 
         # 4. Affichage des fiches
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
+            # --- Le reste de votre code d'affichage (HTML + Boutons) ici ---
+            st.write(f"Fiche #{idx}: {row.get('Nom')} - {row.get('Statut')}") # Exemple simple pour tester
             
             # Nettoyage des données pour affichage
             pre = clean_text(row.get('Prénom', '')).upper()
