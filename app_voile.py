@@ -146,7 +146,10 @@ if st.session_state.page == "CONTACTS":
 
     if not df_c.empty:
         df_c['orig_idx'] = df_c.index
-        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+        # Nettoyage des dates : on remplace les nan par une date vide pour l'affichage
+        df_c['DateNav'] = df_c['DateNav'].fillna("").replace("nan", "")
+        # Création d'une colonne technique pour le tri (sans casser l'affichage)
+        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')    
         if 'Relancer' not in df_c.columns: df_c['Relancer'] = "Non"
         
         c_search, c_yr = st.columns([2, 1])
@@ -208,9 +211,17 @@ if st.session_state.page == "CONTACTS":
             reste = prix - aco
             val_paye = str(row.get('Paiement', 'UNPAID')).strip().upper()
 
-            # Couleurs
-            if val_paye == "PAID" or reste <= 0: p_label, p_color = "PAYÉ", "green"
-            else: p_label, p_color = "NON PAYÉ", "#E74C3C"
+           # --- LOGIQUE PAIEMENT CORRIGÉE ---
+            val_paye = str(row.get('Paiement', 'UNPAID')).strip().upper()
+            
+            # On ne marque "PAYÉ" que si c'est explicitement "PAID" 
+            # OU si le prix est supérieur à 0 ET que le reste est 0.
+            if val_paye == "PAID":
+                p_label, p_color = "PAYÉ", "green"
+            elif prix > 0 and reste <= 0:
+                p_label, p_color = "PAYÉ", "green"
+            else:
+                p_label, p_color = "NON PAYÉ", "#E74C3C"
 
             if rel_val == "OUI" or "LISTE" in sta_clean: bg = "#F5EEF8" 
             elif soc == "CMN": bg = "#D6EAF8"
