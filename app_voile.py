@@ -610,14 +610,21 @@ if st.session_state.page == "STATS":
             
             if 'Société' in df_r_yr.columns and not df_r_yr.empty:
                 df_soc_final = df_r_yr.groupby('Société')['Encaissé_Reel'].sum().reset_index().rename(columns={'Encaissé_Reel':'CA €'})
-
     # B. CALCUL DES FRAIS
     if not df_frais_full.empty:
         df_f = df_frais_full.copy()
         df_f['dt_vrai'] = df_f['Date'].apply(conversion_date_robuste)
-        df_f['M_Num'] = pd.to_numeric(df_f['M_Num'], errors='coerce').fillna(0)
         
-        mask_f = (df_f['dt_vrai'].dt.year == (sel_y if mode_bilan == "Par Saison" else 2026))
+        # On s'assure que M_Num est bien un nombre
+        if 'M_Num' in df_f.columns:
+            df_f['M_Num'] = pd.to_numeric(df_f['M_Num'], errors='coerce').fillna(0)
+        else:
+            df_f['M_Num'] = 0
+        
+        # Filtre de période
+        annee_cible = sel_y if mode_bilan == "Par Saison" else 2026
+        mask_f = (df_f['dt_vrai'].dt.year == annee_cible)
+        
         if mode_bilan == "A ce jour":
             mask_f &= (df_f['dt_vrai'].dt.date <= today)
             
@@ -635,23 +642,29 @@ if st.session_state.page == "STATS":
 
     # --- 6. DÉTAIL DES OPÉRATIONS ---
     st.divider()
-    with st.expander("📥 Détail des Revenus Encaissés (Payés ou Soldés)", expanded=True):
-        if not df_r_yr.empty:
-            df_disp = df_r_yr.copy()
-            df_disp['Client'] = (df_disp['Prénom'].fillna('') + " " + df_disp['Nom'].fillna('')).str.strip().str.title()
-            
-            cols_aff = ['DateNav', 'Client', 'Encaissé_Reel']
-            st.dataframe(
-                df_disp[cols_aff].rename(columns={'DateNav':'Date', 'Encaissé_Reel':'Montant €'}),
-                hide_index=True, use_container_width=True
-            )
-        else:
-            st.info("Aucun revenu encaissé sur cette période.")
+    
+    # [REVENUS - Garde ton bloc revenus ici, il est bon]
+    # ... (Bloc revenus précédent) ...
 
+    # B. DÉTAIL DES DÉPENSES (VERSION SÉCURISÉE)
     with st.expander("📤 Détail des Dépenses", expanded=False):
         if not df_f_yr.empty:
-            st.dataframe(df_f_yr[['Date', 'Type', 'Description', 'M_Num']].rename(columns={'M_Num':'Montant €'}), hide_index=True, use_container_width=True)
-
+            # Liste des colonnes qu'on VEUT afficher
+            cols_souhaitees = ['Date', 'Type', 'Description', 'M_Num']
+            
+            # On ne garde que celles qui existent RÉELLEMENT dans le fichier
+            cols_finales_f = [c for c in cols_souhaitees if c in df_f_yr.columns]
+            
+            # Renommage pour l'esthétique
+            mapping_noms = {'M_Num': 'Montant €', 'Type': 'Catégorie'}
+            
+            st.dataframe(
+                df_f_yr[cols_finales_f].rename(columns=mapping_noms),
+                hide_index=True, 
+                use_container_width=True
+            )
+        else:
+            st.info("Aucune dépense enregistrée sur cette période.")
     # =================================================================
     # --- 6. INDICATEURS DE PILOTAGE STRATÉGIQUES (RÉ-INTÉGRÉS) ---
     # =================================================================
