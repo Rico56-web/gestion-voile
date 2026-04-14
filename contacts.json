@@ -262,7 +262,7 @@
         "Nom":"COURONNE",
         "Statut":"Termin\u00e9",
         "Paiement":"Paid",
-        "DateNav":null,
+        "DateNav":"14\/03\/2026",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":70,
         "Nbre de personnes":1.0,
@@ -298,7 +298,7 @@
         "Statut_Paye":null,
         "Acompte":0,
         "Pers":1.0,
-        "Relancer":null
+        "Relancer":"Non"
     },
     {
         "Pr\u00e9nom":"",
