@@ -218,7 +218,7 @@
         "Pr\u00e9nom":"AURELIEN",
         "Nom":"FAUCHEUX",
         "Statut":"Termin\u00e9",
-        "Paiement":"Paid",
+        "Paiement":"Unpaid",
         "DateNav":"2026-04-04",
         "Soci\u00e9t\u00e9":"PERSO",
         "Prix":540,
@@ -255,7 +255,7 @@
         "Statut_Paye":null,
         "Acompte":540,
         "Pers":0.0,
-        "Relancer":null
+        "Relancer":"Non"
     },
     {
         "Pr\u00e9nom":"BENOIT",
