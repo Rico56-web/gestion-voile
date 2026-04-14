@@ -299,7 +299,19 @@ if st.session_state.page == "MODIFIER_CONTACT":
             s_idx = s_list.index(curr_s) if curr_s in s_list else 0
             new_statut = s1.selectbox("Statut Mission", s_list, index=s_idx)
             
-            new_pay = s2.radio("Paiement", ["Unpaid", "Paid"], index=1 if "PAID" in str(row.get('Paiement','')).upper() else 0, horizontal=True)
+           # On récupère la valeur actuelle, on la nettoie (majuscules et sans espaces)
+           val_actuelle = str(row.get('Paiement', 'Unpaid')).strip().upper()
+
+           # On définit l'index : 1 si c'est "PAID", sinon 0 pour "UNPAID"
+           idx_paye = 1 if val_actuelle == "PAID" else 0
+
+           new_pay = s2.radio(
+              "Paiement", 
+              ["Unpaid", "Paid"], 
+              index=idx_paye, 
+              horizontal=True,
+              key=f"pay_radio_{idx_to_edit}" # La clé unique évite que Streamlit s'emmêle les pinceaux
+           )
             
             new_notes = st.text_area("Notes", value=str(row.get('Notes', '')).replace('nan',''))
 
