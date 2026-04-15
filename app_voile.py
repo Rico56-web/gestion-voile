@@ -746,25 +746,40 @@ if st.session_state.page == "MAINT":
     def sauver_params(data):
         with open('params_maint.json', 'w') as f:
             json.dump(data, f)
+    def maintenance_donnees_globale():
+    import pandas as pd
+    
+    # --- 1. NETTOYAGE DES CONTACTS & PLANNING ---
+    df_c = charger_data('contacts.json')
+    if not df_c.empty:
+        # Conversion flexible des dates (JJ/MM/AAAA ou ISO) vers objet date
+        df_c['DateNav'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+        # Retour au format Français pour le stockage
+        df_c['DateNav'] = df_c['DateNav'].dt.strftime('%d/%m/%Y')
+        
+        # On ne garde que les colonnes qui servent vraiment au projet
+        colonnes_utiles_c = [
+            'Prénom', 'Nom', 'Société', 'DateNav', 'Paiement', 
+            'Statut', 'Prix', 'Acompte', 'Jours', 'Pers', 
+            'Téléphone', 'Email', 'Notes', 'Relancer'
+        ]
+        df_c = df_c[[c for c in colonnes_utiles_c if c in df_c.columns]]
+        sauvegarder_data(df_c, 'contacts.json')
 
-    # --- B. NETTOYAGE AUTOMATIQUE DES CONTACTS ---
-    # Cette fonction est maintenant bien alignée à l'intérieur du bloc IF
-    def maintenance_donnees():
-        df = charger_data('contacts.json')
-        if not df.empty:
-            # 1. Redressement des dates : format ISO pour le stockage
-            df['DateNav'] = pd.to_datetime(df['DateNav'], dayfirst=True, errors='coerce').dt.strftime('%Y-%m-%d')
-            # 2. Remplissage des valeurs numériques
-            df['Prix'] = pd.to_numeric(df['Prix'], errors='coerce').fillna(0).astype(int)
-            df['Acompte'] = pd.to_numeric(df['Acompte'], errors='coerce').fillna(0).astype(int)
-            # 3. Standardisation textes
-            df['Nom'] = df['Nom'].astype(str).str.upper().str.strip()
-            df['Prénom'] = df['Prénom'].astype(str).str.upper().str.strip()
-            df['Société'] = df['Société'].astype(str).str.upper().str.strip().replace('NAN', 'PERSO')
-            sauvegarder_data(df, 'contacts.json')
+    # --- 2. NETTOYAGE DE LA MAINTENANCE ---
+    df_m = charger_data('maintenance.json')
+    if not df_m.empty:
+        # Correction des dates (gère le 29/02/2026 invalide en le mettant à vide si besoin)
+        df_m['Date'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+        df_m['Date'] = df_m['Date'].dt.strftime('%d/%m/%Y')
+        
+        # On garde M_Num et on vire le doublon "Montant" pour alléger le JSON
+        colonnes_utiles_m = ['Date', 'Objet', 'M_Num', 'Statut', 'Type']
+        df_m = df_m[[c for c in colonnes_utiles_m if c in df_m.columns]]
+        sauvegarder_data(df_m, 'maintenance.json')
+    
+    st.success("✅ Base de données Vesta nettoyée et optimisée (Format FR conservé).")
 
-    # On lance le nettoyage immédiatement à l'ouverture de la page
-    maintenance_donnees()
 
     # --- C. RÉCUPÉRATION DES DONNÉES ---
     params = charger_params()
