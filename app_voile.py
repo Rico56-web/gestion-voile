@@ -606,57 +606,59 @@ if st.session_state.page == "STATS":
     col_sel1, col_sel2 = st.columns(2)
     mode_bilan = col_sel1.radio("Vue :", ["À ce jour", "Par Saison"], horizontal=True)
     sel_y = col_sel2.selectbox("Choisir l'année :", [2025, 2026, 2027], index=1)
-
-    # --- 3. FUSION ET NETTOYAGE DES DÉPENSES ---
-    # On unifie les deux fichiers de maintenance
+    
+    # --- 3. FUSION ET NETTOYAGE RADICAL ---
+    # On crée une copie propre pour ne pas abîmer les fichiers originaux
     df_f_yr = pd.concat([df_m_curr, df_m_arch], ignore_index=True)
 
-    if not df_f_yr.empty:
-        # Harmonisation des colonnes : 'Montant' (archives) vs 'M_Num' (courant)
-        if 'Montant' in df_f_yr.columns:
-            df_f_yr['M_Num_Calc'] = pd.to_numeric(df_f_yr['Montant'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-        elif 'M_Num' in df_f_yr.columns:
-            df_f_yr['M_Num_Calc'] = pd.to_numeric(df_f_yr['M_Num'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-        else:
-            df_f_yr['M_Num_Calc'] = 0
+    def to_num(df, col):
+        if col in df.columns:
+            return pd.to_numeric(df[col].astype(str).str.replace(',', '.').str.replace('€', '').str.strip(), errors='coerce').fillna(0)
+        return 0
 
-        # Harmonisation des dates : 'DateEnvoi' (archives) vs 'Date' (courant)
-        if 'DateEnvoi' in df_f_yr.columns:
-            df_f_yr['Date'] = df_f_yr['Date'].fillna(df_f_yr['DateEnvoi'])
-        
-        df_f_yr['dt_vrai'] = pd.to_datetime(df_f_yr['Date'], dayfirst=True, errors='coerce')
-        
-        # Filtre selon le mode
-        if mode_bilan == "Par Saison":
-            df_f_yr = df_f_yr[df_f_yr['dt_vrai'].dt.year == sel_y]
-
-    # --- 4. NETTOYAGE DES RECETTES ---
     if not df_r_yr.empty:
-        for col in ['Prix', 'Acompte']:
-            if col in df_r_yr.columns:
-                df_r_yr[col] = pd.to_numeric(df_r_yr[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-        
+        df_r_yr['Acompte_Calcul'] = to_num(df_r_yr, 'Acompte')
+        df_r_yr['Prix_Calcul'] = to_num(df_r_yr, 'Prix')
         df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
         
+        # Filtre de période
         if mode_bilan == "À ce jour":
             df_r_yr = df_r_yr[df_r_yr['dt_vrai'] <= today]
         else:
             df_r_yr = df_r_yr[df_r_yr['dt_vrai'].dt.year == sel_y]
 
-    # --- 5. INDICATEURS CLÉS (KPI) ---
+    if not df_f_yr.empty:
+        # On vérifie toutes les colonnes possibles pour le montant (Montant, M_Num, etc.)
+        df_f_yr['Frais_Calcul'] = to_num(df_f_yr, 'Montant') + to_num(df_f_yr, 'M_Num')
+        
+        # On harmonise les dates de dépenses
+        df_f_yr['Date_Unifiee'] = df_f_yr['Date'].fillna(df_f_yr.get('DateEnvoi'))
+        df_f_yr['dt_vrai'] = pd.to_datetime(df_f_yr['Date_Unifiee'], dayfirst=True, errors='coerce')
+        
+        if mode_bilan == "Par Saison":
+            df_f_yr = df_f_yr[df_f_yr['dt_vrai'].dt.year == sel_y]
+
+    # --- 4. LES CHIFFRES (KPI) ---
     st.divider()
-    ca_reel = df_r_yr['Acompte'].sum() if not df_r_yr.empty else 0
-    frais_reel = df_f_yr['M_Num_Calc'].sum() if not df_f_yr.empty else 0
     
-    # Calcul de l'objectif (Prix total des missions non annulées)
-    mask_ok = ~df_r_yr['Paiement'].str.lower().str.contains("annul", na=False) if (not df_r_yr.empty and 'Paiement' in df_r_yr.columns) else True
-    ca_prev_total = df_r_yr[mask_ok]['Prix'].sum() if not df_r_yr.empty else 0
+    # CALCULS FINAUX
+    ca_total = df_r_yr['Acompte_Calcul'].sum() if not df_r_yr.empty else 0
+    depenses_totales = df_f_yr['Frais_Calcul'].sum() if not df_f_yr.empty else 0
+    solde = ca_total - depenses_totales
+    
+    # Objectif (Prix total des missions non annulées)
+    if not df_r_yr.empty:
+        mask = ~df_r_yr.get('Paiement', '').astype(str).str.lower().str.contains("annul", na=False)
+        objectif = df_r_yr[mask]['Prix_Calcul'].sum()
+    else:
+        objectif = 0
 
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("💰 CA Encaissé", f"{ca_reel:,.0f} €".replace(',', ' '))
-    k2.metric("📉 Frais Réels", f"{frais_reel:,.0f} €".replace(',', ' '))
-    k3.metric("⚖️ Solde Net", f"{(ca_reel - frais_reel):,.0f} €".replace(',', ' '))
-    k4.metric("🎯 Objectif CA", f"{ca_prev_total:,.0f} €".replace(',', ' '))
+    k1.metric("💰 CA Encaissé", f"{ca_total:,.2f} €".replace(',', ' '))
+    k2.metric("📉 Frais Réels", f"{depenses_totales:,.2f} €".replace(',', ' '))
+    k3.metric("⚖️ Solde Net", f"{solde:,.2f} €".replace(',', ' '))
+    k4.metric("🎯 Objectif CA", f"{objectif:,.2f} €".replace(',', ' '))
+
 
     # --- 6. CALCULS MENSUELS ---
     mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
