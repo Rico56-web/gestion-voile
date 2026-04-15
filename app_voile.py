@@ -588,7 +588,7 @@ if st.session_state.page == "PLANNING":
         st.info("Aucune mission ce mois-ci.")
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
-    # =================================================================
+# =================================================================
 # --- 7. PAGE STATS (VERSION FINALE SYNCHRONISÉE) ---
 # =================================================================
 if st.session_state.page == "STATS":
