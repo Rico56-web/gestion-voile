@@ -722,7 +722,12 @@ if st.session_state.page == "STATS":
         df_r_yr['Client'] = df_r_yr['Prénom'].fillna('') + " " + df_r_yr['Nom'].fillna('')
         view = df_r_yr[['DateNav', 'Client', 'Société', 'Montant_Final']].sort_values('DateNav', ascending=False)
         view.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
-        st.dataframe(view, hide_index=True, use_container_width=True)
+        st.dataframe(
+            view_frais, 
+            hide_index=True, 
+            use_container_width=True,
+            height=None # L'ascenseur interne disparaît
+        )
     else:
         st.info("Aucune recette pour cette période.")
 
@@ -742,7 +747,12 @@ if st.session_state.page == "STATS":
         view_frais = df_f_yr[cols_frais].sort_values('Date_Unifiee', ascending=False)
         view_frais = view_frais.rename(columns={'Date_Unifiee': 'Date', 'Frais_Calc': 'Montant (€)', 'Type': 'Catégorie'})
         
-        st.dataframe(view_frais, hide_index=True, use_container_width=True)
+        st.dataframe(
+            view_frais, 
+            hide_index=True, 
+            use_container_width=True,
+            height=None # L'ascenseur interne disparaît
+        )
     else:
         st.info("Aucune dépense pour cette période.")
 # --- FIN DE LA PAGE STATS ---
@@ -789,14 +799,12 @@ if st.session_state.page == "MAINT":
         edited_df = st.data_editor(
             df_edit,
             column_config={
-                "Date": st.column_config.TextColumn("Date (JJ/MM/AAAA)", help="Respectez le format français"),
-                "Objet": st.column_config.TextColumn("Désignation"),
-                "M_Num": st.column_config.NumberColumn("Montant (€)", format="%.2f"),
-                "Type": st.column_config.SelectboxColumn("Catégorie", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres frais"]),
-                "Statut": st.column_config.SelectboxColumn("État", options=["Fait", "À prévoir", "Urgent"])
+                # ... tes configs de colonnes ...
             },
-            hide_index=False, # On garde l'index pour la suppression
+            hide_index=False,
             use_container_width=True,
+            num_rows="dynamic", # Permet au tableau de s'ajuster
+            height=None,        # Supprime la contrainte de hauteur (donc l'ascenseur)
             key="maint_editor"
         )
 
