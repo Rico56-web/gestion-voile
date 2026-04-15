@@ -676,8 +676,7 @@ if st.session_state.page == "STATS":
             df_soc = df_r_yr.groupby('Société')['Acompte_Calc'].sum().reset_index()
             fig2 = px.pie(df_soc, values='Acompte_Calc', names='Société', hole=0.4, height=350)
             st.plotly_chart(fig2, use_container_width=True)
-
-    # --- 9. TABLEAUX DÉTAILLÉS (VERSION MULTI-TABLEAUX) ---
+# --- 9. TABLEAUX DÉTAILLÉS (VERSION FINALE AVEC CALCULS CORRIGÉS) ---
     st.divider()
     st.subheader("📋 Journaux de bord financiers (2026)")
     
@@ -685,15 +684,20 @@ if st.session_state.page == "STATS":
     col_rec, col_dep = st.columns(2)
     
     with col_rec:
-        st.markdown("**💰 Flux des Recettes (Par Client)**")
+        st.markdown("**💰 Flux des Recettes (Par Société)**")
         if not df_r_yr.empty:
+            # On s'assure d'avoir la meilleure valeur possible pour le CA
+            # Si Acompte est vide, on prend Prix.
+            df_r_yr['CA_Ligne'] = df_r_yr['Acompte_Calc']
+            df_r_yr.loc[df_r_yr['CA_Ligne'] == 0, 'CA_Ligne'] = df_r_yr['Prix_Calc']
+            
             df_rec_2026 = df_r_yr[df_r_yr['dt_vrai'].dt.year == 2026].copy()
             df_rec_2026 = df_rec_2026.sort_values('dt_vrai', ascending=False)
             
-            # On affiche Date, Société et Somme
-            view_r = df_rec_2026[['DateNav', 'Société', 'Acompte_Calc']].copy()
+            view_r = df_rec_2026[['DateNav', 'Société', 'CA_Ligne']].copy()
             view_r.columns = ['Date', 'Société', 'Somme (€)']
             st.dataframe(view_r, hide_index=True, use_container_width=True)
+            st.success(f"Total Recettes 2026 : {view_r['Somme (€)'].sum():,.0f} €")
         else:
             st.info("Aucune recette.")
             
@@ -702,8 +706,6 @@ if st.session_state.page == "STATS":
         if not df_f_yr.empty:
             df_f_yr = df_f_yr.sort_values('dt_vrai', ascending=False)
             
-            # --- LOGIQUE DE DESCRIPTION ROBUSTE ---
-            # On cherche l'info dans 'Equipement', sinon 'Désignation', sinon 'Mois'
             def get_description(row):
                 for col in ['Equipement', 'Désignation', 'Objet', 'Mois']:
                     if col in row and pd.notna(row[col]) and str(row[col]).strip() != "":
@@ -711,27 +713,32 @@ if st.session_state.page == "STATS":
                 return "Dépense diverse"
 
             df_f_yr['Description_Finale'] = df_f_yr.apply(get_description, axis=1)
-            
             view_f = df_f_yr[['Date_Unifiee', 'Description_Finale', 'Frais_Calc']].copy()
             view_f.columns = ['Date', 'Description', 'Somme (€)']
             st.dataframe(view_f, hide_index=True, use_container_width=True)
-        else:
-            st.info("Aucune dépense.")
+            st.error(f"Total Dépenses : {view_f['Somme (€)'].sum():,.0f} €")
 
-    # RANGÉE 2 : Détail nominatif (Le nouveau tableau que vous avez demandé)
+    # RANGÉE 2 : Détail nominatif (NOM + PRÉNOM)
     st.markdown("---")
-    st.markdown("**👤 Détail Nominatif des Recettes (Passagers / Skippers)**")
+    st.markdown("**👤 Détail Nominatif des Recettes (Identité complète)**")
     if not df_r_yr.empty:
-        # On cherche la colonne 'Nom' ou 'Client' ou 'Personne'
-        col_pers = next((c for c in ['Nom', 'Client', 'Passager'] if c in df_r_yr.columns), None)
+        df_nom = df_r_yr[df_r_yr['dt_vrai'].dt.year == 2026].copy()
         
-        if col_pers:
-            df_nom = df_r_yr[df_r_yr['dt_vrai'].dt.year == 2026].copy()
-            view_nom = df_nom[['DateNav', col_pers, 'Société', 'Acompte_Calc']].sort_values('DateNav', ascending=False)
-            view_nom.columns = ['Date', 'Nom / Personne', 'Société', 'Somme (€)']
-            st.dataframe(view_nom, hide_index=True, use_container_width=True)
+        # Création de la colonne Identité (fusion Nom + Prénom)
+        # On gère les cas où l'un des deux serait manquant
+        c_nom = 'Nom' if 'Nom' in df_nom.columns else None
+        c_pre = 'Prénom' if 'Prénom' in df_nom.columns else None
+        
+        if c_nom and c_pre:
+            df_nom['Identité'] = df_nom[c_pre].fillna('') + " " + df_nom[c_nom].fillna('')
+        elif c_nom:
+            df_nom['Identité'] = df_nom[c_nom]
         else:
-            st.warning("La colonne 'Nom' n'a pas été trouvée dans votre fichier contacts.json.")
+            df_nom['Identité'] = "Non renseigné"
+
+        view_nom = df_nom[['DateNav', 'Identité', 'Société', 'CA_Ligne']].sort_values('DateNav', ascending=False)
+        view_nom.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
+        st.dataframe(view_nom, hide_index=True, use_container_width=True)
     # =================================================================
     # --- 8. BOUTON ARCHIVAGE (VERSION UNIQUE & PROPRE) ---
     # =================================================================
