@@ -960,39 +960,43 @@ if st.session_state.page == "LOG":
                 # ... (Votre logique de sauvegarde habituelle) ...
                 st.success("Enregistré !")
                 st.rerun()
-
-    # --- 3. AFFICHAGE DES FICHES (MAINTENANT DANS LE BLOC PAGE == "LOG") ---
-    st.divider()
-    if not df_log.empty:
-        df_log['dt_tri'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
-        df_visu = df_log.sort_values('dt_tri', ascending=False)
+# --- 3. AFFICHAGE DES FICHES ---
+st.divider()
+if not df_log.empty:
+    # On s'assure que la colonne de tri existe sans polluer le DataFrame
+    df_log['dt_tri'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+    df_visu = df_log.sort_values('dt_tri', ascending=False)
+    
+    for idx, r in df_visu.iterrows():
+        # Création d'une carte propre en HTML
+        port_dep = r.get('PortDep', 'Inconnu')
+        port_arr = r.get('PortArr', 'Inconnu')
+        date_nav = r.get('Date', '??/??/????')
         
-        if "log_confirm_del" not in st.session_state:
-            st.session_state.log_confirm_del = None
-
-        for idx, r in df_visu.iterrows():
-            # Affichage de la carte
-            info_gasoil = f" | &#9981; <b>{r.get('Litre Gazoil',0)}L</b>" if r.get('Plein')=="Oui" else ""
-            html_card = (f'<div style="border: 1px solid #ddd; padding: 12px; border-radius: 10px; background: #f1f8ff; margin-bottom: 5px; border-left: 8px solid #01579b;">'
-                         f'<b>&#128197; {r["Date"]}</b> | {r["PortDep"]} &rarr; {r["PortArr"]}</div>')
-            st.markdown(html_card, unsafe_allow_html=True)
+        html_card = f"""
+        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 12px; 
+                    background: #f8f9fa; margin-bottom: 10px; border-left: 8px solid #01579b;">
+            <div style="display: flex; justify-content: space-between;">
+                <span style="font-weight: bold; color: #01579b;">📅 {date_nav}</span>
+                <span style="font-style: italic; color: #666;">📍 {port_dep} ➔ {port_arr}</span>
+            </div>
+        </div>
+        """
+        st.markdown(html_card, unsafe_allow_html=True)
+        
+        # Boutons d'actions bien espacés
+        col_edit, col_del, col_spacer = st.columns([1, 1, 8])
+        
+        if col_edit.button("✏️", key=f"edit_{idx}"):
+            st.session_state.log_edit_idx = idx
+            st.rerun()
             
-            # Boutons Actions
-            c_a, c_b, c_c = st.columns([1, 1, 4])
-            if c_a.button("✏️", key=f"edit_btn_{idx}"):
-                st.session_state.log_edit_idx = idx
-                st.rerun()
-            
-            if st.session_state.get("log_confirm_del") == idx:
-                if c_b.button("✅ OUI", key=f"conf_del_{idx}", type="primary"):
-                    df_log = df_log.drop(idx)
-                    sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
-                    st.session_state.log_confirm_del = None
-                    st.rerun()
-            else:
-                if c_b.button("🗑️", key=f"ask_del_{idx}"):
-                    st.session_state.log_confirm_del = idx
-                    st.rerun()
+        if col_del.button("🗑️", key=f"del_{idx}"):
+            # On pourrait ajouter une confirmation ici
+            df_log = df_log.drop(idx)
+            sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
+            st.rerun()
+ 
 # --- FIN DU FICHIER ---
 
 
