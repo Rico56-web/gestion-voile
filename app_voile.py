@@ -589,87 +589,74 @@ if st.session_state.page == "PLANNING":
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 # =================================================================
-# --- 7. PAGE STATS (VERSION SÉCURISÉE SANS KEYERROR) ---
+# --- 7. PAGE STATS (VERSION RÉCUPÉRATION TOTALE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # 1. Chargement et Fusion
+    # 1. Chargement sans aucune perte
     df_actuel = charger_data_safe('contacts.json')
     df_archive = charger_data_safe('archives_factures.json')
-    df_r_yr = pd.concat([df_actuel, df_archive], ignore_index=True).fillna("")
+    df_all = pd.concat([df_actuel, df_archive], ignore_index=True).fillna("")
 
-    # 2. Nettoyage financier
-    def force_num(df, col):
-        if col in df.columns:
-            s = df[col].astype(str).str.replace(r'[^\d.]', '', regex=True)
-            return pd.to_numeric(s, errors='coerce').fillna(0.0)
-        return pd.Series(0.0, index=df.index)
-
-    # 3. INTERFACE
+    # 2. Interface
     col_sel1, col_sel2 = st.columns(2)
     mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
     sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-    if not df_r_yr.empty:
-        # Préparation des données
-        df_r_yr['Mnt_A'] = force_num(df_r_yr, 'Acompte')
-        df_r_yr['Mnt_P'] = force_num(df_r_yr, 'Prix')
-        df_r_yr['Montant_Final'] = df_r_yr[['Mnt_A', 'Mnt_P']].max(axis=1)
+    if not df_all.empty:
+        # Nettoyage des montants (ultra-robuste)
+        for col in ['Acompte', 'Prix']:
+            df_all[col] = pd.to_numeric(df_all[col].astype(str).str.replace(r'[^\d.]', '', regex=True), errors='coerce').fillna(0.0)
+        df_all['Montant_Final'] = df_all[['Acompte', 'Prix']].max(axis=1)
 
-        # Extraction de la date (Multi-colonnes)
-        def extraire_date(row):
-            for col in ['DateNav', 'Date', 'date', 'Date Envoi']:
-                val = str(row.get(col, "")).strip()
-                if val and val.lower() != "nan": return val
-            return ""
+        # Gestion des dates "Tout-Terrain"
+        # On fusionne DateNav et Date, puis on convertit
+        df_all['date_brute'] = df_all['DateNav'].replace('', '').mask(df_all['DateNav'] == '', df_all['Date'])
+        df_all['dt_vrai'] = pd.to_datetime(df_all['date_brute'], dayfirst=True, errors='coerce')
 
-        df_r_yr['Date_Texte'] = df_r_yr.apply(extraire_date, axis=1)
-        df_r_yr['dt_objet'] = pd.to_datetime(df_r_yr['Date_Texte'], dayfirst=True, errors='coerce')
+        # --- LE FILTRE QUI NE DOIT PLUS BLOQUER ---
+        # On filtre sur l'année choisie, MAIS on garde les lignes sans date (au cas où)
+        mask_annee = (df_all['dt_vrai'].dt.year == sel_y) | (df_all['dt_vrai'].isna())
+        df_filtre = df_all[mask_annee].copy()
 
-        # FILTRAGE SÉCURISÉ
-        # On ne garde que les lignes avec une date valide pour l'année choisie
-        mask_annee = (df_r_yr['dt_objet'].dt.year == sel_y)
-        df_annee = df_r_yr[mask_annee].copy()
-
-        # Mode "À ce jour"
+        # Filtre "À ce jour" (uniquement si la date est connue)
         if mode_bilan == "À ce jour":
             today = pd.to_datetime(datetime.now().date())
-            df_final = df_annee[df_annee['dt_objet'] <= today].copy()
+            # On garde ce qui est passé OU ce qui n'a pas de date du tout
+            df_final = df_filtre[(df_filtre['dt_vrai'] <= today) | (df_filtre['dt_vrai'].isna())].copy()
         else:
-            df_final = df_annee.copy()
+            df_final = df_filtre.copy()
 
-        # 4. KPI (LES TOTAUX)
+        # 3. AFFICHAGE DES CHIFFRES (TOTO)
         st.divider()
-        ca_total = df_final['Montant_Final'].sum() if not df_final.empty else 0
-        st.metric(f"💰 CA ({mode_bilan})", f"{ca_total:,.0f} €".replace(',', ' '))
+        total_ca = df_final['Montant_Final'].sum()
+        
+        c1, c2 = st.columns(2)
+        c1.metric(f"💰 CA ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
+        c2.metric("📈 Nombre de lignes", f"{len(df_final)}")
 
-        # 5. AFFICHAGE DU TABLEAU
-        st.markdown(f"### 📋 Détail Recettes : {len(df_final)} ligne(s)")
+        # 4. LE TABLEAU (SANS RISQUE DE KEYERROR)
+        st.markdown(f"### 📋 Détail des {len(df_final)} lignes")
         
         if not df_final.empty:
-            # On trie AVANT de formater les dates en texte
-            df_final = df_final.sort_values('dt_objet', ascending=False)
+            # On prépare un affichage propre même si la date est cassée
+            df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y').fillna(df_final['date_brute'])
+            df_final['Client'] = df_final['Nom'].replace('', 'Non renseigné')
             
-            # On prépare les colonnes d'affichage
-            df_final['Date_Aff'] = df_final['dt_objet'].dt.strftime('%d/%m/%Y')
-            df_final['Client'] = df_final['Nom'].replace('', 'Navigation')
+            # Tri par date (les plus récentes en haut)
+            df_final = df_final.sort_values('dt_vrai', ascending=False, na_position='last')
             
-            # Sécurité colonnes pour l'affichage final
-            cols_dispo = ['Date_Aff', 'Client', 'Société', 'Montant_Final']
-            existing_cols = [c for c in cols_dispo if c in df_final.columns]
+            # Affichage restreint aux colonnes utiles
+            cols_prevues = ['Date_Aff', 'Client', 'Société', 'Montant_Final']
+            cols_dispo = [c for c in cols_prevues if c in df_final.columns]
             
-            st.dataframe(df_final[existing_cols], hide_index=True, use_container_width=True)
+            st.dataframe(df_final[cols_dispo], hide_index=True, use_container_width=True)
         else:
-            st.info(f"Aucune ligne trouvée pour {sel_y} ({mode_bilan}).")
-            
-            # BOUTON DE SECOURS : Pour comprendre où sont passées les 25 lignes
-            with st.expander("🛠️ Debug : Pourquoi 1 seule ligne ?"):
-                st.write("Dates détectées dans vos fichiers :")
-                st.write(df_r_yr[['Date_Texte', 'dt_objet', 'Nom']].head(30))
+            st.warning("Aucune donnée trouvée.")
 
     else:
-        st.error("Les fichiers contacts.json ou archives_factures.json sont introuvables ou vides.")
+        st.error("Les fichiers sont vides.")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
