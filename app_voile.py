@@ -588,23 +588,21 @@ if st.session_state.page == "PLANNING":
         st.info("Aucune mission ce mois-ci.")
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
-# =================================================================
-# --- 7. PAGE STATS (VERSION FINALE - SÉCURITÉ MAXIMALE) ---
+    # =================================================================
+# --- 7. PAGE STATS (CORRECTIF FINAL SANS NUMPY) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
     
-    # 1. FONCTION DE NETTOYAGE SIMPLE
     def clean_val_final(df, col):
         if col in df.columns:
             s = df[col].astype(str).str.replace(',', '.').str.replace('€', '').str.strip()
             return pd.to_numeric(s, errors='coerce').fillna(0.0)
         return pd.Series(0.0, index=df.index)
 
-    # 2. CHARGEMENT
+    # --- 1. CHARGEMENT ---
     df_actuel = charger_data_safe('contacts.json')
     df_archive = charger_data_safe('archives_factures.json')
-    # On concatène et on réinitialise l'index immédiatement
     df_r_yr = pd.concat([df_actuel, df_archive], ignore_index=True)
 
     df_m_curr = charger_data_safe('maintenance.json')
@@ -613,30 +611,28 @@ if st.session_state.page == "STATS":
     
     today_dt = pd.to_datetime(datetime.now().date())
 
-    # 3. FILTRES
+    # --- 2. FILTRES ---
     col_sel1, col_sel2 = st.columns(2)
     mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
     sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-    # 4. TRAITEMENT RECETTES (SANS LAMBDA)
+    # --- 3. TRAITEMENT RECETTES ---
     if not df_r_yr.empty:
-        # On s'assure que les colonnes existent
-        for c in ['Acompte', 'Prix', 'DateNav', 'Statut', 'Nom', 'Objet']:
+        for c in ['Acompte', 'Prix', 'DateNav', 'Statut', 'Nom', 'Objet', 'Société']:
             if c not in df_r_yr.columns: df_r_yr[c] = ""
 
-        # Calcul financier direct
+        # Calcul financier
         df_r_yr['A_Num'] = clean_val_final(df_r_yr, 'Acompte')
         df_r_yr['P_Num'] = clean_val_final(df_r_yr, 'Prix')
-        # On prend le max entre Acompte et Prix ligne par ligne
         df_r_yr['Montant_Calculé'] = df_r_yr[['A_Num', 'P_Num']].max(axis=1)
         
-        # Conversion Date
+        # Dates
         df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
         
-        # Filtre Annulés
+        # Nettoyage des lignes annulées
         df_r_yr = df_r_yr[~df_r_yr['Statut'].astype(str).str.contains("Annulé", case=False, na=False)].copy()
 
-        # Application du mode choisi
+        # Application des filtres de temps
         mask_annee = (df_r_yr['dt_vrai'].dt.year == sel_y)
         if mode_bilan == "À ce jour":
             df_final_r = df_r_yr[mask_annee & (df_r_yr['dt_vrai'] <= today_dt)].copy()
@@ -645,7 +641,7 @@ if st.session_state.page == "STATS":
     else:
         df_final_r = pd.DataFrame()
 
-    # 5. TRAITEMENT DÉPENSES
+    # --- 4. TRAITEMENT DÉPENSES ---
     if not df_f_yr.empty:
         df_f_yr['Frais_Calc'] = clean_val_final(df_f_yr, 'Montant') + clean_val_final(df_f_yr, 'M_Num')
         df_f_yr['dt_vrai'] = pd.to_datetime(df_f_yr['Date'].fillna(df_f_yr.get('DateEnvoi')), dayfirst=True, errors='coerce')
@@ -655,35 +651,37 @@ if st.session_state.page == "STATS":
     else:
         df_final_f = pd.DataFrame()
 
-    # 6. KPI (LES TOTAUX)
+    # --- 5. KPI (LES TOTAUX / TOTO) ---
     st.divider()
     ca_total = df_final_r['Montant_Calculé'].sum() if not df_final_r.empty else 0
     frais_total = df_final_f['Frais_Calc'].sum() if not df_final_f.empty else 0
     
-    col_k1, col_k2, col_k3 = st.columns(3)
-    with col_k1:
-        st.metric("💰 CA " + ("Encaissé" if mode_bilan == "À ce jour" else "Prévisionnel"), f"{ca_total:,.2f} €".replace(',', ' '))
-    with col_k2:
-        st.metric("📉 Frais", f"{frais_total:,.2f} €".replace(',', ' '))
-    with col_k3:
-        st.metric("⚖️ Solde Net", f"{(ca_total - frais_total):,.2f} €".replace(',', ' '))
+    c1, c2, c3 = st.columns(3)
+    c1.metric("💰 CA Total", f"{ca_total:,.2f} €".replace(',', ' '))
+    c2.metric("📉 Frais", f"{frais_total:,.2f} €".replace(',', ' '))
+    c3.metric("⚖️ Solde Net", f"{(ca_total - frais_total):,.2f} €".replace(',', ' '))
 
-    # 7. TABLEAU DES RECETTES
+    # --- 6. TABLEAU DES RECETTES ---
     st.markdown(f"### 📋 Détail Recettes : {len(df_final_r)} ligne(s)")
     if not df_final_r.empty:
-        # On définit le nom du client (Nom ou Objet)
-        # Si 'Nom' est vide, on prend 'Objet'
-        df_final_r['Client'] = df_final_r['Nom'].replace('', np.nan).fillna(df_final_r['Objet']).fillna("Inconnu")
-        df_final_r['Date'] = df_final_r['dt_vrai'].dt.strftime('%d/%m/%Y')
+        # CORRECTION DU NAMEERROR : Utilisation de None au lieu de np.nan
+        df_final_r['Client'] = df_final_r['Nom'].replace('', None).fillna(df_final_r['Objet']).fillna("Navigation")
+        df_final_r['Date_Aff'] = df_final_r['dt_vrai'].dt.strftime('%d/%m/%Y')
         
-        # Sélection finale des colonnes pour l'affichage
-        view_cols = ['Date', 'Client', 'Société', 'Montant_Calculé']
-        # On ne garde que les colonnes qui existent vraiment
-        actual_cols = [c for c in view_cols if c in df_final_r.columns]
-        
-        st.dataframe(df_final_r[actual_cols].sort_values('dt_vrai', ascending=False), hide_index=True, use_container_width=True)
+        # Affichage
+        view_r = df_final_r[['Date_Aff', 'Client', 'Société', 'Montant_Calculé']]
+        view_r.columns = ['Date', 'Client / Objet', 'Société', 'Montant (€)']
+        st.dataframe(view_r.sort_values('Date', ascending=False), hide_index=True, use_container_width=True)
     else:
-        st.warning(f"Aucune donnée trouvée pour {sel_y} en mode {mode_bilan}")
+        st.warning(f"Aucune donnée pour {sel_y} en mode {mode_bilan}")
+
+    # --- 7. TABLEAU DES DÉPENSES ---
+    st.markdown("### 💸 Détail Dépenses")
+    if not df_final_f.empty:
+        df_final_f['Date_Aff'] = df_final_f['dt_vrai'].dt.strftime('%d/%m/%Y')
+        view_f = df_final_f[['Date_Aff', 'Objet', 'Frais_Calc']]
+        view_f.columns = ['Date', 'Désignation', 'Montant (€)']
+        st.dataframe(view_f.sort_values('Date', ascending=False), hide_index=True, use_container_width=True)
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
