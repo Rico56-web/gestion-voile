@@ -747,24 +747,22 @@ if st.session_state.page == "MAINT":
         with open('params_maint.json', 'w') as f:
             json.dump(data, f)
     def maintenance_donnees_globale():
-
-    
-    # --- 1. NETTOYAGE DES CONTACTS & PLANNING ---
-    df_c = charger_data('contacts.json')
-    if not df_c.empty:
-        # Conversion flexible des dates (JJ/MM/AAAA ou ISO) vers objet date
-        df_c['DateNav'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
-        # Retour au format Français pour le stockage
-        df_c['DateNav'] = df_c['DateNav'].dt.strftime('%d/%m/%Y')
+        # --- 1. NETTOYAGE DES CONTACTS & PLANNING ---
+        df_c = charger_data('contacts.json')
+        if not df_c.empty:
+            # Conversion flexible des dates (JJ/MM/AAAA ou ISO) vers objet date
+            df_c['DateNav'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+            # Retour au format Français pour le stockage
+            df_c['DateNav'] = df_c['DateNav'].dt.strftime('%d/%m/%Y')
         
-        # On ne garde que les colonnes qui servent vraiment au projet
-        colonnes_utiles_c = [
-            'Prénom', 'Nom', 'Société', 'DateNav', 'Paiement', 
-            'Statut', 'Prix', 'Acompte', 'Jours', 'Pers', 
-            'Téléphone', 'Email', 'Notes', 'Relancer'
-        ]
-        df_c = df_c[[c for c in colonnes_utiles_c if c in df_c.columns]]
-        sauvegarder_data(df_c, 'contacts.json')
+            # On ne garde que les colonnes qui servent vraiment au projet
+            colonnes_utiles_c = [
+                'Prénom', 'Nom', 'Société', 'DateNav', 'Paiement', 
+                'Statut', 'Prix', 'Acompte', 'Jours', 'Pers', 
+                'Téléphone', 'Email', 'Notes', 'Relancer'
+            ]
+            df_c = df_c[[c for c in colonnes_utiles_c if c in df_c.columns]]
+            sauvegarder_data(df_c, 'contacts.json')
 
     # --- 2. NETTOYAGE DE LA MAINTENANCE ---
     df_m = charger_data('maintenance.json')
