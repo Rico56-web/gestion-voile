@@ -588,14 +588,12 @@ if st.session_state.page == "PLANNING":
         st.info("Aucune mission ce mois-ci.")
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
-# =================================================================
-# =================================================================
-# --- 7. PAGE STATS (CORRECTIF SÉCURISÉ - PLUS DE KEYERROR) ---
+    # =================================================================
+# --- 7. PAGE STATS (CORRECTIF DÉFINITIF - SÉCURITÉ COLONNES) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
     
-    # 1. FONCTION DE NETTOYAGE (Vectorisée)
     def clean_series(df, col):
         if col in df.columns:
             return pd.to_numeric(
@@ -604,19 +602,24 @@ if st.session_state.page == "STATS":
             ).fillna(0.0)
         return pd.Series(0.0, index=df.index)
 
-    # 2. CHARGEMENT
+    # --- 1. CHARGEMENT ---
     df_actuel = charger_data_safe('contacts.json')
     df_archive = charger_data_safe('archives_factures.json')
     df_r_yr = pd.concat([df_actuel, df_archive], ignore_index=True)
 
-    # 3. FILTRES INTERFACE
+    # --- 2. FILTRES INTERFACE ---
     col_sel1, col_sel2 = st.columns(2)
     mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
     sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-    # 4. TRAITEMENT DES RECETTES
+    # --- 3. TRAITEMENT DES RECETTES ---
     if not df_r_yr.empty:
-        # Nettoyage direct sans passer par un apply complexe (évite le KeyError)
+        # SÉCURITÉ : On s'assure que TOUTES les colonnes nécessaires existent
+        for c in ['Nom', 'Objet', 'Société', 'Acompte', 'Prix', 'DateNav', 'Statut']:
+            if c not in df_r_yr.columns:
+                df_r_yr[c] = "" # On crée la colonne vide si elle manque
+
+        # Calcul financier
         df_r_yr['A_val'] = clean_series(df_r_yr, 'Acompte')
         df_r_yr['P_val'] = clean_series(df_r_yr, 'Prix')
         df_r_yr['Mnt_Calc'] = df_r_yr[['A_val', 'P_val']].max(axis=1)
@@ -630,7 +633,7 @@ if st.session_state.page == "STATS":
         # Filtre Année
         df_annee = df_base[df_base['dt_vrai'].dt.year == sel_y].copy()
         
-        # Application du Mode
+        # Application du Mode (À ce jour vs Année Complète)
         if mode_bilan == "À ce jour":
             today_dt = pd.to_datetime(datetime.now().date())
             df_final_r = df_annee[df_annee['dt_vrai'] <= today_dt].copy()
@@ -639,26 +642,33 @@ if st.session_state.page == "STATS":
     else:
         df_final_r = pd.DataFrame()
 
-    # 5. TOTAUX (KPI)
+    # --- 4. TOTAUX (LE "TOTO") ---
     st.divider()
     ca_total = df_final_r['Mnt_Calc'].sum() if not df_final_r.empty else 0
     
     # Affichage des metrics
     c1, c2, c3 = st.columns(3)
-    c1.metric("💰 CA " + mode_bilan, f"{ca_total:,.2f} €".replace(',', ' '))
-    # Les autres metrics (Frais/Solde) peuvent être ajoutées ici de la même manière
+    # Le libellé change selon le mode pour être précis
+    label_kpi = "💰 CA Encaissé" if mode_bilan == "À ce jour" else "💰 CA Prévisionnel"
+    c1.metric(label_kpi, f"{ca_total:,.2f} €".replace(',', ' '))
+    # Vous pouvez ajouter ici les metrics Frais (k2) et Solde (k3) si vous le souhaitez
 
-    # 6. TABLEAU DÉTAILLÉ
+    # --- 5. TABLEAU DÉTAILLÉ ---
     st.markdown(f"### 📋 Détail Recettes : {len(df_final_r)} ligne(s)")
     
     if not df_final_r.empty:
-        # Préparation du nom client
-        df_final_r['Client'] = df_final_r['Nom'].replace('', None).fillna(df_final_r['Objet']).fillna("Navigation")
+        # Création du nom client avec sécurité sur les colonnes
+        # On utilise .get() pour être doublement prudent
+        df_final_r['Client'] = df_final_r['Nom'].replace('', None)
+        df_final_r['Client'] = df_final_r['Client'].fillna(df_final_r['Objet']).fillna("Navigation")
+        
         df_final_r['Date_Aff'] = df_final_r['dt_vrai'].dt.strftime('%d/%m/%Y')
         
-        # Affichage du tableau trié par date
+        # Sélection pour l'affichage
         view = df_final_r[['Date_Aff', 'Client', 'Société', 'Mnt_Calc']]
         view.columns = ['Date', 'Client / Objet', 'Société', 'Montant (€)']
+        
+        # Affichage du tableau
         st.dataframe(view.sort_values('Date', ascending=False), hide_index=True, use_container_width=True)
     else:
         st.info(f"Aucune ligne à afficher pour {sel_y} en mode '{mode_bilan}'")
