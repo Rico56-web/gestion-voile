@@ -623,11 +623,22 @@ if st.session_state.page == "STATS":
         if col in df.columns:
             return pd.to_numeric(df[col].astype(str).str.replace(',', '.').str.replace('€', '').str.strip(), errors='coerce').fillna(0)
         return 0
-    # --- 4. TRAITEMENT UNIFIÉ DES RECETTES (FILTRE ENCAISSEMENT RÉEL) ---
+        # --- 4. TRAITEMENT UNIFIÉ DES RECETTES (SÉCURISÉ) ---
         if not df_r_yr.empty:
+            # SÉCURITÉ : On s'assure que les colonnes de base existent dans le DataFrame
+            for col_name in ['Acompte', 'Prix', 'Paiement', 'Statut']:
+                if col_name not in df_r_yr.columns:
+                    df_r_yr[col_name] = 0 if col_name in ['Acompte', 'Prix'] else ""
+
+            # TES 3 LIGNES MODIFIÉES ET SÉCURISÉES :
             df_r_yr['Acompte_Calc'] = clean_val(df_r_yr, 'Acompte')
             df_r_yr['Prix_Calc'] = clean_val(df_r_yr, 'Prix')
+        
+            # On calcule le montant final AVANT de filtrer
             df_r_yr['Montant_Final'] = df_r_yr[['Acompte_Calc', 'Prix_Calc']].max(axis=1)
+
+            # ... la suite du code (dates et filtres) ...
+
 
             # Conversion date robuste
             df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
