@@ -930,9 +930,11 @@ if st.session_state.page == "ARCHIVES":
 # --- 10. PAGE LOG (LIVRE DE BORD) ---
 # =================================================================
 if st.session_state.page == "LOG":
-    st.markdown('<div style="text-align:center; background-color:#01579b; color:white; padding:10px; border-radius:10px; margin-bottom:20px;"><h1>📖 LIVRE DE BORD</h1></div>', unsafe_allow_html=True)
+    st.title("📖 LIVRE DE BORD")
     
-    df_log = charger_data('logbook.json')
+    # Utilisation du chargement sécurisé
+    df_log = charger_data_safe('logbook.json')   
+
     if df_log is None or not isinstance(df_log, pd.DataFrame):
         df_log = pd.DataFrame()
 
