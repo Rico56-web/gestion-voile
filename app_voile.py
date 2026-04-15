@@ -588,11 +588,13 @@ if st.session_state.page == "PLANNING":
         st.info("Aucune mission ce mois-ci.")
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
-# =================================================================
-# --- 7. PAGE STATS (MODES : À CE JOUR vs ANNÉE COMPLÈTE) ---
+    # =================================================================
+# --- 7. PAGE STATS (CORRECTIF ATTRIBUTE ERROR) ---
 # =================================================================
 if st.session_state.page == "STATS":
-    st.markdown(f'<h2 style="text-align:center;">📊 {st.session_state.app_name}</h2>', unsafe_allow_html=True)
+    # On utilise le nom en dur ou une valeur par défaut pour éviter le crash
+    app_title = st.session_state.get('app_name', "Vesta Skipper 2026")
+    st.markdown(f'<h2 style="text-align:center;">📊 {app_title}</h2>', unsafe_allow_html=True)
     
     def clean_val(df, col):
         if col in df.columns:
@@ -609,6 +611,7 @@ if st.session_state.page == "STATS":
     df_m_arch = charger_data_safe('archives_maintenance.json')
     df_f_yr = pd.concat([df_m_curr, df_m_arch], ignore_index=True)
     
+    # Correction : on s'assure que today_dt est comparable aux colonnes de dates
     today_dt = pd.to_datetime(datetime.now().date())
 
     # --- 2. FILTRES DE VUE ---
@@ -617,26 +620,22 @@ if st.session_state.page == "STATS":
     sel_y = col_sel2.selectbox("Choisir l'année :", [2025, 2026, 2027], index=1)
 
     # --- 3. TRAITEMENT DES RECETTES ---
+    df_final_r = pd.DataFrame()
     if not df_r_yr.empty:
-        # Nettoyage des montants
         df_r_yr['Mnt_A'] = clean_val(df_r_yr, 'Acompte')
         df_r_yr['Mnt_P'] = clean_val(df_r_yr, 'Prix')
         df_r_yr['Montant_Final'] = df_r_yr[['Mnt_A', 'Mnt_P']].max(axis=1)
-        
-        # Gestion des dates
         df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
         
-        # Filtre de base (on retire les Annulés)
         mask = ~(df_r_yr['Statut'].astype(str).str.contains("Annulé", case=False, na=False))
         
         if mode_bilan == "À ce jour":
-            # Uniquement ce qui est passé (ou aujourd'hui) pour l'année choisie
             df_final_r = df_r_yr[mask & (df_r_yr['dt_vrai'].dt.year == sel_y) & (df_r_yr['dt_vrai'] <= today_dt)].copy()
         else:
-            # Toute l'année sélectionnée, futur inclus
             df_final_r = df_r_yr[mask & (df_r_yr['dt_vrai'].dt.year == sel_y)].copy()
 
     # --- 4. TRAITEMENT DES DÉPENSES ---
+    df_final_f = pd.DataFrame()
     if not df_f_yr.empty:
         df_f_yr['Frais_Calc'] = clean_val(df_f_yr, 'Montant') + clean_val(df_f_yr, 'M_Num')
         df_f_yr['dt_vrai'] = pd.to_datetime(df_f_yr['Date'].fillna(df_f_yr.get('DateEnvoi')), dayfirst=True, errors='coerce')
@@ -645,8 +644,6 @@ if st.session_state.page == "STATS":
             df_final_f = df_f_yr[(df_f_yr['dt_vrai'].dt.year == sel_y) & (df_f_yr['dt_vrai'] <= today_dt)].copy()
         else:
             df_final_f = df_f_yr[df_f_yr['dt_vrai'].dt.year == sel_y].copy()
-    else:
-        df_final_f = pd.DataFrame()
 
     # --- 5. KPI ---
     st.divider()
@@ -666,11 +663,12 @@ if st.session_state.page == "STATS":
         df_view_r['Date'] = df_view_r['dt_vrai'].dt.strftime('%d/%m/%Y')
         df_view_r['Désignation'] = df_view_r.apply(lambda x: x['Nom'] if str(x.get('Nom', "")).strip() != "" else x.get('Objet', "Navigation"), axis=1)
         
-        # Ajout du statut Paid / Unpaid demandé
-        if 'Paiement' not in df_view_r.columns: df_view_r['Paiement'] = "À vérifier"
-        
+        cols_r = ['Date', 'Désignation', 'Société', 'Montant_Final']
+        # Ajout sécurisé du paiement pour vos archives
+        if 'Paiement' in df_view_r.columns: cols_r.insert(3, 'Paiement')
+            
         st.dataframe(
-            df_view_r[['Date', 'Désignation', 'Société', 'Paiement', 'Montant_Final']].sort_values('Date', ascending=False),
+            df_view_r[cols_r].sort_values('Date', ascending=False),
             hide_index=True, use_container_width=True
         )
     else:
