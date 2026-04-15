@@ -599,29 +599,33 @@ if st.session_state.page == "STATS":
     df_f_yr = charger_data_safe('maintenance.json')
     today = datetime.now()
 
-    # --- 2. FILTRES DE VUE ---
-    col_sel1, col_sel2 = st.columns(2)
-    mode_bilan = col_sel1.radio("Vue :", ["À ce jour", "Par Saison"], horizontal=True)
-    sel_y = col_sel2.selectbox("Choisir l'année :", [2025, 2026, 2027], index=1)
+    # --- 2. CHARGEMENT SÉCURISÉ ---
+    df_r_yr = charger_data_safe('contacts.json')
+    
+    # CHARGEMENT DES DEUX SOURCES DE MAINTENANCE
+    df_maint_courant = charger_data_safe('maintenance.json')
+    df_maint_archive = charger_data_safe('archives_maintenance.json')
+    
+    # FUSION DES DEUX (On les met ensemble)
+    df_f_yr = pd.concat([df_maint_courant, df_maint_archive], ignore_index=True)
 
-    # --- 3. TRAITEMENT DES DONNÉES ---
-    if not df_r_yr.empty:
-        # Nettoyage numérique
-        for col in ['Prix', 'Acompte']:
-            if col in df_r_yr.columns:
-                df_r_yr[col] = pd.to_numeric(df_r_yr[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-        
-        df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
-        
-        if mode_bilan == "À ce jour":
-            df_r_yr = df_r_yr[df_r_yr['dt_vrai'] <= today]
-        else:
-            df_r_yr = df_r_yr[df_r_yr['dt_vrai'].dt.year == sel_y]
+    # --- 3. TRAITEMENT & NETTOYAGE ---
+    # (Traitement des recettes df_r_yr déjà existant...)
 
     if not df_f_yr.empty:
-        col_f_nom = 'M_Num' if 'M_Num' in df_f_yr.columns else 'Montant'
-        df_f_yr[col_f_nom] = pd.to_numeric(df_f_yr[col_f_nom].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+        # On harmonise les colonnes de montant car l'archive utilise 'Montant'
+        # et le courant utilise peut-être 'M_Num'
+        if 'Montant' in df_f_yr.columns:
+            df_f_yr['Montant'] = pd.to_numeric(df_f_yr['Montant'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+            # On crée une colonne unifiée 'M_Num' pour le reste des calculs
+            df_f_yr['M_Num'] = df_f_yr['Montant']
+        
+        # Gestion des dates (Archive utilise 'DateEnvoi' au lieu de 'Date')
+        if 'DateEnvoi' in df_f_yr.columns:
+            df_f_yr['Date'] = df_f_yr['Date'].fillna(df_f_yr['DateEnvoi'])
+            
         df_f_yr['dt_vrai'] = pd.to_datetime(df_f_yr['Date'], dayfirst=True, errors='coerce')
+        
         if mode_bilan == "Par Saison":
             df_f_yr = df_f_yr[df_f_yr['dt_vrai'].dt.year == sel_y]
 
