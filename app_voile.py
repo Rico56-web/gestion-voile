@@ -746,113 +746,53 @@ if st.session_state.page == "STATS":
     else:
         st.info("Aucune dépense pour cette période.")
 # --- FIN DE LA PAGE STATS ---
-# =================================================================
-# --- 8. PAGE MAINTENANCE (PERSISTANTE & CARNET DE SANTÉ) ---
-# =================================================================
 if st.session_state.page == "MAINT":
     import pandas as pd
-    import json
-    import os
     from datetime import datetime
 
-    # --- A. FONCTIONS INTERNES ---
-    def charger_params():
-        if os.path.exists('params_maint.json'):
-            with open('params_maint.json', 'r') as f:
-                return json.load(f)
-        return {"cible_vidange": 2450.0}
+    # --- 1. CHARGEMENT SÉCURISÉ ---
+    # On utilise charger_data_safe pour éviter les erreurs de fichier corrompu
+    df_m = charger_data_safe('maintenance.json')
+    df_log = charger_data_safe('logbook.json')
 
-    def sauver_params(data):
-        with open('params_maint.json', 'w') as f:
-            json.dump(data, f)
-    def maintenance_donnees_globale():
-        # --- 1. NETTOYAGE DES CONTACTS & PLANNING ---
-        df_c = charger_data('contacts.json')
-        if not df_c.empty:
-            # Conversion flexible des dates (JJ/MM/AAAA ou ISO) vers objet date
-            df_c['DateNav'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
-            # Retour au format Français pour le stockage
-            df_c['DateNav'] = df_c['DateNav'].dt.strftime('%d/%m/%Y')
-        
-            # On ne garde que les colonnes qui servent vraiment au projet
-            colonnes_utiles_c = [
-                'Prénom', 'Nom', 'Société', 'DateNav', 'Paiement', 
-                'Statut', 'Prix', 'Acompte', 'Jours', 'Pers', 
-                'Téléphone', 'Email', 'Notes', 'Relancer'
-            ]
-            df_c = df_c[[c for c in colonnes_utiles_c if c in df_c.columns]]
-            sauvegarder_data(df_c, 'contacts.json')
-
-        # --- 2. NETTOYAGE DE LA MAINTENANCE (VERSION SÉCURISÉE) ---
-        df_m = charger_data('maintenance.json')
-        if not df_m.empty:
-            # A. On s'assure que les colonnes indispensables existent
-            colonnes_vitales = ['Date', 'Objet', 'M_Num', 'Statut', 'Type']
-            for col in colonnes_vitales:
-                if col not in df_m.columns:
-                    # Si 'Montant' existe mais pas 'M_Num', on fait le transfert
-                    if col == 'M_Num' and 'Montant' in df_m.columns:
-                        df_m['M_Num'] = df_m['Montant']
-                    else:
-                        df_m[col] = 0.0 if col == 'M_Num' else "Inconnu"
-
-        # B. Correction robuste des dates
-        # On ne convertit que si la colonne n'est pas déjà au bon format
-        df_m['dt_temp'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-        
-        # On remplit les dates vides (comme tes taxes DGN) par la date du jour pour éviter les erreurs
-        df_m['dt_temp'] = df_m['dt_temp'].fillna(datetime.now())
-        
-        # On reformate proprement en texte pour le JSON
-        df_m['Date'] = df_m['dt_temp'].dt.strftime('%d/%m/%Y')
-        df_m = df_m.drop(columns=['dt_temp']) # On supprime la colonne de calcul
-        
-        # C. Sauvegarde sans rien supprimer d'autre
-        sauvegarder_data(df_m, 'maintenance.json')
-    
-    st.success("✅ Base de données Vesta nettoyée et optimisée (Format FR conservé).")
-
-    # --- C. RÉCUPÉRATION DES DONNÉES ---
-    params = charger_params()
-    df_log = charger_data('logbook.json')
-    df_m = charger_data('maintenance.json')
-    
+    # --- 2. CALCUL DES HEURES MOTEUR ---
     releve_h = 0
-    if not df_log.empty:
+    if not df_log.empty and 'MotArr' in df_log.columns:
         df_log['MotArr'] = pd.to_numeric(df_log['MotArr'], errors='coerce').fillna(0)
         releve_h = df_log['MotArr'].max()
 
-    # --- D. INTERFACE ---
-    st.title("🛠️ MAINTENANCE")
+    # --- 3. PARAMÈTRES VIDANGE ---
+    if os.path.exists('params_maint.json'):
+        with open('params_maint.json', 'r') as f:
+            params = json.load(f)
+    else:
+        params = {"cible_vidange": 2450.0}
+
+    # --- 4. INTERFACE : BANDEAU VIDANGE ---
+    st.title("🛠️ MAINTENANCE VESTA")
     
     col_target, col_info = st.columns([2, 1])
     with col_target:
         new_target = st.number_input("Prochaine vidange à (h) :", 
-                                     value=float(params['cible_vidange']), 
+                                     value=float(params.get('cible_vidange', 2450)), 
                                      step=10.0, format="%.1f")
-        if new_target != params['cible_vidange']:
+        if new_target != params.get('cible_vidange'):
             params['cible_vidange'] = new_target
-            sauver_params(params)
+            with open('params_maint.json', 'w') as f:
+                json.dump(params, f)
     
-    PROCHAINE_VIDANGE = params['cible_vidange']
-    heures_restantes = PROCHAINE_VIDANGE - releve_h
-    percent_prog = max(0.0, min(1.0, (100.0 - heures_restantes) / 100.0))
-
-    # --- E. BANDEAU D'ALERTE ---
+    heures_restantes = params['cible_vidange'] - releve_h
     color_v = "#2e7d32" if heures_restantes > 15 else ("#ef6c00" if heures_restantes > 0 else "#c62828")
-    bg_v = "#e8f5e9" if heures_restantes > 15 else ("#fff3e0" if heures_restantes > 0 else "#ffebee")
+    
+    st.markdown(f"""
+        <div style="background-color: {color_v}22; border: 2px solid {color_v}; padding: 15px; border-radius: 12px; text-align: center;">
+            <h3 style="margin:0; color: {color_v};">{heures_restantes:.1f} h avant vidange</h3>
+            <p style="margin:0; color: #555;">Compteur moteur : <b>{releve_h:.1f} h</b></p>
+        </div>
+    """, unsafe_allow_html=True)
 
-    html_cycle = f"""
-    <div style="background-color: {bg_v}; border: 2px solid {color_v}; padding: 12px; border-radius: 12px; text-align: center; margin-top: 10px;">
-        <div style="color: {color_v}; font-weight: bold; font-size: 0.75rem;">&#128712; ÉTAT DU CYCLE</div>
-        <div style="font-size: 1.6rem; font-weight: 900; color: {color_v};">{heures_restantes:.1f} h restantes</div>
-        <div style="font-size: 0.75rem; color: #555;">Compteur : <b>{releve_h:.1f} h</b></div>
-    </div>
-    """
-    st.markdown(html_cycle, unsafe_allow_html=True)
-    st.progress(percent_prog)
-
-    if st.button("🔧 ENREGISTRER LA VIDANGE", use_container_width=True, type="primary"):
+    # --- 5. BOUTON ACTION VIDANGE ---
+    if st.button("🔧 ENREGISTRER UNE VIDANGE MAINTENANT", use_container_width=True, type="primary"):
         new_v = {
             "Date": datetime.now().strftime("%d/%m/%Y"),
             "Objet": f"VIDANGE MOTEUR ({releve_h}h)",
@@ -861,13 +801,75 @@ if st.session_state.page == "MAINT":
         df_m = pd.concat([df_m, pd.DataFrame([new_v])], ignore_index=True)
         sauvegarder_data(df_m, 'maintenance.json')
         params['cible_vidange'] = releve_h + 100.0
-        sauver_params(params)
-        st.success("Vidange archivée !")
+        with open('params_maint.json', 'w') as f:
+            json.dump(params, f)
+        st.success("Vidange enregistrée !")
         st.rerun()
 
     st.divider()
-    st.subheader("📋 Historique")
-    # ... (Suite de ton code d'affichage d'historique)
+
+    # --- 6. AFFICHAGE DE L'HISTORIQUE (LA ZONE CRITIQUE) ---
+    st.subheader("📋 Historique des entretiens et achats")
+
+    if not df_m.empty:
+        # Nettoyage à la volée pour l'affichage uniquement
+        df_display = df_m.copy()
+        
+        # On s'assure que M_Num existe (si c'était Montant dans le JSON)
+        if 'M_Num' not in df_display.columns and 'Montant' in df_display.columns:
+            df_display['M_Num'] = df_display['Montant']
+        
+        # Gestion des colonnes manquantes pour éviter le crash de l'affichage
+        for c in ['Date', 'Objet', 'M_Num', 'Statut', 'Type']:
+            if c not in df_display.columns:
+                df_display[c] = "N/A"
+
+        # Tri par date (on crée une colonne de tri invisible)
+        df_display['dt_tri'] = pd.to_datetime(df_display['Date'], dayfirst=True, errors='coerce')
+        df_display = df_display.sort_values('dt_tri', ascending=False).drop(columns=['dt_tri'])
+
+        # AFFICHAGE DU TABLEAU
+        st.dataframe(
+            df_display[['Date', 'Objet', 'M_Num', 'Type', 'Statut']],
+            column_config={
+                "Date": st.column_config.TextColumn("Date", width="small"),
+                "Objet": st.column_config.TextColumn("Désignation", width="large"),
+                "M_Num": st.column_config.NumberColumn("Montant (€)", format="%.2f"),
+                "Type": st.column_config.TextColumn("Catégorie"),
+                "Statut": st.column_config.TextColumn("État")
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+    else:
+        st.warning("⚠️ Le fichier maintenance.json est vide ou introuvable.")
+        st.info("Utilisez le formulaire ci-dessous pour ajouter votre première dépense.")
+
+    # --- 7. FORMULAIRE D'AJOUT ---
+    with st.expander("➕ Ajouter un achat ou un entretien"):
+        with st.form("add_maint"):
+            f_date = st.date_input("Date de l'opération", datetime.now())
+            f_obj = st.text_input("Désignation (ex: Gilets, Antifouling...)")
+            col_a, col_b = st.columns(2)
+            f_montant = col_a.number_input("Montant (€)", min_value=0.0, step=0.01)
+            f_type = col_b.selectbox("Catégorie", ["Maintenance", "Sécurité", "Port", "Assurances", "Autres frais"])
+            f_statut = st.selectbox("Statut", ["Fait", "À prévoir", "Urgent"])
+            
+            if st.form_submit_button("💾 Enregistrer"):
+                if f_obj:
+                    new_line = {
+                        "Date": f_date.strftime("%d/%m/%Y"),
+                        "Objet": f_obj,
+                        "M_Num": f_montant,
+                        "Statut": f_statut,
+                        "Type": f_type
+                    }
+                    df_m = pd.concat([df_m, pd.DataFrame([new_line])], ignore_index=True)
+                    sauvegarder_data(df_m, 'maintenance.json')
+                    st.success("Donnée ajoutée !")
+                    st.rerun()
+                else:
+                    st.error("Veuillez saisir une désignation.")
 # =================================================================
 # --- PAGE : FACTURATION & SUIVI PAIEMENTS ---
 # =================================================================
