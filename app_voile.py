@@ -590,12 +590,19 @@ if st.session_state.page == "PLANNING":
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 
     # =================================================================
-# --- 7. PAGE STATS (VERSION CORRIGÉE - AFFICHAGE ALIGNÉ) ---
+# --- 7. PAGE STATS (CORRIGÉE - INDENTATION & LOGIQUE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Tableau de Bord Vesta Skipper 2026</h2>', unsafe_allow_html=True)
     
-    # --- INITIALISATION & CHARGEMENT ---
+    # 1. FONCTION DE NETTOYAGE (Définie proprement à l'intérieur du bloc)
+    def clean_val(df, col):
+        if col in df.columns:
+            s = df[col].astype(str).str.replace(',', '.').str.replace('€', '').str.strip()
+            return pd.to_numeric(s, errors='coerce').fillna(0)
+        return pd.Series(0, index=df.index)
+
+    # 2. CHARGEMENT DES DONNÉES
     df_actuel = charger_data_safe('contacts.json')
     df_archive = charger_data_safe('archives_factures.json')
     df_r_yr = pd.concat([df_actuel, df_archive], ignore_index=True)
@@ -606,46 +613,39 @@ if st.session_state.page == "STATS":
     
     today = datetime.now()
 
-    # --- FILTRES ---
+    # 3. FILTRES
     col_sel1, col_sel2 = st.columns(2)
     mode_bilan = col_sel1.radio("Vue :", ["À ce jour", "Par Saison"], horizontal=True)
     sel_y = col_sel2.selectbox("Choisir l'année :", [2025, 2026, 2027], index=1)
 
-     def clean_val(df, col):
-        if col in df.columns:
-            # On convertit en texte, on nettoie les symboles, et on transforme en nombre
-            s = df[col].astype(str).str.replace(',', '.').str.replace('€', '').str.strip()
-            return pd.to_numeric(s, errors='coerce').fillna(0)
-        return pd.Series(0, index=df.index) # Renvoie une colonne de 0 si la colonne n'existe pas
-
-    # --- 4. TRAITEMENT UNIFIÉ DES RECETTES (SÉCURISÉ) ---
+    # 4. TRAITEMENT RECETTES
     if not df_r_yr.empty:
-        # On s'assure que les colonnes existent pour éviter les crashs
-        for col_name in ['Acompte', 'Prix', 'Paiement', 'Statut', 'DateNav']:
-            if col_name not in df_r_yr.columns:
-                df_r_yr[col_name] = 0 if col_name in ['Acompte', 'Prix'] else ""
-
-        # Version optimisée et sécurisée pour calculer le montant final
-        # On nettoie les deux colonnes d'un coup
+        for col in ['Acompte', 'Prix', 'Paiement', 'Statut', 'DateNav', 'Société']:
+            if col not in df_r_yr.columns: df_r_yr[col] = 0 if col in ['Acompte', 'Prix'] else ""
+        
         df_r_yr['Acompte_Num'] = clean_val(df_r_yr, 'Acompte')
         df_r_yr['Prix_Num'] = clean_val(df_r_yr, 'Prix')
-        
-        # On prend le maximum entre l'acompte et le prix pour chaque ligne
         df_r_yr['Montant_Final'] = df_r_yr[['Acompte_Num', 'Prix_Num']].max(axis=1)
-
-        # Conversion des dates
+        
         df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
+        
+        mask_base = (df_r_yr['Statut'] != "Liste d'attente") & (df_r_yr['Statut'] != "Annulé")
+        if mode_bilan == "À ce jour":
+            df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'] <= pd.to_datetime(today.date()))].copy()
+        else:
+            df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'].dt.year == sel_y)].copy()
 
-    # --- TRAITEMENT DÉPENSES ---
+    # 5. TRAITEMENT DÉPENSES
     if not df_f_yr.empty:
         df_f_yr['Frais_Calc'] = clean_val(df_f_yr, 'Montant') + clean_val(df_f_yr, 'M_Num')
         df_f_yr['dt_vrai'] = pd.to_datetime(df_f_yr['Date'].fillna(df_f_yr.get('DateEnvoi')), dayfirst=True, errors='coerce')
+        
         if mode_bilan == "À ce jour":
             df_f_yr = df_f_yr[df_f_yr['dt_vrai'] <= today].copy()
         else:
             df_f_yr = df_f_yr[df_f_yr['dt_vrai'].dt.year == sel_y].copy()
 
-    # --- KPI ---
+    # 6. INDICATEURS CLÉS (KPI)
     st.divider()
     ca_total = df_r_yr['Montant_Final'].sum() if not df_r_yr.empty else 0
     frais_total = df_f_yr['Frais_Calc'].sum() if not df_f_yr.empty else 0
@@ -656,7 +656,7 @@ if st.session_state.page == "STATS":
     k3.metric("⚖️ Solde Net", f"{(ca_total - frais_total):,.0f} €".replace(',', ' '))
     k4.metric("📈 Marge %", f"{( (ca_total - frais_total)/ca_total*100 if ca_total > 0 else 0):.1f}%")
 
-    # --- GRAPHIQUES ---
+    # 7. GRAPHIQUES
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("📊 Trésorerie Mensuelle")
@@ -673,38 +673,35 @@ if st.session_state.page == "STATS":
         if not df_r_yr.empty and 'Société' in df_r_yr.columns:
             st.plotly_chart(px.pie(df_r_yr.groupby('Société')['Montant_Final'].sum().reset_index(), values='Montant_Final', names='Société', hole=0.4, height=300), use_container_width=True)
 
-    # --- 09. DÉTAIL DES RECETTES (SORTI DES COLONNES) ---
+    # 8. DÉTAIL DES RECETTES
     st.divider()
     st.markdown("### 💰 Détail des recettes")
     if not df_r_yr.empty:
         df_r_view = df_r_yr.copy()
-        df_r_view['Date_Affiche'] = df_r_view['dt_vrai'].dt.strftime('%d/%m/%Y').fillna(df_r_view['DateNav'])
-        df_r_view['Desig_Affiche'] = df_r_view.get('Nom', df_r_view.get('Objet', "Inconnu"))
+        df_r_view['Date_A'] = df_r_view['dt_vrai'].dt.strftime('%d/%m/%Y').fillna(df_r_view['DateNav'])
+        df_r_view['Client'] = df_r_view.get('Nom', df_r_view.get('Objet', "Inconnu"))
         
-        view_recettes = df_r_view[['Date_Affiche', 'Desig_Affiche', 'Société', 'Montant_Final']]
+        view_recettes = df_r_view[['Date_A', 'Client', 'Société', 'Montant_Final']]
         view_recettes.columns = ['Date', 'Client', 'Société', 'Montant (€)']
         st.dataframe(view_recettes.sort_values('Date', ascending=False), hide_index=True, use_container_width=True)
-        st.metric("Total Recettes", f"{ca_total:,.2f} €".replace(',', ' '))
     else:
         st.info("Aucune recette pour cette sélection.")
 
-    # --- 10. DÉTAIL DES DÉPENSES ---
+    # 9. DÉTAIL DES DÉPENSES
     st.markdown("### 💸 Détail des dépenses")
     if not df_f_yr.empty:
         df_f_view = df_f_yr.copy()
-        # Filtre anti-recettes 450€
+        # Filtre anti-recettes 450€ / CMN
         df_f_view = df_f_view[df_f_view['Frais_Calc'] != 450]
         
-        df_f_view['Date_Affiche'] = df_f_view['dt_vrai'].dt.strftime('%d/%m/%Y').fillna(df_f_view['Date'])
-        df_f_view['Desig_Affiche'] = df_f_view.get('Objet', df_f_view.get('Désignation', "Divers"))
+        df_f_view['Date_A'] = df_f_view['dt_vrai'].dt.strftime('%d/%m/%Y').fillna(df_f_view['Date'])
+        df_f_view['Objet'] = df_f_view.get('Objet', df_f_view.get('Désignation', "Divers"))
         
-        view_frais = df_f_view[['Date_Affiche', 'Desig_Affiche', 'Frais_Calc']]
+        view_frais = df_f_view[['Date_A', 'Objet', 'Frais_Calc']]
         view_frais.columns = ['Date', 'Désignation', 'Montant (€)']
         st.dataframe(view_frais.sort_values('Date', ascending=False), hide_index=True, use_container_width=True)
-        st.metric("Total Dépenses", f"{frais_total:,.2f} €".replace(',', ' '))
     else:
         st.info("Aucune dépense pour cette sélection.")
-
     # --- FIN DE LA PAGE STATS ---
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
