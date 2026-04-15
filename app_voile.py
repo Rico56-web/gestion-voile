@@ -676,46 +676,62 @@ if st.session_state.page == "STATS":
             df_soc = df_r_yr.groupby('Société')['Acompte_Calc'].sum().reset_index()
             fig2 = px.pie(df_soc, values='Acompte_Calc', names='Société', hole=0.4, height=350)
             st.plotly_chart(fig2, use_container_width=True)
-    # --- 9. TABLEAUX DÉTAILLÉS (VERSION CHRONOLOGIQUE) ---
+
+    # --- 9. TABLEAUX DÉTAILLÉS (VERSION MULTI-TABLEAUX) ---
     st.divider()
     st.subheader("📋 Journaux de bord financiers (2026)")
     
+    # RANGÉE 1 : Synthèse Recettes et Dépenses
     col_rec, col_dep = st.columns(2)
     
     with col_rec:
-        st.markdown("**💰 Détail des Recettes (Depuis le 01/01)**")
+        st.markdown("**💰 Flux des Recettes (Par Client)**")
         if not df_r_yr.empty:
-            # On filtre pour n'avoir que l'année en cours (2026)
             df_rec_2026 = df_r_yr[df_r_yr['dt_vrai'].dt.year == 2026].copy()
-            # On trie du plus récent au plus ancien
             df_rec_2026 = df_rec_2026.sort_values('dt_vrai', ascending=False)
             
+            # On affiche Date, Société et Somme
             view_r = df_rec_2026[['DateNav', 'Société', 'Acompte_Calc']].copy()
-            view_r.columns = ['Date', 'Client', 'Somme (€)']
+            view_r.columns = ['Date', 'Société', 'Somme (€)']
             st.dataframe(view_r, hide_index=True, use_container_width=True)
-            st.caption(f"Total Recettes 2026 : {view_r['Somme (€)'].sum():,.0f} €")
         else:
-            st.info("Aucune recette enregistrée.")
+            st.info("Aucune recette.")
             
     with col_dep:
         st.markdown("**💸 Détail des Dépenses (Vérifié)**")
         if not df_f_yr.empty:
-            # On trie du plus récent au plus ancien
             df_f_yr = df_f_yr.sort_values('dt_vrai', ascending=False)
             
-            # On identifie la colonne descriptive (Mois, Objet ou Equipement)
-            c_desc = 'Mois' if 'Mois' in df_f_yr.columns else df_f_yr.columns[0]
+            # --- LOGIQUE DE DESCRIPTION ROBUSTE ---
+            # On cherche l'info dans 'Equipement', sinon 'Désignation', sinon 'Mois'
+            def get_description(row):
+                for col in ['Equipement', 'Désignation', 'Objet', 'Mois']:
+                    if col in row and pd.notna(row[col]) and str(row[col]).strip() != "":
+                        return row[col]
+                return "Dépense diverse"
+
+            df_f_yr['Description_Finale'] = df_f_yr.apply(get_description, axis=1)
             
-            view_f = df_f_yr[['Date_Unifiee', c_desc, 'Frais_Calc']].copy()
+            view_f = df_f_yr[['Date_Unifiee', 'Description_Finale', 'Frais_Calc']].copy()
             view_f.columns = ['Date', 'Description', 'Somme (€)']
-            
-            # Suppression des lignes sans date ou futures (sécurité affichage)
-            view_f = view_f.dropna(subset=['Date'])
-            
             st.dataframe(view_f, hide_index=True, use_container_width=True)
-            st.caption(f"Total Dépenses affichées : {view_f['Somme (€)'].sum():,.0f} €")
         else:
-            st.info("Aucune dépense sur cette période.")
+            st.info("Aucune dépense.")
+
+    # RANGÉE 2 : Détail nominatif (Le nouveau tableau que vous avez demandé)
+    st.markdown("---")
+    st.markdown("**👤 Détail Nominatif des Recettes (Passagers / Skippers)**")
+    if not df_r_yr.empty:
+        # On cherche la colonne 'Nom' ou 'Client' ou 'Personne'
+        col_pers = next((c for c in ['Nom', 'Client', 'Passager'] if c in df_r_yr.columns), None)
+        
+        if col_pers:
+            df_nom = df_r_yr[df_r_yr['dt_vrai'].dt.year == 2026].copy()
+            view_nom = df_nom[['DateNav', col_pers, 'Société', 'Acompte_Calc']].sort_values('DateNav', ascending=False)
+            view_nom.columns = ['Date', 'Nom / Personne', 'Société', 'Somme (€)']
+            st.dataframe(view_nom, hide_index=True, use_container_width=True)
+        else:
+            st.warning("La colonne 'Nom' n'a pas été trouvée dans votre fichier contacts.json.")
     # =================================================================
     # --- 8. BOUTON ARCHIVAGE (VERSION UNIQUE & PROPRE) ---
     # =================================================================
