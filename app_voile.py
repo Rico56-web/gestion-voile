@@ -613,29 +613,34 @@ if st.session_state.page == "STATS":
         if col in df.columns:
             return pd.to_numeric(df[col].astype(str).str.replace(',', '.').str.replace('€', '').str.strip(), errors='coerce').fillna(0)
         return 0
-    # --- 4. TRAITEMENT UNIFIÉ DES RECETTES (ROBUSTE AUX FORMATS) ---
-    if not df_r_yr.empty:
-        df_r_yr['Acompte_Calc'] = clean_val(df_r_yr, 'Acompte')
-        df_r_yr['Prix_Calc'] = clean_val(df_r_yr, 'Prix')
-        df_r_yr['Montant_Final'] = df_r_yr[['Acompte_Calc', 'Prix_Calc']].max(axis=1)
+    # --- 4. TRAITEMENT UNIFIÉ DES RECETTES (FILTRE ENCAISSEMENT RÉEL) ---
+        if not df_r_yr.empty:
+            df_r_yr['Acompte_Calc'] = clean_val(df_r_yr, 'Acompte')
+            df_r_yr['Prix_Calc'] = clean_val(df_r_yr, 'Prix')
+            df_r_yr['Montant_Final'] = df_r_yr[['Acompte_Calc', 'Prix_Calc']].max(axis=1)
 
-        # Conversion intelligente : on essaie le format FR d'abord, sinon ISO
-        df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
-        
-        # Pour les lignes qui seraient encore vides (NaT), on tente une conversion automatique
-        mask_nat = df_r_yr['dt_vrai'].isna()
-        if mask_nat.any():
-            df_r_yr.loc[mask_nat, 'dt_vrai'] = pd.to_datetime(df_r_yr.loc[mask_nat, 'DateNav'], errors='coerce')
+            # Conversion date robuste
+            df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
+            mask_nat = df_r_yr['dt_vrai'].isna()
+            if mask_nat.any():
+                df_r_yr.loc[mask_nat, 'dt_vrai'] = pd.to_datetime(df_r_yr.loc[mask_nat, 'DateNav'], errors='coerce')
 
-        # Filtres de sécurité (Exclusion Liste d'attente et Annulé)
-        mask_base = (df_r_yr['Statut'] != "Liste d'attente") & (df_r_yr['Statut'] != "Annulé")
+            # --- LOGIQUE DE FILTRE PRÉCISE ---
+            mask_base = (df_r_yr['Statut'] != "Liste d'attente") & (df_r_yr['Statut'] != "Annulé")
         
-        if mode_bilan == "À ce jour":
-            # On s'assure que today est bien au format datetime
-            today_dt = pd.to_datetime(datetime.now().date())
-            df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'] <= today_dt)]
-        else:
-            df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'].dt.year == sel_y)]
+            if mode_bilan == "À ce jour":
+                today_dt = pd.to_datetime(datetime.now().date())
+            
+                # CONDITION CRUCIALE : 
+                # On prend la ligne si :
+                # 1. Elle est déjà passée (Date <= today) 
+                # ET 2. Elle est marquée "Paid" OU elle vient des archives (car l'archive = encaissé par défaut)
+                mask_paye = (df_r_yr['Paiement'].str.lower() == "paid") | (df_r_yr['Provenance'] == 'archive')
+            
+                # Note : Pour que cela marche, on ajoute une colonne 'Provenance' lors du chargement
+                df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'] <= today_dt) & mask_paye]
+            else:
+                df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'].dt.year == sel_y)]
             
     # --- 5. TRAITEMENT DES DÉPENSES ---
     df_f_yr = pd.concat([df_m_curr, df_m_arch], ignore_index=True)
