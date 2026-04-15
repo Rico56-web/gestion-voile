@@ -727,129 +727,105 @@ if st.session_state.page == "STATS":
             df_soc = df_r_yr.groupby('Société')['Montant_Final'].sum().reset_index()
             fig2 = px.pie(df_soc, values='Montant_Final', names='Société', hole=0.4, height=350)
             st.plotly_chart(fig2, use_container_width=True)
+    # --- 9. DÉTAIL DES RECETTES ---
+    st.markdown("### 💰 Détail des recettes")
+    
+    total_recettes = 0.0  # Initialisation de sécurité
+    
+    if not df_v_yr.empty:
+        df_v_view = df_v_yr.copy()
+        
+        # Recherche flexible des colonnes pour les recettes
+        def find_val_r(row, choices):
+            for c in choices:
+                if c in row.index and pd.notna(row[c]) and str(row[c]).strip().lower() not in ['none', 'nan', '']:
+                    return row[c]
+            return None
 
-    # --- 9. TABLEAU DÉTAILLÉ RECETTES ---
-    st.markdown("### 📋 Détail des recettes")
-    if not df_r_yr.empty:
-        df_r_view = df_r_yr.copy()
+        # A. Date
+        df_v_view['dt_temp_raw'] = df_v_view.apply(lambda r: find_val_r(r, ['DateNav', 'Date', 'dt']), axis=1)
+        df_v_view['dt_temp'] = pd.to_datetime(df_v_view['dt_temp_raw'], errors='coerce')
+        df_v_view['Date_Affiche'] = df_v_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna(df_v_view['dt_temp_raw'].astype(str))
         
-        # On cible la colonne exacte identifiée dans ton JSON : DateNav
-        col_cible = 'DateNav' if 'DateNav' in df_r_view.columns else 'Date'
+        # B. Désignation
+        df_v_view['Desig_Affiche'] = df_v_view.apply(lambda r: find_val_r(r, ['Nom', 'Objet', 'Désignation']) or "Client Inconnu", axis=1)
         
-        # Conversion flexible (gère les slashs et les tirets)
-        def clean_date_nav(val):
-            if pd.isna(val) or val == "": return None
-            # On tente le format ISO (tirets) puis FR (slashs)
-            for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
-                try:
-                    return pd.to_datetime(val, format=fmt)
-                except:
-                    continue
-            # Si échec, on laisse pandas deviner
-            return pd.to_datetime(val, errors='coerce')
+        # C. Catégorie (ou Société)
+        df_v_view['Cat_Affiche'] = df_v_view.apply(lambda r: find_val_r(r, ['Société', 'Type', 'Catégorie']) or "Prestation", axis=1)
+        
+        # D. Montant
+        df_v_view['Mnt_Affiche'] = pd.to_numeric(df_v_view.get('Prix', df_v_view.get('Montant', 0)), errors='coerce').fillna(0.0)
 
-        df_r_view['dt_temp'] = df_r_view[col_cible].apply(clean_date_nav)
-        
-        # Affichage propre ou valeur brute si échec
-        df_r_view['Date_Affiche'] = df_r_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna(df_r_view[col_cible].astype(str))
-        # Nettoyage final pour les "None" textuels
-        df_r_view['Date_Affiche'] = df_r_view['Date_Affiche'].replace(['None', 'nan', 'NaT'], 'À saisir')
-
-        # Construction du nom client
-        df_r_view['Client'] = df_r_view.apply(lambda x: f"{str(x.get('Prénom',''))} {str(x.get('Nom',''))}".replace('None', '').strip(), axis=1)
-        
-        # Sélection des colonnes pour l'affichage
-        view_recettes = df_r_view.sort_values('dt_temp', ascending=False)
-        view_recettes = view_recettes[['Date_Affiche', 'Client', 'Société', 'Prix']]
-        view_recettes.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
-        
-        # --- CALCUL DU TOTAL (SÉCURISÉ) ---
-        # On calcule sur 'Mnt_Affiche' qui est le nom interne de la colonne
+        # Calcul du total avant affichage
         total_recettes = df_v_view['Mnt_Affiche'].sum()
-        
-        # Affichage du tableau
+
+        # Préparation du tableau d'affichage
         view_recettes = df_v_view[['Date_Affiche', 'Desig_Affiche', 'Cat_Affiche', 'Mnt_Affiche']]
-        view_recettes.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
-        st.dataframe(view_recettes, hide_index=True, use_container_width=True)
+        view_recettes.columns = ['Date', 'Client / Objet', 'Société', 'Montant (€)']
         
-        # Affichage du total sous le tableau
-        st.metric("Total des Recettes (Net)", f"{total_recettes:,.2f} €".replace(',', ' '))
-        st.dataframe(view_recettes, hide_index=True, use_container_width=True)
-        # --- TOTAL RECETTES ---
-        total_recettes = view_recettes['Montant (€)'].sum()
-        st.metric("Total des Recettes (Net)", f"{total_recettes:,.2f} €".replace(',', ' '))
+        st.dataframe(view_recettes.sort_values('Date', ascending=False), hide_index=True, use_container_width=True)
         
-    # --- 10. DÉTAIL DES DÉPENSES (VERSION ANTI-INTRUS) ---
+        # Affichage du total
+        st.metric("Total des Recettes (Brut)", f"{total_recettes:,.2f} €".replace(',', ' '))
+    else:
+        st.info("Aucune recette enregistrée pour cette année.")
+
+     # --- 10. DÉTAIL DES DÉPENSES ---
     st.markdown("### 💸 Détail des dépenses")
+    
+    total_depenses = 0.0  # Initialisation de sécurité
     
     if not df_f_yr.empty:
         df_f_view = df_f_yr.copy()
         
-        # --- NETTOYAGE RADICAL DES RECETTES CMN (450€) ---
-        # 1. On cherche la colonne qui contient le montant (Prix, Frais_Calc ou Montant)
-        col_prix = next((c for c in ['Prix', 'Frais_Calc', 'Montant'] if c in df_f_view.columns), None)
+        # --- FILTRE ANTI-RECETTES (450€ / CMN) ---
+        col_check_mnt = next((c for c in ['Prix', 'Frais_Calc', 'Montant'] if c in df_f_view.columns), None)
+        if col_check_mnt:
+            # Conversion numérique pour filtrage précis
+            df_f_view[col_check_mnt] = pd.to_numeric(df_f_view[col_check_mnt], errors='coerce')
+            df_f_view = df_f_view[df_f_view[col_check_mnt] != 450]
         
-        if col_prix:
-            # On convertit en numérique (les erreurs deviennent NaN)
-            temp_mnt = pd.to_numeric(df_f_view[col_prix], errors='coerce')
-            # On exclut TOUT ce qui est égal à 450
-            df_f_view = df_f_view[temp_mnt != 450]
-
-        # 2. Sécurité supplémentaire sur le nom de la société
         if 'Société' in df_f_view.columns:
             df_f_view = df_f_view[df_f_view['Société'].astype(str).str.upper() != 'CMN']
 
-        # --- AFFICHAGE SI LE TABLEAU N'EST PAS VIDE ---
         if not df_f_view.empty:
-            def find_value(row, possibilities):
-                for p in possibilities:
-                    if p in row.index and pd.notna(row[p]) and str(row[p]).strip().lower() not in ['none', 'nan', '']:
-                        return row[p]
+            # Recherche flexible des colonnes
+            def find_val_f(row, choices):
+                for c in choices:
+                    if c in row.index and pd.notna(row[c]) and str(row[c]).strip().lower() not in ['none', 'nan', '']:
+                        return row[c]
                 return None
 
-            # A. DATE
-            df_f_view['dt_temp_raw'] = df_f_view.apply(lambda r: find_value(r, ['DateNav', 'Date', 'dt']), axis=1)
+            # A. Date
+            df_f_view['dt_temp_raw'] = df_f_view.apply(lambda r: find_val_f(r, ['Date', 'DateNav', 'dt']), axis=1)
             df_f_view['dt_temp'] = pd.to_datetime(df_f_view['dt_temp_raw'], errors='coerce')
             df_f_view['Date_Affiche'] = df_f_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna(df_f_view['dt_temp_raw'].astype(str))
             
-            # B. DÉSIGNATION
-            df_f_view['Desig_Affiche'] = df_f_view.apply(
-                lambda r: find_value(r, ['Objet', 'Désignation', 'Notes', 'Nom']) or "Divers", axis=1
-            )
+            # B. Désignation
+            df_f_view['Desig_Affiche'] = df_f_view.apply(lambda r: find_val_f(r, ['Objet', 'Désignation', 'Notes']) or "Divers", axis=1)
+            
+            # C. Catégorie
+            df_f_view['Cat_Affiche'] = df_f_view.apply(lambda r: find_val_f(r, ['Type', 'Catégorie']) or "Frais", axis=1)
+            
+            # D. Montant
+            df_f_view['Mnt_Affiche'] = pd.to_numeric(df_f_view.get('Frais_Calc', df_f_view.get('Montant', 0)), errors='coerce').fillna(0.0)
 
-            # C. CATÉGORIE
-            df_f_view['Cat_Affiche'] = df_f_view.apply(
-                lambda r: find_value(r, ['Type', 'Catégorie']) or "Frais", axis=1
-            )
-
-            # D. MONTANT
-            df_f_view['Mnt_Affiche'] = pd.to_numeric(df_f_view[col_prix] if col_prix else 0, errors='coerce').fillna(0.0)
-
-            # Nettoyage affichage
-            df_f_view['Date_Affiche'] = df_f_view['Date_Affiche'].replace(['None', 'nan', 'NaT'], 'À saisir')
-
-            # Tri et Table
-            view_frais = df_f_view.sort_values('dt_temp', ascending=False)
-            view_frais = view_frais[['Date_Affiche', 'Desig_Affiche', 'Cat_Affiche', 'Mnt_Affiche']]
-            view_frais.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
-
-            # --- CALCUL DU TOTAL (SÉCURISÉ) ---
+            # Calcul du total
             total_depenses = df_f_view['Mnt_Affiche'].sum()
 
-            # Affichage du tableau
+            # Préparation du tableau
             view_frais = df_f_view[['Date_Affiche', 'Desig_Affiche', 'Cat_Affiche', 'Mnt_Affiche']]
             view_frais.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
-            st.dataframe(view_frais, hide_index=True, use_container_width=True)
             
-            # Affichage du total sous le tableau
+            st.dataframe(view_frais.sort_values('Date', ascending=False), hide_index=True, use_container_width=True)
+            
+            # Affichage du total
             st.metric("Total des Dépenses", f"{total_depenses:,.2f} €".replace(',', ' '), 
                       delta=f"-{total_depenses:,.2f} €", delta_color="inverse")
-            st.dataframe(view_frais, hide_index=True, use_container_width=True)
-            # --- TOTAL DÉPENSES ---
-            total_depenses = view_frais['Montant (€)'].sum()
-            st.metric("Total des Dépenses", f"{total_depenses:,.2f} €".replace(',', ' '), delta=f"-{total_depenses:,.2f} €", delta_color="inverse")
         else:
-            st.info("Aucune dépense réelle (hors recettes) à afficher.")
+            st.info("Aucune dépense après filtrage des recettes.")
+    else:
+        st.info("Aucun frais enregistré pour cette année.")    
 
     # --- FIN DE LA PAGE STATS ---
     # =================================================================
