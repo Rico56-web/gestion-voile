@@ -618,29 +618,25 @@ if st.session_state.page == "STATS":
     col_sel1, col_sel2 = st.columns(2)
     mode_bilan = col_sel1.radio("Vue :", ["À ce jour", "Par Saison"], horizontal=True)
     sel_y = col_sel2.selectbox("Choisir l'année :", [2025, 2026, 2027], index=1)
-
-    # --- 4. TRAITEMENT DES RECETTES ---
+    
+    # --- 4. TRAITEMENT DES RECETTES (TEST SANS FILTRE) ---
     if not df_r_yr.empty:
-        # Assurer la présence des colonnes minimales
         for c in ['Acompte', 'Prix', 'Statut', 'DateNav', 'Société', 'Nom', 'Objet']:
             if c not in df_r_yr.columns: df_r_yr[c] = 0 if c in ['Acompte', 'Prix'] else ""
 
-        # Calcul financier propre
         df_r_yr['Acompte_N'] = clean_val(df_r_yr, 'Acompte')
         df_r_yr['Prix_N'] = clean_val(df_r_yr, 'Prix')
         df_r_yr['Montant_Final'] = df_r_yr[['Acompte_N', 'Prix_N']].max(axis=1)
 
-        # Dates
+        # On force la conversion des dates
         df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
         
-        # Filtres : on exclut uniquement les listes d'attente et annulés
-        mask_base = ~(df_r_yr['Statut'].astype(str).str.contains("attente|Annulé", case=False, na=False))
+        # --- FILTRE TRÈS LARGE ---
+        # On ne filtre QUE les annulés. On ignore l'année pour ce test.
+        df_r_yr = df_r_yr[~df_r_yr['Statut'].astype(str).str.contains("Annulé", case=False, na=False)].copy()
         
-        if mode_bilan == "À ce jour":
-            today_dt = pd.to_datetime(today.date())
-            df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'] <= today_dt)].copy()
-        else:
-            df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'].dt.year == sel_y)].copy()
+        # Debug : Affiche les années détectées dans ton fichier
+        # st.write("Années trouvées dans le fichier :", df_r_yr['dt_vrai'].dt.year.unique())
 
     # --- 5. TRAITEMENT DES DÉPENSES ---
     if not df_f_yr.empty:
