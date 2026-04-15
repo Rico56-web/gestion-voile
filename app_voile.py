@@ -6,6 +6,13 @@ import urllib.parse
 from datetime import datetime, date, timedelta
 import calendar
 
+# --- INITIALISATION DU SESSION STATE (Ménage de début de script) ---
+if 'log_edit_idx' not in st.session_state:
+    st.session_state.log_edit_idx = None
+
+# Vous pouvez faire de même pour les autres modes d'édition si vous en avez
+if 'edit_mode' not in st.session_state:
+    st.session_state.edit_mode = False
 # =================================================================
 # --- 1. FONCTIONS DE SÉCURITÉ UNIVERSELLES ---
 # =================================================================
