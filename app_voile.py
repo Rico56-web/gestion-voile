@@ -727,25 +727,28 @@ if st.session_state.page == "STATS":
             df_soc = df_r_yr.groupby('Société')['Montant_Final'].sum().reset_index()
             fig2 = px.pie(df_soc, values='Montant_Final', names='Société', hole=0.4, height=350)
             st.plotly_chart(fig2, use_container_width=True)
-
-    # --- 9. TABLEAU DÉTAILLÉ RECETTES ---
+    # --- 9. TABLEAU DÉTAILLÉ RECETTES (UNIFIÉ EN FR) ---
     st.markdown("### 📋 Détail des recettes")
     if not df_r_yr.empty:
         df_r_yr['Client'] = df_r_yr['Prénom'].fillna('') + " " + df_r_yr['Nom'].fillna('')
         
-        view_recettes = df_r_yr[['DateNav', 'Client', 'Société', 'Montant_Final']].sort_values('DateNav', ascending=False)
+        # 1. On s'assure que la date est bien comprise par Python (ISO ou FR)
+        df_r_yr['dt_temp'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
+        
+        # 2. On prépare la vue avec le format Français pour l'affichage
+        view_recettes = df_r_yr.copy()
+        view_recettes['Date'] = view_recettes['dt_temp'].dt.strftime('%d/%m/%Y')
+        
+        # 3. Tri et sélection des colonnes
+        view_recettes = view_recettes.sort_values('dt_temp', ascending=False)
+        view_recettes = view_recettes[['Date', 'Client', 'Société', 'Montant_Final']]
         view_recettes.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
         
-        st.dataframe(
-            view_recettes, 
-            hide_index=True, 
-            use_container_width=True
-            # Suppression de height=None qui causait l'erreur
-        )
+        st.dataframe(view_recettes, hide_index=True, use_container_width=True)
     else:
         st.info("Aucune recette pour cette période.")
         
-    # --- 10. DÉTAIL DES DÉPENSES ---
+    # --- 10. DÉTAIL DES DÉPENSES (UNIFIÉ EN FR) ---
     st.markdown("### 💸 Détail des dépenses")
     
     view_frais = pd.DataFrame() 
@@ -753,34 +756,31 @@ if st.session_state.page == "STATS":
     if not df_f_yr.empty:
         df_temp = df_f_yr.copy()
         
+        # 1. Conversion de la date pour le tri (gère ISO et FR)
+        df_temp['dt_temp'] = pd.to_datetime(df_temp['Date_Unifiee'], dayfirst=True, errors='coerce')
+        
+        # 2. Formatage en Français pour l'œil humain
+        df_temp['Date'] = df_temp['dt_temp'].dt.strftime('%d/%m/%Y')
+        
         if 'Désignation' not in df_temp.columns:
             df_temp['Désignation'] = df_temp['Objet'] if 'Objet' in df_temp.columns else "N/A"
         
         if 'Frais_Calc' not in df_temp.columns:
             df_temp['Frais_Calc'] = 0.0
 
-        cols_a_afficher = ['Date_Unifiee', 'Désignation', 'Frais_Calc']
+        cols_a_afficher = ['Date', 'Désignation', 'Frais_Calc']
         if 'Type' in df_temp.columns: 
             cols_a_afficher.insert(2, 'Type')
 
-        view_frais = df_temp[cols_a_afficher].sort_values('Date_Unifiee', ascending=False)
-        view_frais = view_frais.rename(columns={
-            'Date_Unifiee': 'Date', 
-            'Frais_Calc': 'Montant (€)', 
-            'Type': 'Catégorie'
-        })
+        # 3. Tri et renommage
+        view_frais = df_temp.sort_values('dt_temp', ascending=False)[cols_a_afficher]
+        view_frais = view_frais.rename(columns={'Frais_Calc': 'Montant (€)', 'Type': 'Catégorie'})
 
     if not view_frais.empty:
-        st.dataframe(
-            view_frais, 
-            hide_index=True, 
-            use_container_width=True
-            # Ici aussi, on laisse Streamlit gérer la hauteur automatiquement
-        )
+        st.dataframe(view_frais, hide_index=True, use_container_width=True)
     else:
         st.info("Aucune dépense enregistrée sur cette période.")
 
- 
 # --- FIN DE LA PAGE STATS ---
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
