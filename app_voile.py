@@ -588,8 +588,9 @@ if st.session_state.page == "PLANNING":
         st.info("Aucune mission ce mois-ci.")
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
-    # =================================================================
-# --- 7. PAGE STATS (VERSION FINALE CORRIGÉE & ALIGNÉE) ---
+
+# =================================================================
+# --- 7. PAGE STATS (VERSION APEX - NAVIGATION & RENTABILITÉ) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Tableau de Bord Vesta Skipper 2026</h2>', unsafe_allow_html=True)
@@ -621,28 +622,23 @@ if st.session_state.page == "STATS":
 
     # --- 4. TRAITEMENT UNIFIÉ DES RECETTES (SÉCURISÉ) ---
     if not df_r_yr.empty:
-        # SÉCURITÉ : On s'assure que les colonnes de base existent
         for col_name in ['Acompte', 'Prix', 'Paiement', 'Statut']:
             if col_name not in df_r_yr.columns:
                 df_r_yr[col_name] = 0 if col_name in ['Acompte', 'Prix'] else ""
 
-        # Calculs des montants (AVANT FILTRE)
         df_r_yr['Acompte_Calc'] = clean_val(df_r_yr, 'Acompte')
         df_r_yr['Prix_Calc'] = clean_val(df_r_yr, 'Prix')
         df_r_yr['Montant_Final'] = df_r_yr[['Acompte_Calc', 'Prix_Calc']].max(axis=1)
 
-        # Conversion date robuste
         df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
         mask_nat = df_r_yr['dt_vrai'].isna()
         if mask_nat.any():
             df_r_yr.loc[mask_nat, 'dt_vrai'] = pd.to_datetime(df_r_yr.loc[mask_nat, 'DateNav'], errors='coerce')
 
-        # LOGIQUE DE FILTRE
         mask_base = (df_r_yr['Statut'] != "Liste d'attente") & (df_r_yr['Statut'] != "Annulé")
         
         if mode_bilan == "À ce jour":
             today_dt = pd.to_datetime(datetime.now().date())
-            # Filtre : Payé (pour actuel) OU Archive
             mask_paye = (df_r_yr['Paiement'].str.lower() == "paid") | (df_r_yr['Provenance'] == 'archive')
             df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'] <= today_dt) & mask_paye].copy()
         else:
@@ -662,8 +658,6 @@ if st.session_state.page == "STATS":
 
     # --- 6. INDICATEURS CLÉS (KPI) ---
     st.divider()
-    
-    # Garantir l'existence des colonnes même si vide
     if 'Montant_Final' not in df_r_yr.columns: df_r_yr['Montant_Final'] = 0.0
     if 'Prix_Calc' not in df_r_yr.columns: df_r_yr['Prix_Calc'] = 0.0
     if 'Frais_Calc' not in df_f_yr.columns: df_f_yr['Frais_Calc'] = 0.0
@@ -671,18 +665,20 @@ if st.session_state.page == "STATS":
     ca_total = df_r_yr['Montant_Final'].sum() if not df_r_yr.empty else 0
     frais_total = df_f_yr['Frais_Calc'].sum() if not df_f_yr.empty else 0
     
-    k1, k2, k3, k4 = st.columns(4)
+    # Calcul du Taux de Remplissage (Objectif 100 jours)
+    nb_jours = len(df_r_yr) if not df_r_yr.empty else 0
+    taux_remplissage = (nb_jours / 100) * 100
+
+    k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric("💰 CA Encaissé", f"{ca_total:,.0f} €".replace(',', ' '))
     k2.metric("📉 Frais Réels", f"{frais_total:,.0f} €".replace(',', ' '))
     k3.metric("⚖️ Solde Net", f"{(ca_total - frais_total):,.0f} €".replace(',', ' '))
-    
-    obj = df_r_yr['Prix_Calc'].sum() if not df_r_yr.empty else 0
-    k4.metric("🎯 Objectif Vue", f"{obj:,.0f} €".replace(',', ' '))
+    k4.metric("🎯 Objectif Vue", f"{df_r_yr['Prix_Calc'].sum():,.0f} €".replace(',', ' '))
+    k5.metric("⚓ Remplissage", f"{taux_remplissage:.0f}%", help="Basé sur un objectif de 100 jours/an")
 
     # --- 7. CALCULS MENSUELS ---
     mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     rs_m = []
-    
     has_dates = not df_r_yr.empty and 'dt_vrai' in df_r_yr.columns and 'Montant_Final' in df_r_yr.columns
     has_frais = not df_f_yr.empty and 'dt_vrai' in df_f_yr.columns and 'Frais_Calc' in df_f_yr.columns
 
@@ -708,51 +704,35 @@ if st.session_state.page == "STATS":
             fig2 = px.pie(df_soc, values='Montant_Final', names='Société', hole=0.4, height=350)
             st.plotly_chart(fig2, use_container_width=True)
 
-    # --- 9. TABLEAU DÉTAILLÉ ---
-    st.markdown("### 📋 Détail des opérations")
+    # --- 9. TABLEAU DÉTAILLÉ RECETTES ---
+    st.markdown("### 📋 Détail des recettes")
     if not df_r_yr.empty:
         df_r_yr['Client'] = df_r_yr['Prénom'].fillna('') + " " + df_r_yr['Nom'].fillna('')
         view = df_r_yr[['DateNav', 'Client', 'Société', 'Montant_Final']].sort_values('DateNav', ascending=False)
         view.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
         st.dataframe(view, hide_index=True, use_container_width=True)
     else:
-        st.info("Aucune donnée à afficher.")
-        
-    # --- 10. DÉTAIL DES DÉPENSES ---
+        st.info("Aucune recette pour cette période.")
+
+    # --- 10. DÉTAIL DES DÉPENSES (SÉCURISÉ) ---
     st.markdown("### 💸 Détail des dépenses")
     if not df_f_yr.empty:
-        # On s'assure d'avoir les colonnes nécessaires
-        df_f_yr['Désignation'] = df_f_yr['Désignation'].fillna(df_f_yr.get('Objet', 'N/A'))
+        # Sécurité colonnes Désignation/Objet
+        if 'Désignation' not in df_f_yr.columns:
+            df_f_yr['Désignation'] = df_f_yr['Objet'] if 'Objet' in df_f_yr.columns else "N/A"
         
-        # Sélection et renommage pour l'affichage
-        view_frais = df_f_yr[['Date_Unifiee', 'Désignation', 'Type', 'Frais_Calc']].sort_values('Date_Unifiee', ascending=False)
-        view_frais.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
+        df_f_yr['Désignation'] = df_f_yr['Désignation'].fillna("N/A")
+        df_f_yr['Type'] = df_f_yr['Type'].fillna("Divers") if 'Type' in df_f_yr.columns else "Divers"
+
+        cols_frais = ['Date_Unifiee', 'Désignation', 'Frais_Calc']
+        if 'Type' in df_f_yr.columns: cols_frais.insert(2, 'Type')
+
+        view_frais = df_f_yr[cols_frais].sort_values('Date_Unifiee', ascending=False)
+        view_frais = view_frais.rename(columns={'Date_Unifiee': 'Date', 'Frais_Calc': 'Montant (€)', 'Type': 'Catégorie'})
         
         st.dataframe(view_frais, hide_index=True, use_container_width=True)
-        st.info(f"Total des dépenses sur cette période : **{frais_total:,.0f} €**")
     else:
-        st.info("Aucune dépense enregistrée sur cette période.")
-    # =================================================================
-    # --- 8. BOUTON ARCHIVAGE (VERSION UNIQUE & PROPRE) ---
-    # =================================================================
-    if mode_bilan == "Par Saison":
-        st.divider()
-        st.subheader("⚙️ Outils de la Saison")
-        st.warning(f"Attention, cette action va archiver les données de l'année {sel_y}.")
-        
-        with st.expander(f"⚙️ Archiver les données de {sel_y}", expanded=False):
-            st.write("Voulez-vous archiver les frais et les missions ?")
-            arch_btn = st.button(f"🚀 Lancer l'archivage de {sel_y}", key=f"arch_unique_{sel_y}")
-            
-            if arch_btn:
-                try:
-                    # Ici votre logique d'archivage (A et B)
-                    # ...
-                    st.success(f"📦 Saison {sel_y} archivée avec succès !")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erreur : {e}")
-
+        st.info("Aucune dépense pour cette période.")
 # --- FIN DE LA PAGE STATS ---
 # =================================================================
 # --- 8. PAGE MAINTENANCE (PERSISTANTE & CARNET DE SANTÉ) ---
