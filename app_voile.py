@@ -594,7 +594,19 @@ if st.session_state.page == "PLANNING":
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Tableau de Bord Vesta Skipper 2026</h2>', unsafe_allow_html=True)
-    
+    st.markdown("""
+    <style>
+    /* Supprime les marges inutiles sur mobile */
+    .block-container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    /* Force les tableaux à ne pas scroller verticalement si possible */
+    div[data-testid="stTable"] {
+        overflow: visible !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     # --- 1. CHARGEMENT DE TOUTES LES SOURCES ---
     df_actuel = charger_data_safe('contacts.json')
     df_actuel['Provenance'] = 'actuel'
