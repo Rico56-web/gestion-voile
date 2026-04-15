@@ -136,22 +136,47 @@ if not st.session_state.authenticated:
             st.rerun()
         else: st.error("Code incorrect.")
     st.stop()
-
 # =================================================================
-# --- NAVIGATION ---
+# --- NAVIGATION (VERSION CORRIGÉE) ---
 # =================================================================
 st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=True)
 
-menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "LOG"]
-icones = {"CONTACTS": "👤", "PLANNING": "🗓️", "STATS": "📊", "MAINT": "🛠️", "LOG": "📖"}
+# 1. Mise à jour de la liste (Ajout de FACTURES)
+# J'ai raccourci "FACTURES" en "FACT" pour que ça tienne bien sur mobile
+menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "LOG", "FACT"]
 
+# 2. Mise à jour des icônes
+icones = {
+    "CONTACTS": "👤", 
+    "PLANNING": "🗓️", 
+    "STATS": "📊", 
+    "MAINT": "🛠️", 
+    "LOG": "📖",
+    "FACT": "📑"   # Nouvelle icône pour la facturation
+}
+
+# 3. Génération des colonnes de navigation
 cols_nav = st.columns(len(menu))
+
 for i, name in enumerate(menu):
-    if cols_nav[i].button(icones[name], key=f"nav_{name}", use_container_width=True, 
-                          type="primary" if st.session_state.page == name else "secondary"):
-        st.session_state.page = name
+    # Mapping du nom court (FACT) vers le nom de page utilisé dans votre code (FACTURES)
+    page_target = "FACTURES" if name == "FACT" else name
+    
+    # Détermination du style (Bleu "Primary" si on est sur la page)
+    is_active = st.session_state.page == page_target
+    
+    if cols_nav[i].button(
+        f"{icones[name]}\n{name}", # Affiche l'icône ET le nom en dessous
+        key=f"nav_{name}", 
+        use_container_width=True, 
+        type="primary" if is_active else "secondary"
+    ):
+        st.session_state.page = page_target
         st.rerun()
+
+st.divider()
+
 
 # =================================================================
 # --- 5. BLOC CONTACTS (V98 - RESTAURATION COMPLÈTE + AUTO-EDIT) ---
