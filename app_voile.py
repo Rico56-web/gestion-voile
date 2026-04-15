@@ -594,7 +594,8 @@ if st.session_state.page == "PLANNING":
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Tableau de Bord Vesta Skipper 2026</h2>', unsafe_allow_html=True)
     
-    # --- 1. CHARGEMENT AVEC MARQUAGE DE PROVENANCE ---
+    # --- 1. CHARGEMENT DE TOUTES LES SOURCES ---
+    # On charge tout ici dès le début de la page STATS
     df_actuel = charger_data_safe('contacts.json')
     df_actuel['Provenance'] = 'actuel'
     
@@ -602,6 +603,15 @@ if st.session_state.page == "STATS":
     df_archive['Provenance'] = 'archive'
     
     df_r_yr = pd.concat([df_actuel, df_archive], ignore_index=True)
+
+    df_m_curr = charger_data_safe('maintenance.json')
+    df_m_arch = charger_data_safe('archives_maintenance.json')
+    
+    today = datetime.now()
+
+    # --- 2. FILTRES DE VUE ---
+    # ... la suite de votre code (Radios, Selectbox, etc.)
+
 
     # --- 2. FILTRES DE VUE ---
     col_sel1, col_sel2 = st.columns(2)
