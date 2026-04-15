@@ -727,28 +727,37 @@ if st.session_state.page == "STATS":
             df_soc = df_r_yr.groupby('Société')['Montant_Final'].sum().reset_index()
             fig2 = px.pie(df_soc, values='Montant_Final', names='Société', hole=0.4, height=350)
             st.plotly_chart(fig2, use_container_width=True)
-    # --- 9. TABLEAU DÉTAILLÉ RECETTES (UNIFIÉ EN FR) ---
+            
+    # --- 9. TABLEAU DÉTAILLÉ RECETTES (SÉCURITÉ ANTI-NONE) ---
     st.markdown("### 📋 Détail des recettes")
     if not df_r_yr.empty:
-        df_r_yr['Client'] = df_r_yr['Prénom'].fillna('') + " " + df_r_yr['Nom'].fillna('')
+        df_r_view = df_r_yr.copy()
         
-        # 1. On s'assure que la date est bien comprise par Python (ISO ou FR)
-        df_r_yr['dt_temp'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
+        # 1. On cherche la date dans toutes les colonnes possibles
+        # On essaie DateNav, puis Date, puis date
+        for col_possible in ['DateNav', 'Date', 'date']:
+            if col_possible in df_r_view.columns:
+                df_r_view['dt_temp'] = pd.to_datetime(df_r_view[col_possible], dayfirst=True, errors='coerce')
+                # Si on a trouvé au moins une date valide, on s'arrête
+                if df_r_view['dt_temp'].notna().any():
+                    break
+
+        # 2. Gestion des clients
+        df_r_view['Client'] = df_r_view['Prénom'].fillna('') + " " + df_r_view['Nom'].fillna('')
         
-        # 2. On prépare la vue avec le format Français pour l'affichage
-        view_recettes = df_r_yr.copy()
-        view_recettes['Date'] = view_recettes['dt_temp'].dt.strftime('%d/%m/%Y')
+        # 3. Formatage pour l'affichage (si dt_temp est None, on met un texte par défaut)
+        df_r_view['Date_Affiche'] = df_r_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna("Date à saisir")
         
-        # 3. Tri et sélection des colonnes
-        view_recettes = view_recettes.sort_values('dt_temp', ascending=False)
-        view_recettes = view_recettes[['Date', 'Client', 'Société', 'Montant_Final']]
+        # 4. Tri et sélection
+        view_recettes = df_r_view.sort_values('dt_temp', ascending=False)
+        view_recettes = view_recettes[['Date_Affiche', 'Client', 'Société', 'Montant_Final']]
         view_recettes.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
         
         st.dataframe(view_recettes, hide_index=True, use_container_width=True)
     else:
         st.info("Aucune recette pour cette période.")
         
-    # --- 10. DÉTAIL DES DÉPENSES (UNIFIÉ EN FR) ---
+      # --- 10. DÉTAIL DES DÉPENSES (SÉCURITÉ ANTI-NONE) ---
     st.markdown("### 💸 Détail des dépenses")
     
     view_frais = pd.DataFrame() 
@@ -756,26 +765,40 @@ if st.session_state.page == "STATS":
     if not df_f_yr.empty:
         df_temp = df_f_yr.copy()
         
-        # 1. Conversion de la date pour le tri (gère ISO et FR)
+        # 1. Gestion robuste de la Date
         df_temp['dt_temp'] = pd.to_datetime(df_temp['Date_Unifiee'], dayfirst=True, errors='coerce')
+        df_temp['Date_Affiche'] = df_temp['dt_temp'].dt.strftime('%d/%m/%Y').fillna("Date ?")
         
-        # 2. Formatage en Français pour l'œil humain
-        df_temp['Date'] = df_temp['dt_temp'].dt.strftime('%d/%m/%Y')
-        
-        if 'Désignation' not in df_temp.columns:
-            df_temp['Désignation'] = df_temp['Objet'] if 'Objet' in df_temp.columns else "N/A"
-        
+        # 2. Gestion robuste de la Désignation (Objet vs Désignation)
+        # On cherche 'Désignation', sinon 'Objet', sinon on met "Non spécifié"
+        if 'Désignation' in df_temp.columns:
+            df_temp['Desig_Affiche'] = df_temp['Désignation'].fillna(df_temp.get('Objet', "Non spécifié"))
+        elif 'Objet' in df_temp.columns:
+            df_temp['Desig_Affiche'] = df_temp['Objet'].fillna("Non spécifié")
+        else:
+            df_temp['Desig_Affiche'] = "Non spécifié"
+
+        # 3. Gestion robuste de la Catégorie (Type vs Categorie)
+        # On cherche 'Type', sinon 'Catégorie', sinon "Divers"
+        if 'Type' in df_temp.columns:
+            df_temp['Cat_Affiche'] = df_temp['Type'].fillna(df_temp.get('Catégorie', "Divers"))
+        elif 'Catégorie' in df_temp.columns:
+            df_temp['Cat_Affiche'] = df_temp['Catégorie'].fillna("Divers")
+        else:
+            df_temp['Cat_Affiche'] = "Divers"
+
+        # 4. Sécurité sur le montant
         if 'Frais_Calc' not in df_temp.columns:
             df_temp['Frais_Calc'] = 0.0
 
-        cols_a_afficher = ['Date', 'Désignation', 'Frais_Calc']
-        if 'Type' in df_temp.columns: 
-            cols_a_afficher.insert(2, 'Type')
+        # 5. Tri et sélection des colonnes finales
+        view_frais = df_temp.sort_values('dt_temp', ascending=False)
+        view_frais = view_frais[['Date_Affiche', 'Desig_Affiche', 'Cat_Affiche', 'Frais_Calc']]
+        
+        # Renommage pour l'affichage tableau
+        view_frais.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
 
-        # 3. Tri et renommage
-        view_frais = df_temp.sort_values('dt_temp', ascending=False)[cols_a_afficher]
-        view_frais = view_frais.rename(columns={'Frais_Calc': 'Montant (€)', 'Type': 'Catégorie'})
-
+    # Affichage final sans ascenseur
     if not view_frais.empty:
         st.dataframe(view_frais, hide_index=True, use_container_width=True)
     else:
