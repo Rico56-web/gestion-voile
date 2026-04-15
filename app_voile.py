@@ -743,29 +743,30 @@ if st.session_state.page == "STATS":
     else:
         st.info("Aucune recette pour cette période.")
         
-    # --- 10. DÉTAIL DES DÉPENSES (SÉCURISÉ & IPHONE-FRIENDLY) ---
-        st.markdown("### 💸 Détail des dépenses")
+   # --- 10. DÉTAIL DES DÉPENSES (SÉCURISÉ & IPHONE-FRIENDLY) ---
+    st.markdown("### 💸 Détail des dépenses")
     
-    # 1. Initialisation systématique pour éviter le NameError
-    view_frais = pd.DataFrame()
+    # ÉTAPE 1 : Initialisation préventive pour éviter le NameError
+    view_frais = pd.DataFrame() 
 
-    # 2. Construction de la vue si des données existent
-    if not df_f_yr.empty:
+    # ÉTAPE 2 : Construction de la vue seulement si des données existent
+    if 'df_f_yr' in locals() and not df_f_yr.empty:
         df_temp = df_f_yr.copy()
         
-        # Harmonisation des colonnes pour les dépenses
+        # Harmonisation des colonnes (Désignation vs Objet)
         if 'Désignation' not in df_temp.columns:
             df_temp['Désignation'] = df_temp['Objet'] if 'Objet' in df_temp.columns else "N/A"
         
-        # Utilisation de la colonne calculée Frais_Calc (qui vient de M_Num ou Montant)
+        # Sécurité sur le montant
         if 'Frais_Calc' not in df_temp.columns:
             df_temp['Frais_Calc'] = 0.0
 
+        # Sélection des colonnes pour l'affichage mobile
         cols_a_afficher = ['Date_Unifiee', 'Désignation', 'Frais_Calc']
         if 'Type' in df_temp.columns: 
             cols_a_afficher.insert(2, 'Type')
 
-        # Création et tri du tableau final
+        # Préparation du tableau final
         view_frais = df_temp[cols_a_afficher].sort_values('Date_Unifiee', ascending=False)
         view_frais = view_frais.rename(columns={
             'Date_Unifiee': 'Date', 
@@ -773,16 +774,17 @@ if st.session_state.page == "STATS":
             'Type': 'Catégorie'
         })
 
-    # 3. Affichage sans ascenseur interne (height=None)
+    # ÉTAPE 3 : Affichage sans ascenseur vertical (height=None)
     if not view_frais.empty:
         st.dataframe(
             view_frais, 
             hide_index=True, 
             use_container_width=True,
-            height=None  # Indispensable pour supprimer l'ascenseur sur mobile
+            height=None  # Supprime l'ascenseur interne pour scroller avec le pouce
         )
     else:
-        st.info("Aucune dépense enregistrée pour cette période.")
+        st.info("Aucune dépense enregistrée sur cette période.")    
+
  
 # --- FIN DE LA PAGE STATS ---
     # =================================================================
