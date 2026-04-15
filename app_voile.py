@@ -801,42 +801,62 @@ if st.session_state.page == "MAINT":
         )
     else:
         st.info("Historique vide.")
-
-     # --- 4. FORMULAIRE D'AJOUT (AVEC PRÉCISION DU FORMAT) ---
-    with st.expander("➕ Ajouter une opération"):
-        with st.form("form_maint_fr"):
-            # On précise le format attendu pour la cohérence visuelle
+    # --- 4. FORMULAIRE D'AJOUT (AVEC OPTION MENSUELLE) ---
+    with st.expander("➕ Ajouter une opération (Unique ou Mensuelle)"):
+        with st.form("form_maint_recurrence"):
             st.markdown("📅 **Format d'enregistrement : JJ/MM/AAAA**")
             
-            f_date_iso = st.date_input(
-                "Choisir la date", 
-                datetime.now(),
-                help="Sélectionnez la date dans le calendrier, elle sera automatiquement enregistrée au format Français (JJ/MM/AAAA)."
-            )
+            f_obj = st.text_input("Désignation (ex: Place de port)")
             
-            f_obj = st.text_input("Désignation")
-            c1, c2 = st.columns(2)
-            f_montant = c1.number_input("Montant (€)", min_value=0.0, format="%.2f")
-            f_type = c2.selectbox("Type", ["Maintenance", "Sécurité", "Port", "Assurances", "Autres frais"])
-            f_statut = st.selectbox("Statut", ["Fait", "À prévoir", "Urgent"])
+            col_a, col_b = st.columns(2)
+            f_date_iso = col_a.date_input("Date de début", datetime.now())
+            f_montant = col_b.number_input("Montant (€)", min_value=0.0, format="%.2f")
             
-            if st.form_submit_button("Enregistrer"):
+            col_c, col_d = st.columns(2)
+            f_type = col_c.selectbox("Catégorie", ["Port", "Assurances", "Maintenance", "Sécurité", "Autres frais"])
+            f_statut = col_d.selectbox("Statut par défaut", ["À prévoir", "Fait"])
+            
+            # LA CLÉ : L'option de récurrence
+            f_recurrence = st.checkbox("Répéter mensuellement jusqu'à la fin de l'année")
+            
+            if st.form_submit_button("💾 Enregistrer"):
                 if f_obj:
-                    # Conversion forcée pour garantir le format JJ/MM/AAAA dans le JSON
-                    date_fr = f_date_iso.strftime("%d/%m/%Y")
+                    nouvelles_lignes = []
                     
-                    new_line = {
-                        "Date": date_fr, 
-                        "Objet": f_obj,
-                        "M_Num": f_montant,
-                        "Statut": f_statut,
-                        "Type": f_type
-                    }
+                    if f_recurrence:
+                        # Générer une ligne pour chaque mois restant de l'année
+                        mois_restants = range(f_date_iso.month, 13)
+                        for m in mois_restants:
+                            # On crée la date pour le mois 'm'
+                            date_generee = f_date_iso.replace(month=m).strftime("%d/%m/%Y")
+                            nouvelles_lignes.append({
+                                "Date": date_generee,
+                                "Objet": f"{f_obj} (M{m})", # On ajoute l'indice du mois pour s'y retrouver
+                                "M_Num": f_montant,
+                                "Statut": f_statut,
+                                "Type": f_type
+                            })
+                    else:
+                        # Enregistrement unique classique
+                        nouvelles_lignes.append({
+                            "Date": f_date_iso.strftime("%d/%m/%Y"),
+                            "Objet": f_obj,
+                            "M_Num": f_montant,
+                            "Statut": f_statut,
+                            "Type": f_type
+                        })
                     
-                    df_m = pd.concat([df_m, pd.DataFrame([new_line])], ignore_index=True)
+                    # Fusion et sauvegarde
+                    df_new = pd.DataFrame(nouvelles_lignes)
+                    df_m = pd.concat([df_m, df_new], ignore_index=True)
                     sauvegarder_data(df_m, 'maintenance.json')
-                    st.success(f"✅ Enregistré avec succès : {date_fr}")
+                    
+                    st.success(f"✅ {len(nouvelles_lignes)} opération(s) enregistrée(s) !")
                     st.rerun()
+                else:
+                    st.error("Veuillez saisir une désignation.")
+                    
+
 
 # =================================================================
 # --- PAGE : FACTURATION & SUIVI PAIEMENTS ---
