@@ -594,36 +594,28 @@ if st.session_state.page == "PLANNING":
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Tableau de Bord Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # --- 1. FILTRES DE VUE ---
+    # --- 1. FILTRES DE VUE AJUSTÉS ---
     col_sel1, col_sel2 = st.columns(2)
-    mode_bilan = col_sel1.radio("Période :", ["Global", "Par Saison"], horizontal=True)
-    sel_y = col_sel2.selectbox("Année de référence :", [2025, 2026, 2027], index=1)
+    # On renomme "Global" en "Situation à ce jour"
+    mode_bilan = col_sel1.radio("Vue :", ["À ce jour", "Par Saison"], horizontal=True)
+    sel_y = col_sel2.selectbox("Choisir l'année :", [2025, 2026, 2027], index=1)
 
-    # --- 2. CHARGEMENT & NETTOYAGE DES DONNÉES ---
-    # On utilise contacts.json (votre base de facturation actuelle)
-    df_r_yr = charger_data_safe('contacts.json')
-    df_f_yr = charger_data_safe('maintenance.json')
-    
-    # Nettoyage des revenus (Prix et Acompte)
+    # --- 2. LOGIQUE DE FILTRAGE ---
+    today = datetime.now()
+
     if not df_r_yr.empty:
-        # Conversion numérique forcée (gestion des points/virgules)
-        for col in ['Prix', 'Acompte']:
-            if col in df_r_yr.columns:
-                df_r_yr[col] = pd.to_numeric(df_r_yr[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-        
         df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
-        if mode_bilan == "Par Saison":
+    
+        if mode_bilan == "À ce jour":
+            # FILTRE : Uniquement ce qui est AVANT ou ÉGAL à aujourd'hui (toutes années confondues)
+            df_r_yr = df_r_yr[df_r_yr['dt_vrai'] <= today]
+        else:
+            # FILTRE : Uniquement l'année sélectionnée (Saison complète)
             df_r_yr = df_r_yr[df_r_yr['dt_vrai'].dt.year == sel_y]
-            
-    # Nettoyage des frais (Maintenance)
-    if not df_f_yr.empty:
-        # On s'assure que la colonne montant (M_Num ou Montant) est numérique
-        col_maint = 'M_Num' if 'M_Num' in df_f_yr.columns else 'Montant'
-        df_f_yr[col_maint] = pd.to_numeric(df_f_yr[col_maint].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-        
-        df_f_yr['dt_vrai'] = pd.to_datetime(df_f_yr['Date'], dayfirst=True, errors='coerce')
-        if mode_bilan == "Par Saison":
-            df_f_yr = df_f_yr[df_f_yr['dt_vrai'].dt.year == sel_y]
+
+# --- 3. LES CHIFFRES (KPI) ---
+# Le reste de votre code de calcul (ca_reel, frais_reel) s'appliquera 
+# automatiquement sur le tableau filtré juste au-dessus.
 
     # --- 3. INDICATEURS CLÉS (KPI) ---
     st.divider()
