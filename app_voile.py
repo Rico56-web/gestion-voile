@@ -84,7 +84,17 @@ def sauvegarder_data(df, file):
                      json={"message": f"Update {file}", "content": content, "sha": sha})
     except Exception as e: 
         st.error(f"Erreur sauvegarde {file} : {e}")
-
+        
+    # --- 3. SÉCURISATION (La nouvelle fonction) ---
+def charger_data_safe(fichier):
+    try:
+        data = charger_data(fichier)
+        if data is None or (isinstance(data, list) and len(data) == 0):
+            return pd.DataFrame()
+        return pd.DataFrame(data)
+    except Exception as e:
+        print(f"Erreur sur {fichier}: {e}")
+        return pd.DataFrame()
 # =================================================================
 # --- CONFIGURATION & STYLE ---
 # =================================================================
