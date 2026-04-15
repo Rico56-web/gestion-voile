@@ -684,28 +684,35 @@ if st.session_state.page == "STATS":
         st.subheader("👥 Par Société")
         if not df_r_yr.empty and 'Société' in df_r_yr.columns:
             st.plotly_chart(px.pie(df_r_yr.groupby('Société')['Montant_Final'].sum().reset_index(), values='Montant_Final', names='Société', hole=0.4, height=300), use_container_width=True)
-    # --- 8. DÉTAIL DES RECETTES ---
-    st.divider()
-    st.markdown("### 💰 Détail des recettes")
     
+    # --- 4. TRAITEMENT UNIFIÉ DES RECETTES (MODE DIAGNOSTIC) ---
     if not df_r_yr.empty:
-        df_r_view = df_r_yr.copy()
+        # Nettoyage initial des colonnes pour éviter les crashs
+        for c in ['Acompte', 'Prix', 'Paiement', 'Statut', 'DateNav', 'Société']:
+            if c not in df_r_yr.columns: df_r_yr[c] = 0 if c in ['Acompte', 'Prix'] else ""
+
+        # Calcul financier
+        df_r_yr['Acompte_Num'] = clean_val(df_r_yr, 'Acompte')
+        df_r_yr['Prix_Num'] = clean_val(df_r_yr, 'Prix')
+        df_r_yr['Montant_Final'] = df_r_yr[['Acompte_Num', 'Prix_Num']].max(axis=1)
+
+        # Conversion date
+        df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
         
-        # Formatage des colonnes pour l'affichage
-        df_r_view['Date_A'] = df_r_view['dt_vrai'].dt.strftime('%d/%m/%Y').fillna(df_r_view['DateNav'])
-        df_r_view['Client'] = df_r_view.get('Nom', df_r_view.get('Objet', "Inconnu"))
+        # --- TEST DE DÉBOGAGE (À supprimer après) ---
+        # st.write(f"Lignes totales chargées : {len(df_r_yr)}")
+
+        # Application des filtres
+        mask_base = ~(df_r_yr['Statut'].astype(str).str.contains("attente|Annulé", case=False, na=False))
         
-        # Sélection des colonnes
-        view_recettes = df_r_view[['Date_A', 'Client', 'Société', 'Montant_Final']]
-        view_recettes.columns = ['Date', 'Client', 'Société', 'Montant (€)']
-        
-        # Affichage du tableau trié
-        st.dataframe(view_recettes.sort_values('Date', ascending=False), hide_index=True, use_container_width=True)
-        
-        # AFFICHAGE DU TOTAL JUSTE EN DESSOUS
-        st.metric("Total des Recettes sur la période", f"{ca_total:,.2f} €".replace(',', ' '))
-    else:
-        st.info("Aucune recette pour cette sélection (Vérifiez l'année ou le mode 'À ce jour').")
+        if mode_bilan == "À ce jour":
+            today_dt = pd.to_datetime(datetime.now().date())
+            df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'] <= today_dt)].copy()
+        else:
+            # On force le filtre sur l'année sélectionnée (sel_y)
+            df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'].dt.year == sel_y)].copy()
+
+        # st.write(f"Lignes après filtrage ({sel_y}) : {len(df_r_yr)}")
 
     # --- 9. DÉTAIL DES DÉPENSES ---
     st.markdown("### 💸 Détail des dépenses")
