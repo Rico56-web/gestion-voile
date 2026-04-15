@@ -727,63 +727,94 @@ if st.session_state.page == "STATS":
             df_soc = df_r_yr.groupby('Société')['Montant_Final'].sum().reset_index()
             fig2 = px.pie(df_soc, values='Montant_Final', names='Société', hole=0.4, height=350)
             st.plotly_chart(fig2, use_container_width=True)
-       # --- 9. TABLEAU DÉTAILLÉ RECETTES (RÉCUPÉRATION TOTALE) ---
+
+    # --- 9. TABLEAU DÉTAILLÉ RECETTES ---
     st.markdown("### 📋 Détail des recettes")
     if not df_r_yr.empty:
         df_r_view = df_r_yr.copy()
         
-        # On cherche la date dans n'importe quelle colonne contenant "Date"
-        cols_date = [c for c in df_r_view.columns if 'date' in c.lower()]
-        col_date_r = cols_date[0] if cols_date else None
+        # On cible la colonne exacte identifiée dans ton JSON : DateNav
+        col_cible = 'DateNav' if 'DateNav' in df_r_view.columns else 'Date'
         
-        if col_date_r:
-            df_r_view['dt_temp'] = pd.to_datetime(df_r_view[col_date_r], dayfirst=True, errors='coerce')
-            df_r_view['Date_Affiche'] = df_r_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna("Date à saisir")
-        else:
-            df_r_view['Date_Affiche'] = "Date à saisir"
+        # Conversion flexible (gère les slashs et les tirets)
+        def clean_date_nav(val):
+            if pd.isna(val) or val == "": return None
+            # On tente le format ISO (tirets) puis FR (slashs)
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+                try:
+                    return pd.to_datetime(val, format=fmt)
+                except:
+                    continue
+            # Si échec, on laisse pandas deviner
+            return pd.to_datetime(val, errors='coerce')
 
-        # On récupère le nom du client
-        df_r_view['Client'] = df_r_view.apply(lambda x: f"{x.get('Prénom','')} {x.get('Nom','')}".strip(), axis=1)
+        df_r_view['dt_temp'] = df_r_view[col_cible].apply(clean_date_nav)
         
-        # On s'assure que le montant est bien là
-        mnt_col = 'Montant_Final' if 'Montant_Final' in df_r_view.columns else 'Prix'
-        df_r_view['Somme'] = pd.to_numeric(df_r_view[mnt_col], errors='coerce').fillna(0)
+        # Affichage propre ou valeur brute si échec
+        df_r_view['Date_Affiche'] = df_r_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna(df_r_view[col_cible].astype(str))
+        # Nettoyage final pour les "None" textuels
+        df_r_view['Date_Affiche'] = df_r_view['Date_Affiche'].replace(['None', 'nan', 'NaT'], 'À saisir')
 
-        view_recettes = df_r_view.sort_values('dt_temp', ascending=False) if col_date_r else df_r_view
-        view_recettes = view_recettes[['Date_Affiche', 'Client', 'Société', 'Somme']]
+        # Construction du nom client
+        df_r_view['Client'] = df_r_view.apply(lambda x: f"{str(x.get('Prénom',''))} {str(x.get('Nom',''))}".replace('None', '').strip(), axis=1)
+        
+        # Sélection des colonnes pour l'affichage
+        view_recettes = df_r_view.sort_values('dt_temp', ascending=False)
+        view_recettes = view_recettes[['Date_Affiche', 'Client', 'Société', 'Prix']]
         view_recettes.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
         
         st.dataframe(view_recettes, hide_index=True, use_container_width=True)
-
-    # --- 10. DÉTAIL DES DÉPENSES (RÉCUPÉRATION TOTALE) ---
+        
+    # --- 10. DÉTAIL DES DÉPENSES (SÉCURITÉ MAXIMALE) ---
     st.markdown("### 💸 Détail des dépenses")
     if not df_f_yr.empty:
         df_f_view = df_f_yr.copy()
         
-        # 1. DATE : On cherche n'importe quelle colonne de date
-        c_date_f = [c for c in df_f_view.columns if 'date' in c.lower()]
-        target_date = c_date_f[0] if c_date_f else None
-        df_f_view['dt_temp'] = pd.to_datetime(df_f_view[target_date], dayfirst=True, errors='coerce') if target_date else None
-        df_f_view['Date_Affiche'] = df_f_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna("Date à saisir")
+        # 1. GESTION DE LA DATE (Même logique que pour les recettes)
+        # On cherche 'Date' ou 'DateNav'
+        col_date_f = next((c for c in df_f_view.columns if 'date' in c.lower()), None)
         
-        # 2. DÉSIGNATION : On cherche 'Objet', 'Désignation', ou 'Label'
-        c_desig = [c for c in df_f_view.columns if c.lower() in ['objet', 'désignation', 'designation', 'label']]
-        df_f_view['Desig_Affiche'] = df_f_view[c_desig[0]].fillna("À préciser") if c_desig else "À préciser"
+        def clean_date_depense(val):
+            if pd.isna(val) or str(val).lower() in ['none', 'nan', '']: return None
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+                try:
+                    return pd.to_datetime(val, format=fmt)
+                except:
+                    continue
+            return pd.to_datetime(val, errors='coerce')
+
+        if col_date_f:
+            df_f_view['dt_temp'] = df_f_view[col_date_f].apply(clean_date_depense)
+            df_f_view['Date_Affiche'] = df_f_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna(df_f_view[col_date_f].astype(str))
+        else:
+            df_f_view['Date_Affiche'] = "À saisir"
+            df_f_view['dt_temp'] = pd.NaT
+
+        # 2. DÉSIGNATION (Objet ou Désignation)
+        # On cherche la première colonne qui correspond
+        df_f_view['Desig_Affiche'] = df_f_view.get('Désignation', df_f_view.get('Objet', "Non spécifié")).fillna("Non spécifié")
         
-        # 3. CATÉGORIE : On cherche 'Type', 'Catégorie', ou 'Genre'
-        c_cat = [c for c in df_f_view.columns if c.lower() in ['type', 'catégorie', 'categorie']]
-        df_f_view['Cat_Affiche'] = df_f_view[c_cat[0]].fillna("Divers") if c_cat else "Divers"
+        # 3. CATÉGORIE (Type ou Catégorie)
+        df_f_view['Cat_Affiche'] = df_f_view.get('Type', df_f_view.get('Catégorie', "Divers")).fillna("Divers")
+        
+        # 4. MONTANT (Frais_Calc, Montant ou Prix)
+        # On essaie de récupérer la valeur numérique
+        col_mnt = next((c for c in ['Frais_Calc', 'Montant', 'Prix'] if c in df_f_view.columns), None)
+        if col_mnt:
+            df_f_view['Mnt_Affiche'] = pd.to_numeric(df_f_view[col_mnt], errors='coerce').fillna(0.0)
+        else:
+            df_f_view['Mnt_Affiche'] = 0.0
 
-        # 4. MONTANT : On cherche Frais_Calc, M_Num ou Montant
-        c_mnt = [c for c in df_f_view.columns if c in ['Frais_Calc', 'M_Num', 'Montant']]
-        df_f_view['Mnt_Affiche'] = pd.to_numeric(df_f_view[c_mnt[0]], errors='coerce').fillna(0.0) if c_mnt else 0.0
+        # Nettoyage final des dates illisibles
+        df_f_view['Date_Affiche'] = df_f_view['Date_Affiche'].replace(['None', 'nan', 'NaT'], 'À saisir')
 
-        view_frais = df_f_view.sort_values('dt_temp', ascending=False) if target_date else df_f_view
+        # Tri et affichage
+        view_frais = df_f_view.sort_values('dt_temp', ascending=False)
         view_frais = view_frais[['Date_Affiche', 'Desig_Affiche', 'Cat_Affiche', 'Mnt_Affiche']]
         view_frais.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
         
-        st.dataframe(view_frais, hide_index=True, use_container_width=True)         
-
+        st.dataframe(view_frais, hide_index=True, use_container_width=True)
+ 
 
 # --- FIN DE LA PAGE STATS ---
     # =================================================================
