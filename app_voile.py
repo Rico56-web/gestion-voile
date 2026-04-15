@@ -765,55 +765,68 @@ if st.session_state.page == "STATS":
         
         st.dataframe(view_recettes, hide_index=True, use_container_width=True)
         
-    # --- 10. DÉTAIL DES DÉPENSES (SCANNER INTÉGRAL) ---
+    # --- 10. DÉTAIL DES DÉPENSES (VERSION FINALE CORRIGÉE) ---
     st.markdown("### 💸 Détail des dépenses")
+    
     if not df_f_yr.empty:
+        # 1. FILTRE DE SÉCURITÉ : On nettoie les recettes qui se cachent dans les frais
         df_f_view = df_f_yr.copy()
-
-        # Fonction de recherche flexible pour trouver une valeur dans plusieurs colonnes possibles
-        def find_value(row, possibilities):
-            for p in possibilities:
-                if p in row.index and pd.notna(row[p]) and str(row[p]).strip().lower() not in ['none', 'nan', '']:
-                    return row[p]
-            return None
-
-        # 1. DATE : On cherche toutes les variantes
-        df_f_view['dt_temp_raw'] = df_f_view.apply(lambda r: find_value(r, ['DateNav', 'Date Nav', 'Date', 'dt', 'date']), axis=1)
         
-        def clean_date_depense(val):
-            if val is None: return None
-            for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
-                try: return pd.to_datetime(val, format=fmt)
-                except: continue
-            return pd.to_datetime(val, errors='coerce')
+        # On exclut les lignes CMN ou à 450€ car ce sont des recettes confirmées
+        if 'Société' in df_f_view.columns:
+            df_f_view = df_f_view[df_f_view['Société'] != 'CMN']
+        if 'Prix' in df_f_view.columns:
+            df_f_view = df_f_view[df_f_view['Prix'] != 450]
 
-        df_f_view['dt_temp'] = df_f_view['dt_temp_raw'].apply(clean_date_depense)
-        df_f_view['Date_Affiche'] = df_f_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna(df_f_view['dt_temp_raw'].astype(str))
-        
-        # 2. DÉSIGNATION : On cherche les noms, prénoms ou notes si l'objet est vide
-        df_f_view['Desig_Affiche'] = df_f_view.apply(
-            lambda r: find_value(r, ['Désignation', 'Objet', 'Notes', 'Nom', 'Commentaires']) or "Non spécifié", axis=1
-        )
+        if not df_f_view.empty:
+            # Fonction de recherche flexible pour trouver une donnée dans plusieurs colonnes
+            def find_value(row, possibilities):
+                for p in possibilities:
+                    if p in row.index and pd.notna(row[p]) and str(row[p]).strip().lower() not in ['none', 'nan', '']:
+                        return row[p]
+                return None
 
-        # 3. CATÉGORIE
-        df_f_view['Cat_Affiche'] = df_f_view.apply(
-            lambda r: find_value(r, ['Type', 'Catégorie', 'Société', 'Société']) or "Divers", axis=1
-        )
+            # A. GESTION DE LA DATE
+            df_f_view['dt_temp_raw'] = df_f_view.apply(lambda r: find_value(r, ['DateNav', 'Date Nav', 'Date', 'dt']), axis=1)
+            
+            def clean_date_depense(val):
+                if val is None: return None
+                for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+                    try: return pd.to_datetime(val, format=fmt)
+                    except: continue
+                return pd.to_datetime(val, errors='coerce')
 
-        # 4. MONTANT : On cherche Prix ou Frais_Calc
-        df_f_view['Mnt_Affiche'] = df_f_view.apply(
-            lambda r: pd.to_numeric(find_value(r, ['Frais_Calc', 'Prix', 'Montant']), errors='coerce') or 0.0, axis=1
-        )
+            df_f_view['dt_temp'] = df_f_view['dt_temp_raw'].apply(clean_date_depense)
+            df_f_view['Date_Affiche'] = df_f_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna(df_f_view['dt_temp_raw'].astype(str))
+            
+            # B. DÉSIGNATION (On pioche dans Objet, puis Désignation, puis Notes si besoin)
+            df_f_view['Desig_Affiche'] = df_f_view.apply(
+                lambda r: find_value(r, ['Objet', 'Désignation', 'Notes', 'Commentaires']) or "Divers", axis=1
+            )
 
-        # Nettoyage des textes résiduels
-        df_f_view['Date_Affiche'] = df_f_view['Date_Affiche'].replace(['None', 'nan', 'NaT'], 'À saisir')
+            # C. CATÉGORIE
+            df_f_view['Cat_Affiche'] = df_f_view.apply(
+                lambda r: find_value(r, ['Type', 'Catégorie', 'Société']) or "Frais", axis=1
+            )
 
-        # Tri et affichage
-        view_frais = df_f_view.sort_values('dt_temp', ascending=False)
-        view_frais = view_frais[['Date_Affiche', 'Desig_Affiche', 'Cat_Affiche', 'Mnt_Affiche']]
-        view_frais.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
-        
-        st.dataframe(view_frais, hide_index=True, use_container_width=True)
+            # D. MONTANT (On cherche Frais_Calc, Montant ou Prix)
+            df_f_view['Mnt_Affiche'] = df_f_view.apply(
+                lambda r: pd.to_numeric(find_value(r, ['Frais_Calc', 'Montant', 'Prix']), errors='coerce') or 0.0, axis=1
+            )
+
+            # Nettoyage final des chaînes de caractères système
+            df_f_view['Date_Affiche'] = df_f_view['Date_Affiche'].replace(['None', 'nan', 'NaT'], 'À saisir')
+
+            # Tri par date décroissante et sélection finale
+            view_frais = df_f_view.sort_values('dt_temp', ascending=False)
+            view_frais = view_frais[['Date_Affiche', 'Desig_Affiche', 'Cat_Affiche', 'Mnt_Affiche']]
+            view_frais.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
+            
+            st.dataframe(view_frais, hide_index=True, use_container_width=True)
+        else:
+            st.info("Aucune dépense enregistrée pour cette période.")
+    else:
+        st.info("Aucune donnée de dépense disponible.")
 
     # --- FIN DE LA PAGE STATS ---
     # =================================================================
