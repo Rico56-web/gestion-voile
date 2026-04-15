@@ -607,6 +607,14 @@ if st.session_state.page == "STATS":
     }
     </style>
     """, unsafe_allow_html=True)
+    # --- INITIALISATION DE SÉCURITÉ ---
+    # On crée des DataFrames vides pour éviter les NameError plus bas
+    df_v_yr = pd.DataFrame()
+    df_f_yr = pd.DataFrame()
+
+    # --- CHARGEMENT DES DONNÉES (Exemple de logique à vérifier) ---
+    # C'est ici que vous devez normalement filtrer vos données par année
+    # df_v_yr = df_global[df_global['Annee'] == annee_choisie]
     # --- 1. CHARGEMENT DE TOUTES LES SOURCES ---
     df_actuel = charger_data_safe('contacts.json')
     df_actuel['Provenance'] = 'actuel'
@@ -769,63 +777,28 @@ if st.session_state.page == "STATS":
         st.metric("Total des Recettes (Brut)", f"{total_recettes:,.2f} €".replace(',', ' '))
     else:
         st.info("Aucune recette enregistrée pour cette année.")
-
-     # --- 10. DÉTAIL DES DÉPENSES ---
+    # --- 10. DÉTAIL DES DÉPENSES ---
     st.markdown("### 💸 Détail des dépenses")
-    
-    total_depenses = 0.0  # Initialisation de sécurité
-    
-    if not df_f_yr.empty:
+
+    total_depenses = 0.0
+
+    if 'df_f_yr' in locals() and not df_f_yr.empty:
         df_f_view = df_f_yr.copy()
-        
-        # --- FILTRE ANTI-RECETTES (450€ / CMN) ---
-        col_check_mnt = next((c for c in ['Prix', 'Frais_Calc', 'Montant'] if c in df_f_view.columns), None)
-        if col_check_mnt:
-            # Conversion numérique pour filtrage précis
-            df_f_view[col_check_mnt] = pd.to_numeric(df_f_view[col_check_mnt], errors='coerce')
-            df_f_view = df_f_view[df_f_view[col_check_mnt] != 450]
-        
-        if 'Société' in df_f_view.columns:
-            df_f_view = df_f_view[df_f_view['Société'].astype(str).str.upper() != 'CMN']
-
-        if not df_f_view.empty:
-            # Recherche flexible des colonnes
-            def find_val_f(row, choices):
-                for c in choices:
-                    if c in row.index and pd.notna(row[c]) and str(row[c]).strip().lower() not in ['none', 'nan', '']:
-                        return row[c]
-                return None
-
-            # A. Date
-            df_f_view['dt_temp_raw'] = df_f_view.apply(lambda r: find_val_f(r, ['Date', 'DateNav', 'dt']), axis=1)
-            df_f_view['dt_temp'] = pd.to_datetime(df_f_view['dt_temp_raw'], errors='coerce')
-            df_f_view['Date_Affiche'] = df_f_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna(df_f_view['dt_temp_raw'].astype(str))
-            
-            # B. Désignation
-            df_f_view['Desig_Affiche'] = df_f_view.apply(lambda r: find_val_f(r, ['Objet', 'Désignation', 'Notes']) or "Divers", axis=1)
-            
-            # C. Catégorie
-            df_f_view['Cat_Affiche'] = df_f_view.apply(lambda r: find_val_f(r, ['Type', 'Catégorie']) or "Frais", axis=1)
-            
-            # D. Montant
-            df_f_view['Mnt_Affiche'] = pd.to_numeric(df_f_view.get('Frais_Calc', df_f_view.get('Montant', 0)), errors='coerce').fillna(0.0)
-
-            # Calcul du total
-            total_depenses = df_f_view['Mnt_Affiche'].sum()
-
-            # Préparation du tableau
-            view_frais = df_f_view[['Date_Affiche', 'Desig_Affiche', 'Cat_Affiche', 'Mnt_Affiche']]
-            view_frais.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
-            
-            st.dataframe(view_frais.sort_values('Date', ascending=False), hide_index=True, use_container_width=True)
-            
-            # Affichage du total
-            st.metric("Total des Dépenses", f"{total_depenses:,.2f} €".replace(',', ' '), 
-                      delta=f"-{total_depenses:,.2f} €", delta_color="inverse")
-        else:
-            st.info("Aucune dépense après filtrage des recettes.")
+    
+        # Filtre anti-CMN/450€
+        col_mnt = next((c for c in ['Frais_Calc', 'Montant', 'Prix'] if c in df_f_view.columns), None)
+        if col_mnt:
+            df_f_view = df_f_view[pd.to_numeric(df_f_view[col_mnt], errors='coerce') != 450]
+    
+        # Calcul et affichage
+        df_f_view['Mnt_Affiche'] = pd.to_numeric(df_f_view.get(col_mnt, 0), errors='coerce').fillna(0.0)
+        total_depenses = df_f_view['Mnt_Affiche'].sum()
+    
+        st.dataframe(df_f_view[['Date_Affiche', 'Desig_Affiche', 'Mnt_Affiche']], hide_index=True)
+        st.metric("Total Dépenses", f"{total_depenses:,.2f} €", delta_color="inverse")
     else:
-        st.info("Aucun frais enregistré pour cette année.")    
+        st.info("Aucune donnée de dépense trouvée.")
+
 
     # --- FIN DE LA PAGE STATS ---
     # =================================================================
