@@ -747,7 +747,7 @@ if st.session_state.page == "MAINT":
         with open('params_maint.json', 'w') as f:
             json.dump(data, f)
     def maintenance_donnees_globale():
-    import pandas as pd
+
     
     # --- 1. NETTOYAGE DES CONTACTS & PLANNING ---
     df_c = charger_data('contacts.json')
