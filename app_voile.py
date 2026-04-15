@@ -589,96 +589,84 @@ if st.session_state.page == "PLANNING":
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 # =================================================================
-# --- 7. PAGE STATS (RETOUR AU MOTEUR ZÉRO PERTE) ---
+# --- 7. PAGE STATS (VERSION FORCE BRUTE - RÉCUPÉRATION DES 25 LIGNES) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
-    
-    # 1. LA FONCTION ORIGINALE QUI MARCHAIT PARFAITEMENT (avec Regex)
-    def clean_val_safe(df, col):
-        if col in df.columns:
-            s = df[col].astype(str).str.replace(r'[^\d.,-]', '', regex=True).str.replace(',', '.')
-            return pd.to_numeric(s, errors='coerce').fillna(0.0)
-        return pd.Series(0.0, index=df.index)
 
-    # --- 2. CHARGEMENT ET SÉCURISATION MASSIVE ---
+    # 1. Chargement et Fusion propre
     df_actuel = charger_data_safe('contacts.json')
     df_archive = charger_data_safe('archives_factures.json')
-    # Le .fillna("") ici est la clé de voûte de la version qui fonctionnait
     df_r_yr = pd.concat([df_actuel, df_archive], ignore_index=True).fillna("")
 
-    df_m_curr = charger_data_safe('maintenance.json')
-    df_m_arch = charger_data_safe('archives_maintenance.json')
-    df_f_yr = pd.concat([df_m_curr, df_m_arch], ignore_index=True).fillna("")
-    
-    today_dt = pd.to_datetime(datetime.now().date())
+    # 2. Nettoyage financier ultra-simple
+    def force_num(df, col):
+        if col in df.columns:
+            return pd.to_numeric(df[col].astype(str).str.replace(r'[^\d.]', '', regex=True), errors='coerce').fillna(0.0)
+        return pd.Series(0.0, index=df.index)
 
-    # --- 3. INTERFACE ---
+    # 3. INTERFACE
     col_sel1, col_sel2 = st.columns(2)
     mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
     sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-    # --- 4. TRAITEMENT RECETTES ---
     if not df_r_yr.empty:
-        # Montants
-        df_r_yr['Mnt_A'] = clean_val_safe(df_r_yr, 'Acompte')
-        df_r_yr['Mnt_P'] = clean_val_safe(df_r_yr, 'Prix')
-        df_r_yr['Montant_Calculé'] = df_r_yr[['Mnt_A', 'Mnt_P']].max(axis=1)
-        
-        # SÉCURITÉ DATES : On va chercher la date dans DateNav, et si c'est vide, dans Date (pour les archives)
-        if 'Date' in df_r_yr.columns and 'DateNav' in df_r_yr.columns:
-            df_r_yr['Date_Temp'] = df_r_yr.apply(lambda x: x['DateNav'] if str(x['DateNav']).strip() != "" else x['Date'], axis=1)
-        elif 'DateNav' in df_r_yr.columns:
-            df_r_yr['Date_Temp'] = df_r_yr['DateNav']
-        else:
-            df_r_yr['Date_Temp'] = df_r_yr.get('Date', "")
+        # Calcul des montants
+        df_r_yr['Mnt_A'] = force_num(df_r_yr, 'Acompte')
+        df_r_yr['Mnt_P'] = force_num(df_r_yr, 'Prix')
+        df_r_yr['Montant_Final'] = df_r_yr[['Mnt_A', 'Mnt_P']].max(axis=1)
 
-        df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['Date_Temp'], dayfirst=True, errors='coerce')
-        
-        # Filtre Statut (Pas annulé)
-        if 'Statut' in df_r_yr.columns:
-            mask_statut = ~(df_r_yr['Statut'].astype(str).str.contains("Annulé", case=False, na=False))
-            df_r_yr = df_r_yr[mask_statut]
+        # IDENTIFICATION DE LA DATE (La source du problème)
+        # On essaie de créer une colonne 'Date_Vrai' en cherchant partout
+        def extraire_date(row):
+            for col in ['DateNav', 'Date', 'date', 'Date Envoi']:
+                val = str(row.get(col, "")).strip()
+                if val and val != "nan":
+                    return val
+            return ""
 
-        # Application stricte de l'année et du mode
-        mask_annee = (df_r_yr['dt_vrai'].dt.year == sel_y)
+        df_r_yr['Date_Texte'] = df_r_yr.apply(extraire_date, axis=1)
+        df_r_yr['dt_objet'] = pd.to_datetime(df_r_yr['Date_Texte'], dayfirst=True, errors='coerce')
+
+        # FILTRAGE
+        # On enlève les annulés
+        df_clean = df_r_yr[~df_r_yr.get('Statut', '').astype(str).str.contains("Annulé", case=False)].copy()
         
+        # Filtrage par année choisi
+        df_annee = df_clean[df_clean['dt_objet'].dt.year == sel_y].copy()
+
+        # Mode "À ce jour"
         if mode_bilan == "À ce jour":
-            df_final_r = df_r_yr[mask_annee & (df_r_yr['dt_vrai'] <= today_dt)].copy()
+            today = pd.to_datetime(datetime.now().date())
+            df_final = df_annee[df_annee['dt_objet'] <= today].copy()
         else:
-            df_final_r = df_r_yr[mask_annee].copy()
+            df_final = df_annee.copy()
+
+        # 4. AFFICHAGE DES KPI
+        st.divider()
+        total_ca = df_final['Montant_Final'].sum()
+        st.metric(f"💰 CA ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
+
+        # 5. LE TABLEAU
+        st.markdown(f"### 📋 Détail Recettes : {len(df_final)} ligne(s)")
+        
+        if not df_final.empty:
+            # On prépare l'affichage
+            df_final['Date_Aff'] = df_final['dt_objet'].dt.strftime('%d/%m/%Y')
+            df_final['Client'] = df_final['Nom'].replace('', 'Navigation')
             
-    else:
-        df_final_r = pd.DataFrame()
+            st.dataframe(
+                df_final[['Date_Aff', 'Client', 'Société', 'Montant_Final']].sort_values('dt_objet', ascending=False),
+                hide_index=True, use_container_width=True
+            )
+        else:
+            st.warning(f"Zéro ligne trouvée pour l'année {sel_y}. Vérifiez vos dates !")
+            # TEST DE SECOURS : On montre ce qu'il y a dans le fichier sans filtre
+            with st.expander("Voir toutes les données brutes (sans aucun filtre)"):
+                st.write(df_r_yr[['Date_Texte', 'Nom', 'Montant_Final']])
 
-    # --- 5. TOTAUX ---
-    st.divider()
-    ca_total = df_final_r['Montant_Calculé'].sum() if not df_final_r.empty else 0
-    
-    st.metric("💰 CA " + mode_bilan, f"{ca_total:,.0f} €".replace(',', ' '))
-
-    # --- 6. TABLEAU ---
-    st.markdown(f"### 📋 Détail Recettes : {len(df_final_r)} ligne(s)")
-    if not df_final_r.empty:
-        # Création du nom client avec la logique qui marchait
-        df_final_r['Client'] = df_final_r.apply(
-            lambda x: x.get('Nom', "") if str(x.get('Nom', "")).strip() != "" 
-            else (x.get('Objet', "") if str(x.get('Objet', "")).strip() != "" else "Navigation"), axis=1
-        )
-        
-        df_final_r['Date_Aff'] = df_final_r['dt_vrai'].dt.strftime('%d/%m/%Y').fillna(df_final_r.get('Date_Temp', ""))
-        
-        # Affichage sécurisé : on ne montre que les colonnes qui existent vraiment
-        cols_to_show = ['Date_Aff', 'Client', 'Société', 'Montant_Calculé']
-        cols_exist = [c for c in cols_to_show if c in df_final_r.columns]
-        
-        view_r = df_final_r[cols_exist].sort_values('Date_Aff', ascending=False)
-        # Renommer les colonnes proprement pour l'affichage
-        view_r.columns = ['Date', 'Client / Objet', 'Société', 'Montant (€)'][:len(cols_exist)]
-        
-        st.dataframe(view_r, hide_index=True, use_container_width=True)
     else:
-        st.info("Aucune donnée.")
+        st.info("Les fichiers de données sont vides.")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
