@@ -732,41 +732,40 @@ if st.session_state.page == "STATS":
     st.markdown("### 📋 Détail des recettes")
     if not df_r_yr.empty:
         df_r_yr['Client'] = df_r_yr['Prénom'].fillna('') + " " + df_r_yr['Nom'].fillna('')
-        view = df_r_yr[['DateNav', 'Client', 'Société', 'Montant_Final']].sort_values('DateNav', ascending=False)
-        view.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
+        
+        # On crée la vue des recettes
+        view_recettes = df_r_yr[['DateNav', 'Client', 'Société', 'Montant_Final']].sort_values('DateNav', ascending=False)
+        view_recettes.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
+        
+        # CORRECTION ICI : On affiche 'view_recettes' et non 'view_frais'
         st.dataframe(
-            view_frais, 
+            view_recettes, 
             hide_index=True, 
             use_container_width=True,
-            height=None # L'ascenseur interne disparaît
+            height=None # iPhone-friendly
         )
     else:
         st.info("Aucune recette pour cette période.")
         
-   # --- 10. DÉTAIL DES DÉPENSES (SÉCURISÉ & IPHONE-FRIENDLY) ---
+    # --- 10. DÉTAIL DES DÉPENSES (SÉCURISÉ & IPHONE-FRIENDLY) ---
     st.markdown("### 💸 Détail des dépenses")
     
-    # ÉTAPE 1 : Initialisation préventive pour éviter le NameError
+    # On initialise view_frais ici pour que le bloc 10 soit autonome
     view_frais = pd.DataFrame() 
 
-    # ÉTAPE 2 : Construction de la vue seulement si des données existent
-    if 'df_f_yr' in locals() and not df_f_yr.empty:
+    if not df_f_yr.empty:
         df_temp = df_f_yr.copy()
         
-        # Harmonisation des colonnes (Désignation vs Objet)
         if 'Désignation' not in df_temp.columns:
             df_temp['Désignation'] = df_temp['Objet'] if 'Objet' in df_temp.columns else "N/A"
         
-        # Sécurité sur le montant
         if 'Frais_Calc' not in df_temp.columns:
             df_temp['Frais_Calc'] = 0.0
 
-        # Sélection des colonnes pour l'affichage mobile
         cols_a_afficher = ['Date_Unifiee', 'Désignation', 'Frais_Calc']
         if 'Type' in df_temp.columns: 
             cols_a_afficher.insert(2, 'Type')
 
-        # Préparation du tableau final
         view_frais = df_temp[cols_a_afficher].sort_values('Date_Unifiee', ascending=False)
         view_frais = view_frais.rename(columns={
             'Date_Unifiee': 'Date', 
@@ -774,16 +773,15 @@ if st.session_state.page == "STATS":
             'Type': 'Catégorie'
         })
 
-    # ÉTAPE 3 : Affichage sans ascenseur vertical (height=None)
     if not view_frais.empty:
         st.dataframe(
             view_frais, 
             hide_index=True, 
             use_container_width=True,
-            height=None  # Supprime l'ascenseur interne pour scroller avec le pouce
+            height=None  # iPhone-friendly
         )
     else:
-        st.info("Aucune dépense enregistrée sur cette période.")    
+        st.info("Aucune dépense enregistrée sur cette période.")
 
  
 # --- FIN DE LA PAGE STATS ---
