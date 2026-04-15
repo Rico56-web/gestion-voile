@@ -735,69 +735,66 @@ if st.session_state.page == "STATS":
             df_soc = df_r_yr.groupby('Société')['Montant_Final'].sum().reset_index()
             fig2 = px.pie(df_soc, values='Montant_Final', names='Société', hole=0.4, height=350)
             st.plotly_chart(fig2, use_container_width=True)
-    # --- 9. DÉTAIL DES RECETTES ---
-    st.markdown("### 💰 Détail des recettes")
-    
-    total_recettes = 0.0  # Initialisation de sécurité
-    
-    if not df_v_yr.empty:
-        df_v_view = df_v_yr.copy()
-        
-        # Recherche flexible des colonnes pour les recettes
-        def find_val_r(row, choices):
-            for c in choices:
-                if c in row.index and pd.notna(row[c]) and str(row[c]).strip().lower() not in ['none', 'nan', '']:
-                    return row[c]
-            return None
+            
+        # --- 09. DÉTAIL DES RECETTES ---      
+        st.markdown("### 💰 Détail des recettes")
+        total_recettes = 0.0
 
-        # A. Date
-        df_v_view['dt_temp_raw'] = df_v_view.apply(lambda r: find_val_r(r, ['DateNav', 'Date', 'dt']), axis=1)
-        df_v_view['dt_temp'] = pd.to_datetime(df_v_view['dt_temp_raw'], errors='coerce')
-        df_v_view['Date_Affiche'] = df_v_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna(df_v_view['dt_temp_raw'].astype(str))
+        if 'df_v_yr' in locals() and not df_v_yr.empty:
+            df_v_view = df_v_yr.copy()
         
-        # B. Désignation
-        df_v_view['Desig_Affiche'] = df_v_view.apply(lambda r: find_val_r(r, ['Nom', 'Objet', 'Désignation']) or "Client Inconnu", axis=1)
-        
-        # C. Catégorie (ou Société)
-        df_v_view['Cat_Affiche'] = df_v_view.apply(lambda r: find_val_r(r, ['Société', 'Type', 'Catégorie']) or "Prestation", axis=1)
-        
-        # D. Montant
-        df_v_view['Mnt_Affiche'] = pd.to_numeric(df_v_view.get('Prix', df_v_view.get('Montant', 0)), errors='coerce').fillna(0.0)
+            # --- SÉCURITÉ : CRÉATION DES COLONNES SI ABSENTES ---
+            if 'Date_Affiche' not in df_v_view.columns:
+                df_v_view['Date_Affiche'] = "À saisir"
+            if 'Desig_Affiche' not in df_v_view.columns:
+                df_v_view['Desig_Affiche'] = df_v_view.get('Nom', df_v_view.get('Objet', "Inconnu"))
+            if 'Mnt_Affiche' not in df_v_view.columns:
+                df_v_view['Mnt_Affiche'] = pd.to_numeric(df_v_view.get('Prix', 0), errors='coerce').fillna(0.0)
 
-        # Calcul du total avant affichage
-        total_recettes = df_v_view['Mnt_Affiche'].sum()
+            total_recettes = df_v_view['Mnt_Affiche'].sum()
 
-        # Préparation du tableau d'affichage
-        view_recettes = df_v_view[['Date_Affiche', 'Desig_Affiche', 'Cat_Affiche', 'Mnt_Affiche']]
-        view_recettes.columns = ['Date', 'Client / Objet', 'Société', 'Montant (€)']
+            # Affichage sécurisé
+            cols_to_show = ['Date_Affiche', 'Desig_Affiche', 'Mnt_Affiche']
+            # On ne garde que les colonnes qui existent réellement pour éviter le KeyError
+            final_cols = [c for c in cols_to_show if c in df_v_view.columns]
         
-        st.dataframe(view_recettes.sort_values('Date', ascending=False), hide_index=True, use_container_width=True)
+            st.dataframe(df_v_view[final_cols], hide_index=True, use_container_width=True)
+            st.metric("Total Recettes", f"{total_recettes:,.2f} €".replace(',', ' '))
         
-        # Affichage du total
-        st.metric("Total des Recettes (Brut)", f"{total_recettes:,.2f} €".replace(',', ' '))
-    else:
-        st.info("Aucune recette enregistrée pour cette année.")
     # --- 10. DÉTAIL DES DÉPENSES ---
     st.markdown("### 💸 Détail des dépenses")
-
     total_depenses = 0.0
 
     if 'df_f_yr' in locals() and not df_f_yr.empty:
         df_f_view = df_f_yr.copy()
-    
-        # Filtre anti-CMN/450€
-        col_mnt = next((c for c in ['Frais_Calc', 'Montant', 'Prix'] if c in df_f_view.columns), None)
-        if col_mnt:
-            df_f_view = df_f_view[pd.to_numeric(df_f_view[col_mnt], errors='coerce') != 450]
-    
-        # Calcul et affichage
-        df_f_view['Mnt_Affiche'] = pd.to_numeric(df_f_view.get(col_mnt, 0), errors='coerce').fillna(0.0)
+        
+        # 1. Identifier la colonne montant pour le filtre
+        col_mnt_brut = next((c for c in ['Frais_Calc', 'Montant', 'Prix'] if c in df_f_view.columns), None)
+        
+        # 2. Filtrer les 450€ (Recettes CMN)
+        if col_mnt_brut:
+            df_f_view = df_f_view[pd.to_numeric(df_f_view[col_mnt_brut], errors='coerce') != 450]
+
+        # 3. SÉCURITÉ : CRÉATION DES COLONNES D'AFFICHAGE
+        if 'Date_Affiche' not in df_f_view.columns:
+            # On essaie de récupérer une date brute
+            col_date = next((c for c in ['Date', 'DateNav', 'dt'] if c in df_f_view.columns), None)
+            df_f_view['Date_Affiche'] = df_f_view[col_date].astype(str) if col_date else "À saisir"
+            
+        if 'Desig_Affiche' not in df_f_view.columns:
+            df_f_view['Desig_Affiche'] = df_f_view.get('Objet', df_f_view.get('Désignation', "Divers"))
+            
+        if 'Mnt_Affiche' not in df_f_view.columns:
+            df_f_view['Mnt_Affiche'] = pd.to_numeric(df_f_view[col_mnt_brut] if col_mnt_brut else 0, errors='coerce').fillna(0.0)
+
         total_depenses = df_f_view['Mnt_Affiche'].sum()
-    
-        st.dataframe(df_f_view[['Date_Affiche', 'Desig_Affiche', 'Mnt_Affiche']], hide_index=True)
-        st.metric("Total Dépenses", f"{total_depenses:,.2f} €", delta_color="inverse")
-    else:
-        st.info("Aucune donnée de dépense trouvée.")
+
+        # 4. Affichage sécurisé
+        cols_to_show = ['Date_Affiche', 'Desig_Affiche', 'Mnt_Affiche']
+        final_cols = [c for c in cols_to_show if c in df_f_view.columns]
+        
+        st.dataframe(df_f_view[final_cols], hide_index=True, use_container_width=True)
+        st.metric("Total Dépenses", f"{total_depenses:,.2f} €".replace(',', ' '))
 
 
     # --- FIN DE LA PAGE STATS ---
