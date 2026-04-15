@@ -618,35 +618,34 @@ if st.session_state.page == "STATS":
     mode_bilan = col_sel1.radio("Vue :", ["À ce jour", "Par Saison"], horizontal=True)
     sel_y = col_sel2.selectbox("Choisir l'année :", [2025, 2026, 2027], index=1)
 
-    # --- 4. TRAITEMENT UNIFIÉ DES RECETTES (SÉCURISÉ & PERMISSIF) ---
+     # --- 4. TRAITEMENT UNIFIÉ DES RECETTES (MODE DIAGNOSTIC) ---
     if not df_r_yr.empty:
-        # Initialisation des colonnes manquantes pour éviter les erreurs
-        for col_name in ['Acompte', 'Prix', 'Paiement', 'Statut', 'DateNav', 'Société', 'Provenance']:
-            if col_name not in df_r_yr.columns:
-                df_r_yr[col_name] = 0 if col_name in ['Acompte', 'Prix'] else "Inconnu"
+        # Nettoyage initial des colonnes pour éviter les crashs
+        for c in ['Acompte', 'Prix', 'Paiement', 'Statut', 'DateNav', 'Société']:
+            if c not in df_r_yr.columns: df_r_yr[c] = 0 if c in ['Acompte', 'Prix'] else ""
 
-        # Calcul des montants
+        # Calcul financier
         df_r_yr['Acompte_Num'] = clean_val(df_r_yr, 'Acompte')
         df_r_yr['Prix_Num'] = clean_val(df_r_yr, 'Prix')
         df_r_yr['Montant_Final'] = df_r_yr[['Acompte_Num', 'Prix_Num']].max(axis=1)
 
-        # Conversion des dates robuste
+        # Conversion date
         df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
         
-        # --- FILTRAGE ASSOUPLI ---
-        # On garde tout sauf ce qui est explicitement "Annulé" ou "Liste d'attente"
+        # --- TEST DE DÉBOGAGE (À supprimer après) ---
+        # st.write(f"Lignes totales chargées : {len(df_r_yr)}")
+
+        # Application des filtres
         mask_base = ~(df_r_yr['Statut'].astype(str).str.contains("attente|Annulé", case=False, na=False))
         
         if mode_bilan == "À ce jour":
             today_dt = pd.to_datetime(datetime.now().date())
-            # On affiche tout ce qui est déjà passé, peu importe le statut "Paid"
             df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'] <= today_dt)].copy()
         else:
-            # Mode Saison : On affiche TOUT pour l'année sélectionnée
+            # On force le filtre sur l'année sélectionnée (sel_y)
             df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'].dt.year == sel_y)].copy()
 
-        # Tri par date
-        df_r_yr = df_r_yr.sort_values('dt_vrai', ascending=False)
+        # st.write(f"Lignes après filtrage ({sel_y}) : {len(df_r_yr)}")
 
     # 5. TRAITEMENT DÉPENSES
     if not df_f_yr.empty:
