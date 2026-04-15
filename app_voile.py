@@ -717,7 +717,21 @@ if st.session_state.page == "STATS":
         st.dataframe(view, hide_index=True, use_container_width=True)
     else:
         st.info("Aucune donnée à afficher.")
-
+        
+    # --- 10. DÉTAIL DES DÉPENSES ---
+    st.markdown("### 💸 Détail des dépenses")
+    if not df_f_yr.empty:
+        # On s'assure d'avoir les colonnes nécessaires
+        df_f_yr['Désignation'] = df_f_yr['Désignation'].fillna(df_f_yr.get('Objet', 'N/A'))
+        
+        # Sélection et renommage pour l'affichage
+        view_frais = df_f_yr[['Date_Unifiee', 'Désignation', 'Type', 'Frais_Calc']].sort_values('Date_Unifiee', ascending=False)
+        view_frais.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
+        
+        st.dataframe(view_frais, hide_index=True, use_container_width=True)
+        st.info(f"Total des dépenses sur cette période : **{frais_total:,.0f} €**")
+    else:
+        st.info("Aucune dépense enregistrée sur cette période.")
     # =================================================================
     # --- 8. BOUTON ARCHIVAGE (VERSION UNIQUE & PROPRE) ---
     # =================================================================
