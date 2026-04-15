@@ -779,85 +779,99 @@ if st.session_state.page == "MAINT":
     st.divider()
     st.subheader("📋 Historique")
     # ... (Suite de ton code d'affichage d'historique)
-# ===============================================================================
-# --- 9. PAGE FACTURES (ANALYSE & ENVOI CMN OPTIMISÉ) ---
+# =================================================================
+# --- PAGE : FACTURATION & SUIVI PAIEMENTS ---
 # =================================================================
 if st.session_state.page == "FACTURES":
-    st.title("📑 Facturation & Rapports")
+    st.title("📑 Facturation & Suivi")
 
-    # --- 1. SÉLECTION DU MOIS ---
-    mois_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", 
-                 "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-    maintenant = datetime.now()
-    
-    col_m, col_a = st.columns(2)
-    sel_mois = col_m.selectbox("Choisir le mois", mois_noms, index=maintenant.month - 1)
-    sel_annee = col_a.selectbox("Année", [2025, 2026, 2027], index=1)
+    # 1. Chargement sécurisé des données
+    df_f = charger_data_safe('contacts.json')
 
-    index_mois = mois_noms.index(sel_mois) + 1
-
-    # --- 2. FILTRAGE ET CALCULS ---
-    if not df_c.empty:
-        df_fact = df_c.copy()
-        df_fact['dt'] = pd.to_datetime(df_fact['DateNav'], format='%d/%m/%Y', errors='coerce')
-        
-        mask_cmn = (df_fact['Société'].astype(str).str.upper() == "CMN") & \
-                   (df_fact['dt'].dt.month == index_mois) & \
-                   (df_fact['dt'].dt.year == sel_annee)
-        
-        df_cmn_mois = df_fact[mask_cmn].copy()
-        
-        if not df_cmn_mois.empty:
-            st.subheader(f"Missions CMN - {sel_mois} {sel_annee}")
-            
-            def clean_prix(x):
-                try:
-                    s = "".join(c for c in str(x) if c.isdigit() or c in ".,")
-                    return float(s.replace(",", "."))
-                except: return 0.0
-
-            df_cmn_mois['PrixNum'] = df_cmn_mois['Prix'].apply(clean_prix)
-            total_cmn = df_cmn_mois['PrixNum'].sum()
-            
-            st.table(df_cmn_mois[['DateNav', 'Nom', 'Prix']].set_index('DateNav'))
-            st.metric("Total à facturer", f"{total_cmn:.2f} €")
-            
-            # --- Préparation des variables pour le mail ---
-            total_txt = f"{total_cmn:.2f}".replace(".", ",")
-            
-            # Construction de la liste des missions pour le corps du mail
-            lignes = []
-            for _, r in df_cmn_mois.iterrows():
-                lignes.append(f"- {r['DateNav']} : {r['Nom']} ({r['Prix']})")
-            texte_missions = "\n".join(lignes)
-
-            destinataire = "tresorier@cmn-asso.fr, aurelienfaucheux@gmail.com"
-            objet = f"Facturation Missions Vesta - {sel_mois} {sel_annee}"
-
-            # Modèle de mail (Nettoyé de tout caractère invisible)
-            modele_mail = "Bonjour,\n\nJ'espère que vous allez bien !\n\nVoici le récapitulatif des navigations de la CMN concernant le mois de {mois} {annee} :\n\n{missions}\n\nLe montant total s'élève à {total} EUR.\n\nMerci d'avance pour le règlement et à très vite sur l'eau !\n\nAmicalement,\nEric (Vesta)"
-
-            corps_mail = modele_mail.format(
-                mois=sel_mois, 
-                annee=sel_annee, 
-                missions=texte_missions, 
-                total=total_txt
-            )
-
-            # --- 4. ZONE D'ENVOI ET COPIE ---
-            st.text_area("Copier ce texte pour Gmail :", corps_mail, height=300)
-            st.info(f"**Destinataire :** {destinataire}\n\n**Objet :** {objet}")
-            
-            import urllib.parse
-            mail_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
-            
-            st.link_button("🚀 TENTER L'ENVOI DIRECT (MAILTO)", mail_link, use_container_width=True)
-            st.caption("Note : Utilisez le copier-coller si le bouton ne lance pas votre application de mail.")
-            
-        else:
-            st.info(f"Aucune mission CMN trouvée pour {sel_mois} {sel_annee}.")
+    if df_f.empty:
+        st.warning("Aucune donnée de facturation trouvée.")
     else:
-        st.warning("La base de données est vide.")
+        # --- 2. NETTOYAGE & HARMONISATION DES NOMBRES ---
+        # On s'assure que les calculs ne plantent pas à cause des virgules
+        for col in ['Prix', 'Acompte', 'Jours', 'Pers']:
+            if col in df_f.columns:
+                df_f[col] = pd.to_numeric(df_f[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+
+        # --- 3. FILTRES DE VUE ---
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            filtre_paye = st.selectbox("Filtrer par paiement", ["Tous", "Paid", "Unpaid"])
+        with col_f2:
+            search_nom = st.text_input("Rechercher un client", "").lower()
+
+        # Application des filtres
+        df_visu = df_f.copy()
+        if filtre_paye != "Tous":
+            df_visu = df_visu[df_visu['Paiement'] == filtre_paye]
+        if search_nom:
+            df_visu = df_visu[df_visu['Nom'].str.lower().contains(search_nom) | df_visu['Prénom'].str.lower().contains(search_nom)]
+
+        # Tri par date (on crée une colonne de tri temporaire)
+        df_visu['dt_tri'] = pd.to_datetime(df_visu['DateNav'], dayfirst=True, errors='coerce')
+        df_visu = df_visu.sort_values('dt_tri', ascending=False)
+
+        # --- 4. RÉCAPITULATIF FINANCIER ---
+        total_du = df_visu['Prix'].sum()
+        total_recu = df_visu['Acompte'].sum()
+        reste_a_percevoir = total_du - total_recu
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("CA Total (Sélection)", f"{total_du:,.2f} €".replace(',', ' '))
+        c2.metric("Total Encaissé", f"{total_recu:,.2f} €".replace(',', ' '), delta=None)
+        c3.metric("Reste à percevoir", f"{reste_a_percevoir:,.2f} €".replace(',', ' '), delta_color="inverse")
+
+        st.divider()
+
+        # --- 5. AFFICHAGE DES LIGNES DE FACTURATION ---
+        for idx, r in df_visu.iterrows():
+            solde = r['Prix'] - r['Acompte']
+            is_paid = r['Paiement'] == "Paid"
+            
+            # Design de la ligne
+            color_border = "#2e7d32" if is_paid else "#d32f2f"
+            bg_label = "rgba(46, 125, 50, 0.1)" if is_paid else "rgba(211, 47, 47, 0.1)"
+            status_text = "✅ PAYÉ" if is_paid else "⏳ EN ATTENTE"
+
+            html_facture = f"""
+            <div style="border: 1px solid #ddd; padding: 12px; border-radius: 10px; 
+                        margin-bottom: 8px; border-left: 10px solid {color_border}; background: white;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <b style="font-size: 1.1em;">{r['Nom']} {r['Prénom']}</b><br>
+                        <small>📅 Date : {r['DateNav']} | 🏢 Société : {r.get('Société', 'PERSO')}</small>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="background: {bg_label}; color: {color_border}; padding: 4px 8px; 
+                                     border-radius: 5px; font-weight: bold; font-size: 0.9em;">{status_text}</span><br>
+                        <b style="font-size: 1.2em;">{solde:,.2f} €</b><br>
+                        <small>sur un total de {r['Prix']}€</small>
+                    </div>
+                </div>
+            </div>
+            """
+            st.markdown(html_facture, unsafe_allow_html=True)
+
+            # Actions rapides
+            col_a, col_b, col_c = st.columns([2, 2, 6])
+            if not is_paid:
+                if col_a.button("💰 Marquer PAYÉ", key=f"pay_{idx}"):
+                    # On met à jour le DataFrame original
+                    df_f.at[idx, 'Paiement'] = "Paid"
+                    df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix'] # On considère tout payé
+                    sauvegarder_data(df_f, 'contacts.json')
+                    st.rerun()
+            
+            if col_b.button("✏️ Modifier", key=f"edit_f_{idx}"):
+                st.session_state.contact_edit_idx = idx
+                st.session_state.page = "CONTACTS" # Redirige vers le formulaire
+                st.rerun()
+
+    st.markdown("<br><br>", unsafe_allow_html=True)
 # =================================================================
 # --- 11. PAGE ARCHIVES (NETTOYAGE, EXPORT & CARTES VIDANGE) ---
 # =================================================================
