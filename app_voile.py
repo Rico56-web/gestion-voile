@@ -611,24 +611,30 @@ if st.session_state.page == "STATS":
     mode_bilan = col_sel1.radio("Vue :", ["À ce jour", "Par Saison"], horizontal=True)
     sel_y = col_sel2.selectbox("Choisir l'année :", [2025, 2026, 2027], index=1)
 
-    def clean_val(df, col):
+     def clean_val(df, col):
         if col in df.columns:
-            return pd.to_numeric(df[col].astype(str).str.replace(',', '.').str.replace('€', '').str.strip(), errors='coerce').fillna(0)
-        return 0
+            # On convertit en texte, on nettoie les symboles, et on transforme en nombre
+            s = df[col].astype(str).str.replace(',', '.').str.replace('€', '').str.strip()
+            return pd.to_numeric(s, errors='coerce').fillna(0)
+        return pd.Series(0, index=df.index) # Renvoie une colonne de 0 si la colonne n'existe pas
 
-    # --- TRAITEMENT RECETTES ---
+    # --- 4. TRAITEMENT UNIFIÉ DES RECETTES (SÉCURISÉ) ---
     if not df_r_yr.empty:
-        for col in ['Acompte', 'Prix', 'Paiement', 'Statut', 'DateNav']:
-            if col not in df_r_yr.columns: df_r_yr[col] = 0 if col in ['Acompte', 'Prix'] else ""
+        # On s'assure que les colonnes existent pour éviter les crashs
+        for col_name in ['Acompte', 'Prix', 'Paiement', 'Statut', 'DateNav']:
+            if col_name not in df_r_yr.columns:
+                df_r_yr[col_name] = 0 if col_name in ['Acompte', 'Prix'] else ""
+
+        # Version optimisée et sécurisée pour calculer le montant final
+        # On nettoie les deux colonnes d'un coup
+        df_r_yr['Acompte_Num'] = clean_val(df_r_yr, 'Acompte')
+        df_r_yr['Prix_Num'] = clean_val(df_r_yr, 'Prix')
         
-        df_r_yr['Montant_Final'] = df_r_yr.apply(lambda x: max(clean_val(pd.DataFrame([x]), 'Acompte')[0], clean_val(pd.DataFrame([x]), 'Prix')[0]), axis=1)
+        # On prend le maximum entre l'acompte et le prix pour chaque ligne
+        df_r_yr['Montant_Final'] = df_r_yr[['Acompte_Num', 'Prix_Num']].max(axis=1)
+
+        # Conversion des dates
         df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
-        
-        mask_base = (df_r_yr['Statut'] != "Liste d'attente") & (df_r_yr['Statut'] != "Annulé")
-        if mode_bilan == "À ce jour":
-            df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'] <= pd.to_datetime(today.date()))].copy()
-        else:
-            df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'].dt.year == sel_y)].copy()
 
     # --- TRAITEMENT DÉPENSES ---
     if not df_f_yr.empty:
