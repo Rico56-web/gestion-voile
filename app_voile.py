@@ -727,82 +727,63 @@ if st.session_state.page == "STATS":
             df_soc = df_r_yr.groupby('Société')['Montant_Final'].sum().reset_index()
             fig2 = px.pie(df_soc, values='Montant_Final', names='Société', hole=0.4, height=350)
             st.plotly_chart(fig2, use_container_width=True)
-            
-    # --- 9. TABLEAU DÉTAILLÉ RECETTES (SÉCURITÉ ANTI-NONE) ---
+       # --- 9. TABLEAU DÉTAILLÉ RECETTES (RÉCUPÉRATION TOTALE) ---
     st.markdown("### 📋 Détail des recettes")
     if not df_r_yr.empty:
         df_r_view = df_r_yr.copy()
         
-        # 1. On cherche la date dans toutes les colonnes possibles
-        # On essaie DateNav, puis Date, puis date
-        for col_possible in ['DateNav', 'Date', 'date']:
-            if col_possible in df_r_view.columns:
-                df_r_view['dt_temp'] = pd.to_datetime(df_r_view[col_possible], dayfirst=True, errors='coerce')
-                # Si on a trouvé au moins une date valide, on s'arrête
-                if df_r_view['dt_temp'].notna().any():
-                    break
+        # On cherche la date dans n'importe quelle colonne contenant "Date"
+        cols_date = [c for c in df_r_view.columns if 'date' in c.lower()]
+        col_date_r = cols_date[0] if cols_date else None
+        
+        if col_date_r:
+            df_r_view['dt_temp'] = pd.to_datetime(df_r_view[col_date_r], dayfirst=True, errors='coerce')
+            df_r_view['Date_Affiche'] = df_r_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna("Date à saisir")
+        else:
+            df_r_view['Date_Affiche'] = "Date à saisir"
 
-        # 2. Gestion des clients
-        df_r_view['Client'] = df_r_view['Prénom'].fillna('') + " " + df_r_view['Nom'].fillna('')
+        # On récupère le nom du client
+        df_r_view['Client'] = df_r_view.apply(lambda x: f"{x.get('Prénom','')} {x.get('Nom','')}".strip(), axis=1)
         
-        # 3. Formatage pour l'affichage (si dt_temp est None, on met un texte par défaut)
-        df_r_view['Date_Affiche'] = df_r_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna("Date à saisir")
-        
-        # 4. Tri et sélection
-        view_recettes = df_r_view.sort_values('dt_temp', ascending=False)
-        view_recettes = view_recettes[['Date_Affiche', 'Client', 'Société', 'Montant_Final']]
+        # On s'assure que le montant est bien là
+        mnt_col = 'Montant_Final' if 'Montant_Final' in df_r_view.columns else 'Prix'
+        df_r_view['Somme'] = pd.to_numeric(df_r_view[mnt_col], errors='coerce').fillna(0)
+
+        view_recettes = df_r_view.sort_values('dt_temp', ascending=False) if col_date_r else df_r_view
+        view_recettes = view_recettes[['Date_Affiche', 'Client', 'Société', 'Somme']]
         view_recettes.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
         
         st.dataframe(view_recettes, hide_index=True, use_container_width=True)
-    else:
-        st.info("Aucune recette pour cette période.")
-        
-      # --- 10. DÉTAIL DES DÉPENSES (SÉCURITÉ ANTI-NONE) ---
+
+    # --- 10. DÉTAIL DES DÉPENSES (RÉCUPÉRATION TOTALE) ---
     st.markdown("### 💸 Détail des dépenses")
-    
-    view_frais = pd.DataFrame() 
-
     if not df_f_yr.empty:
-        df_temp = df_f_yr.copy()
+        df_f_view = df_f_yr.copy()
         
-        # 1. Gestion robuste de la Date
-        df_temp['dt_temp'] = pd.to_datetime(df_temp['Date_Unifiee'], dayfirst=True, errors='coerce')
-        df_temp['Date_Affiche'] = df_temp['dt_temp'].dt.strftime('%d/%m/%Y').fillna("Date ?")
+        # 1. DATE : On cherche n'importe quelle colonne de date
+        c_date_f = [c for c in df_f_view.columns if 'date' in c.lower()]
+        target_date = c_date_f[0] if c_date_f else None
+        df_f_view['dt_temp'] = pd.to_datetime(df_f_view[target_date], dayfirst=True, errors='coerce') if target_date else None
+        df_f_view['Date_Affiche'] = df_f_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna("Date à saisir")
         
-        # 2. Gestion robuste de la Désignation (Objet vs Désignation)
-        # On cherche 'Désignation', sinon 'Objet', sinon on met "Non spécifié"
-        if 'Désignation' in df_temp.columns:
-            df_temp['Desig_Affiche'] = df_temp['Désignation'].fillna(df_temp.get('Objet', "Non spécifié"))
-        elif 'Objet' in df_temp.columns:
-            df_temp['Desig_Affiche'] = df_temp['Objet'].fillna("Non spécifié")
-        else:
-            df_temp['Desig_Affiche'] = "Non spécifié"
-
-        # 3. Gestion robuste de la Catégorie (Type vs Categorie)
-        # On cherche 'Type', sinon 'Catégorie', sinon "Divers"
-        if 'Type' in df_temp.columns:
-            df_temp['Cat_Affiche'] = df_temp['Type'].fillna(df_temp.get('Catégorie', "Divers"))
-        elif 'Catégorie' in df_temp.columns:
-            df_temp['Cat_Affiche'] = df_temp['Catégorie'].fillna("Divers")
-        else:
-            df_temp['Cat_Affiche'] = "Divers"
-
-        # 4. Sécurité sur le montant
-        if 'Frais_Calc' not in df_temp.columns:
-            df_temp['Frais_Calc'] = 0.0
-
-        # 5. Tri et sélection des colonnes finales
-        view_frais = df_temp.sort_values('dt_temp', ascending=False)
-        view_frais = view_frais[['Date_Affiche', 'Desig_Affiche', 'Cat_Affiche', 'Frais_Calc']]
+        # 2. DÉSIGNATION : On cherche 'Objet', 'Désignation', ou 'Label'
+        c_desig = [c for c in df_f_view.columns if c.lower() in ['objet', 'désignation', 'designation', 'label']]
+        df_f_view['Desig_Affiche'] = df_f_view[c_desig[0]].fillna("À préciser") if c_desig else "À préciser"
         
-        # Renommage pour l'affichage tableau
+        # 3. CATÉGORIE : On cherche 'Type', 'Catégorie', ou 'Genre'
+        c_cat = [c for c in df_f_view.columns if c.lower() in ['type', 'catégorie', 'categorie']]
+        df_f_view['Cat_Affiche'] = df_f_view[c_cat[0]].fillna("Divers") if c_cat else "Divers"
+
+        # 4. MONTANT : On cherche Frais_Calc, M_Num ou Montant
+        c_mnt = [c for c in df_f_view.columns if c in ['Frais_Calc', 'M_Num', 'Montant']]
+        df_f_view['Mnt_Affiche'] = pd.to_numeric(df_f_view[c_mnt[0]], errors='coerce').fillna(0.0) if c_mnt else 0.0
+
+        view_frais = df_f_view.sort_values('dt_temp', ascending=False) if target_date else df_f_view
+        view_frais = view_frais[['Date_Affiche', 'Desig_Affiche', 'Cat_Affiche', 'Mnt_Affiche']]
         view_frais.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
+        
+        st.dataframe(view_frais, hide_index=True, use_container_width=True)         
 
-    # Affichage final sans ascenseur
-    if not view_frais.empty:
-        st.dataframe(view_frais, hide_index=True, use_container_width=True)
-    else:
-        st.info("Aucune dépense enregistrée sur cette période.")
 
 # --- FIN DE LA PAGE STATS ---
     # =================================================================
