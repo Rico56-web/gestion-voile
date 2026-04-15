@@ -672,36 +672,53 @@ if st.session_state.page == "STATS":
         st.subheader("👥 Par Société")
         if not df_r_yr.empty and 'Société' in df_r_yr.columns:
             st.plotly_chart(px.pie(df_r_yr.groupby('Société')['Montant_Final'].sum().reset_index(), values='Montant_Final', names='Société', hole=0.4, height=300), use_container_width=True)
-
-    # 8. DÉTAIL DES RECETTES
+    # --- 8. DÉTAIL DES RECETTES ---
     st.divider()
     st.markdown("### 💰 Détail des recettes")
+    
     if not df_r_yr.empty:
         df_r_view = df_r_yr.copy()
+        
+        # Formatage des colonnes pour l'affichage
         df_r_view['Date_A'] = df_r_view['dt_vrai'].dt.strftime('%d/%m/%Y').fillna(df_r_view['DateNav'])
         df_r_view['Client'] = df_r_view.get('Nom', df_r_view.get('Objet', "Inconnu"))
         
+        # Sélection des colonnes
         view_recettes = df_r_view[['Date_A', 'Client', 'Société', 'Montant_Final']]
         view_recettes.columns = ['Date', 'Client', 'Société', 'Montant (€)']
+        
+        # Affichage du tableau trié
         st.dataframe(view_recettes.sort_values('Date', ascending=False), hide_index=True, use_container_width=True)
+        
+        # AFFICHAGE DU TOTAL JUSTE EN DESSOUS
+        st.metric("Total des Recettes sur la période", f"{ca_total:,.2f} €".replace(',', ' '))
     else:
-        st.info("Aucune recette pour cette sélection.")
+        st.info("Aucune recette pour cette sélection (Vérifiez l'année ou le mode 'À ce jour').")
 
-    # 9. DÉTAIL DES DÉPENSES
+    # --- 9. DÉTAIL DES DÉPENSES ---
     st.markdown("### 💸 Détail des dépenses")
+    
     if not df_f_yr.empty:
         df_f_view = df_f_yr.copy()
+        
         # Filtre anti-recettes 450€ / CMN
         df_f_view = df_f_view[df_f_view['Frais_Calc'] != 450]
         
         df_f_view['Date_A'] = df_f_view['dt_vrai'].dt.strftime('%d/%m/%Y').fillna(df_f_view['Date'])
-        df_f_view['Objet'] = df_f_view.get('Objet', df_f_view.get('Désignation', "Divers"))
+        df_f_view['Objet_A'] = df_f_view.get('Objet', df_f_view.get('Désignation', "Divers"))
         
-        view_frais = df_f_view[['Date_A', 'Objet', 'Frais_Calc']]
+        # Sélection des colonnes
+        view_frais = df_f_view[['Date_A', 'Objet_A', 'Frais_Calc']]
         view_frais.columns = ['Date', 'Désignation', 'Montant (€)']
+        
+        # Affichage du tableau trié
         st.dataframe(view_frais.sort_values('Date', ascending=False), hide_index=True, use_container_width=True)
+        
+        # AFFICHAGE DU TOTAL JUSTE EN DESSOUS
+        st.metric("Total des Dépenses sur la période", f"{frais_total:,.2f} €".replace(',', ' '), delta_color="inverse")
     else:
         st.info("Aucune dépense pour cette sélection.")
+ 
     # --- FIN DE LA PAGE STATS ---
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
