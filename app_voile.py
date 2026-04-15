@@ -765,47 +765,47 @@ if st.session_state.page == "STATS":
         
         st.dataframe(view_recettes, hide_index=True, use_container_width=True)
         
-    # --- 10. DÉTAIL DES DÉPENSES (SÉCURITÉ MAXIMALE) ---
+    # --- 10. DÉTAIL DES DÉPENSES (SCANNER INTÉGRAL) ---
     st.markdown("### 💸 Détail des dépenses")
     if not df_f_yr.empty:
         df_f_view = df_f_yr.copy()
-        
-        # 1. GESTION DE LA DATE (Même logique que pour les recettes)
-        # On cherche 'Date' ou 'DateNav'
-        col_date_f = next((c for c in df_f_view.columns if 'date' in c.lower()), None)
+
+        # Fonction de recherche flexible pour trouver une valeur dans plusieurs colonnes possibles
+        def find_value(row, possibilities):
+            for p in possibilities:
+                if p in row.index and pd.notna(row[p]) and str(row[p]).strip().lower() not in ['none', 'nan', '']:
+                    return row[p]
+            return None
+
+        # 1. DATE : On cherche toutes les variantes
+        df_f_view['dt_temp_raw'] = df_f_view.apply(lambda r: find_value(r, ['DateNav', 'Date Nav', 'Date', 'dt', 'date']), axis=1)
         
         def clean_date_depense(val):
-            if pd.isna(val) or str(val).lower() in ['none', 'nan', '']: return None
+            if val is None: return None
             for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
-                try:
-                    return pd.to_datetime(val, format=fmt)
-                except:
-                    continue
+                try: return pd.to_datetime(val, format=fmt)
+                except: continue
             return pd.to_datetime(val, errors='coerce')
 
-        if col_date_f:
-            df_f_view['dt_temp'] = df_f_view[col_date_f].apply(clean_date_depense)
-            df_f_view['Date_Affiche'] = df_f_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna(df_f_view[col_date_f].astype(str))
-        else:
-            df_f_view['Date_Affiche'] = "À saisir"
-            df_f_view['dt_temp'] = pd.NaT
-
-        # 2. DÉSIGNATION (Objet ou Désignation)
-        # On cherche la première colonne qui correspond
-        df_f_view['Desig_Affiche'] = df_f_view.get('Désignation', df_f_view.get('Objet', "Non spécifié")).fillna("Non spécifié")
+        df_f_view['dt_temp'] = df_f_view['dt_temp_raw'].apply(clean_date_depense)
+        df_f_view['Date_Affiche'] = df_f_view['dt_temp'].dt.strftime('%d/%m/%Y').fillna(df_f_view['dt_temp_raw'].astype(str))
         
-        # 3. CATÉGORIE (Type ou Catégorie)
-        df_f_view['Cat_Affiche'] = df_f_view.get('Type', df_f_view.get('Catégorie', "Divers")).fillna("Divers")
-        
-        # 4. MONTANT (Frais_Calc, Montant ou Prix)
-        # On essaie de récupérer la valeur numérique
-        col_mnt = next((c for c in ['Frais_Calc', 'Montant', 'Prix'] if c in df_f_view.columns), None)
-        if col_mnt:
-            df_f_view['Mnt_Affiche'] = pd.to_numeric(df_f_view[col_mnt], errors='coerce').fillna(0.0)
-        else:
-            df_f_view['Mnt_Affiche'] = 0.0
+        # 2. DÉSIGNATION : On cherche les noms, prénoms ou notes si l'objet est vide
+        df_f_view['Desig_Affiche'] = df_f_view.apply(
+            lambda r: find_value(r, ['Désignation', 'Objet', 'Notes', 'Nom', 'Commentaires']) or "Non spécifié", axis=1
+        )
 
-        # Nettoyage final des dates illisibles
+        # 3. CATÉGORIE
+        df_f_view['Cat_Affiche'] = df_f_view.apply(
+            lambda r: find_value(r, ['Type', 'Catégorie', 'Société', 'Société']) or "Divers", axis=1
+        )
+
+        # 4. MONTANT : On cherche Prix ou Frais_Calc
+        df_f_view['Mnt_Affiche'] = df_f_view.apply(
+            lambda r: pd.to_numeric(find_value(r, ['Frais_Calc', 'Prix', 'Montant']), errors='coerce') or 0.0, axis=1
+        )
+
+        # Nettoyage des textes résiduels
         df_f_view['Date_Affiche'] = df_f_view['Date_Affiche'].replace(['None', 'nan', 'NaT'], 'À saisir')
 
         # Tri et affichage
@@ -814,9 +814,8 @@ if st.session_state.page == "STATS":
         view_frais.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
         
         st.dataframe(view_frais, hide_index=True, use_container_width=True)
- 
 
-# --- FIN DE LA PAGE STATS ---
+    # --- FIN DE LA PAGE STATS ---
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
