@@ -589,74 +589,74 @@ if st.session_state.page == "PLANNING":
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 # =================================================================
-# --- 7. PAGE STATS (VERSION RÉCUPÉRATION TOTALE) ---
+# --- 7. PAGE STATS (STRICT : À CE JOUR / ANNÉE COMPLÈTE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # 1. Chargement sans aucune perte
+    # 1. Chargement et fusion sans perte
     df_actuel = charger_data_safe('contacts.json')
     df_archive = charger_data_safe('archives_factures.json')
     df_all = pd.concat([df_actuel, df_archive], ignore_index=True).fillna("")
 
-    # 2. Interface
+    # 2. Sélecteurs (Interface demandée)
     col_sel1, col_sel2 = st.columns(2)
     mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
     sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
     if not df_all.empty:
-        # Nettoyage des montants (ultra-robuste)
-        for col in ['Acompte', 'Prix']:
-            df_all[col] = pd.to_numeric(df_all[col].astype(str).str.replace(r'[^\d.]', '', regex=True), errors='coerce').fillna(0.0)
-        df_all['Montant_Final'] = df_all[['Acompte', 'Prix']].max(axis=1)
+        # Nettoyage financier (Regex pour garder uniquement les chiffres et points)
+        def to_num(s):
+            val = "".join(c for c in str(s) if c.isdigit() or c in '.,')
+            val = val.replace(',', '.')
+            try: return float(val)
+            except: return 0.0
 
-        # Gestion des dates "Tout-Terrain"
-        # On fusionne DateNav et Date, puis on convertit
+        df_all['Mnt_A'] = df_all['Acompte'].apply(to_num)
+        df_all['Mnt_P'] = df_all['Prix'].apply(to_num)
+        df_all['Montant_Final'] = df_all[['Mnt_A', 'Mnt_P']].max(axis=1)
+
+        # Gestion des dates (fusion DateNav et Date)
         df_all['date_brute'] = df_all['DateNav'].replace('', '').mask(df_all['DateNav'] == '', df_all['Date'])
         df_all['dt_vrai'] = pd.to_datetime(df_all['date_brute'], dayfirst=True, errors='coerce')
 
-        # --- LE FILTRE QUI NE DOIT PLUS BLOQUER ---
-        # On filtre sur l'année choisie, MAIS on garde les lignes sans date (au cas où)
-        mask_annee = (df_all['dt_vrai'].dt.year == sel_y) | (df_all['dt_vrai'].isna())
-        df_filtre = df_all[mask_annee].copy()
+        # --- FILTRAGE PAR ANNÉE (D'abord l'année sélectionnée) ---
+        df_annee = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
 
-        # Filtre "À ce jour" (uniquement si la date est connue)
+        # --- FILTRAGE PAR MODE (La logique "À ce jour" vs "Année Complète") ---
         if mode_bilan == "À ce jour":
             today = pd.to_datetime(datetime.now().date())
-            # On garde ce qui est passé OU ce qui n'a pas de date du tout
-            df_final = df_filtre[(df_filtre['dt_vrai'] <= today) | (df_filtre['dt_vrai'].isna())].copy()
+            # On ne garde que ce qui est <= aujourd'hui (15 avril 2026)
+            df_final = df_annee[df_annee['dt_vrai'] <= today].copy()
         else:
-            df_final = df_filtre.copy()
+            # On garde TOUT pour l'année sélectionnée (2026)
+            df_final = df_annee.copy()
 
-        # 3. AFFICHAGE DES CHIFFRES (TOTO)
+        # 3. AFFICHAGE DU RÉSULTAT (TOTO)
         st.divider()
         total_ca = df_final['Montant_Final'].sum()
         
         c1, c2 = st.columns(2)
-        c1.metric(f"💰 CA ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
-        c2.metric("📈 Nombre de lignes", f"{len(df_final)}")
+        c1.metric(f"💰 CA {mode_bilan}", f"{total_ca:,.2f} €".replace(',', ' '))
+        c2.metric("📋 Lignes", f"{len(df_final)}")
 
-        # 4. LE TABLEAU (SANS RISQUE DE KEYERROR)
-        st.markdown(f"### 📋 Détail des {len(df_final)} lignes")
-        
+        # 4. TABLEAU DÉTAILLÉ
         if not df_final.empty:
-            # On prépare un affichage propre même si la date est cassée
-            df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y').fillna(df_final['date_brute'])
-            df_final['Client'] = df_final['Nom'].replace('', 'Non renseigné')
+            # Nom : Nom si existe, sinon Objet, sinon Société
+            df_final['Client'] = df_final['Nom'].replace('', None).fillna(df_final['Objet']).replace('', 'Navigation')
+            df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
             
-            # Tri par date (les plus récentes en haut)
-            df_final = df_final.sort_values('dt_vrai', ascending=False, na_position='last')
+            # Tri et sélection colonnes
+            view = df_final.sort_values('dt_vrai', ascending=False)
+            view = view[['Date_Aff', 'Client', 'Société', 'Montant_Final']]
+            view.columns = ['Date', 'Client / Objet', 'Société', 'Montant (€)']
             
-            # Affichage restreint aux colonnes utiles
-            cols_prevues = ['Date_Aff', 'Client', 'Société', 'Montant_Final']
-            cols_dispo = [c for c in cols_prevues if c in df_final.columns]
-            
-            st.dataframe(df_final[cols_dispo], hide_index=True, use_container_width=True)
+            st.dataframe(view, hide_index=True, use_container_width=True)
         else:
-            st.warning("Aucune donnée trouvée.")
+            st.info(f"Aucune donnée pour {sel_y} en mode {mode_bilan}.")
 
     else:
-        st.error("Les fichiers sont vides.")
+        st.error("Aucune donnée trouvée dans les fichiers JSON.")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
