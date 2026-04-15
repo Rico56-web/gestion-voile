@@ -666,16 +666,27 @@ if st.session_state.page == "STATS":
 
     # --- 6. INDICATEURS CLÉS (KPI) ---
     st.divider()
+    
+    # SÉCURITÉ ULTIME : Si df_r_yr est vide ou si la colonne manque, on la crée à 0
+    if 'Montant_Final' not in df_r_yr.columns:
+        df_r_yr['Montant_Final'] = 0.0
+
+    # Calcul des totaux avec gestion des tableaux vides
     ca_total = df_r_yr['Montant_Final'].sum() if not df_r_yr.empty else 0
+    
+    # Pareil pour les frais
+    if 'Frais_Calc' not in df_f_yr.columns:
+        df_f_yr['Frais_Calc'] = 0.0
     frais_total = df_f_yr['Frais_Calc'].sum() if not df_f_yr.empty else 0
     
+    # Affichage des métriques
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("💰 CA Encaissé", f"{ca_total:,.0f} €".replace(',', ' '))
     k2.metric("📉 Frais Réels", f"{frais_total:,.0f} €".replace(',', ' '))
     k3.metric("⚖️ Solde Net", f"{(ca_total - frais_total):,.0f} €".replace(',', ' '))
     
-    # Objectif CA (basé sur le Prix de tout ce qui n'est pas annulé)
-    obj = df_r_yr['Prix_Calc'].sum() if not df_r_yr.empty else 0
+    # Sécurité pour l'Objectif
+    obj = df_r_yr['Prix_Calc'].sum() if (not df_r_yr.empty and 'Prix_Calc' in df_r_yr.columns) else 0
     k4.metric("🎯 Objectif Vue", f"{obj:,.0f} €".replace(',', ' '))
 
     # --- 7. CALCULS MENSUELS ---
