@@ -700,16 +700,30 @@ if st.session_state.page == "STATS":
     obj = df_r_yr['Prix_Calc'].sum() if (not df_r_yr.empty and 'Prix_Calc' in df_r_yr.columns) else 0
     k4.metric("🎯 Objectif Vue", f"{obj:,.0f} €".replace(',', ' '))
 
-    # --- 7. CALCULS MENSUELS ---
+    # --- 7. CALCULS MENSUELS (SÉCURISÉS) ---
     mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     rs_m = []
+    
+    # Vérification de sécurité pour éviter le crash
+    has_dates = not df_r_yr.empty and 'dt_vrai' in df_r_yr.columns and 'Montant_Final' in df_r_yr.columns
+    has_frais = not df_f_yr.empty and 'dt_vrai' in df_f_yr.columns and 'Frais_Calc' in df_f_yr.columns
+
     for i in range(1, 13):
-        r_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['Montant_Final'].sum() if not df_r_yr.empty else 0
-        f_m = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['Frais_Calc'].sum() if not df_f_yr.empty else 0
+        # Calcul recettes du mois
+        if has_dates:
+            r_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['Montant_Final'].sum()
+        else:
+            r_m = 0
+            
+        # Calcul frais du mois
+        if has_frais:
+            f_m = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['Frais_Calc'].sum()
+        else:
+            f_m = 0
+            
         rs_m.append({'Mois': mois_noms[i-1], 'Encaissé €': r_m, 'Décaissé €': f_m})
     
     df_stats_m = pd.DataFrame(rs_m)
-
     # --- 8. GRAPHIQUES ---
     c1, c2 = st.columns(2)
     with c1:
