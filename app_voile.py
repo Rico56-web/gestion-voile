@@ -658,6 +658,8 @@ if st.session_state.page == "STATS":
 
     # --- 6. INDICATEURS CLÉS (KPI) ---
     st.divider()
+    
+    # Garantir l'existence des colonnes
     if 'Montant_Final' not in df_r_yr.columns: df_r_yr['Montant_Final'] = 0.0
     if 'Prix_Calc' not in df_r_yr.columns: df_r_yr['Prix_Calc'] = 0.0
     if 'Frais_Calc' not in df_f_yr.columns: df_f_yr['Frais_Calc'] = 0.0
@@ -669,12 +671,22 @@ if st.session_state.page == "STATS":
     nb_jours = len(df_r_yr) if not df_r_yr.empty else 0
     taux_remplissage = (nb_jours / 100) * 100
 
-    k1, k2, k3, k4, k5 = st.columns(5)
+    # CALCUL DE LA MARGE OPÉRATIONNELLE
+    marge_valeur = ca_total - frais_total
+    marge_pourcent = (marge_valeur / ca_total * 100) if ca_total > 0 else 0
+
+    # Affichage sur 6 colonnes pour une vue d'ensemble parfaite
+    k1, k2, k3, k4, k5, k6 = st.columns(6)
+    
     k1.metric("💰 CA Encaissé", f"{ca_total:,.0f} €".replace(',', ' '))
     k2.metric("📉 Frais Réels", f"{frais_total:,.0f} €".replace(',', ' '))
-    k3.metric("⚖️ Solde Net", f"{(ca_total - frais_total):,.0f} €".replace(',', ' '))
-    k4.metric("🎯 Objectif Vue", f"{df_r_yr['Prix_Calc'].sum():,.0f} €".replace(',', ' '))
-    k5.metric("⚓ Remplissage", f"{taux_remplissage:.0f}%", help="Basé sur un objectif de 100 jours/an")
+    k3.metric("⚖️ Solde Net", f"{marge_valeur:,.0f} €".replace(',', ' '))
+    
+    # La Marge en % avec une couleur dynamique (optionnel dans l'esprit, ici simple texte)
+    k4.metric("📈 Marge %", f"{marge_pourcent:.1f}%")
+    
+    k5.metric("🎯 Objectif CA", f"{df_r_yr['Prix_Calc'].sum():,.0f} €".replace(',', ' '))
+    k6.metric("⚓ Remplissage", f"{taux_remplissage:.0f}%", help="Basé sur 100 jours/an")
 
     # --- 7. CALCULS MENSUELS ---
     mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
