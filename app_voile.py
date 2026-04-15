@@ -2,6 +2,7 @@ import requests, base64, json, time, os, html, io
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import urllib.parse
 from datetime import datetime, date, timedelta
 import calendar
 
