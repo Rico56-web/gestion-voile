@@ -742,31 +742,38 @@ if st.session_state.page == "STATS":
         )
     else:
         st.info("Aucune recette pour cette période.")
-
-    # --- 10. DÉTAIL DES DÉPENSES (SÉCURISÉ) ---
+    # --- 10. DÉTAIL DES DÉPENSES (SÉCURISÉ & MOBILE-FRIENDLY) ---
     st.markdown("### 💸 Détail des dépenses")
+    
+    # On initialise view_frais avec un DataFrame vide par défaut pour éviter le NameError
+    view_frais = pd.DataFrame()
+
     if not df_f_yr.empty:
-        # Sécurité colonnes Désignation/Objet
+        # Sécurité colonnes
         if 'Désignation' not in df_f_yr.columns:
             df_f_yr['Désignation'] = df_f_yr['Objet'] if 'Objet' in df_f_yr.columns else "N/A"
         
         df_f_yr['Désignation'] = df_f_yr['Désignation'].fillna("N/A")
-        df_f_yr['Type'] = df_f_yr['Type'].fillna("Divers") if 'Type' in df_f_yr.columns else "Divers"
-
+        df_f_yr['Type'] = df_f_yr['Type'].fillna("Divers")
+        
         cols_frais = ['Date_Unifiee', 'Désignation', 'Frais_Calc']
         if 'Type' in df_f_yr.columns: cols_frais.insert(2, 'Type')
 
+        # Création de la vue
         view_frais = df_f_yr[cols_frais].sort_values('Date_Unifiee', ascending=False)
         view_frais = view_frais.rename(columns={'Date_Unifiee': 'Date', 'Frais_Calc': 'Montant (€)', 'Type': 'Catégorie'})
-        
+
+    # Affichage final
+    if not view_frais.empty:
         st.dataframe(
             view_frais, 
             hide_index=True, 
             use_container_width=True,
-            height=None # L'ascenseur interne disparaît
+            height=None  # <--- Supprime l'ascenseur interne pour l'iPhone
         )
     else:
         st.info("Aucune dépense pour cette période.")
+ 
 # --- FIN DE LA PAGE STATS ---
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
