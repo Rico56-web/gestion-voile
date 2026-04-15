@@ -764,6 +764,9 @@ if st.session_state.page == "STATS":
         view_recettes.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
         
         st.dataframe(view_recettes, hide_index=True, use_container_width=True)
+        # --- TOTAL RECETTES ---
+        total_recettes = view_recettes['Montant (€)'].sum()
+        st.metric("Total des Recettes (Net)", f"{total_recettes:,.2f} €".replace(',', ' '))
         
     # --- 10. DÉTAIL DES DÉPENSES (VERSION ANTI-INTRUS) ---
     st.markdown("### 💸 Détail des dépenses")
@@ -820,6 +823,9 @@ if st.session_state.page == "STATS":
             view_frais.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
             
             st.dataframe(view_frais, hide_index=True, use_container_width=True)
+            # --- TOTAL DÉPENSES ---
+            total_depenses = view_frais['Montant (€)'].sum()
+            st.metric("Total des Dépenses", f"{total_depenses:,.2f} €".replace(',', ' '), delta=f"-{total_depenses:,.2f} €", delta_color="inverse")
         else:
             st.info("Aucune dépense réelle (hors recettes) à afficher.")
 
