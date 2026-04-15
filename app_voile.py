@@ -589,213 +589,115 @@ if st.session_state.page == "PLANNING":
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 
-# =================================================================
-# --- 7. PAGE STATS (VERSION APEX - NAVIGATION & RENTABILITÉ) ---
+    # =================================================================
+# --- 7. PAGE STATS (VERSION CORRIGÉE - AFFICHAGE ALIGNÉ) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Tableau de Bord Vesta Skipper 2026</h2>', unsafe_allow_html=True)
-    st.markdown("""
-    <style>
-    /* Supprime les marges inutiles sur mobile */
-    .block-container {
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
-    /* Force les tableaux à ne pas scroller verticalement si possible */
-    div[data-testid="stTable"] {
-        overflow: visible !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    # --- INITIALISATION DE SÉCURITÉ ---
-    # On crée des DataFrames vides pour éviter les NameError plus bas
-    df_v_yr = pd.DataFrame()
-    df_f_yr = pd.DataFrame()
-
-    # --- CHARGEMENT DES DONNÉES (Exemple de logique à vérifier) ---
-    # C'est ici que vous devez normalement filtrer vos données par année
-    # df_v_yr = df_global[df_global['Annee'] == annee_choisie]
-    # --- 1. CHARGEMENT DE TOUTES LES SOURCES ---
+    
+    # --- INITIALISATION & CHARGEMENT ---
     df_actuel = charger_data_safe('contacts.json')
-    df_actuel['Provenance'] = 'actuel'
-    
     df_archive = charger_data_safe('archives_factures.json')
-    df_archive['Provenance'] = 'archive'
-    
     df_r_yr = pd.concat([df_actuel, df_archive], ignore_index=True)
 
     df_m_curr = charger_data_safe('maintenance.json')
     df_m_arch = charger_data_safe('archives_maintenance.json')
+    df_f_yr = pd.concat([df_m_curr, df_m_arch], ignore_index=True)
     
     today = datetime.now()
 
-    # --- 2. FILTRES DE VUE ---
+    # --- FILTRES ---
     col_sel1, col_sel2 = st.columns(2)
     mode_bilan = col_sel1.radio("Vue :", ["À ce jour", "Par Saison"], horizontal=True)
     sel_y = col_sel2.selectbox("Choisir l'année :", [2025, 2026, 2027], index=1)
 
-    # --- 3. FONCTION DE NETTOYAGE NUMÉRIQUE ---
     def clean_val(df, col):
         if col in df.columns:
             return pd.to_numeric(df[col].astype(str).str.replace(',', '.').str.replace('€', '').str.strip(), errors='coerce').fillna(0)
         return 0
 
-    # --- 4. TRAITEMENT UNIFIÉ DES RECETTES (SÉCURISÉ) ---
+    # --- TRAITEMENT RECETTES ---
     if not df_r_yr.empty:
-        for col_name in ['Acompte', 'Prix', 'Paiement', 'Statut']:
-            if col_name not in df_r_yr.columns:
-                df_r_yr[col_name] = 0 if col_name in ['Acompte', 'Prix'] else ""
-
-        df_r_yr['Acompte_Calc'] = clean_val(df_r_yr, 'Acompte')
-        df_r_yr['Prix_Calc'] = clean_val(df_r_yr, 'Prix')
-        df_r_yr['Montant_Final'] = df_r_yr[['Acompte_Calc', 'Prix_Calc']].max(axis=1)
-
-        df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
-        mask_nat = df_r_yr['dt_vrai'].isna()
-        if mask_nat.any():
-            df_r_yr.loc[mask_nat, 'dt_vrai'] = pd.to_datetime(df_r_yr.loc[mask_nat, 'DateNav'], errors='coerce')
-
-        mask_base = (df_r_yr['Statut'] != "Liste d'attente") & (df_r_yr['Statut'] != "Annulé")
+        for col in ['Acompte', 'Prix', 'Paiement', 'Statut', 'DateNav']:
+            if col not in df_r_yr.columns: df_r_yr[col] = 0 if col in ['Acompte', 'Prix'] else ""
         
+        df_r_yr['Montant_Final'] = df_r_yr.apply(lambda x: max(clean_val(pd.DataFrame([x]), 'Acompte')[0], clean_val(pd.DataFrame([x]), 'Prix')[0]), axis=1)
+        df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
+        
+        mask_base = (df_r_yr['Statut'] != "Liste d'attente") & (df_r_yr['Statut'] != "Annulé")
         if mode_bilan == "À ce jour":
-            today_dt = pd.to_datetime(datetime.now().date())
-            mask_paye = (df_r_yr['Paiement'].str.lower() == "paid") | (df_r_yr['Provenance'] == 'archive')
-            df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'] <= today_dt) & mask_paye].copy()
+            df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'] <= pd.to_datetime(today.date()))].copy()
         else:
             df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'].dt.year == sel_y)].copy()
 
-    # --- 5. TRAITEMENT DES DÉPENSES ---
-    df_f_yr = pd.concat([df_m_curr, df_m_arch], ignore_index=True)
+    # --- TRAITEMENT DÉPENSES ---
     if not df_f_yr.empty:
         df_f_yr['Frais_Calc'] = clean_val(df_f_yr, 'Montant') + clean_val(df_f_yr, 'M_Num')
-        df_f_yr['Date_Unifiee'] = df_f_yr['Date'].fillna(df_f_yr.get('DateEnvoi'))
-        df_f_yr['dt_vrai'] = pd.to_datetime(df_f_yr['Date_Unifiee'], dayfirst=True, errors='coerce')
-        
+        df_f_yr['dt_vrai'] = pd.to_datetime(df_f_yr['Date'].fillna(df_f_yr.get('DateEnvoi')), dayfirst=True, errors='coerce')
         if mode_bilan == "À ce jour":
             df_f_yr = df_f_yr[df_f_yr['dt_vrai'] <= today].copy()
         else:
             df_f_yr = df_f_yr[df_f_yr['dt_vrai'].dt.year == sel_y].copy()
 
-    # --- 6. INDICATEURS CLÉS (KPI) ---
+    # --- KPI ---
     st.divider()
-    
-    # Garantir l'existence des colonnes
-    if 'Montant_Final' not in df_r_yr.columns: df_r_yr['Montant_Final'] = 0.0
-    if 'Prix_Calc' not in df_r_yr.columns: df_r_yr['Prix_Calc'] = 0.0
-    if 'Frais_Calc' not in df_f_yr.columns: df_f_yr['Frais_Calc'] = 0.0
-
     ca_total = df_r_yr['Montant_Final'].sum() if not df_r_yr.empty else 0
     frais_total = df_f_yr['Frais_Calc'].sum() if not df_f_yr.empty else 0
     
-    # Calcul du Taux de Remplissage (Objectif 100 jours)
-    nb_jours = len(df_r_yr) if not df_r_yr.empty else 0
-    taux_remplissage = (nb_jours / 100) * 100
-
-    # CALCUL DE LA MARGE OPÉRATIONNELLE
-    marge_valeur = ca_total - frais_total
-    marge_pourcent = (marge_valeur / ca_total * 100) if ca_total > 0 else 0
-
-    # Affichage sur 6 colonnes pour une vue d'ensemble parfaite
-    k1, k2, k3, k4, k5, k6 = st.columns(6)
-    
+    k1, k2, k3, k4 = st.columns(4)
     k1.metric("💰 CA Encaissé", f"{ca_total:,.0f} €".replace(',', ' '))
     k2.metric("📉 Frais Réels", f"{frais_total:,.0f} €".replace(',', ' '))
-    k3.metric("⚖️ Solde Net", f"{marge_valeur:,.0f} €".replace(',', ' '))
-    
-    # La Marge en % avec une couleur dynamique (optionnel dans l'esprit, ici simple texte)
-    k4.metric("📈 Marge %", f"{marge_pourcent:.1f}%")
-    
-    k5.metric("🎯 Objectif CA", f"{df_r_yr['Prix_Calc'].sum():,.0f} €".replace(',', ' '))
-    k6.metric("⚓ Remplissage", f"{taux_remplissage:.0f}%", help="Basé sur 100 jours/an")
+    k3.metric("⚖️ Solde Net", f"{(ca_total - frais_total):,.0f} €".replace(',', ' '))
+    k4.metric("📈 Marge %", f"{( (ca_total - frais_total)/ca_total*100 if ca_total > 0 else 0):.1f}%")
 
-    # --- 7. CALCULS MENSUELS ---
-    mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
-    rs_m = []
-    has_dates = not df_r_yr.empty and 'dt_vrai' in df_r_yr.columns and 'Montant_Final' in df_r_yr.columns
-    has_frais = not df_f_yr.empty and 'dt_vrai' in df_f_yr.columns and 'Frais_Calc' in df_f_yr.columns
-
-    for i in range(1, 13):
-        r_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['Montant_Final'].sum() if has_dates else 0
-        f_m = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['Frais_Calc'].sum() if has_frais else 0
-        rs_m.append({'Mois': mois_noms[i-1], 'Encaissé €': r_m, 'Décaissé €': f_m})
-    
-    df_stats_m = pd.DataFrame(rs_m)
-
-    # --- 8. GRAPHIQUES ---
+    # --- GRAPHIQUES ---
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("📊 Trésorerie Mensuelle")
-        fig1 = px.bar(df_stats_m, x='Mois', y=['Encaissé €', 'Décaissé €'], barmode='group',
-                      color_discrete_map={'Encaissé €': '#2ecc71', 'Décaissé €': '#e74c3c'}, height=350)
-        st.plotly_chart(fig1, use_container_width=True)
-    
+        mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+        data_m = []
+        for i in range(1, 13):
+            r = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['Montant_Final'].sum() if not df_r_yr.empty else 0
+            f = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['Frais_Calc'].sum() if not df_f_yr.empty else 0
+            data_m.append({'Mois': mois_noms[i-1], 'Encaissé €': r, 'Décaissé €': f})
+        st.plotly_chart(px.bar(pd.DataFrame(data_m), x='Mois', y=['Encaissé €', 'Décaissé €'], barmode='group', color_discrete_map={'Encaissé €': '#2ecc71', 'Décaissé €': '#e74c3c'}, height=300), use_container_width=True)
+
     with c2:
         st.subheader("👥 Par Société")
         if not df_r_yr.empty and 'Société' in df_r_yr.columns:
-            df_soc = df_r_yr.groupby('Société')['Montant_Final'].sum().reset_index()
-            fig2 = px.pie(df_soc, values='Montant_Final', names='Société', hole=0.4, height=350)
-            st.plotly_chart(fig2, use_container_width=True)
-            
-        # --- 09. DÉTAIL DES RECETTES ---      
-        st.markdown("### 💰 Détail des recettes")
-        total_recettes = 0.0
+            st.plotly_chart(px.pie(df_r_yr.groupby('Société')['Montant_Final'].sum().reset_index(), values='Montant_Final', names='Société', hole=0.4, height=300), use_container_width=True)
 
-        if 'df_v_yr' in locals() and not df_v_yr.empty:
-            df_v_view = df_v_yr.copy()
+    # --- 09. DÉTAIL DES RECETTES (SORTI DES COLONNES) ---
+    st.divider()
+    st.markdown("### 💰 Détail des recettes")
+    if not df_r_yr.empty:
+        df_r_view = df_r_yr.copy()
+        df_r_view['Date_Affiche'] = df_r_view['dt_vrai'].dt.strftime('%d/%m/%Y').fillna(df_r_view['DateNav'])
+        df_r_view['Desig_Affiche'] = df_r_view.get('Nom', df_r_view.get('Objet', "Inconnu"))
         
-            # --- SÉCURITÉ : CRÉATION DES COLONNES SI ABSENTES ---
-            if 'Date_Affiche' not in df_v_view.columns:
-                df_v_view['Date_Affiche'] = "À saisir"
-            if 'Desig_Affiche' not in df_v_view.columns:
-                df_v_view['Desig_Affiche'] = df_v_view.get('Nom', df_v_view.get('Objet', "Inconnu"))
-            if 'Mnt_Affiche' not in df_v_view.columns:
-                df_v_view['Mnt_Affiche'] = pd.to_numeric(df_v_view.get('Prix', 0), errors='coerce').fillna(0.0)
+        view_recettes = df_r_view[['Date_Affiche', 'Desig_Affiche', 'Société', 'Montant_Final']]
+        view_recettes.columns = ['Date', 'Client', 'Société', 'Montant (€)']
+        st.dataframe(view_recettes.sort_values('Date', ascending=False), hide_index=True, use_container_width=True)
+        st.metric("Total Recettes", f"{ca_total:,.2f} €".replace(',', ' '))
+    else:
+        st.info("Aucune recette pour cette sélection.")
 
-            total_recettes = df_v_view['Mnt_Affiche'].sum()
-
-            # Affichage sécurisé
-            cols_to_show = ['Date_Affiche', 'Desig_Affiche', 'Mnt_Affiche']
-            # On ne garde que les colonnes qui existent réellement pour éviter le KeyError
-            final_cols = [c for c in cols_to_show if c in df_v_view.columns]
-        
-            st.dataframe(df_v_view[final_cols], hide_index=True, use_container_width=True)
-            st.metric("Total Recettes", f"{total_recettes:,.2f} €".replace(',', ' '))
-        
     # --- 10. DÉTAIL DES DÉPENSES ---
     st.markdown("### 💸 Détail des dépenses")
-    total_depenses = 0.0
-
-    if 'df_f_yr' in locals() and not df_f_yr.empty:
+    if not df_f_yr.empty:
         df_f_view = df_f_yr.copy()
+        # Filtre anti-recettes 450€
+        df_f_view = df_f_view[df_f_view['Frais_Calc'] != 450]
         
-        # 1. Identifier la colonne montant pour le filtre
-        col_mnt_brut = next((c for c in ['Frais_Calc', 'Montant', 'Prix'] if c in df_f_view.columns), None)
+        df_f_view['Date_Affiche'] = df_f_view['dt_vrai'].dt.strftime('%d/%m/%Y').fillna(df_f_view['Date'])
+        df_f_view['Desig_Affiche'] = df_f_view.get('Objet', df_f_view.get('Désignation', "Divers"))
         
-        # 2. Filtrer les 450€ (Recettes CMN)
-        if col_mnt_brut:
-            df_f_view = df_f_view[pd.to_numeric(df_f_view[col_mnt_brut], errors='coerce') != 450]
-
-        # 3. SÉCURITÉ : CRÉATION DES COLONNES D'AFFICHAGE
-        if 'Date_Affiche' not in df_f_view.columns:
-            # On essaie de récupérer une date brute
-            col_date = next((c for c in ['Date', 'DateNav', 'dt'] if c in df_f_view.columns), None)
-            df_f_view['Date_Affiche'] = df_f_view[col_date].astype(str) if col_date else "À saisir"
-            
-        if 'Desig_Affiche' not in df_f_view.columns:
-            df_f_view['Desig_Affiche'] = df_f_view.get('Objet', df_f_view.get('Désignation', "Divers"))
-            
-        if 'Mnt_Affiche' not in df_f_view.columns:
-            df_f_view['Mnt_Affiche'] = pd.to_numeric(df_f_view[col_mnt_brut] if col_mnt_brut else 0, errors='coerce').fillna(0.0)
-
-        total_depenses = df_f_view['Mnt_Affiche'].sum()
-
-        # 4. Affichage sécurisé
-        cols_to_show = ['Date_Affiche', 'Desig_Affiche', 'Mnt_Affiche']
-        final_cols = [c for c in cols_to_show if c in df_f_view.columns]
-        
-        st.dataframe(df_f_view[final_cols], hide_index=True, use_container_width=True)
-        st.metric("Total Dépenses", f"{total_depenses:,.2f} €".replace(',', ' '))
-
+        view_frais = df_f_view[['Date_Affiche', 'Desig_Affiche', 'Frais_Calc']]
+        view_frais.columns = ['Date', 'Désignation', 'Montant (€)']
+        st.dataframe(view_frais.sort_values('Date', ascending=False), hide_index=True, use_container_width=True)
+        st.metric("Total Dépenses", f"{frais_total:,.2f} €".replace(',', ' '))
+    else:
+        st.info("Aucune dépense pour cette sélection.")
 
     # --- FIN DE LA PAGE STATS ---
     # =================================================================
