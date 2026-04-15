@@ -948,75 +948,84 @@ if st.session_state.page == "ARCHIVES":
             st.write("Aucun frais archivé.")
 
 # =================================================================
-# --- 10. PAGE LOG (LIVRE DE BORD) ---
+# --- PAGE : LIVRE DE BORD (LOGBOOK) ---
 # =================================================================
 if st.session_state.page == "LOG":
-    st.title("📖 LIVRE DE BORD")
-    
-    # Utilisation du chargement sécurisé
-    df_log = charger_data_safe('logbook.json')   
+    st.title("📖 Livre de Bord")
 
-    if df_log is None or not isinstance(df_log, pd.DataFrame):
-        df_log = pd.DataFrame()
+    # 1. Initialisation des onglets
+    tab1, tab2 = st.tabs(["⛵ Saison Actuelle", "📚 Archives Historiques"])
 
-    if st.button("📂 ACCÉDER AUX ARCHIVES", use_container_width=True):
-        st.session_state.page = "ARCHIVES"
-        st.rerun()
+    # --- ONGLET 1 : SAISON EN COURS ---
+    with tab1:
+        # On utilise notre fonction sécurisée
+        df_log = charger_data_safe('logbook.json')
+        
+        col_btn1, col_btn2 = st.columns([2, 1])
+        with col_btn1:
+            st.subheader("Navigations 2026")
+        with col_btn2:
+            if st.button("➕ Nouvelle Entrée", use_container_width=True):
+                st.session_state.log_edit_idx = None # On s'assure qu'on n'est pas en mode édition
+                # Ici votre logique pour ouvrir le formulaire
+        
+        st.divider()
 
-    # 1. Préparation sécurisée
-    df_log = preparer_log_safe(df_log)
-    
-    # 2. Formulaire
-    is_editing = st.session_state.log_edit_idx is not None and st.session_state.log_edit_idx in df_log.index
-    titre_expander = "📝 MODIFIER LA NAVIGATION" if is_editing else "➕ NOUVELLE SORTIE"
-    
-    with st.expander(titre_expander, expanded=is_editing):
-        row = df_log.loc[st.session_state.log_edit_idx] if is_editing else {}
-        with st.form("form_log_vesta", clear_on_submit=True):
-            # ... (Gardez ici tout votre code de colonnes c1, c2, c3, e1-e6, etc.) ...
-            # IMPORTANT: Le bouton de sauvegarde doit rester dans ce bloc indenté
-            f_date = st.date_input("Date", datetime.now()) # Exemple simplifié pour l'espace
-            btn_save = st.form_submit_button("💾 ENREGISTRER")
-            if btn_save:
-                # ... (Votre logique de sauvegarde habituelle) ...
-                st.success("Enregistré !")
-                st.rerun()
-# --- 3. AFFICHAGE DES FICHES ---
-st.divider()
-if not df_log.empty:
-    # On s'assure que la colonne de tri existe sans polluer le DataFrame
-    df_log['dt_tri'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
-    df_visu = df_log.sort_values('dt_tri', ascending=False)
-    
-    for idx, r in df_visu.iterrows():
-        # Création d'une carte propre en HTML
-        port_dep = r.get('PortDep', 'Inconnu')
-        port_arr = r.get('PortArr', 'Inconnu')
-        date_nav = r.get('Date', '??/??/????')
+        if df_log.empty:
+            st.info("Aucune navigation enregistrée pour le moment.")
+        else:
+            # Tri chronologique inverse (plus récent en haut)
+            df_log['dt_tri'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+            df_visu = df_log.sort_values('dt_tri', ascending=False)
+
+            for idx, r in df_visu.iterrows():
+                # Carte visuelle
+                st.markdown(f"""
+                <div style="border: 1px solid #ddd; padding: 15px; border-radius: 12px; 
+                            background: #f8f9fa; margin-bottom: 5px; border-left: 8px solid #01579b;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: bold; color: #01579b; font-size: 1.1em;">📅 {r.get('Date','--')}</span>
+                        <span style="font-style: italic; color: #666;">📍 {r.get('PortDep','?')} ➔ {r.get('PortArr','?')}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Boutons d'actions sous la carte
+                c_edit, c_del, c_space = st.columns([1, 1, 8])
+                if c_edit.button("✏️", key=f"ed_log_{idx}"):
+                    st.session_state.log_edit_idx = idx
+                    st.rerun()
+                if c_del.button("🗑️", key=f"del_log_{idx}"):
+                    df_log = df_log.drop(idx)
+                    sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
+                    st.rerun()
+                st.markdown("<br>", unsafe_allow_html=True)
+
+    # --- ONGLET 2 : ARCHIVES ---
+    with tab2:
+        st.subheader("Consulter les années passées")
+        df_arch = charger_data_safe('archives_logbook.json')
         
-        html_card = f"""
-        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 12px; 
-                    background: #f8f9fa; margin-bottom: 10px; border-left: 8px solid #01579b;">
-            <div style="display: flex; justify-content: space-between;">
-                <span style="font-weight: bold; color: #01579b;">📅 {date_nav}</span>
-                <span style="font-style: italic; color: #666;">📍 {port_dep} ➔ {port_arr}</span>
-            </div>
-        </div>
-        """
-        st.markdown(html_card, unsafe_allow_html=True)
-        
-        # Boutons d'actions bien espacés
-        col_edit, col_del, col_spacer = st.columns([1, 1, 8])
-        
-        if col_edit.button("✏️", key=f"edit_{idx}"):
-            st.session_state.log_edit_idx = idx
-            st.rerun()
+        if df_arch.empty:
+            st.write("Le coffre à souvenirs est vide.")
+        else:
+            # Sélecteur d'année basé sur les données réelles des archives
+            df_arch['Année'] = pd.to_datetime(df_arch['Date'], dayfirst=True, errors='coerce').dt.year
+            annees_dispo = sorted(df_arch['Année'].dropna().unique().astype(int).tolist(), reverse=True)
             
-        if col_del.button("🗑️", key=f"del_{idx}"):
-            # On pourrait ajouter une confirmation ici
-            df_log = df_log.drop(idx)
-            sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
-            st.rerun()
+            sel_arch_y = st.selectbox("Choisir une année", annees_dispo)
+            
+            # Affichage filtré
+            df_year_arch = df_arch[df_arch['Année'] == sel_arch_y]
+            st.write(f"📊 {len(df_year_arch)} sorties trouvées pour {sel_arch_y}")
+            
+            # On réutilise le même design pour la cohérence
+            for idx, r in df_year_arch.iterrows():
+                st.markdown(f"""
+                <div style="border: 1px solid #ccc; padding: 10px; border-radius: 8px; margin-bottom: 5px;">
+                    <b>{r.get('Date')}</b> : {r.get('PortDep')} ➔ {r.get('PortArr')} ({r.get('Milles', 0)} NM)
+                </div>
+                """, unsafe_allow_html=True)
  
 # --- FIN DU FICHIER ---
 
