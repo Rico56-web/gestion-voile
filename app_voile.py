@@ -763,6 +763,17 @@ if st.session_state.page == "STATS":
         view_recettes = view_recettes[['Date_Affiche', 'Client', 'Société', 'Prix']]
         view_recettes.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
         
+        # --- CALCUL DU TOTAL (SÉCURISÉ) ---
+        # On calcule sur 'Mnt_Affiche' qui est le nom interne de la colonne
+        total_recettes = df_v_view['Mnt_Affiche'].sum()
+        
+        # Affichage du tableau
+        view_recettes = df_v_view[['Date_Affiche', 'Desig_Affiche', 'Cat_Affiche', 'Mnt_Affiche']]
+        view_recettes.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
+        st.dataframe(view_recettes, hide_index=True, use_container_width=True)
+        
+        # Affichage du total sous le tableau
+        st.metric("Total des Recettes (Net)", f"{total_recettes:,.2f} €".replace(',', ' '))
         st.dataframe(view_recettes, hide_index=True, use_container_width=True)
         # --- TOTAL RECETTES ---
         total_recettes = view_recettes['Montant (€)'].sum()
@@ -821,7 +832,18 @@ if st.session_state.page == "STATS":
             view_frais = df_f_view.sort_values('dt_temp', ascending=False)
             view_frais = view_frais[['Date_Affiche', 'Desig_Affiche', 'Cat_Affiche', 'Mnt_Affiche']]
             view_frais.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
+
+            # --- CALCUL DU TOTAL (SÉCURISÉ) ---
+            total_depenses = df_f_view['Mnt_Affiche'].sum()
+
+            # Affichage du tableau
+            view_frais = df_f_view[['Date_Affiche', 'Desig_Affiche', 'Cat_Affiche', 'Mnt_Affiche']]
+            view_frais.columns = ['Date', 'Désignation', 'Catégorie', 'Montant (€)']
+            st.dataframe(view_frais, hide_index=True, use_container_width=True)
             
+            # Affichage du total sous le tableau
+            st.metric("Total des Dépenses", f"{total_depenses:,.2f} €".replace(',', ' '), 
+                      delta=f"-{total_depenses:,.2f} €", delta_color="inverse")
             st.dataframe(view_frais, hide_index=True, use_container_width=True)
             # --- TOTAL DÉPENSES ---
             total_depenses = view_frais['Montant (€)'].sum()
