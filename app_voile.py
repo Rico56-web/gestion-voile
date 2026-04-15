@@ -733,24 +733,21 @@ if st.session_state.page == "STATS":
     if not df_r_yr.empty:
         df_r_yr['Client'] = df_r_yr['Prénom'].fillna('') + " " + df_r_yr['Nom'].fillna('')
         
-        # On crée la vue des recettes
         view_recettes = df_r_yr[['DateNav', 'Client', 'Société', 'Montant_Final']].sort_values('DateNav', ascending=False)
         view_recettes.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
         
-        # CORRECTION ICI : On affiche 'view_recettes' et non 'view_frais'
         st.dataframe(
             view_recettes, 
             hide_index=True, 
-            use_container_width=True,
-            height=None # iPhone-friendly
+            use_container_width=True
+            # Suppression de height=None qui causait l'erreur
         )
     else:
         st.info("Aucune recette pour cette période.")
         
-    # --- 10. DÉTAIL DES DÉPENSES (SÉCURISÉ & IPHONE-FRIENDLY) ---
+    # --- 10. DÉTAIL DES DÉPENSES ---
     st.markdown("### 💸 Détail des dépenses")
     
-    # On initialise view_frais ici pour que le bloc 10 soit autonome
     view_frais = pd.DataFrame() 
 
     if not df_f_yr.empty:
@@ -777,8 +774,8 @@ if st.session_state.page == "STATS":
         st.dataframe(
             view_frais, 
             hide_index=True, 
-            use_container_width=True,
-            height=None  # iPhone-friendly
+            use_container_width=True
+            # Ici aussi, on laisse Streamlit gérer la hauteur automatiquement
         )
     else:
         st.info("Aucune dépense enregistrée sur cette période.")
