@@ -783,20 +783,34 @@ if st.session_state.page == "MAINT":
             df_c = df_c[[c for c in colonnes_utiles_c if c in df_c.columns]]
             sauvegarder_data(df_c, 'contacts.json')
 
-    # --- 2. NETTOYAGE DE LA MAINTENANCE ---
-    df_m = charger_data('maintenance.json')
-    if not df_m.empty:
-        # Correction des dates (gère le 29/02/2026 invalide en le mettant à vide si besoin)
-        df_m['Date'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-        df_m['Date'] = df_m['Date'].dt.strftime('%d/%m/%Y')
+        # --- 2. NETTOYAGE DE LA MAINTENANCE (VERSION SÉCURISÉE) ---
+        df_m = charger_data('maintenance.json')
+        if not df_m.empty:
+            # A. On s'assure que les colonnes indispensables existent
+            colonnes_vitales = ['Date', 'Objet', 'M_Num', 'Statut', 'Type']
+            for col in colonnes_vitales:
+                if col not in df_m.columns:
+                    # Si 'Montant' existe mais pas 'M_Num', on fait le transfert
+                    if col == 'M_Num' and 'Montant' in df_m.columns:
+                        df_m['M_Num'] = df_m['Montant']
+                    else:
+                        df_m[col] = 0.0 if col == 'M_Num' else "Inconnu"
+
+        # B. Correction robuste des dates
+        # On ne convertit que si la colonne n'est pas déjà au bon format
+        df_m['dt_temp'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
         
-        # On garde M_Num et on vire le doublon "Montant" pour alléger le JSON
-        colonnes_utiles_m = ['Date', 'Objet', 'M_Num', 'Statut', 'Type']
-        df_m = df_m[[c for c in colonnes_utiles_m if c in df_m.columns]]
+        # On remplit les dates vides (comme tes taxes DGN) par la date du jour pour éviter les erreurs
+        df_m['dt_temp'] = df_m['dt_temp'].fillna(datetime.now())
+        
+        # On reformate proprement en texte pour le JSON
+        df_m['Date'] = df_m['dt_temp'].dt.strftime('%d/%m/%Y')
+        df_m = df_m.drop(columns=['dt_temp']) # On supprime la colonne de calcul
+        
+        # C. Sauvegarde sans rien supprimer d'autre
         sauvegarder_data(df_m, 'maintenance.json')
     
     st.success("✅ Base de données Vesta nettoyée et optimisée (Format FR conservé).")
-
 
     # --- C. RÉCUPÉRATION DES DONNÉES ---
     params = charger_params()
