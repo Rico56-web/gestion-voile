@@ -697,6 +697,42 @@ if st.session_state.page == "STATS":
     # --- 9. TABLEAUX DE DÉTAILS ---
     with st.expander("📝 Voir les données détaillées par mois"):
         st.table(df_stats_m.set_index('Mois'))
+    # --- 10. TABLEAUX DÉTAILLÉS (RECETTES & DÉPENSES) ---
+    st.divider()
+    st.subheader("📋 Détail des opérations")
+    
+    col_rec, col_dep = st.columns(2)
+    
+    with col_rec:
+        st.markdown("#### ✅ Recettes (Facturation)")
+        if not df_r_yr.empty:
+            # On sélectionne et renomme les colonnes pour la clarté
+            df_recettes_view = df_r_yr[['DateNav', 'Société', 'Acompte']].copy()
+            df_recettes_view.columns = ['Date', 'Client', 'Somme (€)']
+            # Tri par date
+            df_recettes_view = df_recettes_view.sort_values('Date', ascending=False)
+            
+            st.dataframe(df_recettes_view, use_container_width=True, hide_index=True)
+            st.info(f"Total affiché : {df_recettes_view['Somme (€)'].sum():,.0f} €")
+        else:
+            st.write("Aucune recette sur cette période.")
+
+    with col_dep:
+        st.markdown("#### ❌ Dépenses (Maintenance)")
+        if not df_f_yr.empty:
+            # On adapte selon le nom de vos colonnes dans maintenance.json
+            col_nom_m = 'Equipement' if 'Equipement' in df_f_yr.columns else 'Désignation'
+            col_prix_m = 'M_Num' if 'M_Num' in df_f_yr.columns else 'Montant'
+            
+            df_depenses_view = df_f_yr[['Date', col_nom_m, col_prix_m]].copy()
+            df_depenses_view.columns = ['Date', 'Objet', 'Somme (€)']
+            # Tri par date
+            df_depenses_view = df_depenses_view.sort_values('Date', ascending=False)
+            
+            st.dataframe(df_depenses_view, use_container_width=True, hide_index=True)
+            st.info(f"Total affiché : {df_depenses_view['Somme (€)'].sum():,.0f} €")
+        else:
+            st.write("Aucune dépense sur cette période.")    
     # =================================================================
     # --- 8. BOUTON ARCHIVAGE (VERSION UNIQUE & PROPRE) ---
     # =================================================================
