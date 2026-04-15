@@ -683,50 +683,6 @@ if st.session_state.page == "STATS":
                     st.rerun()
                 except Exception as e:
                     st.error(f"Une erreur est survenue lors de l'archivage : {e}")
-    
-    # =================================================================
-    # --- 9. BOUTON ARCHIVAGE (INTÉGRÉ) ---
-    # =================================================================
-    if mode_bilan == "Par Saison":
-        st.divider()
-        st.subheader("⚙️ Outils de la Saison")
-        st.warning(f"Attention, cette action va archiver **toutes** les données de l'année **{sel_y}**.")
-        
-        with st.expander(f"⚙️ Archiver les données de la saison {sel_y}", expanded=False):
-            st.write(f"Voulez-vous archiver les frais (vers `archives_factures.json`) et les missions (vers `archives_planning.json`) de {sel_y} ?")
-            arch_btn = st.button(f"🚀 Lancer l'archivage de {sel_y}", key=f"arch_button_{sel_y}")
-            
-            if arch_btn:
-                import json
-                try:
-                    # A. ARCHIVAGE FRAIS (Maintenance)
-                    df_m_yr_raw = df_m_actif[pd.to_datetime(df_m_actif['Date'], dayfirst=True, errors='coerce').dt.year == sel_y]
-                    if not df_m_yr_raw.empty:
-                        # 1. Sauvegarder dans archive
-                        nouvelle_archive_m = pd.concat([df_m_arch, df_m_yr_raw], ignore_index=True)
-                        save_data('archives_factures.json', nouvelle_archive_m.to_dict(orient='records'))
-                        # 2. Supprimer de l'actif
-                        nouvelle_actif_m = df_m_actif.drop(df_m_yr_raw.index)
-                        save_data('maintenance.json', nouvelle_actif_m.to_dict(orient='records'))
-                        st.success(f"📦 Frais {sel_y} archivés !")
-
-                    # B. ARCHIVAGE REVENUS (Planning)
-                    df_c_yr_raw = df_planning_actif[pd.to_datetime(df_planning_actif['DateNav'], errors='coerce', dayfirst=True).dt.year == sel_y]
-                    if not df_c_yr_raw.empty:
-                        # 1. Sauvegarder dans archive (Crée le fichier si n'existe pas)
-                        try: df_c_arch = charger_data('archives_planning.json')
-                        except: df_c_arch = pd.DataFrame()
-                        nouvelle_archive_c = pd.concat([df_c_arch, df_c_yr_raw], ignore_index=True)
-                        save_data('archives_planning.json', nouvelle_archive_c.to_dict(orient='records'))
-                        # 2. Supprimer de l'actif
-                        nouvelle_actif_c = df_planning_actif.drop(df_c_yr_raw.index)
-                        save_data('contacts.json', nouvelle_actif_c.to_dict(orient='records'))
-                        st.success(f"📦 Missions {sel_y} archivées !")
-                        
-                    st.info("Le script va redémarrer pour appliquer les changements.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Une erreur est survenue lors de l'archivage : {e}")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (PERSISTANTE & CARNET DE SANTÉ) ---
