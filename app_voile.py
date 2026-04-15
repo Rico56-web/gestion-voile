@@ -677,47 +677,52 @@ if st.session_state.page == "STATS":
             fig2 = px.pie(df_soc, values='Acompte_Calc', names='Société', hole=0.4, height=350)
             st.plotly_chart(fig2, use_container_width=True)
             
+# =================================================================
+    # --- 9. TABLEAUX DÉTAILLÉS (LOGIQUE DE RECOUVREMENT TOTAL) ---
     # =================================================================
-    # --- 9. CALCUL DU CA ENCAISSÉ (FILTRE "À CE JOUR") ---
-    # =================================================================
+    st.divider()
     
     if not df_r_yr.empty:
-        # 1. Nettoyage strict
+        # 1. On force le numérique sur l'Acompte et le Prix
         df_r_yr['Acompte'] = pd.to_numeric(df_r_yr['Acompte'], errors='coerce').fillna(0)
         df_r_yr['Prix'] = pd.to_numeric(df_r_yr['Prix'], errors='coerce').fillna(0)
+        
+        # 2. On crée la colonne "Argent_Trouvé" (Le max entre les deux)
+        df_r_yr['Argent_Trouvé'] = df_r_yr[['Acompte', 'Prix']].max(axis=1)
+        
+        # 3. Conversion de date robuste
         df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], errors='coerce')
 
-        # 2. LOGIQUE "À CE JOUR" : 
-        # On ne garde que ce qui est marqué "Paid" ET dont la date est passée (ou aujourd'hui)
+        # 4. FILTRE "À CE JOUR" (On prend TOUT ce qui est passé et non annulé)
         if mode_bilan == "À ce jour":
-            mask_archive = (df_r_yr['Paiement'] == "Paid") & (df_r_yr['dt_vrai'] <= today)
-            df_final_ca = df_r_yr[mask_archive].copy()
-            label_ca = "CA Encaissé (Réel)"
+            # On prend les missions passées ET celles qui ont un Acompte > 0 (même si date future)
+            mask = (df_r_yr['dt_vrai'] <= today) & (df_r_yr['Statut'] != "Annulé")
+            df_final_ca = df_r_yr[mask].copy()
+            titre_tab = "💰 Recettes encaissées ou passées"
         else:
-            # Mode "Saison 2026" : Tout ce qui est validé (payé ou non) pour l'année
-            mask_saison = (df_r_yr['dt_vrai'].dt.year == 2026) & (df_r_yr['Statut'] != "Annulé")
-            df_final_ca = df_r_yr[mask_saison].copy()
-            label_ca = "Prévisionnel Saison 2026"
+            # Mode Saison : Tout 2026
+            mask = (df_r_yr['dt_vrai'].dt.year == 2026) & (df_r_yr['Statut'] != "Annulé")
+            df_final_ca = df_r_yr[mask].copy()
+            titre_tab = "📅 Prévisionnel Saison 2026"
 
-        # On utilise l'Acompte pour le réel, ou le Prix pour le prévisionnel
-        df_final_ca['Montant_Affiché'] = df_final_ca['Acompte'] if mode_bilan == "À ce jour" else df_final_ca['Prix']
-        ca_total = df_final_ca['Montant_Affiché'].sum()
+        total_ca = df_final_ca['Argent_Trouvé'].sum()
     else:
-        ca_total = 0
+        total_ca = 0
         df_final_ca = pd.DataFrame()
 
-    # --- AFFICHAGE DU RÉSULTAT ---
-    st.metric(label_ca, f"{ca_total:,.0f} €")
+    # --- AFFICHAGE ---
+    st.metric("Total calculé", f"{total_ca:,.0f} €")
 
-    # --- TABLEAU DÉTAILLÉ ---
     if not df_final_ca.empty:
-        # Identité complète
-        df_final_ca['Identité'] = df_final_ca['Prénom'].fillna('') + " " + df_final_ca['Nom'].fillna('')
+        # Fusion Nom + Prénom
+        df_final_ca['Client'] = df_final_ca['Prénom'].fillna('') + " " + df_final_ca['Nom'].fillna('')
         
-        view_final = df_final_ca[['DateNav', 'Identité', 'Société', 'Montant_Affiché']].sort_values('DateNav', ascending=False)
-        view_final.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
+        # Préparation du tableau
+        view = df_final_ca[['DateNav', 'Client', 'Société', 'Argent_Trouvé']].sort_values('DateNav', ascending=False)
+        view.columns = ['Date', 'Nom & Prénom', 'Société', 'Montant (€)']
         
-        st.dataframe(view_final, hide_index=True, use_container_width=True)
+        st.markdown(f"**{titre_tab}**")
+        st.dataframe(view, hide_index=True, use_container_width=True)
 
     # =================================================================
     # --- 8. BOUTON ARCHIVAGE (VERSION UNIQUE & PROPRE) ---
