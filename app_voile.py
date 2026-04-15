@@ -677,51 +677,48 @@ if st.session_state.page == "STATS":
             fig2 = px.pie(df_soc, values='Acompte_Calc', names='Société', hole=0.4, height=350)
             st.plotly_chart(fig2, use_container_width=True)
             
-# =================================================================
-    # --- 9. TABLEAUX DÉTAILLÉS (LOGIQUE DE RECOUVREMENT TOTAL) ---
-    # =================================================================
-    st.divider()
-    
+    # --- 1. CHARGEMENT ET FUSION (INDISPENSABLE POUR BENOIT/PEDRO) ---
+    df_actuel = charger_data_safe('contacts.json')
+    df_archive = charger_data_safe('archives_factures.json')
+    df_r_yr = pd.concat([df_actuel, df_archive], ignore_index=True)
+
     if not df_r_yr.empty:
-        # 1. On force le numérique sur l'Acompte et le Prix
+        # 2. NETTOYAGE NUMÉRIQUE
         df_r_yr['Acompte'] = pd.to_numeric(df_r_yr['Acompte'], errors='coerce').fillna(0)
         df_r_yr['Prix'] = pd.to_numeric(df_r_yr['Prix'], errors='coerce').fillna(0)
         
-        # 2. On crée la colonne "Argent_Trouvé" (Le max entre les deux)
-        df_r_yr['Argent_Trouvé'] = df_r_yr[['Acompte', 'Prix']].max(axis=1)
+        # 3. ON PREND LA VALEUR LA PLUS HAUTE (Si Acompte est 0, on prend le Prix)
+        df_r_yr['Montant_Calculé'] = df_r_yr[['Acompte', 'Prix']].max(axis=1)
         
-        # 3. Conversion de date robuste
+        # 4. CONVERSION DATE
         df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], errors='coerce')
 
-        # 4. FILTRE "À CE JOUR" (On prend TOUT ce qui est passé et non annulé)
+        # 5. FILTRES DE SÉCURITÉ
+        # On exclut la liste d'attente et les prix à 0
+        mask_valide = (df_r_yr['Statut'] != "Liste d'attente") & (df_r_yr['Montant_Calculé'] > 0)
+        
         if mode_bilan == "À ce jour":
-            # On prend les missions passées ET celles qui ont un Acompte > 0 (même si date future)
-            mask = (df_r_yr['dt_vrai'] <= today) & (df_r_yr['Statut'] != "Annulé")
-            df_final_ca = df_r_yr[mask].copy()
-            titre_tab = "💰 Recettes encaissées ou passées"
+            # Uniquement ce qui est passé (Archives + Contacts passés)
+            df_final_ca = df_r_yr[mask_valide & (df_r_yr['dt_vrai'] <= today)].copy()
         else:
-            # Mode Saison : Tout 2026
-            mask = (df_r_yr['dt_vrai'].dt.year == 2026) & (df_r_yr['Statut'] != "Annulé")
-            df_final_ca = df_r_yr[mask].copy()
-            titre_tab = "📅 Prévisionnel Saison 2026"
+            # Toute la saison 2026
+            df_final_ca = df_r_yr[mask_valide & (df_r_yr['dt_vrai'].dt.year == 2026)].copy()
 
-        total_ca = df_final_ca['Argent_Trouvé'].sum()
+        total_ca = df_final_ca['Montant_Calculé'].sum()
     else:
         total_ca = 0
         df_final_ca = pd.DataFrame()
 
     # --- AFFICHAGE ---
-    st.metric("Total calculé", f"{total_ca:,.0f} €")
+    st.metric("Total Recettes", f"{total_ca:,.0f} €")
 
     if not df_final_ca.empty:
-        # Fusion Nom + Prénom
+        # Identité (Prénom + Nom)
         df_final_ca['Client'] = df_final_ca['Prénom'].fillna('') + " " + df_final_ca['Nom'].fillna('')
         
-        # Préparation du tableau
-        view = df_final_ca[['DateNav', 'Client', 'Société', 'Argent_Trouvé']].sort_values('DateNav', ascending=False)
-        view.columns = ['Date', 'Nom & Prénom', 'Société', 'Montant (€)']
-        
-        st.markdown(f"**{titre_tab}**")
+        # Tableau
+        view = df_final_ca[['DateNav', 'Client', 'Société', 'Montant_Calculé']].sort_values('DateNav', ascending=False)
+        view.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
         st.dataframe(view, hide_index=True, use_container_width=True)
 
     # =================================================================
