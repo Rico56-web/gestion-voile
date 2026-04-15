@@ -773,34 +773,56 @@ if st.session_state.page == "MAINT":
     """, unsafe_allow_html=True)
 
     st.divider()
-
-    # --- 3. HISTORIQUE COHÉRENT ---
-    st.subheader("📋 Historique")
+    # --- 3. HISTORIQUE INTERACTIF (MODIFIER / SUPPRIMER) ---
+    st.subheader("📋 Historique & Gestion")
     
     if not df_m.empty:
-        df_display = df_m.copy()
+        # Préparation des données pour l'édition
+        df_edit = df_m.copy()
         
-        # SÉCURITÉ : Conversion forcée en datetime pour le tri, peu importe le format d'origine
-        # dayfirst=True est crucial pour interpréter le format FR correctement
-        df_display['dt_objet'] = pd.to_datetime(df_display['Date'], dayfirst=True, errors='coerce')
-        
-        # Tri : Les plus récents en haut
-        df_display = df_display.sort_values('dt_objet', ascending=False)
-        
-        # RE-FORMATAGE : On s'assure que la colonne affichée est en format FR (JJ/MM/AAAA)
-        # On gère les NaT (dates invalides) en mettant "Date inconnue"
-        df_display['Date'] = df_display['dt_objet'].dt.strftime('%d/%m/%Y').fillna("01/01/2026")
+        # On s'assure que les types sont corrects pour l'éditeur
+        if 'M_Num' in df_edit.columns:
+            df_edit['M_Num'] = pd.to_numeric(df_edit['M_Num'], errors='coerce').fillna(0.0)
 
-        st.dataframe(
-            df_display[['Date', 'Objet', 'M_Num', 'Type', 'Statut']],
+        # A. LE TABLEAU ÉDITABLE
+        st.info("💡 Vous pouvez modifier les cellules directement dans le tableau ci-dessous.")
+        edited_df = st.data_editor(
+            df_edit,
             column_config={
-                "Date": st.column_config.TextColumn("Date", width="small"),
-                "M_Num": st.column_config.NumberColumn("Montant (€)", format="%.2f")
+                "Date": st.column_config.TextColumn("Date (JJ/MM/AAAA)", help="Respectez le format français"),
+                "Objet": st.column_config.TextColumn("Désignation"),
+                "M_Num": st.column_config.NumberColumn("Montant (€)", format="%.2f"),
+                "Type": st.column_config.SelectboxColumn("Catégorie", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres frais"]),
+                "Statut": st.column_config.SelectboxColumn("État", options=["Fait", "À prévoir", "Urgent"])
             },
-            hide_index=True, use_container_width=True
+            hide_index=False, # On garde l'index pour la suppression
+            use_container_width=True,
+            key="maint_editor"
         )
+
+        # B. BOUTONS DE SAUVEGARDE ET SUPPRESSION
+        col_btn1, col_btn2 = st.columns([1, 1])
+        
+        if col_btn1.button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True):
+            sauvegarder_data(edited_df, 'maintenance.json')
+            st.success("Modifications enregistrées !")
+            st.rerun()
+
+        # C. SUPPRESSION AVEC CONFIRMATION
+        with col_btn2:
+            with st.popover("🗑️ SUPPRIMER UNE LIGNE", use_container_width=True):
+                st.warning("Sélectionnez l'index à supprimer (chiffre à gauche)")
+                index_to_del = st.number_input("Index :", min_value=0, max_value=len(df_m)-1, step=1)
+                
+                # Double confirmation par bouton
+                if st.button(f"Confirmer la suppression de l'index {index_to_del}", type="primary"):
+                    df_m = df_m.drop(df_m.index[index_to_del])
+                    sauvegarder_data(df_m, 'maintenance.json')
+                    st.success("Ligne supprimée !")
+                    st.rerun()
     else:
         st.info("Historique vide.")
+
     # --- 4. FORMULAIRE D'AJOUT (AVEC OPTION MENSUELLE) ---
     with st.expander("➕ Ajouter une opération (Unique ou Mensuelle)"):
         with st.form("form_maint_recurrence"):
