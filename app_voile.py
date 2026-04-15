@@ -676,6 +676,7 @@ if st.session_state.page == "STATS":
             df_soc = df_r_yr.groupby('Société')['Acompte_Calc'].sum().reset_index()
             fig2 = px.pie(df_soc, values='Acompte_Calc', names='Société', hole=0.4, height=350)
             st.plotly_chart(fig2, use_container_width=True)
+            
 # =================================================================
     # --- 9. TABLEAUX DÉTAILLÉS (VERSION FINALE CORRIGÉE) ---
     # =================================================================
