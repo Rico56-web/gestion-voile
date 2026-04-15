@@ -676,67 +676,77 @@ if st.session_state.page == "STATS":
             df_soc = df_r_yr.groupby('Société')['Acompte_Calc'].sum().reset_index()
             fig2 = px.pie(df_soc, values='Acompte_Calc', names='Société', hole=0.4, height=350)
             st.plotly_chart(fig2, use_container_width=True)
-# --- 9. TABLEAUX DÉTAILLÉS (VERSION FINALE AVEC CALCULS CORRIGÉS) ---
+# =================================================================
+    # --- 9. TABLEAUX DÉTAILLÉS (VERSION FINALE CORRIGÉE) ---
+    # =================================================================
     st.divider()
     st.subheader("📋 Journaux de bord financiers (2026)")
     
-    # RANGÉE 1 : Synthèse Recettes et Dépenses
+    # --- GROUPE A : CALCUL DU CA RÉEL (Pour atteindre les 2609 €) ---
+    if not df_r_yr.empty:
+        def force_num(x):
+            try:
+                if isinstance(x, str):
+                    return float(x.replace('€', '').replace(',', '.').replace(' ', '').strip())
+                return float(x)
+            except: return 0.0
+
+        # On sécurise les deux colonnes possibles
+        df_r_yr['Acompte_C'] = df_r_yr['Acompte'].apply(force_num)
+        df_r_yr['Prix_C'] = df_r_yr['Prix'].apply(force_num)
+        
+        # LOGIQUE : On prend la valeur la plus haute renseignée entre Prix et Acompte
+        df_r_yr['Somme_Correcte'] = df_r_yr[['Acompte_C', 'Prix_C']].max(axis=1)
+        
+        # Filtre selon le mode choisi
+        df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
+        if mode_bilan == "À ce jour":
+            df_final_ca = df_r_yr[df_r_yr['dt_vrai'] <= today]
+        else:
+            df_final_ca = df_r_yr[df_r_yr['dt_vrai'].dt.year == sel_y]
+    else:
+        df_final_ca = pd.DataFrame()
+
+    # --- GROUPE B : AFFICHAGE DES 3 TABLEAUX ---
     col_rec, col_dep = st.columns(2)
     
     with col_rec:
-        st.markdown("**💰 Flux des Recettes (Par Société)**")
-        if not df_r_yr.empty:
-            # On s'assure d'avoir la meilleure valeur possible pour le CA
-            # Si Acompte est vide, on prend Prix.
-            df_r_yr['CA_Ligne'] = df_r_yr['Acompte_Calc']
-            df_r_yr.loc[df_r_yr['CA_Ligne'] == 0, 'CA_Ligne'] = df_r_yr['Prix_Calc']
-            
-            df_rec_2026 = df_r_yr[df_r_yr['dt_vrai'].dt.year == 2026].copy()
-            df_rec_2026 = df_rec_2026.sort_values('dt_vrai', ascending=False)
-            
-            view_r = df_rec_2026[['DateNav', 'Société', 'CA_Ligne']].copy()
+        st.markdown("**💰 Recettes par Société**")
+        if not df_final_ca.empty:
+            view_r = df_final_ca[['DateNav', 'Société', 'Somme_Correcte']].sort_values('DateNav', ascending=False)
             view_r.columns = ['Date', 'Société', 'Somme (€)']
             st.dataframe(view_r, hide_index=True, use_container_width=True)
-            st.success(f"Total Recettes 2026 : {view_r['Somme (€)'].sum():,.0f} €")
-        else:
-            st.info("Aucune recette.")
-            
+            st.success(f"Total affiché : {view_r['Somme (€)'].sum():,.0f} €")
+
     with col_dep:
-        st.markdown("**💸 Détail des Dépenses (Vérifié)**")
+        st.markdown("**💸 Dépenses (Détail)**")
         if not df_f_yr.empty:
-            df_f_yr = df_f_yr.sort_values('dt_vrai', ascending=False)
-            
             def get_description(row):
                 for col in ['Equipement', 'Désignation', 'Objet', 'Mois']:
                     if col in row and pd.notna(row[col]) and str(row[col]).strip() != "":
                         return row[col]
-                return "Dépense diverse"
-
-            df_f_yr['Description_Finale'] = df_f_yr.apply(get_description, axis=1)
-            view_f = df_f_yr[['Date_Unifiee', 'Description_Finale', 'Frais_Calc']].copy()
+                return "Dépense"
+            
+            df_f_yr['Desc'] = df_f_yr.apply(get_description, axis=1)
+            view_f = df_f_yr[['Date_Unifiee', 'Desc', 'Frais_Calc']].sort_values('Date_Unifiee', ascending=False)
             view_f.columns = ['Date', 'Description', 'Somme (€)']
             st.dataframe(view_f, hide_index=True, use_container_width=True)
-            st.error(f"Total Dépenses : {view_f['Somme (€)'].sum():,.0f} €")
+            st.error(f"Total : {view_f['Somme (€)'].sum():,.0f} €")
 
-    # RANGÉE 2 : Détail nominatif (NOM + PRÉNOM)
+    # --- TABLEAU NOMINATIF (NOM + PRÉNOM) ---
     st.markdown("---")
-    st.markdown("**👤 Détail Nominatif des Recettes (Identité complète)**")
-    if not df_r_yr.empty:
-        df_nom = df_r_yr[df_r_yr['dt_vrai'].dt.year == 2026].copy()
-        
-        # Création de la colonne Identité (fusion Nom + Prénom)
-        # On gère les cas où l'un des deux serait manquant
-        c_nom = 'Nom' if 'Nom' in df_nom.columns else None
-        c_pre = 'Prénom' if 'Prénom' in df_nom.columns else None
+    st.markdown("**👤 Détail Nominatif (Identité Complète)**")
+    if not df_final_ca.empty:
+        # Fusion Nom + Prénom
+        c_nom = 'Nom' if 'Nom' in df_final_ca.columns else None
+        c_pre = 'Prénom' if 'Prénom' in df_final_ca.columns else None
         
         if c_nom and c_pre:
-            df_nom['Identité'] = df_nom[c_pre].fillna('') + " " + df_nom[c_nom].fillna('')
-        elif c_nom:
-            df_nom['Identité'] = df_nom[c_nom]
+            df_final_ca['Identité'] = df_final_ca[c_pre].fillna('') + " " + df_final_ca[c_nom].fillna('')
         else:
-            df_nom['Identité'] = "Non renseigné"
+            df_final_ca['Identité'] = df_final_ca['Société'] # Repli si colonnes absentes
 
-        view_nom = df_nom[['DateNav', 'Identité', 'Société', 'CA_Ligne']].sort_values('DateNav', ascending=False)
+        view_nom = df_final_ca[['DateNav', 'Identité', 'Société', 'Somme_Correcte']].sort_values('DateNav', ascending=False)
         view_nom.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
         st.dataframe(view_nom, hide_index=True, use_container_width=True)
     # =================================================================
