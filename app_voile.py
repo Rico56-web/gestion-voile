@@ -594,38 +594,50 @@ if st.session_state.page == "PLANNING":
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Tableau de Bord Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # --- 1. FILTRES DE VUE AJUSTÉS ---
+    # --- 1. CHARGEMENT INITIAL DES DONNÉES (CRITIQUE pour éviter NameError) ---
+    df_r_yr = charger_data_safe('contacts.json')
+    df_f_yr = charger_data_safe('maintenance.json')
+    today = datetime.now()
+
+    # --- 2. FILTRES DE VUE AJUSTÉS ---
     col_sel1, col_sel2 = st.columns(2)
-    # On renomme "Global" en "Situation à ce jour"
     mode_bilan = col_sel1.radio("Vue :", ["À ce jour", "Par Saison"], horizontal=True)
     sel_y = col_sel2.selectbox("Choisir l'année :", [2025, 2026, 2027], index=1)
 
-    # --- 2. LOGIQUE DE FILTRAGE ---
-    today = datetime.now()
-
+    # --- 3. LOGIQUE DE FILTRAGE & NETTOYAGE ---
     if not df_r_yr.empty:
+        # Nettoyage numérique (Points/Virgules)
+        for col in ['Prix', 'Acompte']:
+            if col in df_r_yr.columns:
+                df_r_yr[col] = pd.to_numeric(df_r_yr[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+        
+        # Conversion des dates
         df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
-    
+        
+        # Application du filtre selon le mode choisi
         if mode_bilan == "À ce jour":
-            # FILTRE : Uniquement ce qui est AVANT ou ÉGAL à aujourd'hui (toutes années confondues)
+            # On garde tout ce qui est passé ou aujourd'hui
             df_r_yr = df_r_yr[df_r_yr['dt_vrai'] <= today]
         else:
-            # FILTRE : Uniquement l'année sélectionnée (Saison complète)
+            # On garde uniquement l'année sélectionnée
             df_r_yr = df_r_yr[df_r_yr['dt_vrai'].dt.year == sel_y]
 
-# --- 3. LES CHIFFRES (KPI) ---
-# Le reste de votre code de calcul (ca_reel, frais_reel) s'appliquera 
-# automatiquement sur le tableau filtré juste au-dessus.
+    # Nettoyage des frais (Maintenance)
+    if not df_f_yr.empty:
+        col_f_nom = 'M_Num' if 'M_Num' in df_f_yr.columns else 'Montant'
+        df_f_yr[col_f_nom] = pd.to_numeric(df_f_yr[col_f_nom].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+        df_f_yr['dt_vrai'] = pd.to_datetime(df_f_yr['Date'], dayfirst=True, errors='coerce')
+        # On applique le même filtre de saison aux frais si nécessaire
+        if mode_bilan == "Par Saison":
+            df_f_yr = df_f_yr[df_f_yr['dt_vrai'].dt.year == sel_y]
 
-    # --- 3. INDICATEURS CLÉS (KPI) ---
+    # --- 4. INDICATEURS CLÉS (KPI) ---
     st.divider()
     
-    # L'encaissé réel correspond maintenant à la colonne 'Acompte'
     ca_reel = df_r_yr['Acompte'].sum() if not df_r_yr.empty else 0
-    # Les frais (on vérifie le nom de colonne utilisé)
     col_f = 'M_Num' if 'M_Num' in df_f_yr.columns else 'Montant'
     frais_reel = df_f_yr[col_f].sum() if not df_f_yr.empty else 0
-    # Le CA prévisionnel (Total des Prix, sauf annulés)
+    
     mask_ok = ~df_r_yr['Paiement'].str.lower().str.contains("annul", na=False) if 'Paiement' in df_r_yr.columns else True
     ca_prev_total = df_r_yr[mask_ok]['Prix'].sum() if not df_r_yr.empty else 0
 
@@ -635,17 +647,15 @@ if st.session_state.page == "STATS":
     k3.metric("⚖️ Solde Actuel", f"{(ca_reel - frais_reel):,.0f} €".replace(',', ' '))
     k4.metric("🎯 Objectif CA", f"{ca_prev_total:,.0f} €".replace(',', ' '))
 
-    # --- 4. CALCULS MENSUELS ---
+    # --- 5. CALCULS MENSUELS ---
     mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     rs_m, prev_m = [], []
 
     for i in range(1, 13):
-        # Réel mensuel
         r_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['Acompte'].sum() if not df_r_yr.empty else 0
         f_m = df_f_yr[df_f_yr['dt_vrai'].dt.month == i][col_f].sum() if not df_f_yr.empty else 0
         rs_m.append({'Mois': mois_noms[i-1], 'Encaissé €': r_m, 'Décaissé €': f_m})
 
-        # Prévisionnel mensuel
         if not df_r_yr.empty:
             df_m = df_r_yr[(df_r_yr['dt_vrai'].dt.month == i)]
             r_p = df_m[~df_m['Paiement'].str.lower().str.contains("annul", na=False)]['Prix'].sum() if 'Paiement' in df_m.columns else df_m['Prix'].sum()
@@ -655,26 +665,25 @@ if st.session_state.page == "STATS":
     df_reel = pd.DataFrame(rs_m)
     df_prev = pd.DataFrame(prev_m)
 
-    # --- 5. GRAPHIQUES ---
+    # --- 6. GRAPHIQUES ---
     st.divider()
     c1, c2 = st.columns(2)
     with c1:
-        st.subheader("📊 Flux de Trésorerie Réel")
+        st.subheader("📊 Flux de Trésorerie")
         fig1 = px.bar(df_reel, x='Mois', y=['Encaissé €', 'Décaissé €'], barmode='group',
                       color_discrete_map={'Encaissé €': '#2ecc71', 'Décaissé €': '#e74c3c'}, height=350)
         st.plotly_chart(fig1, use_container_width=True)
 
     with c2:
-        st.subheader("👥 Répartition par Société")
+        st.subheader("👥 Répartition Société")
         if not df_r_yr.empty and 'Société' in df_r_yr.columns:
             df_soc = df_r_yr.groupby('Société')['Acompte'].sum().reset_index()
             fig2 = px.pie(df_soc, values='Acompte', names='Société', hole=0.4, height=350)
-            # CMN en bleu comme demandé
             colors = ['#0000FF' if n == 'CMN' else '#3498DB' for n in df_soc['Société']]
             fig2.update_traces(marker=dict(colors=colors))
             st.plotly_chart(fig2, use_container_width=True)
 
-    # --- 6. TABLEAUX DE DÉTAILS ---
+    # --- 7. TABLEAU DE DÉTAILS ---
     with st.expander("📝 Voir les données brutes"):
         st.dataframe(df_prev.set_index('Mois'), use_container_width=True)
     # =================================================================
