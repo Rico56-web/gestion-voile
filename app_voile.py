@@ -589,13 +589,16 @@ if st.session_state.page == "PLANNING":
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 # =================================================================
-# --- 7. PAGE STATS (VERSION FINALE SYNCHRONISÉE) ---
+# --- 7. PAGE STATS (VERSION FINALE CORRIGÉE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Tableau de Bord Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # --- 1. CHARGEMENT ET INITIALISATION ---
-    df_r_yr = charger_data_safe('contacts.json')
+    # --- 1. CHARGEMENT ET FUSION INITIALE (RECETTES + ARCHIVES) ---
+    df_actuel = charger_data_safe('contacts.json')
+    df_archive = charger_data_safe('archives_factures.json')
+    df_r_yr = pd.concat([df_actuel, df_archive], ignore_index=True)
+    
     df_m_curr = charger_data_safe('maintenance.json')
     df_m_arch = charger_data_safe('archives_maintenance.json')
     today = datetime.now()
@@ -611,36 +614,37 @@ if st.session_state.page == "STATS":
             return pd.to_numeric(df[col].astype(str).str.replace(',', '.').str.replace('€', '').str.strip(), errors='coerce').fillna(0)
         return 0
 
-    # --- 4. TRAITEMENT DES RECETTES ---
+    # --- 4. TRAITEMENT UNIFIÉ DES RECETTES ---
     if not df_r_yr.empty:
         df_r_yr['Acompte_Calc'] = clean_val(df_r_yr, 'Acompte')
         df_r_yr['Prix_Calc'] = clean_val(df_r_yr, 'Prix')
+        # On prend le montant le plus élevé (Acompte ou Prix) pour ne rien rater
+        df_r_yr['Montant_Final'] = df_r_yr[['Acompte_Calc', 'Prix_Calc']].max(axis=1)
         df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], dayfirst=True, errors='coerce')
         
+        # Filtres de sécurité
+        mask_base = (df_r_yr['Statut'] != "Liste d'attente") & (df_r_yr['Statut'] != "Annulé")
+        
         if mode_bilan == "À ce jour":
-            df_r_yr = df_r_yr[df_r_yr['dt_vrai'] <= today]
+            df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'] <= today)]
         else:
-            df_r_yr = df_r_yr[df_r_yr['dt_vrai'].dt.year == sel_y]
+            df_r_yr = df_r_yr[mask_base & (df_r_yr['dt_vrai'].dt.year == sel_y)]
             
-    # --- 5. FUSION ET TRAITEMENT DES DÉPENSES (CORRIGÉ) ---
+    # --- 5. TRAITEMENT DES DÉPENSES ---
     df_f_yr = pd.concat([df_m_curr, df_m_arch], ignore_index=True)
     if not df_f_yr.empty:
         df_f_yr['Frais_Calc'] = clean_val(df_f_yr, 'Montant') + clean_val(df_f_yr, 'M_Num')
         df_f_yr['Date_Unifiee'] = df_f_yr['Date'].fillna(df_f_yr.get('DateEnvoi'))
-        # Conversion forcée en format date pour le tri et le filtre
         df_f_yr['dt_vrai'] = pd.to_datetime(df_f_yr['Date_Unifiee'], dayfirst=True, errors='coerce')
         
-        # APPLICATION DU FILTRE TEMPOREL SUR LES DÉPENSES AUSSI
         if mode_bilan == "À ce jour":
-            # On ne garde QUE ce qui est passé (avant aujourd'hui)
             df_f_yr = df_f_yr[df_f_yr['dt_vrai'] <= today]
         else:
             df_f_yr = df_f_yr[df_f_yr['dt_vrai'].dt.year == sel_y]
 
-
     # --- 6. INDICATEURS CLÉS (KPI) ---
     st.divider()
-    ca_total = df_r_yr['Acompte_Calc'].sum() if not df_r_yr.empty else 0
+    ca_total = df_r_yr['Montant_Final'].sum() if not df_r_yr.empty else 0
     frais_total = df_f_yr['Frais_Calc'].sum() if not df_f_yr.empty else 0
     
     k1, k2, k3, k4 = st.columns(4)
@@ -648,15 +652,15 @@ if st.session_state.page == "STATS":
     k2.metric("📉 Frais Réels", f"{frais_total:,.0f} €".replace(',', ' '))
     k3.metric("⚖️ Solde Net", f"{(ca_total - frais_total):,.0f} €".replace(',', ' '))
     
-    mask_ok = ~df_r_yr['Paiement'].str.lower().str.contains("annul", na=False) if (not df_r_yr.empty and 'Paiement' in df_r_yr.columns) else True
-    obj = df_r_yr[mask_ok]['Prix_Calc'].sum() if not df_r_yr.empty else 0
-    k4.metric("🎯 Objectif CA", f"{obj:,.0f} €".replace(',', ' '))
+    # Objectif CA (basé sur le Prix de tout ce qui n'est pas annulé)
+    obj = df_r_yr['Prix_Calc'].sum() if not df_r_yr.empty else 0
+    k4.metric("🎯 Objectif Vue", f"{obj:,.0f} €".replace(',', ' '))
 
     # --- 7. CALCULS MENSUELS ---
     mois_noms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
     rs_m = []
     for i in range(1, 13):
-        r_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['Acompte_Calc'].sum() if not df_r_yr.empty else 0
+        r_m = df_r_yr[df_r_yr['dt_vrai'].dt.month == i]['Montant_Final'].sum() if not df_r_yr.empty else 0
         f_m = df_f_yr[df_f_yr['dt_vrai'].dt.month == i]['Frais_Calc'].sum() if not df_f_yr.empty else 0
         rs_m.append({'Mois': mois_noms[i-1], 'Encaissé €': r_m, 'Décaissé €': f_m})
     
@@ -671,55 +675,21 @@ if st.session_state.page == "STATS":
         st.plotly_chart(fig1, use_container_width=True)
     
     with c2:
-        st.subheader("👥 Répartition par Client")
+        st.subheader("👥 Par Société")
         if not df_r_yr.empty and 'Société' in df_r_yr.columns:
-            df_soc = df_r_yr.groupby('Société')['Acompte_Calc'].sum().reset_index()
-            fig2 = px.pie(df_soc, values='Acompte_Calc', names='Société', hole=0.4, height=350)
+            df_soc = df_r_yr.groupby('Société')['Montant_Final'].sum().reset_index()
+            fig2 = px.pie(df_soc, values='Montant_Final', names='Société', hole=0.4, height=350)
             st.plotly_chart(fig2, use_container_width=True)
-            
-    # --- 1. CHARGEMENT ET FUSION (INDISPENSABLE POUR BENOIT/PEDRO) ---
-    df_actuel = charger_data_safe('contacts.json')
-    df_archive = charger_data_safe('archives_factures.json')
-    df_r_yr = pd.concat([df_actuel, df_archive], ignore_index=True)
 
+    # --- 9. TABLEAU DÉTAILLÉ ---
+    st.markdown("### 📋 Détail des opérations")
     if not df_r_yr.empty:
-        # 2. NETTOYAGE NUMÉRIQUE
-        df_r_yr['Acompte'] = pd.to_numeric(df_r_yr['Acompte'], errors='coerce').fillna(0)
-        df_r_yr['Prix'] = pd.to_numeric(df_r_yr['Prix'], errors='coerce').fillna(0)
-        
-        # 3. ON PREND LA VALEUR LA PLUS HAUTE (Si Acompte est 0, on prend le Prix)
-        df_r_yr['Montant_Calculé'] = df_r_yr[['Acompte', 'Prix']].max(axis=1)
-        
-        # 4. CONVERSION DATE
-        df_r_yr['dt_vrai'] = pd.to_datetime(df_r_yr['DateNav'], errors='coerce')
-
-        # 5. FILTRES DE SÉCURITÉ
-        # On exclut la liste d'attente et les prix à 0
-        mask_valide = (df_r_yr['Statut'] != "Liste d'attente") & (df_r_yr['Montant_Calculé'] > 0)
-        
-        if mode_bilan == "À ce jour":
-            # Uniquement ce qui est passé (Archives + Contacts passés)
-            df_final_ca = df_r_yr[mask_valide & (df_r_yr['dt_vrai'] <= today)].copy()
-        else:
-            # Toute la saison 2026
-            df_final_ca = df_r_yr[mask_valide & (df_r_yr['dt_vrai'].dt.year == 2026)].copy()
-
-        total_ca = df_final_ca['Montant_Calculé'].sum()
-    else:
-        total_ca = 0
-        df_final_ca = pd.DataFrame()
-
-    # --- AFFICHAGE ---
-    st.metric("Total Recettes", f"{total_ca:,.0f} €")
-
-    if not df_final_ca.empty:
-        # Identité (Prénom + Nom)
-        df_final_ca['Client'] = df_final_ca['Prénom'].fillna('') + " " + df_final_ca['Nom'].fillna('')
-        
-        # Tableau
-        view = df_final_ca[['DateNav', 'Client', 'Société', 'Montant_Calculé']].sort_values('DateNav', ascending=False)
+        df_r_yr['Client'] = df_r_yr['Prénom'].fillna('') + " " + df_r_yr['Nom'].fillna('')
+        view = df_r_yr[['DateNav', 'Client', 'Société', 'Montant_Final']].sort_values('DateNav', ascending=False)
         view.columns = ['Date', 'Nom & Prénom', 'Société', 'Somme (€)']
         st.dataframe(view, hide_index=True, use_container_width=True)
+    else:
+        st.info("Aucune donnée à afficher pour cette sélection.")
 
     # =================================================================
     # --- 8. BOUTON ARCHIVAGE (VERSION UNIQUE & PROPRE) ---
