@@ -811,61 +811,101 @@ if st.session_state.page == "FACTURES":
         c2.metric("Reste à encaisser", f"{(total_du - total_recu):,.0f} €")
 
         st.dataframe(df_f[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True)
-
-# =================================================================
+        # =================================================================
 # --- 11. PAGE ARCHIVES ---
 # =================================================================
 if st.session_state.page == "ARCHIVES":
     st.title("📂 Archives")
-    if st.button("⬅️ Retour Planning"):
+    
+    if st.button("⬅️ Retour au Planning"):
         st.session_state.page = "PLANNING"
         st.rerun()
 
-    t1, t2, t3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook"])
-    with t1: st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
-    with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
-    with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
+    tab1, tab2, tab3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook"])
+    
+    with tab1:
+        df_a_m = charger_data_safe('archives_maintenance.json')
+        st.dataframe(df_a_m, use_container_width=True, hide_index=True)
+    with tab2:
+        df_a_p = charger_data_safe('archives_planning.json')
+        st.dataframe(df_a_p, use_container_width=True, hide_index=True)
+    with tab3:
+        df_a_l = charger_data_safe('archives_logbook.json')
+        st.dataframe(df_a_l, use_container_width=True, hide_index=True)
 
 # =================================================================
 # --- 12. PAGE LIVRE DE BORD (LOGBOOK) ---
 # =================================================================
 if st.session_state.page == "LOGBOOK":
     st.title("📖 Livre de Bord")
+
+    # 1. Chargement
     df_log = charger_data_safe('logbook.json')
 
+    # 2. Initialisation des variables avec forçage de type FLOAT
+    # C'est ici que Streamlit plante souvent (conflit int/float)
     last_h = 0.0
+    last_m = 0.0
     last_p = ""
-    if not df_log.empty:
-        last_h = float(str(df_log.iloc[-1].get('TotalMot', 0.0)).replace(',','.'))
-        last_p = str(df_log.iloc[-1].get('PortArr', ""))
 
-    with st.form("log_v2"):
+    if not df_log.empty:
+        try:
+            derniere_ligne = df_log.iloc[-1]
+            # On force la conversion en float pour éviter la page blanche
+            last_h = float(str(derniere_ligne.get('TotalMot', 0.0)).replace(',', '.'))
+            last_m = float(str(derniere_ligne.get('TotalMil', 0.0)).replace(',', '.'))
+            last_p = str(derniere_ligne.get('PortArr', ""))
+        except Exception as e:
+            st.error(f"Erreur lecture données : {e}")
+
+    # 3. Formulaire avec paramètres explicites
+    with st.form("form_logbook_2026_v3"):
         c1, c2 = st.columns(2)
         f_date = c1.date_input("Date")
-        f_dep = c2.text_input("Départ", value=last_p)
-        f_arr = st.text_input("Arrivée")
+        f_dep = c2.text_input("Port Départ", value=last_p)
+        f_arr = st.text_input("Port Arrivée")
+
+        st.divider()
         
-        cm1, cm2 = st.columns(2)
-        f_h_dep = cm1.number_input("H. Moteur Départ", value=last_h)
-        f_h_arr = cm2.number_input("H. Moteur Arrivée", value=last_h)
-        f_mil = st.number_input("Milles", min_value=0.0)
+        # IMPORTANT : On s'assure que value est bien un float
+        col_m1, col_m2 = st.columns(2)
+        f_h_dep = col_m1.number_input("H. Moteur Départ", value=float(last_h), step=0.1)
+        f_h_arr = col_m2.number_input("H. Moteur Fin", value=float(last_h), step=0.1)
 
-        if st.form_submit_button("💾 ENREGISTRER"):
+        f_mil = st.number_input("Milles de l'étape (NM)", value=0.0, step=1.0)
+
+        if st.form_submit_button("💾 ENREGISTRER L'ÉTAPE", use_container_width=True, type="primary"):
             if f_arr:
-                new_log = {
+                nouvelle_etape = {
                     "Date": f_date.strftime("%d/%m/%Y"),
-                    "PortDep": f_dep, "PortArr": f_arr,
-                    "MotDep": f_h_dep, "TotalMot": f_h_arr,
-                    "TotalMil": f_mil # Simplifié pour le test
+                    "PortDep": f_dep,
+                    "PortArr": f_arr,
+                    "MotDep": f_h_dep,
+                    "TotalMot": f_h_arr,
+                    "TotalMil": float(last_m + f_mil),
+                    "MillesEtape": float(f_mil)
                 }
-                df_l = charger_data_safe('logbook.json')
-                df_f = pd.concat([df_l, pd.DataFrame([new_log])], ignore_index=True)
-                sauvegarder_data(df_f, 'logbook.json')
-                st.success("Enregistré !")
+                
+                # Sauvegarde
+                df_actuel = charger_data_safe('logbook.json')
+                df_final = pd.concat([df_actuel, pd.DataFrame([nouvelle_etape])], ignore_index=True)
+                sauvegarder_data(df_final, 'logbook.json')
+                
+                st.success("✅ Étape mémorisée !")
                 st.rerun()
+            else:
+                st.warning("⚠️ Indiquez au moins le port d'arrivée.")
 
+    # 4. Affichage historique simple (sans HTML)
     if not df_log.empty:
-        st.dataframe(df_log.iloc[::-1].head(10), use_container_width=True)
+        st.write("---")
+        st.subheader("📜 10 dernières navigations")
+        # Inversion pour voir le plus récent en haut
+        st.dataframe(df_log.iloc[::-1].head(10), use_container_width=True, hide_index=True)
+
+# --- FIN DU FICHIER ---
+
+
 
 # --- FIN DU FICHIER ---
 
