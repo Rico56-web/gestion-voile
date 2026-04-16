@@ -653,17 +653,51 @@ if st.session_state.page == "STATS":
             df_top_dep = df_m_y.groupby('Titre')['M_Num'].apply(lambda x: sum(to_f(i) for i in x)).sort_values(ascending=False).head(5)
             st.bar_chart(df_top_dep, height=200, use_container_width=True, color="#d32f2f")
         else: st.info("Aucune dépense")
-
-        # --- F. TABLEAUX DÉTAILLÉS ---
+            # --- F. TABLEAUX DÉTAILLÉS (AVEC SÉCURITÉ ANTI-PLANTAGE) ---
         st.write("---")
         t_rec, t_dep = st.tabs(["💰 Recettes", "🛠️ Dépenses"])
         
         with t_rec:
-            cols_dispo = [c for c in ['DateNav', 'Client', 'Société', 'Prix'] if c in df_final.columns]
+            # Sécurité colonnes Recettes
+            cols_r = [c for c in ['DateNav', 'Client', 'Société', 'Prix'] if c in df_final.columns]
             if not df_final.empty:
-                st.dataframe(df_final[cols_dispo], use_container_width=True, hide_index=True)
-                st.success(f"TOTAL : {total_ca:,.2f} €")
-                with t_dep:
+                st.dataframe(df_final[cols_r], use_container_width=True, hide_index=True)
+                st.success(f"TOTAL RECETTES : {total_ca:,.2f} €")
+            else:
+                st.info("Aucune recette enregistrée.")
+
+        with t_dep:
+            # --- SECTION MAINTENANCE ---
+            if not df_m_y.empty:
+                st.write("**🔧 Maintenance :**")
+                cols_m = [c for c in ['Date', 'Titre', 'M_Num'] if c in df_m_y.columns]
+                if cols_m:
+                    st.dataframe(df_m_y[cols_m], use_container_width=True, hide_index=True)
+                else:
+                    st.warning("Colonnes de maintenance introuvables.")
+            else:
+                st.info("Aucune maintenance faite.")
+            
+            # --- SECTION CARBURANT ---
+            if t_gasoil_eur > 0:
+                st.write("**⛽ Carburant (Logbook) :**")
+                cols_l = [c for c in ['Date', 'PortArr', 'Cout Gazoil'] if c in df_log_y.columns]
+                st.dataframe(df_log_y[df_log_y['Cout Gazoil'] > 0][cols_l], use_container_width=True, hide_index=True)
+            
+            st.error(f"💰 TOTAL DÉPENSES : {total_dep:,.2f} €")
+
+        # --- G. PERFORMANCE TECHNIQUE ---
+        st.write("---")
+        st.write("📊 **Indicateurs Performance**")
+        cp1, cp2, cp3 = st.columns(3)
+        t_milles = df_log_y['TotalMil'].sum() if not df_log_y.empty else 0
+        t_moteur = df_log_y['TotalMot'].sum() if not df_log_y.empty else 0
+        
+        cp1.metric("Distance", f"{t_milles:,.0f} NM")
+        cp2.metric("Coût/NM", f"{(total_dep/t_milles if t_milles>0 else 0):.2f}€")
+        cp3.metric("L/h Mot.", f"{(df_log_y['Litre Gazoil'].sum()/t_moteur if t_moteur>0 else 0):.1f} L")
+
+    
                     
             # --- SECTION MAINTENANCE ---
             if not df_m_y.empty:
