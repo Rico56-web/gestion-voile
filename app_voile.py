@@ -1027,31 +1027,45 @@ if st.session_state.page == "ARCHIVES":
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
         else:
             st.warning("Aucune donnée à exporter.")
-
-    # --- 4. AFFICHAGE DES TABLEAUX ---
+            # --- 4. AFFICHAGE DES TABLEAUX (FIN DU BLOC ARCHIVES) ---
     st.subheader("📜 Historique actuel")
     t1, t2, t3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Livre de Bord"])
     
     with t1:
         st.caption("Visualisation des archives de maintenance")
-        df_frais_arch = charger_data('archives_maintenance.json')
+        df_frais_arch = charger_data_safe('archives_maintenance.json')
         if not df_frais_arch.empty:
             df_frais_arch['dt_t'] = pd.to_datetime(df_frais_arch['Date'], dayfirst=True, errors='coerce')
             df_frais_arch = df_frais_arch.sort_values('dt_t', ascending=False)
             for idx, row in df_frais_arch.iterrows():
-                est_vidange = "VIDANGE" in str(row['Objet']).upper()
+                est_vidange = "VIDANGE" in str(row.get('Objet', '')).upper()
                 bg_c, brd_c = ("#fff3e0", "#ef6c00") if est_vidange else ("#f1f3f4", "#9aa0a6")
                 icon = "🛠️" if est_vidange else "📄"
                 montant_val = float(pd.to_numeric(row.get('M_Num', 0), errors='coerce'))
                 html_frais = (f'<div style="border: 1px solid {brd_c}; border-left: 10px solid {brd_c}; padding: 12px; border-radius: 10px; margin-bottom: 8px; background-color: {bg_c};">'
                               f'<div style="display: flex; justify-content: space-between;">'
-                              f'<b>{icon} {row["Date"]} | {row["Objet"]}</b>'
+                              f'<b>{icon} {row["Date"]} | {row.get("Objet", "Sans titre")}</b>'
                               f'<b>{montant_val:.0f} &euro;</b></div></div>')
                 st.markdown(html_frais, unsafe_allow_html=True)
         else:
             st.write("Aucun frais archivé.")
+
+    with t2:
+        df_plan_arch = charger_data_safe('archives_planning.json')
+        if not df_plan_arch.empty:
+            st.dataframe(df_plan_arch, use_container_width=True, hide_index=True)
+        else:
+            st.write("Aucun planning archivé.")
+
+    with t3:
+        df_log_arch = charger_data_safe('archives_logbook.json')
+        if not df_log_arch.empty:
+            st.dataframe(df_log_arch, use_container_width=True, hide_index=True)
+        else:
+            st.write("Aucun logbook archivé.")
+
 # =================================================================
-# --- PAGE LIVRE DE BORD : DIAGNOSTIC & SAISIE ---
+# --- 12. PAGE LIVRE DE BORD (INDÉPENDANTE) ---
 # =================================================================
 if st.session_state.page == "LOGBOOK":
     import pandas as pd
@@ -1059,94 +1073,65 @@ if st.session_state.page == "LOGBOOK":
 
     st.title("📖 Livre de Bord")
 
-    # --- 1. FONCTIONS DE SÉCURITÉ LOCALES ---
     def safe_float(val):
         try:
             if pd.isna(val) or val == "": return 0.0
             return float(str(val).replace('€','').replace(' ','').replace(',','.').strip())
-        except:
-            return 0.0
+        except: return 0.0
 
-    # --- 2. TENTATIVE DE CHARGEMENT AVEC ERREUR VISIBLE ---
-    try:
-        df_log = charger_data_safe('logbook.json')
-    except Exception as e:
-        st.error(f"❌ Erreur de chargement du fichier JSON : {e}")
-        df_log = pd.DataFrame()
+    # Chargement
+    df_log = charger_data_safe('logbook.json')
 
-    # --- 3. RÉCUPÉRATION DES DERNIÈRES VALEURS ---
-    try:
-        if not df_log.empty:
-            # On récupère la dernière ligne
-            last = df_log.iloc[-1]
-            # On force le passage en float pour éviter le bug Streamlit
-            val_dep_mot = safe_float(last.get('TotalMot', 0.0))
-            val_dep_mil = safe_float(last.get('TotalMil', 0.0))
-            dernier_port = str(last.get('PortArr', ""))
-        else:
-            val_dep_mot, val_dep_mil, dernier_port = 0.0, 0.0, ""
-    except Exception as e:
-        st.warning(f"⚠️ Problème de lecture des dernières données : {e}")
+    # Récupération dernières valeurs
+    if not df_log.empty:
+        last = df_log.iloc[-1]
+        val_dep_mot = safe_float(last.get('TotalMot', 0.0))
+        val_dep_mil = safe_float(last.get('TotalMil', 0.0))
+        dernier_port = str(last.get('PortArr', ""))
+    else:
         val_dep_mot, val_dep_mil, dernier_port = 0.0, 0.0, ""
 
-    # --- 4. FORMULAIRE DE SAISIE ---
+    # Formulaire
     with st.form("form_logbook_final"):
         st.subheader("📍 Nouvelle Étape")
-        
         c1, c2 = st.columns(2)
         f_date = c1.date_input("Date", datetime.now())
         f_port_dep = c2.text_input("Départ", value=dernier_port)
         f_port_arr = st.text_input("Arrivée")
 
         st.divider()
-        
-        # Moteur
         col_m1, col_m2 = st.columns(2)
-        f_mot_dep = col_m1.number_input("Compteur Début (h)", value=val_dep_mot, step=0.1)
-        f_mot_arr = col_m2.number_input("Compteur Fin (h)", value=val_dep_mot, step=0.1)
+        f_mot_dep = col_m1.number_input("Compteur Début (h)", value=float(val_dep_mot), step=0.1)
+        f_mot_arr = col_m2.number_input("Compteur Fin (h)", value=float(val_dep_mot), step=0.1)
         
-        # Navigation
         col_v1, col_v2 = st.columns(2)
         f_mil_etape = col_v1.number_input("Distance (NM)", min_value=0.0, step=1.0)
         f_h_voile = col_v2.number_input("Dont Voile (h)", min_value=0.0, step=0.5)
 
-        st.divider()
         f_gaz = st.number_input("Plein Gazole (€)", min_value=0.0)
 
-        # Bouton d'enregistrement
         if st.form_submit_button("💾 ENREGISTRER L'ÉTAPE", use_container_width=True, type="primary"):
             if f_port_arr and f_port_dep:
-                try:
-                    # Préparation de la donnée
-                    nouvelle_etape = {
-                        "Date": f_date.strftime("%d/%m/%Y"),
-                        "PortDep": f_port_dep,
-                        "PortArr": f_port_arr,
-                        "MotDep": f_mot_dep,
-                        "TotalMot": f_mot_arr,
-                        "TotalMil": val_dep_mil + f_mil_etape,
-                        "MillesEtape": f_mil_etape,
-                        "HVoile": f_h_voile,
-                        "Cout Gazoil": f_gaz
-                    }
+                nouvelle_etape = {
+                    "Date": f_date.strftime("%d/%m/%Y"),
+                    "PortDep": f_port_dep,
+                    "PortArr": f_port_arr,
+                    "MotDep": f_mot_dep,
+                    "TotalMot": f_mot_arr,
+                    "TotalMil": val_dep_mil + f_mil_etape,
+                    "MillesEtape": f_mil_etape,
+                    "HVoile": f_h_voile,
+                    "Cout Gazoil": f_gaz
+                }
+                df_upd = charger_data_safe('logbook.json')
+                df_final = pd.concat([df_upd, pd.DataFrame([nouvelle_etape])], ignore_index=True)
+                sauvegarder_data(df_final, 'logbook.json')
+                st.success("✅ Étape mémorisée !")
+                st.rerun()
 
-                    # Re-chargement et Sauvegarde
-                    df_upd = charger_data_safe('logbook.json')
-                    df_final = pd.concat([df_upd, pd.DataFrame([nouvelle_etape])], ignore_index=True)
-                    sauvegarder_data(df_final, 'logbook.json')
-                    
-                    st.success("✅ Étape mémorisée !")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Erreur lors de la sauvegarde : {e}")
-            else:
-                st.warning("Les ports de départ et d'arrivée sont requis.")
-
-    # --- 5. AFFICHAGE DE L'HISTORIQUE ---
     if not df_log.empty:
         st.write("---")
         st.subheader("📜 Historique")
-        # Inversion pour voir le plus récent en haut
         st.dataframe(df_log.iloc[::-1].head(10), use_container_width=True, hide_index=True)
 
 # --- FIN DU FICHIER ---
