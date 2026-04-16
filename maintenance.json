@@ -1,13 +1,5 @@
 [
     {
-        "Date":null,
-        "Objet":"taxes DGN",
-        "M_Num":178.0,
-        "Statut":"Fait",
-        "Type":"Autres frais",
-        "dt_maint":null
-    },
-    {
         "Date":"15\/05\/2026",
         "Objet":"place de port du Crouesty (M5)",
         "M_Num":374.6,
