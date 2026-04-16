@@ -664,8 +664,7 @@ if st.session_state.page == "STATS":
         st.write("---")
         st.subheader("📈 Analyses Visuelles")
 
-        # 1. Préparation des données mensuelles (Courbe)
-        # Création d'une base de 12 mois pour 2026
+        # 1. Courbe Recettes / Dépenses
         mois_labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
         
         df_final['Mois'] = df_final['dt_vrai'].dt.month
@@ -675,38 +674,36 @@ if st.session_state.page == "STATS":
         dep_mensuel = df_dep_final.groupby('Mois')['M_Num'].apply(lambda x: sum(to_f(v) for v in x)).reindex(range(1, 13), fill_value=0)
         
         df_chart = pd.DataFrame({
-            'Mois': mois_labels,
             'Recettes': rev_mensuel.values,
             'Dépenses': dep_mensuel.values
-        }).set_index('Mois')
+        }, index=mois_labels)
 
         st.line_chart(df_chart, color=["#2e7d32", "#c62828"])
-        st.caption("Comparaison mensuelle des flux financiers")
 
-        # 2. Camemberts (Répartition)
+        # 2. Camemberts (Correction de l'AttributeError)
         col_chart1, col_chart2 = st.columns(2)
 
         with col_chart1:
             if not df_final.empty:
                 st.write("**Part par Sté**")
-                # Groupement par Société
                 df_ste = df_final.copy()
                 df_ste['Prix_f'] = df_ste['Prix'].apply(to_f)
+                # Utilisation de bar_chart si pie_chart pose problème, ou formatage propre
                 chart_ste = df_ste.groupby('Société')['Prix_f'].sum()
-                st.pie_chart(chart_ste)
+                st.bar_chart(chart_ste, color="#2e7d32")
             else:
-                st.info("Pas de recettes")
+                st.info("Pas de revenus")
 
         with col_chart2:
             if not df_dep_final.empty:
                 st.write("**Part Dépenses**")
-                # Groupement par Type de maintenance
                 df_type = df_dep_final.copy()
                 df_type['M_Num_f'] = df_type['M_Num'].apply(to_f)
                 chart_type = df_type.groupby('Type')['M_Num_f'].sum()
-                st.pie_chart(chart_type)
+                st.bar_chart(chart_type, color="#c62828")
             else:
                 st.info("Pas de frais")
+    
         
 
 # =================================================================
