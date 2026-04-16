@@ -564,16 +564,19 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
-
- # =================================================================
-# --- 7. PAGE STATS (VERSION FINALE - CIBLE 2509€) ---
+# =================================================================
+# --- 7. PAGE STATS (SYNCHRO FINANCES & MAINTENANCE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # 1. Chargement et Fusion
+    # 1. Chargement des sources
     df_actif = charger_data_safe('contacts.json')
     df_arch = charger_data_safe('archives_planning.json')
+    # On charge explicitement df_m ici pour éviter le NameError
+    df_m = charger_data_safe('maintenance.json') 
+    
+    # Fusion des revenus
     df_all = pd.concat([df_actif, df_arch], ignore_index=True) if not df_arch.empty else df_actif
 
     if not df_all.empty:
@@ -582,108 +585,93 @@ if st.session_state.page == "STATS":
         mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
         sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-        # --- B. RADAR DE DATE (GÈRE LES SLASHES ÉCHAPPÉS \/ DU JSON) ---
+        # --- B. RADAR DE DATE (REVENUS) ---
         def radar_date(row):
-            # Nettoyage des caractères d'échappement JSON \/ pour la fiche du 07/03
             val = str(row.get('DateNav', '')).replace('\\/', '/').strip().split(' ')[0]
             if val and val.lower() not in ["nan", "", "none"]:
-                # Tentative en format français (dayfirst) pour tes fiches
                 dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
-                # Si échec, tentative format auto (tirets)
-                if pd.isnull(dt):
-                    dt = pd.to_datetime(val, errors='coerce')
+                if pd.isnull(dt): dt = pd.to_datetime(val, errors='coerce')
                 return dt
             return pd.NaT
 
-        # CRÉATION DE DF_FILTRE (Placé ici pour éviter NameError)
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
         df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
 
-        # --- C. FILTRAGE ET CALCULS ---
+        # --- C. FILTRAGE REVENUS ---
+        def est_comptabilise(row):
+            soc = str(row.get('Société', '')).strip().upper()
+            paiement = str(row.get('Paiement', '')).strip().upper()
+            statut = str(row.get('Statut', '')).strip().upper()
+            if "LISTE D'ATTENTE" in statut: return False
+            if "CMN" in soc: return True
+            return paiement == "PAID"
+
         if not df_filtre.empty:
-            def est_comptabilise(row):
-                societe = str(row.get('Société', '')).strip().upper()
-                paiement = str(row.get('Paiement', '')).strip().upper()
-                statut = str(row.get('Statut', '')).strip().upper()
-                
-                # On exclut toujours les listes d'attente
-                if "LISTE D'ATTENTE" in statut: return False
-                
-                # RÈGLE CMN : On prend si c'est CMN (même si Unpaid dans le futur)
-                if "CMN" in societe: return True
-                
-                # AUTRES : Uniquement si payé (exclut fiche #15)
-                return paiement == "PAID"
-
             df_final = df_filtre[df_filtre.apply(est_comptabilise, axis=1)].copy()
-
-            # Filtre temporel "À ce jour"
-            if mode_bilan == "À ce jour" and not df_final.empty:
+            if mode_bilan == "À ce jour":
                 today = pd.Timestamp.now().normalize()
                 df_final = df_final[df_final['dt_vrai'] <= today].copy()
-# --- D. CALCULS FINANCIERS (OPTIMISÉ IPHONE 16) ---
-            st.divider()
+        else:
+            df_final = pd.DataFrame()
+
+        # --- D. CALCUL DES DÉPENSES (MAINTENANCE) ---
+        total_dep = 0.0
+        df_dep_final = pd.DataFrame()
+
+        if not df_m.empty: # <--- C'est ici que l'erreur se produisait
+            # Conversion des dates de maintenance
+            df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+            
+            # Filtre : Année + Statut "Fait"
+            mask_dep = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")
+            
+            # Filtre optionnel "À ce jour"
+            if mode_bilan == "À ce jour":
+                today = pd.Timestamp.now().normalize()
+                mask_dep = mask_dep & (df_m['dt_maint'] <= today)
+            
+            df_dep_final = df_m[mask_dep].copy()
             
             def force_float(val):
-                if val is None or val == "": return 0.0
                 s = str(val).replace('€', '').replace(' ', '').replace('\xa0', '').replace(',', '.')
                 try: return float(s)
                 except: return 0.0
 
-            if not df_final.empty:
-                # 1. Préparation des colonnes (Sécurité Totale)
-                df_final['Prix_Num'] = df_final['Prix'].apply(force_float)
-                
-                # Sécurité pour les dépenses : si la colonne n'existe pas, on la crée proprement
-                if 'Depenses' not in df_final.columns:
-                    df_final['Depenses'] = 0.0
-                else:
-                    df_final['Depenses'] = df_final['Depenses'].apply(force_float)
-                
-                # 2. Calcul des totaux
-                total_ca = df_final['Prix_Num'].sum()
-                total_dep = df_final['Depenses'].sum()
-                net = total_ca - total_dep
-                nb_missions = len(df_final)
+            total_dep = df_dep_final['M_Num'].apply(force_float).sum()
 
-                # 3. KPI en GRILLE 2x2 (Spécial Mobile)
-                # Sur iPhone, les colonnes s'empilent mieux ainsi
-                c1, c2 = st.columns(2)
-                c1.metric("💰 CA", f"{total_ca:,.0f} €".replace(',', ' '))
-                c2.metric("📋 Missions", f"{nb_missions}")
-                
-                c3, c4 = st.columns(2)
-                c3.metric("📉 Frais", f"{total_dep:,.0f} €".replace(',', ' '))
-                c4.metric("⚖️ Net", f"{net:,.0f} €".replace(',', ' '))
+        # --- E. AFFICHAGE FINAL (IPHONE 16) ---
+        st.divider()
+        
+        def force_float(val):
+            s = str(val).replace('€', '').replace(' ', '').replace('\xa0', '').replace(',', '.')
+            try: return float(s)
+            except: return 0.0
 
-                # 4. TABLEAU REVENUS (Format Ultra-Compact iPhone)
-                st.write("---")
-                st.subheader("📄 Détail Revenus")
-                df_rev_view = df_final.sort_values('dt_vrai', ascending=False).copy()
-                df_rev_view['D'] = df_rev_view['dt_vrai'].dt.strftime('%d/%m') # Date courte
-                
-                # On ne garde que 3 colonnes pour éviter le scroll horizontal
-                st.dataframe(
-                    df_rev_view[['D', 'Société', 'Prix']], 
-                    hide_index=True, 
-                    use_container_width=True
-                )
+        # Calcul CA
+        total_ca = df_final['Prix'].apply(force_float).sum() if not df_final.empty else 0.0
+        net = total_ca - total_dep
 
-                # 5. TABLEAU DÉPENSES (Seulement si > 0)
-                df_dep_only = df_final[df_final['Depenses'] > 0].copy()
-                if not df_dep_only.empty:
-                    st.subheader("💸 Détail Frais")
-                    df_dep_only['D'] = df_dep_only['dt_vrai'].dt.strftime('%d/%m')
-                    st.dataframe(
-                        df_dep_only[['D', 'Société', 'Depenses']], 
-                        hide_index=True, 
-                        use_container_width=True
-                    )
-                else:
-                    st.caption("ℹ️ Aucune dépense notée.")
+        # KPI en Grille 2x2
+        c1, c2 = st.columns(2)
+        c1.metric("💰 CA", f"{total_ca:,.0f} €".replace(',', ' '))
+        c2.metric("📋 Missions", f"{len(df_final)}")
+        
+        c3, c4 = st.columns(2)
+        c3.metric("📉 Frais", f"{total_dep:,.0f} €".replace(',', ' '))
+        c4.metric("⚖️ Net", f"{net:,.0f} €".replace(',', ' '))
 
-            else:
-                st.info(f"Aucune mission validée pour {sel_y}.")
+        # Tableaux compacts pour iPhone
+        st.write("---")
+        if not df_final.empty:
+            st.subheader("📄 Revenus")
+            df_final['D'] = df_final['dt_vrai'].dt.strftime('%d/%m')
+            st.dataframe(df_final[['D', 'Société', 'Prix']], hide_index=True, use_container_width=True)
+
+        if not df_dep_final.empty:
+            st.subheader("💸 Dépenses")
+            df_dep_final['D'] = df_dep_final['dt_maint'].dt.strftime('%d/%m')
+            st.dataframe(df_dep_final[['D', 'Objet', 'M_Num']], hide_index=True, use_container_width=True)
+
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
