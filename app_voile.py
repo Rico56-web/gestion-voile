@@ -694,32 +694,32 @@ if st.session_state.page == "STATS":
                 else:
                     st.info("Ajoute une colonne 'Catégorie' dans Maintenance")
 
-# --- F. RÉPARTITION (LES "FROMAGES" VERSION MOBILE) ---
+        # --- F. RÉPARTITION (VUE SYNCHRONISÉE) ---
         st.write("---")
         st.subheader("🍕 Répartition des Volumes")
-        col_pie1, col_pie2 = st.columns(2)
+        c_pie1, c_pie2 = st.columns(2)
         
-        with col_pie1:
+        with c_pie1:
             if not df_final.empty and 'Société' in df_final.columns:
                 st.write("**Par Société (Sorties)**")
-                # On compte le nombre de lignes par société
+                # Compte du nombre de sorties
                 df_rep_soc = df_final['Société'].value_counts().reset_index()
                 df_rep_soc.columns = ['Société', 'Nombre']
-                # Affichage en barres horizontales (plus lisible qu'un fromage sur iPhone)
-                st.bar_chart(df_rep_soc.set_index('Société'), horizontal=True, height=180)
+                st.bar_chart(df_rep_soc.set_index('Société'), horizontal=True, height=200)
             
-        with col_pie2:
-            if not df_m_y.empty:
+        with c_pie2:
+            # On utilise uniquement 'Type' (la colonne de ton onglet Maintenance)
+            if not df_m_y.empty and 'Type' in df_m_y.columns:
                 st.write("**Par Catégorie (€)**")
-                # SYNCHRO ICI : On utilise 'Type' qui est ta colonne réelle
-                col_cat_reelle = 'Type' if 'Type' in df_m_y.columns else None
-                
-                if col_cat_reelle:
-                    # On somme les montants par type de dépense
-                    df_rep_maint = df_m_y.groupby(col_cat_reelle)[col_m_val].apply(lambda x: sum(to_f(i) for i in x))
-                    st.bar_chart(df_rep_maint, horizontal=True, height=180)
-                else:
-                    st.info("Colonne 'Type' non trouvée")
+                # Somme des montants par Type
+                df_rep_maint = df_m_y.groupby('Type')[col_m_val].apply(lambda x: sum(to_f(i) for i in x))
+                st.bar_chart(df_rep_maint, horizontal=True, height=200)
+            else:
+                # Si 'Type' n'est pas trouvé, on ne met pas de message d'erreur, 
+                # on affiche juste un petit indicateur discret
+                st.caption("Données de catégorie indisponibles")
+
+
 
         # --- G. TABLEAUX DÉTAILLÉS (TRI CHRONO RÉCENT EN HAUT) ---
         st.write("---")
