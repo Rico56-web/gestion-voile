@@ -622,7 +622,7 @@ if st.session_state.page == "STATS":
                 today = pd.Timestamp.now().normalize()
                 df_final = df_final[df_final['dt_vrai'] <= today].copy()
 
-            # --- D. AFFICHAGE DES RÉSULTATS ---
+# --- D. AFFICHAGE DES RÉSULTATS & INDICATEURS ---
             st.divider()
             
             def force_float(val):
@@ -633,22 +633,41 @@ if st.session_state.page == "STATS":
             if not df_final.empty:
                 df_final['Prix_Num'] = df_final['Prix'].apply(force_float)
                 total_ca = df_final['Prix_Num'].sum()
+                nb_missions = len(df_final)
+                panier_moyen = total_ca / nb_missions if nb_missions > 0 else 0
                 
-                c1, c2 = st.columns(2)
-                c1.metric(f"💰 CA Encaissé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
-                c2.metric("📋 Missions", f"{len(df_final)}")
+                # 1. KPI Principaux
+                c1, c2, c3 = st.columns(3)
+                c1.metric(f"💰 CA Global ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
+                c2.metric("📋 Missions", f"{nb_missions}")
+                c3.metric("📈 Panier Moyen", f"{panier_moyen:,.0f} €".replace(',', ' '))
 
-                # Liste détaillée pour vérification (doit afficher 7 lignes)
+                st.write("") # Espace
+
+                # 2. Indicateurs Visuels (Répartition)
+                col_graph1, col_graph2 = st.columns(2)
+
+                with col_graph1:
+                    st.subheader("🏢 Top Sociétés")
+                    # Groupement par société pour voir le poids de CMN vs les autres
+                    df_soc = df_final.groupby('Société')['Prix_Num'].sum().sort_values(ascending=False)
+                    st.bar_chart(df_soc)
+
+                with col_graph2:
+                    st.subheader("📅 Évolution Mensuelle")
+                    # Extraction du mois pour voir la saisonnalité
+                    df_final['Mois'] = df_final['dt_vrai'].dt.strftime('%m - %b')
+                    df_mois = df_final.groupby('Mois')['Prix_Num'].sum()
+                    st.line_chart(df_mois)
+
+                # 3. Tableau de contrôle détaillé
+                st.subheader("📄 Détail des encaissements")
                 df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
                 view = df_final.sort_values('dt_vrai', ascending=False)
-                st.dataframe(view[['Date_Aff', 'Nom', 'Société', 'Prix', 'Paiement']], 
+                st.dataframe(view[['Date_Aff', 'Nom', 'Société', 'Prix', 'Paiement', 'Statut']], 
                              hide_index=True, use_container_width=True)
             else:
                 st.info(f"Aucune mission validée pour l'année {sel_y}.")
-        else:
-            st.info(f"Aucune donnée trouvée pour {sel_y}.")
-    else:
-        st.error("Aucune donnée disponible.")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
