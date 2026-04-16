@@ -564,73 +564,85 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
- # =================================================================
-# --- PAGE STATS (FINANCES & LOGBOOK) ---
+# =================================================================
+# --- PAGE STATS (FINANCES & PERFORMANCE LOGBOOK) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Tableau de Bord Vesta</h2>', unsafe_allow_html=True)
 
-    # 1. Chargement avec sécurité
+    # 1. Chargement des données
     df_actif = charger_data_safe('contacts.json')
     df_arch = charger_data_safe('archives_planning.json')
     df_m = charger_data_safe('maintenance.json') 
     df_log = charger_data_safe('logbook.json')
     
+    # Fusion des revenus (Actifs + Archives)
     df_all = pd.concat([df_actif, df_arch], ignore_index=True) if not df_arch.empty else df_actif
 
-    # Fonction de conversion ultra-robuste
+    # Fonction de nettoyage numérique
     def to_f(val):
         if pd.isna(val): return 0.0
-        try: 
-            return float(str(val).replace('€','').replace(' ','').replace(',','.').strip())
-        except: 
-            return 0.0
+        try: return float(str(val).replace('€','').replace(' ','').replace(',','.').strip())
+        except: return 0.0
 
     if not df_all.empty:
-        # --- A. FILTRAGE ---
-        sel_y = st.selectbox("Choisir l'année :", [2025, 2026, 2027], index=1)
+        # --- A. FILTRES DE PÉRIODE (RESTAURÉS) ---
+        col_sel1, col_sel2 = st.columns(2)
+        mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
+        sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-        # Revenus
+        # --- B. CALCUL DES REVENUS ---
         df_all['dt_vrai'] = pd.to_datetime(df_all['DateNav'], dayfirst=True, errors='coerce')
         df_f = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
         
-        # On calcule le CA (Chiffre d'Affaires)
-        total_ca = sum(to_f(x) for x in df_f['Prix']) if 'Prix' in df_f.columns else 0.0
+        # Filtre "À ce jour"
+        if mode_bilan == "À ce jour" and not df_f.empty:
+            df_f = df_f[df_f['dt_vrai'] <= pd.Timestamp.now().normalize()].copy()
 
-        # Dépenses Maintenance (On cherche 'M_Num' ou 'Montant')
+        # Calcul du CA (Uniquement si payé ou CMN)
+        def est_comptabilise(row):
+            soc = str(row.get('Société', '')).upper()
+            paiement = str(row.get('Paiement', '')).upper()
+            if "LISTE D'ATTENTE" in str(row.get('Statut', '')).upper(): return False
+            return "CMN" in soc or paiement == "PAID"
+
+        df_final = df_f[df_f.apply(est_comptabilise, axis=1)].copy() if not df_f.empty else pd.DataFrame()
+        total_ca = sum(to_f(x) for x in df_final['Prix']) if not df_final.empty else 0.0
+
+        # --- C. CALCUL DES DÉPENSES (Maintenance + Gasoil) ---
         t_maint = 0.0
         if not df_m.empty:
             df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-            df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")]
+            mask_m = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")
+            df_m_y = df_m[mask_m]
             col_m = 'M_Num' if 'M_Num' in df_m.columns else 'Montant'
             t_maint = sum(to_f(x) for x in df_m_y[col_m])
 
-        # Données Logbook (On cherche les noms de ton JSON)
+        # Données Logbook (Technique & Gasoil)
         t_milles, t_moteur, t_voile, t_gasoil_eur, t_gasoil_l = 0, 0, 0, 0, 0
         if not df_log.empty:
             df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
             df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
             
-            # Sommes intelligentes
             t_milles = df_log_y['TotalMil'].sum() if 'TotalMil' in df_log_y.columns else 0
             t_moteur = df_log_y['TotalMot'].sum() if 'TotalMot' in df_log_y.columns else 0
             t_voile = df_log_y['HVoile'].sum() if 'HVoile' in df_log_y.columns else 0
             t_gasoil_l = df_log_y['Litre Gazoil'].sum() if 'Litre Gazoil' in df_log_y.columns else 0
             t_gasoil_eur = df_log_y['Cout Gazoil'].sum() if 'Cout Gazoil' in df_log_y.columns else 0
 
-        # --- B. AFFICHAGE DES INDICATEURS ---
+        # --- D. AFFICHAGE DES INDICATEURS CLÉS ---
         total_dep = t_maint + t_gasoil_eur
         net = total_ca - total_dep
 
         st.divider()
-        # Ligne 1 : Finances
+        # Ligne Finances
         c1, c2, c3 = st.columns(3)
         c1.metric("💰 CA", f"{total_ca:,.0f} €")
         c2.metric("💸 Dépenses", f"{total_dep:,.0f} €")
         c3.metric("⚖️ Net", f"{net:,.0f} €")
 
-        # Ligne 2 : Performance
-        st.write("**📈 Performance Technique**")
+        # Ligne Performance (Logbook)
+        st.write("📈 **Indicateurs de Performance**")
         cp1, cp2, cp3 = st.columns(3)
         
         cout_mille = (total_dep / t_milles) if t_milles > 0 else 0
@@ -642,16 +654,14 @@ if st.session_state.page == "STATS":
         cp2.metric("Coût/NM", f"{cout_mille:.2f} €")
         cp3.metric("% Voile", f"{tx_voile:.0f}%")
 
-        # --- C. GRAPHIQUE COMPARATIF ---
+        # --- E. GRAPHIQUE COMPARATIF ---
         st.write("---")
-        st.subheader("📉 Recettes vs Dépenses")
-        
-        # Préparation mini-dataframe pour le graphe
+        st.subheader("📉 Équilibre Financier")
         chart_data = pd.DataFrame({
-            "Type": ["Recettes", "Dépenses"],
-            "Montant": [total_ca, total_dep]
+            "Indicateur": ["Chiffre d'Affaires", "Total Dépenses"],
+            "Montant (€)": [total_ca, total_dep]
         })
-        st.bar_chart(chart_data.set_index("Type"), color=["#2e7d32"])
+        st.bar_chart(chart_data.set_index("Indicateur"), color="#01579b")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
