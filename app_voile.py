@@ -564,13 +564,14 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
-# =================================================================
-# --- 7. PAGE STATS (SYNCHRO CMN + AUTRES MISSIONS) ---
+
+   # =================================================================
+# --- 7. PAGE STATS (VERSION CORRIGÉE & UNIVERSELLE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # 1. Chargement global
+    # 1. Chargement et Fusion
     df_actif = charger_data_safe('contacts.json')
     df_arch = charger_data_safe('archives_planning.json')
     df_all = pd.concat([df_actif, df_arch], ignore_index=True) if not df_arch.empty else df_actif
@@ -581,47 +582,43 @@ if st.session_state.page == "STATS":
         mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
         sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-        # --- B. RADAR DE DATE (VERSION UNIVERSELLE) ---
+        # --- B. RADAR DE DATE (GÈRE SLASH ET TIRETS) ---
         def radar_date(row):
             val = str(row.get('DateNav', '')).strip().split(' ')[0]
             if val and val.lower() not in ["nan", "", "none"]:
-                # 1. On tente le format auto (gère les tirets 2026-05-15)
+                # On essaie d'abord le format auto (tirets) puis français (slashs)
                 dt = pd.to_datetime(val, errors='coerce')
-                # 2. Si ça échoue, on force le format français (slashs 15/05/2026)
                 if pd.isnull(dt):
                     dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
                 return dt
             return pd.NaT
 
-        # --- C. LOGIQUE DE CALCUL DU CA ---
+        # On crée df_filtre ICI (impératif pour éviter le NameError)
+        df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
+        df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
+
+        # --- C. FILTRAGE ET CALCULS ---
         if not df_filtre.empty:
             def est_comptabilise(row):
                 societe = str(row.get('Société', '')).strip().upper()
                 paiement = str(row.get('Paiement', '')).strip().upper()
                 statut = str(row.get('Statut', '')).strip().upper()
-
-                # On ignore toujours les listes d'attente
-                if "LISTE D'ATTENTE" in statut:
-                    return False
-
-                # RÈGLE CMN : Si c'est CMN, on compte tout (car contrat pro validé)
-                if "CMN" in societe:
-                    return True
                 
-                # RÈGLE STANDARD : Pour les autres (ex: particuliers), on attend le "PAID"
-                if paiement == "PAID":
-                    return True
+                if "LISTE D'ATTENTE" in statut: return False
                 
-                return False
+                # Règle CMN (prioritaire pour tes 2509€)
+                if "CMN" in societe: return True
+                
+                # Autres (si payé)
+                return paiement == "PAID"
 
             df_final = df_filtre[df_filtre.apply(est_comptabilise, axis=1)].copy()
 
-            # Filtre temporel
             if mode_bilan == "À ce jour" and not df_final.empty:
                 today = pd.Timestamp.now().normalize()
                 df_final = df_final[df_final['dt_vrai'] <= today].copy()
 
-            # --- D. AFFICHAGE DES RÉSULTATS ---
+            # --- D. AFFICHAGE ---
             st.divider()
             
             def force_float(val):
@@ -634,17 +631,18 @@ if st.session_state.page == "STATS":
                 total_ca = df_final['Prix_Num'].sum()
                 
                 c1, c2 = st.columns(2)
-                c1.metric(f"💰 CA Global ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
+                c1.metric(f"💰 CA Encaissé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
                 c2.metric("📋 Missions", f"{len(df_final)}")
 
-                # Tableau pour vérifier les 5 lignes CMN
                 df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
                 view = df_final.sort_values('dt_vrai', ascending=False)
-                st.dataframe(view[['Date_Aff', 'Nom', 'Société', 'Prix', 'Paiement', 'Statut']], 
-                             hide_index=True, use_container_width=True)
+                st.dataframe(view[['Date_Aff', 'Nom', 'Société', 'Prix', 'Paiement']], hide_index=True, use_container_width=True)
             else:
-                st.info("Aucune mission à comptabiliser.")
-           
+                st.info("Aucune mission validée pour cette sélection.")
+        else:
+            st.info(f"Aucune donnée trouvée pour l'année {sel_y}.")
+    else:
+        st.error("Les fichiers de données sont vides ou introuvables.")        
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
