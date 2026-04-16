@@ -922,74 +922,98 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True) 
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - ORDRE MANUEL FORCÉ ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION MOBILE FLUIDE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
 
-    # 1. Chargement des données brutes
     df_log = charger_data_safe('logbook.json')
 
+    # 1. FORMULAIRE NOUVELLE ÉTAPE (Toujours visible)
+    st.subheader("🚀 Nouvelle Étape")
+    with st.form("form_new_log", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        f_date = c1.date_input("Date", datetime.now())
+        f_dest = c2.text_input("Destination / Etape")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        f_h_dep = col1.number_input("H.Moteur Dép", step=0.1)
+        f_h_arr = col2.number_input("H.Moteur Arr", step=0.1)
+        f_m_dep = col3.number_input("Milles Dép", step=1.0)
+        f_m_arr = col4.number_input("Milles Arr", step=1.0)
+        
+        f_voile = st.number_input("Heures Voile", step=0.1)
+        f_notes = st.text_area("Notes / Météo")
+        
+        if st.form_submit_button("💾 ENREGISTRER L'ÉTAPE", use_container_width=True):
+            nouvelle = {
+                "Date": f_date.strftime("%d/%m/%Y"),
+                "Navigation": f_dest,
+                "MotDep": float(f_h_dep),
+                "TotalMot": float(f_h_arr),
+                "MillesDep": float(f_m_dep),
+                "TotalMil": float(f_m_arr),
+                "H_Voile": float(f_voile),
+                "Notes": f_notes
+            }
+            df_log = pd.concat([df_log, pd.DataFrame([nouvelle])], ignore_index=True)
+            sauvegarder_data(df_log, 'logbook.json')
+            st.rerun()
+
+    # 2. HISTORIQUE (Le plus récent est TOUJOURS en haut)
     if not df_log.empty:
-        # --- LA SOLUTION : RÉORGANISATION PHYSIQUE ---
-        # On définit l'ordre exact que tu as demandé (2, 1, 0, 3, 4)
-        # On s'assure que ces index existent avant de les trier
-        index_existants = df_log.index.tolist()
-        ordre_souhaite = [2, 1, 0, 3, 4]
-        
-        # On ne garde que les index qui existent vraiment dans ton fichier
-        ordre_final = [i for i in ordre_souhaite if i in index_existants]
-        
-        # On ajoute les autres index (si tu as plus de 5 lignes) à la fin
-        autres_index = [i for i in index_existants if i not in ordre_final]
-        ordre_total = ordre_final + autres_index
-
-        # On réordonne le DataFrame selon cet ordre précis
-        df_affichage = df_log.reindex(ordre_total)
-        
-        # On ajoute une colonne "N°" pour que tu saches quel index modifier
-        df_affichage.insert(0, 'N°', df_affichage.index)
-
-        # 2. AFFICHAGE (Lecture seule pour garantir l'ordre visuel)
+        st.divider()
         st.subheader("📜 Historique")
+
+        # Inversion physique pour l'affichage (la ligne 5 sera au dessus de la 4, etc.)
+        df_affichage = df_log.copy()
+        df_affichage.insert(0, 'N°', df_log.index)
+        df_affichage = df_affichage.iloc[::-1] 
+
         st.dataframe(df_affichage, use_container_width=True, hide_index=True)
 
-        # 3. ACTIONS (MODIFIER / SUPPRIMER)
+        # 3. ACTIONS DE GESTION
         st.write("---")
-        c1, c2 = st.columns(2)
+        col_mod, col_del = st.columns(2)
 
-        with c1:
-            with st.expander("📝 MODIFIER"):
-                # Ici on demande l'index ORIGINAL (celui de la colonne N°)
-                idx_to_mod = st.number_input("Entrez le N° (colonne de gauche)", min_value=0, max_value=df_log.index.max(), step=1)
-                if idx_to_mod in df_log.index:
-                    row = df_log.loc[idx_to_mod]
-                    with st.form("edit_log_manual"):
-                        new_dest = st.text_input("Destination", value=row.get('Navigation', ''))
-                        new_h = st.number_input("H. Moteur Arrivée", value=float(row.get('TotalMot', 0.0)))
-                        new_m = st.number_input("Milles Arrivée", value=float(row.get('TotalMil', 0.0)))
-                        
-                        if st.form_submit_button("VALIDER"):
-                            df_log.at[idx_to_mod, 'Navigation'] = new_dest
-                            df_log.at[idx_to_mod, 'TotalMot'] = new_h
-                            df_log.at[idx_to_mod, 'TotalMil'] = new_m
-                            sauvegarder_data(df_log, 'logbook.json')
-                            st.rerun()
-
-        with c2:
-            with st.expander("🗑️ SUPPRIMER"):
-                idx_to_del = st.number_input("N° à supprimer", min_value=0, max_value=df_log.index.max(), step=1, key="del_log")
-                if st.checkbox("Confirmer la suppression"):
-                    if st.button("🔥 SUPPRIMER DÉFINITIVEMENT"):
-                        df_log = df_log.drop(index=idx_to_del)
+        with col_mod:
+            with st.expander("📝 MODIFIER UNE LIGNE"):
+                idx_m = st.number_input("Modifier le N°", min_value=0, max_value=df_log.index.max(), step=1)
+                row = df_log.loc[idx_m]
+                # Formulaire de modification avec TOUTES les cases
+                with st.form("edit_full_log"):
+                    e_dest = st.text_input("Destination", value=row.get('Navigation', ''))
+                    c_m1, c_m2 = st.columns(2)
+                    e_h_dep = c_m1.number_input("H.Moteur Dép", value=float(row.get('MotDep', 0.0)))
+                    e_h_arr = c_m2.number_input("H.Moteur Arr", value=float(row.get('TotalMot', 0.0)))
+                    
+                    c_mi1, c_mi2 = st.columns(2)
+                    e_m_dep = c_mi1.number_input("Milles Dép", value=float(row.get('MillesDep', 0.0)))
+                    e_m_arr = c_mi2.number_input("Milles Arr", value=float(row.get('TotalMil', 0.0)))
+                    
+                    e_voile = st.number_input("Heures Voile", value=float(row.get('H_Voile', 0.0)))
+                    e_notes = st.text_area("Notes", value=row.get('Notes', ''))
+                    
+                    if st.form_submit_button("VALIDER LES MODIFICATIONS"):
+                        df_log.at[idx_m, 'Navigation'] = e_dest
+                        df_log.at[idx_m, 'MotDep'] = e_h_dep
+                        df_log.at[idx_m, 'TotalMot'] = e_h_arr
+                        df_log.at[idx_m, 'MillesDep'] = e_m_dep
+                        df_log.at[idx_m, 'TotalMil'] = e_m_arr
+                        df_log.at[idx_m, 'H_Voile'] = e_voile
+                        df_log.at[idx_m, 'Notes'] = e_notes
                         sauvegarder_data(df_log, 'logbook.json')
                         st.rerun()
 
-    # 4. FORMULAIRE D'AJOUT (En bas pour ne pas gêner la vue)
-    st.divider()
-    with st.expander("➕ AJOUTER UNE NOUVELLE ÉTAPE"):
-        # ... (Ton formulaire d'ajout classique ici)
-        st.info("Les nouvelles étapes s'ajouteront à la liste.")
+        with col_del:
+            with st.expander("🗑️ SUPPRIMER"):
+                idx_s = st.number_input("Supprimer le N°", min_value=0, max_value=df_log.index.max(), step=1, key="del_log")
+                if st.checkbox("Confirmer la suppression", key="check_del"):
+                    if st.button("🔥 SUPPRIMER DÉFINITIVEMENT", type="primary"):
+                        df_log = df_log.drop(index=idx_s).reset_index(drop=True)
+                        sauvegarder_data(df_log, 'logbook.json')
+                        st.rerun()
+
  
 
 
