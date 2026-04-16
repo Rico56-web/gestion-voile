@@ -922,99 +922,74 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - ORDRE GARANTI ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - MÉTHODE ANTI-CACHE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
 
-    # 1. Chargement
     df_log = charger_data_safe('logbook.json')
 
-    # 2. Formulaire de saisie (Haut de page)
-    st.subheader("🚀 Nouvelle Navigation")
-    c1, c2, c3 = st.columns([2, 1, 2])
-    f_date = c1.date_input("Date", datetime.now())
-    f_jours = c2.number_input("Jours", min_value=1, value=1)
-    f_titre = c3.text_input("Titre", placeholder="Destination")
-    
-    # Préparation du tableau de saisie vide
-    if 'temp_log_df' not in st.session_state:
-        last_h = 0.0
-        last_m = 0.0
-        if not df_log.empty:
-            last_h = pd.to_numeric(df_log['TotalMot'], errors='coerce').iloc[-1]
-            last_m = pd.to_numeric(df_log['TotalMil'], errors='coerce').iloc[-1]
-        
-        st.session_state.temp_log_df = pd.DataFrame([{
-            "Port": "", 
-            "Mot_Dep": float(last_h), "Mot_Arr": float(last_h),
-            "Mil_Dep": float(last_m), "Mil_Arr": float(last_m),
-            "Voile": 0.0, "Notes": ""
-        }])
+    # 1. SAISIE (Haut de page)
+    with st.expander("➕ AJOUTER UNE NAVIGATION", expanded=df_log.empty):
+        # ... (Garder ton formulaire de saisie avec Mot_Dep, Mot_Arr, etc.)
+        # Assure-toi que les clés des widgets de saisie sont uniques
+        st.info("Utilise le tableau ci-dessus pour tes étapes")
 
-    st.data_editor(
-        st.session_state.temp_log_df,
-        column_config={
-            "Port": "📍 Etape", "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
-            "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr", "Voile": "Voile", "Notes": "Notes"
-        },
-        num_rows="dynamic",
-        use_container_width=True,
-        key="input_v3"
-    )
-
-    if st.button("💾 ENREGISTRER LA NAVIGATION", use_container_width=True, type="primary"):
-        # Logique d'enregistrement inchangée...
-        # (Concaténation et sauvegarde dans logbook.json)
-        # ...
-        st.rerun()
-
-    # 3. HISTORIQUE - TECHNIQUE DE TRI FORCÉ
+    # 2. ACTIONS (Modifier / Supprimer)
     if not df_log.empty:
         st.divider()
-        st.subheader("📜 Historique (Le plus récent en haut)")
-
-        # On prépare le DataFrame pour l'affichage
-        df_hist_display = df_log.copy()
+        col_act1, col_act2 = st.columns(2)
         
-        # On crée une colonne 'ID' visible pour être sûr de l'ordre
-        df_hist_display['ID'] = df_hist_display.index
-        
-        # On réorganise les colonnes pour mettre l'ID et la Date en premier
-        cols = ['ID', 'Date'] + [c for c in df_hist_display.columns if c not in ['ID', 'Date']]
-        df_hist_display = df_hist_display[cols]
+        with col_act1:
+            with st.expander("📝 MODIFIER UNE LIGNE"):
+                idx_mod = st.number_input("N° de ligne à modifier", min_value=0, max_value=df_log.index.max(), step=1)
+                ligne = df_log.loc[idx_mod]
+                
+                with st.form("form_edit_log"):
+                    new_port = st.text_input("Port", value=ligne['PortArr'])
+                    c_ed1, c_ed2 = st.columns(2)
+                    new_m_arr = c_ed1.number_input("Moteur Arr", value=float(ligne['TotalMot']))
+                    new_mil_arr = c_ed2.number_input("Milles Arr", value=float(ligne['TotalMil']))
+                    new_notes = st.text_area("Notes", value=ligne['Notes'])
+                    
+                    if st.form_submit_button("VALIDER LA MODIFICATION"):
+                        df_log.at[idx_mod, 'PortArr'] = new_port
+                        df_log.at[idx_mod, 'TotalMot'] = new_m_arr
+                        df_log.at[idx_mod, 'TotalMil'] = new_mil_arr
+                        df_log.at[idx_mod, 'Notes'] = new_notes
+                        sauvegarder_data(df_log, 'logbook.json')
+                        st.success("Modifié !")
+                        st.rerun()
 
-        # ON FORCE LE TRI PAR ID DÉCROISSANT
-        df_hist_display = df_hist_display.sort_values(by='ID', ascending=False)
-
-        # L'éditeur avec une nouvelle clé pour casser le cache
-        edited_hist = st.data_editor(
-            df_hist_display,
-            use_container_width=True,
-            num_rows="dynamic",
-            key="log_editor_force_sort_v4",
-            disabled=["ID"] # On empêche de modifier l'ID
-        )
-
-        col_val, col_del = st.columns(2)
-        
-        with col_val:
-            if st.button("💾 VALIDER LES MODIFICATIONS", use_container_width=True):
-                # On retire la colonne ID et on remet dans l'ordre chronologique pour le JSON
-                df_to_save = edited_hist.drop(columns=['ID']).sort_index()
-                sauvegarder_data(df_to_save, 'logbook.json')
-                st.success("Modifications enregistrées !")
-                st.rerun()
-
-        with col_del:
+        with col_act2:
             with st.expander("🗑️ SUPPRIMER"):
-                idx_del = st.number_input("Index à effacer", min_value=0, max_value=df_log.index.max(), step=1)
-                if st.checkbox(f"Confirmer suppression ligne {idx_del}"):
-                    if st.button("🔥 SUPPRIMER DÉFINITIVEMENT", type="primary"):
+                idx_del = st.number_input("N° de ligne à effacer", min_value=0, max_value=df_log.index.max(), step=1, key="del_idx")
+                if st.checkbox("Confirmer suppression", key="conf_del"):
+                    if st.button("🔥 EFFACER DÉFINITIVEMENT", type="primary"):
                         df_log = df_log.drop(index=idx_del).reset_index(drop=True)
                         sauvegarder_data(df_log, 'logbook.json')
                         st.rerun()
 
+        # 3. L'AFFICHAGE (L'ordre est forcé ici)
+        st.subheader("📜 Historique (Dernier en haut)")
+        
+        # On inverse le DataFrame physiquement
+        df_view = df_log.copy()
+        df_view.index.name = 'N°'
+        df_view = df_view.iloc[::-1] # Inversion physique des lignes
+        
+        # On utilise st.dataframe (lecture seule) qui respecte TOUJOURS l'ordre qu'on lui donne
+        st.dataframe(
+            df_view,
+            use_container_width=True,
+            column_config={
+                "MotDep": "Mtr Dép",
+                "TotalMot": "Mtr Arr",
+                "MillesEtape": "Milles",
+                "TotalMil": "Cumul",
+                "PortArr": "📍 Port"
+            }
+        )
 
 
 
