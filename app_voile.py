@@ -717,57 +717,54 @@ if st.session_state.page == "MAINT":
 
     st.divider()
 
-    # --- 4. GESTION DU TABLEAU ---
-    if not df_m.empty:
-        # A. Conversion et Tri Chronologique
-        df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-        
-        # B. Filtrage par année
-        df_filtre = df_m[df_m['dt_maint'].dt.year == sel_y].copy()
-        
-        # C. Filtrage "À ce jour" (ne montre que ce qui est passé ou aujourd'hui)
-        if mode_maint == "À ce jour" and not df_filtre.empty:
-            today = pd.Timestamp.now().normalize()
-            df_filtre = df_filtre[df_filtre['dt_maint'] <= today].copy()
+ # --- 4. GESTION DU TABLEAU (VERSION MOBILE EDITABLE) ---
+if not df_m.empty:
+    # A. Préparation technique
+    df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+    
+    # B. Filtrage
+    df_filtre = df_m[df_m['dt_maint'].dt.year == sel_y].copy()
+    if mode_maint == "À ce jour":
+        today = pd.Timestamp.now().normalize()
+        df_filtre = df_filtre[df_filtre['dt_maint'] <= today].copy()
 
-        # D. Tri Final (Du plus récent au plus ancien pour iPhone)
-        df_filtre = df_filtre.sort_values('dt_maint', ascending=False)
+    # C. Tri
+    df_filtre = df_filtre.sort_values('dt_maint', ascending=False)
 
-        if not df_filtre.empty:
-            st.subheader(f"📋 Suivi {sel_y}")
+    if not df_filtre.empty:
+        st.subheader(f"📋 Suivi {sel_y}")
+        
+        # On garde l'index original pour la sauvegarde
+        # L'éditeur doit recevoir le dataframe filtré
+        edited_df = st.data_editor(
+            df_filtre.drop(columns=['dt_maint']), # On cache la colonne de tri
+            column_config={
+                "Date": st.column_config.TextColumn("Date", width="small"),
+                "Objet": st.column_config.TextColumn("Désignation"),
+                "M_Num": st.column_config.NumberColumn("€", format="%.2f"),
+                "Statut": st.column_config.SelectboxColumn("Etat", options=["À prévoir", "Fait"], required=True),
+                "Type": st.column_config.SelectboxColumn("Cat", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
+            },
+            hide_index=False,
+            use_container_width=True,
+            num_rows="dynamic",
+            key="maint_editor_v3"
+        )
+
+        # D. SAUVEGARDE ROBUSTE
+        if st.button("💾 ENREGISTRER MODIFICATIONS", use_container_width=True):
+            # 1. On récupère les lignes qui n'étaient pas affichées (autres années/futur)
+            df_non_affiches = df_m[~df_m.index.isin(df_filtre.index)].drop(columns=['dt_maint'])
             
-            # Suppression de la colonne technique avant affichage
-            df_display = df_filtre.drop(columns=['dt_maint'])
-
-            # ÉDITEUR (Correction de l'erreur Height et optimisation mobile)
-            edited_df = st.data_editor(
-                df_display,
-                column_config={
-                    "Date": st.column_config.TextColumn("Date", width="small"),
-                    "Objet": st.column_config.TextColumn("Désignation"),
-                    "M_Num": st.column_config.NumberColumn("€", format="%.2f"),
-                    "Statut": st.column_config.SelectboxColumn("Etat", options=["À prévoir", "Fait"]),
-                    "Type": st.column_config.SelectboxColumn("Cat", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
-                },
-                hide_index=False,
-                use_container_width=True,
-                num_rows="dynamic",
-                key="maint_editor_v2"
-            )
-
-            # E. Sauvegarde
-            if st.button("💾 ENREGISTRER MODIFICATIONS", use_container_width=True):
-                # On récupère les données éditées et on resauvegarde le fichier complet
-                # (Attention : si on filtre, il faut fusionner avec les données non filtrées pour ne pas les perdre)
-                indices_a_garder = df_m[~df_m.index.isin(df_filtre.index)]
-                df_final_save = pd.concat([indices_a_garder, edited_df], ignore_index=True)
-                sauvegarder_data(df_final_save, 'maintenance.json')
-                st.success("Modifications enregistrées !")
-                st.rerun()
-        else:
-            st.info(f"Rien à afficher pour {sel_y} en mode '{mode_maint}'.")
+            # 2. On fusionne avec les données modifiées
+            df_final_save = pd.concat([df_non_affiches, edited_df], ignore_index=True)
+            
+            # 3. Nettoyage final avant écriture
+            sauvegarder_data(df_final_save, 'maintenance.json')
+            st.success("✅ Modifications enregistrées !")
+            st.rerun()
     else:
-        st.info("Aucune donnée de maintenance.")
+        st.info(f"Rien à afficher pour {sel_y}.")
 # --- 5. FORMULAIRE D'AJOUT (AVEC OPTION MENSUELLE) ---
     st.write("---")
     with st.expander("➕ Ajouter une opération (Unique ou Mensuelle)"):
