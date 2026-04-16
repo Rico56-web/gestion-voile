@@ -736,20 +736,34 @@ if st.session_state.page == "MAINT":
                 sauvegarder_data(df_final_save, 'maintenance.json')
                 st.success("✅ Mis à jour !")
                 st.rerun()
-
         with col_del:
-            # BOUTON SUPPRIMER AVEC CONFIRMATION (Popover)
-            with st.popover("🗑️ SUPPRIMER", use_container_width=True):
-                st.warning("Action irréversible")
-                idx_to_remove = st.number_input("Index à supprimer (chiffre à gauche) :", 
-                                                min_value=0, max_value=df_m.index.max(), step=1)
+            # SYSTÈME DE SÉCURITÉ À DOUBLE ÉTAPE
+            with st.expander("🗑️ ZONE DE SUPPRESSION"):
+                st.error("⚠️ Attention : action définitive")
                 
-                if st.button(f"Confirmer suppression index {idx_to_remove}", type="primary", use_container_width=True):
-                    # Suppression dans le DataFrame original
-                    df_m = df_m.drop(index=idx_to_remove).reset_index(drop=True)
-                    sauvegarder_data(df_m, 'maintenance.json')
-                    st.success("Ligne supprimée !")
-                    st.rerun()
+                # Étape 1 : Le Verrou
+                unlock = st.checkbox("Déverrouiller le bouton")
+                
+                # Étape 2 : L'Index
+                idx_to_remove = st.number_input(
+                    "Index à supprimer (chiffre à gauche) :", 
+                    min_value=0, 
+                    max_value=df_m.index.max() if not df_m.empty else 0, 
+                    step=1
+                )
+                
+                # Étape 3 : Le bouton ne s'affiche QUE si déverrouillé
+                if unlock:
+                    if st.button(f"🔥 CONFIRMER SUPPRESSION {idx_to_remove}", type="primary", use_container_width=True):
+                        # Action de suppression
+                        df_m = df_m.drop(index=idx_to_remove).reset_index(drop=True)
+                        sauvegarder_data(df_m, 'maintenance.json')
+                        st.success("Ligne supprimée !")
+                        st.rerun()
+                else:
+                    st.info("Cochez la case pour confirmer.")
+
+      
 
     # --- 5. FORMULAIRE D'AJOUT (SÉCURISÉ CONTRE LES DOUBLONS) ---
     st.write("---")
