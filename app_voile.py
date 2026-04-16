@@ -564,6 +564,7 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
+        
 # =================================================================
 # --- 7. PAGE STATS (SYNCHRO FINANCES & MAINTENANCE) ---
 # =================================================================
@@ -573,7 +574,6 @@ if st.session_state.page == "STATS":
     # 1. Chargement des sources
     df_actif = charger_data_safe('contacts.json')
     df_arch = charger_data_safe('archives_planning.json')
-    # On charge explicitement df_m ici pour éviter le NameError
     df_m = charger_data_safe('maintenance.json') 
     
     # Fusion des revenus
@@ -585,7 +585,7 @@ if st.session_state.page == "STATS":
         mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
         sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-        # --- B. RADAR DE DATE (REVENUS) ---
+        # --- B. RADAR DE DATE ---
         def radar_date(row):
             val = str(row.get('DateNav', '')).replace('\\/', '/').strip().split(' ')[0]
             if val and val.lower() not in ["nan", "", "none"]:
@@ -606,33 +606,26 @@ if st.session_state.page == "STATS":
             if "CMN" in soc: return True
             return paiement == "PAID"
 
-        if not df_filtre.empty:
-            df_final = df_filtre[df_filtre.apply(est_comptabilise, axis=1)].copy()
-            if mode_bilan == "À ce jour":
-                today = pd.Timestamp.now().normalize()
-                df_final = df_final[df_final['dt_vrai'] <= today].copy()
-        else:
-            df_final = pd.DataFrame()
+        df_final = df_filtre[df_filtre.apply(est_comptabilise, axis=1)].copy() if not df_filtre.empty else pd.DataFrame()
+        
+        if mode_bilan == "À ce jour" and not df_final.empty:
+            today = pd.Timestamp.now().normalize()
+            df_final = df_final[df_final['dt_vrai'] <= today].copy()
 
-        # --- D. CALCUL DES DÉPENSES (MAINTENANCE) ---
+        # --- D. CALCUL DES DÉPENSES ---
         total_dep = 0.0
         df_dep_final = pd.DataFrame()
 
         if not df_m.empty:
-            # 1. Conversion des dates
             df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-            
-            # 2. Filtre par année et statut "Fait"
             mask_dep = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")
             
-            # 3. Utilisation de mode_bilan (et non mode_maint) pour le filtrage temporel
             if mode_bilan == "À ce jour":
                 today = pd.Timestamp.now().normalize()
                 mask_dep = mask_dep & (df_m['dt_maint'] <= today)
             
             df_dep_final = df_m[mask_dep].copy()
             
-            # Calcul du total des frais
             def force_float_m(val):
                 s = str(val).replace('€', '').replace(' ', '').replace('\xa0', '').replace(',', '.')
                 try: return float(s)
@@ -640,29 +633,18 @@ if st.session_state.page == "STATS":
 
             total_dep = df_dep_final['M_Num'].apply(force_float_m).sum()
 
-
-        # --- E. AFFICHAGE FINAL (IPHONE 16) ---
+        # --- E. AFFICHAGE (IPHONE 16) ---
         st.divider()
-        
-        def force_float(val):
-            s = str(val).replace('€', '').replace(' ', '').replace('\xa0', '').replace(',', '.')
-            try: return float(s)
-            except: return 0.0
-
-        # Calcul CA
-        total_ca = df_final['Prix'].apply(force_float).sum() if not df_final.empty else 0.0
+        total_ca = df_final['Prix'].apply(force_float_m).sum() if not df_final.empty else 0.0
         net = total_ca - total_dep
 
-        # KPI en Grille 2x2
         c1, c2 = st.columns(2)
         c1.metric("💰 CA", f"{total_ca:,.0f} €".replace(',', ' '))
         c2.metric("📋 Missions", f"{len(df_final)}")
-        
         c3, c4 = st.columns(2)
         c3.metric("📉 Frais", f"{total_dep:,.0f} €".replace(',', ' '))
         c4.metric("⚖️ Net", f"{net:,.0f} €".replace(',', ' '))
 
-        # Tableaux compacts pour iPhone
         st.write("---")
         if not df_final.empty:
             st.subheader("📄 Revenus")
@@ -673,7 +655,6 @@ if st.session_state.page == "STATS":
             st.subheader("💸 Dépenses")
             df_dep_final['D'] = df_dep_final['dt_maint'].dt.strftime('%d/%m')
             st.dataframe(df_dep_final[['D', 'Objet', 'M_Num']], hide_index=True, use_container_width=True)
-
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
@@ -691,123 +672,84 @@ if st.session_state.page == "MAINT":
 
     st.title("🛠️ MAINTENANCE")
 
-    # --- 2. FILTRES DE PÉRIODE (Comme en Stats) ---
+    # --- 2. FILTRES ---
     col_sel1, col_sel2 = st.columns(2)
     mode_maint = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
     sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-    # --- 3. BANDEAU VIDANGE ---
+    # --- 3. VIDANGE ---
     heures_restantes = params['cible_vidange'] - releve_h
     color_v = "#2e7d32" if heures_restantes > 15 else "#c62828"
-    st.markdown(f"""
-        <div style="background-color: {color_v}15; border: 1px solid {color_v}; padding: 10px; border-radius: 10px; text-align: center; border: 1px solid {color_v}">
-            <span style="color: {color_v}; font-weight: bold;">{heures_restantes:.1f} h restantes</span> | Compteur : {releve_h:.1f} h
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<div style="background-color: {color_v}15; border: 1px solid {color_v}; padding: 10px; border-radius: 10px; text-align: center;">
+        <span style="color: {color_v}; font-weight: bold;">{heures_restantes:.1f} h restantes</span> | Compteur : {releve_h:.1f} h
+    </div>""", unsafe_allow_html=True)
 
     st.divider()
 
- # --- 4. GESTION DU TABLEAU (VERSION MOBILE EDITABLE) ---
-if not df_m.empty:
-    # A. Préparation technique
-    df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-    
-    # B. Filtrage
-    df_filtre = df_m[df_m['dt_maint'].dt.year == sel_y].copy()
-    if mode_maint == "À ce jour":
-        today = pd.Timestamp.now().normalize()
-        df_filtre = df_filtre[df_filtre['dt_maint'] <= today].copy()
-
-    # C. Tri
-    df_filtre = df_filtre.sort_values('dt_maint', ascending=False)
-
-    if not df_filtre.empty:
-        st.subheader(f"📋 Suivi {sel_y}")
+    # --- 4. GESTION DU TABLEAU (BIEN INDENTÉ) ---
+    if not df_m.empty:
+        df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+        df_filtre = df_m[df_m['dt_maint'].dt.year == sel_y].copy()
         
-        # On garde l'index original pour la sauvegarde
-        # L'éditeur doit recevoir le dataframe filtré
-        edited_df = st.data_editor(
-            df_filtre.drop(columns=['dt_maint']), # On cache la colonne de tri
-            column_config={
-                "Date": st.column_config.TextColumn("Date", width="small"),
-                "Objet": st.column_config.TextColumn("Désignation"),
-                "M_Num": st.column_config.NumberColumn("€", format="%.2f"),
-                "Statut": st.column_config.SelectboxColumn("Etat", options=["À prévoir", "Fait"], required=True),
-                "Type": st.column_config.SelectboxColumn("Cat", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
-            },
-            hide_index=False,
-            use_container_width=True,
-            num_rows="dynamic",
-            key="maint_editor_v3"
-        )
+        if mode_maint == "À ce jour":
+            today = pd.Timestamp.now().normalize()
+            df_filtre = df_filtre[df_filtre['dt_maint'] <= today].copy()
 
-        # D. SAUVEGARDE ROBUSTE
-        if st.button("💾 ENREGISTRER MODIFICATIONS", use_container_width=True):
-            # 1. On récupère les lignes qui n'étaient pas affichées (autres années/futur)
-            df_non_affiches = df_m[~df_m.index.isin(df_filtre.index)].drop(columns=['dt_maint'])
-            
-            # 2. On fusionne avec les données modifiées
-            df_final_save = pd.concat([df_non_affiches, edited_df], ignore_index=True)
-            
-            # 3. Nettoyage final avant écriture
-            sauvegarder_data(df_final_save, 'maintenance.json')
-            st.success("✅ Modifications enregistrées !")
-            st.rerun()
-    else:
-        st.info(f"Rien à afficher pour {sel_y}.")
-# --- 5. FORMULAIRE D'AJOUT (AVEC OPTION MENSUELLE) ---
+        df_filtre = df_filtre.sort_values('dt_maint', ascending=False)
+
+        if not df_filtre.empty:
+            st.subheader(f"📋 Suivi {sel_y}")
+            edited_df = st.data_editor(
+                df_filtre.drop(columns=['dt_maint']),
+                column_config={
+                    "Date": st.column_config.TextColumn("Date", width="small"),
+                    "Objet": st.column_config.TextColumn("Désignation"),
+                    "M_Num": st.column_config.NumberColumn("€", format="%.2f"),
+                    "Statut": st.column_config.SelectboxColumn("Etat", options=["À prévoir", "Fait"], required=True),
+                    "Type": st.column_config.SelectboxColumn("Cat", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
+                },
+                hide_index=False,
+                use_container_width=True,
+                num_rows="dynamic",
+                key="maint_editor_v4"
+            )
+
+            if st.button("💾 ENREGISTRER MODIFICATIONS", use_container_width=True):
+                df_non_affiches = df_m[~df_m.index.isin(df_filtre.index)].drop(columns=['dt_maint'], errors='ignore')
+                df_final_save = pd.concat([df_non_affiches, edited_df], ignore_index=True)
+                sauvegarder_data(df_final_save, 'maintenance.json')
+                st.success("✅ Modifications enregistrées !")
+                st.rerun()
+
+    # --- 5. FORMULAIRE D'AJOUT (BIEN INDENTÉ) ---
     st.write("---")
-    with st.expander("➕ Ajouter une opération (Unique ou Mensuelle)"):
+    with st.expander("➕ Ajouter une opération"):
         with st.form("form_maint_recurrence"):
-            st.markdown("📅 **Format d'enregistrement : JJ/MM/AAAA**")
+            f_obj = st.text_input("Désignation")
+            c_a, c_b = st.columns(2)
+            f_date_iso = c_a.date_input("Date", datetime.now())
+            f_montant = c_b.number_input("Montant (€)", min_value=0.0, format="%.2f")
             
-            f_obj = st.text_input("Désignation (ex: Place de port)")
-            
-            col_a, col_b = st.columns(2)
-            f_date_iso = col_a.date_input("Date de début", datetime.now())
-            f_montant = col_b.number_input("Montant (€)", min_value=0.0, format="%.2f")
-            
-            col_c, col_d = st.columns(2)
-            f_type = col_c.selectbox("Catégorie", ["Port", "Assurances", "Maintenance", "Sécurité", "Autres frais"])
-            # Détection automatique du statut selon la date
+            c_c, c_d = st.columns(2)
+            f_type = c_c.selectbox("Catégorie", ["Port", "Assurances", "Maintenance", "Sécurité", "Autres frais"])
             default_statut_index = 1 if f_date_iso <= datetime.now().date() else 0
-            f_statut = col_d.selectbox("Statut", ["À prévoir", "Fait"], index=default_statut_index)
-            f_recurrence = st.checkbox("Répéter mensuellement (jusqu'à fin 2026)")
+            f_statut = c_d.selectbox("Statut", ["À prévoir", "Fait"], index=default_statut_index)
+            f_recurrence = st.checkbox("Répéter mensuellement (fin d'année)")
             
-            # BOUTON DE SOUMISSION DU FORMULAIRE
-            submitted = st.form_submit_button("💾 Enregistrer", use_container_width=True)
-            
-            if submitted:
+            if st.form_submit_button("💾 Enregistrer", use_container_width=True):
                 if f_obj:
                     nouvelles_lignes = []
                     if f_recurrence:
-                        # Boucle du mois actuel jusqu'à Décembre
                         for m in range(f_date_iso.month, 13):
                             date_gen = f_date_iso.replace(month=m).strftime("%d/%m/%Y")
-                            nouvelles_lignes.append({
-                                "Date": date_gen,
-                                "Objet": f"{f_obj} (M{m})",
-                                "M_Num": f_montant,
-                                "Statut": f_statut,
-                                "Type": f_type
-                            })
+                            nouvelles_lignes.append({"Date": date_gen, "Objet": f"{f_obj} (M{m})", "M_Num": f_montant, "Statut": f_statut, "Type": f_type})
                     else:
-                        nouvelles_lignes.append({
-                            "Date": f_date_iso.strftime("%d/%m/%Y"),
-                            "Objet": f_obj,
-                            "M_Num": f_montant,
-                            "Statut": f_statut,
-                            "Type": f_type
-                        })
+                        nouvelles_lignes.append({"Date": f_date_iso.strftime("%d/%m/%Y"), "Objet": f_obj, "M_Num": f_montant, "Statut": f_statut, "Type": f_type})
                     
-                    # Mise à jour du fichier
-                    df_new = pd.DataFrame(nouvelles_lignes)
-                    df_m = pd.concat([df_m, df_new], ignore_index=True)
+                    df_m = pd.concat([df_m, pd.DataFrame(nouvelles_lignes)], ignore_index=True)
                     sauvegarder_data(df_m, 'maintenance.json')
-                    st.success(f"✅ {len(nouvelles_lignes)} ligne(s) ajoutée(s) !")
+                    st.success("✅ Enregistré !")
                     st.rerun()
-                else:
-                    st.error("Veuillez remplir la désignation.")
 
 # =================================================================
 # --- PAGE : FACTURATION & SUIVI PAIEMENTS ---
