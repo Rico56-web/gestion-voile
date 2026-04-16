@@ -590,31 +590,35 @@ if st.session_state.page == "PLANNING":
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 
         st.error("Le fichier contacts.json semble vide.")
-    # =================================================================
-# --- 7. PAGE STATS (VERSION FINALE OPTIMISÉE SELON JSON) ---
+# =================================================================
+# --- 7. PAGE STATS (VERSION FINALE SANS ERREUR D'INDENTATION) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
+    # 1. Chargement
     df_all = charger_data_safe('contacts.json')
 
-    col_sel1, col_sel2 = st.columns(2)
-    mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
-    sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
-
     if not df_all.empty:
-        # --- A. SÉCURISATION ---
-        for c in ['Nom', 'Prénom', 'Prix', 'DateNav', 'Statut', 'Paiement']:
-            if c not in df_all.columns: df_all[c] = ""
+        # 2. Interface
+        col_sel1, col_sel2 = st.columns(2)
+        mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
+        sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
+
+        # --- A. SÉCURISATION DES COLONNES (Basé sur votre JSON) ---
+        cols_requis = ['Nom', 'Prénom', 'Prix', 'DateNav', 'Statut', 'Paiement', 'Société']
+        for c in cols_requis:
+            if c not in df_all.columns: 
+                df_all[c] = ""
         df_all = df_all.fillna("")
 
-        # --- B. RADAR DE DATE (GÈRE 05/02/2026 ET 2026-06-01) ---
+        # --- B. RADAR DE DATE (Gère ISO #11 et Français CMN) ---
         def radar_date(row):
             val = str(row['DateNav']).strip()
-            if val and val.lower() != "nan":
-                # Test ISO d'abord (fiche #11)
+            if val and val.lower() != "nan" and val != "":
+                # Priorité ISO (ex: 2026-04-04)
                 dt = pd.to_datetime(val, errors='coerce')
-                # Secours Français (fiche CMN 05/02)
+                # Secours FR (ex: 05/02/2026)
                 if pd.isnull(dt):
                     dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
                 return dt
@@ -622,41 +626,45 @@ if st.session_state.page == "STATS":
 
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
 
-        # --- C. FILTRAGE ---
+        # --- C. FILTRAGE DES MISSIONS VALIDES ---
         # 1. Année
         df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
 
-        # 2. Logique de Validation (Terminé ou Archivé) + PAYÉ
-        # On ignore la casse et les accents pour "Terminé"
+        # 2. Validation Statut (Terminé/Archivé) ET Paiement (Paid)
         def est_valide_ca(row):
             statut = str(row['Statut']).upper()
             paiement = str(row['Paiement']).upper()
+            nom = str(row['Nom']).upper()
             
-            # On accepte si c'est TERMINÉ ou ARCHIVÉ et que c'est PAID
-            confirmé = "TERMIN" in statut or "ARCHIV" in statut
-            est_paye = "PAID" in paiement or "PAYÉ" in paiement or "PAYE" in paiement
+            # On accepte si TERMINÉ ou ARCHIVÉ + PAID (et pas Faucheux)
+            est_termine = "TERMIN" in statut or "ARCHIV" in statut
+            est_paye = "PAID" in paiement or "PAYÉ" in paiement
+            pas_faucheux = "FAUCHEUX" not in nom
             
-            return confirmé and est_paye
+            return est_termine and est_paye and pas_faucheux
 
-        df_filtre['Valide'] = df_filtre.apply(est_valide_ca, axis=1)
-        df_final = df_filtre[df_filtre['Valide'] == True].copy()
+        if not df_filtre.empty:
+            df_filtre['Valide'] = df_filtre.apply(est_valide_ca, axis=1)
+            df_final = df_filtre[df_filtre['Valide'] == True].copy()
 
-        # 3. Mode "À ce jour"
-        if mode_bilan == "À ce jour":
-            today = pd.Timestamp.now().normalize()
-            df_final = df_final[df_final['dt_vrai'] <= today].copy()
+            # 3. Mode "À ce jour" (Aujourd'hui = 16/04/2026)
+            if mode_bilan == "À ce jour":
+                today = pd.Timestamp.now().normalize()
+                df_final = df_final[df_final['dt_vrai'] <= today].copy()
+        else:
+            df_final = pd.DataFrame()
 
-        # --- D. AFFICHAGE ---
+        # --- D. AFFICHAGE DES RÉSULTATS ---
         st.divider()
-        # On force la conversion du prix en numérique au dernier moment
-        total_ca = pd.to_numeric(df_final['Prix'], errors='coerce').sum()
+        total_ca = pd.to_numeric(df_final['Prix'], errors='coerce').sum() if not df_final.empty else 0
         
         c1, c2 = st.columns(2)
         c1.metric(f"💰 CA Confirmé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
         c2.metric("📋 Missions Validées", f"{len(df_final)}")
 
         if not df_final.empty:
-            df_final['Client'] = df_final['Prénom'] + " " + df_final['Nom']
+            # Reconstruction propre du nom
+            df_final['Client'] = df_final['Prénom'].astype(str) + " " + df_final['Nom'].astype(str)
             df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
             
             view = df_final.sort_values('dt_vrai', ascending=False)
@@ -665,10 +673,10 @@ if st.session_state.page == "STATS":
             
             st.dataframe(view, hide_index=True, use_container_width=True)
         else:
-            st.info("Aucune mission 'Terminée' ou 'Archivée' avec paiement 'Paid' détectée.")
+            st.info(f"Aucune mission 'Paid' et 'Terminée' pour {sel_y}.")
 
     else:
-        st.error("Fichier contacts.json non trouvé.")
+        st.error("Le fichier contacts.json est vide ou introuvable.")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
