@@ -1031,20 +1031,22 @@ if st.session_state.page == "ARCHIVES":
                 st.markdown(html_frais, unsafe_allow_html=True)
         else:
             st.write("Aucun frais archivé.")
-
-# =================================================================
+            # =================================================================
 # --- PAGE : LIVRE DE BORD (LOGBOOK) ---
 # =================================================================
 if st.session_state.page == "LOG":
-    st.title("📖 Livre de Bord")
+    st.markdown('<h2 style="text-align:center;">📖 Livre de Bord</h2>', unsafe_allow_html=True)
+    
+    # 1. CHARGEMENT
     df_log = charger_data_safe('logbook.json')
 
+    # 2. INTERFACE DE SAISIE (MODIFIER OU NOUVEAU)
     if st.session_state.get('log_edit_idx') is not None or st.session_state.get('nouveau_log', False):
         idx = st.session_state.get('log_edit_idx')
         is_edit = idx is not None
         row = df_log.loc[idx] if is_edit and idx in df_log.index else {}
 
-        # 1. ENTÊTE & RETOUR
+        # ENTÊTE & BOUTON RETOUR
         c_titre, c_ret = st.columns([3, 1])
         c_titre.subheader("📝 Détails de Navigation")
         if c_ret.button("🔙 RETOUR", use_container_width=True):
@@ -1052,61 +1054,71 @@ if st.session_state.page == "LOG":
             st.session_state.nouveau_log = False
             st.rerun()
 
-        # 2. OPTION CROISIÈRE (HORS FORMULAIRE POUR RÉACTIVITÉ)
-        is_croisiere = st.checkbox("🚢 C'est une croisière (plusieurs jours)", value=False)
-        nb_jours = 1
-        if is_croisiere:
-            col_cr1, col_cr2 = st.columns(2)
-            nb_jours = col_cr1.number_input("Nombre de jours :", min_value=2, max_value=15, value=2)
-            # Calcul prédictif de la date de fin
-            try:
-                date_input = row.get('Date', datetime.now().strftime("%d/%m/%Y"))
-                date_debut = pd.to_datetime(date_input, dayfirst=True)
-                date_fin = (date_debut + pd.Timedelta(days=nb_jours-1)).strftime("%d/%m/%Y")
-                col_cr2.info(f"🏁 Fin : {date_fin}")
-            except: pass
+        # --- CONFIGURATION DYNAMIQUE (HORS FORMULAIRE) ---
+        st.info("💡 Pour une croisière, réglez les dates ici, puis détaillez l'itinéraire ci-dessous.")
+        col_cfg1, col_cfg2 = st.columns(2)
+        
+        # Gestion de la date de départ (Calendrier interactif)
+        try:
+            val_d = pd.to_datetime(row.get('Date', datetime.now().strftime("%d/%m/%Y")), dayfirst=True)
+        except:
+            val_d = datetime.now()
+            
+        d_deb = col_cfg1.date_input("📅 Date de début", value=val_d)
+        nb_j = col_cfg2.number_input("⏳ Nombre de jours", min_value=1, max_value=15, value=1)
+        
+        d_fin = d_deb + pd.Timedelta(days=nb_j-1)
+        if nb_j > 1:
+            st.warning(f"Total : {nb_j} jours. Fin le {d_fin.strftime('%d/%m/%Y')}")
 
-        # 3. LE FORMULAIRE (AVEC BOUTON SUBMIT)
-        with st.form("form_log_final"):
-            c1, c2, c3 = st.columns([2, 3, 3])
-            date_n = c1.text_input("📅 Date", value=row.get('Date', datetime.now().strftime("%d/%m/%Y")))
-            p_dep = c2.text_input("⚓ Départ", value=row.get('PortDep', ''))
-            p_arr = c3.text_input("🏁 Arrivée", value=row.get('PortArr', ''))
+        # --- FORMULAIRE DE SAISIE ---
+        with st.form("form_logbook_pro"):
+            st.write("📍 **Itinéraire & Escales**")
+            p_dep = st.text_input("⚓ Port de Départ Initial", value=row.get('PortDep', 'ARZON'))
+            
+            # Génération des champs d'étapes selon le nombre de jours
+            etapes = []
+            if nb_j > 1:
+                for i in range(nb_j - 1):
+                    label = f"🏁 Destination Finale (Jour {nb_j})" if i == nb_j - 2 else f"⚓ Étape soir du Jour {i+1}"
+                    etapes.append(st.text_input(label))
+            else:
+                etapes.append(st.text_input("🏁 Port d'Arrivée", value=row.get('PortArr', '')))
 
+            st.write("📊 **Statistiques Totales (pour tout le séjour)**")
             c4, c5, c6, c7 = st.columns(4)
-            # Lecture des clés existantes dans ton JSON
+            # Lecture des clés existantes (TotalMil/Milles et TotalMot/HMot)
             v_mil = row.get('TotalMil', row.get('Milles', 0))
             v_mot = row.get('TotalMot', row.get('HMot', 0))
             
-            milles = c4.number_input("📏 Milles", value=float(v_mil), step=0.5)
+            milles = c4.number_input("📏 Milles", value=float(v_mil), step=1.0)
             h_mot = c5.number_input("⚙️ Moteur", value=float(v_mot), step=0.1)
-            gasoil = c6.number_input("⛽ Gasoil (L)", value=float(row.get('Litre Gazoil', 0)), step=1.0)
-            h_voile = c7.number_input("⛵ Voile", value=float(row.get('HVoile', 0)), step=0.1)
+            gasoil = c6.number_input("⛽ Gasoil (L)", value=float(row.get('Litre Gazoil', 0)))
+            h_voile = c7.number_input("⛵ Voile", value=float(row.get('HVoile', 0)))
 
-            notes = st.text_area("🗒️ Observations", value=row.get('Observations', row.get('Notes', '')))
+            notes = st.text_area("🗒️ Observations (Équipage, Météo...)", value=row.get('Observations', ''))
 
-            # LE BOUTON DOIT ÊTRE ICI (DANS LE FORM)
-            submit = st.form_submit_button("💾 ENREGISTRER LA NAVIGATION", use_container_width=True, type="primary")
-
-            if submit:
-                if not date_n or not p_dep:
-                    st.error("Date et Port de départ obligatoires !")
+            if st.form_submit_button("💾 ENREGISTRER LA NAVIGATION", use_container_width=True, type="primary"):
+                if not p_dep or not etapes[0]:
+                    st.error("Veuillez remplir au moins le départ et l'arrivée.")
                 else:
-                    base_date = pd.to_datetime(date_n, dayfirst=True, errors='coerce')
                     nouvelles_entrees = []
-                    
-                    for i in range(nb_jours):
-                        curr_dt = (base_date + pd.Timedelta(days=i)).strftime("%d/%m/%Y")
-                        # On divise les stats par le nombre de jours de croisière
+                    for i in range(nb_j):
+                        curr_dt = (d_deb + pd.Timedelta(days=i)).strftime("%d/%m/%Y")
+                        
+                        # Logique de chaînage des ports
+                        d_port = p_dep if i == 0 else etapes[i-1]
+                        a_port = etapes[i]
+
                         nouvelles_entrees.append({
-                            "Date": curr_dt, 
-                            "PortDep": p_dep if i == 0 else "---", 
-                            "PortArr": p_arr if i == nb_jours-1 else "Escale",
-                            "TotalMil": milles / nb_jours,
-                            "TotalMot": h_mot / nb_jours,
-                            "Litre Gazoil": gasoil / nb_jours,
-                            "HVoile": h_voile / nb_jours,
-                            "Observations": f"{notes} (J{i+1}/{nb_jours})" if nb_jours > 1 else notes
+                            "Date": curr_dt,
+                            "PortDep": d_port,
+                            "PortArr": a_port,
+                            "TotalMil": round(milles / nb_j, 1),
+                            "TotalMot": round(h_mot / nb_j, 1),
+                            "Litre Gazoil": round(gasoil / nb_j, 1),
+                            "HVoile": round(h_voile / nb_j, 1),
+                            "Observations": f"{notes} (Jour {i+1}/{nb_j})" if nb_j > 1 else notes
                         })
 
                     if is_edit:
@@ -1118,14 +1130,48 @@ if st.session_state.page == "LOG":
                     sauvegarder_data(df_log, 'logbook.json')
                     st.session_state.log_edit_idx = None
                     st.session_state.nouveau_log = False
-                    st.success("✅ Journal mis à jour !")
+                    st.success("✅ Navigation(s) enregistrée(s) !")
                     st.rerun()
 
-    # --- 4. LISTE DES NAVIGATIONS (ONGLETS) ---
+    # 3. LISTE DES NAVIGATIONS (AFFICHAGE)
     else:
-        # (Le reste du code de l'onglet 1 et 2 reste identique à la version précédente)
-        # N'oublie pas d'y laisser le bouton de suppression avec popover !
-        pass
+        tab1, tab2 = st.tabs(["⛵ Saison 2026", "📚 Archives"])
+        
+        with tab1:
+            col_t, col_b = st.columns([2, 1])
+            col_t.subheader("Journal de Bord")
+            if col_b.button("➕ NOUVEAU", use_container_width=True, type="primary"):
+                st.session_state.nouveau_log = True
+                st.rerun()
+
+            if not df_log.empty:
+                df_log['dt_tri'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+                df_visu = df_log.sort_values('dt_tri', ascending=False)
+
+                for idx, r in df_visu.iterrows():
+                    m = r.get('TotalMil', r.get('Milles', 0))
+                    h = r.get('TotalMot', r.get('HMot', 0))
+                    
+                    st.markdown(f"""
+                    <div style="border: 1px solid #ddd; padding: 12px; border-radius: 10px; background: white; border-left: 8px solid #01579b; margin-bottom: 5px;">
+                        <b>📅 {r.get('Date')}</b> | 📍 {r.get('PortDep')} ➔ {r.get('PortArr')}<br>
+                        <small>📏 {m} NM | ⚙️ {h} h | ⛵ {r.get('HVoile', 0)} h</small>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    c_ed, c_de, _ = st.columns([1, 1, 3])
+                    if c_ed.button("✏️", key=f"ed_{idx}"):
+                        st.session_state.log_edit_idx = idx
+                        st.rerun()
+                    
+                    with c_de.popover("🗑️"):
+                        st.error("Confirmer ?")
+                        if st.button("OUI", key=f"del_{idx}", type="primary", use_container_width=True):
+                            df_log = df_log.drop(idx)
+                            sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
+                            st.rerun()
+
+
 
 
 
