@@ -564,9 +564,8 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
-        
-# =================================================================
-# --- 7. PAGE STATS (SYNCHRO FINANCES & MAINTENANCE) ---
+        # =================================================================
+# --- 7. PAGE STATS (VERSION PERFORMANCE PRO) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
@@ -575,8 +574,8 @@ if st.session_state.page == "STATS":
     df_actif = charger_data_safe('contacts.json')
     df_arch = charger_data_safe('archives_planning.json')
     df_m = charger_data_safe('maintenance.json') 
+    df_log = charger_data_safe('logbook.json')
     
-    # Fusion des revenus
     df_all = pd.concat([df_actif, df_arch], ignore_index=True) if not df_arch.empty else df_actif
 
     if not df_all.empty:
@@ -585,19 +584,17 @@ if st.session_state.page == "STATS":
         mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
         sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-        # --- B. RADAR DE DATE ---
+        # --- B. FILTRAGE REVENUS ---
         def radar_date(row):
             val = str(row.get('DateNav', '')).replace('\\/', '/').strip().split(' ')[0]
             if val and val.lower() not in ["nan", "", "none"]:
                 dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
-                if pd.isnull(dt): dt = pd.to_datetime(val, errors='coerce')
                 return dt
             return pd.NaT
 
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
         df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
 
-        # --- C. FILTRAGE REVENUS ---
         def est_comptabilise(row):
             soc = str(row.get('Société', '')).strip().upper()
             paiement = str(row.get('Paiement', '')).strip().upper()
@@ -612,57 +609,58 @@ if st.session_state.page == "STATS":
             today = pd.Timestamp.now().normalize()
             df_final = df_final[df_final['dt_vrai'] <= today].copy()
 
-        # --- D. CALCUL DES DÉPENSES ---
+        # --- C. CALCUL DES DÉPENSES ---
         total_dep = 0.0
         df_dep_final = pd.DataFrame()
-
         if not df_m.empty:
             df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
             mask_dep = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")
-            
             if mode_bilan == "À ce jour":
-                today = pd.Timestamp.now().normalize()
-                mask_dep = mask_dep & (df_m['dt_maint'] <= today)
-            
+                mask_dep = mask_dep & (df_m['dt_maint'] <= pd.Timestamp.now().normalize())
             df_dep_final = df_m[mask_dep].copy()
             
-            def force_float_m(val):
-                s = str(val).replace('€', '').replace(' ', '').replace('\xa0', '').replace(',', '.')
-                try: return float(s)
+            def to_f(val):
+                try: return float(str(val).replace('€','').replace(' ','').replace(',','.'))
                 except: return 0.0
+            total_dep = df_dep_final['M_Num'].apply(to_f).sum()
 
-            total_dep = df_dep_final['M_Num'].apply(force_float_m).sum()
-            
-            # --- E. AFFICHAGE FINAL (AVEC TOTAUX SOUS TABLEAUX) ---
-        st.divider()
-        
-        # Calculs CA et Net (déjà faits plus haut, on les réutilise)
-        total_ca = df_final['Prix'].apply(force_float_m).sum() if not df_final.empty else 0.0
+        # --- D. INDICATEURS DE PERFORMANCE (KPI) ---
+        total_ca = df_final['Prix'].apply(to_f).sum() if not df_final.empty else 0.0
         net = total_ca - total_dep
-
-        # KPI principaux
+        marge = (net / total_ca * 100) if total_ca > 0 else 0
+        panier_moyen = (total_ca / len(df_final)) if not df_final.empty else 0
+        
+        # Affichage Grille
+        st.divider()
         c1, c2 = st.columns(2)
-        c1.metric("💰 CA Brut", f"{total_ca:,.0f} €".replace(',', ' '))
+        c1.metric("💰 Chiffre d'Affaires", f"{total_ca:,.0f} €".replace(',', ' '))
         c2.metric("⚖️ Revenu Net", f"{net:,.0f} €".replace(',', ' '))
+        
+        st.write("📈 **Efficacité de l'activité**")
+        cp1, cp2, cp3 = st.columns(3)
+        cp1.metric("Marge", f"{marge:.1f}%")
+        cp2.metric("Panier", f"{panier_moyen:.0f}€")
+        cp3.metric("Sorties", f"{len(df_final)}")
 
-        # --- TABLEAU REVENUS ---
+        # --- E. TABLEAUX SANS ASCENSEURS AVEC TOTAUX ---
         st.write("---")
         if not df_final.empty:
             st.subheader("📄 Détail des Revenus")
             df_final['D'] = df_final['dt_vrai'].dt.strftime('%d/%m')
-            st.dataframe(df_final[['D', 'Société', 'Prix']], hide_index=True, use_container_width=True)
-            # Affichage du total juste en dessous
-            st.markdown(f"<div style='text-align:right; font-weight:bold; color:#2e7d32;'>Total Revenus : {total_ca:,.2f} €</div>", unsafe_allow_html=True)
+            # Calcul hauteur : 35px par ligne + 45px header
+            h_rev = (len(df_final) * 35) + 45
+            st.dataframe(df_final[['D', 'Société', 'Prix']], hide_index=True, use_container_width=True, height=h_rev)
+            st.markdown(f"<div style='text-align:right; font-weight:bold; color:#2e7d32; padding-bottom:20px;'>Sous-Total : {total_ca:,.2f} €</div>", unsafe_allow_html=True)
 
-        # --- TABLEAU DÉPENSES ---
         if not df_dep_final.empty:
-            st.write("")
             st.subheader("💸 Détail des Dépenses")
             df_dep_final['D'] = df_dep_final['dt_maint'].dt.strftime('%d/%m')
-            st.dataframe(df_dep_final[['D', 'Objet', 'M_Num']], hide_index=True, use_container_width=True)
-            # Affichage du total juste en dessous
-            st.markdown(f"<div style='text-align:right; font-weight:bold; color:#c62828;'>Total Dépenses : {total_dep:,.2f} €</div>", unsafe_allow_html=True)
-
+            h_dep = (len(df_dep_final) * 35) + 45
+            st.dataframe(df_dep_final[['D', 'Objet', 'M_Num']], hide_index=True, use_container_width=True, height=h_dep)
+            st.markdown(f"<div style='text-align:right; font-weight:bold; color:#c62828;'>Sous-Total : {total_dep:,.2f} €</div>", unsafe_allow_html=True)
+        else:
+            st.info("Aucune dépense enregistrée (statut 'Fait') pour cette période.")
+        
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
