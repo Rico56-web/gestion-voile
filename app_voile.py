@@ -589,7 +589,7 @@ if st.session_state.page == "PLANNING":
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 # =================================================================
-# --- 7. PAGE STATS (VERSION FINALE SANS ERREUR) ---
+# --- 7. PAGE STATS (RADAR TOTAL : RÉCUPÉRATION DES 28 LIGNES) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
@@ -599,70 +599,84 @@ if st.session_state.page == "STATS":
     df_archive = charger_data_safe('archives_factures.json')
     df_all = pd.concat([df_actuel, df_archive], ignore_index=True)
 
-    # --- SÉCURITÉ CRITIQUE : Création des colonnes si absentes ---
-    for col_name in ['Nom', 'Objet', 'Société', 'Acompte', 'Prix', 'DateNav', 'Date']:
-        if col_name not in df_all.columns:
-            df_all[col_name] = ""
-    
-    df_all = df_all.fillna("")
-
-    # 2. Interface (Tes deux modes)
+    # 2. Interface (Les deux modes demandés)
     col_sel1, col_sel2 = st.columns(2)
     mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
     sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
     if not df_all.empty:
-        # Nettoyage des prix
+        # --- SÉCURITÉ : On nettoie les colonnes pour éviter les KeyError ---
+        for c in ['Nom', 'Objet', 'Société', 'Acompte', 'Prix', 'DateNav', 'Date', 'date']:
+            if c not in df_all.columns: df_all[c] = ""
+        df_all = df_all.fillna("")
+
+        # --- FONCTION RADAR POUR LA DATE ---
+        def radar_date(row):
+            # On cherche dans toutes les colonnes possibles
+            for col in ['DateNav', 'Date', 'date']:
+                val = str(row[col]).strip()
+                if val and val.lower() != "nan":
+                    # On tente la conversion
+                    dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
+                    if pd.notnull(dt): return dt
+            return pd.NaT
+
+        df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
+
+        # --- NETTOYAGE MONTANTS ---
         def to_num(s):
             val = "".join(c for c in str(s) if c.isdigit() or c in '.,')
             val = val.replace(',', '.')
             try: return float(val)
             except: return 0.0
 
-        df_all['Mnt_A'] = df_all['Acompte'].apply(to_num)
-        df_all['Mnt_P'] = df_all['Prix'].apply(to_num)
-        df_all['Montant_Final'] = df_all[['Mnt_A', 'Mnt_P']].max(axis=1)
-
-        # Fusion des dates (DateNav ou Date)
-        df_all['dt_vrai'] = pd.to_datetime(
-            df_all['DateNav'].where(df_all['DateNav'] != "", df_all['Date']), 
-            dayfirst=True, errors='coerce'
-        )
+        df_all['Mnt_Final'] = df_all.apply(lambda x: max(to_num(x['Prix']), to_num(x['Acompte'])), axis=1)
 
         # --- FILTRAGE ---
-        # 1. On filtre sur l'année choisie
-        df_annee = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
+        # 1. On prend l'année (ou les dates vides pour ne rien perdre)
+        mask_annee = (df_all['dt_vrai'].dt.year == sel_y)
+        df_annee = df_all[mask_annee].copy()
 
-        # 2. On applique ton mode
+        # 2. Application du mode
         if mode_bilan == "À ce jour":
-            today = pd.to_datetime("2026-04-15") # Nous sommes le 15 avril 2026
+            # Aujourd'hui = 15 avril 2026
+            today = pd.to_datetime("2026-04-15")
             df_final = df_annee[df_annee['dt_vrai'] <= today].copy()
         else:
             df_final = df_annee.copy()
 
-        # 3. AFFICHAGE DES CHIFFRES
+        # 3. AFFICHAGE DES KPI
         st.divider()
-        total_ca = df_final['Montant_Final'].sum()
+        total_ca = df_final['Mnt_Final'].sum()
         
         c1, c2 = st.columns(2)
-        c1.metric(f"💰 CA {mode_bilan}", f"{total_ca:,.2f} €".replace(',', ' '))
-        c2.metric("📋 Lignes affichées", f"{len(df_final)}")
+        c1.metric(f"💰 CA {mode_bilan}", f"{total_ca:,.0f} €".replace(',', ' '))
+        c2.metric("📋 Lignes détectées", f"{len(df_final)}")
 
-        # 4. TABLEAU (SÉCURISÉ)
+        # 4. TABLEAU
         if not df_final.empty:
-            # Construction du nom client sans risque de KeyError
-            df_final['Client'] = df_final['Nom'].replace('', None)
-            df_final['Client'] = df_final['Client'].fillna(df_final['Objet']).replace('', 'Navigation')
-            
+            # Construction du nom client sécurisée
+            df_final['Client'] = df_final['Nom'].replace('', None).fillna(df_final['Objet']).replace('', 'Navigation')
             df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
             
             view = df_final.sort_values('dt_vrai', ascending=False)
-            view = view[['Date_Aff', 'Client', 'Société', 'Montant_Final']]
+            view = view[['Date_Aff', 'Client', 'Société', 'Mnt_Final']]
             view.columns = ['Date', 'Client / Objet', 'Société', 'Montant (€)']
             
             st.dataframe(view, hide_index=True, use_container_width=True)
         else:
-            st.info(f"Aucune donnée pour {sel_y} en mode {mode_bilan}.")
+            st.warning(f"Aucune donnée reconnue pour {sel_y}. Vérifiez le format de vos dates dans les fichiers.")
+            
+            # --- OUTIL DE DIAGNOSTIC ---
+            with st.expander("🔍 Voir pourquoi les lignes sont rejetées"):
+                st.write("Voici ce que le système lit dans vos fichiers (30 premières lignes) :")
+                # On montre les colonnes brutes pour comprendre le bug
+                diag = df_all[['DateNav', 'Date', 'Nom', 'Mnt_Final']].copy()
+                diag['Date_Reconnue'] = df_all['dt_vrai'].dt.strftime('%d/%m/%Y')
+                st.write(diag.head(30))
+
+    else:
+        st.error("Fichiers JSON vides ou introuvables.")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
