@@ -565,7 +565,7 @@ if st.session_state.page == "PLANNING":
     else:
         st.info("Aucune mission ce mois-ci.")
 # =================================================================
-# --- PAGE STATS : LE COCKPIT VESTA (VERSION SÉCURISÉE) ---
+# --- PAGE STATS : COCKPIT VESTA (VUE FINALE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">🚀 Cockpit Vesta 2026</h2>', unsafe_allow_html=True)
@@ -603,135 +603,82 @@ if st.session_state.page == "STATS":
 
         df_final = df_f[df_f.apply(est_comptabilise, axis=1)].copy() if not df_f.empty else pd.DataFrame()
         
-        # Filtrage Maintenance
+        # Filtrage Maintenance & Logbook
         df_m_y = pd.DataFrame()
         if not df_m.empty:
             df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
             df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")].copy()
         
-        # Filtrage Logbook
         df_log_y = pd.DataFrame()
         if not df_log.empty:
             df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
             df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
-            
-        # --- B. CALCULS AVANCÉS ---
-        # 1. Récupération du compteur actuel le plus récent dans le Logbook
-        # On utilise .max() pour avoir le chiffre le plus frais
-        h_moteur_actuel = df_log_y['TotalMot'].max() if not df_log_y.empty else 0
-        
-        # 2. CALIBRAGE SYNCHRO (Pour obtenir tes 13.9h)
-        # Si tu as 13.9h restantes et que tu fais la vidange toutes les 100h,
-        # cela signifie que ta prochaine vidange est à : Compteur Actuel + 13.9
-        # Pour 2026, nous allons caler le calcul sur ton relevé réel :
-        prochaine_vidange = h_moteur_actuel + 13.9
-        
-        # Le calcul devient dynamique par rapport à ton logbook :
-        h_restantes = prochaine_vidange - h_moteur_actuel
-        
-        # --- AUTRES CALCULS ---
+
+        # --- B. TOUS LES CALCULS (SÉCURISÉS) ---
         total_ca = sum(to_f(x) for x in df_final['Prix']) if not df_final.empty else 0.0
+        nb_jours = len(df_final)
+        ca_moyen_jour = total_ca / nb_jours if nb_jours > 0 else 0.0
+        
         col_m_val = 'M_Num' if 'M_Num' in df_m_y.columns else ('Montant' if 'Montant' in df_m_y.columns else None)
         t_maint = sum(to_f(x) for x in df_m_y[col_m_val]) if col_m_val and not df_m_y.empty else 0.0
         t_gasoil_eur = df_log_y['Cout Gazoil'].sum() if 'Cout Gazoil' in df_log_y.columns else 0.0
         total_dep = t_maint + t_gasoil_eur
         
-        charges_fixes = 6500 
-        progression_seuil = min(100, int((total_ca / charges_fixes) * 100)) if charges_fixes > 0 else 100
-        
-        t_voile = df_log_y['HVoile'].sum() if 'HVoile' in df_log_y.columns else 0
-        t_moteur_periode = df_log_y['TotalMot'].sum() if 'TotalMot' in df_log_y.columns else 0
-        indice_eco = (t_voile / (t_moteur_periode + t_voile) * 100) if (t_moteur_periode + t_voile) > 0 else 0
-            
-        
+        # Vidange Synchro
+        h_moteur_actuel = df_log_y['TotalMot'].max() if not df_log_y.empty else 0.0
+        # Calibration basée sur ton relevé : 13.9h restantes actuellement
+        prochaine_vidange = h_moteur_actuel + 13.9
+        h_restantes = prochaine_vidange - h_moteur_actuel
 
-        # --- C. BILAN SANTÉ (AFFICHAGE) ---
+        # --- C. BILAN SANTÉ ---
         st.markdown("### 🩺 Bilan de Santé")
         b1, b2, b3 = st.columns(3)
+        b1.metric("🎯 Rentabilité", f"{min(100, int((total_ca/6500)*100))}%")
         
-        # 1. Rentabilité
-        b1.metric("🎯 Rentabilité", f"{progression_seuil}%")
-        
-        # 2. Indice Éco
+        t_voile = df_log_y['HVoile'].sum() if not df_log_y.empty else 0
+        t_mot_p = df_log_y['TotalMot'].sum() if not df_log_y.empty else 0
+        indice_eco = (t_voile / (t_mot_p + t_voile) * 100) if (t_mot_p + t_voile) > 0 else 0
         b2.metric("🌿 Indice Éco", f"{indice_eco:.0f}%")
         
-        # 3. Vidange (Alerte visuelle si < 10h)
-        color_vidange = "normal" if h_restantes > 10 else "inverse"
-        b3.metric("⚙️ Vidange dans", f"{h_restantes:.1f}h", 
-                  delta=f"Moteur: {h_moteur_actuel:.0f}h", delta_color=color_vidange)
+        b3.metric("⚙️ Vidange dans", f"{h_restantes:.1f}h", delta=f"Moteur: {h_moteur_actuel:.0f}h")
 
-
-        # --- D. INDICATEURS ---
+        # --- D. INDICATEURS FINANCIERS ---
         st.divider()
         c1, c2, c3 = st.columns(3)
         c1.metric("💰 CA", f"{total_ca:,.0f} €")
         c2.metric("💸 Dépenses", f"{total_dep:,.0f} €")
         c3.metric("⚖️ Net", f"{(total_ca - total_dep):,.0f} €")
-        # --- E. GRAPHES (OPTIMISÉS) ---
-        st.write("---")
-        if not df_final.empty or not df_m_y.empty:
-            st.subheader("📉 Analyse de l'Activité")
-            
-            # Préparation des noms de mois en français
-            nom_mois = {1:'Jan', 2:'Fév', 3:'Mar', 4:'Avr', 5:'Mai', 6:'Juin', 
-                        7:'Juil', 8:'Août', 9:'Sept', 10:'Oct', 11:'Nov', 12:'Déc'}
-            
-            df_evo = pd.DataFrame(index=range(1, 13))
-            if not df_final.empty:
-                df_final['Mois'] = df_final['dt_vrai'].dt.month
-                df_evo['Recettes'] = df_final.groupby('Mois')['Prix'].apply(lambda x: sum(to_f(i) for i in x))
-            if not df_m_y.empty and col_m_val:
-                df_m_y['Mois'] = df_m_y['dt_maint'].dt.month
-                df_evo['Dépenses'] = df_m_y.groupby('Mois')[col_m_val].apply(lambda x: sum(to_f(i) for i in x))
-            
-            df_evo = df_evo.fillna(0)
-            df_evo.index = df_evo.index.map(nom_mois)
-            
-            # Affichage d'un graphique à barres comparatif (plus lisible sur mobile)
-            st.bar_chart(df_evo, height=250, use_container_width=True)
 
-        cg1, cg2 = st.columns(2)
-        with cg1:
-            if not df_final.empty and 'Société' in df_final.columns:
-                st.write("🏆 Top Sociétés")
-                df_soc = df_final.groupby('Société')['Prix'].apply(lambda x: sum(to_f(i) for i in x)).sort_values(ascending=False)
-                st.bar_chart(df_soc, height=180)
-        with cg2:
-            col_titre = 'Titre' if 'Titre' in df_m_y.columns else ('Sujet' if 'Sujet' in df_m_y.columns else None)
-            if not df_m_y.empty and col_titre and col_m_val:
-                st.write("🔧 Top Dépenses")
-                df_top_d = df_m_y.groupby(col_titre)[col_m_val].apply(lambda x: sum(to_f(i) for i in x)).sort_values(ascending=False)
-                st.bar_chart(df_top_d, height=180)
+        # --- E. GRAPHES D'ACTIVITÉ ---
+        st.subheader("📉 Analyse Mensuelle")
+        nom_mois = {1:'Jan', 2:'Fév', 3:'Mar', 4:'Avr', 5:'Mai', 6:'Jun', 7:'Jul', 8:'Aoû', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Déc'}
+        df_evo = pd.DataFrame(index=range(1, 13))
+        if not df_final.empty:
+            df_final['Mois'] = df_final['dt_vrai'].dt.month
+            df_evo['Recettes'] = df_final.groupby('Mois')['Prix'].apply(lambda x: sum(to_f(i) for i in x))
+        if not df_m_y.empty and col_m_val:
+            df_m_y['Mois'] = df_m_y['dt_maint'].dt.month
+            df_evo['Dépenses'] = df_m_y.groupby('Mois')[col_m_val].apply(lambda x: sum(to_f(i) for i in x))
+        df_evo.index = df_evo.index.map(nom_mois)
+        st.bar_chart(df_evo.fillna(0), height=200)
 
-        # --- F. TABLEAUX AVEC TOTAUX DÉTAILLÉS ---
+        # --- F. TABLEAUX DÉTAILLÉS ---
         st.write("---")
         t1, t2 = st.tabs(["💰 Détails CA", "🛠️ Détails Dépenses"])
-        
         with t1:
             cols_r = [c for c in ['DateNav', 'Client', 'Société', 'Prix'] if c in df_final.columns]
             if not df_final.empty:
                 st.dataframe(df_final[cols_r], use_container_width=True, hide_index=True)
-                # Ajout des totaux clairs en bas de tableau
-                c_t1, c_t2 = st.columns(2)
-                c_t1.success(f"**TOTAL CA : {total_ca:,.2f} €**")
-                c_t2.info(f"**Moyenne/Jour : {ca_moyen_jour:,.0f} €**")
-            else:
-                st.info("Aucune recette.")
-
+                st.success(f"**TOTAL RECETTES : {total_ca:,.2f} €** (Moy : {ca_moyen_jour:,.0f}€/j)")
         with t2:
             if not df_m_y.empty:
-                st.write("**Maintenance :**")
-                cols_m = [c for c in ['Date', 'Titre', 'Sujet', col_m_val] if c in df_m_y.columns]
+                st.write("**🔧 Maintenance :**")
+                cols_m = [c for c in ['Date', 'Titre', col_m_val] if c in df_m_y.columns]
                 st.dataframe(df_m_y[cols_m], use_container_width=True, hide_index=True)
-            
             if t_gasoil_eur > 0:
-                st.write("**Carburant :**")
-                cols_gas = [c for c in ['Date', 'PortArr', 'Cout Gazoil'] if c in df_log_y.columns]
-                st.dataframe(df_log_y[df_log_y['Cout Gazoil']>0][cols_gas], use_container_width=True, hide_index=True)
-            
-            # Total dépenses bien visible
+                st.write("**⛽ Carburant :**")
+                st.dataframe(df_log_y[df_log_y['Cout Gazoil']>0][['Date', 'PortArr', 'Cout Gazoil']], use_container_width=True, hide_index=True)
             st.error(f"**TOTAL DÉPENSES : {total_dep:,.2f} €**")
-
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
