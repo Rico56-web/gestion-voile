@@ -632,29 +632,37 @@ if st.session_state.page == "STATS":
                 except: return 0.0
 
             total_dep = df_dep_final['M_Num'].apply(force_float_m).sum()
-
-        # --- E. AFFICHAGE (IPHONE 16) ---
+            
+            # --- E. AFFICHAGE FINAL (AVEC TOTAUX SOUS TABLEAUX) ---
         st.divider()
+        
+        # Calculs CA et Net (déjà faits plus haut, on les réutilise)
         total_ca = df_final['Prix'].apply(force_float_m).sum() if not df_final.empty else 0.0
         net = total_ca - total_dep
 
+        # KPI principaux
         c1, c2 = st.columns(2)
-        c1.metric("💰 CA", f"{total_ca:,.0f} €".replace(',', ' '))
-        c2.metric("📋 Missions", f"{len(df_final)}")
-        c3, c4 = st.columns(2)
-        c3.metric("📉 Frais", f"{total_dep:,.0f} €".replace(',', ' '))
-        c4.metric("⚖️ Net", f"{net:,.0f} €".replace(',', ' '))
+        c1.metric("💰 CA Brut", f"{total_ca:,.0f} €".replace(',', ' '))
+        c2.metric("⚖️ Revenu Net", f"{net:,.0f} €".replace(',', ' '))
 
+        # --- TABLEAU REVENUS ---
         st.write("---")
         if not df_final.empty:
-            st.subheader("📄 Revenus")
+            st.subheader("📄 Détail des Revenus")
             df_final['D'] = df_final['dt_vrai'].dt.strftime('%d/%m')
             st.dataframe(df_final[['D', 'Société', 'Prix']], hide_index=True, use_container_width=True)
+            # Affichage du total juste en dessous
+            st.markdown(f"<div style='text-align:right; font-weight:bold; color:#2e7d32;'>Total Revenus : {total_ca:,.2f} €</div>", unsafe_allow_html=True)
 
+        # --- TABLEAU DÉPENSES ---
         if not df_dep_final.empty:
-            st.subheader("💸 Dépenses")
+            st.write("")
+            st.subheader("💸 Détail des Dépenses")
             df_dep_final['D'] = df_dep_final['dt_maint'].dt.strftime('%d/%m')
             st.dataframe(df_dep_final[['D', 'Objet', 'M_Num']], hide_index=True, use_container_width=True)
+            # Affichage du total juste en dessous
+            st.markdown(f"<div style='text-align:right; font-weight:bold; color:#c62828;'>Total Dépenses : {total_dep:,.2f} €</div>", unsafe_allow_html=True)
+
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
