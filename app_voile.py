@@ -922,76 +922,121 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - MÉTHODE ANTI-CACHE ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION BLINDÉE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
 
+    # 1. Chargement et Nettoyage des types
     df_log = charger_data_safe('logbook.json')
+    
+    # Sécurité : on s'assure que les colonnes numériques sont bien des nombres
+    for col in ['TotalMot', 'TotalMil', 'MotDep', 'MillesEtape']:
+        if col in df_log.columns:
+            df_log[col] = pd.to_numeric(df_log[col], errors='coerce').fillna(0.0)
 
-    # 1. SAISIE (Haut de page)
-    with st.expander("➕ AJOUTER UNE NAVIGATION", expanded=df_log.empty):
-        # ... (Garder ton formulaire de saisie avec Mot_Dep, Mot_Arr, etc.)
-        # Assure-toi que les clés des widgets de saisie sont uniques
-        st.info("Utilise le tableau ci-dessus pour tes étapes")
+    # 2. Récupération derniers compteurs pour le pré-remplissage
+    last_h = 0.0
+    last_m = 0.0
+    if not df_log.empty:
+        last_h = float(df_log['TotalMot'].iloc[-1])
+        last_m = float(df_log['TotalMil'].iloc[-1])
 
-    # 2. ACTIONS (Modifier / Supprimer)
+    # 3. FORMULAIRE DE SAISIE (Haut de page)
+    st.subheader("🚀 Nouvelle Navigation")
+    c1, c2, c3 = st.columns([2, 1, 2])
+    f_date = c1.date_input("Date", datetime.now())
+    f_jours = c2.number_input("Jours", min_value=1, value=1)
+    f_titre = c3.text_input("Destination / Titre")
+    
+    if 'temp_log_df' not in st.session_state:
+        st.session_state.temp_log_df = pd.DataFrame([{
+            "Port": "", 
+            "Mot_Dep": last_h, "Mot_Arr": last_h,
+            "Mil_Dep": last_m, "Mil_Arr": last_m,
+            "Voile": 0.0, "Notes": ""
+        }])
+
+    edited_steps = st.data_editor(
+        st.session_state.temp_log_df,
+        column_config={
+            "Port": "📍 Etape", "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
+            "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr", "Voile": "Voile", "Notes": "Notes"
+        },
+        num_rows="dynamic", use_container_width=True, key="saisie_log_v2026"
+    )
+
+    if st.button("💾 ENREGISTRER LA NAVIGATION", use_container_width=True, type="primary"):
+        if not edited_steps.empty and edited_steps.iloc[0]["Port"] != "":
+            nouvelles = []
+            for _, row in edited_steps.iterrows():
+                if row["Port"]:
+                    nouvelles.append({
+                        "Date": f_date.strftime("%d/%m/%Y"),
+                        "Jours": int(f_jours),
+                        "Navigation": f_titre,
+                        "PortArr": row["Port"],
+                        "MotDep": float(row["Mot_Dep"]),
+                        "TotalMot": float(row["Mot_Arr"]),
+                        "MillesEtape": float(row["Mil_Arr"]) - float(row["Mil_Dep"]),
+                        "TotalMil": float(row["Mil_Arr"]),
+                        "H_Voile": float(row["Voile"]),
+                        "Notes": row.get("Notes", "") # .get évite le KeyError
+                    })
+            df_save = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
+            sauvegarder_data(df_save, 'logbook.json')
+            if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
+            st.rerun()
+
+    # 4. AFFICHAGE ET GESTION (MODIFIER / SUPPRIMER)
     if not df_log.empty:
         st.divider()
-        col_act1, col_act2 = st.columns(2)
-        
-        with col_act1:
-            with st.expander("📝 MODIFIER UNE LIGNE"):
-                idx_mod = st.number_input("N° de ligne à modifier", min_value=0, max_value=df_log.index.max(), step=1)
-                ligne = df_log.loc[idx_mod]
-                
-                with st.form("form_edit_log"):
-                    new_port = st.text_input("Port", value=ligne['PortArr'])
-                    c_ed1, c_ed2 = st.columns(2)
-                    new_m_arr = c_ed1.number_input("Moteur Arr", value=float(ligne['TotalMot']))
-                    new_mil_arr = c_ed2.number_input("Milles Arr", value=float(ligne['TotalMil']))
-                    new_notes = st.text_area("Notes", value=ligne['Notes'])
-                    
-                    if st.form_submit_button("VALIDER LA MODIFICATION"):
-                        df_log.at[idx_mod, 'PortArr'] = new_port
-                        df_log.at[idx_mod, 'TotalMot'] = new_m_arr
-                        df_log.at[idx_mod, 'TotalMil'] = new_mil_arr
-                        df_log.at[idx_mod, 'Notes'] = new_notes
-                        sauvegarder_data(df_log, 'logbook.json')
-                        st.success("Modifié !")
-                        st.rerun()
+        st.subheader("📜 Historique (Récent en haut)")
 
-        with col_act2:
-            with st.expander("🗑️ SUPPRIMER"):
-                idx_del = st.number_input("N° de ligne à effacer", min_value=0, max_value=df_log.index.max(), step=1, key="del_idx")
-                if st.checkbox("Confirmer suppression", key="conf_del"):
-                    if st.button("🔥 EFFACER DÉFINITIVEMENT", type="primary"):
-                        df_log = df_log.drop(index=idx_del).reset_index(drop=True)
-                        sauvegarder_data(df_log, 'logbook.json')
-                        st.rerun()
-
-        # 3. L'AFFICHAGE (L'ordre est forcé ici)
-        st.subheader("📜 Historique (Dernier en haut)")
-        
-        # On inverse le DataFrame physiquement
+        # L'ASTUCE : On affiche un tableau de bord propre, inversé
+        # On ajoute une colonne temporaire pour l'affichage
         df_view = df_log.copy()
-        df_view.index.name = 'N°'
-        df_view = df_view.iloc[::-1] # Inversion physique des lignes
+        df_view['N°'] = df_view.index
+        # Inversion physique des lignes
+        df_view = df_view.iloc[::-1]
         
-        # On utilise st.dataframe (lecture seule) qui respecte TOUJOURS l'ordre qu'on lui donne
-        st.dataframe(
-            df_view,
-            use_container_width=True,
-            column_config={
-                "MotDep": "Mtr Dép",
-                "TotalMot": "Mtr Arr",
-                "MillesEtape": "Milles",
-                "TotalMil": "Cumul",
-                "PortArr": "📍 Port"
-            }
-        )
+        # Colonnes à afficher dans l'ordre
+        cols_ordre = ['N°', 'Date', 'Navigation', 'PortArr', 'TotalMot', 'TotalMil', 'Notes']
+        # On ne garde que les colonnes qui existent vraiment pour éviter un nouveau crash
+        cols_existantes = [c for c in cols_ordre if c in df_view.columns]
+        
+        st.dataframe(df_view[cols_existantes], use_container_width=True, hide_index=True)
 
+        # Zone d'outils
+        c_mod, c_sup = st.columns(2)
+        
+        with c_mod:
+            with st.expander("📝 Modifier une ligne"):
+                idx_m = st.number_input("Entrez le N° de ligne", min_value=0, max_value=df_log.index.max(), step=1)
+                # Sécurité .get() pour chaque champ
+                row_m = df_log.loc[idx_m]
+                with st.form("edit_quick"):
+                    e_port = st.text_input("Port", value=row_m.get('PortArr', ''))
+                    e_mot = st.number_input("Moteur Total", value=float(row_m.get('TotalMot', 0.0)))
+                    e_mil = st.number_input("Milles Total", value=float(row_m.get('TotalMil', 0.0)))
+                    e_not = st.text_area("Notes", value=row_m.get('Notes', ''))
+                    
+                    if st.form_submit_button("VALIDER MODIF"):
+                        df_log.at[idx_m, 'PortArr'] = e_port
+                        df_log.at[idx_m, 'TotalMot'] = e_mot
+                        df_log.at[idx_m, 'TotalMil'] = e_mil
+                        df_log.at[idx_m, 'Notes'] = e_not
+                        sauvegarder_data(df_log, 'logbook.json')
+                        st.rerun()
 
+        with c_sup:
+            with st.expander("🗑️ Supprimer"):
+                idx_d = st.number_input("N° à effacer", min_value=0, max_value=df_log.index.max(), step=1, key="del_idx")
+                if st.checkbox("Confirmer suppression"):
+                    if st.button("SUPPRIMER LIGNE", type="primary"):
+                        df_log = df_log.drop(index=idx_d).reset_index(drop=True)
+                        sauvegarder_data(df_log, 'logbook.json')
+                        st.rerun()
 
 # --- FIN DU FICHIER ---
 
