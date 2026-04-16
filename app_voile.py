@@ -922,7 +922,7 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - TRI ABSOLU ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION STABLE ET TRIÉE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
@@ -930,76 +930,99 @@ if st.session_state.page == "LOG":
     # 1. Chargement
     df_log = charger_data_safe('logbook.json')
 
-    # 2. Formulaire d'ajout
+    # 2. Formulaire d'ajout (Toujours avec tes compteurs)
     with st.expander("➕ AJOUTER UNE NAVIGATION", expanded=df_log.empty):
-        # ... (Garder le formulaire précédent avec st.form("new_entry_log"))
-        # N'oublie pas de bien inclure f_h_dep, f_h_arr, f_m_dep, f_m_arr
-        st.info("Saisis tes données ci-dessus")
+        with st.form("new_entry_v2026"):
+            c1, c2 = st.columns(2)
+            f_date = c1.date_input("Date", datetime.now())
+            f_dest = c2.text_input("Destination")
+            
+            col_m1, col_m2 = st.columns(2)
+            f_h_dep = col_m1.number_input("H. Moteur Départ", step=0.1, format="%.1f")
+            f_h_arr = col_m2.number_input("H. Moteur Arrivée", step=0.1, format="%.1f")
+            
+            col_mi1, col_mi2 = st.columns(2)
+            f_m_dep = col_mi1.number_input("Milles Départ", step=1.0)
+            f_m_arr = col_mi2.number_input("Milles Arrivée", step=1.0)
+            
+            f_notes = st.text_area("Notes")
 
-    # 3. L'HISTORIQUE AVEC TRI FORCÉ
+            if st.form_submit_button("💾 ENREGISTRER"):
+                nouvelle_ligne = {
+                    "Date": f_date.strftime("%d/%m/%Y"),
+                    "Navigation": f_dest,
+                    "MotDep": float(f_h_dep),
+                    "TotalMot": float(f_h_arr),
+                    "MillesDep": float(f_m_dep),
+                    "TotalMil": float(f_m_arr),
+                    "Notes": f_notes
+                }
+                df_log = pd.concat([df_log, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
+                sauvegarder_data(df_log, 'logbook.json')
+                st.rerun()
+
+    # 3. L'HISTORIQUE AVEC TRI GARANTI
     if not df_log.empty:
         st.divider()
         st.subheader("📜 Historique (Le plus récent en haut)")
 
-        # --- RE-PRÉPARATION PHYSIQUE DU TABLEAU ---
-        df_affichage = df_log.copy()
+        # --- PRÉPARATION DU TRI ---
+        df_visu = df_log.copy()
         
-        # On s'assure que la date est exploitable pour le tri
-        df_affichage['dt_sort'] = pd.to_datetime(df_affichage['Date'], format='%d/%m/%Y', errors='coerce')
+        # On crée une colonne de date technique pour trier proprement
+        df_visu['dt_sort'] = pd.to_datetime(df_visu['Date'], format='%d/%m/%Y', errors='coerce')
         
-        # On trie d'abord par Date (récent en haut), puis par Index (le plus grand en haut)
-        # Cela garantit que l'entrée 2 passe devant la 1 et la 0.
-        df_affichage = df_affichage.sort_values(by=['dt_sort', df_affichage.index.name or 'index'], 
-                                               ascending=[False, False], 
-                                               axis=0).reset_index(drop=True)
+        # On crée une colonne avec l'index actuel pour garder l'ordre de création en cas d'égalité de date
+        df_visu['temp_idx'] = df_visu.index
         
-        # On recrée une colonne N° propre pour tes boutons
-        df_affichage.insert(0, 'N°', df_affichage.index)
+        # TRI : Date récente d'abord, puis Index le plus grand d'abord (le fameux 2, 0, 1...)
+        df_visu = df_visu.sort_values(by=['dt_sort', 'temp_idx'], ascending=[False, False])
+        
+        # On remet un index propre de 0 à X pour l'affichage et les boutons
+        df_visu = df_visu.reset_index(drop=True)
+        df_visu.insert(0, 'N°', df_visu.index)
 
-        # Affichage du tableau (Lecture seule pour figer l'ordre)
+        # Affichage (On retire les colonnes techniques de la vue)
         st.dataframe(
-            df_affichage.drop(columns=['dt_sort']), 
-            use_container_width=True, 
+            df_visu.drop(columns=['dt_sort', 'temp_idx']),
+            use_container_width=True,
             hide_index=True
         )
 
-        # 4. ACTIONS (MODIFIER / SUPPRIMER)
+        # 4. GESTION (MODIFIER / SUPPRIMER)
         st.write("---")
         c_mod, c_sup = st.columns(2)
 
         with c_mod:
             with st.expander("📝 MODIFIER"):
-                n_ligne = st.number_input("Modifier le N° affiché", min_value=0, max_value=len(df_affichage)-1, step=1)
-                row_edit = df_affichage.iloc[n_ligne]
-                
-                with st.form("edit_final"):
-                    e_dest = st.text_input("Destination", value=row_edit.get('Navigation', ''))
-                    e_h_arr = st.number_input("H. Moteur Arrivée", value=float(row_edit.get('TotalMot', 0.0)))
-                    e_m_arr = st.number_input("Milles Arrivée", value=float(row_edit.get('TotalMil', 0.0)))
-                    e_notes = st.text_area("Notes", value=row_edit.get('Notes', ''))
+                n_mod = st.number_input("Modifier N°", min_value=0, max_value=len(df_visu)-1, step=1)
+                row = df_visu.iloc[n_mod]
+                with st.form("edit_log_stable"):
+                    new_dest = st.text_input("Destination", value=row.get('Navigation', ''))
+                    new_mot = st.number_input("Moteur Final", value=float(row.get('TotalMot', 0.0)))
+                    new_mil = st.number_input("Milles Final", value=float(row.get('TotalMil', 0.0)))
                     
                     if st.form_submit_button("VALIDER"):
-                        # On met à jour le tableau affiché
-                        df_affichage.at[n_ligne, 'Navigation'] = e_dest
-                        df_affichage.at[n_ligne, 'TotalMot'] = e_h_arr
-                        df_affichage.at[n_ligne, 'TotalMil'] = e_m_arr
-                        df_affichage.at[n_ligne, 'Notes'] = e_notes
+                        # On met à jour le DataFrame trié
+                        df_visu.at[n_mod, 'Navigation'] = new_dest
+                        df_visu.at[n_mod, 'TotalMot'] = new_mot
+                        df_visu.at[n_mod, 'TotalMil'] = new_mil
                         
-                        # On sauvegarde le tout sans les colonnes techniques
-                        df_final = df_affichage.drop(columns=['N°', 'dt_sort'])
-                        # On remet dans l'ordre chronologique pour le fichier JSON
-                        sauvegarder_data(df_final.iloc[::-1], 'logbook.json')
+                        # On sauvegarde l'état actuel (sans les colonnes de tri)
+                        # On inverse pour que le fichier JSON reste chronologique en interne
+                        df_to_save = df_visu.drop(columns=['N°', 'dt_sort', 'temp_idx']).iloc[::-1]
+                        sauvegarder_data(df_to_save, 'logbook.json')
                         st.rerun()
 
         with c_sup:
             with st.expander("🗑️ SUPPRIMER"):
-                n_del = st.number_input("Supprimer le N° affiché", min_value=0, max_value=len(df_affichage)-1, step=1, key="del_log")
+                n_del = st.number_input("Supprimer N°", min_value=0, max_value=len(df_visu)-1, step=1, key="del_final")
                 if st.checkbox("Confirmer la suppression du N° " + str(n_del)):
                     if st.button("🔥 SUPPRIMER DÉFINITIVEMENT"):
-                        df_final = df_affichage.drop(index=n_del).drop(columns=['N°', 'dt_sort'])
+                        df_final = df_visu.drop(index=n_del).drop(columns=['N°', 'dt_sort', 'temp_idx'])
                         sauvegarder_data(df_final.iloc[::-1], 'logbook.json')
                         st.rerun()
-    
+
 # --- FIN DU FICHIER ---
 
 
