@@ -1031,12 +1031,12 @@ if st.session_state.page == "ARCHIVES":
                 st.markdown(html_frais, unsafe_allow_html=True)
         else:
             st.write("Aucun frais archivé.")
-            # =================================================================
+
+# =================================================================
 # --- PAGE : LIVRE DE BORD (LOGBOOK) ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.markdown('<h2 style="text-align:center;">📖 Livre de Bord</h2>', unsafe_allow_html=True)
-    
     df_log = charger_data_safe('logbook.json')
 
     # --- 1. INTERFACE DE SAISIE ---
@@ -1045,94 +1045,94 @@ if st.session_state.page == "LOG":
         is_edit = idx is not None
         row = df_log.loc[idx] if is_edit and idx in df_log.index else {}
 
-        # Bouton Retour
-        if st.button("🔙 RETOUR À LA LISTE", use_container_width=True):
+        # BOUTON RETOUR (Placé en haut pour annuler rapidement)
+        if st.button("🔙 ANNULER ET RETOUR", use_container_width=True):
             st.session_state.log_edit_idx = None
             st.session_state.nouveau_log = False
             st.rerun()
 
         st.divider()
         
-        # --- RÉGLAGES DE LA PÉRIODE (HORS FORMULAIRE) ---
-        st.subheader("🗓️ Période de navigation")
+        # --- RÉGLAGES PÉRIODE ---
+        st.subheader("🗓️ Période & Croisière")
         col_cfg1, col_cfg2 = st.columns(2)
-        
-        # Initialisation de la date par défaut
         try:
             date_defaut = pd.to_datetime(row.get('Date', datetime.now().strftime("%d/%m/%Y")), dayfirst=True).date()
         except:
             date_defaut = datetime.now().date()
             
-        # Widget Date avec format français DD/MM/YYYY
         d_deb = col_cfg1.date_input("Date de départ", value=date_defaut, format="DD/MM/YYYY")
         nb_j = col_cfg2.number_input("Nombre de jours", min_value=1, max_value=15, value=1)
         
-        st.info(f"Voyage prévu du {d_deb.strftime('%d/%m/%Y')} au {(d_deb + pd.Timedelta(days=nb_j-1)).strftime('%d/%m/%Y')}")
-
         # --- FORMULAIRE DE DÉTAILS ---
-        with st.form("form_logbook_final_v6"):
-            st.write("📍 **Itinéraire & Escales**")
-            
-            # Port de départ (Jour 1)
+        with st.form("form_logbook_v7"):
+            st.write("📍 **Itinéraire**")
             p_dep_initial = st.text_input("⚓ Port de Départ (Jour 1)", value=row.get('PortDep', 'ARZON'))
             
-            # Génération dynamique des destinations quotidiennes
             etapes_saisies = []
             for i in range(1, nb_j + 1):
-                type_label = "🏁 Destination Finale" if i == nb_j else f"⚓ Étape soir du Jour {i}"
-                # Pour l'édition, on essaie de récupérer l'arrivée
-                val_init = row.get('PortArr', '') if (is_edit and i == nb_j) else ""
-                etapes_saisies.append(st.text_input(f"{type_label}", value=val_init, key=f"step_input_{i}"))
+                label = "🏁 Destination Finale" if i == nb_j else f"⚓ Étape soir du Jour {i}"
+                etapes_saisies.append(st.text_input(label, key=f"step_{i}"))
 
-            st.write("📊 **Données Techniques (Totaux pour le séjour)**")
-            c1, c2, c3, c4 = st.columns(4)
-            v_mil = row.get('TotalMil', row.get('Milles', 0))
-            v_mot = row.get('TotalMot', row.get('HMot', 0))
+            st.write("📊 **Compteurs & Technique**")
+            # Ligne Milles
+            c1, c2 = st.columns(2)
+            mi_dep = c1.number_input("📏 Milles Départ", value=float(row.get('MilDep', 0.0)), step=1.0)
+            mi_arr = c2.number_input("📏 Milles Arrivée", value=float(row.get('MilArr', 0.0)), step=1.0)
             
-            milles = c1.number_input("📏 Milles", value=float(v_mil), step=1.0)
-            h_mot = c2.number_input("⚙️ Moteur", value=float(v_mot), step=0.1)
-            gasoil = c3.number_input("⛽ Gasoil (L)", value=float(row.get('Litre Gazoil', 0)))
-            h_voile = c4.number_input("⛵ Voile", value=float(row.get('HVoile', 0)))
+            # Ligne Moteur
+            c3, c4 = st.columns(2)
+            mo_dep = c3.number_input("⚙️ Moteur Départ (h)", value=float(row.get('MotDep', 0.0)), step=0.1)
+            mo_arr = c4.number_input("⚙️ Moteur Arrivée (h)", value=float(row.get('MotArr', 0.0)), step=0.1)
+
+            # Ligne Voile et Carburant
+            st.write("⛽ **Consommation & Voile**")
+            c5, c6, c7 = st.columns(3)
+            h_voile = c5.number_input("⛵ Heures Voile", value=float(row.get('HVoile', 0.0)), help="Temps passé sous voiles seules")
+            gasoil_l = c6.number_input("Litre Gasoil", value=0.0)
+            gasoil_euro = c7.number_input("Coût (€)", value=0.0)
 
             notes = st.text_area("🗒️ Observations / Équipage", value=row.get('Observations', ''))
 
-            if st.form_submit_button("💾 ENREGISTRER TOUTE LA NAVIGATION", use_container_width=True, type="primary"):
-                if not p_dep_initial or any(not e for e in etapes_saisies):
-                    st.error("Veuillez remplir tous les ports (départ et étapes).")
+            if st.form_submit_button("💾 ENREGISTRER LA NAVIGATION", use_container_width=True, type="primary"):
+                # Calculs des totaux
+                total_milles = max(0.0, mi_arr - mi_dep)
+                total_moteur = max(0.0, mo_arr - mo_dep)
+                
+                nouvelles_entrees = []
+                for i in range(nb_j):
+                    date_j = (d_deb + pd.Timedelta(days=i)).strftime("%d/%m/%Y")
+                    dep_j = p_dep_initial if i == 0 else etapes_saisies[i-1]
+                    arr_j = etapes_saisies[i]
+
+                    nouvelles_entrees.append({
+                        "Date": date_j,
+                        "PortDep": dep_j,
+                        "PortArr": arr_j,
+                        "MilDep": mi_dep if i==0 else 0, # On ne stocke les compteurs que sur la fiche globale ou début/fin
+                        "MilArr": mi_arr if i==nb_j-1 else 0,
+                        "MotDep": mo_dep if i==0 else 0,
+                        "MotArr": mo_arr if i==nb_j-1 else 0,
+                        "TotalMil": round(total_milles / nb_j, 1),
+                        "TotalMot": round(total_moteur / nb_j, 1),
+                        "HVoile": round(h_voile / nb_j, 1),
+                        "Litre Gazoil": round(gasoil_l / nb_j, 1),
+                        "Cout Gazoil": round(gasoil_euro / nb_j, 1),
+                        "Observations": f"{notes} (J{i+1}/{nb_j})" if nb_j > 1 else notes
+                    })
+
+                if is_edit:
+                    df_log.loc[idx] = nouvelles_entrees[0]
                 else:
-                    nouvelles_entrees = []
-                    for i in range(nb_j):
-                        # Calcul de la date du jour i
-                        date_jour = (d_deb + pd.Timedelta(days=i)).strftime("%d/%m/%Y")
-                        
-                        # Le départ du jour est soit le port initial, soit l'étape de la veille
-                        dep_j = p_dep_initial if i == 0 else etapes_saisies[i-1]
-                        arr_j = etapes_saisies[i]
+                    df_log = pd.concat([pd.DataFrame(nouvelles_entrees), df_log], ignore_index=True)
+                
+                sauvegarder_data(df_log, 'logbook.json')
+                st.session_state.nouveau_log = False
+                st.session_state.log_edit_idx = None
+                st.success(f"✅ Enregistré : {total_milles} NM et {total_moteur} h moteur.")
+                st.rerun()
 
-                        nouvelles_entrees.append({
-                            "Date": date_jour,
-                            "PortDep": dep_j,
-                            "PortArr": arr_j,
-                            "TotalMil": round(milles / nb_j, 1),
-                            "TotalMot": round(h_mot / nb_j, 1),
-                            "Litre Gazoil": round(gasoil / nb_j, 1),
-                            "HVoile": round(h_voile / nb_j, 1),
-                            "Observations": f"{notes} (J{i+1}/{nb_j})" if nb_j > 1 else notes
-                        })
-
-                    # Sauvegarde (on insère au début pour voir les nouveaux en haut)
-                    if is_edit:
-                        df_log.loc[idx] = nouvelles_entrees[0]
-                    else:
-                        df_log = pd.concat([pd.DataFrame(nouvelles_entrees), df_log], ignore_index=True)
-                    
-                    sauvegarder_data(df_log, 'logbook.json')
-                    st.session_state.nouveau_log = False
-                    st.session_state.log_edit_idx = None
-                    st.success(f"✅ {nb_j} jours enregistrés avec succès !")
-                    st.rerun()
-
-    # --- 2. AFFICHAGE DE LA LISTE ---
+    # --- 2. LISTE DES NAVIGATIONS ---
     else:
         col_t, col_b = st.columns([2, 1])
         col_t.subheader("Navigations 2026")
@@ -1147,11 +1147,10 @@ if st.session_state.page == "LOG":
             for idx, r in df_visu.iterrows():
                 m = r.get('TotalMil', 0)
                 h = r.get('TotalMot', 0)
-                
                 st.markdown(f"""
                 <div style="border: 1px solid #ddd; padding: 12px; border-radius: 10px; background: white; border-left: 8px solid #01579b; margin-bottom: 5px;">
                     <b>📅 {r.get('Date')}</b> | 📍 {r.get('PortDep')} ➔ {r.get('PortArr')}<br>
-                    <small>📏 {m} NM | ⚙️ {h} h | ⛵ {r.get('HVoile', 0)} h</small>
+                    <small>📏 {m} NM | ⚙️ {h} h | ⛵ {r.get('HVoile', 0)} h | ⛽ {r.get('Cout Gazoil', 0)} €</small>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -1161,12 +1160,11 @@ if st.session_state.page == "LOG":
                     st.rerun()
                 
                 with c_de.popover("🗑️"):
-                    st.error("Confirmer ?")
-                    if st.button("OUI", key=f"del_{idx}", type="primary", use_container_width=True):
+                    if st.button("CONFIRMER SUPPR", key=f"del_{idx}", type="primary"):
                         df_log = df_log.drop(idx)
                         sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
                         st.rerun()
- 
+
 # --- FIN DU FICHIER ---
 
 
