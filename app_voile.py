@@ -589,12 +589,12 @@ if st.session_state.page == "PLANNING":
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 # =================================================================
-# --- 7. PAGE STATS (LOGIQUE : FICHES AU STATUT "ARCHIVÉ" UNIQUEMENT) ---
+# --- 7. PAGE STATS (CORRECTION ATTRIBUTEERROR & FILTRE ARCHIVÉ) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # 1. On travaille sur le fichier actif (contacts.json)
+    # 1. Chargement du fichier principal
     df_all = charger_data_safe('contacts.json')
 
     # 2. Interface
@@ -603,20 +603,21 @@ if st.session_state.page == "STATS":
     sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
     if not df_all.empty:
-        # --- ÉTAPE A : SÉCURISATION ---
-        # On s'assure que 'Statut' et les dates existent
+        # --- ÉTAPE A : SÉCURISATION DES COLONNES ---
         for c in ['Nom', 'Objet', 'Société', 'Acompte', 'Prix', 'DateNav', 'Statut']:
-            if c not in df_all.columns: df_all[c] = ""
+            if c not in df_all.columns: 
+                df_all[c] = ""
         df_all = df_all.fillna("")
 
-        # --- ÉTAPE B : RADAR DE DATE (GÈRE ISO ET FR) ---
+        # --- ÉTAPE B : RADAR DE DATE (GÈRE ISO #11 ET FR) ---
         def radar_date(row):
             for col in ['DateNav', 'Date', 'date']:
                 if col in row.index:
                     val = str(row[col]).strip()
                     if val and val.lower() != "nan" and val != "":
-                        # Tentative ISO d'abord (fiche #11) puis FR
+                        # Priorité ISO (pour la #11 : 2026-04-04)
                         dt = pd.to_datetime(val, errors='coerce')
+                        # Secours Français
                         if pd.isnull(dt):
                             dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
                         if pd.notnull(dt): return dt
@@ -634,34 +635,34 @@ if st.session_state.page == "STATS":
         df_all['Mnt_Total'] = df_all.apply(lambda x: max(to_num(x['Prix']), to_num(x['Acompte'])), axis=1)
 
         # --- ÉTAPE D : FILTRAGE "ARCHIVÉ" UNIQUEMENT ---
-        # 1. Filtre sur l'année choisie
+        # 1. On filtre sur l'année choisie
         mask_annee = (df_all['dt_vrai'].dt.year == sel_y)
         df_filtre = df_all[mask_annee].copy()
 
-        # 2. On ne garde que les fiches dont le statut contient "ARCHIV" (Archivé, Archivée)
-        # On exclut toujours Faucheux par sécurité
-        df_filtre['Statut_Str'] = df_filtre['Statut'].astype(str).upper()
-        df_filtre['Nom_Str'] = df_filtre['Nom'].astype(str).upper()
-        
-        df_final = df_filtre[
-            (df_filtre['Statut_Str'].str.contains("ARCHIV", na=False)) & 
-            (~df_filtre['Nom_Str'].str.contains("FAUCHEUX", na=False))
-        ].copy()
+        if not df_filtre.empty:
+            # 2. On ne garde que les fiches "Archivé" (Correction de l'AttributeError)
+            # Utilisation de .str.contains pour éviter les erreurs de type
+            mask_archive = df_filtre['Statut'].astype(str).str.upper().str.contains("ARCHIV", na=False)
+            mask_faucheux = df_filtre['Nom'].astype(str).str.upper().str.contains("FAUCHEUX", na=False)
+            
+            df_final = df_filtre[mask_archive & ~mask_faucheux].copy()
 
-        # 3. Filtre temporel "À ce jour"
-        if mode_bilan == "À ce jour":
-            today = pd.Timestamp.now().normalize()
-            df_final = df_final[df_final['dt_vrai'] <= today].copy()
+            # 3. Filtre temporel "À ce jour" (Aujourd'hui = 16/04/2026)
+            if mode_bilan == "À ce jour":
+                today = pd.Timestamp.now().normalize()
+                df_final = df_final[df_final['dt_vrai'] <= today].copy()
+        else:
+            df_final = pd.DataFrame()
 
         # --- ÉTAPE E : AFFICHAGE KPI ---
         st.divider()
         total_ca = df_final['Mnt_Total'].sum() if not df_final.empty else 0
         
         c1, c2 = st.columns(2)
-        c1.metric(f"💰 CA Missions Archivées ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
-        c2.metric("📋 Nombre de fiches", f"{len(df_final)}")
+        c1.metric(f"💰 CA Archivé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
+        c2.metric("📋 Missions Validées", f"{len(df_final)}")
 
-        # --- ÉTAPE F : TABLEAU ---
+        # --- ÉTAPE F : TABLEAU FINAL ---
         if not df_final.empty:
             df_final['Client'] = df_final['Nom'].replace('', None).fillna(df_final['Objet'])
             df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
@@ -672,9 +673,10 @@ if st.session_state.page == "STATS":
             
             st.dataframe(view, hide_index=True, use_container_width=True)
         else:
-            st.info(f"Aucune fiche avec le statut 'Archivé' trouvée pour {sel_y}.")
-            with st.expander("🔍 Vérifier les statuts actuels"):
-                st.write(df_filtre[['DateNav', 'Nom', 'Statut']].head(20))
+            st.info("Aucune fiche avec le statut 'Archivé' n'est comptabilisée pour le moment.")
+
+    else:
+        st.error("Le fichier contacts.json semble vide.")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
