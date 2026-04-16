@@ -570,24 +570,19 @@ if st.session_state.page == "PLANNING":
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # 1. On charge le fichier principal
-    df_all = charger_data('contacts.json')
+    df_all = charger_data_safe('contacts.json')
 
     if not df_all.empty:
         col_sel1, col_sel2 = st.columns(2)
         mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
         sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-        # --- A. NETTOYAGE ---
+        # --- A. PRÉPARATION ---
         df_all = df_all.fillna("")
-        # Normalisation des statuts (comme dans votre onglet Archives)
-        statut_clean = df_all['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
-
-        # --- B. RADAR DE DATE ---
+        
         def radar_date(row):
             val = str(row['DateNav']).strip().split(' ')[0]
             if val and val.lower() not in ["nan", "", "none"]:
-                # Test format ISO d'abord (fiche #11) puis FR (#0, #8)
                 dt = pd.to_datetime(val, errors='coerce')
                 if pd.isnull(dt):
                     dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
@@ -596,24 +591,31 @@ if st.session_state.page == "STATS":
 
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
 
-            # --- C. FILTRAGE CHIRURGICAL ---
-            if not df_filtre.empty:
-                # On nettoie la colonne Statut : majuscules, sans espaces inutiles
-                df_filtre['Statut_Clean'] = df_filtre['Statut'].astype(str).str.upper().str.strip()
-    
-                # On accepte tout ce qui contient ARCHIV ou PAYE (pour ne rien rater)
-                mask_archive = df_filtre['Statut_Clean'].str.contains("ARCHIV|PAYE", na=False)
-                df_final = df_filtre[mask_archive].copy()
+        # --- B. FILTRAGE PAR ANNÉE (CRUCIAL) ---
+        # On définit df_filtre ici pour ne pas avoir d'erreur
+        df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
 
-                # Filtre "À ce jour"
-                if mode_bilan == "À ce jour" and not df_final.empty:
-                    today = pd.Timestamp.now().normalize()
-                    # On garde ce qui est passé OU aujourd'hui
-                    df_final = df_final[df_final['dt_vrai'] <= today].copy()
+        if not df_filtre.empty:
+            # --- C. FILTRAGE STATUT (ARCHIV|PAYE|PAID) ---
+            # On nettoie tout : majuscules, sans accents, sans espaces
+            df_filtre['Statut_Clean'] = df_filtre['Statut'].astype(str).str.upper().str.strip()
             
-            # --- D. AFFICHAGE ---
+            # Recherche de n'importe quel mot-clé de validation
+            mask_archive = df_filtre['Statut_Clean'].str.contains("ARCHIV|PAYE|PAID", na=False)
+            df_final = df_filtre[mask_archive].copy()
+
+            # Filtre temporel "À ce jour"
+            if mode_bilan == "À ce jour" and not df_final.empty:
+                today = pd.Timestamp.now().normalize()
+                df_final = df_final[df_final['dt_vrai'] <= today].copy()
+            
+            # --- D. AFFICHAGE DES RÉSULTATS ---
             st.divider()
-            df_final['Prix_Num'] = pd.to_numeric(df_final['Prix'], errors='coerce').fillna(0)
+            
+            # Conversion robuste du prix (gestion virgule et texte)
+            df_final['Prix_Num'] = df_final['Prix'].astype(str).str.replace(',', '.')
+            df_final['Prix_Num'] = pd.to_numeric(df_final['Prix_Num'], errors='coerce').fillna(0)
+            
             total_ca = df_final['Prix_Num'].sum()
             
             c1, c2 = st.columns(2)
@@ -629,11 +631,11 @@ if st.session_state.page == "STATS":
                 view.columns = ['Date', 'Client', 'Société', 'Montant (€)']
                 st.dataframe(view, hide_index=True, use_container_width=True)
             else:
-                st.info(f"Aucune mission 'Paid' trouvée dans vos archives pour {sel_y}.")
+                st.info(f"Aucune mission confirmée/payée trouvée pour {sel_y}.")
         else:
-            st.info(f"Aucune donnée pour l'année {sel_y}.")
+            st.info(f"Aucune donnée enregistrée pour l'année {sel_y}.")
     else:
-        st.error("Fichier contacts.json introuvable.")
+        st.error("Le fichier contacts.json est vide ou introuvable.")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
