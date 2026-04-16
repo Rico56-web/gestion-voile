@@ -922,7 +922,7 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION FINALE SANS CACHE ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - TRI CHRONOLOGIQUE FORCÉ ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
@@ -930,91 +930,101 @@ if st.session_state.page == "LOG":
     # 1. Chargement des données
     df_log = charger_data_safe('logbook.json')
 
-    # 2. Formulaire de saisie (Toujours en haut)
+    # 2. Formulaire d'ajout (simplifié et clair)
     with st.expander("➕ AJOUTER UNE NAVIGATION", expanded=df_log.empty):
-        # On récupère les derniers compteurs pour pré-remplir
-        last_h = 0.0
-        last_m = 0.0
-        if not df_log.empty:
-            try:
-                last_h = float(df_log.iloc[-1].get('TotalMot', 0.0))
-                last_m = float(df_log.iloc[-1].get('TotalMil', 0.0))
-            except: pass
+        with st.form("new_entry_log"):
+            c1, c2 = st.columns(2)
+            f_date = c1.date_input("Date", datetime.now())
+            f_dest = c2.text_input("Destination")
+            
+            col_m1, col_m2 = st.columns(2)
+            f_h_dep = col_m1.number_input("H. Moteur Départ", step=0.1)
+            f_h_arr = col_m2.number_input("H. Moteur Arrivée", step=0.1)
+            
+            col_mi1, col_mi2 = st.columns(2)
+            f_m_dep = col_mi1.number_input("Milles Départ", step=1.0)
+            f_m_arr = col_mi2.number_input("Milles Arrivée", step=1.0)
+            
+            f_notes = st.text_area("Notes / Météo")
 
-        st.subheader("🚀 Nouvelle Etape")
-        c1, c2 = st.columns(2)
-        f_date = c1.date_input("Date", datetime.now())
-        f_titre = c2.text_input("Destination")
-        
-        col_m1, col_m2 = st.columns(2)
-        f_h_dep = col_m1.number_input("H. Moteur Départ", value=last_h)
-        f_h_arr = col_m2.number_input("H. Moteur Arrivée", value=last_h)
-        
-        col_mi1, col_mi2 = st.columns(2)
-        f_m_dep = col_mi1.number_input("Milles Départ", value=last_m)
-        f_m_arr = col_mi2.number_input("Milles Arrivée", value=last_m)
-        
-        f_notes = st.text_area("Notes / Météo")
+            if st.form_submit_button("💾 ENREGISTRER", use_container_width=True):
+                nouvelle_ligne = {
+                    "Date": f_date.strftime("%d/%m/%Y"),
+                    "Navigation": f_dest,
+                    "MotDep": float(f_h_dep),
+                    "TotalMot": float(f_h_arr),
+                    "MillesDep": float(f_m_dep),
+                    "TotalMil": float(f_m_arr),
+                    "Notes": f_notes
+                }
+                df_log = pd.concat([df_log, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
+                sauvegarder_data(df_log, 'logbook.json')
+                st.rerun()
 
-        if st.button("💾 ENREGISTRER L'ÉTAPE", use_container_width=True, type="primary"):
-            nouvelle_ligne = {
-                "Date": f_date.strftime("%d/%m/%Y"),
-                "Navigation": f_titre,
-                "MotDep": float(f_h_dep),
-                "TotalMot": float(f_h_arr),
-                "MillesDep": float(f_m_dep),
-                "TotalMil": float(f_m_arr),
-                "Notes": f_notes
-            }
-            df_log = pd.concat([df_log, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
-            sauvegarder_data(df_log, 'logbook.json')
-            st.rerun()
-
-    # 3. AFFICHAGE ET GESTION (MODIFIER / SUPPRIMER)
+    # 3. GESTION DE L'HISTORIQUE (TRI ET AFFICHAGE)
     if not df_log.empty:
         st.divider()
-        st.subheader("📜 Historique")
+        st.subheader("📜 Historique (Le plus récent en haut)")
 
-        # --- FORCE L'ORDRE ICI ---
-        # On crée une copie avec l'index affiché en colonne 'N°'
+        # --- ÉTAPE CRUCIALE : TRI PAR DATE ---
         df_affichage = df_log.copy()
-        df_affichage.insert(0, 'N°', df_log.index)
+        # On convertit la colonne Date en format "Date" pour que le tri fonctionne
+        df_affichage['Date_DT'] = pd.to_datetime(df_affichage['Date'], format='%d/%m/%Y', errors='coerce')
         
-        # On renverse le tableau (le plus récent en haut)
-        df_affichage = df_affichage.iloc[::-1]
+        # On trie par date la plus récente, puis on réinitialise l'index pour avoir 0, 1, 2...
+        df_affichage = df_affichage.sort_values(by='Date_DT', ascending=False).reset_index(drop=True)
+        
+        # On crée une colonne N° propre pour l'utilisateur
+        df_affichage.insert(0, 'N°', df_affichage.index)
 
-        # Affichage simple (non éditable pour garantir l'ordre)
-        st.dataframe(df_affichage, use_container_width=True, hide_index=True)
+        # Affichage du tableau (Lecture seule pour garantir l'ordre)
+        st.dataframe(
+            df_affichage.drop(columns=['Date_DT']), 
+            use_container_width=True, 
+            hide_index=True
+        )
 
-        # 4. BOUTONS DE GESTION (Comme sur Maintenance)
+        # 4. ACTIONS (MODIFIER / SUPPRIMER)
+        # Attention : On travaille sur df_affichage pour que le N° corresponde à ce qu'on voit
         st.write("---")
-        col_edit, col_del = st.columns(2)
+        c_mod, c_sup = st.columns(2)
 
-        with col_edit:
-            with st.expander("📝 MODIFIER"):
-                idx_mod = st.number_input("Modifier la ligne N°", min_value=0, max_value=df_log.index.max(), step=1)
-                row = df_log.loc[idx_mod]
-                with st.form("edit_log_form"):
-                    e_port = st.text_input("Destination", value=row.get('Navigation', ''))
-                    e_h = st.number_input("Moteur Final", value=float(row.get('TotalMot', 0.0)))
-                    e_m = st.number_input("Milles Final", value=float(row.get('TotalMil', 0.0)))
-                    if st.form_submit_button("VALIDER MODIFICATION"):
-                        df_log.at[idx_mod, 'Navigation'] = e_port
-                        df_log.at[idx_mod, 'TotalMot'] = e_h
-                        df_log.at[idx_mod, 'TotalMil'] = e_m
-                        sauvegarder_data(df_log, 'logbook.json')
+        with c_mod:
+            with st.expander("📝 MODIFIER UNE LIGNE"):
+                n_ligne = st.number_input("Modifier le N°", min_value=0, max_value=len(df_affichage)-1, step=1)
+                # On récupère la ligne sélectionnée dans le tableau affiché
+                row_to_edit = df_affichage.iloc[n_ligne]
+                
+                with st.form("edit_log_v2"):
+                    e_dest = st.text_input("Destination", value=row_to_edit.get('Navigation', ''))
+                    e_h_arr = st.number_input("H. Moteur Arrivée", value=float(row_to_edit.get('TotalMot', 0.0)))
+                    e_m_arr = st.number_input("Milles Arrivée", value=float(row_to_edit.get('TotalMil', 0.0)))
+                    
+                    if st.form_submit_button("VALIDER"):
+                        # On retrouve l'index réel dans le fichier original via la date et la destination
+                        # ou plus simplement, on écrase tout le fichier avec le nouvel ordre trié
+                        df_log_nouveau = df_affichage.drop(columns=['N°', 'Date_DT'])
+                        df_log_nouveau.at[n_ligne, 'Navigation'] = e_dest
+                        df_log_nouveau.at[n_ligne, 'TotalMot'] = e_h_arr
+                        df_log_nouveau.at[n_ligne, 'TotalMil'] = e_m_arr
+                        
+                        # On sauvegarde l'ordre chronologique (plus vieux en premier) pour le JSON
+                        sauvegarder_data(df_log_nouveau.iloc[::-1], 'logbook.json')
                         st.rerun()
 
-        with col_del:
+        with c_sup:
             with st.expander("🗑️ SUPPRIMER"):
-                idx_del = st.number_input("Supprimer la ligne N°", min_value=0, max_value=df_log.index.max(), step=1, key="del_log")
-                if st.checkbox("Confirmer la suppression", key="check_del"):
-                    if st.button("🔥 SUPPRIMER DÉFINITIVEMENT", type="primary"):
-                        df_log = df_log.drop(index=idx_del).reset_index(drop=True)
-                        sauvegarder_data(df_log, 'logbook.json')
+                n_del = st.number_input("Supprimer le N°", min_value=0, max_value=len(df_affichage)-1, step=1, key="del")
+                if st.checkbox("Confirmer la suppression du N° " + str(n_del)):
+                    if st.button("🔥 SUPPRIMER DÉFINITIVEMENT"):
+                        # On met à jour le DataFrame trié
+                        df_log_nouveau = df_affichage.drop(columns=['N°', 'Date_DT'])
+                        df_log_nouveau = df_log_nouveau.drop(index=n_del)
+                        # On sauvegarde
+                        sauvegarder_data(df_log_nouveau.iloc[::-1], 'logbook.json')
                         st.rerun()
 
-
+    
 # --- FIN DU FICHIER ---
 
 
