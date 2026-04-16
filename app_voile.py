@@ -812,37 +812,15 @@ if st.session_state.page == "FACTURES":
 
         st.dataframe(df_f[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True)
         # =================================================================
-# --- 11. PAGE ARCHIVES ---
+# --- 10. PAGE LIVRE DE BORD (LOG) - SYNCHRONISÉE AVEC LE MENU ---
 # =================================================================
-if st.session_state.page == "ARCHIVES":
-    st.title("📂 Archives")
-    
-    if st.button("⬅️ Retour au Planning"):
-        st.session_state.page = "PLANNING"
-        st.rerun()
-
-    tab1, tab2, tab3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook"])
-    
-    with tab1:
-        df_a_m = charger_data_safe('archives_maintenance.json')
-        st.dataframe(df_a_m, use_container_width=True, hide_index=True)
-    with tab2:
-        df_a_p = charger_data_safe('archives_planning.json')
-        st.dataframe(df_a_p, use_container_width=True, hide_index=True)
-    with tab3:
-        df_a_l = charger_data_safe('archives_logbook.json')
-        st.dataframe(df_a_l, use_container_width=True, hide_index=True)
-        # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOGBOOK) - VERSION SÉCURISÉE ---
-# =================================================================
-if st.session_state.page == "LOGBOOK":
+if st.session_state.page == "LOG":  # Changé de "LOGBOOK" à "LOG"
     st.title("📖 Livre de Bord")
 
     # 1. Chargement des données
     df_log = charger_data_safe('logbook.json')
 
     # 2. Préparation des valeurs par défaut (Sécurité Anti-Crash)
-    # On force TOUT en float pour éviter la page blanche
     last_h_moteur = 0.0
     last_milles = 0.0
     dernier_port = ""
@@ -850,19 +828,17 @@ if st.session_state.page == "LOGBOOK":
     if not df_log.empty:
         try:
             derniere_ligne = df_log.iloc[-1]
-            # Conversion forcée en flottant, on remplace la virgule par un point au cas où
             h_str = str(derniere_ligne.get('TotalMot', '0.0')).replace(',', '.')
             m_str = str(derniere_ligne.get('TotalMil', '0.0')).replace(',', '.')
             
             last_h_moteur = float(h_str) if h_str != "" else 0.0
             last_milles = float(m_str) if m_str != "" else 0.0
             dernier_port = str(derniere_ligne.get('PortArr', ""))
-        except Exception as e:
-            # Si la conversion échoue, on reste à 0.0 au lieu de faire planter la page
+        except:
             last_h_moteur = 0.0
 
     # 3. Formulaire de saisie
-    with st.form("logbook_v2026_safe"):
+    with st.form("logbook_v2026_final"):
         col_a, col_b = st.columns(2)
         f_date = col_a.date_input("Date", datetime.now())
         f_dep = col_b.text_input("Départ", value=dernier_port)
@@ -871,7 +847,6 @@ if st.session_state.page == "LOGBOOK":
         st.divider()
         
         c_h1, c_h2 = st.columns(2)
-        # On précise explicitement le format 'float' dans number_input
         f_h_dep = c_h1.number_input("H. Moteur Départ", value=float(last_h_moteur), step=0.1, format="%.1f")
         f_h_fin = c_h2.number_input("H. Moteur Arrivée", value=float(last_h_moteur), step=0.1, format="%.1f")
 
@@ -879,20 +854,16 @@ if st.session_state.page == "LOGBOOK":
 
         if st.form_submit_button("💾 ENREGISTRER L'ÉTAPE", use_container_width=True, type="primary"):
             if f_arr:
-                # Calcul du nouveau total milles
-                nouveau_total_milles = last_milles + f_nm
-                
                 nouvelle_entree = {
                     "Date": f_date.strftime("%d/%m/%Y"),
                     "PortDep": f_dep,
                     "PortArr": f_arr,
-                    "MotDep": f_h_dep,
-                    "TotalMot": f_h_fin,
-                    "TotalMil": nouveau_total_milles,
-                    "MillesEtape": f_nm
+                    "MotDep": float(f_h_dep),
+                    "TotalMot": float(f_h_fin),
+                    "TotalMil": float(last_milles + f_nm),
+                    "MillesEtape": float(f_nm)
                 }
                 
-                # Sauvegarde propre
                 df_actuel = charger_data_safe('logbook.json')
                 df_final = pd.concat([df_actuel, pd.DataFrame([nouvelle_entree])], ignore_index=True)
                 sauvegarder_data(df_final, 'logbook.json')
@@ -902,18 +873,34 @@ if st.session_state.page == "LOGBOOK":
             else:
                 st.warning("Veuillez saisir au moins le port d'arrivée.")
 
-    # 4. Tableau d'historique (Affichage simple)
+    # 4. Historique
     if not df_log.empty:
         st.write("---")
         st.subheader("📜 Historique Récent")
-        # On affiche les 10 derniers en inversant l'ordre
-        st.dataframe(
-            df_log.iloc[::-1].head(10), 
-            use_container_width=True, 
-            hide_index=True
-        )
+        st.dataframe(df_log.iloc[::-1].head(10), use_container_width=True, hide_index=True)
+
+# =================================================================
+# --- 11. PAGE ARCHIVES (Lien avec le bouton du Planning) ---
+# =================================================================
+if st.session_state.page == "ARCHIVES":
+    st.title("📂 Archives")
+    
+    if st.button("⬅️ Retour"):
+        st.session_state.page = "PLANNING"
+        st.rerun()
+
+    tab1, tab2, tab3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook"])
+    
+    with tab1:
+        st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
+    with tab2:
+        st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
+    with tab3:
+        st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
 
 # --- FIN DU FICHIER ---
+
+
 
 
 
