@@ -782,8 +782,9 @@ if st.session_state.page == "MAINT":
             
             col_c, col_d = st.columns(2)
             f_type = col_c.selectbox("Catégorie", ["Port", "Assurances", "Maintenance", "Sécurité", "Autres frais"])
-            f_statut = col_d.selectbox("Statut par défaut", ["À prévoir", "Fait"])
-            
+            # Détection automatique du statut selon la date
+            default_statut_index = 1 if f_date_iso <= datetime.now().date() else 0
+            f_statut = col_d.selectbox("Statut", ["À prévoir", "Fait"], index=default_statut_index)
             f_recurrence = st.checkbox("Répéter mensuellement (jusqu'à fin 2026)")
             
             # BOUTON DE SOUMISSION DU FORMULAIRE
@@ -820,11 +821,6 @@ if st.session_state.page == "MAINT":
                     st.rerun()
                 else:
                     st.error("Veuillez remplir la désignation.")
-
-# --- 9. PAGES SUIVANTES (FACTURATION, ETC.) ---
-if st.session_state.page == "FACTURES":
-    st.title("📑 FACTURES")
-    # ... ton code factures ici ...
 
 # =================================================================
 # --- PAGE : FACTURATION & SUIVI PAIEMENTS ---
