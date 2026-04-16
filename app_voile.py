@@ -1039,100 +1039,111 @@ if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
     df_log = charger_data_safe('logbook.json')
 
+    # --- 1. INTERFACE DE SAISIE (MODIFIER OU NOUVEAU) ---
     if st.session_state.get('log_edit_idx') is not None or st.session_state.get('nouveau_log', False):
         idx = st.session_state.get('log_edit_idx')
         is_edit = idx is not None
         row = df_log.loc[idx] if is_edit and idx in df_log.index else {}
 
-        with st.form("form_logbook", clear_on_submit=False):
-            # Ligne 1 : L'essentiel
+        # ENTÊTE DE SAISIE
+        col_titre, col_ret = st.columns([3, 1])
+        col_titre.subheader("📝 Détails de Navigation")
+        if col_ret.button("🔙 RETOUR", use_container_width=True):
+            st.session_state.log_edit_idx = None
+            st.session_state.nouveau_log = False
+            st.rerun()
+
+        with st.form("form_logbook_v3", clear_on_submit=False):
             c1, c2, c3 = st.columns([2, 3, 3])
             date_n = c1.text_input("📅 Date", value=row.get('Date', datetime.now().strftime("%d/%m/%Y")))
             p_dep = c2.text_input("⚓ Départ", value=row.get('PortDep', ''))
             p_arr = c3.text_input("🏁 Arrivée", value=row.get('PortArr', ''))
 
-            # Ligne 2 : Les chiffres (SYNCHRO AVEC TON JSON)
             c4, c5, c6, c7 = st.columns(4)
-            # On cherche 'TotalMil' ou 'Milles' / 'TotalMot' ou 'HMot'
             val_milles = row.get('TotalMil', row.get('Milles', 0))
             val_hmot = row.get('TotalMot', row.get('HMot', 0))
             
-            milles = c4.number_input("📏 Milles (NM)", value=float(val_milles), step=0.5)
-            h_mot = c5.number_input("⚙️ Heures Moteur", value=float(val_hmot), step=0.1)
+            milles = c4.number_input("📏 Milles", value=float(val_milles), step=0.5)
+            h_mot = c5.number_input("⚙️ Moteur", value=float(val_hmot), step=0.1)
             gasoil = c6.number_input("⛽ Gasoil (L)", value=float(row.get('Litre Gazoil', 0)), step=1.0)
-            h_voile = c7.number_input("⛵ Heures Voile", value=float(row.get('HVoile', 0)), step=0.1)
+            h_voile = c7.number_input("⛵ Voile", value=float(row.get('HVoile', 0)), step=0.1)
 
             notes = st.text_area("🗒️ Observations", value=row.get('Observations', row.get('Notes', '')))
+            
+            # OPTION CROISIÈRE (Ajout automatique)
+            is_croisiere = st.checkbox("🚢 C'est une croisière (Répéter sur plusieurs jours)")
+            nb_jours = st.number_input("Nombre de jours :", min_value=1, max_value=15, value=1) if is_croisiere else 1
 
-            submit = st.form_submit_button("💾 ENREGISTRER", use_container_width=True)
-
-            if submit:
-                new_data = {
-                    "Date": date_n, "PortDep": p_dep, "PortArr": p_arr,
-                    "TotalMil": milles, "TotalMot": h_mot, "Litre Gazoil": gasoil,
-                    "HVoile": h_voile, "Observations": notes,
-                    "MotArr": row.get('MotArr', 0), # On garde les index compteurs pour les stats vidange
-                    "MilArr": row.get('MilArr', 0)
-                }
+            if st.form_submit_button("💾 ENREGISTRER", use_container_width=True, type="primary"):
+                nouvelles_entrees = []
+                base_date = pd.to_datetime(date_n, dayfirst=True, errors='coerce')
+                
+                for i in range(nb_jours):
+                    current_date = (base_date + pd.Timedelta(days=i)).strftime("%d/%m/%Y")
+                    suffixe = f" (Jour {i+1})" if nb_jours > 1 else ""
+                    
+                    nouvelles_entrees.append({
+                        "Date": current_date, "PortDep": p_dep if i==0 else "Escale", 
+                        "PortArr": p_arr + suffixe, "TotalMil": milles / nb_jours, 
+                        "TotalMot": h_mot / nb_jours, "Litre Gazoil": gasoil / nb_jours,
+                        "HVoile": h_voile / nb_jours, "Observations": notes
+                    })
+                
                 if is_edit:
-                    df_log.loc[idx] = new_data
+                    df_log.loc[idx] = nouvelles_entrees[0]
                 else:
-                    df_log = pd.concat([pd.DataFrame([new_data]), df_log], ignore_index=True)
+                    df_new = pd.DataFrame(nouvelles_entrees)
+                    df_log = pd.concat([df_new, df_log], ignore_index=True)
                 
                 sauvegarder_data(df_log, 'logbook.json')
                 st.session_state.log_edit_idx = None
                 st.session_state.nouveau_log = False
+                st.success("Navigation enregistrée !")
                 st.rerun()
 
-    # --- AFFICHAGE DES CARTES ---
-    tab1, tab2 = st.tabs(["⛵ Saison Actuelle", "📚 Archives"])
-    with tab1:
-        if not df_log.empty:
-            df_log['dt_tri'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
-            df_visu = df_log.sort_values('dt_tri', ascending=False)
-
-            for idx, r in df_visu.iterrows():
-                # On récupère les milles et heures selon les deux noms possibles
-                m = r.get('TotalMil', r.get('Milles', 0))
-                h = r.get('TotalMot', r.get('HMot', 0))
-                
-                st.markdown(f"""
-                <div style="border: 1px solid #ddd; padding: 12px; border-radius: 10px; background: white; margin-bottom: 5px; border-left: 8px solid #01579b;">
-                    <b>📅 {r.get('Date')}</b> | 📍 {r.get('PortDep')} ➔ {r.get('PortArr')}<br>
-                    <span style="color:#555;">📏 {m} NM | ⚙️ {h} h | ⛵ {r.get('HVoile', 0)} h</span>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                c_ed, c_de, _ = st.columns([1, 1, 8])
-                if c_ed.button("✏️", key=f"ed_{idx}"):
-                    st.session_state.log_edit_idx = idx
-                    st.rerun()
-                if c_de.button("🗑️", key=f"de_{idx}"):
-                    df_log = df_log.drop(idx)
-                    sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
-                    st.rerun()
-
-
-
-    # ONGLET 2 : ARCHIVES
-    with tab2:
-        st.subheader("Consulter les années passées")
-        df_arch = charger_data_safe('archives_logbook.json')
+    # --- 2. AFFICHAGE DES ONGLETS ---
+    else:
+        tab1, tab2 = st.tabs(["⛵ Saison 2026", "📚 Archives"])
         
-        if df_arch.empty:
-            st.write("Le coffre à souvenirs est vide.")
-        else:
-            df_arch['Année'] = pd.to_datetime(df_arch['Date'], dayfirst=True, errors='coerce').dt.year
-            annees_dispo = sorted(df_arch['Année'].dropna().unique().astype(int).tolist(), reverse=True)
-            sel_arch_y = st.selectbox("Choisir une année", annees_dispo)
-            
-            df_year_arch = df_arch[df_arch['Année'] == sel_arch_y]
-            for idx, r in df_year_arch.iterrows():
-                st.markdown(f"""
-                <div style="border: 1px solid #ccc; padding: 10px; border-radius: 8px; margin-bottom: 5px; background: #f9f9f9;">
-                    <b>{r.get('Date')}</b> : {r.get('PortDep')} ➔ {r.get('PortArr')} ({r.get('Milles', 0)} NM)
-                </div>
-                """, unsafe_allow_html=True)
+        with tab1:
+            col_t, col_b = st.columns([2, 1])
+            col_t.subheader("Journal de Bord")
+            if col_b.button("➕ NOUVEAU", use_container_width=True, type="primary"):
+                st.session_state.nouveau_log = True
+                st.rerun()
+
+            if not df_log.empty:
+                # Tri par date
+                df_log['dt_tri'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+                df_visu = df_log.sort_values('dt_tri', ascending=False)
+
+                for idx, r in df_visu.iterrows():
+                    m = r.get('TotalMil', r.get('Milles', 0))
+                    h = r.get('TotalMot', r.get('HMot', 0))
+                    
+                    with st.container():
+                        st.markdown(f"""
+                        <div style="border: 1px solid #ddd; padding: 12px; border-radius: 10px; background: white; border-left: 8px solid #01579b;">
+                            <b>📅 {r.get('Date')}</b> | 📍 {r.get('PortDep')} ➔ {r.get('PortArr')}<br>
+                            <small>📏 {m} NM | ⚙️ {h} h | ⛵ {r.get('HVoile', 0)} h</small>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        c_ed, c_de, c_sp = st.columns([1, 1, 3])
+                        if c_ed.button("✏️", key=f"ed_{idx}"):
+                            st.session_state.log_edit_idx = idx
+                            st.rerun()
+                        
+                        # BOUTON SUPPRIMER AVEC CONFIRMATION (Popover)
+                        with c_de.popover("🗑️"):
+                            st.error("Supprimer cette ligne ?")
+                            if st.button("OUI, CONFIRMER", key=f"conf_del_{idx}", type="primary"):
+                                df_log = df_log.drop(idx)
+                                sauvegarder_data(df_log.drop(columns=['dt_tri'], errors='ignore'), 'logbook.json')
+                                st.rerun()
+                        st.write("") # Espace
+
+
  
 # --- FIN DU FICHIER ---
 
