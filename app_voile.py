@@ -575,6 +575,7 @@ if st.session_state.page == "STATS":
     df_arch = charger_data_safe('archives_planning.json')
     
     if not df_actif.empty or not df_arch.empty:
+        # Fusion des données
         df_all = pd.concat([df_actif, df_arch], ignore_index=True)
         
         # --- A. CONFIGURATION ---
@@ -598,30 +599,26 @@ if st.session_state.page == "STATS":
         df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
 
         if not df_filtre.empty:
-            # --- C. FILTRAGE CHIRURGICAL STRICT ---
-        # SÉCURITÉ : On s'assure que la colonne existe dans df_filtre avant de continuer
-        if 'Paiement' not in df_filtre.columns:
-            df_filtre['Paiement'] = "Unpaid"
-        
-        # On remplace les valeurs nulles par "Unpaid"
-        df_filtre['Paiement'] = df_filtre['Paiement'].fillna("Unpaid").astype(str)
+            # --- C. FILTRAGE CHIRURGICAL STRICT (CORRIGÉ) ---
+            if 'Paiement' not in df_filtre.columns:
+                df_filtre['Paiement'] = "Unpaid"
+            
+            df_filtre['Paiement'] = df_filtre['Paiement'].fillna("Unpaid").astype(str)
+            df_filtre['Pay_Status'] = df_filtre['Paiement'].str.strip().upper()
+            
+            # On ne garde QUE les "PAID"
+            df_final = df_filtre[df_filtre['Pay_Status'] == "PAID"].copy()
 
-        # Création de la colonne de nettoyage sans risque d'AttributeError
-        df_filtre['Pay_Status'] = df_filtre['Paiement'].str.strip().upper()
-        
-        # FILTRE : Uniquement "PAID"
-        df_final = df_filtre[df_filtre['Pay_Status'] == "PAID"].copy()
-
-        # Application du filtre temporel
-        if mode_bilan == "À ce jour" and not df_final.empty:
-            today = pd.Timestamp.now().normalize()
-            df_final = df_final[df_final['dt_vrai'] <= today].copy()
+            # Application du filtre "À ce jour"
+            if mode_bilan == "À ce jour" and not df_final.empty:
+                today = pd.Timestamp.now().normalize()
+                df_final = df_final[df_final['dt_vrai'] <= today].copy()
 
             # --- D. CALCULS ET AFFICHAGE ---
             st.divider()
             
             def force_float(val):
-                # Nettoyage agressif pour ne rater aucun euro (CMN)
+                # Nettoyage pour CMN (gère espaces, €, virgules)
                 s = str(val).replace('€', '').replace(' ', '').replace('\xa0', '').replace(',', '.')
                 try: return float(s)
                 except: return 0.0
@@ -631,21 +628,22 @@ if st.session_state.page == "STATS":
                 total_ca = df_final['Prix_Num'].sum()
                 
                 c1, c2 = st.columns(2)
+                # Affichage du CA avec séparateur de milliers pour plus de clarté
                 c1.metric(f"💰 CA Encaissé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
                 c2.metric("📋 Missions Payées", f"{len(df_final)}")
 
-                # Affichage de la liste pour vérification
+                # Affichage de la liste pour vérification (Aide à trouver les CMN)
                 df_final['Client'] = df_final['Prénom'].astype(str).str.upper() + " " + df_final['Nom'].astype(str).str.upper()
                 df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
                 
                 view = df_final.sort_values('dt_vrai', ascending=False)
                 st.dataframe(view[['Date_Aff', 'Client', 'Société', 'Prix']], hide_index=True, use_container_width=True)
             else:
-                st.info(f"Aucune mission 'Paid' trouvée pour {sel_y} ({mode_bilan}).")
+                st.info(f"Aucune mission 'Paid' trouvée pour {sel_y}.")
         else:
             st.info(f"Aucune donnée de navigation pour {sel_y}.")
     else:
-        st.error("Aucune donnée disponible (fichiers vides).")
+        st.error("Aucune donnée disponible dans les fichiers JSON.")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
