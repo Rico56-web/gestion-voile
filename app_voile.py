@@ -694,33 +694,63 @@ if st.session_state.page == "STATS":
                 else:
                     st.info("Ajoute une colonne 'Catégorie' dans Maintenance")
 
-        # --- F. TABLEAUX DÉTAILLÉS (TRIÉS DU PLUS RÉCENT AU PLUS ANCIEN) ---
+# --- F. RÉPARTITION (LES "FROMAGES" VERSION MOBILE) ---
+        st.write("---")
+        st.subheader("🍕 Répartition des Volumes")
+        col_pie1, col_pie2 = st.columns(2)
+        
+        with col_pie1:
+            if not df_final.empty and 'Société' in df_final.columns:
+                st.write("**Par Société (Sorties)**")
+                # On compte le nombre de lignes par société
+                df_rep_soc = df_final['Société'].value_counts().reset_index()
+                df_rep_soc.columns = ['Société', 'Nombre']
+                # Affichage en barres horizontales (plus lisible qu'un fromage sur iPhone)
+                st.bar_chart(df_rep_soc.set_index('Société'), horizontal=True, height=180)
+            
+        with col_pie2:
+            if not df_m_y.empty:
+                st.write("**Par Catégorie (€)**")
+                # SYNCHRO ICI : On utilise 'Type' qui est ta colonne réelle
+                col_cat_reelle = 'Type' if 'Type' in df_m_y.columns else None
+                
+                if col_cat_reelle:
+                    # On somme les montants par type de dépense
+                    df_rep_maint = df_m_y.groupby(col_cat_reelle)[col_m_val].apply(lambda x: sum(to_f(i) for i in x))
+                    st.bar_chart(df_rep_maint, horizontal=True, height=180)
+                else:
+                    st.info("Colonne 'Type' non trouvée")
+
+        # --- G. TABLEAUX DÉTAILLÉS (TRI CHRONO RÉCENT EN HAUT) ---
         st.write("---")
         t1, t2 = st.tabs(["💰 Détails CA", "🛠️ Détails Dépenses"])
         
         with t1:
             if not df_final.empty:
-                # TRI CHRONO INVERSÉ (Le plus récent en haut)
+                # Tri par date réelle (dt_vrai) descendant
                 df_final_clean = df_final.sort_values(by='dt_vrai', ascending=False)
-                cols_r = [c for c in ['DateNav', 'Client', 'Société', 'Prix'] if c in df_final_clean.columns]
+                # On affiche 'Objet' si 'Client' est vide pour la désignation
+                cols_r = [c for c in ['DateNav', 'Société', 'Prix'] if c in df_final_clean.columns]
                 st.dataframe(df_final_clean[cols_r], use_container_width=True, hide_index=True)
-                st.success(f"**TOTAL RECETTES : {total_ca:,.2f} €** (Moy : {ca_moyen_jour:,.0f}€/j)")
+                st.success(f"**TOTAL RECETTES : {total_ca:,.2f} €**")
         
         with t2:
             if not df_m_y.empty:
-                # TRI CHRONO INVERSÉ (Le plus récent en haut)
+                # Tri par date de maintenance descendant
                 df_m_y_clean = df_m_y.sort_values(by='dt_maint', ascending=False)
                 st.write("**🔧 Maintenance :**")
-                cols_m = [c for c in ['Date', 'Titre', col_m_val] if c in df_m_y_clean.columns]
+                # SYNCHRO ICI : Ton code utilise 'Objet' et non 'Titre'
+                col_nom_m = 'Objet' if 'Objet' in df_m_y_clean.columns else 'Titre'
+                cols_m = [c for c in ['Date', col_nom_m, col_m_val] if c in df_m_y_clean.columns]
                 st.dataframe(df_m_y_clean[cols_m], use_container_width=True, hide_index=True)
             
             if t_gasoil_eur > 0:
-                # TRI CHRONO INVERSÉ pour le Logbook
                 df_log_y_clean = df_log_y[df_log_y['Cout Gazoil']>0].sort_values(by='dt_log', ascending=False)
                 st.write("**⛽ Carburant :**")
                 st.dataframe(df_log_y_clean[['Date', 'PortArr', 'Cout Gazoil']], use_container_width=True, hide_index=True)
             
             st.error(f"**TOTAL DÉPENSES : {total_dep:,.2f} €**")
+
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
