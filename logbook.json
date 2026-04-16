@@ -1,22 +1,22 @@
 [
     {
         "Date":"14\/03\/2026",
-        "Meteo":"venteux le premier jour et calme le suivant",
+        "Meteo":null,
         "PortDep":"ARZON",
         "PortArr":"ARZON",
-        "MotDep":2416.6,
+        "MotDep":null,
         "MotArr":2424.9,
-        "MilDep":2653.0,
+        "MilDep":null,
         "MilArr":2700.0,
         "TotalMot":8.3,
         "TotalMil":47.0,
         "Observations":"",
-        "Vent":2.0,
-        "Mouillage":"Port",
-        "Equipage":"nan",
-        "Plein":"Non",
+        "Vent":null,
+        "Mouillage":null,
+        "Equipage":null,
+        "Plein":null,
         "Litre Gazoil":0.0,
-        "Cout Gazoil":0.0
+        "Cout Gazoil":null
     },
     {
         "Date":"04\/03\/2026",
