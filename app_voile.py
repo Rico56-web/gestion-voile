@@ -595,22 +595,20 @@ if st.session_state.page == "STATS":
         df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
 
         if not df_filtre.empty:
-            # --- C. FILTRAGE CHIRURGICAL STRICT ---
-            # On ne garde QUE ce qui est marqué "Paid" (on vire les "Unpaid" et "En attente")
-            # .str.strip().upper() permet d'éviter les erreurs de saisie (ex: " paid" ou "Paid ")
-            df_filtre['Pay_Status'] = df_filtre['Paiement'].astype(str).str.strip().upper()
+             # --- C. FILTRAGE CHIRURGICAL STRICT ---
+             if not df_filtre.empty:
+                 # SÉCURITÉ : Si la colonne 'Paiement' n'existe pas, on la crée vide
+                 if 'Paiement' not in df_filtre.columns:
+                     df_filtre['Paiement'] = "Unpaid"
             
-            # FILTRE : Uniquement "PAID"
-            df_final = df_filtre[df_filtre['Pay_Status'] == "PAID"].copy()
+                 # On remplit les cases vides (NaN) par "Unpaid" pour éviter les erreurs
+                 df_filtre['Paiement'] = df_filtre['Paiement'].fillna("Unpaid")
 
-            # Optionnel : Si vous voulez aussi exclure les statuts "Annulé" par précaution
-            if 'Statut' in df_final.columns:
-                df_final = df_final[~df_final['Statut'].astype(str).str.contains("Annulé|Refusé", case=False, na=False)]
-
-            # Filtre "À ce jour"
-            if mode_bilan == "À ce jour" and not df_final.empty:
-                today = pd.Timestamp.now().normalize()
-                df_final = df_final[df_final['dt_vrai'] <= today].copy()
+                 # Maintenant on peut nettoyer sans risque d'AttributeError
+                 df_filtre['Pay_Status'] = df_filtre['Paiement'].astype(str).str.strip().upper()
+            
+                 # FILTRE : Uniquement "PAID"
+                 df_final = df_filtre[df_filtre['Pay_Status'] == "PAID"].copy()
 
             # --- D. CALCULS ET NETTOYAGE DES PRIX ---
             st.divider()
