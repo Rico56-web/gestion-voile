@@ -1,66 +1,10 @@
 [
     {
-        "Date":"22\/03\/2026",
-        "Objet":"4 gilets de sauvetage",
-        "M_Num":246.8,
-        "Statut":"Fait",
-        "Type":"S\u00e9curit\u00e9"
-    },
-    {
-        "Date":"15\/03\/2026",
-        "Objet":"Place de port  du Crouesty",
-        "M_Num":374.6,
-        "Statut":"Fait",
-        "Type":"Port"
-    },
-    {
-        "Date":"15\/03\/2026",
-        "Objet":"Assurances MAIF",
-        "M_Num":70.0,
-        "Statut":"Fait",
-        "Type":"Assurances"
-    },
-    {
-        "Date":"15\/02\/2026",
-        "Objet":"Place de port  du Crouesty",
-        "M_Num":374.6,
-        "Statut":"Fait",
-        "Type":"Port"
-    },
-    {
-        "Date":"15\/02\/2026",
-        "Objet":"Assurances MAIF",
-        "M_Num":70.0,
-        "Statut":"Fait",
-        "Type":"Assurances"
-    },
-    {
-        "Date":"15\/01\/2026",
-        "Objet":"Place de port  du Crouesty",
-        "M_Num":374.6,
-        "Statut":"Fait",
-        "Type":"Port"
-    },
-    {
         "Date":null,
         "Objet":"taxes DGN",
         "M_Num":178.0,
         "Statut":"Fait",
         "Type":"Autres frais"
-    },
-    {
-        "Date":"15\/01\/2026",
-        "Objet":"Assurances MAIF",
-        "M_Num":70.0,
-        "Statut":"Fait",
-        "Type":"Assurances"
-    },
-    {
-        "Date":"15\/04\/2026",
-        "Objet":"place de port du Crouesty (M4)",
-        "M_Num":374.6,
-        "Statut":"\u00c0 pr\u00e9voir",
-        "Type":"Port"
     },
     {
         "Date":"15\/05\/2026",
@@ -126,13 +70,6 @@
         "Type":"Assurances"
     },
     {
-        "Date":"15\/04\/2026",
-        "Objet":"MAIF assurance vesta (M4)",
-        "M_Num":70.0,
-        "Statut":"\u00c0 pr\u00e9voir",
-        "Type":"Assurances"
-    },
-    {
         "Date":"15\/06\/2026",
         "Objet":"MAIF assurance vesta (M6)",
         "M_Num":70.0,
@@ -165,6 +102,69 @@
         "Objet":"MAIF assurance vesta (M12)",
         "M_Num":70.0,
         "Statut":"\u00c0 pr\u00e9voir",
+        "Type":"Assurances"
+    },
+    {
+        "Date":"15\/04\/2026",
+        "Objet":"place de port du Crouesty (M4)",
+        "M_Num":374.6,
+        "Statut":"Fait",
+        "Type":"Port"
+    },
+    {
+        "Date":"15\/04\/2026",
+        "Objet":"MAIF assurance vesta (M4)",
+        "M_Num":70.0,
+        "Statut":"Fait",
+        "Type":"Assurances"
+    },
+    {
+        "Date":"22\/03\/2026",
+        "Objet":"4 gilets de sauvetage",
+        "M_Num":246.8,
+        "Statut":"Fait",
+        "Type":"S\u00e9curit\u00e9"
+    },
+    {
+        "Date":"15\/03\/2026",
+        "Objet":"Place de port  du Crouesty",
+        "M_Num":374.6,
+        "Statut":"Fait",
+        "Type":"Port"
+    },
+    {
+        "Date":"15\/03\/2026",
+        "Objet":"Assurances MAIF",
+        "M_Num":70.0,
+        "Statut":"Fait",
+        "Type":"Assurances"
+    },
+    {
+        "Date":"15\/02\/2026",
+        "Objet":"Place de port  du Crouesty",
+        "M_Num":374.6,
+        "Statut":"Fait",
+        "Type":"Port"
+    },
+    {
+        "Date":"15\/02\/2026",
+        "Objet":"Assurances MAIF",
+        "M_Num":70.0,
+        "Statut":"Fait",
+        "Type":"Assurances"
+    },
+    {
+        "Date":"15\/01\/2026",
+        "Objet":"Place de port  du Crouesty",
+        "M_Num":374.6,
+        "Statut":"Fait",
+        "Type":"Port"
+    },
+    {
+        "Date":"15\/01\/2026",
+        "Objet":"Assurances MAIF",
+        "M_Num":70.0,
+        "Statut":"Fait",
         "Type":"Assurances"
     }
 ]
