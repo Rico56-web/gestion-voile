@@ -565,31 +565,29 @@ if st.session_state.page == "PLANNING":
     else:
         st.info("Aucune mission ce mois-ci.")
 # =================================================================
-# --- 7. PAGE STATS (CIBLE : STATUT "ARCHIVÉE" DANS CONTACTS.JSON) ---
+# --- 7. PAGE STATS (SYNCHRO AVEC L'ONGLET ARCHIVES) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # 1. On charge le fichier ACTIF
-    df_all = charger_data_safe('contacts.json')
+    # 1. On charge le fichier principal
+    df_all = charger_data('contacts.json')
 
     if not df_all.empty:
-        # 2. Interface
         col_sel1, col_sel2 = st.columns(2)
         mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
         sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-        # --- A. SÉCURISATION ---
-        cols = ['Nom', 'Prénom', 'Prix', 'DateNav', 'Statut', 'Société']
-        for c in cols:
-            if c not in df_all.columns: df_all[c] = ""
+        # --- A. NETTOYAGE ---
         df_all = df_all.fillna("")
+        # Normalisation des statuts (comme dans votre onglet Archives)
+        statut_clean = df_all['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
 
         # --- B. RADAR DE DATE ---
         def radar_date(row):
-            val = str(row['DateNav']).strip()
-            if val and val.lower() != "nan" and val != "":
-                # Gère ISO (#11) et FR (#0, #8)
+            val = str(row['DateNav']).strip().split(' ')[0]
+            if val and val.lower() not in ["nan", "", "none"]:
+                # Test format ISO d'abord (fiche #11) puis FR (#0, #8)
                 dt = pd.to_datetime(val, errors='coerce')
                 if pd.isnull(dt):
                     dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
@@ -598,52 +596,49 @@ if st.session_state.page == "STATS":
 
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
 
-        # --- C. FILTRAGE CHIRURGICAL ---
-        # 1. Filtre Année
-        df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
+        # --- C. FILTRAGE IDENTIQUE À L'ONGLET ARCHIVES ---
+        # On ne prend que l'année sélectionnée
+        df_annee = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
+        
+        if not df_annee.empty:
+            # On applique le même filtre que votre onglet "ARCHIVES" du bloc CONTACTS
+            # Mais on ajoute la sécurité 'PAID' pour le CA confirmé
+            s_clean_annee = df_annee['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
+            
+            # FILTRE : Terminé/Annulé/Refusé ET Paiement == Paid (pour le CA)
+            mask_archives = s_clean_annee.str.contains("termine|annule|refuse")
+            mask_paye = df_annee['Paiement'].astype(str).str.upper() == "PAID"
+            
+            df_final = df_annee[mask_archives & mask_paye].copy()
 
-        # 2. On cherche le statut "Archivé" ou "Archivée" (insensible à la casse/accents)
-        def est_archive(statut):
-            s = str(statut).upper()
-            # On cherche la racine du mot pour être sûr de tout attraper
-            return "ARCHIV" in s 
-
-        if not df_filtre.empty:
-            mask_archive = df_filtre['Statut'].apply(est_archive)
-            df_final = df_filtre[mask_archive].copy()
-
-            # 3. Mode "À ce jour"
+            # Mode "À ce jour"
             if mode_bilan == "À ce jour" and not df_final.empty:
                 today = pd.Timestamp.now().normalize()
                 df_final = df_final[df_final['dt_vrai'] <= today].copy()
-        else:
-            df_final = pd.DataFrame()
-
-        # --- D. AFFICHAGE ---
-        st.divider()
-        # Conversion prix
-        total_ca = pd.to_numeric(df_final['Prix'], errors='coerce').sum() if not df_final.empty else 0
-        
-        c1, c2 = st.columns(2)
-        c1.metric(f"💰 CA Missions Archivées ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
-        c2.metric("📋 Nombre de fiches", f"{len(df_final)}")
-
-        if not df_final.empty:
-            df_final['Client'] = df_final['Prénom'].astype(str) + " " + df_final['Nom'].astype(str)
-            df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
             
-            view = df_final.sort_values('dt_vrai', ascending=False)
-            view = view[['Date_Aff', 'Client', 'Société', 'Prix']]
-            view.columns = ['Date', 'Client', 'Société', 'Montant (€)']
+            # --- D. AFFICHAGE ---
+            st.divider()
+            df_final['Prix_Num'] = pd.to_numeric(df_final['Prix'], errors='coerce').fillna(0)
+            total_ca = df_final['Prix_Num'].sum()
             
-            st.dataframe(view, hide_index=True, use_container_width=True)
+            c1, c2 = st.columns(2)
+            c1.metric(f"💰 CA Confirmé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
+            c2.metric("📋 Missions Archivées & Payées", f"{len(df_final)}")
+
+            if not df_final.empty:
+                df_final['Client'] = df_final['Prénom'].astype(str).str.upper() + " " + df_final['Nom'].astype(str).str.upper()
+                df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
+                
+                view = df_final.sort_values('dt_vrai', ascending=False)
+                view = view[['Date_Aff', 'Client', 'Société', 'Prix']]
+                view.columns = ['Date', 'Client', 'Société', 'Montant (€)']
+                st.dataframe(view, hide_index=True, use_container_width=True)
+            else:
+                st.info(f"Aucune mission 'Paid' trouvée dans vos archives pour {sel_y}.")
         else:
-            st.info(f"Aucune fiche avec le statut 'Archivée' trouvée pour {sel_y}.")
-            # Petit outil de diagnostic pour vous aider à voir ce qui bloque
-            with st.expander("🔍 Vérifier les statuts présents dans votre fichier"):
-                st.write(df_filtre[['Nom', 'DateNav', 'Statut']].head(10))
+            st.info(f"Aucune donnée pour l'année {sel_y}.")
     else:
-        st.error("Le fichier contacts.json est vide.")
+        st.error("Fichier contacts.json introuvable.")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
