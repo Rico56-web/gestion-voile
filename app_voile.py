@@ -977,139 +977,97 @@ if st.session_state.page == "FACTURES":
 
     st.markdown("<br><br>", unsafe_allow_html=True)
     # =================================================================
-# --- 11. PAGE ARCHIVES (NETTOYAGE & EXPORT) ---
+# --- 11. PAGE ARCHIVES ---
 # =================================================================
 if st.session_state.page == "ARCHIVES":
-    import pandas as pd
-    import io
-    from datetime import datetime
-
-    # 1. BOUTON DE RETOUR
-    last = st.session_state.get('last_page', 'PLANNING')
-    if st.button(f"⬅️ RETOUR VERS {last}", use_container_width=True):
-        st.session_state.page = last
+    st.title("📂 Archives")
+    
+    # Bouton retour simple
+    if st.button("⬅️ Retour au Planning"):
+        st.session_state.page = "PLANNING"
         st.rerun()
 
-    st.title("📂 Centre d'Archivage Vesta")
-
-    # --- 2. LE PANNEAU DE NETTOYAGE ---
-    with st.expander("✂️ ARCHIVER UNE PÉRIODE", expanded=False):
-        st.info("Bascule les données vers l'historique.")
-        c1, c2 = st.columns(2)
-        d_debut = c1.date_input("Du", datetime(2026, 1, 1), key="arch_d1")
-        d_fin = c2.date_input("Au", datetime(2026, 12, 31), key="arch_d2")
-        
-        if st.button("🚀 LANCER L'ARCHIVAGE", use_container_width=True, type="primary"):
-            # Simulation/Appel des fonctions d'archivage
-            st.success("Données déplacées avec succès.")
-            st.rerun()
-
-    # --- 3. EXPORT EXCEL ---
-    with st.expander("📤 EXPORT PC (Excel)", expanded=False):
-        st.write("Générer un fichier global des archives.")
-        # ... (ton code d'export excel ici si besoin)
-
-    # --- 4. AFFICHAGE DES TABLEAUX ---
-    st.subheader("📜 Historique")
-    t1, t2, t3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Livre de Bord"])
+    t1, t2, t3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook"])
     
     with t1:
-        df_frais_arch = charger_data_safe('archives_maintenance.json')
-        if not df_frais_arch.empty:
-            st.dataframe(df_frais_arch, use_container_width=True, hide_index=True)
-        else:
-            st.write("Aucun frais archivé.")
-
+        df_arch_m = charger_data_safe('archives_maintenance.json')
+        st.dataframe(df_arch_m, use_container_width=True)
     with t2:
-        df_plan_arch = charger_data_safe('archives_planning.json')
-        if not df_plan_arch.empty:
-            st.dataframe(df_plan_arch, use_container_width=True, hide_index=True)
-        else:
-            st.write("Aucun planning archivé.")
-
+        df_arch_p = charger_data_safe('archives_planning.json')
+        st.dataframe(df_arch_p, use_container_width=True)
     with t3:
-        df_log_arch = charger_data_safe('archives_logbook.json')
-        if not df_log_arch.empty:
-            st.dataframe(df_log_arch, use_container_width=True, hide_index=True)
-        else:
-            st.write("Aucun logbook archivé.")
+        df_arch_l = charger_data_safe('archives_logbook.json')
+        st.dataframe(df_arch_l, use_container_width=True)
 
 # =================================================================
 # --- 12. PAGE LIVRE DE BORD (LOGBOOK) ---
 # =================================================================
 if st.session_state.page == "LOGBOOK":
-    import pandas as pd
-    from datetime import datetime
-
     st.title("📖 Livre de Bord")
 
-    # Fonction de conversion locale
-    def to_f_local(val):
-        try:
-            if pd.isna(val) or val == "": return 0.0
-            return float(str(val).replace('€','').replace(' ','').replace(',','.').strip())
-        except: return 0.0
-
-    # Chargement des données
+    # 1. Chargement sécurisé
     df_log = charger_data_safe('logbook.json')
 
-    # Initialisation des compteurs
-    if not df_log.empty:
-        last = df_log.iloc[-1]
-        val_dep_mot = to_f_local(last.get('TotalMot', 0.0))
-        val_dep_mil = to_f_local(last.get('TotalMil', 0.0))
-        dernier_port = str(last.get('PortArr', ""))
-    else:
-        val_dep_mot, val_dep_mil, dernier_port = 0.0, 0.0, ""
+    # 2. Récupération des compteurs (avec valeurs par défaut forcées en float)
+    last_h = 0.0
+    last_m = 0.0
+    last_p = ""
 
-    # Formulaire de saisie
-    with st.form("form_logbook_2026"):
-        st.subheader("📍 Nouvelle Étape")
-        c1, c2 = st.columns(2)
-        f_date = c1.date_input("Date", datetime.now())
-        f_port_dep = c2.text_input("Départ", value=dernier_port)
-        f_port_arr = st.text_input("Arrivée")
+    if not df_log.empty:
+        try:
+            # On prend la dernière ligne proprement
+            derniere = df_log.iloc[-1]
+            last_h = float(str(derniere.get('TotalMot', 0.0)).replace(',','.'))
+            last_m = float(str(derniere.get('TotalMil', 0.0)).replace(',','.'))
+            last_p = str(derniere.get('PortArr', ""))
+        except:
+            pass
+
+    # 3. Formulaire simplifié (Anti-Bug)
+    with st.form("log_v2026"):
+        col1, col2 = st.columns(2)
+        f_date = col1.date_input("Date")
+        f_dep = col2.text_input("Départ", value=last_p)
+        f_arr = st.text_input("Arrivée")
 
         st.divider()
-        col_m1, col_m2 = st.columns(2)
-        # On force float() pour éviter l'erreur Streamlit sur les types
-        f_mot_dep = col_m1.number_input("Compteur Début (h)", value=float(val_dep_mot), step=0.1)
-        f_mot_arr = col_m2.number_input("Compteur Fin (h)", value=float(val_dep_mot), step=0.1)
         
-        col_v1, col_v2 = st.columns(2)
-        f_mil_etape = col_v1.number_input("Distance (NM)", min_value=0.0, step=1.0)
-        f_h_voile = col_v2.number_input("Dont Voile (h)", min_value=0.0, step=0.5)
+        c_m1, c_m2 = st.columns(2)
+        f_h_dep = c_m1.number_input("H. Moteur Départ", value=last_h, step=0.1)
+        f_h_arr = c_m2.number_input("H. Moteur Arrivée", value=last_h, step=0.1)
+
+        f_mil = st.number_input("Milles de l'étape", min_value=0.0, step=1.0)
 
         if st.form_submit_button("💾 ENREGISTRER", use_container_width=True, type="primary"):
-            if f_port_arr:
+            if f_arr:
+                # Création de la ligne
                 nouvelle_etape = {
                     "Date": f_date.strftime("%d/%m/%Y"),
-                    "PortDep": f_port_dep,
-                    "PortArr": f_port_arr,
-                    "MotDep": f_mot_dep,
-                    "TotalMot": f_mot_arr,
-                    "TotalMil": val_dep_mil + f_mil_etape,
-                    "MillesEtape": f_mil_etape,
-                    "HVoile": f_h_voile
+                    "PortDep": f_dep,
+                    "PortArr": f_arr,
+                    "MotDep": f_h_dep,
+                    "TotalMot": f_h_arr,
+                    "TotalMil": last_m + f_mil,
+                    "MillesEtape": f_mil
                 }
-                # Sauvegarde
-                df_upd = charger_data_safe('logbook.json')
-                df_final = pd.concat([df_upd, pd.DataFrame([nouvelle_etape])], ignore_index=True)
+                
+                # Re-chargement et concaténation
+                df_actuel = charger_data_safe('logbook.json')
+                df_final = pd.concat([df_actuel, pd.DataFrame([nouvelle_etape])], ignore_index=True)
                 sauvegarder_data(df_final, 'logbook.json')
+                
                 st.success("Étape enregistrée !")
                 st.rerun()
             else:
-                st.warning("Précisez l'arrivée.")
+                st.warning("Veuillez saisir le port d'arrivée.")
 
+    # 4. Affichage de l'historique
     if not df_log.empty:
         st.divider()
-        st.subheader("📜 Historique")
         st.dataframe(df_log.iloc[::-1].head(10), use_container_width=True, hide_index=True)
 
 # --- FIN DU FICHIER ---
 
-
-# --- FIN DU FICHIER ---
 
 
 
