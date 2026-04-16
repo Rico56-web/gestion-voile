@@ -82,21 +82,21 @@
     {
         "Date":"21\/02\/2026",
         "PortDep":"ARZON",
-        "PortArr":"ARZON",
+        "PortArr":"",
         "MilDep":2600.0,
         "MilArr":2643.0,
         "MotDep":2411.1,
         "MotArr":2415.8,
         "TotalMil":43.0,
         "TotalMot":4.7,
-        "HVoile":null,
-        "Litre Gazoil":0.0,
-        "Cout Gazoil":0.0,
+        "HVoile":6.0,
+        "Litre Gazoil":6.0,
+        "Cout Gazoil":13.2,
         "Observations":"sortie cmn",
-        "Meteo":"Correct",
-        "Vent":2.0,
-        "Mouillage":"Port",
-        "Equipage":"",
-        "Plein":"Non"
+        "Meteo":null,
+        "Vent":null,
+        "Mouillage":null,
+        "Equipage":null,
+        "Plein":null
     }
 ]
