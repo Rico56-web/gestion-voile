@@ -589,14 +589,18 @@ if st.session_state.page == "PLANNING":
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
 # =================================================================
-# --- 7. PAGE STATS (CORRECTION : EXCLUSION CA DES NON-PAYÉS) ---
+# --- 7. PAGE STATS (LOGIQUE SIMPLIFIÉE : DATE = FILTRE TEMPOREL UNIQUEMENT) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # 1. Chargement
+    # 1. Chargement et marquage
     df_actuel = charger_data_safe('contacts.json')
+    if not df_actuel.empty: df_actuel['Source'] = 'ACTUEL'
+    
     df_archive = charger_data_safe('archives_factures.json')
+    if not df_archive.empty: df_archive['Source'] = 'ARCHIVES'
+    
     df_all = pd.concat([df_actuel, df_archive], ignore_index=True)
 
     # 2. Interface
@@ -605,22 +609,20 @@ if st.session_state.page == "STATS":
     sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
     if not df_all.empty:
-        # --- ÉTAPE A : SÉCURISATION & NETTOYAGE ---
-        # On s'assure que 'Statut' existe pour gérer le Paid/Unpaid
-        for c in ['Nom', 'Objet', 'Société', 'Acompte', 'Prix', 'DateNav', 'Statut']:
+        # --- ÉTAPE A : SÉCURISATION ---
+        for c in ['Nom', 'Objet', 'Société', 'Acompte', 'Prix', 'DateNav', 'Statut', 'Etat']:
             if c not in df_all.columns: df_all[c] = ""
         df_all = df_all.fillna("")
 
-        # --- ÉTAPE B : RADAR DE DATE (ISO #11 INCLUS) ---
+        # --- ÉTAPE B : RADAR DE DATE (POUR LE FILTRE "À CE JOUR") ---
         def radar_date(row):
             for col in ['DateNav', 'Date', 'date']:
-                if col in row:
-                    val = str(row[col]).strip()
-                    if val and val.lower() != "nan":
-                        dt = pd.to_datetime(val, errors='coerce') # Priorité ISO
-                        if pd.isnull(dt):
-                            dt = pd.to_datetime(val, dayfirst=True, errors='coerce') # Secours FR
-                        if pd.notnull(dt): return dt
+                val = str(row[col]).strip()
+                if val and val.lower() != "nan" and val != "":
+                    dt = pd.to_datetime(val, errors='coerce') # Gère ISO (#11)
+                    if pd.isnull(dt):
+                        dt = pd.to_datetime(val, dayfirst=True, errors='coerce') # Gère FR
+                    if pd.notnull(dt): return dt
             return pd.NaT
 
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
@@ -632,44 +634,45 @@ if st.session_state.page == "STATS":
             try: return float(val)
             except: return 0.0
 
-        # Montant théorique (Prix ou Acompte)
         df_all['Mnt_Total'] = df_all.apply(lambda x: max(to_num(x['Prix']), to_num(x['Acompte'])), axis=1)
-        
-        # Montant encaissé (0 si "Unpaid" ou "Non payé")
-        def calcul_encaisse(row):
-            statut = str(row['Statut']).lower()
-            if "unpaid" in statut or "non payé" in statut:
-                return 0.0
-            return row['Mnt_Total']
 
-        df_all['Mnt_Encaisse'] = df_all.apply(calcul_encaisse, axis=1)
-
-        # --- ÉTAPE D : FILTRAGE ---
+        # --- ÉTAPE D : FILTRAGE CHIRURGICAL ---
+        # 1. Année d'abord
         mask_annee = (df_all['dt_vrai'].dt.year == sel_y)
         df_filtre = df_all[mask_annee].copy()
 
-        if not df_filtre.empty:
-            # Exclusion Faucheux & Lignes vides
-            df_filtre['Nom_C'] = df_filtre['Nom'].astype(str)
-            df_filtre = df_filtre[~df_filtre['Nom_C'].str.contains('Faucheux', case=False, na=False)]
-            df_filtre = df_filtre[(df_filtre['Nom_C'] != "") | (df_filtre['Objet'] != "")]
+        # 2. Conditions de VALIDATION (Archive ou Payé/Terminé)
+        def est_valide(row):
+            statut = str(row['Statut']).upper()
+            etat = str(row['Etat']).upper()
+            nom = str(row['Nom']).upper()
+            
+            # Exclusion stricte de Faucheux et des Listes d'Attente
+            if "FAUCHEUX" in nom or "ATTENTE" in statut or "ATTENTE" in etat:
+                return False
+            
+            # Validation : Soit c'est dans le fichier Archive, soit c'est marqué comme réglé
+            keywords = ["PAYÉ", "PAYE", "TERMINÉ", "TERMINE", "REGLÉ", "REGLE"]
+            is_confirmed = any(kw in statut or kw in etat for kw in keywords)
+            
+            return (row['Source'] == 'ARCHIVES' or is_confirmed)
 
-            if mode_bilan == "À ce jour":
-                today = pd.Timestamp.now().normalize()
-                df_final = df_filtre[df_filtre['dt_vrai'] <= today].copy()
-            else:
-                df_final = df_filtre.copy()
-        else:
-            df_final = pd.DataFrame()
+        df_filtre['Valide'] = df_filtre.apply(est_valide, axis=1)
+        df_final = df_filtre[df_filtre['Valide'] == True].copy()
 
-        # --- ÉTAPE E : AFFICHAGE DES KPI ---
+        # 3. FILTRE TEMPOREL (Optionnel selon le bouton)
+        if mode_bilan == "À ce jour":
+            today = pd.Timestamp.now().normalize()
+            # On ne garde que ce qui est passé ou aujourd'hui
+            df_final = df_final[df_final['dt_vrai'] <= today].copy()
+
+        # --- ÉTAPE E : AFFICHAGE KPI ---
         st.divider()
-        # Le CA ne somme que ce qui est réellement encaissé
-        total_ca = df_final['Mnt_Encaisse'].sum() if not df_final.empty else 0
+        total_ca = df_final['Mnt_Total'].sum()
         
         c1, c2 = st.columns(2)
         c1.metric(f"💰 CA Encaissé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
-        c2.metric("📋 Missions suivies", f"{len(df_final)}")
+        c2.metric("📋 Missions", f"{len(df_final)}")
 
         # --- ÉTAPE F : TABLEAU ---
         if not df_final.empty:
@@ -677,11 +680,15 @@ if st.session_state.page == "STATS":
             df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
             
             view = df_final.sort_values('dt_vrai', ascending=False)
-            # On affiche le Mnt_Total pour info, mais il n'est pas dans le KPI CA si non payé
-            view = view[['Date_Aff', 'Client', 'Société', 'Mnt_Total', 'Statut']]
-            view.columns = ['Date', 'Client / Objet', 'Société', 'Montant (€)', 'État']
+            view = view[['Date_Aff', 'Client', 'Société', 'Mnt_Total']]
+            view.columns = ['Date', 'Client / Objet', 'Société', 'Montant (€)']
             
             st.dataframe(view, hide_index=True, use_container_width=True)
+        else:
+            st.info("Aucune mission validée (Payée/Terminée/Archive) détectée.")
+
+    else:
+        st.error("Fichiers JSON vides ou introuvables.")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
