@@ -932,10 +932,10 @@ if st.session_state.page == "LOG":
 
     if not df_log.empty:
         # --- LA SOLUTION : RÉORGANISATION PHYSIQUE ---
-        # On définit l'ordre exact que tu as demandé (2, 0, 1, 3, 4)
+        # On définit l'ordre exact que tu as demandé (2, 1, 0, 3, 4)
         # On s'assure que ces index existent avant de les trier
         index_existants = df_log.index.tolist()
-        ordre_souhaite = [2, 0, 1, 3, 4]
+        ordre_souhaite = [2, 1, 0, 3, 4]
         
         # On ne garde que les index qui existent vraiment dans ton fichier
         ordre_final = [i for i in ordre_souhaite if i in index_existants]
