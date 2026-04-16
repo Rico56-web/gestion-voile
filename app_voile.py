@@ -922,21 +922,21 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True) 
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION SÉCURISÉE ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - ORDRE PHYSIQUE INVERSÉ ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
 
     df_log = charger_data_safe('logbook.json')
 
-    # 1. RÉCUPÉRATION DES COMPTEURS
+    # 1. RÉCUPÉRATION DES COMPTEURS (sur la ligne du haut car c'est la plus récente)
     last_h = 0.0
     last_m = 0.0
     if not df_log.empty:
         try:
-            derniere = df_log.iloc[-1]
-            last_h = float(derniere.get('TotalMot', 0.0))
-            last_m = float(derniere.get('TotalMil', 0.0))
+            premiere_ligne = df_log.iloc[0] # Index 0 car on va sauver à l'envers
+            last_h = float(premiere_ligne.get('TotalMot', 0.0))
+            last_m = float(premiere_ligne.get('TotalMil', 0.0))
         except: pass
 
     # 2. BLOC NOUVELLE NAVIGATION
@@ -947,99 +947,93 @@ if st.session_state.page == "LOG":
     f_jours = c2.number_input("Jours", min_value=1, value=1)
     f_titre = c3.text_input("Titre / Destination")
     
-    # Préparation du tableau de saisie
     if 'temp_log_df' not in st.session_state:
         st.session_state.temp_log_df = pd.DataFrame([{
-            "Port": "", 
-            "Mot_Dep": last_h, "Mot_Arr": last_h,
-            "Mil_Dep": last_m, "Mil_Arr": last_m,
-            "Voile": 0.0, "Notes": ""
+            "Port": "", "Mot_Dep": last_h, "Mot_Arr": last_h,
+            "Mil_Dep": last_m, "Mil_Arr": last_m, "Voile": 0.0, "Notes": ""
         }])
 
-    # L'éditeur de données
     edited_steps = st.data_editor(
         st.session_state.temp_log_df,
         column_config={
-            "Port": "📍 Etape",
-            "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
-            "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr",
-            "Voile": "Voile", "Notes": "Notes"
+            "Port": "📍 Etape", "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
+            "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr", "Voile": "Voile", "Notes": "Notes"
         },
-        num_rows="dynamic",
-        use_container_width=True,
-        key="editor_log_v3"
+        num_rows="dynamic", use_container_width=True, key="editor_vfinal"
     )
 
     if st.button("💾 ENREGISTRER LA NAVIGATION", use_container_width=True, type="primary"):
-        # On vérifie si le tableau n'est pas vide
         if edited_steps is not None and not edited_steps.empty:
-            nouvelles_entrees = []
+            nouvelles = []
             for _, row in edited_steps.iterrows():
-                # On utilise .get() pour éviter le KeyError si une colonne manque
-                port_val = row.get("Port", "")
-                if port_val: # On n'enregistre que si le port est rempli
-                    nouvelles_entrees.append({
+                if row.get("Port"):
+                    nouvelles.append({
                         "Date": f_date.strftime("%d/%m/%Y"),
                         "Jours": int(f_jours),
                         "Navigation": f_titre,
-                        "PortArr": port_val,
+                        "PortArr": row.get("Port"),
                         "MotDep": float(row.get("Mot_Dep", last_h)),
                         "TotalMot": float(row.get("Mot_Arr", last_h)),
-                        "MillesEtape": float(row.get("Mil_Arr", 0)) - float(row.get("Mil_Dep", 0)),
+                        "MillesDep": float(row.get("Mil_Dep", last_m)),
                         "TotalMil": float(row.get("Mil_Arr", last_m)),
                         "H_Voile": float(row.get("Voile", 0.0)),
                         "Notes": row.get("Notes", "")
                     })
             
-            if nouvelles_entrees:
-                df_final = pd.concat([df_log, pd.DataFrame(nouvelles_entrees)], ignore_index=True)
+            if nouvelles:
+                # ASTUCE : On met les NOUVELLES lignes AU-DESSUS des anciennes
+                df_final = pd.concat([pd.DataFrame(nouvelles), df_log], ignore_index=True)
                 sauvegarder_data(df_final, 'logbook.json')
-                if 'temp_log_df' in st.session_state:
-                    del st.session_state.temp_log_df
+                if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
                 st.rerun()
 
-    # 3. HISTORIQUE (Le plus récent en haut : 2, 0, 1, 3, 4)
+    # 3. AFFICHAGE (Le plus récent est physiquement en haut)
     if not df_log.empty:
         st.divider()
-        st.subheader("📜 Historique")
-        
-        # Inversion physique pour l'affichage
-        df_affichage = df_log.copy()
-        df_affichage.insert(0, 'N°', df_log.index)
-        df_affichage = df_affichage.iloc[::-1] 
+        st.subheader("📜 Historique (Dernier en haut)")
+        st.dataframe(df_log, use_container_width=True)
 
-        st.dataframe(df_affichage, use_container_width=True, hide_index=True)
-
-        # 4. GESTION
-        col_mod, col_del = st.columns(2)
-        with col_mod:
-            with st.expander("📝 MODIFIER"):
-                idx_m = st.number_input("N° à modifier", min_value=0, max_value=df_log.index.max(), step=1)
-                row_m = df_log.loc[idx_m]
-                with st.form("edit_log_safe"):
-                    # On met toutes les cases nécessaires
-                    new_dest = st.text_input("Navigation", value=row_m.get('Navigation', ''))
-                    new_port = st.text_input("Port", value=row_m.get('PortArr', ''))
-                    c_m1, c_m2 = st.columns(2)
-                    new_h_arr = c_m1.number_input("H. Moteur Arr", value=float(row_m.get('TotalMot', 0.0)))
-                    new_m_arr = c_m2.number_input("Milles Arr", value=float(row_m.get('TotalMil', 0.0)))
-                    if st.form_submit_button("VALIDER"):
-                        df_log.at[idx_m, 'Navigation'] = new_dest
-                        df_log.at[idx_m, 'PortArr'] = new_port
-                        df_log.at[idx_m, 'TotalMot'] = new_h_arr
-                        df_log.at[idx_m, 'TotalMil'] = new_m_arr
+        # 4. GESTION - TOUTES LES DONNÉES ACCESSIBLES
+        col_m, col_s = st.columns(2)
+        with col_m:
+            with st.expander("📝 MODIFIER TOUS LES CHAMPS"):
+                idx_m = st.number_input("Ligne n°", min_value=0, max_value=len(df_log)-1, step=1)
+                r = df_log.loc[idx_m]
+                with st.form("edit_complete"):
+                    ed_dest = st.text_input("Navigation (Titre)", value=r.get('Navigation', ''))
+                    ed_port = st.text_input("Etape (Port)", value=r.get('PortArr', ''))
+                    
+                    c1, c2 = st.columns(2)
+                    ed_h_dep = c1.number_input("Moteur Dép", value=float(r.get('MotDep', 0.0)))
+                    ed_h_arr = c2.number_input("Moteur Arr", value=float(r.get('TotalMot', 0.0)))
+                    
+                    c3, c4 = st.columns(2)
+                    ed_m_dep = c3.number_input("Milles Dép", value=float(r.get('MillesDep', 0.0)))
+                    ed_m_arr = c4.number_input("Milles Arr", value=float(r.get('TotalMil', 0.0)))
+                    
+                    ed_voile = st.number_input("Heures Voile", value=float(r.get('H_Voile', 0.0)))
+                    ed_notes = st.text_area("Notes", value=r.get('Notes', ''))
+                    
+                    if st.form_submit_button("MODIFIER CETTE LIGNE"):
+                        df_log.at[idx_m, 'Navigation'] = ed_dest
+                        df_log.at[idx_m, 'PortArr'] = ed_port
+                        df_log.at[idx_m, 'MotDep'] = ed_h_dep
+                        df_log.at[idx_m, 'TotalMot'] = ed_h_arr
+                        df_log.at[idx_m, 'MillesDep'] = ed_m_dep
+                        df_log.at[idx_m, 'TotalMil'] = ed_m_arr
+                        df_log.at[idx_m, 'H_Voile'] = ed_voile
+                        df_log.at[idx_m, 'Notes'] = ed_notes
                         sauvegarder_data(df_log, 'logbook.json')
                         st.rerun()
 
-        with col_del:
+        with col_s:
             with st.expander("🗑️ SUPPRIMER"):
-                idx_s = st.number_input("N° à supprimer", min_value=0, max_value=df_log.index.max(), step=1, key="del")
-                if st.checkbox("Confirmer"):
-                    if st.button("EFFACER", type="primary"):
+                idx_s = st.number_input("Supprimer n°", min_value=0, max_value=len(df_log)-1, step=1, key="del")
+                if st.checkbox("Confirmer la suppression"):
+                    if st.button("EFFACER DÉFINITIVEMENT"):
                         df_log = df_log.drop(index=idx_s).reset_index(drop=True)
                         sauvegarder_data(df_log, 'logbook.json')
                         st.rerun()
-
 
 
 # --- FIN DU FICHIER ---
