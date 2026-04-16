@@ -768,11 +768,63 @@ if st.session_state.page == "MAINT":
             st.info(f"Rien à afficher pour {sel_y} en mode '{mode_maint}'.")
     else:
         st.info("Aucune donnée de maintenance.")
-
-    # --- 5. FORMULAIRE D'AJOUT ---
+# --- 5. FORMULAIRE D'AJOUT (AVEC OPTION MENSUELLE) ---
     st.write("---")
-    with st.expander("➕ Nouvelle Opération"):
-        # ... Ton formulaire actuel reste le même ...
+    with st.expander("➕ Ajouter une opération (Unique ou Mensuelle)"):
+        with st.form("form_maint_recurrence"):
+            st.markdown("📅 **Format d'enregistrement : JJ/MM/AAAA**")
+            
+            f_obj = st.text_input("Désignation (ex: Place de port)")
+            
+            col_a, col_b = st.columns(2)
+            f_date_iso = col_a.date_input("Date de début", datetime.now())
+            f_montant = col_b.number_input("Montant (€)", min_value=0.0, format="%.2f")
+            
+            col_c, col_d = st.columns(2)
+            f_type = col_c.selectbox("Catégorie", ["Port", "Assurances", "Maintenance", "Sécurité", "Autres frais"])
+            f_statut = col_d.selectbox("Statut par défaut", ["À prévoir", "Fait"])
+            
+            f_recurrence = st.checkbox("Répéter mensuellement (jusqu'à fin 2026)")
+            
+            # BOUTON DE SOUMISSION DU FORMULAIRE
+            submitted = st.form_submit_button("💾 Enregistrer", use_container_width=True)
+            
+            if submitted:
+                if f_obj:
+                    nouvelles_lignes = []
+                    if f_recurrence:
+                        # Boucle du mois actuel jusqu'à Décembre
+                        for m in range(f_date_iso.month, 13):
+                            date_gen = f_date_iso.replace(month=m).strftime("%d/%m/%Y")
+                            nouvelles_lignes.append({
+                                "Date": date_gen,
+                                "Objet": f"{f_obj} (M{m})",
+                                "M_Num": f_montant,
+                                "Statut": f_statut,
+                                "Type": f_type
+                            })
+                    else:
+                        nouvelles_lignes.append({
+                            "Date": f_date_iso.strftime("%d/%m/%Y"),
+                            "Objet": f_obj,
+                            "M_Num": f_montant,
+                            "Statut": f_statut,
+                            "Type": f_type
+                        })
+                    
+                    # Mise à jour du fichier
+                    df_new = pd.DataFrame(nouvelles_lignes)
+                    df_m = pd.concat([df_m, df_new], ignore_index=True)
+                    sauvegarder_data(df_m, 'maintenance.json')
+                    st.success(f"✅ {len(nouvelles_lignes)} ligne(s) ajoutée(s) !")
+                    st.rerun()
+                else:
+                    st.error("Veuillez remplir la désignation.")
+
+# --- 9. PAGES SUIVANTES (FACTURATION, ETC.) ---
+if st.session_state.page == "FACTURES":
+    st.title("📑 FACTURES")
+    # ... ton code factures ici ...
 
 # =================================================================
 # --- PAGE : FACTURATION & SUIVI PAIEMENTS ---
