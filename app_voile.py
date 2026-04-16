@@ -699,7 +699,15 @@ if st.session_state.page == "MAINT":
 
         st.subheader(f"📋 Suivi {sel_y}")
         
-        # L'éditeur (on garde num_rows="dynamic" pour l'ajout/édition rapide)
+        # --- CALCUL DE LA HAUTEUR DYNAMIQUE ---
+        # 35 pixels par ligne + environ 40 pixels pour l'en-tête
+        nb_lignes = len(df_filtre)
+        hauteur_calculee = (nb_lignes * 35) + 45 
+        
+        # On limite la hauteur minimale pour que ce ne soit pas trop écrasé
+        hauteur_finale = max(hauteur_calculee, 150)
+
+        # L'éditeur SANS ascenseur
         edited_df = st.data_editor(
             df_filtre.drop(columns=['dt_maint']),
             column_config={
@@ -712,8 +720,11 @@ if st.session_state.page == "MAINT":
             hide_index=False,
             use_container_width=True,
             num_rows="dynamic",
-            key="maint_editor_v6"
+            height=hauteur_finale, # <--- LA CLÉ EST ICI
+            key="maint_editor_v7"
         )
+        
+  
 
         # Grille de boutons pour iPhone
         col_save, col_del = st.columns(2)
