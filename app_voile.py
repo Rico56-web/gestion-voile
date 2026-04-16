@@ -722,18 +722,23 @@ if st.session_state.page == "MAINT":
         # On s'assure que les types sont corrects pour l'éditeur
         if 'M_Num' in df_edit.columns:
             df_edit['M_Num'] = pd.to_numeric(df_edit['M_Num'], errors='coerce').fillna(0.0)
-
-        # A. LE TABLEAU ÉDITABLE
+         # A. LE TABLEAU ÉDITABLE (Correction de l'erreur Height)
         st.info("💡 Vous pouvez modifier les cellules directement dans le tableau ci-dessous.")
+        
+        # On définit une hauteur raisonnable ou on laisse en automatique
+        # Suppression de height=None qui causait l'erreur
         edited_df = st.data_editor(
             df_edit,
             column_config={
-                # ... tes configs de colonnes ...
+                "Date": st.column_config.TextColumn("Date", help="Format JJ/MM/AAAA"),
+                "Objet": st.column_config.TextColumn("Désignation"),
+                "M_Num": st.column_config.NumberColumn("Montant (€)", format="%.2f"),
+                "Statut": st.column_config.SelectboxColumn("Statut", options=["À prévoir", "Fait"]),
+                "Type": st.column_config.SelectboxColumn("Catégorie", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres frais"])
             },
             hide_index=False,
             use_container_width=True,
-            num_rows="dynamic", # Permet au tableau de s'ajuster
-            height=None,        # Supprime la contrainte de hauteur (donc l'ascenseur)
+            num_rows="dynamic", # Permet d'ajouter des lignes manuellement
             key="maint_editor"
         )
 
