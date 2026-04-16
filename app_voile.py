@@ -1050,107 +1050,104 @@ if st.session_state.page == "ARCHIVES":
                 st.markdown(html_frais, unsafe_allow_html=True)
         else:
             st.write("Aucun frais archivé.")
-            # =================================================================
-# --- PAGE LIVRE DE BORD : SAISIE AUTO-CALCULÉE ---
+# =================================================================
+# --- PAGE LIVRE DE BORD : DIAGNOSTIC & SAISIE ---
 # =================================================================
 if st.session_state.page == "LOGBOOK":
     import pandas as pd
     from datetime import datetime
 
-    # --- 0. FONCTIONS INTERNES DE SÉCURITÉ ---
-    def to_f(val):
-        if pd.isna(val) or val == "": return 0.0
-        try: return float(str(val).replace('€','').replace(' ','').replace(',','.').strip())
-        except: return 0.0
-
     st.title("📖 Livre de Bord")
 
-    # 1. Chargement des données
-    # Assure-toi que charger_data_safe est bien définie dans ton code principal
-    df_log = charger_data_safe('logbook.json')
+    # --- 1. FONCTIONS DE SÉCURITÉ LOCALES ---
+    def safe_float(val):
+        try:
+            if pd.isna(val) or val == "": return 0.0
+            return float(str(val).replace('€','').replace(' ','').replace(',','.').strip())
+        except:
+            return 0.0
 
-    # --- 2. RÉCUPÉRATION DES DERNIÈRES VALEURS ---
-    if not df_log.empty:
-        # On prend la toute dernière ligne enregistrée
-        derniere_ligne = df_log.iloc[-1]
-        val_dep_mot = to_f(derniere_ligne.get('TotalMot', 0))
-        val_dep_mil = to_f(derniere_ligne.get('TotalMil', 0))
-        dernier_port = str(derniere_ligne.get('PortArr', ""))
-    else:
-        val_dep_mot = 0.0
-        val_dep_mil = 0.0
-        dernier_port = ""
+    # --- 2. TENTATIVE DE CHARGEMENT AVEC ERREUR VISIBLE ---
+    try:
+        df_log = charger_data_safe('logbook.json')
+    except Exception as e:
+        st.error(f"❌ Erreur de chargement du fichier JSON : {e}")
+        df_log = pd.DataFrame()
 
-    # --- 3. FORMULAIRE DE SAISIE ---
-    with st.form("form_logbook_v2", clear_on_submit=True):
+    # --- 3. RÉCUPÉRATION DES DERNIÈRES VALEURS ---
+    try:
+        if not df_log.empty:
+            # On récupère la dernière ligne
+            last = df_log.iloc[-1]
+            # On force le passage en float pour éviter le bug Streamlit
+            val_dep_mot = safe_float(last.get('TotalMot', 0.0))
+            val_dep_mil = safe_float(last.get('TotalMil', 0.0))
+            dernier_port = str(last.get('PortArr', ""))
+        else:
+            val_dep_mot, val_dep_mil, dernier_port = 0.0, 0.0, ""
+    except Exception as e:
+        st.warning(f"⚠️ Problème de lecture des dernières données : {e}")
+        val_dep_mot, val_dep_mil, dernier_port = 0.0, 0.0, ""
+
+    # --- 4. FORMULAIRE DE SAISIE ---
+    with st.form("form_logbook_final"):
         st.subheader("📍 Nouvelle Étape")
         
         c1, c2 = st.columns(2)
         f_date = c1.date_input("Date", datetime.now())
-        f_port_dep = c2.text_input("Port de Départ", value=dernier_port)
-        f_port_arr = st.text_input("Port d'Arrivée")
+        f_port_dep = c2.text_input("Départ", value=dernier_port)
+        f_port_arr = st.text_input("Arrivée")
 
         st.divider()
         
-        # Section Moteur
+        # Moteur
         col_m1, col_m2 = st.columns(2)
-        f_mot_dep = col_m1.number_input("Compteur Départ (h)", value=float(val_dep_mot), step=0.1, format="%.1f")
-        f_mot_arr = col_m2.number_input("Compteur Arrivée (h)", value=float(val_dep_mot), step=0.1, format="%.1f")
+        f_mot_dep = col_m1.number_input("Compteur Début (h)", value=val_dep_mot, step=0.1)
+        f_mot_arr = col_m2.number_input("Compteur Fin (h)", value=val_dep_mot, step=0.1)
         
-        # Section Milles & Voile
+        # Navigation
         col_v1, col_v2 = st.columns(2)
-        f_mil_etape = col_v1.number_input("Milles de l'étape (NM)", min_value=0.0, step=1.0)
-        f_h_voile = col_v2.number_input("Dont Heures Voile (h)", min_value=0.0, step=0.5)
+        f_mil_etape = col_v1.number_input("Distance (NM)", min_value=0.0, step=1.0)
+        f_h_voile = col_v2.number_input("Dont Voile (h)", min_value=0.0, step=0.5)
 
         st.divider()
-        f_gaz_euro = st.number_input("Plein Gazole (€)", min_value=0.0, step=1.0)
+        f_gaz = st.number_input("Plein Gazole (€)", min_value=0.0)
 
-        # --- 4. LOGIQUE DE SAUVEGARDE ---
-        submit = st.form_submit_button("💾 ENREGISTRER L'ÉTAPE", use_container_width=True, type="primary")
-        
-        if submit:
+        # Bouton d'enregistrement
+        if st.form_submit_button("💾 ENREGISTRER L'ÉTAPE", use_container_width=True, type="primary"):
             if f_port_arr and f_port_dep:
-                # Calcul du cumul des milles pour les stats
-                nouveau_total_milles = val_dep_mil + f_mil_etape
-                
-                # Création de l'étape
-                nouvelle_etape = {
-                    "Date": f_date.strftime("%d/%m/%Y"),
-                    "PortDep": f_port_dep,
-                    "PortArr": f_port_arr,
-                    "MotDep": f_mot_dep,
-                    "TotalMot": f_mot_arr,
-                    "TotalMil": nouveau_total_milles,
-                    "MillesEtape": f_mil_etape,
-                    "HVoile": f_h_voile,
-                    "Cout Gazoil": f_gaz_euro
-                }
+                try:
+                    # Préparation de la donnée
+                    nouvelle_etape = {
+                        "Date": f_date.strftime("%d/%m/%Y"),
+                        "PortDep": f_port_dep,
+                        "PortArr": f_port_arr,
+                        "MotDep": f_mot_dep,
+                        "TotalMot": f_mot_arr,
+                        "TotalMil": val_dep_mil + f_mil_etape,
+                        "MillesEtape": f_mil_etape,
+                        "HVoile": f_h_voile,
+                        "Cout Gazoil": f_gaz
+                    }
 
-                # Re-chargement de sécurité avant concaténation
-                df_log_upd = charger_data_safe('logbook.json')
-                df_final = pd.concat([df_log_upd, pd.DataFrame([nouvelle_etape])], ignore_index=True)
-                
-                # Sauvegarde
-                sauvegarder_data(df_final, 'logbook.json')
-                
-                st.success(f"✅ Enregistré : {f_port_dep} ➔ {f_port_arr}")
-                st.rerun()
+                    # Re-chargement et Sauvegarde
+                    df_upd = charger_data_safe('logbook.json')
+                    df_final = pd.concat([df_upd, pd.DataFrame([nouvelle_etape])], ignore_index=True)
+                    sauvegarder_data(df_final, 'logbook.json')
+                    
+                    st.success("✅ Étape mémorisée !")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Erreur lors de la sauvegarde : {e}")
             else:
-                st.error("⚠️ Les ports sont obligatoires !")
+                st.warning("Les ports de départ et d'arrivée sont requis.")
 
-    # --- 5. HISTORIQUE (POUR VÉRIFIER QUE ÇA NE S'EFFACE PAS) ---
+    # --- 5. AFFICHAGE DE L'HISTORIQUE ---
     if not df_log.empty:
         st.write("---")
-        st.subheader("📜 5 Dernières Étapes")
-        # Affichage inversé (plus récent en haut)
-        df_display = df_log.iloc[::-1].head(5)
-        st.dataframe(
-            df_display[['Date', 'PortDep', 'PortArr', 'TotalMot', 'MillesEtape']], 
-            use_container_width=True, 
-            hide_index=True
-        )
-
-
+        st.subheader("📜 Historique")
+        # Inversion pour voir le plus récent en haut
+        st.dataframe(df_log.iloc[::-1].head(10), use_container_width=True, hide_index=True)
 
 # --- FIN DU FICHIER ---
 
