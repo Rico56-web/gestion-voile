@@ -565,8 +565,8 @@ if st.session_state.page == "PLANNING":
     else:
         st.info("Aucune mission ce mois-ci.")
 
-   # =================================================================
-# --- 7. PAGE STATS (VERSION CORRIGÉE & UNIVERSELLE) ---
+ # =================================================================
+# --- 7. PAGE STATS (VERSION FINALE - CIBLE 2509€) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
@@ -582,20 +582,23 @@ if st.session_state.page == "STATS":
         mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
         sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-    # --- B. RADAR DE DATE (VERSION NETTOYAGE JSON) ---
+        # --- B. RADAR DE DATE (GÈRE LES SLASHES ÉCHAPPÉS \/ DU JSON) ---
         def radar_date(row):
-            # On récupère la valeur et on vire les anti-slashs d'échappement JSON (\/)
-            val = str(row.get('DateNav', '')).replace('\\/', '/').replace('\\', '/').strip().split(' ')[0]
-            
+            # Nettoyage des caractères d'échappement JSON \/ pour la fiche du 07/03
+            val = str(row.get('DateNav', '')).replace('\\/', '/').strip().split(' ')[0]
             if val and val.lower() not in ["nan", "", "none"]:
-                # Tentative 1 : Format Français (Slashs) - Prioritaire pour tes fiches
+                # Tentative en format français (dayfirst) pour tes fiches
                 dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
-                
-                # Tentative 2 : Si échec, format ISO (Tirets)
+                # Si échec, tentative format auto (tirets)
                 if pd.isnull(dt):
                     dt = pd.to_datetime(val, errors='coerce')
                 return dt
             return pd.NaT
+
+        # CRÉATION DE DF_FILTRE (Placé ici pour éviter NameError)
+        df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
+        df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
+
         # --- C. FILTRAGE ET CALCULS ---
         if not df_filtre.empty:
             def est_comptabilise(row):
@@ -603,21 +606,23 @@ if st.session_state.page == "STATS":
                 paiement = str(row.get('Paiement', '')).strip().upper()
                 statut = str(row.get('Statut', '')).strip().upper()
                 
+                # On exclut toujours les listes d'attente
                 if "LISTE D'ATTENTE" in statut: return False
                 
-                # Règle CMN (prioritaire pour tes 2509€)
+                # RÈGLE CMN : On prend si c'est CMN (même si Unpaid dans le futur)
                 if "CMN" in societe: return True
                 
-                # Autres (si payé)
+                # AUTRES : Uniquement si payé (exclut fiche #15)
                 return paiement == "PAID"
 
             df_final = df_filtre[df_filtre.apply(est_comptabilise, axis=1)].copy()
 
+            # Filtre temporel "À ce jour"
             if mode_bilan == "À ce jour" and not df_final.empty:
                 today = pd.Timestamp.now().normalize()
                 df_final = df_final[df_final['dt_vrai'] <= today].copy()
 
-            # --- D. AFFICHAGE ---
+            # --- D. AFFICHAGE DES RÉSULTATS ---
             st.divider()
             
             def force_float(val):
@@ -633,15 +638,17 @@ if st.session_state.page == "STATS":
                 c1.metric(f"💰 CA Encaissé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
                 c2.metric("📋 Missions", f"{len(df_final)}")
 
+                # Liste détaillée pour vérification (doit afficher 7 lignes)
                 df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
                 view = df_final.sort_values('dt_vrai', ascending=False)
-                st.dataframe(view[['Date_Aff', 'Nom', 'Société', 'Prix', 'Paiement']], hide_index=True, use_container_width=True)
+                st.dataframe(view[['Date_Aff', 'Nom', 'Société', 'Prix', 'Paiement']], 
+                             hide_index=True, use_container_width=True)
             else:
-                st.info("Aucune mission validée pour cette sélection.")
+                st.info(f"Aucune mission validée pour l'année {sel_y}.")
         else:
-            st.info(f"Aucune donnée trouvée pour l'année {sel_y}.")
+            st.info(f"Aucune donnée trouvée pour {sel_y}.")
     else:
-        st.error("Les fichiers de données sont vides ou introuvables.")        
+        st.error("Aucune donnée disponible.")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
