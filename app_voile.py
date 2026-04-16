@@ -623,24 +623,49 @@ if st.session_state.page == "STATS":
                 try: return float(str(val).replace('€','').replace(' ','').replace(',','.'))
                 except: return 0.0
             total_dep = df_dep_final['M_Num'].apply(to_f).sum()
+            # --- D. INDICATEURS DE PERFORMANCE (KPI CROISÉS) ---
+if not df_final.empty:
+    total_ca = df_final['Prix'].apply(to_f).sum()
+    
+    # Calcul des stats techniques depuis le LOGBOOK
+    df_log = charger_data_safe('logbook.json')
+    # On filtre le logbook sur l'année sélectionnée
+    df_log['dt'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+    df_log_y = df_log[df_log['dt'].dt.year == sel_y]
+    
+    t_milles = df_log_y['TotalMil'].sum()
+    t_moteur = df_log_y['TotalMot'].sum()
+    t_gasoil_l = df_log_y['Litre Gazoil'].sum()
+    t_gasoil_eur = df_log_y['Cout Gazoil'].sum()
 
-        # --- D. INDICATEURS DE PERFORMANCE (KPI) ---
-        total_ca = df_final['Prix'].apply(to_f).sum() if not df_final.empty else 0.0
-        net = total_ca - total_dep
-        marge = (net / total_ca * 100) if total_ca > 0 else 0
-        panier_moyen = (total_ca / len(df_final)) if not df_final.empty else 0
-        
-        # Affichage Grille
-        st.divider()
-        c1, c2 = st.columns(2)
-        c1.metric("💰 Chiffre d'Affaires", f"{total_ca:,.0f} €".replace(',', ' '))
-        c2.metric("⚖️ Revenu Net", f"{net:,.0f} €".replace(',', ' '))
-        
-        st.write("📈 **Efficacité de l'activité**")
-        cp1, cp2, cp3 = st.columns(3)
-        cp1.metric("Marge", f"{marge:.1f}%")
-        cp2.metric("Panier", f"{panier_moyen:.0f}€")
-        cp3.metric("Sorties", f"{len(df_final)}")
+    # Intégration du coût gasoil dans les dépenses totales
+    total_dep_global = total_dep + t_gasoil_eur
+    net = total_ca - total_dep_global
+
+    # --- AFFICHAGE DES CHIFFRES CLÉS ---
+    st.divider()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("💰 Chiffre d'Affaires", f"{total_ca:,.0f} €".replace(',', ' '))
+    c2.metric("💸 Total Dépenses", f"{total_dep_global:,.0f} €".replace(',', ' '))
+    c3.metric("⚖️ Revenu Net", f"{net:,.0f} €".replace(',', ' '))
+
+    st.write("📈 **Analyse Technique (Livre de Bord)**")
+    cp1, cp2, cp3 = st.columns(3)
+    
+    # Ratio : Coût du mille (Maintenance + Carburant / Distance)
+    cost_per_mile = (total_dep_global / t_milles) if t_milles > 0 else 0
+    # Ratio : Consommation (Litres / Heures moteur)
+    conso_moy = (t_gasoil_l / t_moteur) if t_moteur > 0 else 0
+    
+    cp1.metric("Distance", f"{t_milles:,.0f} NM")
+    cp2.metric("Coût / Mille", f"{cost_per_mile:.2f} €/NM")
+    cp3.metric("Conso Moy.", f"{conso_moy:.1f} L/h")
+
+    # --- GRAPHIQUE RECETTES / DÉPENSES ---
+    st.write("---")
+    st.subheader("📊 Équilibre Mensuel")
+    # (Ici tu gardes ton code de line_chart précédent pour comparer Recettes et Dépenses)
+            
 
         # --- E. TABLEAUX SANS ASCENSEURS AVEC TOTAUX ---
         st.write("---")
