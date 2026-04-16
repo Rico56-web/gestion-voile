@@ -618,26 +618,28 @@ if st.session_state.page == "STATS":
         total_dep = 0.0
         df_dep_final = pd.DataFrame()
 
-        if not df_m.empty: # <--- C'est ici que l'erreur se produisait
-            # Conversion des dates de maintenance
+        if not df_m.empty:
+            # 1. Conversion des dates
             df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
             
-            # Filtre : Année + Statut "Fait"
+            # 2. Filtre par année et statut "Fait"
             mask_dep = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")
             
-            # Filtre optionnel "À ce jour"
+            # 3. Utilisation de mode_bilan (et non mode_maint) pour le filtrage temporel
             if mode_bilan == "À ce jour":
                 today = pd.Timestamp.now().normalize()
                 mask_dep = mask_dep & (df_m['dt_maint'] <= today)
             
             df_dep_final = df_m[mask_dep].copy()
             
-            def force_float(val):
+            # Calcul du total des frais
+            def force_float_m(val):
                 s = str(val).replace('€', '').replace(' ', '').replace('\xa0', '').replace(',', '.')
                 try: return float(s)
                 except: return 0.0
 
-            total_dep = df_dep_final['M_Num'].apply(force_float).sum()
+            total_dep = df_dep_final['M_Num'].apply(force_float_m).sum()
+
 
         # --- E. AFFICHAGE FINAL (IPHONE 16) ---
         st.divider()
