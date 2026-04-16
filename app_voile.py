@@ -609,47 +609,42 @@ if st.session_state.page == "STATS":
         for c in ['Nom', 'Objet', 'Société', 'Acompte', 'Prix', 'DateNav', 'Date', 'date']:
             if c not in df_all.columns: df_all[c] = ""
         df_all = df_all.fillna("")
-
-        # --- FONCTION RADAR POUR LA DATE ---
+    # --- FONCTION RADAR POUR LA DATE (VERSION UNIVERSELLE) ---
         def radar_date(row):
             for col in ['DateNav', 'Date', 'date']:
                 val = str(row[col]).strip()
                 if val and val.lower() != "nan":
-                    dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
-                    if pd.notnull(dt): return dt
+                    # 1. On tente d'abord la conversion automatique (gère l'ISO 2026-04-04 nativement)
+                    dt = pd.to_datetime(val, errors='coerce')
+                    
+                    # 2. Si ça échoue, on tente avec le jour en premier (format 04/04/2026)
+                    if pd.isnull(dt):
+                        dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
+                        
+                    if pd.notnull(dt): 
+                        return dt
             return pd.NaT
 
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
 
-        # --- NETTOYAGE MONTANTS ---
-        def to_num(s):
-            val = "".join(c for c in str(s) if c.isdigit() or c in '.,')
-            val = val.replace(',', '.')
-            try: return float(val)
-            except: return 0.0
-
-        df_all['Mnt_Final'] = df_all.apply(lambda x: max(to_num(x['Prix']), to_num(x['Acompte'])), axis=1)
-
         # --- FILTRAGE CHIRURGICAL ---
-        # A. On filtre sur l'année choisie
         mask_annee = (df_all['dt_vrai'].dt.year == sel_y)
         df_filtre = df_all[mask_annee].copy()
 
-        # B. EXCLUSION DES PARASITES (Les 4 lignes de trop)
-        # 1. On retire les montants à 0 (nettoyage de la liste d'attente)
-        # 2. On exclut le client "Faucheux" spécifiquement
-        df_filtre = df_filtre[
-            (df_filtre['Mnt_Final'] > 0) & 
-            (df_filtre['Nom'].str.contains('Faucheux', case=False) == False)
-        ]
+        # Nettoyage : On garde les montants > 0 et on exclut Faucheux
+        df_filtre = df_filtre[df_filtre['Mnt_Final'] > 0]
+        # Sécurité : on s'assure que 'Nom' est traité comme du texte pour le filtre
+        df_filtre['Nom_Str'] = df_filtre['Nom'].astype(str)
+        df_filtre = df_filtre[~df_filtre['Nom_Str'].str.contains('Faucheux', case=False, na=False)]
 
-        # C. Application du mode (À ce jour vs Année Complète)
+        # --- MODE "À CE JOUR" ---
         if mode_bilan == "À ce jour":
-            # Aujourd'hui = 15 avril 2026 (selon votre système)
-            today = pd.to_datetime("2026-04-15")
+            # On prend la date système réelle (Aujourd'hui nous sommes le 16/04/2026)
+            today = pd.Timestamp.now().normalize()
             df_final = df_filtre[df_filtre['dt_vrai'] <= today].copy()
         else:
             df_final = df_filtre.copy()
+
 
         # 3. AFFICHAGE DES KPI
         st.divider()
