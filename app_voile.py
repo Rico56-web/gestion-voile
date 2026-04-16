@@ -599,20 +599,23 @@ if st.session_state.page == "STATS":
 
         if not df_filtre.empty:
             # --- C. FILTRAGE CHIRURGICAL STRICT ---
-            # Sécurité colonne Paiement
-            if 'Paiement' not in df_filtre.columns:
-                df_filtre['Paiement'] = "Unpaid"
-            
-            df_filtre['Paiement'] = df_filtre['Paiement'].fillna("Unpaid")
-            df_filtre['Pay_Status'] = df_filtre['Paiement'].astype(str).str.strip().upper()
-            
-            # On ne garde QUE les "PAID" (Exclut d'office les "En attente" et la fiche #15)
-            df_final = df_filtre[df_filtre['Pay_Status'] == "PAID"].copy()
+        # SÉCURITÉ : On s'assure que la colonne existe dans df_filtre avant de continuer
+        if 'Paiement' not in df_filtre.columns:
+            df_filtre['Paiement'] = "Unpaid"
+        
+        # On remplace les valeurs nulles par "Unpaid"
+        df_filtre['Paiement'] = df_filtre['Paiement'].fillna("Unpaid").astype(str)
 
-            # Application du filtre "À ce jour"
-            if mode_bilan == "À ce jour" and not df_final.empty:
-                today = pd.Timestamp.now().normalize()
-                df_final = df_final[df_final['dt_vrai'] <= today].copy()
+        # Création de la colonne de nettoyage sans risque d'AttributeError
+        df_filtre['Pay_Status'] = df_filtre['Paiement'].str.strip().upper()
+        
+        # FILTRE : Uniquement "PAID"
+        df_final = df_filtre[df_filtre['Pay_Status'] == "PAID"].copy()
+
+        # Application du filtre temporel
+        if mode_bilan == "À ce jour" and not df_final.empty:
+            today = pd.Timestamp.now().normalize()
+            df_final = df_final[df_final['dt_vrai'] <= today].copy()
 
             # --- D. CALCULS ET AFFICHAGE ---
             st.divider()
