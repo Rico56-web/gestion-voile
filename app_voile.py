@@ -922,14 +922,15 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - FOCUS COLONNES ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION FINALE RÉTABLIE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
 
+    # 1. Chargement
     df_log = charger_data_safe('logbook.json')
 
-    # Récupération derniers compteurs
+    # 2. Récupération derniers compteurs
     last_h = 0.0
     last_m = 0.0
     if not df_log.empty:
@@ -939,30 +940,26 @@ if st.session_state.page == "LOG":
             last_m = float(str(derniere.get('TotalMil', 0.0)).replace(',','.'))
         except: pass
 
-    # Entête
+    # 3. Entête Navigation
     st.subheader("🚀 Nouvelle Navigation")
     c1, c2, c3 = st.columns([2, 1, 2])
     f_date = c1.date_input("Date", datetime.now())
     f_jours = c2.number_input("Jours", min_value=1, value=1)
-    f_titre = c3.text_input("Titre", placeholder="Destination")
+    f_titre = c3.text_input("Titre / Destination", placeholder="ex: Croisière Sud")
     
     st.write("---")
 
-    # INITIALISATION DU TABLEAU AVEC TOUTES LES COLONNES
+    # 4. TABLEAU DE SAISIE AVEC TOUS LES COMPTEURS
     if 'temp_log_df' not in st.session_state:
         st.session_state.temp_log_df = pd.DataFrame([{
             "Port": "", 
-            "Mot_Dep": float(last_h), 
-            "Mot_Arr": float(last_h),
-            "Mil_Dep": float(last_m), 
-            "Mil_Arr": float(last_m),
-            "Voile": 0.0,
-            "Notes": ""
+            "Mot_Dep": float(last_h), "Mot_Arr": float(last_h),
+            "Mil_Dep": float(last_m), "Mil_Arr": float(last_m),
+            "Voile": 0.0, "Notes": ""
         }])
 
-    # CONFIGURATION VISUELLE (Noms courts pour iPhone)
     config_log = {
-        "Port": st.column_config.TextColumn("📍 Port", width="medium"),
+        "Port": st.column_config.TextColumn("📍 Etape", width="medium"),
         "Mot_Dep": st.column_config.NumberColumn("Mtr Dép", format="%.1f"),
         "Mot_Arr": st.column_config.NumberColumn("Mtr Arr", format="%.1f"),
         "Mil_Dep": st.column_config.NumberColumn("Mil Dép", format="%.0f"),
@@ -971,13 +968,12 @@ if st.session_state.page == "LOG":
         "Notes": st.column_config.TextColumn("Notes", width="small")
     }
 
-    # L'éditeur (Fais bien glisser vers la droite sur ton tel pour voir toutes les colonnes)
     edited_steps = st.data_editor(
         st.session_state.temp_log_df,
         column_config=config_log,
         num_rows="dynamic",
         use_container_width=True,
-        key="log_editor_v2026_mobile"
+        key="log_editor_v2026_final"
     )
 
     if st.button("💾 ENREGISTRER LA NAVIGATION", use_container_width=True, type="primary"):
@@ -997,7 +993,6 @@ if st.session_state.page == "LOG":
                         "H_Voile": float(row["Voile"]),
                         "Notes": row["Notes"]
                     })
-            
             df_actuel = charger_data_safe('logbook.json')
             df_final = pd.concat([df_actuel, pd.DataFrame(nouvelles_entrees)], ignore_index=True)
             sauvegarder_data(df_final, 'logbook.json')
@@ -1005,13 +1000,41 @@ if st.session_state.page == "LOG":
             st.success("✅ Navigation enregistrée !")
             st.rerun()
 
-    # HISTORIQUE (Inversé)
+    # 5. HISTORIQUE, MODIFICATION ET SUPPRESSION
     if not df_log.empty:
         st.divider()
-        st.subheader("📜 Historique")
-        st.data_editor(df_log.sort_index(ascending=False), use_container_width=True)
-
-
+        st.subheader("📜 Historique (Le plus récent en haut)")
+        
+        # Affichage inversé
+        df_hist = df_log.sort_index(ascending=False)
+        
+        edited_hist = st.data_editor(
+            df_hist,
+            use_container_width=True,
+            num_rows="dynamic",
+            key="hist_editor_log_v2"
+        )
+        
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            if st.button("💾 VALIDER LES MODIFS", use_container_width=True):
+                # On remet l'index dans le bon sens avant de sauvegarder
+                sauvegarder_data(edited_hist.sort_index(), 'logbook.json')
+                st.success("Journal mis à jour !")
+                st.rerun()
+                
+        with col_btn2:
+            with st.expander("🗑️ SUPPRIMER UNE LIGNE"):
+                st.warning("Action définitive")
+                unlock = st.checkbox("Déverrouiller", key="del_log_unlock")
+                idx_to_del = st.number_input("Index à supprimer", min_value=0, max_value=df_log.index.max(), step=1)
+                
+                if unlock:
+                    if st.button(f"🔥 CONFIRMER SUPPRESSION {idx_to_del}", type="primary", use_container_width=True):
+                        df_log = df_log.drop(index=idx_to_del).reset_index(drop=True)
+                        sauvegarder_data(df_log, 'logbook.json')
+                        st.rerun()
 
 
 # --- FIN DU FICHIER ---
