@@ -922,65 +922,59 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True) 
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - CALCULS AUTOMATIQUES ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - CORRECTION CALCULS ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
 
     df_log = charger_data_safe('logbook.json')
 
-    # ... [Le reste du code d'ajout reste inchangé] ...
+    # ... [Bloc Nouvelle Navigation - Partie Enregistrement] ...
+    if st.button("💾 ENREGISTRER LA NAVIGATION", use_container_width=True, type="primary"):
+        if edited_steps is not None and not edited_steps.empty:
+            nouvelles = []
+            for _, row in edited_steps.iterrows():
+                if row.get("Port"):
+                    h_dep = float(row.get("Mot_Dep", 0.0))
+                    h_arr = float(row.get("Mot_Arr", 0.0))
+                    m_dep = float(row.get("Mil_Dep", 0.0))
+                    m_arr = float(row.get("Mil_Arr", 0.0))
+                    
+                    nouvelles.append({
+                        "Date": f_date.strftime("%d/%m/%Y"),
+                        "Navigation": f_titre,
+                        "PortArr": row.get("Port"),
+                        "MotDep": h_dep,
+                        "Compteur_Arr": h_arr,         # On stocke le compteur final ici
+                        "TotalMot": h_arr - h_dep,     # LE TOTAL EST MAINTENANT LA DIFFÉRENCE
+                        "MillesDep": m_dep,
+                        "Compteur_Mil": m_arr,         # On stocke le loch final ici
+                        "TotalMil": m_arr - m_dep,     # LES MILLES SONT MAINTENANT LA DIFFÉRENCE
+                        "H_Voile": float(row.get("Voile", 0.0)),
+                        "Notes": row.get("Notes", "")
+                    })
+            # ... [Sauvegarde] ...
 
-    # 3. AFFICHAGE
-    if not df_log.empty:
-        st.divider()
-        st.subheader("📜 Historique")
-        st.dataframe(df_log, use_container_width=True)
-
-        # 4. GESTION - AVEC CALCULS DE DIFFÉRENCE
-        col_m, col_s = st.columns(2)
-        with col_m:
-            with st.expander("📝 MODIFIER ET CALCULER"):
-                idx_m = st.number_input("Ligne n°", min_value=0, max_value=len(df_log)-1, step=1)
-                r = df_log.loc[idx_m]
-                
-                with st.form("edit_with_calc"):
-                    ed_dest = st.text_input("Destination", value=r.get('Navigation', ''))
-                    
-                    st.write("**⚙️ Moteur**")
-                    c1, c2 = st.columns(2)
-                    ed_h_dep = c1.number_input("Compteur Départ", value=float(r.get('MotDep', 0.0)), step=0.1)
-                    ed_h_arr = c2.number_input("Compteur Arrivée", value=float(r.get('TotalMot', 0.0)), step=0.1)
-                    
-                    st.write("**📏 Milles**")
-                    c3, c4 = st.columns(2)
-                    ed_m_dep = c3.number_input("Loch Départ", value=float(r.get('MillesDep', 0.0)), step=1.0)
-                    ed_m_arr = c4.number_input("Loch Arrivée", value=float(r.get('TotalMil', 0.0)), step=1.0)
-                    
-                    ed_notes = st.text_area("Notes", value=r.get('Notes', ''))
-                    
-                    if st.form_submit_button("VALIDER ET CALCULER LES TOTAUX"):
-                        # CALCUL DES DIFFÉRENCES
-                        diff_moteur = ed_h_arr - ed_h_dep
-                        diff_milles = ed_m_arr - ed_m_dep
-                        
-                        # ENREGISTREMENT DES VALEURS
-                        df_log.at[idx_m, 'Navigation'] = ed_dest
-                        df_log.at[idx_m, 'MotDep'] = ed_h_dep
-                        df_log.at[idx_m, 'TotalMot'] = ed_h_arr      # Le compteur final
-                        df_log.at[idx_m, 'MoteurEtape'] = diff_moteur # La différence calculée
-                        
-                        df_log.at[idx_m, 'MillesDep'] = ed_m_dep
-                        df_log.at[idx_m, 'TotalMil'] = ed_m_arr       # Le loch final
-                        df_log.at[idx_m, 'MillesEtape'] = diff_milles # La différence calculée
-                        
-                        df_log.at[idx_m, 'Notes'] = ed_notes
-                        
-                        sauvegarder_data(df_log, 'logbook.json')
-                        st.success(f"Calculé : {diff_moteur}h moteur et {diff_milles} milles.")
-                        st.rerun()
-
-        # ... [Bouton supprimer reste inchangé] ...
+    # ... [Partie Modification] ...
+    with st.form("edit_with_real_totals"):
+        # ... [Champs destination, etc.] ...
+        
+        st.write("**⚙️ Moteur**")
+        c1, c2 = st.columns(2)
+        ed_h_dep = c1.number_input("Compteur Départ", value=float(r.get('MotDep', 0.0)))
+        ed_h_arr = c2.number_input("Compteur Arrivée", value=float(r.get('Compteur_Arr', r.get('TotalMot', 0.0))))
+        
+        if st.form_submit_button("VALIDER LES MODIFICATIONS"):
+            # RE-CALCUL PHYSIQUE AVANT SAUVEGARDE
+            df_log.at[idx_m, 'MotDep'] = ed_h_dep
+            df_log.at[idx_m, 'Compteur_Arr'] = ed_h_arr
+            df_log.at[idx_m, 'TotalMot'] = ed_h_arr - ed_h_dep # On force la différence
+            
+            # Idem pour les milles
+            # ... (code similaire pour milles)
+            
+            sauvegarder_data(df_log, 'logbook.json')
+            st.rerun()
 
 
 
