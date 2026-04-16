@@ -595,18 +595,49 @@ if st.session_state.page == "STATS":
 
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
         df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
-        # --- C. FILTRAGE SIMPLE (TOUT CE QUI EST DANS LES ARCHIVES) ---
+        # --- C. FILTRAGE DE PRÉCISION ---
         if not df_filtre.empty:
-            # On ne filtre plus par "PAID", on prend TOUT ce qui est arrivé 
-            # dans le fichier archives ou qui est marqué comme archivé/payé.
+            # 1. On définit les statuts à EXCLURE (ce qui n'est pas du CA)
+            # On enlève "Liste d'attente", "Annulé", "Refusé"
+            exclus = ["LISTE D'ATTENTE", "ANNULÉ", "ANNULE", "REFUSÉ", "REFUSE", "EN ATTENTE"]
             
-            # On définit df_final comme étant tout ce qui a été filtré par l'année
-            df_final = df_filtre.copy() 
+            # Nettoyage temporaire pour le test
+            df_filtre['Statut_Test'] = df_filtre['Statut'].astype(str).str.strip().upper()
+            
+            # 2. On ne garde que les missions "Sérieuses"
+            df_final = df_filtre[~df_filtre['Statut_Test'].isin(exclus)].copy()
 
-            # Filtre "À ce jour"
-            if mode_bilan == "À ce jour":
+            # 3. On impose le verrou "PAID" pour être sûr (écarte la fiche #15)
+            if 'Paiement' in df_final.columns:
+                df_final['Pay_Status'] = df_final['Paiement'].astype(str).str.strip().upper()
+                df_final = df_final[df_final['Pay_Status'] == "PAID"].copy()
+
+            # 4. Filtre "À ce jour"
+            if mode_bilan == "À ce jour" and not df_final.empty:
                 today = pd.Timestamp.now().normalize()
                 df_final = df_final[df_final['dt_vrai'] <= today].copy()
+
+            # --- D. CALCULS ET AFFICHAGE ---
+            st.divider()
+            
+            def force_float(val):
+                s = str(val).replace('€', '').replace(' ', '').replace('\xa0', '').replace(',', '.')
+                try: return float(s)
+                except: return 0.0
+
+            if not df_final.empty:
+                df_final['Prix_Num'] = df_final['Prix'].apply(force_float)
+                total_ca = df_final['Prix_Num'].sum()
+                
+                c1, c2 = st.columns(2)
+                c1.metric(f"💰 CA Encaissé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
+                c2.metric("📋 Missions Confirmées & Payées", f"{len(df_final)}")
+
+                # Affichage pour vérification
+                df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
+                view = df_final.sort_values('dt_vrai', ascending=False)
+                st.dataframe(view[['Date_Aff', 'Nom', 'Société', 'Prix', 'Statut']], hide_index=True, use_container_width=True)        
+ 
 
             # --- D. CALCULS ET AFFICHAGE ---
             st.divider()
