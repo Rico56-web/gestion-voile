@@ -564,34 +564,86 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
-    # =================================================================
-# --- 7- stats---
+# =================================================================
+# --- 7. PAGE STATS (SYNCHRO CMN + AUTRES MISSIONS) ---
 # =================================================================
 if st.session_state.page == "STATS":
-    st.markdown('## 🔍 Diagnostic Forcé CMN')
-    
+    st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
+
+    # 1. Chargement global
     df_actif = charger_data_safe('contacts.json')
     df_arch = charger_data_safe('archives_planning.json')
-    df_all = pd.concat([df_actif, df_arch], ignore_index=True)
+    df_all = pd.concat([df_actif, df_arch], ignore_index=True) if not df_arch.empty else df_actif
 
-    # 1. On cherche TOUT ce qui ressemble à CMN
-    cmn_debug = df_all[df_all['Société'].astype(str).str.contains("CMN", case=False, na=False)]
-    
-    if not cmn_debug.empty:
-        st.write("### Voici toutes les fiches CMN trouvées dans tes fichiers :")
-        # On affiche les colonnes qui peuvent bloquer
-        st.dataframe(cmn_debug[['DateNav', 'Nom', 'Société', 'Prix', 'Paiement', 'Statut']])
-        
-        # Test de date pour voir si le code les reconnait en 2026
-        def check_year(val):
-            dt = pd.to_datetime(str(val).split(' ')[0], dayfirst=True, errors='coerce')
-            return dt.year if pd.notnull(dt) else "ERREUR DATE"
-        
-        cmn_debug['Année_Détectée'] = cmn_debug['DateNav'].apply(check_year)
-        st.write("### Analyse des dates :")
-        st.table(cmn_debug[['Nom', 'DateNav', 'Année_Détectée']])
-    else:
-        st.error("⚠️ AUCUNE fiche avec le nom 'CMN' n'a été trouvée dans contacts.json ou archives_planning.json")
+    if not df_all.empty:
+        # --- A. CONFIGURATION ---
+        col_sel1, col_sel2 = st.columns(2)
+        mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
+        sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
+
+        # --- B. RADAR DE DATE ---
+        def radar_date(row):
+            val = str(row.get('DateNav', '')).strip().split(' ')[0]
+            if val and val.lower() not in ["nan", "", "none"]:
+                # On force le format français (dayfirst)
+                dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
+                return dt
+            return pd.NaT
+
+        df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
+        df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
+
+        # --- C. LOGIQUE DE CALCUL DU CA ---
+        if not df_filtre.empty:
+            def est_comptabilise(row):
+                societe = str(row.get('Société', '')).strip().upper()
+                paiement = str(row.get('Paiement', '')).strip().upper()
+                statut = str(row.get('Statut', '')).strip().upper()
+
+                # On ignore toujours les listes d'attente
+                if "LISTE D'ATTENTE" in statut:
+                    return False
+
+                # RÈGLE CMN : Si c'est CMN, on compte tout (car contrat pro validé)
+                if "CMN" in societe:
+                    return True
+                
+                # RÈGLE STANDARD : Pour les autres (ex: particuliers), on attend le "PAID"
+                if paiement == "PAID":
+                    return True
+                
+                return False
+
+            df_final = df_filtre[df_filtre.apply(est_comptabilise, axis=1)].copy()
+
+            # Filtre temporel
+            if mode_bilan == "À ce jour" and not df_final.empty:
+                today = pd.Timestamp.now().normalize()
+                df_final = df_final[df_final['dt_vrai'] <= today].copy()
+
+            # --- D. AFFICHAGE DES RÉSULTATS ---
+            st.divider()
+            
+            def force_float(val):
+                s = str(val).replace('€', '').replace(' ', '').replace('\xa0', '').replace(',', '.')
+                try: return float(s)
+                except: return 0.0
+
+            if not df_final.empty:
+                df_final['Prix_Num'] = df_final['Prix'].apply(force_float)
+                total_ca = df_final['Prix_Num'].sum()
+                
+                c1, c2 = st.columns(2)
+                c1.metric(f"💰 CA Global ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
+                c2.metric("📋 Missions", f"{len(df_final)}")
+
+                # Tableau pour vérifier les 5 lignes CMN
+                df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
+                view = df_final.sort_values('dt_vrai', ascending=False)
+                st.dataframe(view[['Date_Aff', 'Nom', 'Société', 'Prix', 'Paiement', 'Statut']], 
+                             hide_index=True, use_container_width=True)
+            else:
+                st.info("Aucune mission à comptabiliser.")
            
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
