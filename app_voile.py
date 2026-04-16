@@ -614,33 +614,44 @@ if st.session_state.page == "STATS":
         if not df_log.empty:
             df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
             df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
-
-        # --- B. CALCULS ---
+            # --- B. CALCULS AVANCÉS ---
         total_ca = sum(to_f(x) for x in df_final['Prix']) if not df_final.empty else 0.0
         
-        # Identification colonne montant maintenance (M_Num ou Montant)
+        # Identification colonne montant maintenance
         col_m_val = 'M_Num' if 'M_Num' in df_m_y.columns else ('Montant' if 'Montant' in df_m_y.columns else None)
         t_maint = sum(to_f(x) for x in df_m_y[col_m_val]) if col_m_val and not df_m_y.empty else 0.0
         
         t_gasoil_eur = df_log_y['Cout Gazoil'].sum() if 'Cout Gazoil' in df_log_y.columns else 0.0
         total_dep = t_maint + t_gasoil_eur
         
-        # Point Mort
+        # --- SYNCHRO VIDANGE (Dernière à 2365h, cycle 100h) ---
+        # On récupère la valeur la plus haute du compteur moteur (TotalMot)
+        h_moteur_actuel = df_log_y['TotalMot'].max() if not df_log_y.empty else 2365
+        h_depuis_vidange = h_moteur_actuel - 2365
+        h_restantes = 100 - (h_depuis_vidange % 100)
+        
+        # Point Mort & Éco
         charges_fixes = 6500 
         progression_seuil = min(100, int((total_ca / charges_fixes) * 100)) if charges_fixes > 0 else 100
-        
-        # Technique
-        t_moteur = df_log_y['TotalMot'].sum() if 'TotalMot' in df_log_y.columns else 0
+        t_moteur_periode = df_log_y['TotalMot'].sum() if 'TotalMot' in df_log_y.columns else 0
         t_voile = df_log_y['HVoile'].sum() if 'HVoile' in df_log_y.columns else 0
-        indice_eco = (t_voile / (t_moteur + t_voile) * 100) if (t_moteur + t_voile) > 0 else 0
-        h_restantes = 100 - (t_moteur % 100)
+        indice_eco = (t_voile / (t_moteur_periode + t_voile) * 100) if (t_moteur_periode + t_voile) > 0 else 0
 
-        # --- C. BILAN SANTÉ ---
+        # --- C. BILAN SANTÉ (AFFICHAGE) ---
         st.markdown("### 🩺 Bilan de Santé")
         b1, b2, b3 = st.columns(3)
+        
+        # 1. Rentabilité
         b1.metric("🎯 Rentabilité", f"{progression_seuil}%")
+        
+        # 2. Indice Éco
         b2.metric("🌿 Indice Éco", f"{indice_eco:.0f}%")
-        b3.metric("⚙️ Vidange dans", f"{int(h_restantes)}h")
+        
+        # 3. Vidange (Alerte visuelle si < 10h)
+        color_vidange = "normal" if h_restantes > 10 else "inverse"
+        b3.metric("⚙️ Vidange dans", f"{h_restantes:.1f}h", 
+                  delta=f"Moteur: {h_moteur_actuel:.0f}h", delta_color=color_vidange)
+
 
         # --- D. INDICATEURS ---
         st.divider()
