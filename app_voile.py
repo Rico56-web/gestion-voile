@@ -564,12 +564,11 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
-
 # =================================================================
-# --- PAGE STATS (FINANCES & PERFORMANCE) ---
+# --- PAGE STATS : LE COCKPIT VESTA SKIPPER ---
 # =================================================================
 if st.session_state.page == "STATS":
-    st.markdown('<h2 style="text-align:center;">📊 Tableau de Bord Vesta</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 style="text-align:center;">🚀 Cockpit Vesta 2026</h2>', unsafe_allow_html=True)
 
     # 1. Chargement des données
     df_actif = charger_data_safe('contacts.json')
@@ -590,7 +589,7 @@ if st.session_state.page == "STATS":
         mode_bilan = c_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
         sel_y = c_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-        # Filtrage Revenus
+        # Filtrage Revenus & Technique
         df_all['dt_vrai'] = pd.to_datetime(df_all['DateNav'], dayfirst=True, errors='coerce')
         df_f = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
         if mode_bilan == "À ce jour" and not df_f.empty:
@@ -603,29 +602,62 @@ if st.session_state.page == "STATS":
             return "CMN" in soc or paiement == "PAID"
 
         df_final = df_f[df_f.apply(est_comptabilise, axis=1)].copy() if not df_f.empty else pd.DataFrame()
-        
-        # Filtrage Dépenses
         df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
         df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")].copy()
         df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
         df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
 
-        # --- B. CALCULS ---
-        total_ca = sum(to_f(x) for x in df_final['Prix']) if not df_final.empty else 0.0
-        total_maint = sum(to_f(x) for x in df_m_y['M_Num']) if not df_m_y.empty else 0.0
-        t_gasoil_eur = df_log_y['Cout Gazoil'].sum() if not df_log_y.empty else 0.0
-        total_dep = total_maint + t_gasoil_eur
+        # --- B. CALCULS AVANCÉS ---
+        total_ca = sum(to_f(x) for x in df_final['Prix'])
+        t_maint = sum(to_f(x) for x in df_m_y['M_Num'])
+        t_gasoil_eur = df_log_y['Cout Gazoil'].sum()
+        total_dep = t_maint + t_gasoil_eur
         
-        # --- C. INDICATEURS ---
+        # Point Mort (Hypothèse Charges Fixes : 6500€ - A ajuster selon tes frais réels)
+        charges_fixes = 6500 
+        nb_jours = len(df_final)
+        ca_moyen_jour = total_ca / nb_jours if nb_jours > 0 else 0
+        seuil_jours = charges_fixes / ca_moyen_jour if ca_moyen_jour > 0 else 0
+        progression_seuil = min(100, int((total_ca / charges_fixes) * 100)) if charges_fixes > 0 else 100
+        
+        # Technique
+        t_milles = df_log_y['TotalMil'].sum()
+        t_moteur = df_log_y['TotalMot'].sum()
+        t_voile = df_log_y['HVoile'].sum()
+        indice_eco = (t_voile / (t_moteur + t_voile) * 100) if (t_moteur + t_voile) > 0 else 0
+        
+        # Révision (Base 100h moteur)
+        heures_depuis_vidange = t_moteur % 100 
+        h_restantes = 100 - heures_depuis_vidange
+
+        # --- C. TABLEAU DE BORD SANTÉ (L'ESSENTIEL) ---
+        st.markdown("### 🩺 Bilan de Santé")
+        b1, b2, b3 = st.columns(3)
+        
+        # Statut Rentabilité
+        b1.metric("🎯 Rentabilité", f"{progression_seuil}%", 
+                  help="Pourcentage des charges fixes couvertes par le CA actuel")
+        
+        # Statut Éco
+        b2.metric("🌿 Indice Éco", f"{indice_eco:.0f}%", 
+                  delta=f"{indice_eco-50:.0f}%", delta_color="normal")
+        
+        # Statut Maintenance
+        b3.metric("⚙️ Prochaine Vidange", f"{int(h_restantes)}h", 
+                  delta=f"-{int(heures_depuis_vidange)}h", delta_color="inverse")
+
+        # --- D. INDICATEURS FINANCIERS ---
         st.divider()
         c1, c2, c3 = st.columns(3)
-        c1.metric("💰 CA", f"{total_ca:,.0f} €")
-        c2.metric("💸 Dépenses", f"{total_dep:,.0f} €")
-        c3.metric("⚖️ Net", f"{(total_ca - total_dep):,.0f} €")
+        c1.metric("💰 CA", f"{total_ca:,.0f}€")
+        c2.metric("💸 Dépenses", f"{total_dep:,.0f}€")
+        c3.metric("⚖️ Net", f"{(total_ca - total_dep):,.0f}€")
 
-        # --- D. GRAPHES ---
-        st.subheader("📈 Évolution & Tops")
+        # --- E. GRAPHES & TOPS ---
+        st.write("---")
+        # Graphe Évolution
         if not df_final.empty or not df_m_y.empty:
+            st.write("📈 **Équilibre Mensuel**")
             df_final['Mois'] = df_final['dt_vrai'].dt.month
             df_m_y['Mois'] = df_m_y['dt_maint'].dt.month
             evo_rec = df_final.groupby('Mois')['Prix'].apply(lambda x: sum(to_f(i) for i in x))
@@ -635,23 +667,21 @@ if st.session_state.page == "STATS":
 
         col_g1, col_g2 = st.columns(2)
         with col_g1:
-            if not df_final.empty and 'Société' in df_final.columns:
+            if not df_final.empty:
                 st.write("🏆 Top Sociétés")
                 st.bar_chart(df_final.groupby('Société')['Prix'].apply(lambda x: sum(to_f(i) for i in x)), height=150)
         with col_g2:
-            if not df_m_y.empty and 'Titre' in df_m_y.columns:
+            if not df_m_y.empty:
                 st.write("🔧 Top Dépenses")
                 st.bar_chart(df_m_y.groupby('Titre')['M_Num'].apply(lambda x: sum(to_f(i) for i in x)), height=150)
 
-        # --- E. TABLEAUX ---
+        # --- F. TABLEAUX ---
         st.write("---")
-        t1, t2 = st.tabs(["💰 Détail Recettes", "🛠️ Détail Dépenses"])
-        
+        t1, t2 = st.tabs(["💰 Détails CA", "🛠️ Détails Dépenses"])
         with t1:
             cols_r = [c for c in ['DateNav', 'Client', 'Société', 'Prix'] if c in df_final.columns]
-            if not df_final.empty:
-                st.dataframe(df_final[cols_r], use_container_width=True, hide_index=True)
-                st.success(f"TOTAL RECETTES : {total_ca:,.2f} €")
+            st.dataframe(df_final[cols_r], use_container_width=True, hide_index=True)
+            st.success(f"Moyenne/Jour : {ca_moyen_jour:,.0f} €")
 
         with t2:
             if not df_m_y.empty:
@@ -659,19 +689,18 @@ if st.session_state.page == "STATS":
                 cols_m = [c for c in ['Date', 'Titre', 'M_Num'] if c in df_m_y.columns]
                 st.dataframe(df_m_y[cols_m], use_container_width=True, hide_index=True)
             if t_gasoil_eur > 0:
-                st.write("**Carburant :**")
+                st.write("**Carburant (Logbook) :**")
                 st.dataframe(df_log_y[df_log_y['Cout Gazoil']>0][['Date', 'PortArr', 'Cout Gazoil']], use_container_width=True, hide_index=True)
             st.error(f"TOTAL DÉPENSES : {total_dep:,.2f} €")
 
-        # --- F. PERFORMANCE ---
+        # --- G. PERFORMANCE TECHNIQUE ---
         st.write("---")
-        st.write("📊 **Indicateurs Performance**")
+        st.write("📊 **Efficacité Navigation**")
         cp1, cp2, cp3 = st.columns(3)
-        t_milles = df_log_y['TotalMil'].sum() if not df_log_y.empty else 0
-        t_moteur = df_log_y['TotalMot'].sum() if not df_log_y.empty else 0
         cp1.metric("Distance", f"{t_milles:,.0f} NM")
-        cp2.metric("Coût/NM", f"{(total_dep/t_milles if t_milles>0 else 0):.2f} €")
-        cp3.metric("L/h Mot.", f"{(df_log_y['Litre Gazoil'].sum()/t_moteur if t_moteur>0 else 0):.1f} L")
+        cp2.metric("Prix/NM", f"{(total_dep/t_milles if t_milles>0 else 0):.2f}€")
+        cp3.metric("Moteur Total", f"{t_moteur:,.1f}h")
+
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
 # =================================================================
