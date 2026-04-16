@@ -686,7 +686,7 @@ if st.session_state.page == "MAINT":
 
     st.divider()
 
-    # --- 4. GESTION DU TABLEAU (BIEN INDENTÉ) ---
+# --- 4. GESTION DU TABLEAU (MODIFICATION & SUPPRESSION SÉCURISÉE) ---
     if not df_m.empty:
         df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
         df_filtre = df_m[df_m['dt_maint'].dt.year == sel_y].copy()
@@ -697,58 +697,96 @@ if st.session_state.page == "MAINT":
 
         df_filtre = df_filtre.sort_values('dt_maint', ascending=False)
 
-        if not df_filtre.empty:
-            st.subheader(f"📋 Suivi {sel_y}")
-            edited_df = st.data_editor(
-                df_filtre.drop(columns=['dt_maint']),
-                column_config={
-                    "Date": st.column_config.TextColumn("Date", width="small"),
-                    "Objet": st.column_config.TextColumn("Désignation"),
-                    "M_Num": st.column_config.NumberColumn("€", format="%.2f"),
-                    "Statut": st.column_config.SelectboxColumn("Etat", options=["À prévoir", "Fait"], required=True),
-                    "Type": st.column_config.SelectboxColumn("Cat", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
-                },
-                hide_index=False,
-                use_container_width=True,
-                num_rows="dynamic",
-                key="maint_editor_v4"
-            )
+        st.subheader(f"📋 Suivi {sel_y}")
+        
+        # L'éditeur (on garde num_rows="dynamic" pour l'ajout/édition rapide)
+        edited_df = st.data_editor(
+            df_filtre.drop(columns=['dt_maint']),
+            column_config={
+                "Date": st.column_config.TextColumn("Date", width="small"),
+                "Objet": st.column_config.TextColumn("Désignation"),
+                "M_Num": st.column_config.NumberColumn("€", format="%.2f"),
+                "Statut": st.column_config.SelectboxColumn("Etat", options=["À prévoir", "Fait"], required=True),
+                "Type": st.column_config.SelectboxColumn("Cat", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
+            },
+            hide_index=False,
+            use_container_width=True,
+            num_rows="dynamic",
+            key="maint_editor_v6"
+        )
 
-            if st.button("💾 ENREGISTRER MODIFICATIONS", use_container_width=True):
+        # Grille de boutons pour iPhone
+        col_save, col_del = st.columns(2)
+
+        with col_save:
+            if st.button("💾 ENREGISTRER", use_container_width=True, type="primary"):
                 df_non_affiches = df_m[~df_m.index.isin(df_filtre.index)].drop(columns=['dt_maint'], errors='ignore')
                 df_final_save = pd.concat([df_non_affiches, edited_df], ignore_index=True)
                 sauvegarder_data(df_final_save, 'maintenance.json')
-                st.success("✅ Modifications enregistrées !")
+                st.success("✅ Mis à jour !")
                 st.rerun()
 
-    # --- 5. FORMULAIRE D'AJOUT (BIEN INDENTÉ) ---
+        with col_del:
+            # BOUTON SUPPRIMER AVEC CONFIRMATION (Popover)
+            with st.popover("🗑️ SUPPRIMER", use_container_width=True):
+                st.warning("Action irréversible")
+                idx_to_remove = st.number_input("Index à supprimer (chiffre à gauche) :", 
+                                                min_value=0, max_value=df_m.index.max(), step=1)
+                
+                if st.button(f"Confirmer suppression index {idx_to_remove}", type="primary", use_container_width=True):
+                    # Suppression dans le DataFrame original
+                    df_m = df_m.drop(index=idx_to_remove).reset_index(drop=True)
+                    sauvegarder_data(df_m, 'maintenance.json')
+                    st.success("Ligne supprimée !")
+                    st.rerun()
+
+    # --- 5. FORMULAIRE D'AJOUT (SÉCURISÉ CONTRE LES DOUBLONS) ---
     st.write("---")
     with st.expander("➕ Ajouter une opération"):
-        with st.form("form_maint_recurrence"):
+        # On utilise une clé unique basée sur le temps pour éviter les doubles clics
+        with st.form("form_maint_v2", clear_on_submit=True):
             f_obj = st.text_input("Désignation")
             c_a, c_b = st.columns(2)
             f_date_iso = c_a.date_input("Date", datetime.now())
             f_montant = c_b.number_input("Montant (€)", min_value=0.0, format="%.2f")
             
             c_c, c_d = st.columns(2)
-            f_type = c_c.selectbox("Catégorie", ["Port", "Assurances", "Maintenance", "Sécurité", "Autres frais"])
-            default_statut_index = 1 if f_date_iso <= datetime.now().date() else 0
-            f_statut = c_d.selectbox("Statut", ["À prévoir", "Fait"], index=default_statut_index)
-            f_recurrence = st.checkbox("Répéter mensuellement (fin d'année)")
+            f_type = c_c.selectbox("Catégorie", ["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
+            f_statut = c_d.selectbox("Statut", ["À prévoir", "Fait"], index=1 if f_date_iso <= datetime.now().date() else 0)
             
-            if st.form_submit_button("💾 Enregistrer", use_container_width=True):
+            f_recurrence = st.checkbox("Répéter mensuellement")
+            
+            if st.form_submit_button("💾 Enregistrer l'opération", use_container_width=True):
                 if f_obj:
                     nouvelles_lignes = []
+                    # FORMATAGE DE LA DATE EN JJ/MM/AAAA AVANT SAUVEGARDE
                     if f_recurrence:
                         for m in range(f_date_iso.month, 13):
-                            date_gen = f_date_iso.replace(month=m).strftime("%d/%m/%Y")
-                            nouvelles_lignes.append({"Date": date_gen, "Objet": f"{f_obj} (M{m})", "M_Num": f_montant, "Statut": f_statut, "Type": f_type})
+                            # On force le format français ici
+                            date_fr = f_date_iso.replace(month=m).strftime("%d/%m/%Y")
+                            nouvelles_lignes.append({
+                                "Date": date_fr, 
+                                "Objet": f"{f_obj} (M{m})", 
+                                "M_Num": f_montant, 
+                                "Statut": f_statut, 
+                                "Type": f_type
+                            })
                     else:
-                        nouvelles_lignes.append({"Date": f_date_iso.strftime("%d/%m/%Y"), "Objet": f_obj, "M_Num": f_montant, "Statut": f_statut, "Type": f_type})
+                        date_fr = f_date_iso.strftime("%d/%m/%Y")
+                        nouvelles_lignes.append({
+                            "Date": date_fr, 
+                            "Objet": f_obj, 
+                            "M_Num": f_montant, 
+                            "Statut": f_statut, 
+                            "Type": f_type
+                        })
                     
-                    df_m = pd.concat([df_m, pd.DataFrame(nouvelles_lignes)], ignore_index=True)
-                    sauvegarder_data(df_m, 'maintenance.json')
-                    st.success("✅ Enregistré !")
+                    # Chargement frais pour concaténation propre
+                    df_m_current = charger_data_safe('maintenance.json')
+                    df_final = pd.concat([df_m_current, pd.DataFrame(nouvelles_lignes)], ignore_index=True)
+                    sauvegarder_data(df_final, 'maintenance.json')
+                    
+                    st.success("✅ Opération(s) ajoutée(s) au format FR !")
                     st.rerun()
 
 # =================================================================
