@@ -685,8 +685,8 @@ if st.session_state.page == "STATS":
             else:
                 st.info(f"Aucune mission validée pour {sel_y}.")
 
-    # =================================================================
-# --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
+# =================================================================
+# --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
 # =================================================================
 if st.session_state.page == "MAINT":
     import pandas as pd
@@ -695,132 +695,84 @@ if st.session_state.page == "MAINT":
     df_m = charger_data_safe('maintenance.json')
     df_log = charger_data_safe('logbook.json')
 
-    # --- 1. CALCULS HEURES (Logique inchangée) ---
+    # --- 1. CALCULS HEURES ---
     releve_h = pd.to_numeric(df_log['MotArr'], errors='coerce').max() if not df_log.empty else 0
     params = charger_params() if 'charger_params' in globals() else {"cible_vidange": 2450.0}
 
     st.title("🛠️ MAINTENANCE")
 
-    # --- 2. BANDEAU VIDANGE ---
+    # --- 2. FILTRES DE PÉRIODE (Comme en Stats) ---
+    col_sel1, col_sel2 = st.columns(2)
+    mode_maint = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
+    sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
+
+    # --- 3. BANDEAU VIDANGE ---
     heures_restantes = params['cible_vidange'] - releve_h
     color_v = "#2e7d32" if heures_restantes > 15 else "#c62828"
     st.markdown(f"""
-        <div style="background-color: {color_v}15; border: 1px solid {color_v}; padding: 15px; border-radius: 10px; text-align: center;">
-            <span style="color: {color_v}; font-weight: bold;">{heures_restantes:.1f} h restantes</span> | 
-            Compteur : {releve_h:.1f} h
+        <div style="background-color: {color_v}15; border: 1px solid {color_v}; padding: 10px; border-radius: 10px; text-align: center; border: 1px solid {color_v}">
+            <span style="color: {color_v}; font-weight: bold;">{heures_restantes:.1f} h restantes</span> | Compteur : {releve_h:.1f} h
         </div>
     """, unsafe_allow_html=True)
 
     st.divider()
-    # --- 3. HISTORIQUE INTERACTIF (MODIFIER / SUPPRIMER) ---
-    st.subheader("📋 Historique & Gestion")
-    
+
+    # --- 4. GESTION DU TABLEAU ---
     if not df_m.empty:
-        # Préparation des données pour l'édition
-        df_edit = df_m.copy()
+        # A. Conversion et Tri Chronologique
+        df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
         
-        # On s'assure que les types sont corrects pour l'éditeur
-        if 'M_Num' in df_edit.columns:
-            df_edit['M_Num'] = pd.to_numeric(df_edit['M_Num'], errors='coerce').fillna(0.0)
-         # A. LE TABLEAU ÉDITABLE (Correction de l'erreur Height)
-        st.info("💡 Vous pouvez modifier les cellules directement dans le tableau ci-dessous.")
+        # B. Filtrage par année
+        df_filtre = df_m[df_m['dt_maint'].dt.year == sel_y].copy()
         
-        # On définit une hauteur raisonnable ou on laisse en automatique
-        # Suppression de height=None qui causait l'erreur
-        edited_df = st.data_editor(
-            df_edit,
-            column_config={
-                "Date": st.column_config.TextColumn("Date", help="Format JJ/MM/AAAA"),
-                "Objet": st.column_config.TextColumn("Désignation"),
-                "M_Num": st.column_config.NumberColumn("Montant (€)", format="%.2f"),
-                "Statut": st.column_config.SelectboxColumn("Statut", options=["À prévoir", "Fait"]),
-                "Type": st.column_config.SelectboxColumn("Catégorie", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres frais"])
-            },
-            hide_index=False,
-            use_container_width=True,
-            num_rows="dynamic", # Permet d'ajouter des lignes manuellement
-            key="maint_editor"
-        )
+        # C. Filtrage "À ce jour" (ne montre que ce qui est passé ou aujourd'hui)
+        if mode_maint == "À ce jour" and not df_filtre.empty:
+            today = pd.Timestamp.now().normalize()
+            df_filtre = df_filtre[df_filtre['dt_maint'] <= today].copy()
 
-        # B. BOUTONS DE SAUVEGARDE ET SUPPRESSION
-        col_btn1, col_btn2 = st.columns([1, 1])
-        
-        if col_btn1.button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True):
-            sauvegarder_data(edited_df, 'maintenance.json')
-            st.success("Modifications enregistrées !")
-            st.rerun()
+        # D. Tri Final (Du plus récent au plus ancien pour iPhone)
+        df_filtre = df_filtre.sort_values('dt_maint', ascending=False)
 
-        # C. SUPPRESSION AVEC CONFIRMATION
-        with col_btn2:
-            with st.popover("🗑️ SUPPRIMER UNE LIGNE", use_container_width=True):
-                st.warning("Sélectionnez l'index à supprimer (chiffre à gauche)")
-                index_to_del = st.number_input("Index :", min_value=0, max_value=len(df_m)-1, step=1)
-                
-                # Double confirmation par bouton
-                if st.button(f"Confirmer la suppression de l'index {index_to_del}", type="primary"):
-                    df_m = df_m.drop(df_m.index[index_to_del])
-                    sauvegarder_data(df_m, 'maintenance.json')
-                    st.success("Ligne supprimée !")
-                    st.rerun()
+        if not df_filtre.empty:
+            st.subheader(f"📋 Suivi {sel_y}")
+            
+            # Suppression de la colonne technique avant affichage
+            df_display = df_filtre.drop(columns=['dt_maint'])
+
+            # ÉDITEUR (Correction de l'erreur Height et optimisation mobile)
+            edited_df = st.data_editor(
+                df_display,
+                column_config={
+                    "Date": st.column_config.TextColumn("Date", width="small"),
+                    "Objet": st.column_config.TextColumn("Désignation"),
+                    "M_Num": st.column_config.NumberColumn("€", format="%.2f"),
+                    "Statut": st.column_config.SelectboxColumn("Etat", options=["À prévoir", "Fait"]),
+                    "Type": st.column_config.SelectboxColumn("Cat", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
+                },
+                hide_index=False,
+                use_container_width=True,
+                num_rows="dynamic",
+                key="maint_editor_v2"
+            )
+
+            # E. Sauvegarde
+            if st.button("💾 ENREGISTRER MODIFICATIONS", use_container_width=True):
+                # On récupère les données éditées et on resauvegarde le fichier complet
+                # (Attention : si on filtre, il faut fusionner avec les données non filtrées pour ne pas les perdre)
+                indices_a_garder = df_m[~df_m.index.isin(df_filtre.index)]
+                df_final_save = pd.concat([indices_a_garder, edited_df], ignore_index=True)
+                sauvegarder_data(df_final_save, 'maintenance.json')
+                st.success("Modifications enregistrées !")
+                st.rerun()
+        else:
+            st.info(f"Rien à afficher pour {sel_y} en mode '{mode_maint}'.")
     else:
-        st.info("Historique vide.")
+        st.info("Aucune donnée de maintenance.")
 
-    # --- 4. FORMULAIRE D'AJOUT (AVEC OPTION MENSUELLE) ---
-    with st.expander("➕ Ajouter une opération (Unique ou Mensuelle)"):
-        with st.form("form_maint_recurrence"):
-            st.markdown("📅 **Format d'enregistrement : JJ/MM/AAAA**")
-            
-            f_obj = st.text_input("Désignation (ex: Place de port)")
-            
-            col_a, col_b = st.columns(2)
-            f_date_iso = col_a.date_input("Date de début", datetime.now())
-            f_montant = col_b.number_input("Montant (€)", min_value=0.0, format="%.2f")
-            
-            col_c, col_d = st.columns(2)
-            f_type = col_c.selectbox("Catégorie", ["Port", "Assurances", "Maintenance", "Sécurité", "Autres frais"])
-            f_statut = col_d.selectbox("Statut par défaut", ["À prévoir", "Fait"])
-            
-            # LA CLÉ : L'option de récurrence
-            f_recurrence = st.checkbox("Répéter mensuellement jusqu'à la fin de l'année")
-            
-            if st.form_submit_button("💾 Enregistrer"):
-                if f_obj:
-                    nouvelles_lignes = []
-                    
-                    if f_recurrence:
-                        # Générer une ligne pour chaque mois restant de l'année
-                        mois_restants = range(f_date_iso.month, 13)
-                        for m in mois_restants:
-                            # On crée la date pour le mois 'm'
-                            date_generee = f_date_iso.replace(month=m).strftime("%d/%m/%Y")
-                            nouvelles_lignes.append({
-                                "Date": date_generee,
-                                "Objet": f"{f_obj} (M{m})", # On ajoute l'indice du mois pour s'y retrouver
-                                "M_Num": f_montant,
-                                "Statut": f_statut,
-                                "Type": f_type
-                            })
-                    else:
-                        # Enregistrement unique classique
-                        nouvelles_lignes.append({
-                            "Date": f_date_iso.strftime("%d/%m/%Y"),
-                            "Objet": f_obj,
-                            "M_Num": f_montant,
-                            "Statut": f_statut,
-                            "Type": f_type
-                        })
-                    
-                    # Fusion et sauvegarde
-                    df_new = pd.DataFrame(nouvelles_lignes)
-                    df_m = pd.concat([df_m, df_new], ignore_index=True)
-                    sauvegarder_data(df_m, 'maintenance.json')
-                    
-                    st.success(f"✅ {len(nouvelles_lignes)} opération(s) enregistrée(s) !")
-                    st.rerun()
-                else:
-                    st.error("Veuillez saisir une désignation.")
-                    
-
+    # --- 5. FORMULAIRE D'AJOUT ---
+    st.write("---")
+    with st.expander("➕ Nouvelle Opération"):
+        # ... Ton formulaire actuel reste le même ...
 
 # =================================================================
 # --- PAGE : FACTURATION & SUIVI PAIEMENTS ---
