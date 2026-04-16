@@ -431,7 +431,7 @@ if st.session_state.page == "MODIFIER_CONTACT":
     if st.button("⬅️ RETOUR"):
         st.session_state.page = "CONTACTS"
         st.rerun()
-# ===============================================================
+# =================================================================
 # --- 6. PAGE PLANNING (V18.5 - FIX ORDRE CHARGEMENT) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
@@ -470,35 +470,13 @@ if st.session_state.page == "PLANNING":
         st.session_state.curr_year = aujourdhui.year
         st.rerun()
 
-    # --- ÉTAPE 1 : CHARGEMENT (DÉPLACÉ ICI POUR FIXER L'ERREUR) ---
+    # --- ÉTAPE 1 : CHARGEMENT ---
     df_p = charger_data('contacts.json')
 
-    # --- ÉTAPE 2 : DIAGNOSTIC (UNIQUEMENT SI DONNÉES PRÉSENTES) ---
+    # --- ÉTAPE 2 : TRAITEMENT ---
     if df_p is not None and not df_p.empty:
-        with st.expander("🔍 Diagnostic technique des dates (Mars)"):
-            erreurs = []
-            for i, r in df_p.iterrows():
-                d = str(r.get('DateNav', 'VIDE'))
-                if "/03/2026" in d or "-03-2026" in d:
-                    valide = False
-                    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
-                        try:
-                            datetime.strptime(d.strip().split(' ')[0], fmt)
-                            valide = True
-                            break
-                        except: continue
-                    if not valide:
-                        erreurs.append(f"Fiche #{i} ({r.get('Nom')}): Date illisible -> '{d}'")
-            
-            if erreurs:
-                for err in erreurs: st.error(err)
-            else:
-                st.success("Toutes les dates de Mars semblent valides ou absentes.")
-
-        # --- ÉTAPE 3 : TRAITEMENT POUR AFFICHAGE ---
         df_p = df_p.fillna("")
-        df_p['DateNav'] = df_p['DateNav'].astype(str)
-
+        
         for idx, r in df_p.iterrows():
             try:
                 nom_client = str(r.get('Nom', '')).strip().upper()
@@ -528,13 +506,13 @@ if st.session_state.page == "PLANNING":
                 elif dt_start < aujourdhui: color = "#34495e"
                 else: color = "#27ae60"
 
-                # Calendrier
+                # Remplissage calendrier
                 for i in range(n_j):
                     curr = dt_start + timedelta(days=i)
                     if curr.month == sel_m and curr.year == sel_y:
                         jours_occ[curr.day] = {"c": color}
 
-                # Liste
+                # Ajout à la liste
                 if (dt_start.year == sel_y and dt_start.month == sel_m) or (dt_end.year == sel_y and dt_end.month == sel_m):
                     missions_list.append({
                         'r': r, 'idx': idx, 'start': dt_start, 'end': dt_end, 
@@ -542,10 +520,9 @@ if st.session_state.page == "PLANNING":
                     })
                     if dt_start.month == sel_m and not any(x in statut for x in ["annul", "refus"]):
                         total_mois += prix_val
-            except:
-                continue
+            except: continue
 
-    # --- ÉTAPE 4 : AFFICHAGE CALENDRIER ---
+    # --- ÉTAPE 3 : AFFICHAGE CALENDRIER ---
     h_cal = '<table style="width:100%; text-align:center; border-collapse:collapse; background:white; border:1px solid #ddd;">'
     h_cal += '<tr style="background:#f8f9fa; font-size:12px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td>Sa</td><td>Di</td></tr>'
     
@@ -568,7 +545,7 @@ if st.session_state.page == "PLANNING":
         h_cal += '</tr>'
     st.markdown(h_cal + '</table>', unsafe_allow_html=True)
 
-    # DÉTAILS
+    # LISTE DES MISSIONS
     st.markdown(f"### 📋 Missions de {sel_m_nom}")
     if missions_list:
         missions_list.sort(key=lambda x: x['start'])
@@ -584,41 +561,34 @@ if st.session_state.page == "PLANNING":
                 if st.button(f"{nom_affiche} ({m['statut'].upper()})", key=f"p_btn_{m['idx']}", use_container_width=True):
                     st.session_state.edit_idx = m['idx']
                     st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
+        st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
 
-    st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
-
-        st.error("Le fichier contacts.json semble vide.")
 # =================================================================
-# --- 7. PAGE STATS (VERSION FINALE SANS ERREUR D'INDENTATION) ---
+# --- 7. PAGE STATS (VERSION FINALE SANS ERREUR) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # 1. Chargement
     df_all = charger_data_safe('contacts.json')
 
     if not df_all.empty:
-        # 2. Interface
         col_sel1, col_sel2 = st.columns(2)
         mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
         sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-        # --- A. SÉCURISATION DES COLONNES (Basé sur votre JSON) ---
+        # Sécurisation colonnes
         cols_requis = ['Nom', 'Prénom', 'Prix', 'DateNav', 'Statut', 'Paiement', 'Société']
         for c in cols_requis:
-            if c not in df_all.columns: 
-                df_all[c] = ""
+            if c not in df_all.columns: df_all[c] = ""
         df_all = df_all.fillna("")
 
-        # --- B. RADAR DE DATE (Gère ISO #11 et Français CMN) ---
+        # Radar de date
         def radar_date(row):
             val = str(row['DateNav']).strip()
             if val and val.lower() != "nan" and val != "":
-                # Priorité ISO (ex: 2026-04-04)
                 dt = pd.to_datetime(val, errors='coerce')
-                # Secours FR (ex: 05/02/2026)
                 if pd.isnull(dt):
                     dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
                 return dt
@@ -626,55 +596,42 @@ if st.session_state.page == "STATS":
 
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
 
-        # --- C. FILTRAGE DES MISSIONS VALIDES ---
-        # 1. Année
+        # Filtrage
         df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
 
-        # 2. Validation Statut (Terminé/Archivé) ET Paiement (Paid)
-        def est_valide_ca(row):
-            statut = str(row['Statut']).upper()
-            paiement = str(row['Paiement']).upper()
-            nom = str(row['Nom']).upper()
-            
-            # On accepte si TERMINÉ ou ARCHIVÉ + PAID (et pas Faucheux)
-            est_termine = "TERMIN" in statut or "ARCHIV" in statut
-            est_paye = "PAID" in paiement or "PAYÉ" in paiement
-            pas_faucheux = "FAUCHEUX" not in nom
-            
-            return est_termine and est_paye and pas_faucheux
-
         if not df_filtre.empty:
+            def est_valide_ca(row):
+                statut = str(row['Statut']).upper()
+                paiement = str(row['Paiement']).upper()
+                nom = str(row['Nom']).upper()
+                return ("TERMIN" in statut or "ARCHIV" in statut) and ("PAID" in paiement or "PAYÉ" in paiement) and ("FAUCHEUX" not in nom)
+
             df_filtre['Valide'] = df_filtre.apply(est_valide_ca, axis=1)
             df_final = df_filtre[df_filtre['Valide'] == True].copy()
 
-            # 3. Mode "À ce jour" (Aujourd'hui = 16/04/2026)
             if mode_bilan == "À ce jour":
                 today = pd.Timestamp.now().normalize()
                 df_final = df_final[df_final['dt_vrai'] <= today].copy()
-        else:
-            df_final = pd.DataFrame()
-
-        # --- D. AFFICHAGE DES RÉSULTATS ---
-        st.divider()
-        total_ca = pd.to_numeric(df_final['Prix'], errors='coerce').sum() if not df_final.empty else 0
-        
-        c1, c2 = st.columns(2)
-        c1.metric(f"💰 CA Confirmé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
-        c2.metric("📋 Missions Validées", f"{len(df_final)}")
-
-        if not df_final.empty:
-            # Reconstruction propre du nom
-            df_final['Client'] = df_final['Prénom'].astype(str) + " " + df_final['Nom'].astype(str)
-            df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
             
-            view = df_final.sort_values('dt_vrai', ascending=False)
-            view = view[['Date_Aff', 'Client', 'Société', 'Prix']]
-            view.columns = ['Date', 'Client / Objet', 'Société', 'Montant (€)']
+            # Affichage
+            st.divider()
+            total_ca = pd.to_numeric(df_final['Prix'], errors='coerce').sum()
             
-            st.dataframe(view, hide_index=True, use_container_width=True)
-        else:
-            st.info(f"Aucune mission 'Paid' et 'Terminée' pour {sel_y}.")
+            c1, c2 = st.columns(2)
+            c1.metric(f"💰 CA Confirmé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
+            c2.metric("📋 Missions Validées", f"{len(df_final)}")
 
+            if not df_final.empty:
+                df_final['Client'] = df_final['Prénom'].astype(str) + " " + df_final['Nom'].astype(str)
+                df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
+                view = df_final.sort_values('dt_vrai', ascending=False)
+                view = view[['Date_Aff', 'Client', 'Société', 'Prix']]
+                view.columns = ['Date', 'Client / Objet', 'Société', 'Montant (€)']
+                st.dataframe(view, hide_index=True, use_container_width=True)
+            else:
+                st.info(f"Aucune mission validée pour {sel_y}.")
+        else:
+            st.info(f"Aucune donnée pour l'année {sel_y}.")
     else:
         st.error("Le fichier contacts.json est vide ou introuvable.")
     # =================================================================
