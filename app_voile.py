@@ -653,16 +653,9 @@ if st.session_state.page == "STATS":
         p1.metric("💎 Rendement/H", f"{revenu_par_h_moteur:.1f} €/h")
         p2.metric("📉 Poids Frais", f"{ratio_maintenance:.1f} %")
         p3.metric("📏 Moy. Sortie", f"{mille_par_sortie:.1f} NM")
-
-        # --- E. INDICATEURS FINANCIERS ---
-        st.divider()
-        c1, c2, c3 = st.columns(3)
-        c1.metric("💰 CA", f"{total_ca:,.0f} €")
-        c2.metric("💸 Dépenses", f"{total_dep:,.0f} €")
-        c3.metric("⚖️ Net", f"{(total_ca - total_dep):,.0f} €")
-
-        # --- F. GRAPHES (CHRONO FORCÉ) ---
-        st.subheader("📉 Évolution Mensuelle")
+        
+        # --- E. GRAPHES D'ACTIVITÉ ---
+        st.subheader("📉 Analyse Mensuelle")
         ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
         nom_mois_map = {i+1: m for i, m in enumerate(ordre_mois)}
         df_evo = pd.DataFrame(index=range(1, 13))
@@ -677,22 +670,56 @@ if st.session_state.page == "STATS":
         df_evo.index = pd.Categorical(df_evo.index, categories=ordre_mois, ordered=True)
         st.bar_chart(df_evo.sort_index(), height=220)
 
-        # --- G. TABLEAUX DÉTAILLÉS ---
+        # --- NOUVEAU : RÉPARTITION (FROMAGES) ---
+        st.write("---")
+        st.subheader("🍕 Répartition des Volumes")
+        col_pie1, col_pie2 = st.columns(2)
+        
+        with col_pie1:
+            if not df_final.empty and 'Société' in df_final.columns:
+                st.write("**Sorties par Société**")
+                # Nombre de sorties (count) par société
+                df_pie_soc = df_final['Société'].value_counts()
+                st.write(df_pie_soc) # Optionnel : affiche les chiffres sous forme de texte ou remplace par un vrai pie chart si tu as Plotly
+                # Note : Streamlit natif n'a pas de st.pie_chart, on utilise une astuce de barres horizontales ou st.dataframe
+            
+        with col_pie2:
+            if not df_m_y.empty:
+                st.write("**Maintenance par Cat.**")
+                # On cherche la colonne catégorie (souvent 'Cat' ou 'Type' dans ton JSON)
+                col_cat = 'Catégorie' if 'Catégorie' in df_m_y.columns else ('Cat' if 'Cat' in df_m_y.columns else None)
+                if col_cat:
+                    df_pie_maint = df_m_y[col_cat].value_counts()
+                    st.write(df_pie_maint)
+                else:
+                    st.info("Ajoute une colonne 'Catégorie' dans Maintenance")
+
+        # --- F. TABLEAUX DÉTAILLÉS (TRIÉS DU PLUS RÉCENT AU PLUS ANCIEN) ---
         st.write("---")
         t1, t2 = st.tabs(["💰 Détails CA", "🛠️ Détails Dépenses"])
+        
         with t1:
-            cols_r = [c for c in ['DateNav', 'Client', 'Société', 'Prix'] if c in df_final.columns]
             if not df_final.empty:
-                st.dataframe(df_final[cols_r], use_container_width=True, hide_index=True)
+                # TRI CHRONO INVERSÉ (Le plus récent en haut)
+                df_final_clean = df_final.sort_values(by='dt_vrai', ascending=False)
+                cols_r = [c for c in ['DateNav', 'Client', 'Société', 'Prix'] if c in df_final_clean.columns]
+                st.dataframe(df_final_clean[cols_r], use_container_width=True, hide_index=True)
                 st.success(f"**TOTAL RECETTES : {total_ca:,.2f} €** (Moy : {ca_moyen_jour:,.0f}€/j)")
+        
         with t2:
             if not df_m_y.empty:
+                # TRI CHRONO INVERSÉ (Le plus récent en haut)
+                df_m_y_clean = df_m_y.sort_values(by='dt_maint', ascending=False)
                 st.write("**🔧 Maintenance :**")
-                cols_m = [c for c in ['Date', 'Titre', col_m_val] if c in df_m_y.columns]
-                st.dataframe(df_m_y[cols_m], use_container_width=True, hide_index=True)
+                cols_m = [c for c in ['Date', 'Titre', col_m_val] if c in df_m_y_clean.columns]
+                st.dataframe(df_m_y_clean[cols_m], use_container_width=True, hide_index=True)
+            
             if t_gasoil_eur > 0:
+                # TRI CHRONO INVERSÉ pour le Logbook
+                df_log_y_clean = df_log_y[df_log_y['Cout Gazoil']>0].sort_values(by='dt_log', ascending=False)
                 st.write("**⛽ Carburant :**")
-                st.dataframe(df_log_y[df_log_y['Cout Gazoil']>0][['Date', 'PortArr', 'Cout Gazoil']], use_container_width=True, hide_index=True)
+                st.dataframe(df_log_y_clean[['Date', 'PortArr', 'Cout Gazoil']], use_container_width=True, hide_index=True)
+            
             st.error(f"**TOTAL DÉPENSES : {total_dep:,.2f} €**")
 
 # =================================================================
