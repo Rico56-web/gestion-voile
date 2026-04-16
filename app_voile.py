@@ -565,7 +565,7 @@ if st.session_state.page == "PLANNING":
     else:
         st.info("Aucune mission ce mois-ci.")
 # =================================================================
-# --- PAGE STATS : COCKPIT VESTA (VUE FINALE) ---
+# --- PAGE STATS : COCKPIT VESTA SKIPPER PRO ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">🚀 Cockpit Vesta 2026</h2>', unsafe_allow_html=True)
@@ -624,62 +624,60 @@ if st.session_state.page == "STATS":
         t_gasoil_eur = df_log_y['Cout Gazoil'].sum() if 'Cout Gazoil' in df_log_y.columns else 0.0
         total_dep = t_maint + t_gasoil_eur
         
-        # Vidange Synchro
+        # Performance & Rendement
+        t_milles = df_log_y['TotalMil'].sum() if not df_log_y.empty else 0
+        t_mot_p = df_log_y['TotalMot'].sum() if not df_log_y.empty else 0
+        t_voile = df_log_y['HVoile'].sum() if not df_log_y.empty else 0
+        
+        revenu_par_h_moteur = total_ca / t_mot_p if t_mot_p > 0 else 0
+        ratio_maintenance = (total_dep / total_ca * 100) if total_ca > 0 else 0
+        mille_par_sortie = t_milles / nb_jours if nb_jours > 0 else 0
+
+        # Vidange (Synchro 13.9h)
         h_moteur_actuel = df_log_y['TotalMot'].max() if not df_log_y.empty else 0.0
-        # Calibration basée sur ton relevé : 13.9h restantes actuellement
         prochaine_vidange = h_moteur_actuel + 13.9
         h_restantes = prochaine_vidange - h_moteur_actuel
 
         # --- C. BILAN SANTÉ ---
         st.markdown("### 🩺 Bilan de Santé")
         b1, b2, b3 = st.columns(3)
-        b1.metric("🎯 Rentabilité", f"{min(100, int((total_ca/6500)*100))}%")
-        
-        t_voile = df_log_y['HVoile'].sum() if not df_log_y.empty else 0
-        t_mot_p = df_log_y['TotalMot'].sum() if not df_log_y.empty else 0
+        b1.metric("🎯 Rentabilité", f"{min(100, int((total_ca/6500)*100))}%", help="Couverture des frais fixes (6500€)")
         indice_eco = (t_voile / (t_mot_p + t_voile) * 100) if (t_mot_p + t_voile) > 0 else 0
-        b2.metric("🌿 Indice Éco", f"{indice_eco:.0f}%")
-        
-        b3.metric("⚙️ Vidange dans", f"{h_restantes:.1f}h", delta=f"Moteur: {h_moteur_actuel:.0f}h")
+        b2.metric("🌿 Indice Éco", f"{indice_eco:.0f}%", help="Ratio Voile / (Voile + Moteur)")
+        b3.metric("⚙️ Vidange dans", f"{h_restantes:.1f}h", delta=f"Mot: {h_moteur_actuel:.0f}h")
 
-        # --- D. INDICATEURS FINANCIERS ---
+        # --- D. ANALYSE DE PERFORMANCE (NOUVEAU) ---
+        st.write("---")
+        st.markdown("### 📈 Analyse de Performance")
+        p1, p2, p3 = st.columns(3)
+        p1.metric("💎 Rendement/H", f"{revenu_par_h_moteur:.1f} €/h")
+        p2.metric("📉 Poids Frais", f"{ratio_maintenance:.1f} %")
+        p3.metric("📏 Moy. Sortie", f"{mille_par_sortie:.1f} NM")
+
+        # --- E. INDICATEURS FINANCIERS ---
         st.divider()
         c1, c2, c3 = st.columns(3)
         c1.metric("💰 CA", f"{total_ca:,.0f} €")
         c2.metric("💸 Dépenses", f"{total_dep:,.0f} €")
         c3.metric("⚖️ Net", f"{(total_ca - total_dep):,.0f} €")
 
-        # --- E. GRAPHES D'ACTIVITÉ (VERROUILLAGE CHRONO) ---
-        st.subheader("📉 Analyse Mensuelle")
-        
-        # 1. Définition de l'ordre immuable
+        # --- F. GRAPHES (CHRONO FORCÉ) ---
+        st.subheader("📉 Évolution Mensuelle")
         ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
-        
-        # 2. Création d'un DataFrame vide avec tous les mois
+        nom_mois_map = {i+1: m for i, m in enumerate(ordre_mois)}
         df_evo = pd.DataFrame(index=range(1, 13))
-        
-        # 3. Remplissage des données
         if not df_final.empty:
             df_final['Mois'] = df_final['dt_vrai'].dt.month
             df_evo['Recettes'] = df_final.groupby('Mois')['Prix'].apply(lambda x: sum(to_f(i) for i in x))
-            
         if not df_m_y.empty and col_m_val:
             df_m_y['Mois'] = df_m_y['dt_maint'].dt.month
             df_evo['Dépenses'] = df_m_y.groupby('Mois')[col_m_val].apply(lambda x: sum(to_f(i) for i in x))
-        
-        # 4. Nettoyage et application des noms
         df_evo = df_evo.fillna(0)
-        nom_mois_map = {i+1: m for i, m in enumerate(ordre_mois)}
         df_evo.index = df_evo.index.map(nom_mois_map)
-        
-        # 5. LA COMMANDE RADICALE : On force l'index en catégorie ordonnée
         df_evo.index = pd.Categorical(df_evo.index, categories=ordre_mois, ordered=True)
-        df_evo = df_evo.sort_index()
-        
-        # 6. Affichage (On fixe la hauteur pour l'iPhone)
-        st.bar_chart(df_evo, height=220, use_container_width=True)
+        st.bar_chart(df_evo.sort_index(), height=220)
 
-        # --- F. TABLEAUX DÉTAILLÉS ---
+        # --- G. TABLEAUX DÉTAILLÉS ---
         st.write("---")
         t1, t2 = st.tabs(["💰 Détails CA", "🛠️ Détails Dépenses"])
         with t1:
