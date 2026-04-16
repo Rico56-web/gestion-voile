@@ -596,15 +596,18 @@ if st.session_state.page == "STATS":
         df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
 
         if not df_filtre.empty:
-            # --- C. FILTRAGE STATUT (ARCHIV|PAYE|PAID) ---
-            # On nettoie tout : majuscules, sans accents, sans espaces
-            df_filtre['Statut_Clean'] = df_filtre['Statut'].astype(str).str.upper().str.strip()
-            
-            # Recherche de n'importe quel mot-clé de validation
-            mask_archive = df_filtre['Statut_Clean'].str.contains("ARCHIV|PAYE|PAID", na=False)
-            df_final = df_filtre[mask_archive].copy()
+       # --- C. FILTRAGE CHIRURGICAL (Basé sur Paid/Unpaid) ---
+        if not df_filtre.empty:
+            # 1. On s'assure que la colonne Paiement existe et est propre
+            if 'Paiement' not in df_filtre.columns:
+                df_filtre['Paiement'] = "Unpaid"
 
-            # Filtre temporel "À ce jour"
+            # 2. On filtre : on ne veut que ce qui est encaissé
+            # On utilise .str.contains pour être flexible (casse, espaces)
+            mask_paye = df_filtre['Paiement'].astype(str).str.contains("Paid", case=False, na=False)
+            df_final = df_filtre[mask_paye].copy()
+
+            # 3. Filtre temporel "À ce jour"
             if mode_bilan == "À ce jour" and not df_final.empty:
                 today = pd.Timestamp.now().normalize()
                 df_final = df_final[df_final['dt_vrai'] <= today].copy()
