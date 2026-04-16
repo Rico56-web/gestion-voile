@@ -582,21 +582,20 @@ if st.session_state.page == "STATS":
         mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
         sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-        # --- B. RADAR DE DATE (GÈRE SLASH ET TIRETS) ---
+    # --- B. RADAR DE DATE (VERSION NETTOYAGE JSON) ---
         def radar_date(row):
-            val = str(row.get('DateNav', '')).strip().split(' ')[0]
+            # On récupère la valeur et on vire les anti-slashs d'échappement JSON (\/)
+            val = str(row.get('DateNav', '')).replace('\\/', '/').replace('\\', '/').strip().split(' ')[0]
+            
             if val and val.lower() not in ["nan", "", "none"]:
-                # On essaie d'abord le format auto (tirets) puis français (slashs)
-                dt = pd.to_datetime(val, errors='coerce')
+                # Tentative 1 : Format Français (Slashs) - Prioritaire pour tes fiches
+                dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
+                
+                # Tentative 2 : Si échec, format ISO (Tirets)
                 if pd.isnull(dt):
-                    dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
+                    dt = pd.to_datetime(val, errors='coerce')
                 return dt
             return pd.NaT
-
-        # On crée df_filtre ICI (impératif pour éviter le NameError)
-        df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
-        df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
-
         # --- C. FILTRAGE ET CALCULS ---
         if not df_filtre.empty:
             def est_comptabilise(row):
