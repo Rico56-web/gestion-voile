@@ -564,8 +564,8 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
-# =================================================================
-# --- PAGE STATS : COCKPIT VESTA SKIPPER PRO ---
+        # =================================================================
+# --- PAGE STATS : COCKPIT VESTA SKIPPER PRO 2026 ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">🚀 Cockpit Vesta 2026</h2>', unsafe_allow_html=True)
@@ -576,6 +576,7 @@ if st.session_state.page == "STATS":
     df_m = charger_data_safe('maintenance.json') 
     df_log = charger_data_safe('logbook.json')
     
+    # Fusion actif + archives
     df_all = pd.concat([df_actif, df_arch], ignore_index=True) if not df_arch.empty else df_actif
 
     def to_f(val):
@@ -614,7 +615,7 @@ if st.session_state.page == "STATS":
             df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
             df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
 
-        # --- B. TOUS LES CALCULS (SÉCURISÉS) ---
+        # --- B. TOUS LES CALCULS (FINANCES & PERFORMANCE) ---
         total_ca = sum(to_f(x) for x in df_final['Prix']) if not df_final.empty else 0.0
         nb_jours = len(df_final)
         ca_moyen_jour = total_ca / nb_jours if nb_jours > 0 else 0.0
@@ -624,7 +625,7 @@ if st.session_state.page == "STATS":
         t_gasoil_eur = df_log_y['Cout Gazoil'].sum() if 'Cout Gazoil' in df_log_y.columns else 0.0
         total_dep = t_maint + t_gasoil_eur
         
-        # Performance & Rendement
+        # Performance
         t_milles = df_log_y['TotalMil'].sum() if not df_log_y.empty else 0
         t_mot_p = df_log_y['TotalMot'].sum() if not df_log_y.empty else 0
         t_voile = df_log_y['HVoile'].sum() if not df_log_y.empty else 0
@@ -633,7 +634,7 @@ if st.session_state.page == "STATS":
         ratio_maintenance = (total_dep / total_ca * 100) if total_ca > 0 else 0
         mille_par_sortie = t_milles / nb_jours if nb_jours > 0 else 0
 
-        # Vidange (Synchro 13.9h)
+        # Vidange Synchro (Basé sur tes 13.9h restantes)
         h_moteur_actuel = df_log_y['TotalMot'].max() if not df_log_y.empty else 0.0
         prochaine_vidange = h_moteur_actuel + 13.9
         h_restantes = prochaine_vidange - h_moteur_actuel
@@ -641,21 +642,28 @@ if st.session_state.page == "STATS":
         # --- C. BILAN SANTÉ ---
         st.markdown("### 🩺 Bilan de Santé")
         b1, b2, b3 = st.columns(3)
-        b1.metric("🎯 Rentabilité", f"{min(100, int((total_ca/6500)*100))}%", help="Couverture des frais fixes (6500€)")
+        b1.metric("🎯 Rentabilité", f"{min(100, int((total_ca/6500)*100))}%", help="Seuil 6500€")
         indice_eco = (t_voile / (t_mot_p + t_voile) * 100) if (t_mot_p + t_voile) > 0 else 0
-        b2.metric("🌿 Indice Éco", f"{indice_eco:.0f}%", help="Ratio Voile / (Voile + Moteur)")
+        b2.metric("🌿 Indice Éco", f"{indice_eco:.0f}%")
         b3.metric("⚙️ Vidange dans", f"{h_restantes:.1f}h", delta=f"Mot: {h_moteur_actuel:.0f}h")
 
-        # --- D. ANALYSE DE PERFORMANCE (NOUVEAU) ---
+        # --- D. ANALYSE DE PERFORMANCE ---
         st.write("---")
-        st.markdown("### 📈 Analyse de Performance")
+        st.markdown("### 📈 Performance Opérationnelle")
         p1, p2, p3 = st.columns(3)
         p1.metric("💎 Rendement/H", f"{revenu_par_h_moteur:.1f} €/h")
         p2.metric("📉 Poids Frais", f"{ratio_maintenance:.1f} %")
         p3.metric("📏 Moy. Sortie", f"{mille_par_sortie:.1f} NM")
-        
-        # --- E. GRAPHES D'ACTIVITÉ ---
-        st.subheader("📉 Analyse Mensuelle")
+
+        # --- E. INDICATEURS FINANCIERS ---
+        st.divider()
+        c1, c2, c3 = st.columns(3)
+        c1.metric("💰 CA", f"{total_ca:,.0f} €")
+        c2.metric("💸 Dépenses", f"{total_dep:,.0f} €")
+        c3.metric("⚖️ Net", f"{(total_ca - total_dep):,.0f} €")
+
+        # --- F. GRAPHES (ORDRE CHRONOLOGIQUE) ---
+        st.subheader("📉 Évolution Mensuelle")
         ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
         nom_mois_map = {i+1: m for i, m in enumerate(ordre_mois)}
         df_evo = pd.DataFrame(index=range(1, 13))
@@ -665,12 +673,13 @@ if st.session_state.page == "STATS":
         if not df_m_y.empty and col_m_val:
             df_m_y['Mois'] = df_m_y['dt_maint'].dt.month
             df_evo['Dépenses'] = df_m_y.groupby('Mois')[col_m_val].apply(lambda x: sum(to_f(i) for i in x))
+        
         df_evo = df_evo.fillna(0)
         df_evo.index = df_evo.index.map(nom_mois_map)
         df_evo.index = pd.Categorical(df_evo.index, categories=ordre_mois, ordered=True)
         st.bar_chart(df_evo.sort_index(), height=220)
 
-        # --- NOUVEAU : RÉPARTITION (FROMAGES) ---
+        # --- G. RÉPARTITION (SOCIÉTÉS ET TYPES) ---
         st.write("---")
         st.subheader("🍕 Répartition des Volumes")
         col_pie1, col_pie2 = st.columns(2)
@@ -678,68 +687,31 @@ if st.session_state.page == "STATS":
         with col_pie1:
             if not df_final.empty and 'Société' in df_final.columns:
                 st.write("**Sorties par Société**")
-                # Nombre de sorties (count) par société
-                df_pie_soc = df_final['Société'].value_counts()
-                st.write(df_pie_soc) # Optionnel : affiche les chiffres sous forme de texte ou remplace par un vrai pie chart si tu as Plotly
-                # Note : Streamlit natif n'a pas de st.pie_chart, on utilise une astuce de barres horizontales ou st.dataframe
-            
-        with col_pie2:
-            if not df_m_y.empty:
-                st.write("**Maintenance par Cat.**")
-                # On cherche la colonne catégorie (souvent 'Cat' ou 'Type' dans ton JSON)
-                col_cat = 'Catégorie' if 'Catégorie' in df_m_y.columns else ('Cat' if 'Cat' in df_m_y.columns else None)
-                if col_cat:
-                    df_pie_maint = df_m_y[col_cat].value_counts()
-                    st.write(df_pie_maint)
-                else:
-                    st.info("Ajoute une colonne 'Catégorie' dans Maintenance")
-
-        # --- F. RÉPARTITION (VUE SYNCHRONISÉE) ---
-        st.write("---")
-        st.subheader("🍕 Répartition des Volumes")
-        c_pie1, c_pie2 = st.columns(2)
-        
-        with c_pie1:
-            if not df_final.empty and 'Société' in df_final.columns:
-                st.write("**Par Société (Sorties)**")
-                # Compte du nombre de sorties
                 df_rep_soc = df_final['Société'].value_counts().reset_index()
                 df_rep_soc.columns = ['Société', 'Nombre']
                 st.bar_chart(df_rep_soc.set_index('Société'), horizontal=True, height=200)
             
-        with c_pie2:
-            # On utilise uniquement 'Type' (la colonne de ton onglet Maintenance)
+        with col_pie2:
             if not df_m_y.empty and 'Type' in df_m_y.columns:
-                st.write("**Par Catégorie (€)**")
-                # Somme des montants par Type
+                st.write("**Maintenance par Cat. (€)**")
                 df_rep_maint = df_m_y.groupby('Type')[col_m_val].apply(lambda x: sum(to_f(i) for i in x))
                 st.bar_chart(df_rep_maint, horizontal=True, height=200)
-            else:
-                # Si 'Type' n'est pas trouvé, on ne met pas de message d'erreur, 
-                # on affiche juste un petit indicateur discret
-                st.caption("Données de catégorie indisponibles")
 
-
-
-        # --- G. TABLEAUX DÉTAILLÉS (TRI CHRONO RÉCENT EN HAUT) ---
+        # --- H. TABLEAUX DÉTAILLÉS (TRI RÉCENT EN HAUT) ---
         st.write("---")
         t1, t2 = st.tabs(["💰 Détails CA", "🛠️ Détails Dépenses"])
         
         with t1:
             if not df_final.empty:
-                # Tri par date réelle (dt_vrai) descendant
                 df_final_clean = df_final.sort_values(by='dt_vrai', ascending=False)
-                # On affiche 'Objet' si 'Client' est vide pour la désignation
                 cols_r = [c for c in ['DateNav', 'Société', 'Prix'] if c in df_final_clean.columns]
                 st.dataframe(df_final_clean[cols_r], use_container_width=True, hide_index=True)
-                st.success(f"**TOTAL RECETTES : {total_ca:,.2f} €**")
+                st.success(f"**TOTAL RECETTES : {total_ca:,.2f} €** (Moy : {ca_moyen_jour:,.0f}€/j)")
         
         with t2:
             if not df_m_y.empty:
-                # Tri par date de maintenance descendant
                 df_m_y_clean = df_m_y.sort_values(by='dt_maint', ascending=False)
                 st.write("**🔧 Maintenance :**")
-                # SYNCHRO ICI : Ton code utilise 'Objet' et non 'Titre'
                 col_nom_m = 'Objet' if 'Objet' in df_m_y_clean.columns else 'Titre'
                 cols_m = [c for c in ['Date', col_nom_m, col_m_val] if c in df_m_y_clean.columns]
                 st.dataframe(df_m_y_clean[cols_m], use_container_width=True, hide_index=True)
@@ -750,6 +722,7 @@ if st.session_state.page == "STATS":
                 st.dataframe(df_log_y_clean[['Date', 'PortArr', 'Cout Gazoil']], use_container_width=True, hide_index=True)
             
             st.error(f"**TOTAL DÉPENSES : {total_dep:,.2f} €**")
+
 
 
 # =================================================================
