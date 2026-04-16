@@ -565,7 +565,7 @@ if st.session_state.page == "PLANNING":
     else:
         st.info("Aucune mission ce mois-ci.")
 # =================================================================
-# --- 7. PAGE STATS (SYNCHRO TOTALE & FILTRE STRICT) ---
+# --- 7. PAGE STATS (VERSION FINALE - 2509€ TARGET) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
@@ -575,7 +575,7 @@ if st.session_state.page == "STATS":
     df_arch = charger_data_safe('archives_planning.json')
     
     if not df_actif.empty or not df_arch.empty:
-        # Fusion des données
+        # Fusion
         df_all = pd.concat([df_actif, df_arch], ignore_index=True)
         
         # --- A. CONFIGURATION ---
@@ -594,27 +594,22 @@ if st.session_state.page == "STATS":
             return pd.NaT
 
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
-        
-        # Filtre par année sélectionnée
         df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
 
+        # --- C. FILTRAGE CHIRURGICAL (SÉCURISÉ) ---
         if not df_filtre.empty:
-             # --- C. FILTRAGE CHIRURGICAL STRICT (VERSION INCASSABLE) ---
-        if not df_filtre.empty:
-            # 1. On s'assure que la colonne Paiement existe
+            # Sécurité colonne Paiement
             if 'Paiement' not in df_filtre.columns:
                 df_filtre['Paiement'] = "Unpaid"
 
-            # 2. Nettoyage ligne par ligne (évite l'AttributeError)
-            def check_paid(val):
-                v = str(val).strip().upper()
-                return v == "PAID"
+            # Fonction de vérification robuste
+            def est_paye(val):
+                return str(val).strip().upper() == "PAID"
 
-            # 3. On crée le masque de filtrage
-            mask_paid = df_filtre['Paiement'].apply(check_paid)
-            df_final = df_filtre[mask_paid].copy()
+            # On ne garde que les PAID (Exclut d'office la #15 et les "En attente")
+            df_final = df_filtre[df_filtre['Paiement'].apply(est_paye)].copy()
 
-            # 4. Application du filtre "À ce jour"
+            # Filtre "À ce jour"
             if mode_bilan == "À ce jour" and not df_final.empty:
                 today = pd.Timestamp.now().normalize()
                 df_final = df_final[df_final['dt_vrai'] <= today].copy()
@@ -623,7 +618,7 @@ if st.session_state.page == "STATS":
             st.divider()
             
             def force_float(val):
-                # Nettoyage pour CMN (gère espaces, €, virgules)
+                # Nettoyage ultra-large pour CMN
                 s = str(val).replace('€', '').replace(' ', '').replace('\xa0', '').replace(',', '.')
                 try: return float(s)
                 except: return 0.0
@@ -633,11 +628,10 @@ if st.session_state.page == "STATS":
                 total_ca = df_final['Prix_Num'].sum()
                 
                 c1, c2 = st.columns(2)
-                # Affichage du CA avec séparateur de milliers pour plus de clarté
                 c1.metric(f"💰 CA Encaissé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
                 c2.metric("📋 Missions Payées", f"{len(df_final)}")
 
-                # Affichage de la liste pour vérification (Aide à trouver les CMN)
+                # Liste pour vérification visuelle des CMN
                 df_final['Client'] = df_final['Prénom'].astype(str).str.upper() + " " + df_final['Nom'].astype(str).str.upper()
                 df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
                 
@@ -646,9 +640,9 @@ if st.session_state.page == "STATS":
             else:
                 st.info(f"Aucune mission 'Paid' trouvée pour {sel_y}.")
         else:
-            st.info(f"Aucune donnée de navigation pour {sel_y}.")
+            st.info(f"Aucune mission trouvée pour l'année {sel_y}.")
     else:
-        st.error("Aucune donnée disponible dans les fichiers JSON.")
+        st.error("Aucune donnée disponible.")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
