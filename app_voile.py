@@ -565,12 +565,12 @@ if st.session_state.page == "PLANNING":
     else:
         st.info("Aucune mission ce mois-ci.")
         # =================================================================
-# --- 7. PAGE STATS (VERSION PERFORMANCE PRO) ---
+# --- 7. PAGE STATS (FINANCES & PERFORMANCE LOGBOOK) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # 1. Chargement des sources
+    # 1. Chargement des données
     df_actif = charger_data_safe('contacts.json')
     df_arch = charger_data_safe('archives_planning.json')
     df_m = charger_data_safe('maintenance.json') 
@@ -584,152 +584,74 @@ if st.session_state.page == "STATS":
         mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
         sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-        # --- B. FILTRAGE REVENUS ---
-        def radar_date(row):
-            val = str(row.get('DateNav', '')).replace('\\/', '/').strip().split(' ')[0]
-            if val and val.lower() not in ["nan", "", "none"]:
-                dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
-                return dt
-            return pd.NaT
+        # --- B. FILTRAGE & CALCULS ---
+        def to_f(val):
+            try: return float(str(val).replace('€','').replace(' ','').replace(',','.'))
+            except: return 0.0
 
-        df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
+        # Filtrage Revenus
+        df_all['dt_vrai'] = pd.to_datetime(df_all['DateNav'], dayfirst=True, errors='coerce')
         df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
 
         def est_comptabilise(row):
-            soc = str(row.get('Société', '')).strip().upper()
-            paiement = str(row.get('Paiement', '')).strip().upper()
-            statut = str(row.get('Statut', '')).strip().upper()
-            if "LISTE D'ATTENTE" in statut: return False
-            if "CMN" in soc: return True
-            return paiement == "PAID"
+            soc = str(row.get('Société', '')).upper()
+            paiement = str(row.get('Paiement', '')).upper()
+            if "LISTE D'ATTENTE" in str(row.get('Statut', '')).upper(): return False
+            return "CMN" in soc or paiement == "PAID"
 
         df_final = df_filtre[df_filtre.apply(est_comptabilise, axis=1)].copy() if not df_filtre.empty else pd.DataFrame()
         
         if mode_bilan == "À ce jour" and not df_final.empty:
-            today = pd.Timestamp.now().normalize()
-            df_final = df_final[df_final['dt_vrai'] <= today].copy()
+            df_final = df_final[df_final['dt_vrai'] <= pd.Timestamp.now().normalize()].copy()
 
-        # --- C. CALCUL DES DÉPENSES ---
-        total_dep = 0.0
-        df_dep_final = pd.DataFrame()
+        # Filtrage Dépenses (Maintenance)
+        total_maint = 0.0
         if not df_m.empty:
             df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-            mask_dep = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")
-            if mode_bilan == "À ce jour":
-                mask_dep = mask_dep & (df_m['dt_maint'] <= pd.Timestamp.now().normalize())
-            df_dep_final = df_m[mask_dep].copy()
-            
-            def to_f(val):
-                try: return float(str(val).replace('€','').replace(' ','').replace(',','.'))
-                except: return 0.0
-            total_dep = df_dep_final['M_Num'].apply(to_f).sum()
-            # --- D. INDICATEURS DE PERFORMANCE (KPI CROISÉS) ---
-if not df_final.empty:
-    total_ca = df_final['Prix'].apply(to_f).sum()
-    
-    # Calcul des stats techniques depuis le LOGBOOK
-    df_log = charger_data_safe('logbook.json')
-    # On filtre le logbook sur l'année sélectionnée
-    df_log['dt'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
-    df_log_y = df_log[df_log['dt'].dt.year == sel_y]
-    
-    t_milles = df_log_y['TotalMil'].sum()
-    t_moteur = df_log_y['TotalMot'].sum()
-    t_gasoil_l = df_log_y['Litre Gazoil'].sum()
-    t_gasoil_eur = df_log_y['Cout Gazoil'].sum()
+            mask_m = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")
+            df_m_f = df_m[mask_m].copy()
+            total_maint = df_m_f['M_Num'].apply(to_f).sum()
 
-    # Intégration du coût gasoil dans les dépenses totales
-    total_dep_global = total_dep + t_gasoil_eur
-    net = total_ca - total_dep_global
+        # Filtrage Technique (Logbook)
+        t_milles, t_moteur, t_voile, t_gasoil_eur, t_gasoil_l = 0, 0, 0, 0, 0
+        if not df_log.empty:
+            df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+            df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
+            t_milles = df_log_y['TotalMil'].sum()
+            t_moteur = df_log_y['TotalMot'].sum()
+            t_voile = df_log_y['HVoile'].sum()
+            t_gasoil_l = df_log_y['Litre Gazoil'].sum()
+            t_gasoil_eur = df_log_y['Cout Gazoil'].sum()
 
-    # --- AFFICHAGE DES CHIFFRES CLÉS ---
-    st.divider()
-    c1, c2, c3 = st.columns(3)
-    c1.metric("💰 Chiffre d'Affaires", f"{total_ca:,.0f} €".replace(',', ' '))
-    c2.metric("💸 Total Dépenses", f"{total_dep_global:,.0f} €".replace(',', ' '))
-    c3.metric("⚖️ Revenu Net", f"{net:,.0f} €".replace(',', ' '))
+        # --- C. INDICATEURS FINANCIERS ---
+        total_ca = df_final['Prix'].apply(to_f).sum() if not df_final.empty else 0.0
+        total_dep = total_maint + t_gasoil_eur
+        net = total_ca - total_dep
 
-    st.write("📈 **Analyse Technique (Livre de Bord)**")
-    cp1, cp2, cp3 = st.columns(3)
-    
-    # Ratio : Coût du mille (Maintenance + Carburant / Distance)
-    cost_per_mile = (total_dep_global / t_milles) if t_milles > 0 else 0
-    # Ratio : Consommation (Litres / Heures moteur)
-    conso_moy = (t_gasoil_l / t_moteur) if t_moteur > 0 else 0
-    
-    cp1.metric("Distance", f"{t_milles:,.0f} NM")
-    cp2.metric("Coût / Mille", f"{cost_per_mile:.2f} €/NM")
-    cp3.metric("Conso Moy.", f"{conso_moy:.1f} L/h")
+        st.divider()
+        c1, c2, c3 = st.columns(3)
+        c1.metric("💰 Chiffre d'Affaires", f"{total_ca:,.0f} €")
+        c2.metric("💸 Total Dépenses", f"{total_dep:,.0f} €")
+        c3.metric("⚖️ Revenu Net", f"{net:,.0f} €")
 
-    # --- GRAPHIQUE RECETTES / DÉPENSES ---
-    st.write("---")
-    st.subheader("📊 Équilibre Mensuel")
-    # (Ici tu gardes ton code de line_chart précédent pour comparer Recettes et Dépenses)
-            
+        # --- D. ANALYSE TECHNIQUE (LOGBOOK) ---
+        st.write("📈 **Rentabilité Technique**")
+        cp1, cp2, cp3 = st.columns(3)
+        
+        cout_mille = (total_dep / t_milles) if t_milles > 0 else 0
+        conso_h = (t_gasoil_l / t_moteur) if t_moteur > 0 else 0
+        # Ratio Voile vs Moteur
+        total_heures = t_moteur + t_voile
+        tx_voile = (t_voile / total_heures * 100) if total_heures > 0 else 0
 
-        # --- E. TABLEAUX SANS ASCENSEURS AVEC TOTAUX ---
+        cp1.metric("Distance", f"{t_milles:,.0f} NM")
+        cp2.metric("Coût/Mille", f"{cout_mille:.2f} €/NM")
+        cp3.metric("% Voile", f"{tx_voile:.0f}%")
+
+        # --- E. GRAPHES ---
         st.write("---")
-        if not df_final.empty:
-            st.subheader("📄 Détail des Revenus")
-            df_final['D'] = df_final['dt_vrai'].dt.strftime('%d/%m')
-            # Calcul hauteur : 35px par ligne + 45px header
-            h_rev = (len(df_final) * 35) + 45
-            st.dataframe(df_final[['D', 'Société', 'Prix']], hide_index=True, use_container_width=True, height=h_rev)
-            st.markdown(f"<div style='text-align:right; font-weight:bold; color:#2e7d32; padding-bottom:20px;'>Sous-Total : {total_ca:,.2f} €</div>", unsafe_allow_html=True)
-
-        if not df_dep_final.empty:
-            st.subheader("💸 Détail des Dépenses")
-            df_dep_final['D'] = df_dep_final['dt_maint'].dt.strftime('%d/%m')
-            h_dep = (len(df_dep_final) * 35) + 45
-            st.dataframe(df_dep_final[['D', 'Objet', 'M_Num']], hide_index=True, use_container_width=True, height=h_dep)
-            st.markdown(f"<div style='text-align:right; font-weight:bold; color:#c62828;'>Sous-Total : {total_dep:,.2f} €</div>", unsafe_allow_html=True)
-        else:
-            st.info("Aucune dépense enregistrée (statut 'Fait') pour cette période.")
-            # --- G. ANALYSE GRAPHIQUE ---
-        st.write("---")
-        st.subheader("📈 Analyses Visuelles")
-
-        # 1. Courbe Recettes / Dépenses
-        mois_labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
-        
-        df_final['Mois'] = df_final['dt_vrai'].dt.month
-        df_dep_final['Mois'] = df_dep_final['dt_maint'].dt.month
-        
-        rev_mensuel = df_final.groupby('Mois')['Prix'].apply(lambda x: sum(to_f(v) for v in x)).reindex(range(1, 13), fill_value=0)
-        dep_mensuel = df_dep_final.groupby('Mois')['M_Num'].apply(lambda x: sum(to_f(v) for v in x)).reindex(range(1, 13), fill_value=0)
-        
-        df_chart = pd.DataFrame({
-            'Recettes': rev_mensuel.values,
-            'Dépenses': dep_mensuel.values
-        }, index=mois_labels)
-
-        st.line_chart(df_chart, color=["#2e7d32", "#c62828"])
-
-        # 2. Camemberts (Correction de l'AttributeError)
-        col_chart1, col_chart2 = st.columns(2)
-
-        with col_chart1:
-            if not df_final.empty:
-                st.write("**Part par Sté**")
-                df_ste = df_final.copy()
-                df_ste['Prix_f'] = df_ste['Prix'].apply(to_f)
-                # Utilisation de bar_chart si pie_chart pose problème, ou formatage propre
-                chart_ste = df_ste.groupby('Société')['Prix_f'].sum()
-                st.bar_chart(chart_ste, color="#2e7d32")
-            else:
-                st.info("Pas de revenus")
-
-        with col_chart2:
-            if not df_dep_final.empty:
-                st.write("**Part Dépenses**")
-                df_type = df_dep_final.copy()
-                df_type['M_Num_f'] = df_type['M_Num'].apply(to_f)
-                chart_type = df_type.groupby('Type')['M_Num_f'].sum()
-                st.bar_chart(chart_type, color="#c62828")
-            else:
-                st.info("Pas de frais")
-    
-        
+        # Ici tu peux remettre tes st.bar_chart par Société et par Type de dépense
+        # en veillant à bien garder l'alignement (4 espaces sous le "if not df_all.empty:")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
