@@ -599,17 +599,22 @@ if st.session_state.page == "STATS":
         df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
 
         if not df_filtre.empty:
-            # --- C. FILTRAGE CHIRURGICAL STRICT (CORRIGÉ) ---
+             # --- C. FILTRAGE CHIRURGICAL STRICT (VERSION INCASSABLE) ---
+        if not df_filtre.empty:
+            # 1. On s'assure que la colonne Paiement existe
             if 'Paiement' not in df_filtre.columns:
                 df_filtre['Paiement'] = "Unpaid"
-            
-            df_filtre['Paiement'] = df_filtre['Paiement'].fillna("Unpaid").astype(str)
-            df_filtre['Pay_Status'] = df_filtre['Paiement'].str.strip().upper()
-            
-            # On ne garde QUE les "PAID"
-            df_final = df_filtre[df_filtre['Pay_Status'] == "PAID"].copy()
 
-            # Application du filtre "À ce jour"
+            # 2. Nettoyage ligne par ligne (évite l'AttributeError)
+            def check_paid(val):
+                v = str(val).strip().upper()
+                return v == "PAID"
+
+            # 3. On crée le masque de filtrage
+            mask_paid = df_filtre['Paiement'].apply(check_paid)
+            df_final = df_filtre[mask_paid].copy()
+
+            # 4. Application du filtre "À ce jour"
             if mode_bilan == "À ce jour" and not df_final.empty:
                 today = pd.Timestamp.now().normalize()
                 df_final = df_final[df_final['dt_vrai'] <= today].copy()
