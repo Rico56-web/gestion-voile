@@ -648,17 +648,17 @@ if st.session_state.page == "STATS":
         c1.metric("💰 CA", f"{total_ca:,.0f} €")
         c2.metric("💸 Dépenses", f"{total_dep:,.0f} €")
         c3.metric("⚖️ Net", f"{(total_ca - total_dep):,.0f} €")
-        
-        # --- E. GRAPHES D'ACTIVITÉ (ORDRE CHRONO FORCÉ) ---
+
+        # --- E. GRAPHES D'ACTIVITÉ (VERROUILLAGE CHRONO) ---
         st.subheader("📉 Analyse Mensuelle")
         
-        # 1. On crée la liste ordonnée des mois
+        # 1. Définition de l'ordre immuable
         ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
-        nom_mois_map = {1:'Jan', 2:'Fév', 3:'Mar', 4:'Avr', 5:'Mai', 6:'Jun', 7:'Jul', 8:'Aoû', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Déc'}
         
-        # 2. On prépare le DataFrame avec tous les mois de l'année
+        # 2. Création d'un DataFrame vide avec tous les mois
         df_evo = pd.DataFrame(index=range(1, 13))
         
+        # 3. Remplissage des données
         if not df_final.empty:
             df_final['Mois'] = df_final['dt_vrai'].dt.month
             df_evo['Recettes'] = df_final.groupby('Mois')['Prix'].apply(lambda x: sum(to_f(i) for i in x))
@@ -667,17 +667,17 @@ if st.session_state.page == "STATS":
             df_m_y['Mois'] = df_m_y['dt_maint'].dt.month
             df_evo['Dépenses'] = df_m_y.groupby('Mois')[col_m_val].apply(lambda x: sum(to_f(i) for i in x))
         
-        # 3. On remplit les vides par 0 et on remplace les chiffres par les noms
+        # 4. Nettoyage et application des noms
         df_evo = df_evo.fillna(0)
+        nom_mois_map = {i+1: m for i, m in enumerate(ordre_mois)}
         df_evo.index = df_evo.index.map(nom_mois_map)
         
-        # 4. ASTUCE : On réindexe selon notre liste 'ordre_mois' pour figer l'ordre
-        df_evo = df_evo.reindex(ordre_mois)
+        # 5. LA COMMANDE RADICALE : On force l'index en catégorie ordonnée
+        df_evo.index = pd.Categorical(df_evo.index, categories=ordre_mois, ordered=True)
+        df_evo = df_evo.sort_index()
         
-        # 5. Affichage
-        st.bar_chart(df_evo, height=200, use_container_width=True)
-
-
+        # 6. Affichage (On fixe la hauteur pour l'iPhone)
+        st.bar_chart(df_evo, height=220, use_container_width=True)
 
         # --- F. TABLEAUX DÉTAILLÉS ---
         st.write("---")
