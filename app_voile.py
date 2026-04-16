@@ -595,22 +595,16 @@ if st.session_state.page == "STATS":
 
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
         df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
-
-        # --- C. FILTRAGE CHIRURGICAL (SÉCURISÉ) ---
+        # --- C. FILTRAGE SIMPLE (TOUT CE QUI EST DANS LES ARCHIVES) ---
         if not df_filtre.empty:
-            # Sécurité colonne Paiement
-            if 'Paiement' not in df_filtre.columns:
-                df_filtre['Paiement'] = "Unpaid"
-
-            # Fonction de vérification robuste
-            def est_paye(val):
-                return str(val).strip().upper() == "PAID"
-
-            # On ne garde que les PAID (Exclut d'office la #15 et les "En attente")
-            df_final = df_filtre[df_filtre['Paiement'].apply(est_paye)].copy()
+            # On ne filtre plus par "PAID", on prend TOUT ce qui est arrivé 
+            # dans le fichier archives ou qui est marqué comme archivé/payé.
+            
+            # On définit df_final comme étant tout ce qui a été filtré par l'année
+            df_final = df_filtre.copy() 
 
             # Filtre "À ce jour"
-            if mode_bilan == "À ce jour" and not df_final.empty:
+            if mode_bilan == "À ce jour":
                 today = pd.Timestamp.now().normalize()
                 df_final = df_final[df_final['dt_vrai'] <= today].copy()
 
@@ -618,7 +612,6 @@ if st.session_state.page == "STATS":
             st.divider()
             
             def force_float(val):
-                # Nettoyage ultra-large pour CMN
                 s = str(val).replace('€', '').replace(' ', '').replace('\xa0', '').replace(',', '.')
                 try: return float(s)
                 except: return 0.0
@@ -629,20 +622,14 @@ if st.session_state.page == "STATS":
                 
                 c1, c2 = st.columns(2)
                 c1.metric(f"💰 CA Encaissé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
-                c2.metric("📋 Missions Payées", f"{len(df_final)}")
+                c2.metric("📋 Missions Classées", f"{len(df_final)}")
 
-                # Liste pour vérification visuelle des CMN
+                # Affichage du tableau pour vérifier si les 7 fiches sont là
                 df_final['Client'] = df_final['Prénom'].astype(str).str.upper() + " " + df_final['Nom'].astype(str).str.upper()
                 df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
                 
                 view = df_final.sort_values('dt_vrai', ascending=False)
                 st.dataframe(view[['Date_Aff', 'Client', 'Société', 'Prix']], hide_index=True, use_container_width=True)
-            else:
-                st.info(f"Aucune mission 'Paid' trouvée pour {sel_y}.")
-        else:
-            st.info(f"Aucune mission trouvée pour l'année {sel_y}.")
-    else:
-        st.error("Aucune donnée disponible.")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
