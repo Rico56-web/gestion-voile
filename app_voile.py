@@ -565,7 +565,7 @@ if st.session_state.page == "PLANNING":
     else:
         st.info("Aucune mission ce mois-ci.")
 # =================================================================
-# --- PAGE STATS : LE COCKPIT VESTA SKIPPER ---
+# --- PAGE STATS : LE COCKPIT VESTA (VERSION SÉCURISÉE) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">🚀 Cockpit Vesta 2026</h2>', unsafe_allow_html=True)
@@ -589,7 +589,7 @@ if st.session_state.page == "STATS":
         mode_bilan = c_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
         sel_y = c_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-        # Filtrage Revenus & Technique
+        # Filtrage Revenus
         df_all['dt_vrai'] = pd.to_datetime(df_all['DateNav'], dayfirst=True, errors='coerce')
         df_f = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
         if mode_bilan == "À ce jour" and not df_f.empty:
@@ -602,78 +602,78 @@ if st.session_state.page == "STATS":
             return "CMN" in soc or paiement == "PAID"
 
         df_final = df_f[df_f.apply(est_comptabilise, axis=1)].copy() if not df_f.empty else pd.DataFrame()
-        df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-        df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")].copy()
-        df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
-        df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
+        
+        # Filtrage Maintenance
+        df_m_y = pd.DataFrame()
+        if not df_m.empty:
+            df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+            df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")].copy()
+        
+        # Filtrage Logbook
+        df_log_y = pd.DataFrame()
+        if not df_log.empty:
+            df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+            df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
 
-        # --- B. CALCULS AVANCÉS ---
-        total_ca = sum(to_f(x) for x in df_final['Prix'])
-        t_maint = sum(to_f(x) for x in df_m_y['M_Num'])
-        t_gasoil_eur = df_log_y['Cout Gazoil'].sum()
+        # --- B. CALCULS ---
+        total_ca = sum(to_f(x) for x in df_final['Prix']) if not df_final.empty else 0.0
+        
+        # Identification colonne montant maintenance (M_Num ou Montant)
+        col_m_val = 'M_Num' if 'M_Num' in df_m_y.columns else ('Montant' if 'Montant' in df_m_y.columns else None)
+        t_maint = sum(to_f(x) for x in df_m_y[col_m_val]) if col_m_val and not df_m_y.empty else 0.0
+        
+        t_gasoil_eur = df_log_y['Cout Gazoil'].sum() if 'Cout Gazoil' in df_log_y.columns else 0.0
         total_dep = t_maint + t_gasoil_eur
         
-        # Point Mort (Hypothèse Charges Fixes : 6500€ - A ajuster selon tes frais réels)
+        # Point Mort
         charges_fixes = 6500 
-        nb_jours = len(df_final)
-        ca_moyen_jour = total_ca / nb_jours if nb_jours > 0 else 0
-        seuil_jours = charges_fixes / ca_moyen_jour if ca_moyen_jour > 0 else 0
         progression_seuil = min(100, int((total_ca / charges_fixes) * 100)) if charges_fixes > 0 else 100
         
         # Technique
-        t_milles = df_log_y['TotalMil'].sum()
-        t_moteur = df_log_y['TotalMot'].sum()
-        t_voile = df_log_y['HVoile'].sum()
+        t_moteur = df_log_y['TotalMot'].sum() if 'TotalMot' in df_log_y.columns else 0
+        t_voile = df_log_y['HVoile'].sum() if 'HVoile' in df_log_y.columns else 0
         indice_eco = (t_voile / (t_moteur + t_voile) * 100) if (t_moteur + t_voile) > 0 else 0
-        
-        # Révision (Base 100h moteur)
-        heures_depuis_vidange = t_moteur % 100 
-        h_restantes = 100 - heures_depuis_vidange
+        h_restantes = 100 - (t_moteur % 100)
 
-        # --- C. TABLEAU DE BORD SANTÉ (L'ESSENTIEL) ---
+        # --- C. BILAN SANTÉ ---
         st.markdown("### 🩺 Bilan de Santé")
         b1, b2, b3 = st.columns(3)
-        
-        # Statut Rentabilité
-        b1.metric("🎯 Rentabilité", f"{progression_seuil}%", 
-                  help="Pourcentage des charges fixes couvertes par le CA actuel")
-        
-        # Statut Éco
-        b2.metric("🌿 Indice Éco", f"{indice_eco:.0f}%", 
-                  delta=f"{indice_eco-50:.0f}%", delta_color="normal")
-        
-        # Statut Maintenance
-        b3.metric("⚙️ Prochaine Vidange", f"{int(h_restantes)}h", 
-                  delta=f"-{int(heures_depuis_vidange)}h", delta_color="inverse")
+        b1.metric("🎯 Rentabilité", f"{progression_seuil}%")
+        b2.metric("🌿 Indice Éco", f"{indice_eco:.0f}%")
+        b3.metric("⚙️ Vidange dans", f"{int(h_restantes)}h")
 
-        # --- D. INDICATEURS FINANCIERS ---
+        # --- D. INDICATEURS ---
         st.divider()
         c1, c2, c3 = st.columns(3)
-        c1.metric("💰 CA", f"{total_ca:,.0f}€")
-        c2.metric("💸 Dépenses", f"{total_dep:,.0f}€")
-        c3.metric("⚖️ Net", f"{(total_ca - total_dep):,.0f}€")
+        c1.metric("💰 CA", f"{total_ca:,.0f} €")
+        c2.metric("💸 Dépenses", f"{total_dep:,.0f} €")
+        c3.metric("⚖️ Net", f"{(total_ca - total_dep):,.0f} €")
 
-        # --- E. GRAPHES & TOPS ---
+        # --- E. GRAPHES (AVEC SÉCURITÉ COLONNES) ---
         st.write("---")
-        # Graphe Évolution
         if not df_final.empty or not df_m_y.empty:
-            st.write("📈 **Équilibre Mensuel**")
-            df_final['Mois'] = df_final['dt_vrai'].dt.month
-            df_m_y['Mois'] = df_m_y['dt_maint'].dt.month
-            evo_rec = df_final.groupby('Mois')['Prix'].apply(lambda x: sum(to_f(i) for i in x))
-            evo_dep = df_m_y.groupby('Mois')['M_Num'].apply(lambda x: sum(to_f(i) for i in x))
-            df_evo = pd.DataFrame({"Recettes": evo_rec, "Dépenses": evo_dep}).fillna(0)
-            st.area_chart(df_evo, height=200)
-
-        col_g1, col_g2 = st.columns(2)
-        with col_g1:
+            st.write("📈 **Évolution Mensuelle**")
+            # Code évolution simplifié pour éviter les crashs de GroupBy
+            df_evo = pd.DataFrame(index=range(1, 13))
             if not df_final.empty:
+                df_final['Mois'] = df_final['dt_vrai'].dt.month
+                df_evo['Recettes'] = df_final.groupby('Mois')['Prix'].apply(lambda x: sum(to_f(i) for i in x))
+            if not df_m_y.empty and col_m_val:
+                df_m_y['Mois'] = df_m_y['dt_maint'].dt.month
+                df_evo['Dépenses'] = df_m_y.groupby('Mois')[col_m_val].apply(lambda x: sum(to_f(i) for i in x))
+            st.area_chart(df_evo.fillna(0), height=200)
+
+        cg1, cg2 = st.columns(2)
+        with cg1:
+            if not df_final.empty and 'Société' in df_final.columns:
                 st.write("🏆 Top Sociétés")
                 st.bar_chart(df_final.groupby('Société')['Prix'].apply(lambda x: sum(to_f(i) for i in x)), height=150)
-        with col_g2:
-            if not df_m_y.empty:
+        with cg2:
+            # SÉCURITÉ ICI : On vérifie 'Titre' ET la colonne montant
+            col_titre = 'Titre' if 'Titre' in df_m_y.columns else ('Sujet' if 'Sujet' in df_m_y.columns else None)
+            if not df_m_y.empty and col_titre and col_m_val:
                 st.write("🔧 Top Dépenses")
-                st.bar_chart(df_m_y.groupby('Titre')['M_Num'].apply(lambda x: sum(to_f(i) for i in x)), height=150)
+                st.bar_chart(df_m_y.groupby(col_titre)[col_m_val].apply(lambda x: sum(to_f(i) for i in x)), height=150)
 
         # --- F. TABLEAUX ---
         st.write("---")
@@ -681,25 +681,16 @@ if st.session_state.page == "STATS":
         with t1:
             cols_r = [c for c in ['DateNav', 'Client', 'Société', 'Prix'] if c in df_final.columns]
             st.dataframe(df_final[cols_r], use_container_width=True, hide_index=True)
-            st.success(f"Moyenne/Jour : {ca_moyen_jour:,.0f} €")
 
         with t2:
             if not df_m_y.empty:
                 st.write("**Maintenance :**")
-                cols_m = [c for c in ['Date', 'Titre', 'M_Num'] if c in df_m_y.columns]
+                cols_m = [c for c in ['Date', 'Titre', 'Sujet', col_m_val] if c in df_m_y.columns]
                 st.dataframe(df_m_y[cols_m], use_container_width=True, hide_index=True)
             if t_gasoil_eur > 0:
-                st.write("**Carburant (Logbook) :**")
+                st.write("**Carburant :**")
                 st.dataframe(df_log_y[df_log_y['Cout Gazoil']>0][['Date', 'PortArr', 'Cout Gazoil']], use_container_width=True, hide_index=True)
             st.error(f"TOTAL DÉPENSES : {total_dep:,.2f} €")
-
-        # --- G. PERFORMANCE TECHNIQUE ---
-        st.write("---")
-        st.write("📊 **Efficacité Navigation**")
-        cp1, cp2, cp3 = st.columns(3)
-        cp1.metric("Distance", f"{t_milles:,.0f} NM")
-        cp2.metric("Prix/NM", f"{(total_dep/t_milles if t_milles>0 else 0):.2f}€")
-        cp3.metric("Moteur Total", f"{t_moteur:,.1f}h")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
