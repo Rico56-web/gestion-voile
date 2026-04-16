@@ -21,7 +21,9 @@
         "Navigation":null,
         "MillesDep":null,
         "H_Voile":null,
-        "Notes":null
+        "Notes":null,
+        "MoteurEtape":null,
+        "MillesEtape":null
     },
     {
         "Date":"13\/04\/2026",
@@ -45,7 +47,9 @@
         "Navigation":null,
         "MillesDep":null,
         "H_Voile":null,
-        "Notes":null
+        "Notes":null,
+        "MoteurEtape":null,
+        "MillesEtape":null
     },
     {
         "Date":"14\/03\/2026",
@@ -69,7 +73,9 @@
         "Navigation":null,
         "MillesDep":null,
         "H_Voile":null,
-        "Notes":null
+        "Notes":null,
+        "MoteurEtape":null,
+        "MillesEtape":null
     },
     {
         "Date":"01\/03\/2026",
@@ -91,9 +97,11 @@
         "Equipage":null,
         "Plein":null,
         "Navigation":"",
-        "MillesDep":0.0,
+        "MillesDep":2643.0,
         "H_Voile":0.0,
-        "Notes":""
+        "Notes":"",
+        "MoteurEtape":6.8,
+        "MillesEtape":-2643.0
     },
     {
         "Date":"21\/02\/2026",
@@ -117,6 +125,8 @@
         "Navigation":null,
         "MillesDep":null,
         "H_Voile":null,
-        "Notes":null
+        "Notes":null,
+        "MoteurEtape":null,
+        "MillesEtape":null
     }
 ]
