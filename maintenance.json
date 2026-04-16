@@ -197,6 +197,14 @@
         "M_Num":70.0,
         "Statut":"Fait",
         "Type":"Autres frais",
+        "dt_maint":1775865600000
+    },
+    {
+        "Date":"11\/04\/2026",
+        "Objet":"2 bouteilles de gaz",
+        "M_Num":70.0,
+        "Statut":"Fait",
+        "Type":"Autres frais",
         "dt_maint":null
     }
 ]
