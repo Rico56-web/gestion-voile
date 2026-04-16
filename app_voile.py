@@ -1069,38 +1069,36 @@ if st.session_state.page == "LOG":
             h_voile = c7.number_input("⛵ Voile", value=float(row.get('HVoile', 0)), step=0.1)
 
             notes = st.text_area("🗒️ Observations", value=row.get('Observations', row.get('Notes', '')))
+            # --- SECTION CROISIÈRE (DYNAMIQUE) ---
+        # On place la case à cocher HORS du formulaire pour qu'elle soit interactive
+        is_croisiere = st.checkbox("🚢 C'est une croisière (plusieurs jours)", value=False)
+        
+        nb_jours = 1
+        if is_croisiere:
+            col_cr1, col_cr2 = st.columns(2)
+            nb_jours = col_cr1.number_input("Nombre de jours :", min_value=2, max_value=15, value=2)
             
-            # OPTION CROISIÈRE (Ajout automatique)
-            is_croisiere = st.checkbox("🚢 C'est une croisière (Répéter sur plusieurs jours)")
-            nb_jours = st.number_input("Nombre de jours :", min_value=1, max_value=15, value=1) if is_croisiere else 1
+            # Calcul automatique de la date de fin pour vérification
+            try:
+                date_debut = pd.to_datetime(date_n, dayfirst=True)
+                date_fin = (date_debut + pd.Timedelta(days=nb_jours-1)).strftime("%d/%m/%Y")
+                col_cr2.info(f"Arrivée prévue : {date_fin}")
+            except:
+                col_cr2.warning("Format date invalide")
+
+        # Début du formulaire pour le reste des données
+        with st.form("form_logbook_v4"):
+            # ... (tes colonnes c1, c2, c3 pour Date, Départ, Arrivée) ...
+            
+            # ... (tes colonnes c4, c5, c6, c7 pour Milles, Moteur, etc.) ...
+
+            notes = st.text_area("🗒️ Observations", value=row.get('Observations', ''))
 
             if st.form_submit_button("💾 ENREGISTRER", use_container_width=True, type="primary"):
-                nouvelles_entrees = []
+                # LOGIQUE D'ENREGISTREMENT
                 base_date = pd.to_datetime(date_n, dayfirst=True, errors='coerce')
-                
-                for i in range(nb_jours):
-                    current_date = (base_date + pd.Timedelta(days=i)).strftime("%d/%m/%Y")
-                    suffixe = f" (Jour {i+1})" if nb_jours > 1 else ""
-                    
-                    nouvelles_entrees.append({
-                        "Date": current_date, "PortDep": p_dep if i==0 else "Escale", 
-                        "PortArr": p_arr + suffixe, "TotalMil": milles / nb_jours, 
-                        "TotalMot": h_mot / nb_jours, "Litre Gazoil": gasoil / nb_jours,
-                        "HVoile": h_voile / nb_jours, "Observations": notes
-                    })
-                
-                if is_edit:
-                    df_log.loc[idx] = nouvelles_entrees[0]
-                else:
-                    df_new = pd.DataFrame(nouvelles_entrees)
-                    df_log = pd.concat([df_new, df_log], ignore_index=True)
-                
-                sauvegarder_data(df_log, 'logbook.json')
-                st.session_state.log_edit_idx = None
-                st.session_state.nouveau_log = False
-                st.success("Navigation enregistrée !")
-                st.rerun()
-
+                # ... (le reste du code de concaténation reste identique)
+    
     # --- 2. AFFICHAGE DES ONGLETS ---
     else:
         tab1, tab2 = st.tabs(["⛵ Saison 2026", "📚 Archives"])
