@@ -922,81 +922,98 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - ORDRE PHYSIQUE FORCÉ ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION FINALE SANS CACHE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
 
-    # 1. Chargement et conversion pour tri
+    # 1. Chargement des données
     df_log = charger_data_safe('logbook.json')
-    
-    # 2. Formulaire de saisie (Haut de page)
-    # [Garder ton bloc de saisie avec Mot_Dep, Mot_Arr, Mil_Dep, Mil_Arr...]
-    # ... (Code de saisie précédent) ...
 
-    # 3. L'HISTORIQUE : LA MÉTHODE DU TRI PHYSIQUE
+    # 2. Formulaire de saisie (Toujours en haut)
+    with st.expander("➕ AJOUTER UNE NAVIGATION", expanded=df_log.empty):
+        # On récupère les derniers compteurs pour pré-remplir
+        last_h = 0.0
+        last_m = 0.0
+        if not df_log.empty:
+            try:
+                last_h = float(df_log.iloc[-1].get('TotalMot', 0.0))
+                last_m = float(df_log.iloc[-1].get('TotalMil', 0.0))
+            except: pass
+
+        st.subheader("🚀 Nouvelle Etape")
+        c1, c2 = st.columns(2)
+        f_date = c1.date_input("Date", datetime.now())
+        f_titre = c2.text_input("Destination")
+        
+        col_m1, col_m2 = st.columns(2)
+        f_h_dep = col_m1.number_input("H. Moteur Départ", value=last_h)
+        f_h_arr = col_m2.number_input("H. Moteur Arrivée", value=last_h)
+        
+        col_mi1, col_mi2 = st.columns(2)
+        f_m_dep = col_mi1.number_input("Milles Départ", value=last_m)
+        f_m_arr = col_mi2.number_input("Milles Arrivée", value=last_m)
+        
+        f_notes = st.text_area("Notes / Météo")
+
+        if st.button("💾 ENREGISTRER L'ÉTAPE", use_container_width=True, type="primary"):
+            nouvelle_ligne = {
+                "Date": f_date.strftime("%d/%m/%Y"),
+                "Navigation": f_titre,
+                "MotDep": float(f_h_dep),
+                "TotalMot": float(f_h_arr),
+                "MillesDep": float(f_m_dep),
+                "TotalMil": float(f_m_arr),
+                "Notes": f_notes
+            }
+            df_log = pd.concat([df_log, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
+            sauvegarder_data(df_log, 'logbook.json')
+            st.rerun()
+
+    # 3. AFFICHAGE ET GESTION (MODIFIER / SUPPRIMER)
     if not df_log.empty:
         st.divider()
-        st.subheader("📜 Historique (Le plus récent en haut)")
+        st.subheader("📜 Historique")
 
-        # On crée une copie pour ne pas abîmer la source
-        df_visu = df_log.copy()
+        # --- FORCE L'ORDRE ICI ---
+        # On crée une copie avec l'index affiché en colonne 'N°'
+        df_affichage = df_log.copy()
+        df_affichage.insert(0, 'N°', df_log.index)
         
-        # On crée une colonne de tri technique (cachée ou visible)
-        # On utilise l'index original comme référence de création
-        df_visu['ID'] = df_visu.index
-        
-        # INVERSION PHYSIQUE : On trie par ID du plus grand au plus petit
-        df_visu = df_visu.sort_values(by='ID', ascending=False)
+        # On renverse le tableau (le plus récent en haut)
+        df_affichage = df_affichage.iloc[::-1]
 
-        # Affichage en mode "Tableau de bord" (Non éditable pour bloquer l'ordre)
-        st.dataframe(
-            df_visu,
-            use_container_width=True,
-            hide_index=True, # On cache l'index Pandas pour ne pas confondre
-            column_order=("ID", "Date", "Navigation", "PortArr", "TotalMot", "TotalMil", "Notes"),
-            column_config={
-                "ID": st.column_config.NumberColumn("N°", width="small"),
-                "TotalMot": "Moteur Final",
-                "TotalMil": "Milles Final",
-                "PortArr": "📍 Destination"
-            }
-        )
+        # Affichage simple (non éditable pour garantir l'ordre)
+        st.dataframe(df_affichage, use_container_width=True, hide_index=True)
 
-        # 4. LES BOUTONS D'ACTION (Modifier / Supprimer)
-        # On utilise des expanders pour ne pas charger l'écran iPhone
+        # 4. BOUTONS DE GESTION (Comme sur Maintenance)
         st.write("---")
-        c_edit, c_suppr = st.columns(2)
+        col_edit, col_del = st.columns(2)
 
-        with c_edit:
-            with st.expander("📝 MODIFIER UNE LIGNE"):
-                num_m = st.number_input("Entrez le N° à modifier", min_value=0, max_value=df_log.index.max(), step=1)
-                if st.button("Charger pour modification"):
-                    # On peut utiliser une variable temporaire pour charger la ligne
-                    st.session_state.edit_log_idx = num_m
+        with col_edit:
+            with st.expander("📝 MODIFIER"):
+                idx_mod = st.number_input("Modifier la ligne N°", min_value=0, max_value=df_log.index.max(), step=1)
+                row = df_log.loc[idx_mod]
+                with st.form("edit_log_form"):
+                    e_port = st.text_input("Destination", value=row.get('Navigation', ''))
+                    e_h = st.number_input("Moteur Final", value=float(row.get('TotalMot', 0.0)))
+                    e_m = st.number_input("Milles Final", value=float(row.get('TotalMil', 0.0)))
+                    if st.form_submit_button("VALIDER MODIFICATION"):
+                        df_log.at[idx_mod, 'Navigation'] = e_port
+                        df_log.at[idx_mod, 'TotalMot'] = e_h
+                        df_log.at[idx_mod, 'TotalMil'] = e_m
+                        sauvegarder_data(df_log, 'logbook.json')
+                        st.rerun()
 
-                if 'edit_log_idx' in st.session_state:
-                    idx = st.session_state.edit_log_idx
-                    row = df_log.loc[idx]
-                    with st.form("quick_edit"):
-                        new_p = st.text_input("Port", value=row.get('PortArr', ''))
-                        new_h = st.number_input("H. Moteur", value=float(row.get('TotalMot', 0.0)))
-                        if st.form_submit_button("SAUVEGARDER"):
-                            df_log.at[idx, 'PortArr'] = new_p
-                            df_log.at[idx, 'TotalMot'] = new_h
-                            sauvegarder_data(df_log, 'logbook.json')
-                            del st.session_state.edit_log_idx
-                            st.rerun()
+        with col_del:
+            with st.expander("🗑️ SUPPRIMER"):
+                idx_del = st.number_input("Supprimer la ligne N°", min_value=0, max_value=df_log.index.max(), step=1, key="del_log")
+                if st.checkbox("Confirmer la suppression", key="check_del"):
+                    if st.button("🔥 SUPPRIMER DÉFINITIVEMENT", type="primary"):
+                        df_log = df_log.drop(index=idx_del).reset_index(drop=True)
+                        sauvegarder_data(df_log, 'logbook.json')
+                        st.rerun()
 
-        with c_suppr:
-            with st.expander("🗑️ SUPPRIMER UNE LIGNE"):
-                num_d = st.number_input("N° à supprimer", min_value=0, max_value=df_log.index.max(), step=1, key="del_log")
-                confirm = st.checkbox("Confirmer la suppression du N° " + str(num_d))
-                if confirm and st.button("🔥 SUPPRIMER DÉFINITIVEMENT", type="primary"):
-                    df_log = df_log.drop(index=num_d).reset_index(drop=True)
-                    sauvegarder_data(df_log, 'logbook.json')
-                    st.rerun()
-  
 
 # --- FIN DU FICHIER ---
 
