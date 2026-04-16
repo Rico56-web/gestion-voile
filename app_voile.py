@@ -581,17 +581,17 @@ if st.session_state.page == "STATS":
         mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
         sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-        # --- B. RADAR DE DATE ---
+    # --- B. RADAR DE DATE (VERSION UNIVERSELLE) ---
         def radar_date(row):
             val = str(row.get('DateNav', '')).strip().split(' ')[0]
             if val and val.lower() not in ["nan", "", "none"]:
-                # On force le format français (dayfirst)
-                dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
+                # 1. On tente le format auto (gère les tirets 2026-05-15)
+                dt = pd.to_datetime(val, errors='coerce')
+                # 2. Si ça échoue, on force le format français (slashs 15/05/2026)
+                if pd.isnull(dt):
+                    dt = pd.to_datetime(val, dayfirst=True, errors='coerce')
                 return dt
             return pd.NaT
-
-        df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
-        df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
 
         # --- C. LOGIQUE DE CALCUL DU CA ---
         if not df_filtre.empty:
