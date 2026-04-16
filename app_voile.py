@@ -621,65 +621,66 @@ if st.session_state.page == "STATS":
             if mode_bilan == "À ce jour" and not df_final.empty:
                 today = pd.Timestamp.now().normalize()
                 df_final = df_final[df_final['dt_vrai'] <= today].copy()
-# --- D. CALCULS ET INDICATEURS (FINANCES COMPLETES) ---
+# --- D. CALCULS FINANCIERS (OPTIMISÉ IPHONE 16) ---
             st.divider()
             
             def force_float(val):
+                if val is None or val == "": return 0.0
                 s = str(val).replace('€', '').replace(' ', '').replace('\xa0', '').replace(',', '.')
                 try: return float(s)
                 except: return 0.0
 
             if not df_final.empty:
-                # 1. Calculs Financiers
+                # 1. Préparation des colonnes (Sécurité Totale)
                 df_final['Prix_Num'] = df_final['Prix'].apply(force_float)
-                # On simule ou récupère les dépenses (ajuste la colonne si elle existe)
-                df_final['Depenses'] = df_final.get('Depenses', 0.0).apply(force_float) 
                 
+                # Sécurité pour les dépenses : si la colonne n'existe pas, on la crée proprement
+                if 'Depenses' not in df_final.columns:
+                    df_final['Depenses'] = 0.0
+                else:
+                    df_final['Depenses'] = df_final['Depenses'].apply(force_float)
+                
+                # 2. Calcul des totaux
                 total_ca = df_final['Prix_Num'].sum()
                 total_dep = df_final['Depenses'].sum()
                 net = total_ca - total_dep
                 nb_missions = len(df_final)
 
-                # 2. KPI - Optimisés iPhone (Colonnes étroites)
-                kpi1, kpi2 = st.columns(2)
-                kpi1.metric("💰 CA", f"{total_ca:,.0f} €".replace(',', ' '))
-                kpi2.metric("📋 Missions", f"{nb_missions}")
+                # 3. KPI en GRILLE 2x2 (Spécial Mobile)
+                # Sur iPhone, les colonnes s'empilent mieux ainsi
+                c1, c2 = st.columns(2)
+                c1.metric("💰 CA", f"{total_ca:,.0f} €".replace(',', ' '))
+                c2.metric("📋 Missions", f"{nb_missions}")
                 
-                kpi3, kpi4 = st.columns(2)
-                kpi3.metric("📉 Frais", f"{total_dep:,.0f} €".replace(',', ' '), delta_color="inverse")
-                kpi4.metric("⚖️ Net", f"{net:,.0f} €".replace(',', ' '))
+                c3, c4 = st.columns(2)
+                c3.metric("📉 Frais", f"{total_dep:,.0f} €".replace(',', ' '))
+                c4.metric("⚖️ Net", f"{net:,.0f} €".replace(',', ' '))
 
-                # 3. Graphique de Répartition (Mobile Friendly)
-                st.write("")
-                st.subheader("📊 Part des Sociétés")
-                df_soc = df_final.groupby('Société')['Prix_Num'].sum().sort_values(ascending=False)
-                st.bar_chart(df_soc, height=250)
-
-                # 4. Tableaux Détails (Optimisation iPhone 16)
-                # On utilise un container pour forcer la largeur
-                st.subheader("📄 Détail des Revenus")
-                # On ne garde que l'essentiel pour éviter le scroll horizontal sur mobile
-                df_aff_rev = df_final.sort_values('dt_vrai', ascending=False)
-                df_aff_rev['Date'] = df_aff_rev['dt_vrai'].dt.strftime('%d/%m') # Format court
+                # 4. TABLEAU REVENUS (Format Ultra-Compact iPhone)
+                st.write("---")
+                st.subheader("📄 Détail Revenus")
+                df_rev_view = df_final.sort_values('dt_vrai', ascending=False).copy()
+                df_rev_view['D'] = df_rev_view['dt_vrai'].dt.strftime('%d/%m') # Date courte
                 
+                # On ne garde que 3 colonnes pour éviter le scroll horizontal
                 st.dataframe(
-                    df_aff_rev[['Date', 'Société', 'Prix']], 
+                    df_rev_view[['D', 'Société', 'Prix']], 
                     hide_index=True, 
                     use_container_width=True
                 )
 
-                st.subheader("💸 Détail des Dépenses")
-                # Si tu as une liste de dépenses spécifique (ex: carburant, frais ports)
-                # On affiche ici les lignes où 'Depenses' > 0
-                df_dep = df_final[df_final['Depenses'] > 0].copy()
-                if not df_dep.empty:
+                # 5. TABLEAU DÉPENSES (Seulement si > 0)
+                df_dep_only = df_final[df_final['Depenses'] > 0].copy()
+                if not df_dep_only.empty:
+                    st.subheader("💸 Détail Frais")
+                    df_dep_only['D'] = df_dep_only['dt_vrai'].dt.strftime('%d/%m')
                     st.dataframe(
-                        df_dep[['Date', 'Société', 'Depenses']], 
+                        df_dep_only[['D', 'Société', 'Depenses']], 
                         hide_index=True, 
                         use_container_width=True
                     )
                 else:
-                    st.caption("Aucune dépense enregistrée sur cette période.")
+                    st.caption("ℹ️ Aucune dépense notée.")
 
             else:
                 st.info(f"Aucune mission validée pour {sel_y}.")
