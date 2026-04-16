@@ -667,12 +667,15 @@ if st.session_state.page == "STATS":
         c1.metric("💰 CA", f"{total_ca:,.0f} €")
         c2.metric("💸 Dépenses", f"{total_dep:,.0f} €")
         c3.metric("⚖️ Net", f"{(total_ca - total_dep):,.0f} €")
-
-        # --- E. GRAPHES (AVEC SÉCURITÉ COLONNES) ---
+        # --- E. GRAPHES (OPTIMISÉS) ---
         st.write("---")
         if not df_final.empty or not df_m_y.empty:
-            st.write("📈 **Évolution Mensuelle**")
-            # Code évolution simplifié pour éviter les crashs de GroupBy
+            st.subheader("📉 Analyse de l'Activité")
+            
+            # Préparation des noms de mois en français
+            nom_mois = {1:'Jan', 2:'Fév', 3:'Mar', 4:'Avr', 5:'Mai', 6:'Juin', 
+                        7:'Juil', 8:'Août', 9:'Sept', 10:'Oct', 11:'Nov', 12:'Déc'}
+            
             df_evo = pd.DataFrame(index=range(1, 13))
             if not df_final.empty:
                 df_final['Mois'] = df_final['dt_vrai'].dt.month
@@ -680,36 +683,55 @@ if st.session_state.page == "STATS":
             if not df_m_y.empty and col_m_val:
                 df_m_y['Mois'] = df_m_y['dt_maint'].dt.month
                 df_evo['Dépenses'] = df_m_y.groupby('Mois')[col_m_val].apply(lambda x: sum(to_f(i) for i in x))
-            st.area_chart(df_evo.fillna(0), height=200)
+            
+            df_evo = df_evo.fillna(0)
+            df_evo.index = df_evo.index.map(nom_mois)
+            
+            # Affichage d'un graphique à barres comparatif (plus lisible sur mobile)
+            st.bar_chart(df_evo, height=250, use_container_width=True)
 
         cg1, cg2 = st.columns(2)
         with cg1:
             if not df_final.empty and 'Société' in df_final.columns:
                 st.write("🏆 Top Sociétés")
-                st.bar_chart(df_final.groupby('Société')['Prix'].apply(lambda x: sum(to_f(i) for i in x)), height=150)
+                df_soc = df_final.groupby('Société')['Prix'].apply(lambda x: sum(to_f(i) for i in x)).sort_values(ascending=False)
+                st.bar_chart(df_soc, height=180)
         with cg2:
-            # SÉCURITÉ ICI : On vérifie 'Titre' ET la colonne montant
             col_titre = 'Titre' if 'Titre' in df_m_y.columns else ('Sujet' if 'Sujet' in df_m_y.columns else None)
             if not df_m_y.empty and col_titre and col_m_val:
                 st.write("🔧 Top Dépenses")
-                st.bar_chart(df_m_y.groupby(col_titre)[col_m_val].apply(lambda x: sum(to_f(i) for i in x)), height=150)
+                df_top_d = df_m_y.groupby(col_titre)[col_m_val].apply(lambda x: sum(to_f(i) for i in x)).sort_values(ascending=False)
+                st.bar_chart(df_top_d, height=180)
 
-        # --- F. TABLEAUX ---
+        # --- F. TABLEAUX AVEC TOTAUX DÉTAILLÉS ---
         st.write("---")
         t1, t2 = st.tabs(["💰 Détails CA", "🛠️ Détails Dépenses"])
+        
         with t1:
             cols_r = [c for c in ['DateNav', 'Client', 'Société', 'Prix'] if c in df_final.columns]
-            st.dataframe(df_final[cols_r], use_container_width=True, hide_index=True)
+            if not df_final.empty:
+                st.dataframe(df_final[cols_r], use_container_width=True, hide_index=True)
+                # Ajout des totaux clairs en bas de tableau
+                c_t1, c_t2 = st.columns(2)
+                c_t1.success(f"**TOTAL CA : {total_ca:,.2f} €**")
+                c_t2.info(f"**Moyenne/Jour : {ca_moyen_jour:,.0f} €**")
+            else:
+                st.info("Aucune recette.")
 
         with t2:
             if not df_m_y.empty:
                 st.write("**Maintenance :**")
                 cols_m = [c for c in ['Date', 'Titre', 'Sujet', col_m_val] if c in df_m_y.columns]
                 st.dataframe(df_m_y[cols_m], use_container_width=True, hide_index=True)
+            
             if t_gasoil_eur > 0:
                 st.write("**Carburant :**")
-                st.dataframe(df_log_y[df_log_y['Cout Gazoil']>0][['Date', 'PortArr', 'Cout Gazoil']], use_container_width=True, hide_index=True)
-            st.error(f"TOTAL DÉPENSES : {total_dep:,.2f} €")
+                cols_gas = [c for c in ['Date', 'PortArr', 'Cout Gazoil'] if c in df_log_y.columns]
+                st.dataframe(df_log_y[df_log_y['Cout Gazoil']>0][cols_gas], use_container_width=True, hide_index=True)
+            
+            # Total dépenses bien visible
+            st.error(f"**TOTAL DÉPENSES : {total_dep:,.2f} €**")
+
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
