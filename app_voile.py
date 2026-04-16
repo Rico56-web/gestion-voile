@@ -663,15 +663,32 @@ if st.session_state.page == "STATS":
             if not df_final.empty:
                 st.dataframe(df_final[cols_dispo], use_container_width=True, hide_index=True)
                 st.success(f"TOTAL : {total_ca:,.2f} €")
-
-        with t_dep:
+                with t_dep:
+                    
+            # --- SECTION MAINTENANCE ---
             if not df_m_y.empty:
-                st.write("**Maintenance :**")
-                st.dataframe(df_m_y[['Date', 'Titre', 'M_Num']], use_container_width=True, hide_index=True)
+                st.write("**🔧 Maintenance :**")
+                # Liste des colonnes que l'on souhaite afficher
+                cols_souhaitees = ['Date', 'Titre', 'M_Num']
+                # On ne garde que celles qui existent réellement dans le fichier
+                cols_valides = [c for c in cols_souhaitees if c in df_m_y.columns]
+                
+                if cols_valides:
+                    st.dataframe(df_m_y[cols_valides], use_container_width=True, hide_index=True)
+                else:
+                    st.warning("Les colonnes Date, Titre ou M_Num sont absentes du fichier maintenance.")
+            else:
+                st.info("Aucune opération de maintenance enregistrée pour cette période.")
+            
+            # --- SECTION CARBURANT ---
             if t_gasoil_eur > 0:
-                st.write("**Carburant (Logbook) :**")
-                st.dataframe(df_log_y[df_log_y['Cout Gazoil']>0][['Date', 'PortArr', 'Cout Gazoil']], use_container_width=True, hide_index=True)
-            st.error(f"TOTAL : {total_dep:,.2f} €")
+                st.write("**⛽ Carburant (Logbook) :**")
+                # Sécurité similaire pour le logbook
+                cols_log = [c for c in ['Date', 'PortArr', 'Cout Gazoil'] if c in df_log_y.columns]
+                st.dataframe(df_log_y[df_log_y['Cout Gazoil'] > 0][cols_log], use_container_width=True, hide_index=True)
+            
+            st.error(f"💰 TOTAL DÉPENSES : {total_dep:,.2f} €")
+
 
         # --- G. PERFORMANCE TECHNIQUE ---
         st.write("---")
