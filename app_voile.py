@@ -565,7 +565,7 @@ if st.session_state.page == "PLANNING":
     else:
         st.info("Aucune mission ce mois-ci.")
 # =================================================================
-# --- PAGE STATS (FINANCES & PERFORMANCE LOGBOOK) ---
+# --- PAGE STATS (COMPLET : INDICATEURS, TABLEAUX & GRAPHES) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Tableau de Bord Vesta</h2>', unsafe_allow_html=True)
@@ -576,30 +576,25 @@ if st.session_state.page == "STATS":
     df_m = charger_data_safe('maintenance.json') 
     df_log = charger_data_safe('logbook.json')
     
-    # Fusion des revenus (Actifs + Archives)
     df_all = pd.concat([df_actif, df_arch], ignore_index=True) if not df_arch.empty else df_actif
 
-    # Fonction de nettoyage numérique
     def to_f(val):
         if pd.isna(val): return 0.0
         try: return float(str(val).replace('€','').replace(' ','').replace(',','.').strip())
         except: return 0.0
 
     if not df_all.empty:
-        # --- A. FILTRES DE PÉRIODE (RESTAURÉS) ---
+        # --- A. FILTRES ---
         col_sel1, col_sel2 = st.columns(2)
         mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
         sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-        # --- B. CALCUL DES REVENUS ---
+        # Filtrage Revenus
         df_all['dt_vrai'] = pd.to_datetime(df_all['DateNav'], dayfirst=True, errors='coerce')
         df_f = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
-        
-        # Filtre "À ce jour"
         if mode_bilan == "À ce jour" and not df_f.empty:
             df_f = df_f[df_f['dt_vrai'] <= pd.Timestamp.now().normalize()].copy()
 
-        # Calcul du CA (Uniquement si payé ou CMN)
         def est_comptabilise(row):
             soc = str(row.get('Société', '')).upper()
             paiement = str(row.get('Paiement', '')).upper()
@@ -607,61 +602,85 @@ if st.session_state.page == "STATS":
             return "CMN" in soc or paiement == "PAID"
 
         df_final = df_f[df_f.apply(est_comptabilise, axis=1)].copy() if not df_f.empty else pd.DataFrame()
+        
+        # Filtrage Dépenses
+        df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+        df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")].copy()
+        
+        # Logbook (Gasoil)
+        df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+        df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
+
+        # --- B. CALCULS ---
         total_ca = sum(to_f(x) for x in df_final['Prix']) if not df_final.empty else 0.0
-
-        # --- C. CALCUL DES DÉPENSES (Maintenance + Gasoil) ---
-        t_maint = 0.0
-        if not df_m.empty:
-            df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-            mask_m = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")
-            df_m_y = df_m[mask_m]
-            col_m = 'M_Num' if 'M_Num' in df_m.columns else 'Montant'
-            t_maint = sum(to_f(x) for x in df_m_y[col_m])
-
-        # Données Logbook (Technique & Gasoil)
-        t_milles, t_moteur, t_voile, t_gasoil_eur, t_gasoil_l = 0, 0, 0, 0, 0
-        if not df_log.empty:
-            df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
-            df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
-            
-            t_milles = df_log_y['TotalMil'].sum() if 'TotalMil' in df_log_y.columns else 0
-            t_moteur = df_log_y['TotalMot'].sum() if 'TotalMot' in df_log_y.columns else 0
-            t_voile = df_log_y['HVoile'].sum() if 'HVoile' in df_log_y.columns else 0
-            t_gasoil_l = df_log_y['Litre Gazoil'].sum() if 'Litre Gazoil' in df_log_y.columns else 0
-            t_gasoil_eur = df_log_y['Cout Gazoil'].sum() if 'Cout Gazoil' in df_log_y.columns else 0
-
-        # --- D. AFFICHAGE DES INDICATEURS CLÉS ---
-        total_dep = t_maint + t_gasoil_eur
-        net = total_ca - total_dep
-
+        total_maint = sum(to_f(x) for x in df_m_y['M_Num']) if not df_m_y.empty else 0.0
+        t_gasoil_eur = df_log_y['Cout Gazoil'].sum() if not df_log_y.empty else 0.0
+        total_dep = total_maint + t_gasoil_eur
+        
+        # --- C. INDICATEURS HAUT DE PAGE ---
         st.divider()
-        # Ligne Finances
         c1, c2, c3 = st.columns(3)
         c1.metric("💰 CA", f"{total_ca:,.0f} €")
         c2.metric("💸 Dépenses", f"{total_dep:,.0f} €")
-        c3.metric("⚖️ Net", f"{net:,.0f} €")
+        c3.metric("⚖️ Net", f"{(total_ca - total_dep):,.0f} €")
 
-        # Ligne Performance (Logbook)
-        st.write("📈 **Indicateurs de Performance**")
-        cp1, cp2, cp3 = st.columns(3)
-        
-        cout_mille = (total_dep / t_milles) if t_milles > 0 else 0
-        conso_h = (t_gasoil_l / t_moteur) if t_moteur > 0 else 0
-        total_h = t_moteur + t_voile
-        tx_voile = (t_voile / total_h * 100) if total_h > 0 else 0
-
-        cp1.metric("Distance", f"{t_milles:,.0f} NM")
-        cp2.metric("Coût/NM", f"{cout_mille:.2f} €")
-        cp3.metric("% Voile", f"{tx_voile:.0f}%")
-
-        # --- E. GRAPHIQUE COMPARATIF ---
+        # --- D. GRAPHIQUES ---
         st.write("---")
-        st.subheader("📉 Équilibre Financier")
-        chart_data = pd.DataFrame({
-            "Indicateur": ["Chiffre d'Affaires", "Total Dépenses"],
-            "Montant (€)": [total_ca, total_dep]
-        })
-        st.bar_chart(chart_data.set_index("Indicateur"), color="#01579b")
+        g1, g2 = st.columns(2)
+        
+        with g1:
+            st.write("📈 **Recettes vs Dépenses**")
+            # Création courbe mensuelle
+            df_final['Mois'] = df_final['dt_vrai'].dt.month
+            df_m_y['Mois'] = df_m_y['dt_maint'].dt.month
+            
+            res_m = df_final.groupby('Mois')['Prix'].apply(lambda x: sum(to_f(i) for i in x))
+            dep_m = df_m_y.groupby('Mois')['M_Num'].apply(lambda x: sum(to_f(i) for i in x))
+            
+            df_chart = pd.DataFrame({"Recettes": res_m, "Dépenses": dep_m}).fillna(0)
+            st.line_chart(df_chart)
+
+        with g2:
+            st.write("🥧 **Répartition Sociétés**")
+            if not df_final.empty:
+                df_pie = df_final.groupby('Société')['Prix'].apply(lambda x: sum(to_f(i) for i in x))
+                st.write(df_pie) # Utilisation d'un tableau car le camembert natif est limité en version simple
+            else:
+                st.info("Aucune donnée")
+
+        # --- E. TABLEAUX DÉTAILLÉS ---
+        st.write("---")
+        tab_rec, tab_dep = st.tabs(["💰 Détail Recettes", "🛠️ Détail Dépenses"])
+        
+        with tab_rec:
+            if not df_final.empty:
+                st.dataframe(df_final[['DateNav', 'Client', 'Société', 'Prix']], use_container_width=True)
+                st.markdown(f"**TOTAL RECETTES : {total_ca:,.2f} €**")
+            else:
+                st.write("Aucune recette sur cette période.")
+
+        with tab_dep:
+            # Union Maintenance + Gasoil du Logbook
+            st.write("**Maintenance :**")
+            if not df_m_y.empty:
+                st.dataframe(df_m_y[['Date', 'Titre', 'M_Num']], use_container_width=True)
+            
+            if t_gasoil_eur > 0:
+                st.write("**Carburant (Logbook) :**")
+                st.dataframe(df_log_y[df_log_y['Cout Gazoil']>0][['Date', 'PortArr', 'Cout Gazoil']], use_container_width=True)
+            
+            st.markdown(f"**TOTAL DÉPENSES : {total_dep:,.2f} €**")
+
+        # --- F. PERFORMANCE TECHNIQUE ---
+        st.write("---")
+        st.write("📊 **Performance du Navire**")
+        cp1, cp2, cp3 = st.columns(3)
+        t_milles = df_log_y['TotalMil'].sum() if not df_log_y.empty else 0
+        t_moteur = df_log_y['TotalMot'].sum() if not df_log_y.empty else 0
+        
+        cp1.metric("Distance", f"{t_milles:,.0f} NM")
+        cp2.metric("Coût/NM", f"{(total_dep/t_milles if t_milles>0 else 0):.2f} €")
+        cp3.metric("Litre/Heure", f"{(df_log_y['Litre Gazoil'].sum()/t_moteur if t_moteur>0 else 0):.1f} L/h")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
