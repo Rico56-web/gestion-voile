@@ -922,60 +922,129 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True) 
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - CORRECTION CALCULS ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION CALCULS & ORDRE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
 
     df_log = charger_data_safe('logbook.json')
 
-    # ... [Bloc Nouvelle Navigation - Partie Enregistrement] ...
-    if st.button("💾 ENREGISTRER LA NAVIGATION", use_container_width=True, type="primary"):
+    # 1. COMPTEURS POUR PRÉ-REMPLISSAGE (Ligne 0 = la plus récente)
+    last_h, last_m = 0.0, 0.0
+    if not df_log.empty:
+        try:
+            r0 = df_log.iloc[0]
+            last_h = float(r0.get('Compteur_Arr', r0.get('TotalMot', 0.0)))
+            last_m = float(r0.get('Compteur_Mil', r0.get('TotalMil', 0.0)))
+        except: pass
+
+    # 2. SAISIE NOUVELLE NAVIGATION
+    st.subheader("🚀 Nouvelle Navigation")
+    c1, c2, c3 = st.columns([2, 1, 2])
+    f_date = c1.date_input("Date", datetime.now())
+    f_jours = c2.number_input("Jours", min_value=1, value=1)
+    f_titre = c3.text_input("Destination")
+
+    if 'temp_log_df' not in st.session_state:
+        st.session_state.temp_log_df = pd.DataFrame([{
+            "Port": "", "Mot_Dep": last_h, "Mot_Arr": last_h,
+            "Mil_Dep": last_m, "Mil_Arr": last_m, "Voile": 0.0, "Notes": ""
+        }])
+
+    edited_steps = st.data_editor(
+        st.session_state.temp_log_df,
+        column_config={
+            "Port": "📍 Etape", "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
+            "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr"
+        },
+        num_rows="dynamic", use_container_width=True, key="log_editor_2026"
+    )
+
+    if st.button("💾 ENREGISTRER LA NAVIGATION", type="primary", use_container_width=True):
         if edited_steps is not None and not edited_steps.empty:
             nouvelles = []
             for _, row in edited_steps.iterrows():
                 if row.get("Port"):
-                    h_dep = float(row.get("Mot_Dep", 0.0))
-                    h_arr = float(row.get("Mot_Arr", 0.0))
-                    m_dep = float(row.get("Mil_Dep", 0.0))
-                    m_arr = float(row.get("Mil_Arr", 0.0))
-                    
+                    h_d, h_a = float(row.get("Mot_Dep", 0.0)), float(row.get("Mot_Arr", 0.0))
+                    m_d, m_a = float(row.get("Mil_Dep", 0.0)), float(row.get("Mil_Arr", 0.0))
                     nouvelles.append({
                         "Date": f_date.strftime("%d/%m/%Y"),
                         "Navigation": f_titre,
                         "PortArr": row.get("Port"),
-                        "MotDep": h_dep,
-                        "Compteur_Arr": h_arr,         # On stocke le compteur final ici
-                        "TotalMot": h_arr - h_dep,     # LE TOTAL EST MAINTENANT LA DIFFÉRENCE
-                        "MillesDep": m_dep,
-                        "Compteur_Mil": m_arr,         # On stocke le loch final ici
-                        "TotalMil": m_arr - m_dep,     # LES MILLES SONT MAINTENANT LA DIFFÉRENCE
+                        "MotDep": h_d,
+                        "Compteur_Arr": h_a,
+                        "TotalMot": h_a - h_d,      # CALCUL DURÉE
+                        "MillesDep": m_d,
+                        "Compteur_Mil": m_a,
+                        "TotalMil": m_a - m_d,      # CALCUL MILLES
                         "H_Voile": float(row.get("Voile", 0.0)),
                         "Notes": row.get("Notes", "")
                     })
-            # ... [Sauvegarde] ...
+            if nouvelles:
+                # On place les nouvelles lignes AVANT les anciennes pour le haut de liste
+                df_final = pd.concat([pd.DataFrame(nouvelles), df_log], ignore_index=True)
+                sauvegarder_data(df_final, 'logbook.json')
+                if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
+                st.rerun()
 
-    # ... [Partie Modification] ...
-    with st.form("edit_with_real_totals"):
-        # ... [Champs destination, etc.] ...
-        
-        st.write("**⚙️ Moteur**")
-        c1, c2 = st.columns(2)
-        ed_h_dep = c1.number_input("Compteur Départ", value=float(r.get('MotDep', 0.0)))
-        ed_h_arr = c2.number_input("Compteur Arrivée", value=float(r.get('Compteur_Arr', r.get('TotalMot', 0.0))))
-        
-        if st.form_submit_button("VALIDER LES MODIFICATIONS"):
-            # RE-CALCUL PHYSIQUE AVANT SAUVEGARDE
-            df_log.at[idx_m, 'MotDep'] = ed_h_dep
-            df_log.at[idx_m, 'Compteur_Arr'] = ed_h_arr
-            df_log.at[idx_m, 'TotalMot'] = ed_h_arr - ed_h_dep # On force la différence
-            
-            # Idem pour les milles
-            # ... (code similaire pour milles)
-            
-            sauvegarder_data(df_log, 'logbook.json')
-            st.rerun()
+    # 3. AFFICHAGE & MODIFICATION
+    if not df_log.empty:
+        st.divider()
+        st.subheader("📜 Historique")
+        st.dataframe(df_log, use_container_width=True)
 
+        col_m, col_s = st.columns(2)
+        
+        with col_m:
+            with st.expander("📝 MODIFIER UNE LIGNE"):
+                idx_m = st.number_input("N° Ligne", min_value=0, max_value=len(df_log)-1, step=1)
+                r = df_log.loc[idx_m] # On définit 'r' ici pour éviter le NameError
+                
+                # DEBUT DU FORMULAIRE
+                with st.form(f"form_mod_{idx_m}"):
+                    st.write(f"Modif Ligne {idx_m}")
+                    ed_port = st.text_input("Port", value=r.get('PortArr', ''))
+                    
+                    st.write("**⚙️ Moteur**")
+                    c_m1, c_m2 = st.columns(2)
+                    m_d = c_m1.number_input("Départ", value=float(r.get('MotDep', 0.0)))
+                    m_a = c_m2.number_input("Arrivée", value=float(r.get('Compteur_Arr', r.get('TotalMot', 0.0))))
+                    
+                    st.write("**📏 Milles**")
+                    c_mi1, c_mi2 = st.columns(2)
+                    mi_d = c_mi1.number_input("Départ", value=float(r.get('MillesDep', 0.0)))
+                    mi_a = c_mi2.number_input("Arrivée", value=float(r.get('Compteur_Mil', r.get('TotalMil', 0.0))))
+                    
+                    ed_voile = st.number_input("Voile", value=float(r.get('H_Voile', 0.0)))
+                    ed_notes = st.text_area("Notes", value=r.get('Notes', ''))
+                    
+                    # BOUTON SUBMIT OBLIGATOIRE DANS LE FORM
+                    submitted = st.form_submit_button("VALIDER ET CALCULER")
+                    
+                    if submitted:
+                        df_log.at[idx_m, 'PortArr'] = ed_port
+                        df_log.at[idx_m, 'MotDep'] = m_d
+                        df_log.at[idx_m, 'Compteur_Arr'] = m_a
+                        df_log.at[idx_m, 'TotalMot'] = m_a - m_d  # Calcul automatique
+                        
+                        df_log.at[idx_m, 'MillesDep'] = mi_d
+                        df_log.at[idx_m, 'Compteur_Mil'] = mi_a
+                        df_log.at[idx_m, 'TotalMil'] = mi_a - mi_d # Calcul automatique
+                        
+                        df_log.at[idx_m, 'H_Voile'] = ed_voile
+                        df_log.at[idx_m, 'Notes'] = ed_notes
+                        
+                        sauvegarder_data(df_log, 'logbook.json')
+                        st.rerun()
+
+        with col_s:
+            with st.expander("🗑️ SUPPRIMER"):
+                idx_s = st.number_input("Supprimer N°", min_value=0, max_value=len(df_log)-1, step=1)
+                if st.checkbox(f"Confirmer suppr {idx_s}"):
+                    if st.button("EFFACER", type="primary"):
+                        df_log = df_log.drop(index=idx_s).reset_index(drop=True)
+                        sauvegarder_data(df_log, 'logbook.json')
+                        st.rerun()
 
 
 # --- FIN DU FICHIER ---
