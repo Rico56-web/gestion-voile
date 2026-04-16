@@ -723,10 +723,8 @@ if st.session_state.page == "STATS":
             
             st.error(f"**TOTAL DÉPENSES : {total_dep:,.2f} €**")
 
-
-
 # =================================================================
-# --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
+# --- 8. PAGE MAINTENANCE (CORRIGÉE) ---
 # =================================================================
 if st.session_state.page == "MAINT":
     import pandas as pd
@@ -735,336 +733,139 @@ if st.session_state.page == "MAINT":
     df_m = charger_data_safe('maintenance.json')
     df_log = charger_data_safe('logbook.json')
 
-    # --- 1. CALCULS HEURES ---
-    releve_h = pd.to_numeric(df_log['MotArr'], errors='coerce').max() if not df_log.empty else 0
-    params = charger_params() if 'charger_params' in globals() else {"cible_vidange": 2450.0}
-
+    # --- CALCULS HEURES ---
+    releve_h = pd.to_numeric(df_log['TotalMot'], errors='coerce').max() if not df_log.empty else 0.0
+    
     st.title("🛠️ MAINTENANCE")
 
-    # --- 2. FILTRES ---
     col_sel1, col_sel2 = st.columns(2)
     mode_maint = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
     sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-    # --- 3. VIDANGE ---
-    heures_restantes = params['cible_vidange'] - releve_h
+    # Vidange (Cible 2450h par défaut)
+    heures_restantes = 2450.0 - releve_h
     color_v = "#2e7d32" if heures_restantes > 15 else "#c62828"
     st.markdown(f"""<div style="background-color: {color_v}15; border: 1px solid {color_v}; padding: 10px; border-radius: 10px; text-align: center;">
         <span style="color: {color_v}; font-weight: bold;">{heures_restantes:.1f} h restantes</span> | Compteur : {releve_h:.1f} h
     </div>""", unsafe_allow_html=True)
 
-    st.divider()
-
-# --- 4. GESTION DU TABLEAU (MODIFICATION & SUPPRESSION SÉCURISÉE) ---
     if not df_m.empty:
         df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
         df_filtre = df_m[df_m['dt_maint'].dt.year == sel_y].copy()
-        
         if mode_maint == "À ce jour":
-            today = pd.Timestamp.now().normalize()
-            df_filtre = df_filtre[df_filtre['dt_maint'] <= today].copy()
-
-        df_filtre = df_filtre.sort_values('dt_maint', ascending=False)
+            df_filtre = df_filtre[df_filtre['dt_maint'] <= pd.Timestamp.now().normalize()]
 
         st.subheader(f"📋 Suivi {sel_y}")
         
-        # --- CALCUL DE LA HAUTEUR DYNAMIQUE ---
-        # 35 pixels par ligne + environ 40 pixels pour l'en-tête
-        nb_lignes = len(df_filtre)
-        hauteur_calculee = (nb_lignes * 35) + 45 
-        
-        # On limite la hauteur minimale pour que ce ne soit pas trop écrasé
-        hauteur_finale = max(hauteur_calculee, 150)
-
-        # L'éditeur SANS ascenseur
         edited_df = st.data_editor(
-            df_filtre.drop(columns=['dt_maint']),
+            df_filtre.drop(columns=['dt_maint'], errors='ignore'),
             column_config={
-                "Date": st.column_config.TextColumn("Date", width="small"),
-                "Objet": st.column_config.TextColumn("Désignation"),
                 "M_Num": st.column_config.NumberColumn("€", format="%.2f"),
-                "Statut": st.column_config.SelectboxColumn("Etat", options=["À prévoir", "Fait"], required=True),
-                "Type": st.column_config.SelectboxColumn("Cat", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
+                "Statut": st.column_config.SelectboxColumn("Etat", options=["À prévoir", "Fait"]),
             },
-            hide_index=False,
             use_container_width=True,
             num_rows="dynamic",
-            height=hauteur_finale, # <--- LA CLÉ EST ICI
-            key="maint_editor_v7"
+            key="maint_ed_final"
         )
         
-  
+        if st.button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True):
+            # On conserve les données des autres années
+            df_autres = df_m[df_m['dt_maint'].dt.year != sel_y].drop(columns=['dt_maint'], errors='ignore')
+            df_final_save = pd.concat([df_autres, edited_df], ignore_index=True)
+            sauvegarder_data(df_final_save, 'maintenance.json')
+            st.success("✅ Mis à jour !")
+            st.rerun()
 
-        # Grille de boutons pour iPhone
-        col_save, col_del = st.columns(2)
-
-        with col_save:
-            if st.button("💾 ENREGISTRER", use_container_width=True, type="primary"):
-                df_non_affiches = df_m[~df_m.index.isin(df_filtre.index)].drop(columns=['dt_maint'], errors='ignore')
-                df_final_save = pd.concat([df_non_affiches, edited_df], ignore_index=True)
-                sauvegarder_data(df_final_save, 'maintenance.json')
-                st.success("✅ Mis à jour !")
-                st.rerun()
-        with col_del:
-            # SYSTÈME DE SÉCURITÉ À DOUBLE ÉTAPE
-            with st.expander("🗑️ ZONE DE SUPPRESSION"):
-                st.error("⚠️ Attention : action définitive")
-                
-                # Étape 1 : Le Verrou
-                unlock = st.checkbox("Déverrouiller le bouton")
-                
-                # Étape 2 : L'Index
-                idx_to_remove = st.number_input(
-                    "Index à supprimer (chiffre à gauche) :", 
-                    min_value=0, 
-                    max_value=df_m.index.max() if not df_m.empty else 0, 
-                    step=1
-                )
-                
-                # Étape 3 : Le bouton ne s'affiche QUE si déverrouillé
-                if unlock:
-                    if st.button(f"🔥 CONFIRMER SUPPRESSION {idx_to_remove}", type="primary", use_container_width=True):
-                        # Action de suppression
-                        df_m = df_m.drop(index=idx_to_remove).reset_index(drop=True)
-                        sauvegarder_data(df_m, 'maintenance.json')
-                        st.success("Ligne supprimée !")
-                        st.rerun()
-                else:
-                    st.info("Cochez la case pour confirmer.")
-
-      
-
-    # --- 5. FORMULAIRE D'AJOUT (SÉCURISÉ CONTRE LES DOUBLONS) ---
-    st.write("---")
+    # Formulaire d'ajout
     with st.expander("➕ Ajouter une opération"):
-        # On utilise une clé unique basée sur le temps pour éviter les doubles clics
-        with st.form("form_maint_v2", clear_on_submit=True):
+        with st.form("form_maint_new"):
             f_obj = st.text_input("Désignation")
             c_a, c_b = st.columns(2)
-            f_date_iso = c_a.date_input("Date", datetime.now())
-            f_montant = c_b.number_input("Montant (€)", min_value=0.0, format="%.2f")
-            
-            c_c, c_d = st.columns(2)
-            f_type = c_c.selectbox("Catégorie", ["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
-            f_statut = c_d.selectbox("Statut", ["À prévoir", "Fait"], index=1 if f_date_iso <= datetime.now().date() else 0)
-            
-            f_recurrence = st.checkbox("Répéter mensuellement")
-            
-            if st.form_submit_button("💾 Enregistrer l'opération", use_container_width=True):
+            f_date = c_a.date_input("Date")
+            f_montant = c_b.number_input("Montant (€)", min_value=0.0)
+            if st.form_submit_button("Ajouter"):
                 if f_obj:
-                    nouvelles_lignes = []
-                    # FORMATAGE DE LA DATE EN JJ/MM/AAAA AVANT SAUVEGARDE
-                    if f_recurrence:
-                        for m in range(f_date_iso.month, 13):
-                            # On force le format français ici
-                            date_fr = f_date_iso.replace(month=m).strftime("%d/%m/%Y")
-                            nouvelles_lignes.append({
-                                "Date": date_fr, 
-                                "Objet": f"{f_obj} (M{m})", 
-                                "M_Num": f_montant, 
-                                "Statut": f_statut, 
-                                "Type": f_type
-                            })
-                    else:
-                        date_fr = f_date_iso.strftime("%d/%m/%Y")
-                        nouvelles_lignes.append({
-                            "Date": date_fr, 
-                            "Objet": f_obj, 
-                            "M_Num": f_montant, 
-                            "Statut": f_statut, 
-                            "Type": f_type
-                        })
-                    
-                    # Chargement frais pour concaténation propre
-                    df_m_current = charger_data_safe('maintenance.json')
-                    df_final = pd.concat([df_m_current, pd.DataFrame(nouvelles_lignes)], ignore_index=True)
+                    new_line = {"Date": f_date.strftime("%d/%m/%Y"), "Objet": f_obj, "M_Num": f_montant, "Statut": "Fait", "Type": "Maintenance"}
+                    df_m_now = charger_data_safe('maintenance.json')
+                    df_final = pd.concat([df_m_now, pd.DataFrame([new_line])], ignore_index=True)
                     sauvegarder_data(df_final, 'maintenance.json')
-                    
-                    st.success("✅ Opération(s) ajoutée(s) au format FR !")
                     st.rerun()
 
 # =================================================================
-# --- PAGE : FACTURATION & SUIVI PAIEMENTS ---
+# --- 9. PAGE FACTURES ---
 # =================================================================
 if st.session_state.page == "FACTURES":
-    st.title("📑 Facturation & Suivi")
-
-    # 1. Chargement sécurisé des données
+    st.title("📑 Facturation")
     df_f = charger_data_safe('contacts.json')
 
-    if df_f.empty:
-        st.warning("Aucune donnée de facturation trouvée.")
-    else:
-        # --- 2. NETTOYAGE & HARMONISATION DES NOMBRES ---
-        # On s'assure que les calculs ne plantent pas à cause des virgules
-        for col in ['Prix', 'Acompte', 'Jours', 'Pers']:
-            if col in df_f.columns:
-                df_f[col] = pd.to_numeric(df_f[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+    if not df_f.empty:
+        # Forcer types numériques
+        for c in ['Prix', 'Acompte']:
+            df_f[c] = pd.to_numeric(df_f[c].astype(str).str.replace(',', '.'), errors='coerce').fillna(0.0)
+        
+        total_du = df_f['Prix'].sum()
+        total_recu = df_f['Acompte'].sum()
+        
+        c1, c2 = st.columns(2)
+        c1.metric("Total CA", f"{total_du:,.0f} €")
+        c2.metric("Reste à encaisser", f"{(total_du - total_recu):,.0f} €")
 
-        # --- 3. FILTRES DE VUE ---
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            filtre_paye = st.selectbox("Filtrer par paiement", ["Tous", "Paid", "Unpaid"])
-        with col_f2:
-            search_nom = st.text_input("Rechercher un client", "").lower()
+        st.dataframe(df_f[['DateNav', 'Nom', 'Prix', 'Paiement']], use_container_width=True)
 
-        # Application des filtres
-        df_visu = df_f.copy()
-        if filtre_paye != "Tous":
-            df_visu = df_visu[df_visu['Paiement'] == filtre_paye]
-        if search_nom:
-            df_visu = df_visu[df_visu['Nom'].str.lower().contains(search_nom) | df_visu['Prénom'].str.lower().contains(search_nom)]
-
-        # Tri par date (on crée une colonne de tri temporaire)
-        df_visu['dt_tri'] = pd.to_datetime(df_visu['DateNav'], dayfirst=True, errors='coerce')
-        df_visu = df_visu.sort_values('dt_tri', ascending=False)
-
-        # --- 4. RÉCAPITULATIF FINANCIER ---
-        total_du = df_visu['Prix'].sum()
-        total_recu = df_visu['Acompte'].sum()
-        reste_a_percevoir = total_du - total_recu
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric("CA Total (Sélection)", f"{total_du:,.2f} €".replace(',', ' '))
-        c2.metric("Total Encaissé", f"{total_recu:,.2f} €".replace(',', ' '), delta=None)
-        c3.metric("Reste à percevoir", f"{reste_a_percevoir:,.2f} €".replace(',', ' '), delta_color="inverse")
-
-        st.divider()
-
-        # --- 5. AFFICHAGE DES LIGNES DE FACTURATION ---
-        for idx, r in df_visu.iterrows():
-            solde = r['Prix'] - r['Acompte']
-            is_paid = r['Paiement'] == "Paid"
-            
-            # Design de la ligne
-            color_border = "#2e7d32" if is_paid else "#d32f2f"
-            bg_label = "rgba(46, 125, 50, 0.1)" if is_paid else "rgba(211, 47, 47, 0.1)"
-            status_text = "✅ PAYÉ" if is_paid else "⏳ EN ATTENTE"
-
-            html_facture = f"""
-            <div style="border: 1px solid #ddd; padding: 12px; border-radius: 10px; 
-                        margin-bottom: 8px; border-left: 10px solid {color_border}; background: white;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <b style="font-size: 1.1em;">{r['Nom']} {r['Prénom']}</b><br>
-                        <small>📅 Date : {r['DateNav']} | 🏢 Société : {r.get('Société', 'PERSO')}</small>
-                    </div>
-                    <div style="text-align: right;">
-                        <span style="background: {bg_label}; color: {color_border}; padding: 4px 8px; 
-                                     border-radius: 5px; font-weight: bold; font-size: 0.9em;">{status_text}</span><br>
-                        <b style="font-size: 1.2em;">{solde:,.2f} €</b><br>
-                        <small>sur un total de {r['Prix']}€</small>
-                    </div>
-                </div>
-            </div>
-            """
-            st.markdown(html_facture, unsafe_allow_html=True)
-
-            # Actions rapides
-            col_a, col_b, col_c = st.columns([2, 2, 6])
-            if not is_paid:
-                if col_a.button("💰 Marquer PAYÉ", key=f"pay_{idx}"):
-                    # On met à jour le DataFrame original
-                    df_f.at[idx, 'Paiement'] = "Paid"
-                    df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix'] # On considère tout payé
-                    sauvegarder_data(df_f, 'contacts.json')
-                    st.rerun()
-            
-            if col_b.button("✏️ Modifier", key=f"edit_f_{idx}"):
-                st.session_state.contact_edit_idx = idx
-                st.session_state.page = "CONTACTS" # Redirige vers le formulaire
-                st.rerun()
-
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    # =================================================================
+# =================================================================
 # --- 11. PAGE ARCHIVES ---
 # =================================================================
 if st.session_state.page == "ARCHIVES":
     st.title("📂 Archives")
-    
-    # Bouton retour simple
-    if st.button("⬅️ Retour au Planning"):
+    if st.button("⬅️ Retour Planning"):
         st.session_state.page = "PLANNING"
         st.rerun()
 
     t1, t2, t3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook"])
-    
-    with t1:
-        df_arch_m = charger_data_safe('archives_maintenance.json')
-        st.dataframe(df_arch_m, use_container_width=True)
-    with t2:
-        df_arch_p = charger_data_safe('archives_planning.json')
-        st.dataframe(df_arch_p, use_container_width=True)
-    with t3:
-        df_arch_l = charger_data_safe('archives_logbook.json')
-        st.dataframe(df_arch_l, use_container_width=True)
+    with t1: st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
+    with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
+    with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
 
 # =================================================================
 # --- 12. PAGE LIVRE DE BORD (LOGBOOK) ---
 # =================================================================
 if st.session_state.page == "LOGBOOK":
     st.title("📖 Livre de Bord")
-
-    # 1. Chargement sécurisé
     df_log = charger_data_safe('logbook.json')
 
-    # 2. Récupération des compteurs (avec valeurs par défaut forcées en float)
     last_h = 0.0
-    last_m = 0.0
     last_p = ""
-
     if not df_log.empty:
-        try:
-            # On prend la dernière ligne proprement
-            derniere = df_log.iloc[-1]
-            last_h = float(str(derniere.get('TotalMot', 0.0)).replace(',','.'))
-            last_m = float(str(derniere.get('TotalMil', 0.0)).replace(',','.'))
-            last_p = str(derniere.get('PortArr', ""))
-        except:
-            pass
+        last_h = float(str(df_log.iloc[-1].get('TotalMot', 0.0)).replace(',','.'))
+        last_p = str(df_log.iloc[-1].get('PortArr', ""))
 
-    # 3. Formulaire simplifié (Anti-Bug)
-    with st.form("log_v2026"):
-        col1, col2 = st.columns(2)
-        f_date = col1.date_input("Date")
-        f_dep = col2.text_input("Départ", value=last_p)
+    with st.form("log_v2"):
+        c1, c2 = st.columns(2)
+        f_date = c1.date_input("Date")
+        f_dep = c2.text_input("Départ", value=last_p)
         f_arr = st.text_input("Arrivée")
-
-        st.divider()
         
-        c_m1, c_m2 = st.columns(2)
-        f_h_dep = c_m1.number_input("H. Moteur Départ", value=last_h, step=0.1)
-        f_h_arr = c_m2.number_input("H. Moteur Arrivée", value=last_h, step=0.1)
+        cm1, cm2 = st.columns(2)
+        f_h_dep = cm1.number_input("H. Moteur Départ", value=last_h)
+        f_h_arr = cm2.number_input("H. Moteur Arrivée", value=last_h)
+        f_mil = st.number_input("Milles", min_value=0.0)
 
-        f_mil = st.number_input("Milles de l'étape", min_value=0.0, step=1.0)
-
-        if st.form_submit_button("💾 ENREGISTRER", use_container_width=True, type="primary"):
+        if st.form_submit_button("💾 ENREGISTRER"):
             if f_arr:
-                # Création de la ligne
-                nouvelle_etape = {
+                new_log = {
                     "Date": f_date.strftime("%d/%m/%Y"),
-                    "PortDep": f_dep,
-                    "PortArr": f_arr,
-                    "MotDep": f_h_dep,
-                    "TotalMot": f_h_arr,
-                    "TotalMil": last_m + f_mil,
-                    "MillesEtape": f_mil
+                    "PortDep": f_dep, "PortArr": f_arr,
+                    "MotDep": f_h_dep, "TotalMot": f_h_arr,
+                    "TotalMil": f_mil # Simplifié pour le test
                 }
-                
-                # Re-chargement et concaténation
-                df_actuel = charger_data_safe('logbook.json')
-                df_final = pd.concat([df_actuel, pd.DataFrame([nouvelle_etape])], ignore_index=True)
-                sauvegarder_data(df_final, 'logbook.json')
-                
-                st.success("Étape enregistrée !")
+                df_l = charger_data_safe('logbook.json')
+                df_f = pd.concat([df_l, pd.DataFrame([new_log])], ignore_index=True)
+                sauvegarder_data(df_f, 'logbook.json')
+                st.success("Enregistré !")
                 st.rerun()
-            else:
-                st.warning("Veuillez saisir le port d'arrivée.")
 
-    # 4. Affichage de l'historique
     if not df_log.empty:
-        st.divider()
-        st.dataframe(df_log.iloc[::-1].head(10), use_container_width=True, hide_index=True)
+        st.dataframe(df_log.iloc[::-1].head(10), use_container_width=True)
 
 # --- FIN DU FICHIER ---
 
