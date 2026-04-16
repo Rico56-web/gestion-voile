@@ -832,82 +832,91 @@ if st.session_state.page == "ARCHIVES":
     with tab3:
         df_a_l = charger_data_safe('archives_logbook.json')
         st.dataframe(df_a_l, use_container_width=True, hide_index=True)
-
-# =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOGBOOK) ---
+        # =================================================================
+# --- 12. PAGE LIVRE DE BORD (LOGBOOK) - VERSION SÉCURISÉE ---
 # =================================================================
 if st.session_state.page == "LOGBOOK":
     st.title("📖 Livre de Bord")
 
-    # 1. Chargement
+    # 1. Chargement des données
     df_log = charger_data_safe('logbook.json')
 
-    # 2. Initialisation des variables avec forçage de type FLOAT
-    # C'est ici que Streamlit plante souvent (conflit int/float)
-    last_h = 0.0
-    last_m = 0.0
-    last_p = ""
+    # 2. Préparation des valeurs par défaut (Sécurité Anti-Crash)
+    # On force TOUT en float pour éviter la page blanche
+    last_h_moteur = 0.0
+    last_milles = 0.0
+    dernier_port = ""
 
     if not df_log.empty:
         try:
             derniere_ligne = df_log.iloc[-1]
-            # On force la conversion en float pour éviter la page blanche
-            last_h = float(str(derniere_ligne.get('TotalMot', 0.0)).replace(',', '.'))
-            last_m = float(str(derniere_ligne.get('TotalMil', 0.0)).replace(',', '.'))
-            last_p = str(derniere_ligne.get('PortArr', ""))
+            # Conversion forcée en flottant, on remplace la virgule par un point au cas où
+            h_str = str(derniere_ligne.get('TotalMot', '0.0')).replace(',', '.')
+            m_str = str(derniere_ligne.get('TotalMil', '0.0')).replace(',', '.')
+            
+            last_h_moteur = float(h_str) if h_str != "" else 0.0
+            last_milles = float(m_str) if m_str != "" else 0.0
+            dernier_port = str(derniere_ligne.get('PortArr', ""))
         except Exception as e:
-            st.error(f"Erreur lecture données : {e}")
+            # Si la conversion échoue, on reste à 0.0 au lieu de faire planter la page
+            last_h_moteur = 0.0
 
-    # 3. Formulaire avec paramètres explicites
-    with st.form("form_logbook_2026_v3"):
-        c1, c2 = st.columns(2)
-        f_date = c1.date_input("Date")
-        f_dep = c2.text_input("Port Départ", value=last_p)
-        f_arr = st.text_input("Port Arrivée")
+    # 3. Formulaire de saisie
+    with st.form("logbook_v2026_safe"):
+        col_a, col_b = st.columns(2)
+        f_date = col_a.date_input("Date", datetime.now())
+        f_dep = col_b.text_input("Départ", value=dernier_port)
+        f_arr = st.text_input("Arrivée (Destination)")
 
         st.divider()
         
-        # IMPORTANT : On s'assure que value est bien un float
-        col_m1, col_m2 = st.columns(2)
-        f_h_dep = col_m1.number_input("H. Moteur Départ", value=float(last_h), step=0.1)
-        f_h_arr = col_m2.number_input("H. Moteur Fin", value=float(last_h), step=0.1)
+        c_h1, c_h2 = st.columns(2)
+        # On précise explicitement le format 'float' dans number_input
+        f_h_dep = c_h1.number_input("H. Moteur Départ", value=float(last_h_moteur), step=0.1, format="%.1f")
+        f_h_fin = c_h2.number_input("H. Moteur Arrivée", value=float(last_h_moteur), step=0.1, format="%.1f")
 
-        f_mil = st.number_input("Milles de l'étape (NM)", value=0.0, step=1.0)
+        f_nm = st.number_input("Distance de l'étape (NM)", min_value=0.0, step=1.0, format="%.1f")
 
         if st.form_submit_button("💾 ENREGISTRER L'ÉTAPE", use_container_width=True, type="primary"):
             if f_arr:
-                nouvelle_etape = {
+                # Calcul du nouveau total milles
+                nouveau_total_milles = last_milles + f_nm
+                
+                nouvelle_entree = {
                     "Date": f_date.strftime("%d/%m/%Y"),
                     "PortDep": f_dep,
                     "PortArr": f_arr,
                     "MotDep": f_h_dep,
-                    "TotalMot": f_h_arr,
-                    "TotalMil": float(last_m + f_mil),
-                    "MillesEtape": float(f_mil)
+                    "TotalMot": f_h_fin,
+                    "TotalMil": nouveau_total_milles,
+                    "MillesEtape": f_nm
                 }
                 
-                # Sauvegarde
+                # Sauvegarde propre
                 df_actuel = charger_data_safe('logbook.json')
-                df_final = pd.concat([df_actuel, pd.DataFrame([nouvelle_etape])], ignore_index=True)
+                df_final = pd.concat([df_actuel, pd.DataFrame([nouvelle_entree])], ignore_index=True)
                 sauvegarder_data(df_final, 'logbook.json')
                 
-                st.success("✅ Étape mémorisée !")
+                st.success(f"Étape vers {f_arr} enregistrée !")
                 st.rerun()
             else:
-                st.warning("⚠️ Indiquez au moins le port d'arrivée.")
+                st.warning("Veuillez saisir au moins le port d'arrivée.")
 
-    # 4. Affichage historique simple (sans HTML)
+    # 4. Tableau d'historique (Affichage simple)
     if not df_log.empty:
         st.write("---")
-        st.subheader("📜 10 dernières navigations")
-        # Inversion pour voir le plus récent en haut
-        st.dataframe(df_log.iloc[::-1].head(10), use_container_width=True, hide_index=True)
+        st.subheader("📜 Historique Récent")
+        # On affiche les 10 derniers en inversant l'ordre
+        st.dataframe(
+            df_log.iloc[::-1].head(10), 
+            use_container_width=True, 
+            hide_index=True
+        )
 
 # --- FIN DU FICHIER ---
 
 
 
-# --- FIN DU FICHIER ---
 
 
 
