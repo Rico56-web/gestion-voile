@@ -621,8 +621,7 @@ if st.session_state.page == "STATS":
             if mode_bilan == "À ce jour" and not df_final.empty:
                 today = pd.Timestamp.now().normalize()
                 df_final = df_final[df_final['dt_vrai'] <= today].copy()
-
-# --- D. AFFICHAGE DES RÉSULTATS & INDICATEURS ---
+# --- D. CALCULS ET INDICATEURS (FINANCES COMPLETES) ---
             st.divider()
             
             def force_float(val):
@@ -631,43 +630,60 @@ if st.session_state.page == "STATS":
                 except: return 0.0
 
             if not df_final.empty:
+                # 1. Calculs Financiers
                 df_final['Prix_Num'] = df_final['Prix'].apply(force_float)
-                total_ca = df_final['Prix_Num'].sum()
-                nb_missions = len(df_final)
-                panier_moyen = total_ca / nb_missions if nb_missions > 0 else 0
+                # On simule ou récupère les dépenses (ajuste la colonne si elle existe)
+                df_final['Depenses'] = df_final.get('Depenses', 0.0).apply(force_float) 
                 
-                # 1. KPI Principaux
-                c1, c2, c3 = st.columns(3)
-                c1.metric(f"💰 CA Global ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
-                c2.metric("📋 Missions", f"{nb_missions}")
-                c3.metric("📈 Panier Moyen", f"{panier_moyen:,.0f} €".replace(',', ' '))
+                total_ca = df_final['Prix_Num'].sum()
+                total_dep = df_final['Depenses'].sum()
+                net = total_ca - total_dep
+                nb_missions = len(df_final)
 
-                st.write("") # Espace
+                # 2. KPI - Optimisés iPhone (Colonnes étroites)
+                kpi1, kpi2 = st.columns(2)
+                kpi1.metric("💰 CA", f"{total_ca:,.0f} €".replace(',', ' '))
+                kpi2.metric("📋 Missions", f"{nb_missions}")
+                
+                kpi3, kpi4 = st.columns(2)
+                kpi3.metric("📉 Frais", f"{total_dep:,.0f} €".replace(',', ' '), delta_color="inverse")
+                kpi4.metric("⚖️ Net", f"{net:,.0f} €".replace(',', ' '))
 
-                # 2. Indicateurs Visuels (Répartition)
-                col_graph1, col_graph2 = st.columns(2)
+                # 3. Graphique de Répartition (Mobile Friendly)
+                st.write("")
+                st.subheader("📊 Part des Sociétés")
+                df_soc = df_final.groupby('Société')['Prix_Num'].sum().sort_values(ascending=False)
+                st.bar_chart(df_soc, height=250)
 
-                with col_graph1:
-                    st.subheader("🏢 Top Sociétés")
-                    # Groupement par société pour voir le poids de CMN vs les autres
-                    df_soc = df_final.groupby('Société')['Prix_Num'].sum().sort_values(ascending=False)
-                    st.bar_chart(df_soc)
+                # 4. Tableaux Détails (Optimisation iPhone 16)
+                # On utilise un container pour forcer la largeur
+                st.subheader("📄 Détail des Revenus")
+                # On ne garde que l'essentiel pour éviter le scroll horizontal sur mobile
+                df_aff_rev = df_final.sort_values('dt_vrai', ascending=False)
+                df_aff_rev['Date'] = df_aff_rev['dt_vrai'].dt.strftime('%d/%m') # Format court
+                
+                st.dataframe(
+                    df_aff_rev[['Date', 'Société', 'Prix']], 
+                    hide_index=True, 
+                    use_container_width=True
+                )
 
-                with col_graph2:
-                    st.subheader("📅 Évolution Mensuelle")
-                    # Extraction du mois pour voir la saisonnalité
-                    df_final['Mois'] = df_final['dt_vrai'].dt.strftime('%m - %b')
-                    df_mois = df_final.groupby('Mois')['Prix_Num'].sum()
-                    st.line_chart(df_mois)
+                st.subheader("💸 Détail des Dépenses")
+                # Si tu as une liste de dépenses spécifique (ex: carburant, frais ports)
+                # On affiche ici les lignes où 'Depenses' > 0
+                df_dep = df_final[df_final['Depenses'] > 0].copy()
+                if not df_dep.empty:
+                    st.dataframe(
+                        df_dep[['Date', 'Société', 'Depenses']], 
+                        hide_index=True, 
+                        use_container_width=True
+                    )
+                else:
+                    st.caption("Aucune dépense enregistrée sur cette période.")
 
-                # 3. Tableau de contrôle détaillé
-                st.subheader("📄 Détail des encaissements")
-                df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
-                view = df_final.sort_values('dt_vrai', ascending=False)
-                st.dataframe(view[['Date_Aff', 'Nom', 'Société', 'Prix', 'Paiement', 'Statut']], 
-                             hide_index=True, use_container_width=True)
             else:
-                st.info(f"Aucune mission validée pour l'année {sel_y}.")
+                st.info(f"Aucune mission validée pour {sel_y}.")
+
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
