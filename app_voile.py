@@ -596,25 +596,20 @@ if st.session_state.page == "STATS":
 
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
 
-        # --- C. FILTRAGE IDENTIQUE À L'ONGLET ARCHIVES ---
-        # On ne prend que l'année sélectionnée
-        df_annee = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
-        
-        if not df_annee.empty:
-            # On applique le même filtre que votre onglet "ARCHIVES" du bloc CONTACTS
-            # Mais on ajoute la sécurité 'PAID' pour le CA confirmé
-            s_clean_annee = df_annee['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
-            
-            # FILTRE : Terminé/Annulé/Refusé ET Paiement == Paid (pour le CA)
-            mask_archives = s_clean_annee.str.contains("termine|annule|refuse")
-            mask_paye = df_annee['Paiement'].astype(str).str.upper() == "PAID"
-            
-            df_final = df_annee[mask_archives & mask_paye].copy()
+# --- C. FILTRAGE CHIRURGICAL ---
+if not df_filtre.empty:
+    # On nettoie la colonne Statut : majuscules, sans espaces inutiles
+    df_filtre['Statut_Clean'] = df_filtre['Statut'].astype(str).str.upper().str.strip()
+    
+    # On accepte tout ce qui contient ARCHIV ou PAYE (pour ne rien rater)
+    mask_archive = df_filtre['Statut_Clean'].str.contains("ARCHIV|PAYE", na=False)
+    df_final = df_filtre[mask_archive].copy()
 
-            # Mode "À ce jour"
-            if mode_bilan == "À ce jour" and not df_final.empty:
-                today = pd.Timestamp.now().normalize()
-                df_final = df_final[df_final['dt_vrai'] <= today].copy()
+    # Filtre "À ce jour"
+    if mode_bilan == "À ce jour" and not df_final.empty:
+        today = pd.Timestamp.now().normalize()
+        # On garde ce qui est passé OU aujourd'hui
+        df_final = df_final[df_final['dt_vrai'] <= today].copy()
             
             # --- D. AFFICHAGE ---
             st.divider()
