@@ -564,13 +564,13 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
-        # =================================================================
-# --- 7. PAGE STATS (FINANCES & PERFORMANCE LOGBOOK) ---
+ # =================================================================
+# --- PAGE STATS (FINANCES & LOGBOOK) ---
 # =================================================================
 if st.session_state.page == "STATS":
-    st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 style="text-align:center;">📊 Tableau de Bord Vesta</h2>', unsafe_allow_html=True)
 
-    # 1. Chargement des données
+    # 1. Chargement avec sécurité
     df_actif = charger_data_safe('contacts.json')
     df_arch = charger_data_safe('archives_planning.json')
     df_m = charger_data_safe('maintenance.json') 
@@ -578,80 +578,80 @@ if st.session_state.page == "STATS":
     
     df_all = pd.concat([df_actif, df_arch], ignore_index=True) if not df_arch.empty else df_actif
 
+    # Fonction de conversion ultra-robuste
+    def to_f(val):
+        if pd.isna(val): return 0.0
+        try: 
+            return float(str(val).replace('€','').replace(' ','').replace(',','.').strip())
+        except: 
+            return 0.0
+
     if not df_all.empty:
-        # --- A. CONFIGURATION ---
-        col_sel1, col_sel2 = st.columns(2)
-        mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
-        sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
+        # --- A. FILTRAGE ---
+        sel_y = st.selectbox("Choisir l'année :", [2025, 2026, 2027], index=1)
 
-        # --- B. FILTRAGE & CALCULS ---
-        def to_f(val):
-            try: return float(str(val).replace('€','').replace(' ','').replace(',','.'))
-            except: return 0.0
-
-        # Filtrage Revenus
+        # Revenus
         df_all['dt_vrai'] = pd.to_datetime(df_all['DateNav'], dayfirst=True, errors='coerce')
-        df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
-
-        def est_comptabilise(row):
-            soc = str(row.get('Société', '')).upper()
-            paiement = str(row.get('Paiement', '')).upper()
-            if "LISTE D'ATTENTE" in str(row.get('Statut', '')).upper(): return False
-            return "CMN" in soc or paiement == "PAID"
-
-        df_final = df_filtre[df_filtre.apply(est_comptabilise, axis=1)].copy() if not df_filtre.empty else pd.DataFrame()
+        df_f = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
         
-        if mode_bilan == "À ce jour" and not df_final.empty:
-            df_final = df_final[df_final['dt_vrai'] <= pd.Timestamp.now().normalize()].copy()
+        # On calcule le CA (Chiffre d'Affaires)
+        total_ca = sum(to_f(x) for x in df_f['Prix']) if 'Prix' in df_f.columns else 0.0
 
-        # Filtrage Dépenses (Maintenance)
-        total_maint = 0.0
+        # Dépenses Maintenance (On cherche 'M_Num' ou 'Montant')
+        t_maint = 0.0
         if not df_m.empty:
             df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-            mask_m = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")
-            df_m_f = df_m[mask_m].copy()
-            total_maint = df_m_f['M_Num'].apply(to_f).sum()
+            df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")]
+            col_m = 'M_Num' if 'M_Num' in df_m.columns else 'Montant'
+            t_maint = sum(to_f(x) for x in df_m_y[col_m])
 
-        # Filtrage Technique (Logbook)
+        # Données Logbook (On cherche les noms de ton JSON)
         t_milles, t_moteur, t_voile, t_gasoil_eur, t_gasoil_l = 0, 0, 0, 0, 0
         if not df_log.empty:
             df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
             df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
-            t_milles = df_log_y['TotalMil'].sum()
-            t_moteur = df_log_y['TotalMot'].sum()
-            t_voile = df_log_y['HVoile'].sum()
-            t_gasoil_l = df_log_y['Litre Gazoil'].sum()
-            t_gasoil_eur = df_log_y['Cout Gazoil'].sum()
+            
+            # Sommes intelligentes
+            t_milles = df_log_y['TotalMil'].sum() if 'TotalMil' in df_log_y.columns else 0
+            t_moteur = df_log_y['TotalMot'].sum() if 'TotalMot' in df_log_y.columns else 0
+            t_voile = df_log_y['HVoile'].sum() if 'HVoile' in df_log_y.columns else 0
+            t_gasoil_l = df_log_y['Litre Gazoil'].sum() if 'Litre Gazoil' in df_log_y.columns else 0
+            t_gasoil_eur = df_log_y['Cout Gazoil'].sum() if 'Cout Gazoil' in df_log_y.columns else 0
 
-        # --- C. INDICATEURS FINANCIERS ---
-        total_ca = df_final['Prix'].apply(to_f).sum() if not df_final.empty else 0.0
-        total_dep = total_maint + t_gasoil_eur
+        # --- B. AFFICHAGE DES INDICATEURS ---
+        total_dep = t_maint + t_gasoil_eur
         net = total_ca - total_dep
 
         st.divider()
+        # Ligne 1 : Finances
         c1, c2, c3 = st.columns(3)
-        c1.metric("💰 Chiffre d'Affaires", f"{total_ca:,.0f} €")
-        c2.metric("💸 Total Dépenses", f"{total_dep:,.0f} €")
-        c3.metric("⚖️ Revenu Net", f"{net:,.0f} €")
+        c1.metric("💰 CA", f"{total_ca:,.0f} €")
+        c2.metric("💸 Dépenses", f"{total_dep:,.0f} €")
+        c3.metric("⚖️ Net", f"{net:,.0f} €")
 
-        # --- D. ANALYSE TECHNIQUE (LOGBOOK) ---
-        st.write("📈 **Rentabilité Technique**")
+        # Ligne 2 : Performance
+        st.write("**📈 Performance Technique**")
         cp1, cp2, cp3 = st.columns(3)
         
         cout_mille = (total_dep / t_milles) if t_milles > 0 else 0
         conso_h = (t_gasoil_l / t_moteur) if t_moteur > 0 else 0
-        # Ratio Voile vs Moteur
-        total_heures = t_moteur + t_voile
-        tx_voile = (t_voile / total_heures * 100) if total_heures > 0 else 0
+        total_h = t_moteur + t_voile
+        tx_voile = (t_voile / total_h * 100) if total_h > 0 else 0
 
         cp1.metric("Distance", f"{t_milles:,.0f} NM")
-        cp2.metric("Coût/Mille", f"{cout_mille:.2f} €/NM")
+        cp2.metric("Coût/NM", f"{cout_mille:.2f} €")
         cp3.metric("% Voile", f"{tx_voile:.0f}%")
 
-        # --- E. GRAPHES ---
+        # --- C. GRAPHIQUE COMPARATIF ---
         st.write("---")
-        # Ici tu peux remettre tes st.bar_chart par Société et par Type de dépense
-        # en veillant à bien garder l'alignement (4 espaces sous le "if not df_all.empty:")
+        st.subheader("📉 Recettes vs Dépenses")
+        
+        # Préparation mini-dataframe pour le graphe
+        chart_data = pd.DataFrame({
+            "Type": ["Recettes", "Dépenses"],
+            "Montant": [total_ca, total_dep]
+        })
+        st.bar_chart(chart_data.set_index("Type"), color=["#2e7d32"])
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
