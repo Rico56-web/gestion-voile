@@ -565,17 +565,18 @@ if st.session_state.page == "PLANNING":
     else:
         st.info("Aucune mission ce mois-ci.")
 # =================================================================
-# --- 7. PAGE STATS (VERROUILLAGE STRICT) ---
+# --- 7. PAGE STATS (SYNCHRO TOTALE & FILTRE STRICT) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Vesta Skipper 2026</h2>', unsafe_allow_html=True)
 
-    # 1. Chargement des sources
+    # 1. Chargement des sources (Actif + Archives)
     df_actif = charger_data_safe('contacts.json')
     df_arch = charger_data_safe('archives_planning.json')
-    df_all = pd.concat([df_actif, df_arch], ignore_index=True) if not df_arch.empty else df_actif
-
-    if not df_all.empty:
+    
+    if not df_actif.empty or not df_arch.empty:
+        df_all = pd.concat([df_actif, df_arch], ignore_index=True)
+        
         # --- A. CONFIGURATION ---
         col_sel1, col_sel2 = st.columns(2)
         mode_bilan = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
@@ -592,51 +593,56 @@ if st.session_state.page == "STATS":
             return pd.NaT
 
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
+        
+        # Filtre par année sélectionnée
         df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
 
         if not df_filtre.empty:
-             # --- C. FILTRAGE CHIRURGICAL STRICT ---
-             if not df_filtre.empty:
-                 # SÉCURITÉ : Si la colonne 'Paiement' n'existe pas, on la crée vide
-                 if 'Paiement' not in df_filtre.columns:
-                     df_filtre['Paiement'] = "Unpaid"
+            # --- C. FILTRAGE CHIRURGICAL STRICT ---
+            # Sécurité colonne Paiement
+            if 'Paiement' not in df_filtre.columns:
+                df_filtre['Paiement'] = "Unpaid"
             
-                 # On remplit les cases vides (NaN) par "Unpaid" pour éviter les erreurs
-                 df_filtre['Paiement'] = df_filtre['Paiement'].fillna("Unpaid")
-
-                 # Maintenant on peut nettoyer sans risque d'AttributeError
-                 df_filtre['Pay_Status'] = df_filtre['Paiement'].astype(str).str.strip().upper()
+            df_filtre['Paiement'] = df_filtre['Paiement'].fillna("Unpaid")
+            df_filtre['Pay_Status'] = df_filtre['Paiement'].astype(str).str.strip().upper()
             
-                 # FILTRE : Uniquement "PAID"
-                 df_final = df_filtre[df_filtre['Pay_Status'] == "PAID"].copy()
+            # On ne garde QUE les "PAID" (Exclut d'office les "En attente" et la fiche #15)
+            df_final = df_filtre[df_filtre['Pay_Status'] == "PAID"].copy()
 
-            # --- D. CALCULS ET NETTOYAGE DES PRIX ---
+            # Application du filtre "À ce jour"
+            if mode_bilan == "À ce jour" and not df_final.empty:
+                today = pd.Timestamp.now().normalize()
+                df_final = df_final[df_final['dt_vrai'] <= today].copy()
+
+            # --- D. CALCULS ET AFFICHAGE ---
             st.divider()
             
             def force_float(val):
-                s = str(val).replace('€', '').replace(' ', '').replace(',', '.')
+                # Nettoyage agressif pour ne rater aucun euro (CMN)
+                s = str(val).replace('€', '').replace(' ', '').replace('\xa0', '').replace(',', '.')
                 try: return float(s)
                 except: return 0.0
 
-            df_final['Prix_Num'] = df_final['Prix'].apply(force_float)
-            total_ca = df_final['Prix_Num'].sum()
-            
-            c1, c2 = st.columns(2)
-            c1.metric(f"💰 CA Encaissé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
-            c2.metric("📋 Missions Payées", f"{len(df_final)}")
-
             if not df_final.empty:
+                df_final['Prix_Num'] = df_final['Prix'].apply(force_float)
+                total_ca = df_final['Prix_Num'].sum()
+                
+                c1, c2 = st.columns(2)
+                c1.metric(f"💰 CA Encaissé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
+                c2.metric("📋 Missions Payées", f"{len(df_final)}")
+
+                # Affichage de la liste pour vérification
                 df_final['Client'] = df_final['Prénom'].astype(str).str.upper() + " " + df_final['Nom'].astype(str).str.upper()
                 df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
                 
                 view = df_final.sort_values('dt_vrai', ascending=False)
                 st.dataframe(view[['Date_Aff', 'Client', 'Société', 'Prix']], hide_index=True, use_container_width=True)
             else:
-                st.info(f"Aucune mission payée trouvée pour {sel_y}.")
+                st.info(f"Aucune mission 'Paid' trouvée pour {sel_y} ({mode_bilan}).")
         else:
-            st.info(f"Aucune donnée pour {sel_y}.")
+            st.info(f"Aucune donnée de navigation pour {sel_y}.")
     else:
-        st.error("Fichier de données vide.")
+        st.error("Aucune donnée disponible (fichiers vides).")
     # =================================================================
 # --- 8. PAGE MAINTENANCE (HARMONISATION DES DATES) ---
 # =================================================================
