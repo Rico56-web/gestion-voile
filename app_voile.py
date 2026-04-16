@@ -595,27 +595,58 @@ if st.session_state.page == "STATS":
 
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
         df_filtre = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
-        # --- C. FILTRAGE DE PRÉCISION ---
+        # --- C. FILTRAGE DE PRÉCISION (VERSION SÉCURISÉE) ---
         if not df_filtre.empty:
-            # 1. On définit les statuts à EXCLURE (ce qui n'est pas du CA)
-            # On enlève "Liste d'attente", "Annulé", "Refusé"
-            exclus = ["LISTE D'ATTENTE", "ANNULÉ", "ANNULE", "REFUSÉ", "REFUSE", "EN ATTENTE"]
-            
-            # Nettoyage temporaire pour le test
-            df_filtre['Statut_Test'] = df_filtre['Statut'].astype(str).str.strip().upper()
-            
-            # 2. On ne garde que les missions "Sérieuses"
-            df_final = df_filtre[~df_filtre['Statut_Test'].isin(exclus)].copy()
+            # 1. Sécurité : Vérification et normalisation des colonnes critiques
+            for col in ['Statut', 'Paiement', 'Prix']:
+                if col not in df_filtre.columns:
+                    df_filtre[col] = "" # On crée la colonne vide si elle manque
 
-            # 3. On impose le verrou "PAID" pour être sûr (écarte la fiche #15)
-            if 'Paiement' in df_final.columns:
-                df_final['Pay_Status'] = df_final['Paiement'].astype(str).str.strip().upper()
-                df_final = df_final[df_final['Pay_Status'] == "PAID"].copy()
+            # 2. Nettoyage des statuts pour exclure les indésirables
+            def est_valide(row):
+                statut = str(row['Statut']).strip().upper()
+                paiement = str(row['Paiement']).strip().upper()
+                
+                # On exclut les listes d'attente et ce qui n'est pas payé
+                exclus = ["LISTE D'ATTENTE", "ANNULÉ", "ANNULE", "REFUSÉ", "REFUSE", "EN ATTENTE"]
+                
+                if statut in exclus:
+                    return False
+                if paiement != "PAID": # Exclut la fiche #15 et autres Unpaid
+                    return False
+                return True
+
+            # 3. Application du filtre
+            df_final = df_filtre[df_filtre.apply(est_valide, axis=1)].copy()
 
             # 4. Filtre "À ce jour"
             if mode_bilan == "À ce jour" and not df_final.empty:
                 today = pd.Timestamp.now().normalize()
                 df_final = df_final[df_final['dt_vrai'] <= today].copy()
+
+            # --- D. CALCULS ET AFFICHAGE ---
+            st.divider()
+            
+            def force_float(val):
+                s = str(val).replace('€', '').replace(' ', '').replace('\xa0', '').replace(',', '.')
+                try: return float(s)
+                except: return 0.0
+
+            if not df_final.empty:
+                df_final['Prix_Num'] = df_final['Prix'].apply(force_float)
+                total_ca = df_final['Prix_Num'].sum()
+                
+                c1, c2 = st.columns(2)
+                # Affichage propre du CA
+                c1.metric(f"💰 CA Encaissé ({mode_bilan})", f"{total_ca:,.0f} €".replace(',', ' '))
+                c2.metric("📋 Missions Confirmées & Payées", f"{len(df_final)}")
+
+                # Tableau de contrôle pour voir les 7 fiches (dont les 2 CMN)
+                df_final['Date_Aff'] = df_final['dt_vrai'].dt.strftime('%d/%m/%Y')
+                view = df_final.sort_values('dt_vrai', ascending=False)
+                st.dataframe(view[['Date_Aff', 'Nom', 'Société', 'Prix', 'Statut']], hide_index=True, use_container_width=True)
+            else:
+                st.info(f"Aucune mission valide (Paid + hors liste d'attente) pour {sel_y}.")
 
             # --- D. CALCULS ET AFFICHAGE ---
             st.divider()
