@@ -596,20 +596,20 @@ if st.session_state.page == "STATS":
 
         df_all['dt_vrai'] = df_all.apply(radar_date, axis=1)
 
-# --- C. FILTRAGE CHIRURGICAL ---
-if not df_filtre.empty:
-    # On nettoie la colonne Statut : majuscules, sans espaces inutiles
-    df_filtre['Statut_Clean'] = df_filtre['Statut'].astype(str).str.upper().str.strip()
+            # --- C. FILTRAGE CHIRURGICAL ---
+            if not df_filtre.empty:
+                # On nettoie la colonne Statut : majuscules, sans espaces inutiles
+                df_filtre['Statut_Clean'] = df_filtre['Statut'].astype(str).str.upper().str.strip()
     
-    # On accepte tout ce qui contient ARCHIV ou PAYE (pour ne rien rater)
-    mask_archive = df_filtre['Statut_Clean'].str.contains("ARCHIV|PAYE", na=False)
-    df_final = df_filtre[mask_archive].copy()
+                # On accepte tout ce qui contient ARCHIV ou PAYE (pour ne rien rater)
+                mask_archive = df_filtre['Statut_Clean'].str.contains("ARCHIV|PAYE", na=False)
+                df_final = df_filtre[mask_archive].copy()
 
-    # Filtre "À ce jour"
-    if mode_bilan == "À ce jour" and not df_final.empty:
-        today = pd.Timestamp.now().normalize()
-        # On garde ce qui est passé OU aujourd'hui
-        df_final = df_final[df_final['dt_vrai'] <= today].copy()
+                # Filtre "À ce jour"
+                if mode_bilan == "À ce jour" and not df_final.empty:
+                    today = pd.Timestamp.now().normalize()
+                    # On garde ce qui est passé OU aujourd'hui
+                    df_final = df_final[df_final['dt_vrai'] <= today].copy()
             
             # --- D. AFFICHAGE ---
             st.divider()
