@@ -223,7 +223,7 @@ if st.session_state.page == "CONTACTS":
         c_search, c_yr, c_new = st.columns([2, 1, 1])
         
         # Correction : Recherche incluant la Société
-        search = c_search.text_input("🔍 Rechercher (Nom, Prénom, Société...)", "").upper()
+        search = c_search.text_input("🔍 Rechercher (Nom, Prénom, Société...)", "", key="search_bar_contacts").upper()
         annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
         
         if c_new.button("➕ NOUVEAU", use_container_width=True):
