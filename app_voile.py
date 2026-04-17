@@ -396,20 +396,16 @@ if st.session_state.page == "MODIFIER_CONTACT":
     if st.button("⬅️ RETOUR"):
         st.session_state.page = "CONTACTS"
         st.rerun()
-
-
 # =================================================================
-# --- 6. PAGE PLANNING (V18.5 - FIX ORDRE CHARGEMENT) ---
+# --- 6. PAGE PLANNING (V18.5 - OPTIMISÉ) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
-    from datetime import datetime, date, timedelta
-    import calendar
-    import pandas as pd
-
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>🗓️ PLANNING</h1></div>', unsafe_allow_html=True)
     
     if st.button("📂 ACCÉDER AUX ARCHIVES", key="k_arch_p", use_container_width=True):
-        st.session_state.last_page = "PLANNING"; st.session_state.page = "ARCHIVES"; st.rerun()
+        st.session_state.last_page = "PLANNING"
+        st.session_state.page = "ARCHIVES"
+        st.rerun()
 
     st.divider()
 
@@ -429,7 +425,8 @@ if st.session_state.page == "PLANNING":
     sel_m_nom = c_m.selectbox("Mois", m_noms, index=st.session_state.curr_month_idx)
     sel_m = m_noms.index(sel_m_nom) + 1
     st.session_state.curr_month_idx = sel_m - 1
-    sel_y = c_y.selectbox("Année", [2026, 2027, 2028], index=[2026, 2027, 2028].index(st.session_state.curr_year))
+    
+    sel_y = c_y.selectbox("Année", [2025, 2026, 2027, 2028], index=[2025, 2026, 2027, 2028].index(st.session_state.curr_year))
     st.session_state.curr_year = sel_y
 
     if c_n.button("📍 ICI", use_container_width=True):
@@ -437,11 +434,11 @@ if st.session_state.page == "PLANNING":
         st.session_state.curr_year = aujourdhui.year
         st.rerun()
 
-    # --- ÉTAPE 1 : CHARGEMENT ---
+    # --- CHARGEMENT ---
     df_p = charger_data('contacts.json')
 
-    # --- ÉTAPE 2 : TRAITEMENT ---
-    if df_p is not None and not df_p.empty:
+    # --- TRAITEMENT ---
+    if not df_p.empty:
         df_p = df_p.fillna("")
         
         for idx, r in df_p.iterrows():
@@ -465,7 +462,7 @@ if st.session_state.page == "PLANNING":
                 statut = str(r.get('Statut', 'En attente')).lower()
                 soc = str(r.get('Société', 'PERSO')).upper()
                 dt_end = dt_start + timedelta(days=max(0, n_j-1))
-                prix_val = float(str(r.get('Prix', '0')).replace('€','').replace(' ','').strip() or 0)
+                prix_val = to_f(r.get('Prix', 0))
 
                 # Couleurs
                 if "CMN" in soc: color = "#3498db"
@@ -473,23 +470,24 @@ if st.session_state.page == "PLANNING":
                 elif dt_start < aujourdhui: color = "#34495e"
                 else: color = "#27ae60"
 
-                # Remplissage calendrier
+                # Remplissage calendrier (uniquement si dans le mois affiché)
                 for i in range(n_j):
                     curr = dt_start + timedelta(days=i)
                     if curr.month == sel_m and curr.year == sel_y:
                         jours_occ[curr.day] = {"c": color}
 
-                # Ajout à la liste
+                # Ajout à la liste si la mission touche le mois sélectionné
                 if (dt_start.year == sel_y and dt_start.month == sel_m) or (dt_end.year == sel_y and dt_end.month == sel_m):
                     missions_list.append({
                         'r': r, 'idx': idx, 'start': dt_start, 'end': dt_end, 
                         'n_j': n_j, 'color': color, 'prix': prix_val, 'statut': statut
                     })
+                    # On ne compte dans le CA du mois que si la mission commence ce mois-ci et n'est pas annulée
                     if dt_start.month == sel_m and not any(x in statut for x in ["annul", "refus"]):
                         total_mois += prix_val
             except: continue
 
-    # --- ÉTAPE 3 : AFFICHAGE CALENDRIER ---
+    # --- AFFICHAGE CALENDRIER ---
     h_cal = '<table style="width:100%; text-align:center; border-collapse:collapse; background:white; border:1px solid #ddd;">'
     h_cal += '<tr style="background:#f8f9fa; font-size:12px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td>Sa</td><td>Di</td></tr>'
     
@@ -527,7 +525,8 @@ if st.session_state.page == "PLANNING":
                 nom_affiche = f"{str(m['r'].get('Prénom','')).upper()} {str(m['r'].get('Nom','')).upper()}"
                 if st.button(f"{nom_affiche} ({m['statut'].upper()})", key=f"p_btn_{m['idx']}", use_container_width=True):
                     st.session_state.edit_idx = m['idx']
-                    st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
+                    st.session_state.page = "MODIFIER_CONTACT"
+                    st.rerun()
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
