@@ -159,15 +159,14 @@ if st.session_state.page == "MEMOS":
                 df_memos = df_memos.drop(idx).reset_index(drop=True)
                 sauvegarder_data(df_memos, 'memos.json')
                 st.rerun()
-
 # =================================================================
-# --- 5. BLOC CONTACTS (V101 - RECHERCHE & EXCEL) ---
+# --- 5. BLOC CONTACTS (V101 - RECHERCHE & EXCEL & CARTES) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    # --- CHARGEMENT ---
+    # --- CHARGEMENT DES DONNÉES ---
     df_raw = charger_data('contacts.json')
     
-    # --- NAVIGATION ET EXCEL ---
+    # --- NAVIGATION ET EXCEL (ARCHIVAGE) ---
     n1, n2, n3, n4 = st.columns([1, 1, 1, 1.5])
     
     if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
@@ -177,7 +176,7 @@ if st.session_state.page == "CONTACTS":
     if n3.button("✅ TERMINÉS", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
         st.session_state.vue_contact = "Archives"; st.rerun()
 
-    # --- BOUTON EXCEL (STANDARDISATION) ---
+    # Bouton d'export standardisé pour archivage de fin d'année
     with n4:
         bouton_export_excel(df_raw, "Planning_General")
 
@@ -191,7 +190,7 @@ if st.session_state.page == "CONTACTS":
         
         c_search, c_yr, c_new = st.columns([2, 1, 1])
         
-        # Correction : Recherche incluant la Société
+        # Recherche par Nom, Prénom OU Société
         search = c_search.text_input("🔍 Rechercher (Nom, Prénom, Société...)", "", key="search_bar_contacts").upper()
         annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1, key="saison_contacts")
         
@@ -207,7 +206,7 @@ if st.session_state.page == "CONTACTS":
             st.session_state.page = "MODIFIER_CONTACT"
             st.rerun()
 
-        # Application des filtres
+        # Application des filtres de recherche et de saison
         mask = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna())
         if search:
             mask = mask & (
@@ -217,7 +216,7 @@ if st.session_state.page == "CONTACTS":
             )
         df_c = df_c[mask].copy()
 
-        # --- LOGIQUE DES ONGLETS ---
+        # --- LOGIQUE DES ONGLETS (EN COURS / ATTENTE / TERMINÉS) ---
         statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
         relance_clean = df_c['Relancer'].fillna("Non").str.upper()
         
@@ -233,24 +232,54 @@ if st.session_state.page == "CONTACTS":
 
         df_aff = df_c[mask_aff].copy().sort_values(by='dt_sort', ascending=tri_ordre)
 
-        # --- BOUCLE D'AFFICHAGE ---
+        # --- BOUCLE D'AFFICHAGE DES FICHES ---
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
-            # ... (Ici votre code HTML de carte reste identique) ...
             
-            # Système de suppression sécurisé
+            # Calcul financier
+            p_total = to_f(row.get('Prix', 0))
+            p_aco = to_f(row.get('Acompte', 0))
+            reste = p_total - p_aco
+            
+            # Personnalisation par société (Couleur & Fond)
+            soc_name = str(row.get('Société', 'PERSO')).upper()
+            border_col = "#3498DB" if soc_name == "CMN" else "#2ECC71" if soc_name == "CLICK" else "#95A5A6"
+            bg_card = "#EBF5FB" if soc_name == "CMN" else "white"
+
+            # Affichage de la fiche HTML
+            st.markdown(f"""
+            <div style="background:{bg_card}; padding:15px; border-radius:10px; border-left:8px solid {border_col}; 
+                        box-shadow: 2px 2px 5px rgba(0,0,0,0.1); margin-bottom:10px; color: black;">
+                <div style="display:flex; justify-content:space-between;">
+                    <span style="font-size:1.1rem; font-weight:bold;">{row['Prénom']} {row['Nom']}</span>
+                    <span style="background:{border_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.8rem; font-weight:bold;">{soc_name}</span>
+                </div>
+                <div style="margin-top:5px; font-size:0.9rem;">
+                    <b>📅 Date :</b> {row['DateNav']} | <b>👥 Pers :</b> {row['Pers']} | <b>☀️ Jours :</b> {row['Jours']}<br>
+                    <b>💰 Total :</b> {int(p_total)}€ | <b>💸 Acompte :</b> {int(p_aco)}€ | 
+                    <b style="color:{'red' if reste > 0 else 'green'};">⌛ Reste : {int(reste)}€</b><br>
+                    <hr style="margin:8px 0; border: 0.5px solid #eee;">
+                    <i>📝 {row['Notes']}</i>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # --- BOUTONS D'ACTION PAR FICHE ---
             c1, c2, c3 = st.columns([1, 1, 1])
+            
+            # Bouton Édition
             if c1.button("✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx
                 st.session_state.page = "MODIFIER_CONTACT"
                 st.rerun()
 
+            # Système de Suppression avec Confirmation
             if f"confirm_del_{idx}" not in st.session_state:
                 if c2.button("🗑️ SUPPRIMER", key=f"del_{idx}", use_container_width=True):
                     st.session_state[f"confirm_del_{idx}"] = True
                     st.rerun()
             else:
-                st.warning(f"Confirmer #{idx} ?")
+                st.error(f"Supprimer {row['Nom']} ?")
                 co1, co2 = st.columns(2)
                 if co1.button("✅ OUI", key=f"y_{idx}"):
                     df_db = charger_data('contacts.json').drop(idx).reset_index(drop=True)
@@ -261,7 +290,7 @@ if st.session_state.page == "CONTACTS":
                     del st.session_state[f"confirm_del_{idx}"]
                     st.rerun()
             
-            # Bouton Terminer rapide
+            # Bouton de clôture rapide (Uniquement pour "En cours")
             if st.session_state.vue_contact == "En cours":
                 if c3.button("🏁 FINIR", key=f"fin_{idx}", use_container_width=True):
                     df_all = charger_data('contacts.json')
@@ -271,6 +300,7 @@ if st.session_state.page == "CONTACTS":
                     st.rerun()
     else:
         st.info("La base de données est vide.")
+
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT ---
 # =================================================================
