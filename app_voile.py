@@ -1031,13 +1031,28 @@ if st.session_state.page == "LOG":
                     
                     sauvegarder_data(df_log, 'logbook.json')
                     st.rerun()
-
-        with st.expander("🗑️ SUPPRIMER"):
-            idx_s = st.number_input("Supprimer le N°", min_value=0, max_value=len(df_log)-1, step=1, key="del")
-            if st.button("🔥 CONFIRMER LA SUPPRESSION"):
-                df_log = df_log.drop(index=idx_s).reset_index(drop=True)
-                sauvegarder_data(df_log, 'logbook.json')
-                st.rerun()
+# --- BLOC SUPPRESSION SÉCURISÉ ---
+        with st.expander("🗑️ SUPPRIMER UNE LIGNE"):
+            with st.form("delete_form"):
+                idx_s = st.number_input("Entrez le N° affiché dans le tableau", 
+                                        min_value=0, 
+                                        max_value=len(df_log)-1, 
+                                        step=1)
+                
+                st.warning(f"Attention, vous allez supprimer la ligne N° {idx_s}")
+                confirmer = st.checkbox("Je confirme la suppression définitive")
+                
+                submit_delete = st.form_submit_button("🔥 SUPPRIMER LA LIGNE", type="primary")
+                
+                if submit_delete:
+                    if confirmer:
+                        # On supprime la ligne, on réinitialise l'index et on sauvegarde
+                        df_log = df_log.drop(index=idx_s).reset_index(drop=True)
+                        sauvegarder_data(df_log, 'logbook.json')
+                        st.success(f"Ligne {idx_s} supprimée avec succès.")
+                        st.rerun()
+                    else:
+                        st.error("Veuillez cocher la case de confirmation.")
 # --- FIN DU FICHIER ---
 
 
