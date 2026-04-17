@@ -205,10 +205,8 @@ for i, name in enumerate(menu):
         st.rerun()
 
 st.divider()
-
-
 # =================================================================
-# --- 5. BLOC CONTACTS (V98 - RESTAURATION COMPLÈTE + AUTO-EDIT) ---
+# --- 5. BLOC CONTACTS (V100 - CONFIRMATION & TERMINÉS) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     st.markdown('<h2 style="text-align:center;">⚓ Gestion des Clients Vesta</h2>', unsafe_allow_html=True)
@@ -216,39 +214,35 @@ if st.session_state.page == "CONTACTS":
     # 1. Chargement
     df_raw = charger_data('contacts.json')
     
-    # Boutons de navigation (Placés en haut pour être toujours visibles)
+    # Boutons de navigation
     n1, n2, n3, n4 = st.columns(4)
     
+    # Init de l'état de vue si vide
+    if 'vue_contact' not in st.session_state:
+        st.session_state.vue_contact = "En cours"
+
     if n4.button("➕ NOUVEAU", use_container_width=True):
         new_r = {
-            "Prénom": "NOUVEAU", "Nom": "CLIENT", "Statut": "Ok", 
-            "Paiement": "Unpaid", "Relancer": "Non", "DateNav": "01/06/2026", 
+            "Prénom": "NOUVEAU", "Nom": "CLIENT", "Statut": "En attente", 
+            "Paiement": "Unpaid", "Relancer": "Non", "DateNav": datetime.now().strftime("%d/%m/%Y"), 
             "Société": "PERSO", "Jours": 1, "Prix": 0, "Acompte": 0,
             "Notes": "", "Téléphone": "", "Email": "", "Pers": 1
         }
         df_actuel = charger_data('contacts.json')
         df_new = pd.concat([pd.DataFrame([new_r]), df_actuel], ignore_index=True)
         sauvegarder_data(df_new, 'contacts.json')
-        
-        # Redirection immédiate vers l'édition de la fiche 0 (la nouvelle)
         st.session_state.edit_idx = 0 
         st.session_state.page = "MODIFIER_CONTACT"
         st.rerun()
 
-    # 2. Nettoyage et Filtrage
     if not df_raw.empty:
-        df_c = df_raw.copy()
-        df_c = df_c.fillna("")
-        
-        df_c['DateNav'] = df_c['DateNav'].apply(lambda x: "" if str(x).lower() in ['nan', 'none', 'nat'] else str(x))
+        df_c = df_raw.copy().fillna("")
         df_c['orig_idx'] = df_c.index
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         
-        if 'Relancer' not in df_c.columns: df_c['Relancer'] = "Non"
-        
         c_search, c_yr = st.columns([2, 1])
         search = c_search.text_input("🔍 Rechercher...", "").upper()
-        annee_sel = c_yr.selectbox("Saison", [2026, 2027, 2028], index=0)
+        annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027, 2028], index=1)
         
         mask = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna()) | (df_c['DateNav'] == "")
         df_c = df_c[mask].copy()
@@ -256,79 +250,45 @@ if st.session_state.page == "CONTACTS":
         if search:
             mask_s = df_c['Nom'].astype(str).str.upper().str.contains(search) | df_c['Prénom'].astype(str).str.upper().str.contains(search)
             df_c = df_c[mask_s]
-        
-        # TRI CHRONOLOGIQUE INVERSE (Le plus récent/futur en haut)
-        # On utilise 'ascending=False' pour que 2027 soit avant 2026, 
-        # et que Décembre soit avant Janvier.
-        df_c = df_c.sort_values(by='dt_sort', ascending=True)
-        
 
-        # Onglets
+        # Onglets renommés
         if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
             st.session_state.vue_contact = "En cours"; st.rerun()
         if n2.button("⌛ ATTENTE", use_container_width=True, type="primary" if st.session_state.vue_contact == "Attente" else "secondary"): 
             st.session_state.vue_contact = "Attente"; st.rerun()
-        if n3.button("📁 ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
+        if n3.button("✅ TERMINÉS", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
             st.session_state.vue_contact = "Archives"; st.rerun()
 
         st.divider()
         
-       # --- NOUVELLE LOGIQUE DE TRI DES ONGLETS ---
-        statut_clean = df_c['Statut'].fillna("").str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
+        statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
         relance_clean = df_c['Relancer'].fillna("Non").str.upper()
         
-        if st.session_state.vue_contact == "Archives":
-            # ARCHIVES : Terminé, Annulé, Refusé (et pas de relance OUI)
+        if st.session_state.vue_contact == "Archives": # Correspond à l'onglet "TERMINÉS"
             mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
             tri_ordre = False 
-
         elif st.session_state.vue_contact == "Attente":
-            # ATTENTE : Uniquement "Liste d'attente" OU (Terminé + Relance Oui)
-            # On exclut le "En attente" simple ici
             mask_aff = (statut_clean == "liste d'attente") | ((statut_clean.str.contains("termine")) & (relance_clean == "OUI"))
             tri_ordre = True  
-
         else:
-            # EN COURS : Tout le reste, incluant désormais "En attente"
-            # On retire les archives et la liste d'attente
             mask_aff = ~(statut_clean.str.contains("termine|annule|refuse")) & (statut_clean != "liste d'attente")
             tri_ordre = True
 
-        # On applique le filtre
-        df_aff = df_c[mask_aff].copy()
+        df_aff = df_c[mask_aff].copy().sort_values(by='dt_sort', ascending=tri_ordre)
 
-        # --- LE FIX : ON TRIE ICI POUR QUE ÇA MARCHE DANS TOUS LES ONGLETS ---
-        if not df_aff.empty:
-            df_aff = df_aff.sort_values(by='dt_sort', ascending=tri_ordre)
-
-        # 4. BOUCLE D'AFFICHAGE
         for _, row in df_aff.iterrows():
-            # ... (Gardez ici tout votre code card_html identique à avant) ...
-    
             idx = row['orig_idx']
-            pre = str(row.get('Prénom', '')).upper()
-            nom = str(row.get('Nom', '')).upper()
-            sta_clean = str(row.get('Statut', 'OK')).upper()
-            soc = str(row.get('Société', 'PERSO')).upper()
-            tel = str(row.get('Téléphone', ''))
-            note = str(row.get('Notes', ''))
-            date_aff = str(row.get('DateNav', '---'))
-            
-            # Calcul financier rapide
-            prix = float(str(row.get('Prix', 0)).replace('€','').replace(' ','') or 0)
-            aco = float(str(row.get('Acompte', 0)).replace('€','').replace(' ','') or 0)
-            reste = prix - aco
-            # --- FIX AFFICHAGE : On écoute uniquement le statut enregistré ---
+            pre, nom = str(row['Prénom']).upper(), str(row['Nom']).upper()
+            sta_clean = str(row['Statut']).upper()
+            soc = str(row['Société']).upper()
+            date_aff = str(row['DateNav'])
+            prix = to_f(row['Prix'])
             val_paye = str(row.get('Paiement', 'UNPAID')).upper()
+            
             p_color = "green" if val_paye == "PAID" else "#E74C3C"
             p_label = "PAYÉ" if val_paye == "PAID" else "NON PAYÉ"
-
-            # Background selon société ou statut
-            bg = "#D6EAF8" if soc == "CMN" else "#D5F5E3"
-            if "ATTENTE" in sta_clean: bg = "#FCF3CF"
+            bg = "#D6EAF8" if soc == "CMN" else ("#FCF3CF" if "ATTENTE" in sta_clean else "#D5F5E3")
             
-            t_url = tel.replace(' ', '').replace('+', '')
-
             card_html = f"""
             <div style="background-color:{bg}; padding:15px; border-radius:12px; border:1px solid #ccc; margin-bottom:10px; color:#2C3E50;">
                 <div style="display:flex; justify-content:space-between; font-weight:bold; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:5px;">
@@ -341,27 +301,50 @@ if st.session_state.page == "CONTACTS":
                     <div>💰 Prix: <b>{prix:.0f} €</b></div>
                     <div style="color:{p_color}; font-weight:bold;">🏷️ {p_label}</div>
                 </div>
-                <div style="margin-top:12px; display:flex; gap:10px;">
-                    <a href="tel:{t_url}" style="flex:1; background:#5DADE2; color:white !important; text-align:center; padding:8px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:0.75rem;">📞 APPEL</a>
-                    <a href="https://wa.me/{t_url}" style="flex:1; background:#52BE80; color:white !important; text-align:center; padding:8px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:0.75rem;">💬 WA</a>
-                </div>
             </div>
             """
             st.markdown(card_html, unsafe_allow_html=True)
             
-            c1, c2 = st.columns(2)
-            if c1.button(f"ÉDITER #{idx}", key=f"ed_{idx}", use_container_width=True):
+            # --- ACTIONS SUR LA FICHE ---
+            c1, c2, c3 = st.columns([1, 1, 1])
+            
+            if c1.button("✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx
                 st.session_state.page = "MODIFIER_CONTACT"
                 st.rerun()
-            if c2.button(f"SUPPRIMER #{idx}", key=f"del_{idx}", use_container_width=True):
-                df_db = charger_data('contacts.json').drop(idx).reset_index(drop=True)
-                sauvegarder_data(df_db, 'contacts.json')
-                st.rerun()
+
+            # BOUTON SUPPRIMER AVEC CONFIRMATION
+            if f"confirm_del_{idx}" not in st.session_state:
+                if c2.button("🗑️ SUPPRIMER", key=f"del_{idx}", use_container_width=True):
+                    st.session_state[f"confirm_del_{idx}"] = True
+                    st.rerun()
+            else:
+                st.warning(f"Confirmer #{idx} ?")
+                co1, co2 = st.columns(2)
+                if co1.button("✅ OUI", key=f"y_{idx}"):
+                    df_db = charger_data('contacts.json').drop(idx).reset_index(drop=True)
+                    sauvegarder_data(df_db, 'contacts.json')
+                    del st.session_state[f"confirm_del_{idx}"]
+                    st.rerun()
+                if co2.button("❌ NON", key=f"n_{idx}"):
+                    del st.session_state[f"confirm_del_{idx}"]
+                    st.rerun()
+
+            # BOUTON TERMINER RAPIDE (Si en cours)
+            if st.session_state.vue_contact == "En cours":
+                if c3.button("🏁 FINIR", key=f"fin_{idx}", use_container_width=True, help="Passe en Terminé + Paid"):
+                    df_all = charger_data('contacts.json')
+                    df_all.loc[idx, 'Statut'] = "Terminé"
+                    df_all.loc[idx, 'Paiement'] = "Paid"
+                    sauvegarder_data(df_all, 'contacts.json')
+                    st.toast(f"Fiche #{idx} classée dans Terminés")
+                    st.rerun()
+
     else:
         st.info("La base de données est vide.")
+
 # =================================================================
-# --- 6. PAGE MODIFIER CONTACT (V96 - FIX SOCIÉTÉ & PAIEMENT) ---
+# --- 6. PAGE MODIFIER CONTACT ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
     st.markdown('<h3 style="text-align:center;">✏️ Modifier le Contact</h3>', unsafe_allow_html=True)
@@ -372,94 +355,67 @@ if st.session_state.page == "MODIFIER_CONTACT":
     if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
         row = df_m.loc[idx_to_edit]
         
-        with st.form("form_edit_v96"):
-            # Ligne 1 : Identité
+        with st.form("form_edit_v100"):
             c1, c2 = st.columns(2)
             new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
             new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
             
-            # Ligne 2 : Date et Société (MODIFIÉ : Menu Déroulant)
             c3, c4 = st.columns(2)
             new_date = c3.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav', '')))
             
-            # --- LOGIQUE SOCIÉTÉ ---
             liste_soc = ["PERSO", "CLICK", "CMN", "VOG"]
             curr_soc = str(row.get('Société', 'PERSO')).upper().strip()
-            # Si la société en base n'est pas dans la liste, on l'ajoute temporairement pour ne pas perdre l'info
-            if curr_soc not in liste_soc and curr_soc != "":
-                liste_soc.append(curr_soc)
+            if curr_soc not in liste_soc and curr_soc != "": liste_soc.append(curr_soc)
             soc_idx = liste_soc.index(curr_soc) if curr_soc in liste_soc else 0
             new_soc = c4.selectbox("Société", liste_soc, index=soc_idx)
             
-            # Ligne 3 : Contacts
             c5, c6 = st.columns(2)
             new_tel = c5.text_input("Téléphone", value=str(row.get('Téléphone', '')))
             new_mail = c6.text_input("Email", value=str(row.get('Email', '')))
             
-            # Ligne 4 : Logistique
             cl1, cl2 = st.columns(2)
-            new_jours = cl1.number_input("Nombre de jours", value=clean_num(row.get('Jours', 0)), min_value=0)
-            new_pers = cl2.number_input("Nombre de personnes", value=clean_num(row.get('Pers', 0)), min_value=0)
+            new_jours = cl1.number_input("Nombre de jours", value=int(clean_num(row.get('Jours', 0))), min_value=0)
+            new_pers = cl2.number_input("Nombre de personnes", value=int(clean_num(row.get('Pers', 0))), min_value=0)
             
-            # Ligne 5 : Finances
             f1, f2 = st.columns(2)
-            new_prix = f1.number_input("Prix Total (€)", value=clean_num(row.get('Prix', 0)))
-            new_aco = f2.number_input("Acompte (€)", value=clean_num(row.get('Acompte', 0)))
+            new_prix = f1.number_input("Prix Total (€)", value=int(clean_num(row.get('Prix', 0))))
+            new_aco = f2.number_input("Acompte (€)", value=int(clean_num(row.get('Acompte', 0))))
             
-            # Ligne 6 : Statuts & Options
             s1, s2 = st.columns(2)
             s_list = ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé", "Liste d'attente"]
-            curr_s = str(row.get('Statut', 'En attente')).capitalize()
-            if "liste" in curr_s.lower(): curr_s = "Liste d'attente"
-            s_idx = s_list.index(curr_s) if curr_s in s_list else 0
+            curr_s = str(row.get('Statut', 'En attente')).strip()
+            # Matching souple pour l'index
+            s_idx = next((i for i, s in enumerate(s_list) if s.lower() in curr_s.lower()), 0)
             new_statut = s1.selectbox("Statut Mission", s_list, index=s_idx)
             
-            # Sous-colonnes pour Paiement et Relance
             sub1, sub2 = s2.columns(2)
-            
-            # --- FIX PAIEMENT DANS LE FORMULAIRE ---
-            val_p_brute = str(row.get('Paiement', 'Unpaid')).strip()
             p_list = ["Unpaid", "Paid"]
-
-            # On force l'index 1 uniquement si c'est écrit "Paid" exactement
-            p_idx = 1 if val_p_brute.upper() == "PAID" else 0
+            p_idx = 1 if str(row.get('Paiement', '')).upper() == "PAID" else 0
             new_pay = sub1.selectbox("Paiement", p_list, index=p_idx)
             
-            # Option Relance
             val_r = str(row.get('Relancer', 'Non')).strip().capitalize()
             new_relance = sub2.selectbox("À recontacter ?", ["Non", "Oui"], index=1 if val_r == "Oui" else 0)
             
             new_notes = st.text_area("Notes", value=str(row.get('Notes', '')).replace('nan',''))
 
-            submitted = st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True)
-            
-            if submitted:
+            if st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True):
                 maj = {
-                    'Prénom': new_pre.upper(),
-                    'Nom': new_nom.upper(),
-                    'DateNav': new_date,
-                    'Société': new_soc.upper(), # Sauvegarde la sélection du menu
-                    'Téléphone': new_tel.strip(),
-                    'Email': new_mail.strip(),
-                    'Jours': int(new_jours),
-                    'Pers': int(new_pers),
-                    'Prix': int(new_prix),
-                    'Acompte': int(new_aco),
-                    'Statut': new_statut,
-                    'Paiement': new_pay,
-                    'Relancer': new_relance,
-                    'Notes': str(new_notes).strip()
+                    'Prénom': new_pre.upper(), 'Nom': new_nom.upper(), 'DateNav': new_date,
+                    'Société': new_soc.upper(), 'Téléphone': new_tel.strip(), 'Email': new_mail.strip(),
+                    'Jours': int(new_jours), 'Pers': int(new_pers), 'Prix': int(new_prix),
+                    'Acompte': int(new_aco), 'Statut': new_statut, 'Paiement': new_pay,
+                    'Relancer': new_relance, 'Notes': str(new_notes).strip()
                 }
-                
                 df_m.loc[idx_to_edit, maj.keys()] = list(maj.values())
                 sauvegarder_data(df_m, 'contacts.json')
-                st.success("Fiche mise à jour !")
                 st.session_state.page = "CONTACTS"
                 st.rerun()
 
     if st.button("⬅️ RETOUR"):
         st.session_state.page = "CONTACTS"
         st.rerun()
+
+
 # =================================================================
 # --- 6. PAGE PLANNING (V18.5 - FIX ORDRE CHARGEMENT) ---
 # =================================================================
