@@ -1025,29 +1025,29 @@ if st.session_state.page == "LOG":
                 df_final = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
                 sauvegarder_data(df_final, 'logbook.json')
                 if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
+                    
                 st.rerun()
-    # 3. AFFICHAGE DE L'HISTORIQUE (Correction du Tri)
+     # 3. AFFICHAGE DE L'HISTORIQUE (VERSION ROBUSTE - TOUTES DONNÉES)
     if not df_log.empty:
         st.divider()
         df_v = df_log.copy()
         
-        # On force la conversion en date pour le tri, les erreurs deviennent NaT (Not a Time)
+        # Conversion des dates pour le tri (plus récent en haut)
         df_v['dt'] = pd.to_datetime(df_v['Date'], dayfirst=True, errors='coerce')
-        # On trie par date, et on met les dates non reconnues à la fin
-        df_v = df_v.sort_values(by='dt', ascending=False, na_position='last')     
-        st.write(f"Nombre de lignes trouvées dans le fichier : {len(df_log)}")
-    if not df_log.empty:
-        st.write("Dates présentes :", df_log['Date'].unique())
+        df_v = df_v.sort_values(by='dt', ascending=False)
 
         groupes_affiches = set()
 
         for idx, row in df_v.iterrows():
-            # ... reste du code d'affichage (Croisière ou Sortie simple) ...
+            # On récupère l'ID de groupe s'il existe, sinon on met None
             gid = row.get('Group_ID')
+            # On vérifie si c'est vraiment un ID (pas NaN, pas vide)
+            has_group = pd.notna(gid) and str(gid).strip() != "" and str(gid).lower() != "none"
             
-            # --- CAS CROISIÈRE (Design adouci Bleu Horizon) ---
-            if gid and str(gid).strip() != "" and str(gid).lower() != "none":
-                if gid in groupes_affiches: continue
+            # --- CAS 1 : C'EST UNE CROISIÈRE LIÉE ---
+            if has_group:
+                if gid in groupes_affiches: 
+                    continue # On saute si déjà affiché
                 
                 group_data = df_v[df_v['Group_ID'] == gid].sort_values(by='dt')
                 if not group_data.empty:
@@ -1059,7 +1059,7 @@ if st.session_state.page == "LOG":
                         <div style="background:#eef2f7; color:#2c3e50; padding:15px; border-radius:10px; margin-bottom:12px; border-left: 8px solid #3498db; border: 1px solid #d1d9e6;">
                             <div style="display:flex; justify-content:space-between; font-size:0.8rem; font-weight:bold; color:#5d6d7e;">
                                 <span>🚢 CROISIÈRE • {n_j} JOURS</span>
-                                <span>{group_data.iloc[0]['Navigation']}</span>
+                                <span>{group_data.iloc[0].get('Navigation', 'Voyage')}</span>
                             </div>
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
                                 <div>
@@ -1074,7 +1074,7 @@ if st.session_state.page == "LOG":
                     """, unsafe_allow_html=True)
                     groupes_affiches.add(gid)
 
-            # --- CAS SORTIE SIMPLE ---
+            # --- CAS 2 : TOUT LE RESTE (Tes 10 lignes de février/mars) ---
             else:
                 st.markdown(f"""
                     <div style="background:white; border:1px solid #dee2e6; padding:10px 15px; border-radius:5px; margin-bottom:5px; display: flex; justify-content: space-between; align-items:center;">
