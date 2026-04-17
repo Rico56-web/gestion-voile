@@ -920,33 +920,27 @@ if st.session_state.page == "ARCHIVES":
     t1, t2, t3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook"])
     with t1: st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
-    with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True) 
+    with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - PROTECTION ANTI-ISO ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - PROTECTION FINALE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
 
+    # 1. CHARGEMENT ET TRI
     df_log = charger_data_safe('logbook.json')
     
     if not df_log.empty:
-        # Sécurité : On s'assure que 'Date' est traitée comme du texte pur dès le départ
-        df_log['Date'] = df_log['Date'].astype(str)
-        
-        # 1. Création d'une clé de tri technique (invisible)
-        # On essaie de lire le format FR, si ça échoue (ISO), on gère l'erreur
-        df_log['sort_key'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
-        
-        # 2. Tri par la clé technique (le plus récent en haut)
-        df_log = df_log.sort_values(by='sort_key', ascending=False).reset_index(drop=True)
-        
-        # 3. On écrase la colonne Date avec le formatage TEXTE définitif
-        df_log['Date'] = df_log['sort_key'].dt.strftime('%d/%m/%Y').astype(str)
-        
-        # On retire la clé de tri pour le stockage
-        df_log = df_log.drop(columns=['sort_key'])
+        # On crée une clé de tri invisible
+        df_log['dt_sort'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+        # On trie (Plus récent en haut)
+        df_log = df_log.sort_values(by='dt_sort', ascending=False).reset_index(drop=True)
+        # FORCE LE FORMAT TEXTE FRANÇAIS ET COUPE LE LIEN AVEC LE TYPE DATE
+        df_log['Date'] = df_log['dt_sort'].dt.strftime('%d/%m/%Y').astype(str)
+        # On supprime la colonne de tri pour le stockage propre
+        df_log = df_log.drop(columns=['dt_sort'])
 
-    # --- RÉCUPÉRATION DERNIERS COMPTEURS ---
+    # 2. RÉCUPÉRATION DERNIERS COMPTEURS
     last_h, last_m = 0.0, 0.0
     if not df_log.empty:
         try:
@@ -955,11 +949,11 @@ if st.session_state.page == "LOG":
             last_m = float(r0.get('MilArr', 0.0))
         except: pass
 
-    # --- FORMULAIRE NOUVELLE NAVIGATION ---
+    # 3. SAISIE NOUVELLE NAVIGATION
     st.subheader("🚀 Nouvelle Navigation")
     c1, c2, c3 = st.columns([2, 1, 2])
     f_date = c1.date_input("Date", datetime.now())
-    f_titre = c3.text_input("Destination")
+    f_titre = c3.text_input("Destination / Titre")
 
     if 'temp_log_df' not in st.session_state:
         st.session_state.temp_log_df = pd.DataFrame([{
@@ -970,17 +964,18 @@ if st.session_state.page == "LOG":
     edited_steps = st.data_editor(
         st.session_state.temp_log_df,
         column_config={
-            "Port": "📍 Etape", "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
+            "Port": "📍 Etape", 
+            "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
             "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr"
         },
-        num_rows="dynamic", use_container_width=True, key="log_final_v2"
+        num_rows="dynamic", use_container_width=True, key="log_editor_vFinal"
     )
 
-    if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
+    if st.button("💾 ENREGISTRER LA NAVIGATION", type="primary", use_container_width=True):
         if edited_steps is not None and not edited_steps.empty:
             nouvelles = []
-            # On génère la date en texte FR strict
-            date_texte_fr = f_date.strftime("%d/%m/%Y")
+            # On génère la date en texte pur format FR
+            date_fr_string = f_date.strftime("%d/%m/%Y")
             
             for _, row in edited_steps.iterrows():
                 if row.get("Port"):
@@ -988,7 +983,7 @@ if st.session_state.page == "LOG":
                     m_d, m_a = float(row.get("Mil_Dep", 0.0)), float(row.get("Mil_Arr", 0.0))
                     
                     nouvelles.append({
-                        "Date": date_texte_fr, # Sauvegardé en texte
+                        "Date": str(date_fr_string), 
                         "Navigation": f_titre,
                         "PortArr": row.get("Port"),
                         "MotDep": h_d,
@@ -1002,8 +997,8 @@ if st.session_state.page == "LOG":
                     })
             
             if nouvelles:
-                # Fusion et ré-application du tri texte
                 df_final = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
+                # Dernier tri avant sauvegarde
                 df_final['tmp'] = pd.to_datetime(df_final['Date'], dayfirst=True, errors='coerce')
                 df_final = df_final.sort_values(by='tmp', ascending=False).reset_index(drop=True)
                 df_final['Date'] = df_final['tmp'].dt.strftime('%d/%m/%Y').astype(str)
@@ -1013,7 +1008,7 @@ if st.session_state.page == "LOG":
                 if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
                 st.rerun()
 
-    # --- AFFICHAGE HISTORIQUE ---
+    # 4. AFFICHAGE ET GESTION (AVEC VERROU TEXTE)
     if not df_log.empty:
         st.divider()
         st.subheader("📜 Historique")
@@ -1021,40 +1016,50 @@ if st.session_state.page == "LOG":
         df_visu = df_log.copy()
         df_visu.insert(0, 'N°', df_visu.index)
         
-        # LE VERROU : On force Streamlit à traiter la colonne comme du texte brut
+        # ON FORCE LE TYPE TEXTE SUR LA COLONNE DATE POUR LE TABLEAU
         st.dataframe(
             df_visu, 
             use_container_width=True, 
             hide_index=True,
             column_config={
-                "Date": st.column_config.TextColumn("Date", help="Format JJ/MM/AAAA"),
+                "Date": st.column_config.TextColumn("Date"), # ICI : Verrouille le format texte
                 "N°": st.column_config.NumberColumn("N°", format="%d")
             }
         )
 
-        # --- BLOCS MODIFIER & SUPPRIMER ---
-        c_mod, c_del = st.columns(2)
-        with c_mod:
+        col_m, col_s = st.columns(2)
+        with col_m:
             with st.expander("📝 MODIFIER"):
-                idx_m = st.number_input("Ligne N°", min_value=0, max_value=len(df_log)-1, step=1)
+                idx_m = st.number_input("N° de ligne", min_value=0, max_value=len(df_log)-1, step=1)
                 r = df_log.loc[idx_m]
                 with st.form(f"f_mod_{idx_m}"):
-                    # On convertit pour le calendrier
-                    try: d_val = datetime.strptime(str(r['Date']), "%d/%m/%Y")
-                    except: d_val = datetime.now()
+                    try: d_obj = datetime.strptime(str(r['Date']), "%d/%m/%Y")
+                    except: d_obj = datetime.now()
                     
-                    new_d = st.date_input("Date", value=d_val)
+                    new_d = st.date_input("Date", value=d_obj)
                     new_p = st.text_input("Port", value=r.get('PortArr', ''))
-                    # ... [Autres champs moteur/milles identiques] ...
+                    
+                    c1, c2 = st.columns(2)
+                    m_d = c1.number_input("Mot Dép", value=float(r.get('MotDep', 0.0)))
+                    m_a = c2.number_input("Mot Arr", value=float(r.get('MotArr', 0.0)))
+                    
+                    c3, c4 = st.columns(2)
+                    mi_d = c3.number_input("Mil Dép", value=float(r.get('MilDep', 0.0)))
+                    mi_a = c4.number_input("Mil Arr", value=float(r.get('MilArr', 0.0)))
                     
                     if st.form_submit_button("VALIDER"):
                         df_log.at[idx_m, 'Date'] = new_d.strftime("%d/%m/%Y")
                         df_log.at[idx_m, 'PortArr'] = new_p
-                        # ... [Calculs totaux identiques] ...
+                        df_log.at[idx_m, 'MotDep'] = m_d
+                        df_log.at[idx_m, 'MotArr'] = m_a
+                        df_log.at[idx_m, 'TotalMot'] = round(m_a - m_d, 2)
+                        df_log.at[idx_m, 'MilDep'] = mi_d
+                        df_log.at[idx_m, 'MilArr'] = mi_a
+                        df_log.at[idx_m, 'TotalMil'] = round(mi_a - mi_d, 1)
                         sauvegarder_data(df_log, 'logbook.json')
                         st.rerun()
-        
-        with c_del:
+
+        with col_s:
             with st.expander("🗑️ SUPPRIMER"):
                 opts = [f"{i} : {df_log.loc[i, 'Date']} - {df_log.loc[i, 'PortArr']}" for i in df_log.index]
                 with st.form("f_del"):
@@ -1063,8 +1068,6 @@ if st.session_state.page == "LOG":
                         df_log = df_log.drop(index=int(sel.split(" : ")[0])).reset_index(drop=True)
                         sauvegarder_data(df_log, 'logbook.json')
                         st.rerun()
-
-
 
 # --- FIN DU FICHIER ---
 
