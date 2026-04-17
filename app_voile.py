@@ -722,125 +722,90 @@ if st.session_state.page == "STATS":
                 st.dataframe(df_log_y_clean[['Date', 'PortArr', 'Cout Gazoil']], use_container_width=True, hide_index=True)
             
             st.error(f"**TOTAL DÉPENSES : {total_dep:,.2f} €**")
-
 # =================================================================
-# --- 8. PAGE MAINTENANCE (CHRONOLOGIQUE & FILTRÉE) ---
+# --- 8. PAGE MAINTENANCE & VIDANGE ---
 # =================================================================
 if st.session_state.page == "MAINT":
     import pandas as pd
-    from datetime import datetime
+    from datetime import datetime, timedelta
 
     df_m = charger_data_safe('maintenance.json')
     df_log = charger_data_safe('logbook.json')
+    
+    # --- 1. RÉCUPÉRATION COMPTEUR RÉEL ---
+    # On prend la valeur max du compteur à l'arrivée
+    releve_h = pd.to_numeric(df_log['MotArr'], errors='coerce').max() if not df_log.empty else 0.0
+    
+    # Chargement de la cible de vidange depuis les paramètres
+    # Si non définie, on initialise à 2450
+    params = charger_params()
+    if 'prochaine_vidange' not in params:
+        params['prochaine_vidange'] = 2450.0
+        sauvegarder_params(params)
 
-    # --- 1. CALCULS HEURES ---
-    releve_h = pd.to_numeric(df_log['MotArr'], errors='coerce').max() if not df_log.empty else 0
-    params = charger_params() if 'charger_params' in globals() else {"cible_vidange": 2450.0}
+    st.title("🛠️ MAINTENANCE & VIDANGE")
 
-    st.title("🛠️ MAINTENANCE")
+    # --- 2. TABLEAU DE BORD VIDANGE ---
+    heures_restantes = params['prochaine_vidange'] - releve_h
+    color_v = "#2e7d32" if heures_restantes > 10 else "#c62828"
+    
+    col_v1, col_v2 = st.columns([2, 1])
+    
+    with col_v1:
+        st.markdown(f"""
+            <div style="background-color: {color_v}15; border: 2px solid {color_v}; padding: 15px; border-radius: 10px; text-align: center;">
+                <h3 style="margin:0; color: {color_v};">{heures_restantes:.1f} h restantes</h3>
+                <p style="margin:0;">Prochaine vidange à : <b>{params['prochaine_vidange']:.1f} h</b></p>
+                <small>Compteur actuel : {releve_h:.1f} h</small>
+            </div>
+        """, unsafe_allow_html=True)
 
-    # --- 2. FILTRES ---
-    col_sel1, col_sel2 = st.columns(2)
-    mode_maint = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
-    sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
-
-    # --- 3. VIDANGE ---
-    heures_restantes = params['cible_vidange'] - releve_h
-    color_v = "#2e7d32" if heures_restantes > 15 else "#c62828"
-    st.markdown(f"""<div style="background-color: {color_v}15; border: 1px solid {color_v}; padding: 10px; border-radius: 10px; text-align: center;">
-        <span style="color: {color_v}; font-weight: bold;">{heures_restantes:.1f} h restantes</span> | Compteur : {releve_h:.1f} h
-    </div>""", unsafe_allow_html=True)
+    with col_v2:
+        # Modifier la cible manuellement si besoin
+        new_target = st.number_input("Ajuster cible (h)", value=float(params['prochaine_vidange']), step=10.0)
+        if new_target != params['prochaine_vidange']:
+            params['prochaine_vidange'] = new_target
+            sauvegarder_params(params)
+            st.rerun()
 
     st.divider()
 
-    # --- 4. GESTION DU TABLEAU (MODIFICATION & SUPPRESSION SÉCURISÉE) ---
-    if not df_m.empty:
-        df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-        df_filtre = df_m[df_m['dt_maint'].dt.year == sel_y].copy()
-        
-        if mode_maint == "À ce jour":
-            today = pd.Timestamp.now().normalize()
-            df_filtre = df_filtre[df_filtre['dt_maint'] <= today].copy()
-
-        df_filtre = df_filtre.sort_values('dt_maint', ascending=False)
-
-        st.subheader(f"📋 Suivi {sel_y}")
-        
-        # --- CALCUL DE LA HAUTEUR DYNAMIQUE ---
-        nb_lignes = len(df_filtre)
-        hauteur_calculee = (nb_lignes * 35) + 45 
-        hauteur_finale = max(hauteur_calculee, 150)
-
-        edited_df = st.data_editor(
-            df_filtre.drop(columns=['dt_maint']),
-            column_config={
-                "Date": st.column_config.TextColumn("Date", width="small"),
-                "Objet": st.column_config.TextColumn("Désignation"),
-                "M_Num": st.column_config.NumberColumn("€", format="%.2f"),
-                "Statut": st.column_config.SelectboxColumn("Etat", options=["À prévoir", "Fait"], required=True),
-                "Type": st.column_config.SelectboxColumn("Cat", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
-            },
-            hide_index=False,
-            use_container_width=True,
-            num_rows="dynamic",
-            height=hauteur_finale,
-            key="maint_editor_v7"
-        )
-        
-        col_save, col_del = st.columns(2)
-
-        with col_save:
-            if st.button("💾 ENREGISTRER", use_container_width=True, type="primary"):
-                df_non_affiches = df_m[~df_m.index.isin(df_filtre.index)].drop(columns=['dt_maint'], errors='ignore')
-                df_final_save = pd.concat([df_non_affiches, edited_df], ignore_index=True)
-                sauvegarder_data(df_final_save, 'maintenance.json')
-                st.success("✅ Mis à jour !")
+    # --- 3. FORMULAIRE "EFFECTUER LA VIDANGE" ---
+    with st.expander("🔧 ENREGISTRER UNE VIDANGE EFFECTUÉE", expanded=False):
+        with st.form("form_vidange"):
+            c1, c2 = st.columns(2)
+            v_date = c1.date_input("Date de la vidange", datetime.now())
+            v_compteur = c2.number_input("Valeur compteur (h)", value=releve_h, step=0.1)
+            
+            v_travaux = st.text_area("Autres travaux faits", 
+                                    placeholder="Ex: Filtre huile, filtre gasoil, contrôle courroie, turbine...")
+            
+            st.info(f"💡 Note : La prochaine vidange sera automatiquement fixée à {v_compteur + 90:.1f} h")
+            
+            if st.form_submit_button("VALIDER LA VIDANGE ET RECALCULER"):
+                # 1. Ajouter à la maintenance
+                nouvelle_maint = {
+                    "Date": v_date.strftime("%d/%m/%Y"),
+                    "Objet": "VIDANGE MOTEUR",
+                    "M_Num": 0.0,
+                    "Statut": "Fait",
+                    "Type": "Maintenance",
+                    "Notes": v_travaux,
+                    "Compteur": v_compteur
+                }
+                df_m = pd.concat([df_m, pd.DataFrame([nouvelle_maint])], ignore_index=True)
+                sauvegarder_data(df_m, 'maintenance.json')
+                
+                # 2. Mettre à jour la prochaine échéance (+90h)
+                params['prochaine_vidange'] = round(v_compteur + 90.0, 1)
+                sauvegarder_params(params)
+                
+                st.success(f"✅ Vidange enregistrée ! Prochaine prévue à {params['prochaine_vidange']} h")
                 st.rerun()
 
-        with col_del:
-            with st.expander("🗑️ ZONE DE SUPPRESSION"):
-                st.error("⚠️ Attention : action définitive")
-                unlock = st.checkbox("Déverrouiller le bouton")
-                idx_to_remove = st.number_input("Index à supprimer :", min_value=0, max_value=df_m.index.max() if not df_m.empty else 0, step=1)
-                
-                if unlock:
-                    if st.button(f"🔥 CONFIRMER SUPPRESSION {idx_to_remove}", type="primary", use_container_width=True):
-                        df_m = df_m.drop(index=idx_to_remove).reset_index(drop=True)
-                        sauvegarder_data(df_m, 'maintenance.json')
-                        st.success("Ligne supprimée !")
-                        st.rerun()
+    # --- 4. AFFICHAGE DU SUIVI (Identique à votre code actuel) ---
+    # [Gardez ici le reste de votre code pour le filtrage par année et le data_editor]
 
-    # --- 5. FORMULAIRE D'AJOUT ---
-    st.write("---")
-    with st.expander("➕ Ajouter une opération"):
-        with st.form("form_maint_v2", clear_on_submit=True):
-            f_obj = st.text_input("Désignation")
-            c_a, c_b = st.columns(2)
-            f_date_iso = c_a.date_input("Date", datetime.now())
-            f_montant = c_b.number_input("Montant (€)", min_value=0.0, format="%.2f")
-            
-            c_c, c_d = st.columns(2)
-            f_type = c_c.selectbox("Catégorie", ["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
-            f_statut = c_d.selectbox("Statut", ["À prévoir", "Fait"], index=1 if f_date_iso <= datetime.now().date() else 0)
-            
-            f_recurrence = st.checkbox("Répéter mensuellement")
-            
-            if st.form_submit_button("💾 Enregistrer l'opération", use_container_width=True):
-                if f_obj:
-                    nouvelles_lignes = []
-                    if f_recurrence:
-                        for m in range(f_date_iso.month, 13):
-                            date_fr = f_date_iso.replace(month=m).strftime("%d/%m/%Y")
-                            nouvelles_lignes.append({"Date": date_fr, "Objet": f"{f_obj} (M{m})", "M_Num": f_montant, "Statut": f_statut, "Type": f_type})
-                    else:
-                        date_fr = f_date_iso.strftime("%d/%m/%Y")
-                        nouvelles_lignes.append({"Date": date_fr, "Objet": f_obj, "M_Num": f_montant, "Statut": f_statut, "Type": f_type})
-                    
-                    df_m_current = charger_data_safe('maintenance.json')
-                    df_final = pd.concat([df_m_current, pd.DataFrame(nouvelles_lignes)], ignore_index=True)
-                    sauvegarder_data(df_final, 'maintenance.json')
-                    st.success("✅ Opération(s) ajoutée(s) !")
-                    st.rerun()
 
 # =================================================================
 # --- PAGE : FACTURATION & SUIVI PAIEMENTS (FACT) ---
