@@ -948,8 +948,8 @@ if st.session_state.page == "LOG":
         st.subheader("📜 Historique")
 
         # --- LOGIQUE D'ORDRE FORCÉ ---
-        # L'ordre demandé de haut en bas : 4, 3, 1, 0, 2
-        ordre_demande = [4, 3, 1, 0, 2]
+        # L'ordre demandé de haut en bas : 2, 0, 1, 3, 4
+        ordre_demande = [2, 0, 1, 3, 4]
         
         # On vérifie quels index existent réellement dans ton fichier
         index_existants = df_log.index.tolist()
