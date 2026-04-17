@@ -734,7 +734,7 @@ if st.session_state.page == "MAINT":
     df_log = charger_data_safe('logbook.json')
 
     # --- 1. CALCULS HEURES ---
-    releve_h = pd.to_numeric(df_log['TotalMot'], errors='coerce').max() if not df_log.empty else 0
+    releve_h = pd.to_numeric(df_log['MotArr'], errors='coerce').max() if not df_log.empty else 0
     params = charger_params() if 'charger_params' in globals() else {"cible_vidange": 2450.0}
 
     st.title("🛠️ MAINTENANCE")
