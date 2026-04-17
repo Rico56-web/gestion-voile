@@ -13,6 +13,8 @@ if 'edit_mode' not in st.session_state:
     st.session_state.edit_mode = False
 if 'page' not in st.session_state: 
     st.session_state.page = "CONTACTS"
+if 'vue_contact' not in st.session_state:
+    st.session_state.vue_contact = "En cours"
 
 # --- FONCTIONS UTILITAIRES GLOBALES ---
 def to_f(val):
