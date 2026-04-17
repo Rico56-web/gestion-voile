@@ -160,24 +160,26 @@ if st.session_state.page == "MEMOS":
                 sauvegarder_data(df_memos, 'memos.json')
                 st.rerun()
 # =================================================================
-# --- 5. BLOC CONTACTS (V101 - RECHERCHE & EXCEL & CARTES) ---
+# --- 5. BLOC CONTACTS (V102 - COMPLET : RELANCES & COULEURS) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     # --- CHARGEMENT DES DONNÉES ---
     df_raw = charger_data('contacts.json')
     
     # --- NAVIGATION ET EXCEL (ARCHIVAGE) ---
-    n1, n2, n3, n4 = st.columns([1, 1, 1, 1.5])
+    # Ajout d'une colonne pour le 4ème onglet "RELANCES"
+    n1, n2, n3, n4, n5 = st.columns([1, 1, 1, 1, 1.5])
     
     if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
         st.session_state.vue_contact = "En cours"; st.rerun()
     if n2.button("⌛ ATTENTE", use_container_width=True, type="primary" if st.session_state.vue_contact == "Attente" else "secondary"): 
         st.session_state.vue_contact = "Attente"; st.rerun()
-    if n3.button("✅ TERMINÉS", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
+    if n3.button("📞 RELANCES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Relances" else "secondary"): 
+        st.session_state.vue_contact = "Relances"; st.rerun()
+    if n4.button("✅ ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
         st.session_state.vue_contact = "Archives"; st.rerun()
 
-    # Bouton d'export standardisé pour archivage de fin d'année
-    with n4:
+    with n5:
         bouton_export_excel(df_raw, "Planning_General")
 
     st.divider()
@@ -189,8 +191,6 @@ if st.session_state.page == "CONTACTS":
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         
         c_search, c_yr, c_new = st.columns([2, 1, 1])
-        
-        # Recherche par Nom, Prénom OU Société
         search = c_search.text_input("🔍 Rechercher (Nom, Prénom, Société...)", "", key="search_bar_contacts").upper()
         annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1, key="saison_contacts")
         
@@ -206,83 +206,76 @@ if st.session_state.page == "CONTACTS":
             st.session_state.page = "MODIFIER_CONTACT"
             st.rerun()
 
-        # Application des filtres de recherche et de saison
+        # Application des filtres
         mask = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna())
         if search:
-            mask = mask & (
-                df_c['Nom'].astype(str).str.upper().str.contains(search) | 
-                df_c['Prénom'].astype(str).str.upper().str.contains(search) | 
-                df_c['Société'].astype(str).str.upper().str.contains(search)
-            )
+            mask = mask & (df_c['Nom'].astype(str).str.upper().str.contains(search) | 
+                           df_c['Prénom'].astype(str).str.upper().str.contains(search) | 
+                           df_c['Société'].astype(str).str.upper().str.contains(search))
         df_c = df_c[mask].copy()
 
-        # --- LOGIQUE DES ONGLETS (EN COURS / ATTENTE / TERMINÉS) ---
+        # --- LOGIQUE DE SÉPARATION DES ONGLETS ---
         statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
         relance_clean = df_c['Relancer'].fillna("Non").str.upper()
         
         if st.session_state.vue_contact == "Archives":
             mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
             tri_ordre = False 
+        elif st.session_state.vue_contact == "Relances":
+            # Uniquement ceux qui sont Terminés ET marqués "A recontacter : Oui"
+            mask_aff = (statut_clean.str.contains("termine")) & (relance_clean == "OUI")
+            tri_ordre = True
         elif st.session_state.vue_contact == "Attente":
-            mask_aff = (statut_clean == "liste d'attente") | ((statut_clean.str.contains("termine")) & (relance_clean == "OUI"))
+            # Uniquement la vraie liste d'attente (pas les terminés)
+            mask_aff = (statut_clean == "liste d'attente")
             tri_ordre = True  
-        else:
+        else: # EN COURS
             mask_aff = ~(statut_clean.str.contains("termine|annule|refuse")) & (statut_clean != "liste d'attente")
             tri_ordre = True
 
         df_aff = df_c[mask_aff].copy().sort_values(by='dt_sort', ascending=tri_ordre)
+
         # --- BOUCLE D'AFFICHAGE DES FICHES ---
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
-            
-            # Calcul financier
-            p_total = to_f(row.get('Prix', 0))
-            p_aco = to_f(row.get('Acompte', 0))
+            p_total, p_aco = to_f(row.get('Prix', 0)), to_f(row.get('Acompte', 0))
             reste = p_total - p_aco
             
-            # Gestion des couleurs et icônes de paiement
+            # Couleurs de société (avec Jaune pour PERSO)
+            soc_name = str(row.get('Société', 'PERSO')).upper()
+            if soc_name == "CMN": border_col, bg_card, text_soc = "#2980B9", "#EBF5FB", "🔵 CMN"
+            elif soc_name == "CLICK": border_col, bg_card, text_soc = "#27AE60", "#EAFAF1", "🟢 CLICK"
+            elif soc_name == "VOG": border_col, bg_card, text_soc = "#8E44AD", "#F5EEF8", "🟣 VOG"
+            elif soc_name == "PERSO": border_col, bg_card, text_soc = "#F1C40F", "#FEF9E7", "🟡 PERSO"
+            else: border_col, bg_card, text_soc = "#7F8C8D", "#FDFEFE", "⚪ " + soc_name
+
+            # Icônes de paiement
             pay_status = str(row.get('Paiement', 'Unpaid')).upper()
             pay_icon = "✅" if pay_status == "PAID" else "⏳"
-            pay_color = "#27AE60" if pay_status == "PAID" else "#E67E22"
             
-        # Personnalisation par société
-            soc_name = str(row.get('Société', 'PERSO')).upper()
-            if soc_name == "CMN":
-                border_col, bg_card, text_soc = "#2980B9", "#EBF5FB", "🔵 CMN"
-            elif soc_name == "CLICK":
-                border_col, bg_card, text_soc = "#27AE60", "#EAFAF1", "🟢 CLICK"
-            elif soc_name == "VOG":
-                border_col, bg_card, text_soc = "#8E44AD", "#F5EEF8", "🟣 VOG"
-            elif soc_name == "PERSO":
-                # Jaune vif pour la bordure et jaune très clair pour le fond
-                border_col, bg_card, text_soc = "#F1C40F", "#FEF9E7", "🟡 PERSO"
-            else:
-                border_col, bg_card, text_soc = "#7F8C8D", "#FDFEFE", "⚪ " + soc_name
+            # Style spécial si c'est une relance
+            style_relance = "border: 2px dashed #E67E22;" if st.session_state.vue_contact == "Relances" else ""
 
-            # Affichage de la fiche HTML colorée
             st.markdown(f"""
             <div style="background:{bg_card}; padding:15px; border-radius:12px; border-left:10px solid {border_col}; 
-                        box-shadow: 4px 4px 10px rgba(0,0,0,0.08); margin-bottom:15px; color: black;">
+                        box-shadow: 4px 4px 10px rgba(0,0,0,0.08); margin-bottom:15px; color: black; {style_relance}">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <span style="font-size:1.2rem; font-weight:bold; color:#2C3E50;">{row['Prénom']} {row['Nom']}</span>
                     <span style="background:{border_col}; color:{'black' if soc_name == 'PERSO' else 'white'}; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:bold;">{text_soc}</span>
                 </div>
-                <div style="margin-top:8px; font-size:0.95rem; line-height:1.4;">
-                    <b>📅 Date :</b> {row['DateNav']} | <b>👥 Pers :</b> {row['Pers']} | <b>☀️ Jours :</b> {row['Jours']}<br>
+                <div style="margin-top:8px; font-size:0.95rem;">
+                    📅 <b>{row['DateNav']}</b> | 👥 {row['Pers']} pers | ☀️ {row['Jours']}j<br>
                     <div style="margin-top:5px; padding:5px; background:rgba(255,255,255,0.6); border-radius:5px;">
-                        <b>💰 Total :</b> {int(p_total)}€ | <b>💸 Acompte :</b> {int(p_aco)}€ | 
-                        <b style="color:{'#C0392B' if reste > 0 else '#27AE60'};">⌛ Reste : {int(reste)}€</b>
+                        💰 {int(p_total)}€ | 💸 {int(p_aco)}€ | <b style="color:{'#C0392B' if reste > 0 else '#27AE60'};">⌛ Reste : {int(reste)}€</b>
                     </div>
-                    <div style="margin-top:5px; font-weight:bold; color:{pay_color};">
-                        {pay_icon} Statut : {pay_status}
-                    </div>
+                    <div style="margin-top:5px; font-weight:bold;">{pay_icon} {pay_status} | 🏁 {row['Statut']}</div>
                     <hr style="margin:10px 0; border: 0.5px solid rgba(0,0,0,0.1);">
                     <i style="color:#566573;">📝 {row['Notes']}</i>
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # --- BOUTONS D'ACTION ---
+            # --- BOUTONS ---
             c1, c2, c3 = st.columns([1, 1, 1])
             if c1.button("✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx
@@ -299,11 +292,9 @@ if st.session_state.page == "CONTACTS":
                 if co1.button("✅ OUI", key=f"y_{idx}"):
                     df_db = charger_data('contacts.json').drop(idx).reset_index(drop=True)
                     sauvegarder_data(df_db, 'contacts.json')
-                    del st.session_state[f"confirm_del_{idx}"]
-                    st.rerun()
+                    del st.session_state[f"confirm_del_{idx}"]; st.rerun()
                 if co2.button("❌ NON", key=f"n_{idx}"):
-                    del st.session_state[f"confirm_del_{idx}"]
-                    st.rerun()
+                    del st.session_state[f"confirm_del_{idx}"]; st.rerun()
             
             if st.session_state.vue_contact == "En cours":
                 if c3.button("🏁 FINIR", key=f"fin_{idx}", use_container_width=True):
