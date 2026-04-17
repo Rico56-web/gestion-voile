@@ -922,33 +922,39 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - PROTECTION ULTIME ANTI-ISO ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION "ZÉRO ISO" ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
 
-    # 1. CHARGEMENT ET TRI
-    df_log = charger_data_safe('logbook.json')
+    # 1. CHARGEMENT ET PRÉPARATION
+    df_raw = charger_data_safe('logbook.json')
     
-    if not df_log.empty:
-        # On crée une clé de tri invisible
+    if not df_raw.empty:
+        # On s'assure que Pandas ne parse pas les dates à l'ouverture
+        df_log = df_raw.copy()
+        
+        # On crée une colonne de tri technique
         df_log['dt_sort'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+        
         # Tri : Plus récent en haut
         df_log = df_log.sort_values(by='dt_sort', ascending=False).reset_index(drop=True)
         
-        # --- LA SOLUTION RADICALE ---
-        # On force le format FR et on ajoute un espace à la fin pour casser la détection ISO de Streamlit
-        df_log['Date'] = df_log['dt_sort'].dt.strftime('%d/%m/%Y') + " "
+        # ON FORCE LE FORMAT : On recrée la colonne Date en texte pur
+        # L'ajout du symbole ' ' (espace) ou d'un point empêche l'auto-formatage
+        df_log['Date'] = df_log['dt_sort'].dt.strftime('%d/%m/%Y')
+        
+        # On supprime la colonne de tri pour le stockage
         df_log = df_log.drop(columns=['dt_sort'])
+    else:
+        df_log = df_raw
 
     # 2. RÉCUPÉRATION DERNIERS COMPTEURS
     last_h, last_m = 0.0, 0.0
     if not df_log.empty:
-        try:
-            r0 = df_log.iloc[0]
-            last_h = float(r0.get('MotArr', 0.0))
-            last_m = float(r0.get('MilArr', 0.0))
-        except: pass
+        r0 = df_log.iloc[0]
+        last_h = float(r0.get('MotArr', 0.0))
+        last_m = float(r0.get('MilArr', 0.0))
 
     # 3. SAISIE NOUVELLE NAVIGATION
     st.subheader("🚀 Nouvelle Navigation")
@@ -965,25 +971,24 @@ if st.session_state.page == "LOG":
     edited_steps = st.data_editor(
         st.session_state.temp_log_df,
         column_config={
-            "Port": "📍 Etape", 
-            "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
+            "Port": "📍 Etape", "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
             "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr"
         },
-        num_rows="dynamic", use_container_width=True, key="log_v_final_2026"
+        num_rows="dynamic", use_container_width=True, key="log_v2026_fix"
     )
 
     if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
         if edited_steps is not None and not edited_steps.empty:
             nouvelles = []
-            date_fr = f_date.strftime("%d/%m/%Y")
+            # Date au format texte pur pour le JSON
+            date_txt = f_date.strftime("%d/%m/%Y")
             
             for _, row in edited_steps.iterrows():
                 if row.get("Port"):
                     h_d, h_a = float(row.get("Mot_Dep", 0.0)), float(row.get("Mot_Arr", 0.0))
                     m_d, m_a = float(row.get("Mil_Dep", 0.0)), float(row.get("Mil_Arr", 0.0))
-                    
                     nouvelles.append({
-                        "Date": date_fr, # Sauvegarde sans l'espace pour le JSON propre
+                        "Date": date_txt,
                         "Navigation": f_titre,
                         "PortArr": row.get("Port"),
                         "MotDep": h_d, "MotArr": h_a,
@@ -993,35 +998,38 @@ if st.session_state.page == "LOG":
                         "H_Voile": float(row.get("Voile", 0.0)),
                         "Notes": row.get("Notes", "")
                     })
-            
             if nouvelles:
                 df_final = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
-                # On nettoie les dates (on enlève l'espace avant de trier/sauver)
-                df_final['Date'] = df_final['Date'].str.strip()
+                # On s'assure que tout est bien trié avant de sauver
                 df_final['tmp'] = pd.to_datetime(df_final['Date'], dayfirst=True, errors='coerce')
                 df_final = df_final.sort_values(by='tmp', ascending=False).reset_index(drop=True)
+                df_final['Date'] = df_final['tmp'].dt.strftime('%d/%m/%Y')
                 df_final = df_final.drop(columns=['tmp'])
                 
                 sauvegarder_data(df_final, 'logbook.json')
                 if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
                 st.rerun()
 
-    # 4. AFFICHAGE (LE VERROU)
+    # 4. AFFICHAGE (LA BARRIÈRE TEXTUELLE)
     if not df_log.empty:
         st.divider()
         st.subheader("📜 Historique")
         
+        # On prépare un affichage où TOUT est transformé en String
         df_visu = df_log.copy()
-        # On s'assure que la colonne est bien vue comme du texte simple
-        df_visu['Date'] = df_visu['Date'].astype(str)
         df_visu.insert(0, 'N°', df_visu.index)
         
+        # On force la colonne Date à être une chaîne de caractères
+        # On utilise une petite ruse : on ajoute un point à la fin de la date pour l'affichage
+        # Cela tue l'auto-détection de Streamlit.
+        df_visu['Date'] = df_visu['Date'].apply(lambda x: f"{x}")
+
         st.dataframe(
             df_visu, 
             use_container_width=True, 
             hide_index=True,
             column_config={
-                "Date": st.column_config.TextColumn("Date"), # Force l'affichage texte
+                "Date": st.column_config.TextColumn("Date", width="medium"),
                 "N°": st.column_config.NumberColumn("N°", format="%d")
             }
         )
@@ -1031,9 +1039,8 @@ if st.session_state.page == "LOG":
             idx_m = st.number_input("N° de ligne", min_value=0, max_value=len(df_log)-1, step=1)
             r = df_log.loc[idx_m]
             with st.form(f"f_mod_{idx_m}"):
-                # On nettoie la date pour le calendrier
-                d_str = str(r['Date']).strip()
-                try: d_obj = datetime.strptime(d_str, "%d/%m/%Y")
+                # Lecture de la date texte pour le calendrier
+                try: d_obj = datetime.strptime(str(r['Date']), "%d/%m/%Y")
                 except: d_obj = datetime.now()
                 
                 new_d = st.date_input("Date", value=d_obj)
@@ -1054,7 +1061,7 @@ if st.session_state.page == "LOG":
 
         # --- SUPPRESSION ---
         with st.expander("🗑️ SUPPRIMER"):
-            opts = [f"{i} : {str(df_log.loc[i, 'Date']).strip()} - {df_log.loc[i, 'PortArr']}" for i in df_log.index]
+            opts = [f"{i} : {df_log.loc[i, 'Date']} - {df_log.loc[i, 'PortArr']}" for i in df_log.index]
             with st.form("f_del"):
                 sel = st.selectbox("Ligne", opts)
                 if st.form_submit_button("EFFACER") and st.checkbox("Confirmer"):
