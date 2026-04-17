@@ -59,6 +59,7 @@ def formater_date_affichage(date_val):
         return datetime.strptime(str(date_val)[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
     except: 
         return str(date_val)
+        # ... (garde tes imports et fonctions clean_num, clean_text, etc.)
 
 # =================================================================
 # --- 2. GESTION GITHUB (BASE DE DONNÉES) ---
@@ -68,6 +69,7 @@ def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
+        # Ajout du paramètre v=time pour éviter le cache GitHub
         res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
         if res.status_code == 200:
             content = base64.b64decode(res.json()['content']).decode('utf-8')
@@ -83,16 +85,41 @@ def sauvegarder_data(df, file):
         res = requests.get(url, headers={"Authorization": f"token {token}"})
         sha = res.json().get('sha') if res.status_code == 200 else None
         
-        # Nettoyage du DataFrame avant export JSON
         df_export = df.copy()
-        content = base64.b64encode(df_export.to_json(orient="records", indent=4).encode('utf-8')).decode('utf-8')
+        # On utilise to_json pour transformer le DataFrame en texte JSON
+        content_str = df_export.to_json(orient="records", indent=4)
+        content_b64 = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
         
         requests.put(url, headers={"Authorization": f"token {token}"}, 
-                     json={"message": f"Update {file}", "content": content, "sha": sha})
+                     json={"message": f"Update {file}", "content": content_b64, "sha": sha})
     except Exception as e: 
         st.error(f"Erreur sauvegarde {file} : {e}")
-        
-    # --- 3. SÉCURISATION (La nouvelle fonction) ---
+
+# --- AJOUT DES FONCTIONS DE PARAMÈTRES POUR LA VIDANGE ---
+
+def charger_params():
+    """Charge les réglages (cible vidange) depuis GitHub (params.json)"""
+    try:
+        # On réutilise ta fonction charger_data
+        df = charger_data('params.json')
+        if not df.empty:
+            # On convertit la première ligne du DataFrame en dictionnaire
+            return df.iloc[0].to_dict()
+    except:
+        pass
+    # Valeurs par défaut si le fichier n'existe pas ou est vide
+    return {"prochaine_vidange": 2450.0, "cible_vidange": 2450.0}
+
+def sauvegarder_params(dict_params):
+    """Sauvegarde les réglages dans params.json sur GitHub"""
+    try:
+        # On transforme le dictionnaire en DataFrame d'une seule ligne pour sauvegarder
+        df = pd.DataFrame([dict_params])
+        sauvegarder_data(df, 'params.json')
+    except Exception as e:
+        st.error(f"Erreur params : {e}")
+
+# --- SÉCURISATION ---
 def charger_data_safe(fichier):
     try:
         data = charger_data(fichier)
@@ -102,6 +129,8 @@ def charger_data_safe(fichier):
     except Exception as e:
         print(f"Erreur sur {fichier}: {e}")
         return pd.DataFrame()
+
+
 # =================================================================
 # --- CONFIGURATION & STYLE ---
 # =================================================================
