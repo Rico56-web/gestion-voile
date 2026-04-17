@@ -245,7 +245,7 @@ if st.session_state.page == "CONTACTS":
             pay_icon = "✅" if pay_status == "PAID" else "⏳"
             pay_color = "#27AE60" if pay_status == "PAID" else "#E67E22"
             
-            # Personnalisation par société
+        # Personnalisation par société
             soc_name = str(row.get('Société', 'PERSO')).upper()
             if soc_name == "CMN":
                 border_col, bg_card, text_soc = "#2980B9", "#EBF5FB", "🔵 CMN"
@@ -253,8 +253,11 @@ if st.session_state.page == "CONTACTS":
                 border_col, bg_card, text_soc = "#27AE60", "#EAFAF1", "🟢 CLICK"
             elif soc_name == "VOG":
                 border_col, bg_card, text_soc = "#8E44AD", "#F5EEF8", "🟣 VOG"
+            elif soc_name == "PERSO":
+                # Jaune vif pour la bordure et jaune très clair pour le fond
+                border_col, bg_card, text_soc = "#F1C40F", "#FEF9E7", "🟡 PERSO"
             else:
-                border_col, bg_card, text_soc = "#7F8C8D", "#FDFEFE", "⚪ PERSO"
+                border_col, bg_card, text_soc = "#7F8C8D", "#FDFEFE", "⚪ " + soc_name
 
             # Affichage de la fiche HTML colorée
             st.markdown(f"""
@@ -262,11 +265,11 @@ if st.session_state.page == "CONTACTS":
                         box-shadow: 4px 4px 10px rgba(0,0,0,0.08); margin-bottom:15px; color: black;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <span style="font-size:1.2rem; font-weight:bold; color:#2C3E50;">{row['Prénom']} {row['Nom']}</span>
-                    <span style="background:{border_col}; color:white; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:bold;">{text_soc}</span>
+                    <span style="background:{border_col}; color:{'black' if soc_name == 'PERSO' else 'white'}; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:bold;">{text_soc}</span>
                 </div>
                 <div style="margin-top:8px; font-size:0.95rem; line-height:1.4;">
                     <b>📅 Date :</b> {row['DateNav']} | <b>👥 Pers :</b> {row['Pers']} | <b>☀️ Jours :</b> {row['Jours']}<br>
-                    <div style="margin-top:5px; padding:5px; background:rgba(255,255,255,0.5); border-radius:5px;">
+                    <div style="margin-top:5px; padding:5px; background:rgba(255,255,255,0.6); border-radius:5px;">
                         <b>💰 Total :</b> {int(p_total)}€ | <b>💸 Acompte :</b> {int(p_aco)}€ | 
                         <b style="color:{'#C0392B' if reste > 0 else '#27AE60'};">⌛ Reste : {int(reste)}€</b>
                     </div>
