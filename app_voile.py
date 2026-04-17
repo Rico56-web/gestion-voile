@@ -257,9 +257,12 @@ if st.session_state.page == "CONTACTS":
         mask = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna()) | (df_c['DateNav'] == "")
         df_c = df_c[mask].copy()
         
-        if search:
-            mask_s = df_c['Nom'].astype(str).str.upper().str.contains(search) | df_c['Prénom'].astype(str).str.upper().str.contains(search)
-            df_c = df_c[mask_s]
+         if search:
+                # Recherche combinée : Nom OU Prénom OU Société
+                mask_s = (df_c['Nom'].astype(str).str.upper().str.contains(search)) | \
+                         (df_c['Prénom'].astype(str).str.upper().str.contains(search)) | \
+                         (df_c['Société'].astype(str).str.upper().str.contains(search))
+                df_c = df_c[mask_s]
 
         # Onglets renommés
         if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
