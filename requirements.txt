@@ -1,7 +1,8 @@
 streamlit
 pandas
 PyGithub
-xlsxwriter.
+xlsxwriter
+openpyxl
 plotly
 requests
 streamlit-calendar
