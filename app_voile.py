@@ -41,7 +41,7 @@ def bouton_export_excel(df, nom_fichier):
     )
 
 # =================================================================
-# --- 1. FONCTIONS DE SÉCURITÉ & GITHUB ---
+# --- 1. FONCTIONS DE SÉCURITÉ, GITHUB & PARAMS ---
 # =================================================================
 
 def clean_num(val, default=0):
@@ -73,6 +73,19 @@ def sauvegarder_data(df, file):
         requests.put(url, headers={"Authorization": f"token {token}"}, 
                      json={"message": f"Update {file}", "content": content_b64, "sha": sha})
     except Exception as e: st.error(f"Erreur sauvegarde {file} : {e}")
+
+# --- NOUVELLES FONCTIONS POUR LA VIDANGE ---
+def charger_params():
+    """Charge les réglages de vidange pour les menus STATS et MAINT"""
+    df = charger_data('params.json')
+    if not df.empty:
+        return df.iloc[0].to_dict()
+    return {"prochaine_vidange": 2450.0, "cible_vidange": 250.0}
+
+def sauvegarder_params(dict_params):
+    """Sauvegarde les réglages moteur"""
+    df = pd.DataFrame([dict_params])
+    sauvegarder_data(df, 'params.json')
 
 def charger_data_safe(fichier):
     df = charger_data(fichier)
