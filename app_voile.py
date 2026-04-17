@@ -13,6 +13,16 @@ if 'log_edit_idx' not in st.session_state:
 # Vous pouvez faire de même pour les autres modes d'édition si vous en avez
 if 'edit_mode' not in st.session_state:
     st.session_state.edit_mode = False
+
+# --- FONCTIONS UTILITAIRES GLOBALES (À mettre au début du fichier) ---
+def to_f(val):
+    if pd.isna(val) or val == "": 
+        return 0.0
+    try: 
+        # Nettoyage complet des caractères monétaires et espaces
+        return float(str(val).replace('€','').replace(' ','').replace(',','.').strip())
+    except: 
+        return 0.0
 # =================================================================
 # --- 1. FONCTIONS DE SÉCURITÉ UNIVERSELLES ---
 # =================================================================
