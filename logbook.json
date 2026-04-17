@@ -37,5 +37,31 @@
         "TotalMil":37.0,
         "H_Voile":6.0,
         "Notes":""
+    },
+    {
+        "Date":"14\/03\/2026",
+        "Navigation":"belle ile",
+        "PortArr":"LE PALAIS",
+        "MotDep":2422.6,
+        "MotArr":2428.7,
+        "TotalMot":6.1,
+        "MilDep":2787.0,
+        "MilArr":2840.0,
+        "TotalMil":53.0,
+        "H_Voile":6.0,
+        "Notes":"avec Pedro et Benoit Couronne"
+    },
+    {
+        "Date":"15\/03\/2026",
+        "Navigation":"belle ile",
+        "PortArr":"Arzon",
+        "MotDep":2428.7,
+        "MotArr":2432.7,
+        "TotalMot":4.0,
+        "MilDep":2840.0,
+        "MilArr":2912.0,
+        "TotalMil":72.0,
+        "H_Voile":6.0,
+        "Notes":"avec Pedro et Benoit Couronne"
     }
 ]
