@@ -954,21 +954,24 @@ if st.session_state.page == "LOG":
     n_etapes = max(1, f_jours - 1)
     
     f_titre = c3.text_input("Destination / Titre")
-
-    # Initialisation dynamique du tableau selon le nombre d'étapes
-    if 'temp_log_df' not in st.session_state or len(st.session_state.temp_log_df) != n_etapes:
-        lignes = []
-        for i in range(n_etapes):
-            lignes.append({
-                "Port": "", 
-                "Mot_Dep": last_h if i == 0 else 0.0, 
-                "Mot_Arr": last_h if i == 0 else 0.0,
-                "Mil_Dep": last_m if i == 0 else 0.0, 
-                "Mil_Arr": last_m if i == 0 else 0.0, 
-                "Voile": 0.0, 
-                "Notes": ""
-            })
+    
+    # --- LOGIQUE DE MISE À JOUR INTELLIGENTE DU TABLEAU ---
+    if 'temp_log_df' not in st.session_state:
+        # Initialisation initiale
+        lignes = [{"Port": "", "Mot_Dep": last_h, "Mot_Arr": last_h, "Mil_Dep": last_m, "Mil_Arr": last_m, "Voile": 0.0, "Notes": ""}]
         st.session_state.temp_log_df = pd.DataFrame(lignes)
+
+    # Si le nombre d'étapes change, on ajuste sans tout effacer
+    current_len = len(st.session_state.temp_log_df)
+    if current_len != n_etapes:
+        if n_etapes > current_len:
+            # On ajoute des lignes vides à la fin
+            for _ in range(n_etapes - current_len):
+                nouvelle_ligne = pd.DataFrame([{"Port": "", "Mot_Dep": 0.0, "Mot_Arr": 0.0, "Mil_Dep": 0.0, "Mil_Arr": 0.0, "Voile": 0.0, "Notes": ""}])
+                st.session_state.temp_log_df = pd.concat([st.session_state.temp_log_df, nouvelle_ligne], ignore_index=True)
+        else:
+            # On retire les lignes en trop à la fin
+            st.session_state.temp_log_df = st.session_state.temp_log_df.iloc[:n_etapes]
 
     # Éditeur de données pour les étapes
     st.info(f"📋 Saisie de {n_etapes} étape(s) pour une croisière de {f_jours} jours.")
