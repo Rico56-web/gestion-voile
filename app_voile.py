@@ -1033,9 +1033,11 @@ if st.session_state.page == "LOG":
         
         # On force la conversion en date pour le tri, les erreurs deviennent NaT (Not a Time)
         df_v['dt'] = pd.to_datetime(df_v['Date'], dayfirst=True, errors='coerce')
-        
-        # On trie : le plus récent en haut, mais on garde tout
-        df_v = df_v.sort_values(by='dt', ascending=False)
+        # On trie par date, et on met les dates non reconnues à la fin
+        df_v = df_v.sort_values(by='dt', ascending=False, na_position='last')     
+        st.write(f"Nombre de lignes trouvées dans le fichier : {len(df_log)}")
+        if not df_log.empty:
+        st.write("Dates présentes :", df_log['Date'].unique())
 
         groupes_affiches = set()
 
