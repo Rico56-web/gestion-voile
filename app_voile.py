@@ -922,25 +922,18 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION SÉCURITÉ ABSOLUE ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION INTÉGRALE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
 
-    # 1. CHARGEMENT ET TRI
+    # 1. CHARGEMENT ET TRI CHRONOLOGIQUE
     df_log = charger_data_safe('logbook.json')
-    
     if not df_log.empty:
-        # Création d'une clé de tri technique (invisible)
-        df_log['dt_sort'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
-        # Tri : Plus récent en haut
-        df_log = df_log.sort_values(by='dt_sort', ascending=False).reset_index(drop=True)
-        
-        # --- LE VERROU ANTI-ISO ---
-        # On force le format FR et on ajoute un préfixe invisible (espace insécable)
-        # Cet espace empêche Streamlit de détecter le type "Date"
-        df_log['Date'] = df_log['dt_sort'].dt.strftime('%d/%m/%Y').apply(lambda x: f" {x}")
-        df_log = df_log.drop(columns=['dt_sort'])
+        # Tri technique pour l'affichage (Plus récent en haut)
+        df_log['dt_tmp'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+        df_log = df_log.sort_values(by='dt_tmp', ascending=False).reset_index(drop=True)
+        df_log = df_log.drop(columns=['dt_tmp'])
 
     # 2. RÉCUPÉRATION DERNIERS COMPTEURS
     last_h, last_m = 0.0, 0.0
@@ -955,13 +948,17 @@ if st.session_state.page == "LOG":
     st.subheader("🚀 Nouvelle Navigation")
     c1, c2, c3 = st.columns([2, 1, 2])
     f_date = c1.date_input("Date", datetime.now())
-    f_jours = c2.number_input("Nombre de jours", min_value=1, value=1, step=1)
+    
+    # Règle : Nombre d'étapes = Jours - 1
+    f_jours = c2.number_input("Nombre de jours", min_value=1, value=2, step=1)
+    n_etapes = max(1, f_jours - 1)
+    
     f_titre = c3.text_input("Destination / Titre")
 
-    # Logique pour générer le nombre de lignes selon f_jours
-    if 'temp_log_df' not in st.session_state or len(st.session_state.temp_log_df) != f_jours:
+    # Initialisation dynamique du tableau selon le nombre d'étapes
+    if 'temp_log_df' not in st.session_state or len(st.session_state.temp_log_df) != n_etapes:
         lignes = []
-        for i in range(int(f_jours)):
+        for i in range(n_etapes):
             lignes.append({
                 "Port": "", 
                 "Mot_Dep": last_h if i == 0 else 0.0, 
@@ -973,23 +970,67 @@ if st.session_state.page == "LOG":
             })
         st.session_state.temp_log_df = pd.DataFrame(lignes)
 
-    # Affichage du tableau de saisie
+    # Éditeur de données pour les étapes
+    st.info(f"📋 Saisie de {n_etapes} étape(s) pour une croisière de {f_jours} jours.")
     edited_steps = st.data_editor(
         st.session_state.temp_log_df,
         column_config={
-            "Port": "📍 Etape", 
+            "Port": "📍 Port d'arrivée / Etape", 
             "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
-            "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr"
+            "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr",
+            "Voile": "⛵ Voile (h)"
         },
-        num_rows="dynamic", 
-        use_container_width=True, 
-        key=f"log_editor_{f_jours}" # Le key change avec f_jours pour forcer le refresh
+        num_rows="dynamic", use_container_width=True, key=f"editor_log_{n_etapes}"
     )
 
-    # 4. AFFICHAGE (VERROUILLÉ)
+    # --- BOUTON ENREGISTRER ---
+    if st.button("💾 ENREGISTRER LA NAVIGATION", type="primary", use_container_width=True):
+        if edited_steps is not None and not edited_steps.empty:
+            nouvelles_entrees = []
+            date_fr = f_date.strftime("%d/%m/%Y")
+            
+            for _, row in edited_steps.iterrows():
+                # On valide uniquement si un Port est saisi
+                if row.get("Port") and str(row.get("Port")).strip() != "":
+                    h_d, h_a = float(row.get("Mot_Dep", 0.0)), float(row.get("Mot_Arr", 0.0))
+                    m_d, m_a = float(row.get("Mil_Dep", 0.0)), float(row.get("Mil_Arr", 0.0))
+                    
+                    nouvelles_entrees.append({
+                        "Date": date_fr,
+                        "Navigation": f_titre,
+                        "PortArr": row.get("Port"),
+                        "MotDep": h_d,
+                        "MotArr": h_a,
+                        "TotalMot": round(h_a - h_d, 2),
+                        "MilDep": m_d,
+                        "MilArr": m_a,
+                        "TotalMil": round(m_a - m_d, 1),
+                        "H_Voile": float(row.get("Voile", 0.0)),
+                        "Notes": row.get("Notes", "")
+                    })
+            
+            if nouvelles_entrees:
+                # Fusion avec l'historique
+                df_final = pd.concat([df_log, pd.DataFrame(nouvelles_entrees)], ignore_index=True)
+                
+                # Tri final par date (plus récent en haut)
+                df_final['tmp'] = pd.to_datetime(df_final['Date'], dayfirst=True, errors='coerce')
+                df_final = df_final.sort_values(by='tmp', ascending=False).reset_index(drop=True)
+                df_final = df_final.drop(columns=['tmp'])
+                
+                sauvegarder_data(df_final, 'logbook.json')
+                
+                # Reset du formulaire et feedback
+                if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
+                st.success(f"✅ {len(nouvelles_entrees)} étape(s) enregistrée(s) !")
+                st.rerun()
+            else:
+                st.warning("⚠️ Veuillez remplir au moins un port d'arrivée pour valider.")
+
+    # 4. AFFICHAGE DE L'HISTORIQUE
     if not df_log.empty:
         st.divider()
-        st.subheader("📜 Historique")
+        st.subheader("📜 Historique des navigations")
         
         df_visu = df_log.copy()
         df_visu.insert(0, 'N°', df_visu.index)
@@ -999,41 +1040,38 @@ if st.session_state.page == "LOG":
             use_container_width=True, 
             hide_index=True,
             column_config={
-                "Date": st.column_config.TextColumn("Date"), # Mode texte pur
+                "Date": st.column_config.TextColumn("Date"),
                 "N°": st.column_config.NumberColumn("N°", format="%d")
             }
         )
 
-        # --- BLOC MODIFIER & SUPPRIMER ---
-        c_mod, c_del = st.columns(2)
-        with c_mod:
-            with st.expander("📝 MODIFIER"):
-                idx_m = st.number_input("Ligne N°", min_value=0, max_value=len(df_log)-1, step=1)
+        # --- OPTIONS DE GESTION (MODIF / SUPPR) ---
+        col_m, col_s = st.columns(2)
+        
+        with col_m:
+            with st.expander("📝 MODIFIER UNE LIGNE"):
+                idx_m = st.number_input("N° à modifier", min_value=0, max_value=len(df_log)-1, step=1)
                 r = df_log.loc[idx_m]
-                with st.form(f"f_mod_{idx_m}"):
-                    # On nettoie la date (on enlève l'espace) pour le calendrier
-                    d_str = str(r['Date']).strip()
-                    try: d_obj = datetime.strptime(d_str, "%d/%m/%Y")
-                    except: d_obj = datetime.now()
-                    
-                    new_d = st.date_input("Date", value=d_obj)
+                with st.form(f"mod_{idx_m}"):
                     new_p = st.text_input("Port", value=r.get('PortArr', ''))
-                    # ... (Autres champs identiques au code précédent)
-                    if st.form_submit_button("VALIDER"):
-                        df_log.at[idx_m, 'Date'] = new_d.strftime("%d/%m/%Y")
+                    new_m_a = st.number_input("Moteur Arr", value=float(r.get('MotArr', 0.0)))
+                    if st.form_submit_button("VALIDER MODIF"):
                         df_log.at[idx_m, 'PortArr'] = new_p
+                        df_log.at[idx_m, 'MotArr'] = new_m_a
+                        df_log.at[idx_m, 'TotalMot'] = round(new_m_a - float(r.get('MotDep', 0.0)), 2)
                         sauvegarder_data(df_log, 'logbook.json')
                         st.rerun()
 
-        with c_del:
+        with col_s:
             with st.expander("🗑️ SUPPRIMER"):
-                opts = [f"{i} : {str(df_log.loc[i, 'Date']).strip()} - {df_log.loc[i, 'PortArr']}" for i in df_log.index]
-                with st.form("f_del"):
-                    sel = st.selectbox("Ligne", opts)
-                    if st.form_submit_button("EFFACER") and st.checkbox("Confirmer"):
-                        df_log = df_log.drop(index=int(sel.split(" : ")[0])).reset_index(drop=True)
-                        sauvegarder_data(df_log, 'logbook.json')
-                        st.rerun()
+                opts = [f"{i}: {df_log.loc[i, 'Date']} - {df_log.loc[i, 'PortArr']}" for i in df_log.index]
+                sel_del = st.selectbox("Ligne à effacer", opts)
+                if st.button("🔥 CONFIRMER SUPPRESSION"):
+                    idx_del = int(sel_del.split(":")[0])
+                    df_log = df_log.drop(index=idx_del).reset_index(drop=True)
+                    sauvegarder_data(df_log, 'logbook.json')
+                    st.rerun()
+
 
 # --- FIN DU FICHIER ---
 
