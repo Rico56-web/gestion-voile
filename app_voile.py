@@ -921,8 +921,8 @@ if st.session_state.page == "ARCHIVES":
     with t1: st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True) 
-# =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - CHRONOLOGIE AUTOMATIQUE ---
+        # =================================================================
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION CORRIGÉE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
@@ -931,13 +931,11 @@ if st.session_state.page == "LOG":
     df_log = charger_data_safe('logbook.json')
     
     if not df_log.empty:
-        # Conversion en vraies dates pour le tri
         df_log['dt_temp'] = pd.to_datetime(df_log['Date'], format='%d/%m/%Y', errors='coerce')
-        # On trie (descending=True pour avoir le plus récent en haut)
         df_log = df_log.sort_values(by='dt_temp', ascending=False).reset_index(drop=True)
         df_log = df_log.drop(columns=['dt_temp'])
 
-    # 2. RÉCUPÉRATION DERNIERS COMPTEURS (Index 0 = le plus récent)
+    # 2. RÉCUPÉRATION DERNIERS COMPTEURS
     last_h, last_m = 0.0, 0.0
     if not df_log.empty:
         last_h = float(df_log.iloc[0].get('MotArr', 0.0))
@@ -965,39 +963,52 @@ if st.session_state.page == "LOG":
         },
         num_rows="dynamic", use_container_width=True, key="log_editor_final"
     )
-        if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
+
+    # --- CORRECTION DE L'INDENTATION ET DES VARIABLES ---
+    if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
         if edited_steps is not None and not edited_steps.empty:
             nouvelles = []
+            date_fr = f_date.strftime("%d/%m/%Y")
+            
             for _, row in edited_steps.iterrows():
                 if row.get("Port"):
-                    # FORCE LE FORMAT ICI
-                    date_fr = f_date.strftime("%d/%m/%Y") 
-                
+                    # On définit les variables AVANT de les utiliser
+                    h_d = float(row.get("Mot_Dep", 0.0))
+                    h_a = float(row.get("Mot_Arr", 0.0))
+                    m_d = float(row.get("Mil_Dep", 0.0))
+                    m_a = float(row.get("Mil_Arr", 0.0))
+                    
                     nouvelles.append({
-                        "Date": date_fr, # Enregistré en texte propre
+                        "Date": date_fr,
                         "Navigation": f_titre,
                         "PortArr": row.get("Port"),
                         "MotDep": h_d,
                         "MotArr": h_a,
-                        "TotalMot": round(h_a - h_d, 2), # CALCUL DURÉE
+                        "TotalMot": round(h_a - h_d, 2),
                         "MilDep": m_d,
                         "MilArr": m_a,
-                        "TotalMil": round(m_a - m_d, 1), # CALCUL MILLES
+                        "TotalMil": round(m_a - m_d, 1),
                         "H_Voile": float(row.get("Voile", 0.0)),
                         "Notes": row.get("Notes", "")
                     })
+            
             if nouvelles:
                 df_final = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
+                # On trie avant de sauver pour garder le plus récent en haut
+                df_final['dt_temp'] = pd.to_datetime(df_final['Date'], format='%d/%m/%Y', errors='coerce')
+                df_final = df_final.sort_values(by='dt_temp', ascending=False).reset_index(drop=True)
+                df_final = df_final.drop(columns=['dt_temp'])
+                
                 sauvegarder_data(df_final, 'logbook.json')
-                if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
+                if 'temp_log_df' in st.session_state: 
+                    del st.session_state.temp_log_df
                 st.rerun()
 
     # 4. AFFICHAGE ET MODIFICATION
     if not df_log.empty:
         st.divider()
-        st.subheader("📜 Historique (Le plus récent en haut)")
+        st.subheader("📜 Historique")
         
-        # On affiche le tableau avec le N° de ligne actuel
         df_visu = df_log.copy()
         df_visu.insert(0, 'N°', df_visu.index)
         st.dataframe(df_visu, use_container_width=True, hide_index=True)
@@ -1028,36 +1039,24 @@ if st.session_state.page == "LOG":
                     df_log.at[idx_m, 'MilDep'] = mi_d
                     df_log.at[idx_m, 'MilArr'] = mi_a
                     df_log.at[idx_m, 'TotalMil'] = round(mi_a - mi_d, 1)
-                    
                     sauvegarder_data(df_log, 'logbook.json')
                     st.rerun()
-                    # --- BLOC SUPPRESSION ULTRA-SÉCURISÉ ---
+
+        # 5. SUPPRESSION
         with st.expander("🗑️ SUPPRIMER UNE LIGNE"):
-            # On crée une liste de labels clairs pour le menu déroulant
             options_suppr = [f"{i} : {df_log.loc[i, 'Date']} - {df_log.loc[i, 'PortArr']}" for i in df_log.index]
-            
             with st.form("delete_form_final"):
                 selection = st.selectbox("Sélectionnez la ligne à supprimer", options_suppr)
-                
-                st.warning("Cette action est irréversible.")
                 confirmer = st.checkbox("Je confirme la suppression")
-                
                 submit_delete = st.form_submit_button("🔥 SUPPRIMER DÉFINITIVEMENT", type="primary")
                 
-                if submit_delete:
-                    if confirmer:
-                        # On récupère l'index réel à partir du texte sélectionné
-                        idx_a_supprimer = int(selection.split(" : ")[0])
-                        
-                        # Suppression chirurgicale
-                        df_log = df_log.drop(index=idx_a_supprimer).reset_index(drop=True)
-                        
-                        # Sauvegarde immédiate
-                        sauvegarder_data(df_log, 'logbook.json')
-                        st.success("Ligne supprimée !")
-                        st.rerun()
-                    else:
-                        st.error("Cochez la case de confirmation.")
+                if submit_delete and confirmer:
+                    idx_a_supprimer = int(selection.split(" : ")[0])
+                    df_log = df_log.drop(index=idx_a_supprimer).reset_index(drop=True)
+                    sauvegarder_data(df_log, 'logbook.json')
+                    st.success("Ligne supprimée !")
+                    st.rerun()
+
 
 # --- FIN DU FICHIER ---
 
