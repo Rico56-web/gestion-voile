@@ -921,86 +921,123 @@ if st.session_state.page == "ARCHIVES":
     with t1: st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True) 
-        # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - ORDRE MANUEL FIXE ---
+# =================================================================
+# --- 12. PAGE LIVRE DE BORD (LOG) - CHRONOLOGIE AUTOMATIQUE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
 
+    # 1. CHARGEMENT ET TRI CHRONOLOGIQUE (Plus récent en haut)
     df_log = charger_data_safe('logbook.json')
+    
+    if not df_log.empty:
+        # Conversion en vraies dates pour le tri
+        df_log['dt_temp'] = pd.to_datetime(df_log['Date'], format='%d/%m/%Y', errors='coerce')
+        # On trie (descending=True pour avoir le plus récent en haut)
+        df_log = df_log.sort_values(by='dt_temp', ascending=False).reset_index(drop=True)
+        df_log = df_log.drop(columns=['dt_temp'])
 
-    # 1. RÉCUPÉRATION DES COMPTEURS (Sur le dernier saisi, l'index le plus haut)
+    # 2. RÉCUPÉRATION DERNIERS COMPTEURS (Index 0 = le plus récent)
     last_h, last_m = 0.0, 0.0
     if not df_log.empty:
-        try:
-            r_last = df_log.iloc[-1]
-            last_h = float(r_last.get('MotArr', 0.0))
-            last_m = float(r_last.get('MilArr', 0.0))
-        except: pass
+        last_h = float(df_log.iloc[0].get('MotArr', 0.0))
+        last_m = float(df_log.iloc[0].get('MilArr', 0.0))
 
-    # 2. BLOC NOUVELLE NAVIGATION (Identique)
+    # 3. SAISIE NOUVELLE NAVIGATION
     st.subheader("🚀 Nouvelle Navigation")
-    # ... [Garder ton bloc de saisie Date / Titre / data_editor ici] ...
+    c1, c2, c3 = st.columns([2, 1, 2])
+    f_date = c1.date_input("Date", datetime.now())
+    f_jours = c2.number_input("Jours", min_value=1, value=1)
+    f_titre = c3.text_input("Destination / Titre")
 
-    # 3. AFFICHAGE DANS L'ORDRE SPÉCIFIQUE : 4, 3, 0, 1, 2
+    if 'temp_log_df' not in st.session_state:
+        st.session_state.temp_log_df = pd.DataFrame([{
+            "Port": "", "Mot_Dep": last_h, "Mot_Arr": last_h,
+            "Mil_Dep": last_m, "Mil_Arr": last_m, "Voile": 0.0, "Notes": ""
+        }])
+
+    edited_steps = st.data_editor(
+        st.session_state.temp_log_df,
+        column_config={
+            "Port": "📍 Etape", 
+            "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
+            "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr"
+        },
+        num_rows="dynamic", use_container_width=True, key="log_editor_final"
+    )
+
+    if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
+        if edited_steps is not None and not edited_steps.empty:
+            nouvelles = []
+            for _, row in edited_steps.iterrows():
+                if row.get("Port"):
+                    h_d, h_a = float(row.get("Mot_Dep", 0.0)), float(row.get("Mot_Arr", 0.0))
+                    m_d, m_a = float(row.get("Mil_Dep", 0.0)), float(row.get("Mil_Arr", 0.0))
+                    nouvelles.append({
+                        "Date": f_date.strftime("%d/%m/%Y"),
+                        "Navigation": f_titre,
+                        "PortArr": row.get("Port"),
+                        "MotDep": h_d,
+                        "MotArr": h_a,
+                        "TotalMot": round(h_a - h_d, 2), # CALCUL DURÉE
+                        "MilDep": m_d,
+                        "MilArr": m_a,
+                        "TotalMil": round(m_a - m_d, 1), # CALCUL MILLES
+                        "H_Voile": float(row.get("Voile", 0.0)),
+                        "Notes": row.get("Notes", "")
+                    })
+            if nouvelles:
+                df_final = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
+                sauvegarder_data(df_final, 'logbook.json')
+                if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
+                st.rerun()
+
+    # 4. AFFICHAGE ET MODIFICATION
     if not df_log.empty:
         st.divider()
-        st.subheader("📜 Historique")
-
-        # --- LOGIQUE D'ORDRE FORCÉ ---
-        # L'ordre demandé de haut en bas : 2, 1, 0, 3, 4
-        ordre_demande = [2, 1, 1, 3, 4]
+        st.subheader("📜 Historique (Le plus récent en haut)")
         
-        # On vérifie quels index existent réellement dans ton fichier
-        index_existants = df_log.index.tolist()
-        ordre_final = [i for i in ordre_demande if i in index_existants]
-        
-        # Si tu as plus de 5 lignes, on ajoute les nouvelles à la suite (en haut)
-        autres_index = [i for i in index_existants if i not in ordre_final]
-        # On place les nouvelles entrées au dessus du bloc 4,3,1,0,2
-        ordre_total = autres_index[::-1] + ordre_final 
+        # On affiche le tableau avec le N° de ligne actuel
+        df_visu = df_log.copy()
+        df_visu.insert(0, 'N°', df_visu.index)
+        st.dataframe(df_visu, use_container_width=True, hide_index=True)
 
-        df_affichage = df_log.reindex(ordre_total)
-        df_affichage.insert(0, 'N°', df_affichage.index)
-
-        st.dataframe(df_affichage, use_container_width=True, hide_index=True)
-
-        # 4. MODIFICATION AVEC CALCULS
-        st.write("---")
         with st.expander("📝 MODIFIER UNE LIGNE"):
-            idx_m = st.number_input("Entrez le N° de ligne (colonne de gauche)", min_value=0, max_value=df_log.index.max(), step=1)
-            if idx_m in df_log.index:
-                r = df_log.loc[idx_m]
-                with st.form(f"mod_manual_{idx_m}"):
-                    c1, c2 = st.columns(2)
-                    m_d = c1.number_input("Compteur Départ", value=float(r.get('MotDep', 0.0)))
-                    m_a = c2.number_input("Compteur Arrivée", value=float(r.get('MotArr', 0.0)))
+            idx_m = st.number_input("Modifier le N°", min_value=0, max_value=len(df_log)-1, step=1)
+            r = df_log.loc[idx_m]
+            
+            with st.form(f"form_mod_chrono_{idx_m}"):
+                c_date, c_port = st.columns(2)
+                ed_date = c_date.text_input("Date (JJ/MM/AAAA)", value=r.get('Date', ''))
+                ed_port = c_port.text_input("Port", value=r.get('PortArr', ''))
+                
+                c1, c2 = st.columns(2)
+                m_d = c1.number_input("Moteur Départ", value=float(r.get('MotDep', 0.0)))
+                m_a = c2.number_input("Moteur Arrivée", value=float(r.get('MotArr', 0.0)))
+                
+                c3, c4 = st.columns(2)
+                mi_d = c3.number_input("Milles Départ", value=float(r.get('MilDep', 0.0)))
+                mi_a = c4.number_input("Milles Arrivée", value=float(r.get('MilArr', 0.0)))
+                
+                if st.form_submit_button("VALIDER LES MODIFICATIONS"):
+                    df_log.at[idx_m, 'Date'] = ed_date
+                    df_log.at[idx_m, 'PortArr'] = ed_port
+                    df_log.at[idx_m, 'MotDep'] = m_d
+                    df_log.at[idx_m, 'MotArr'] = m_a
+                    df_log.at[idx_m, 'TotalMot'] = round(m_a - m_d, 2)
+                    df_log.at[idx_m, 'MilDep'] = mi_d
+                    df_log.at[idx_m, 'MilArr'] = mi_a
+                    df_log.at[idx_m, 'TotalMil'] = round(mi_a - mi_d, 1)
                     
-                    c3, c4 = st.columns(2)
-                    mi_d = c3.number_input("Loch Départ", value=float(r.get('MilDep', 0.0)))
-                    mi_a = c4.number_input("Loch Arrivée", value=float(r.get('MilArr', 0.0)))
-                    
-                    if st.form_submit_button("VALIDER ET RECALCULER"):
-                        df_log.at[idx_m, 'MotDep'] = m_d
-                        df_log.at[idx_m, 'MotArr'] = m_a
-                        df_log.at[idx_m, 'TotalMot'] = round(m_a - m_d, 2)
-                        
-                        df_log.at[idx_m, 'MilDep'] = mi_d
-                        df_log.at[idx_m, 'MilArr'] = mi_a
-                        df_log.at[idx_m, 'TotalMil'] = round(mi_a - mi_d, 1)
-                        
-                        sauvegarder_data(df_log, 'logbook.json')
-                        st.rerun()
-
-        # 5. SUPPRESSION
-        with st.expander("🗑️ SUPPRIMER"):
-            idx_s = st.number_input("N° à supprimer", min_value=0, max_value=df_log.index.max(), step=1, key="del")
-            if st.checkbox("Confirmer"):
-                if st.button("EFFACER DÉFINITIVEMENT"):
-                    df_log = df_log.drop(index=idx_s)
                     sauvegarder_data(df_log, 'logbook.json')
                     st.rerun()
 
+        with st.expander("🗑️ SUPPRIMER"):
+            idx_s = st.number_input("Supprimer le N°", min_value=0, max_value=len(df_log)-1, step=1, key="del")
+            if st.button("🔥 CONFIRMER LA SUPPRESSION"):
+                df_log = df_log.drop(index=idx_s).reset_index(drop=True)
+                sauvegarder_data(df_log, 'logbook.json')
+                st.rerun()
 # --- FIN DU FICHIER ---
 
 
