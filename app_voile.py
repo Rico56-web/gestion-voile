@@ -593,7 +593,7 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
-        # =================================================================
+# =================================================================
 # --- PAGE STATS : COCKPIT VESTA SKIPPER PRO 2026 ---
 # =================================================================
 if st.session_state.page == "STATS":
@@ -604,6 +604,7 @@ if st.session_state.page == "STATS":
     df_arch = charger_data_safe('archives_planning.json')
     df_m = charger_data_safe('maintenance.json') 
     df_log = charger_data_safe('logbook.json')
+    params = charger_params() # Pour la vidange synchronisée
     
     # Fusion actif + archives
     df_all = pd.concat([df_actif, df_arch], ignore_index=True) if not df_arch.empty else df_actif
@@ -651,37 +652,42 @@ if st.session_state.page == "STATS":
         
         col_m_val = 'M_Num' if 'M_Num' in df_m_y.columns else ('Montant' if 'Montant' in df_m_y.columns else None)
         t_maint = sum(to_f(x) for x in df_m_y[col_m_val]) if col_m_val and not df_m_y.empty else 0.0
-        t_gasoil_eur = df_log_y['Cout Gazoil'].sum() if 'Cout Gazoil' in df_log_y.columns else 0.0
+        
+        # Gestion Gazoil (Vérification du nom de colonne dans Logbook)
+        col_gazoil = 'Cout Gazoil' if 'Cout Gazoil' in df_log_y.columns else 'Cout_Gazoil'
+        t_gasoil_eur = df_log_y[col_gazoil].sum() if col_gazoil in df_log_y.columns else 0.0
         total_dep = t_maint + t_gasoil_eur
         
-        # Performance
+        # Performance (Utilisation des bons noms de colonnes)
         t_milles = df_log_y['TotalMil'].sum() if not df_log_y.empty else 0
         t_mot_p = df_log_y['TotalMot'].sum() if not df_log_y.empty else 0
-        t_voile = df_log_y['HVoile'].sum() if not df_log_y.empty else 0
+        t_voile = df_log_y['H_Voile'].sum() if not df_log_y.empty else 0 # FIX KEYERROR
         
         revenu_par_h_moteur = total_ca / t_mot_p if t_mot_p > 0 else 0
         ratio_maintenance = (total_dep / total_ca * 100) if total_ca > 0 else 0
         mille_par_sortie = t_milles / nb_jours if nb_jours > 0 else 0
 
-        # Vidange Synchro (Basé sur tes 13.9h restantes)
-        h_moteur_actuel = df_log_y['TotalMot'].max() if not df_log_y.empty else 0.0
-        prochaine_vidange = h_moteur_actuel + 13.9
-        h_restantes = prochaine_vidange - h_moteur_actuel
+        # Vidange Synchro avec la page MAINT
+        # On récupère le vrai compteur actuel
+        h_moteur_total = pd.to_numeric(df_log['MotArr'], errors='coerce').max() if not df_log.empty else 0.0
+        h_restantes = params.get('prochaine_vidange', 2450.0) - h_moteur_total
 
         # --- C. BILAN SANTÉ ---
         st.markdown("### 🩺 Bilan de Santé")
         b1, b2, b3 = st.columns(3)
         b1.metric("🎯 Rentabilité", f"{min(100, int((total_ca/6500)*100))}%", help="Seuil 6500€")
         indice_eco = (t_voile / (t_mot_p + t_voile) * 100) if (t_mot_p + t_voile) > 0 else 0
-        b2.metric("🌿 Indice Éco", f"{indice_eco:.0f}%")
-        b3.metric("⚙️ Vidange dans", f"{h_restantes:.1f}h", delta=f"Mot: {h_moteur_actuel:.0f}h")
+        b2.metric("🌿 Indice Éco", f"{indice_eco:.0f}%", help="Ratio Voile / (Moteur + Voile)")
+        
+        color_vidange = "normal" if h_restantes > 10 else "inverse"
+        b3.metric("⚙️ Vidange dans", f"{h_restantes:.1f}h", delta=f"Cible: {params.get('prochaine_vidange', 0):.0f}h", delta_color=color_vidange)
 
         # --- D. ANALYSE DE PERFORMANCE ---
         st.write("---")
         st.markdown("### 📈 Performance Opérationnelle")
         p1, p2, p3 = st.columns(3)
-        p1.metric("💎 Rendement/H", f"{revenu_par_h_moteur:.1f} €/h")
-        p2.metric("📉 Poids Frais", f"{ratio_maintenance:.1f} %")
+        p1.metric("💎 Rendement/H", f"{revenu_par_h_moteur:.1f} €/h moteur")
+        p2.metric("📉 Poids Frais", f"{ratio_maintenance:.1f} %", help="Part des dépenses sur le CA")
         p3.metric("📏 Moy. Sortie", f"{mille_par_sortie:.1f} NM")
 
         # --- E. INDICATEURS FINANCIERS ---
@@ -726,7 +732,7 @@ if st.session_state.page == "STATS":
                 df_rep_maint = df_m_y.groupby('Type')[col_m_val].apply(lambda x: sum(to_f(i) for i in x))
                 st.bar_chart(df_rep_maint, horizontal=True, height=200)
 
-        # --- H. TABLEAUX DÉTAILLÉS (TRI RÉCENT EN HAUT) ---
+        # --- H. TABLEAUX DÉTAILLÉS ---
         st.write("---")
         t1, t2 = st.tabs(["💰 Détails CA", "🛠️ Détails Dépenses"])
         
@@ -735,7 +741,7 @@ if st.session_state.page == "STATS":
                 df_final_clean = df_final.sort_values(by='dt_vrai', ascending=False)
                 cols_r = [c for c in ['DateNav', 'Société', 'Prix'] if c in df_final_clean.columns]
                 st.dataframe(df_final_clean[cols_r], use_container_width=True, hide_index=True)
-                st.success(f"**TOTAL RECETTES : {total_ca:,.2f} €** (Moy : {ca_moyen_jour:,.0f}€/j)")
+                st.success(f"**TOTAL RECETTES : {total_ca:,.2f} €**")
         
         with t2:
             if not df_m_y.empty:
@@ -746,9 +752,9 @@ if st.session_state.page == "STATS":
                 st.dataframe(df_m_y_clean[cols_m], use_container_width=True, hide_index=True)
             
             if t_gasoil_eur > 0:
-                df_log_y_clean = df_log_y[df_log_y['Cout Gazoil']>0].sort_values(by='dt_log', ascending=False)
+                df_log_y_clean = df_log_y[df_log_y[col_gazoil]>0].sort_values(by='dt_log', ascending=False)
                 st.write("**⛽ Carburant :**")
-                st.dataframe(df_log_y_clean[['Date', 'PortArr', 'Cout Gazoil']], use_container_width=True, hide_index=True)
+                st.dataframe(df_log_y_clean[['Date', 'PortArr', col_gazoil]], use_container_width=True, hide_index=True)
             
             st.error(f"**TOTAL DÉPENSES : {total_dep:,.2f} €**")
 
