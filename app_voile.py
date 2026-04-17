@@ -1031,28 +1031,34 @@ if st.session_state.page == "LOG":
                     
                     sauvegarder_data(df_log, 'logbook.json')
                     st.rerun()
-# --- BLOC SUPPRESSION SÉCURISÉ ---
+                    # --- BLOC SUPPRESSION ULTRA-SÉCURISÉ ---
         with st.expander("🗑️ SUPPRIMER UNE LIGNE"):
-            with st.form("delete_form"):
-                idx_s = st.number_input("Entrez le N° affiché dans le tableau", 
-                                        min_value=0, 
-                                        max_value=len(df_log)-1, 
-                                        step=1)
+            # On crée une liste de labels clairs pour le menu déroulant
+            options_suppr = [f"{i} : {df_log.loc[i, 'Date']} - {df_log.loc[i, 'PortArr']}" for i in df_log.index]
+            
+            with st.form("delete_form_final"):
+                selection = st.selectbox("Sélectionnez la ligne à supprimer", options_suppr)
                 
-                st.warning(f"Attention, vous allez supprimer la ligne N° {idx_s}")
-                confirmer = st.checkbox("Je confirme la suppression définitive")
+                st.warning("Cette action est irréversible.")
+                confirmer = st.checkbox("Je confirme la suppression")
                 
-                submit_delete = st.form_submit_button("🔥 SUPPRIMER LA LIGNE", type="primary")
+                submit_delete = st.form_submit_button("🔥 SUPPRIMER DÉFINITIVEMENT", type="primary")
                 
                 if submit_delete:
                     if confirmer:
-                        # On supprime la ligne, on réinitialise l'index et on sauvegarde
-                        df_log = df_log.drop(index=idx_s).reset_index(drop=True)
+                        # On récupère l'index réel à partir du texte sélectionné
+                        idx_a_supprimer = int(selection.split(" : ")[0])
+                        
+                        # Suppression chirurgicale
+                        df_log = df_log.drop(index=idx_a_supprimer).reset_index(drop=True)
+                        
+                        # Sauvegarde immédiate
                         sauvegarder_data(df_log, 'logbook.json')
-                        st.success(f"Ligne {idx_s} supprimée avec succès.")
+                        st.success("Ligne supprimée !")
                         st.rerun()
                     else:
-                        st.error("Veuillez cocher la case de confirmation.")
+                        st.error("Cochez la case de confirmation.")
+
 # --- FIN DU FICHIER ---
 
 
