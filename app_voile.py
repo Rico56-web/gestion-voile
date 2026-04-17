@@ -922,7 +922,7 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True) 
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION FINALE INTEGRALE ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION FINALE SÉCURISÉE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.title("📖 Livre de Bord")
@@ -931,15 +931,16 @@ if st.session_state.page == "LOG":
     df_log = charger_data_safe('logbook.json')
     
     if not df_log.empty:
-        # Conversion temporaire pour trier proprement
-        df_log['dt_temp'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+        # On crée une colonne technique de tri pour ne pas toucher à la colonne 'Date' texte
+        df_log['dt_sort'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
         # Tri : plus récent en haut
-        df_log = df_log.sort_values(by='dt_temp', ascending=False).reset_index(drop=True)
-        # On force le format texte FR pour l'affichage et on supprime la colonne tempo
-        df_log['Date'] = df_log['dt_temp'].dt.strftime('%d/%m/%Y')
-        df_log = df_log.drop(columns=['dt_temp'])
+        df_log = df_log.sort_values(by='dt_sort', ascending=False).reset_index(drop=True)
+        # On s'assure que 'Date' est bien du texte formaté (JJ/MM/AAAA)
+        df_log['Date'] = df_log['dt_sort'].dt.strftime('%d/%m/%Y').astype(str)
+        # On supprime la colonne technique
+        df_log = df_log.drop(columns=['dt_sort'])
 
-    # 2. RÉCUPÉRATION DERNIERS COMPTEURS (Index 0 = Haut de liste)
+    # 2. RÉCUPÉRATION DERNIERS COMPTEURS
     last_h, last_m = 0.0, 0.0
     if not df_log.empty:
         try:
@@ -968,7 +969,7 @@ if st.session_state.page == "LOG":
             "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
             "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr"
         },
-        num_rows="dynamic", use_container_width=True, key="log_vfinal_2026"
+        num_rows="dynamic", use_container_width=True, key="log_final_v1"
     )
 
     if st.button("💾 ENREGISTRER LA NAVIGATION", type="primary", use_container_width=True):
@@ -982,7 +983,7 @@ if st.session_state.page == "LOG":
                     m_d, m_a = float(row.get("Mil_Dep", 0.0)), float(row.get("Mil_Arr", 0.0))
                     
                     nouvelles.append({
-                        "Date": date_fr,
+                        "Date": str(date_fr), # On force en String pur
                         "Navigation": f_titre,
                         "PortArr": row.get("Port"),
                         "MotDep": h_d,
@@ -997,9 +998,10 @@ if st.session_state.page == "LOG":
             
             if nouvelles:
                 df_final = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
-                # Re-tri avant sauvegarde pour maintenir l'ordre
+                # Re-tri avant sauvegarde
                 df_final['dt_temp'] = pd.to_datetime(df_final['Date'], dayfirst=True, errors='coerce')
                 df_final = df_final.sort_values(by='dt_temp', ascending=False).reset_index(drop=True)
+                df_final['Date'] = df_final['dt_temp'].dt.strftime('%d/%m/%Y').astype(str)
                 df_final = df_final.drop(columns=['dt_temp'])
                 
                 sauvegarder_data(df_final, 'logbook.json')
@@ -1013,7 +1015,17 @@ if st.session_state.page == "LOG":
         
         df_visu = df_log.copy()
         df_visu.insert(0, 'N°', df_visu.index)
-        st.dataframe(df_visu, use_container_width=True, hide_index=True)
+        
+        # PROTECTION CRITIQUE : On force l'affichage en mode TEXTE
+        st.dataframe(
+            df_visu, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "Date": st.column_config.TextColumn("Date"), # Interdit le format ISO
+                "N°": st.column_config.NumberColumn("N°", format="%d")
+            }
+        )
 
         col_m, col_s = st.columns(2)
 
@@ -1023,7 +1035,6 @@ if st.session_state.page == "LOG":
                 r = df_log.loc[idx_m]
                 
                 with st.form(f"mod_form_{idx_m}"):
-                    # Conversion pour le calendrier du formulaire
                     try:
                         d_obj = datetime.strptime(str(r.get('Date')), "%d/%m/%Y")
                     except:
@@ -1055,6 +1066,7 @@ if st.session_state.page == "LOG":
 
         with col_s:
             with st.expander("🗑️ SUPPRIMER"):
+                # On utilise la date texte telle quelle pour la sélection
                 options_suppr = [f"{i} : {df_log.loc[i, 'Date']} - {df_log.loc[i, 'PortArr']}" for i in df_log.index]
                 with st.form("del_form"):
                     sel = st.selectbox("Ligne à supprimer", options_suppr)
@@ -1065,6 +1077,7 @@ if st.session_state.page == "LOG":
                             df_log = df_log.drop(index=idx_del).reset_index(drop=True)
                             sauvegarder_data(df_log, 'logbook.json')
                             st.rerun()
+
 
 # --- FIN DU FICHIER ---
 
