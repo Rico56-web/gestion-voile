@@ -954,16 +954,17 @@ if st.session_state.page == "ARCHIVES":
     with t1: st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
-        # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION OPTIMISÉE ---
+
+# =================================================================
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION CROISIÈRE ---
 # =================================================================
 if st.session_state.page == "LOG":
-    st.title("📖 Livre de Bord")
+    st.markdown('<div style="text-align:center; background-color:#1a2a6c; color:white; padding:10px; border-radius:10px;"><h1>📖 Livre de Bord</h1></div>', unsafe_allow_html=True)
 
     # 1. CHARGEMENT DES DONNÉES
     df_log = charger_data_safe('logbook.json')
     
-    # 2. RÉCUPÉRATION DES DERNIERS COMPTEURS (MAXIMUM HISTORIQUE)
+    # 2. RÉCUPÉRATION DES DERNIERS COMPTEURS
     last_h, last_m = 0.0, 0.0
     if not df_log.empty:
         try:
@@ -971,70 +972,58 @@ if st.session_state.page == "LOG":
             last_m = float(df_log['MilArr'].max())
         except: pass
 
-    # 3. FORMULAIRE NOUVELLE NAVIGATION (EXTENSIBLE)
-    # Utilisation d'un expander pour pouvoir fermer le formulaire si non utilisé
-    with st.expander("🚀 Nouvelle Navigation", expanded=False):
+    # 3. FORMULAIRE NOUVELLE NAVIGATION
+    with st.expander("🚀 Enregistrer une Navigation", expanded=False):
         c1, c2, c3 = st.columns([2, 1, 2])
         f_date = c1.date_input("Date de départ", datetime.now())
         f_jours = c2.number_input("Nombre de jours", min_value=1, value=1, step=1)
-        f_titre = c3.text_input("Destination / Titre")
-
-        f_notes = st.text_area("Notes de navigation (Optionnel)", height=80)
+        f_titre = c3.text_input("Destination / Nom de la croisière")
+        f_notes = st.text_area("Notes de navigation", height=70)
 
         n_lignes = int(f_jours)
 
-        # Initialisation : On vide tout sauf les départs de la ligne 1 et les dates
         if 'temp_log_df' not in st.session_state or len(st.session_state.temp_log_df) != n_lignes:
             lignes = []
             for i in range(n_lignes):
                 date_etape = (f_date + timedelta(days=i)).strftime("%d/%m/%Y")
                 lignes.append({
-                    "Date": date_etape,
-                    "Port": "", 
-                    "Mot_Dep": last_h if i == 0 else 0.0, 
-                    "Mot_Arr": 0.0,  # Toujours à 0 à l'ouverture
-                    "Mil_Dep": last_m if i == 0 else 0.0, 
-                    "Mil_Arr": 0.0,  # Toujours à 0 à l'ouverture
-                    "Voile": 0.0
+                    "Date": date_etape, "Port": "", 
+                    "Mot_Dep": last_h if i == 0 else 0.0, "Mot_Arr": 0.0, 
+                    "Mil_Dep": last_m if i == 0 else 0.0, "Mil_Arr": 0.0, "Voile": 0.0
                 })
             st.session_state.temp_log_df = pd.DataFrame(lignes)
         else:
-            # Met à jour les dates si la date de départ change
             for i in range(len(st.session_state.temp_log_df)):
                 st.session_state.temp_log_df.at[i, "Date"] = (f_date + timedelta(days=i)).strftime("%d/%m/%Y")
 
-        # Éditeur de données
         edited_steps = st.data_editor(
             st.session_state.temp_log_df,
             column_config={
                 "Date": st.column_config.TextColumn("Date", disabled=True),
-                "Port": "📍 Port d'arrivée", 
-                "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
-                "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr",
-                "Voile": "⛵ Voile (h)"
+                "Port": "📍 Arrivée", "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
+                "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr", "Voile": "⛵ Voile"
             },
             num_rows="dynamic", use_container_width=True, key="log_editor_v2026"
         )
 
-        c_save, c_reset = st.columns([4, 1])
-        if c_save.button("💾 ENREGISTRER LA NAVIGATION", type="primary", use_container_width=True):
+        if st.button("💾 ENREGISTRER TOUTE LA NAVIGATION", type="primary", use_container_width=True):
             if edited_steps is not None and not edited_steps.empty:
                 nouvelles = []
                 for i, row in edited_steps.iterrows():
                     if row.get("Port"):
                         h_d, h_a = float(row.get("Mot_Dep", 0.0)), float(row.get("Mot_Arr", 0.0))
                         m_d, m_a = float(row.get("Mil_Dep", 0.0)), float(row.get("Mil_Arr", 0.0))
-                        
                         nouvelles.append({
                             "Date": row.get("Date"),
-                            "Navigation": f_titre,
+                            "Navigation": f_titre or "Navigation libre",
                             "PortArr": row.get("Port"),
                             "MotDep": h_d, "MotArr": h_a,
                             "TotalMot": round(h_a - h_d, 2),
                             "MilDep": m_d, "MilArr": m_a,
                             "TotalMil": round(m_a - m_d, 1),
                             "H_Voile": float(row.get("Voile", 0.0)),
-                            "Notes": f_notes
+                            "Notes": f_notes,
+                            "Jours": n_lignes  # On stocke l'info ici pour la différenciation
                         })
                 
                 if nouvelles:
@@ -1043,57 +1032,67 @@ if st.session_state.page == "LOG":
                     if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
                     st.rerun()
 
-        if c_reset.button("🗑️ VIDER", use_container_width=True):
-            if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
-            st.rerun()
-
-    # 4. AFFICHAGE DE L'HISTORIQUE
+    # 4. AFFICHAGE DE L'HISTORIQUE EN FICHES VISUELLES
     if not df_log.empty:
         st.divider()
-        st.subheader("📜 Historique")
-        
-        # Tri pour affichage (plus récent en haut)
         df_visu = df_log.copy()
         df_visu['dt_sort'] = pd.to_datetime(df_visu['Date'], dayfirst=True, errors='coerce')
-        df_visu = df_visu.sort_values(by='dt_sort', ascending=False).reset_index(drop=True)
-        df_visu.insert(0, 'N°', df_visu.index)
-        
-        st.dataframe(df_visu.drop(columns=['dt_sort']), use_container_width=True, hide_index=True)
+        df_visu = df_visu.sort_values(by='dt_sort', ascending=False)
 
-        # 5. MODIFICATION ET SUPPRESSION
-        with st.expander("📝 GÉRER L'HISTORIQUE (Modifier / Supprimer)"):
-            idx_m = st.number_input("Sélectionner N°", min_value=0, max_value=len(df_visu)-1, step=1)
-            r = df_visu.loc[idx_m]
+        for idx, row in df_visu.iterrows():
+            n_j = int(row.get('Jours', 1))
             
-            with st.form(f"edit_form_{idx_m}"):
-                col1, col2 = st.columns(2)
-                e_date = col1.text_input("Date", value=r['Date'])
-                e_port = col2.text_input("Port d'arrivée", value=r['PortArr'])
-                
-                c_m1, c_m2, c_v = st.columns(3)
-                e_md = c_m1.number_input("Moteur Dép", value=float(r['MotDep']))
-                e_ma = c_m2.number_input("Moteur Arr", value=float(r['MotArr']))
-                e_vo = c_v.number_input("H Voile", value=float(r['H_Voile']))
-                
-                e_not = st.text_area("Notes", value=r['Notes'])
-                
-                c_btn1, c_btn2 = st.columns(2)
-                if c_btn1.form_submit_button("💾 SAUVEGARDER"):
-                    df_log.at[idx_m, 'Date'] = e_date
-                    df_log.at[idx_m, 'PortArr'] = e_port
-                    df_log.at[idx_m, 'MotDep'] = e_md
-                    df_log.at[idx_m, 'MotArr'] = e_ma
-                    df_log.at[idx_m, 'H_Voile'] = e_vo
-                    df_log.at[idx_m, 'Notes'] = e_not
-                    sauvegarder_data(df_log, 'logbook.json')
-                    st.rerun()
-                
-                if c_btn2.form_submit_button("🗑️ SUPPRIMER CETTE LIGNE"):
-                    df_log = df_log.drop(index=idx_m).reset_index(drop=True)
-                    sauvegarder_data(df_log, 'logbook.json')
-                    st.rerun()
+            # --- STYLE ET COULEUR ---
+            if n_j > 1:
+                bg_color = "#f0f4f8"  # Bleu croisière
+                border_c = "#1a2a6c"
+                badge = f"🚢 CROISIÈRE • {n_j} JOURS"
+                # Calcul de la plage de dates
+                try:
+                    d_start = datetime.strptime(row['Date'], "%d/%m/%Y")
+                    d_end = d_start + timedelta(days=n_j-1)
+                    date_txt = f"Du {d_start.strftime('%d/%m')} au {d_end.strftime('%d/%m/%Y')}"
+                except: date_txt = row['Date']
+            else:
+                bg_color = "#ffffff"
+                border_c = "#bdc3c7"
+                badge = "⚓ SORTIE JOURNÉE"
+                date_txt = row['Date']
 
+            # --- RENDU DE LA FICHE ---
+            st.markdown(f"""
+                <div style="background:{bg_color}; border-left: 6px solid {border_c}; 
+                            padding: 15px; border-radius: 8px; margin-bottom: 12px; 
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-top: 1px solid #eee; border-right: 1px solid #eee; border-bottom: 1px solid #eee;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="color:{border_c}; font-weight: bold; font-size: 0.8rem; letter-spacing: 1px;">{badge}</span>
+                        <span style="font-size: 0.9rem; font-weight: bold;">📍 Arrivée : {row['PortArr']}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                        <div>
+                            <span style="font-size: 1.2rem; font-weight: bold; color: #2c3e50;">{date_txt}</span><br>
+                            <i style="color: #7f8c8d;">{row['Navigation']}</i>
+                        </div>
+                        <div style="text-align: right; min-width: 100px;">
+                            <span style="font-size: 1.3rem; font-weight: bold; color: #2ecc71;">{row['TotalMil']} <small>NM</small></span><br>
+                            <span style="font-size: 0.9rem; color: #34495e;">⚙️ {row['TotalMot']}h mot.</span>
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
+        # 5. GESTION ADMINISTRATIVE (MODIFIER/SUPPRIMER)
+        with st.expander("🛠️ Administration de l'historique"):
+            df_admin = df_visu.copy()
+            df_admin.insert(0, 'ID', df_admin.index)
+            st.dataframe(df_admin[['ID', 'Date', 'PortArr', 'TotalMil']], use_container_width=True, hide_index=True)
+            
+            sel_id = st.number_input("Entrer l'ID pour modifier/supprimer", min_value=0, max_value=int(df_admin.index.max()), step=1)
+            
+            if st.button("🗑️ SUPPRIMER CETTE LIGNE", use_container_width=True):
+                df_log = df_log.drop(index=sel_id).reset_index(drop=True)
+                sauvegarder_data(df_log, 'logbook.json')
+                st.rerun()
 
 
 
