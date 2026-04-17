@@ -1032,7 +1032,7 @@ if st.session_state.page == "LOG":
                     if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
                     st.rerun()
 
-    # 4. AFFICHAGE DE L'HISTORIQUE EN FICHES VISUELLES
+    # 4. AFFICHAGE DE L'HISTORIQUE (DISTINCTION VISUELLE FORTE)
     if not df_log.empty:
         st.divider()
         df_visu = df_log.copy()
@@ -1042,44 +1042,53 @@ if st.session_state.page == "LOG":
         for idx, row in df_visu.iterrows():
             n_j = int(row.get('Jours', 1))
             
-            # --- STYLE ET COULEUR ---
             if n_j > 1:
-                bg_color = "#f0f4f8"  # Bleu croisière
-                border_c = "#1a2a6c"
-                badge = f"🚢 CROISIÈRE • {n_j} JOURS"
-                # Calcul de la plage de dates
+                # --- AFFICHAGE "CROISIÈRE" (Grande Fiche) ---
                 try:
                     d_start = datetime.strptime(row['Date'], "%d/%m/%Y")
                     d_end = d_start + timedelta(days=n_j-1)
                     date_txt = f"Du {d_start.strftime('%d/%m')} au {d_end.strftime('%d/%m/%Y')}"
                 except: date_txt = row['Date']
-            else:
-                bg_color = "#ffffff"
-                border_c = "#bdc3c7"
-                badge = "⚓ SORTIE JOURNÉE"
-                date_txt = row['Date']
 
-            # --- RENDU DE LA FICHE ---
-            st.markdown(f"""
-                <div style="background:{bg_color}; border-left: 6px solid {border_c}; 
-                            padding: 15px; border-radius: 8px; margin-bottom: 12px; 
-                            box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-top: 1px solid #eee; border-right: 1px solid #eee; border-bottom: 1px solid #eee;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <span style="color:{border_c}; font-weight: bold; font-size: 0.8rem; letter-spacing: 1px;">{badge}</span>
-                        <span style="font-size: 0.9rem; font-weight: bold;">📍 Arrivée : {row['PortArr']}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: flex-end;">
-                        <div>
-                            <span style="font-size: 1.2rem; font-weight: bold; color: #2c3e50;">{date_txt}</span><br>
-                            <i style="color: #7f8c8d;">{row['Navigation']}</i>
+                st.markdown(f"""
+                    <div style="background:#1a2a6c; color:white; padding:15px; border-radius:10px; margin-bottom:15px; border-left: 10px solid #f1c40f;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="letter-spacing: 2px; font-weight: bold;">🚢 CROISIÈRE DE {n_j} JOURS</span>
+                            <span style="background:#f1c40f; color:#1a2a6c; padding:2px 10px; border-radius:15px; font-weight:bold; font-size:0.8rem;">ID: {idx}</span>
                         </div>
-                        <div style="text-align: right; min-width: 100px;">
-                            <span style="font-size: 1.3rem; font-weight: bold; color: #2ecc71;">{row['TotalMil']} <small>NM</small></span><br>
-                            <span style="font-size: 0.9rem; color: #34495e;">⚙️ {row['TotalMot']}h mot.</span>
+                        <div style="margin-top:10px; display: flex; justify-content: space-between;">
+                            <div>
+                                <span style="font-size: 1.4rem; font-weight: bold;">{date_txt}</span><br>
+                                <span style="font-size: 1.1rem; opacity: 0.9;">📍 Arrivée : {row['PortArr']}</span><br>
+                                <i style="font-size: 0.9rem; opacity: 0.7;">{row['Navigation']}</i>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="font-size: 1.8rem; font-weight: bold; color: #f1c40f;">{row['TotalMil']} NM</span><br>
+                                <span style="font-size: 1rem;">⚙️ {row['TotalMot']}h moteur</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+            
+            else:
+                # --- AFFICHAGE "SORTIE JOURNÉE" (Ligne Simple Compacte) ---
+                st.markdown(f"""
+                    <div style="background:white; border:1px solid #dee2e6; padding:8px 15px; border-radius:5px; margin-bottom:5px; display: flex; justify-content: space-between; align-items:center;">
+                        <div style="flex: 1; border-right: 2px solid #eee;">
+                            <b style="color:#2c3e50;">{row['Date']}</b>
+                        </div>
+                        <div style="flex: 2; padding-left:15px;">
+                            <span style="font-weight:bold;">⚓ {row['PortArr']}</span> 
+                            <span style="color:#7f8c8d; font-size:0.8rem; margin-left:10px;">({row['Navigation']})</span>
+                        </div>
+                        <div style="flex: 1; text-align: right; font-weight: bold; color:#27ae60;">
+                            {row['TotalMil']} NM
+                        </div>
+                        <div style="margin-left:15px; background:#f8f9fa; padding:2px 8px; border-radius:4px; font-size:0.7rem; color:#95a5a6;">
+                            ID: {idx}
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
 
         # 5. GESTION ADMINISTRATIVE (MODIFIER/SUPPRIMER)
         with st.expander("🛠️ Administration de l'historique"):
