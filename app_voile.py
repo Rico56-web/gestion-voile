@@ -1027,39 +1027,43 @@ if st.session_state.page == "LOG":
                 if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
                     
                 st.rerun()
-     # 3. AFFICHAGE DE L'HISTORIQUE (VERSION ROBUSTE - TOUTES DONNÉES)
+     # 3. AFFICHAGE DE L'HISTORIQUE (GROUPEMENT INTELLIGENT)
     if not df_log.empty:
         st.divider()
         df_v = df_log.copy()
-        
-        # Conversion des dates pour le tri (plus récent en haut)
         df_v['dt'] = pd.to_datetime(df_v['Date'], dayfirst=True, errors='coerce')
         df_v = df_v.sort_values(by='dt', ascending=False)
 
-        groupes_affiches = set()
+        groupes_vus = set()
 
         for idx, row in df_v.iterrows():
-            # On récupère l'ID de groupe s'il existe, sinon on met None
             gid = row.get('Group_ID')
-            # On vérifie si c'est vraiment un ID (pas NaN, pas vide)
-            has_group = pd.notna(gid) and str(gid).strip() != "" and str(gid).lower() != "none"
+            nav_nom = str(row.get('Navigation', '')).strip()
             
-            # --- CAS 1 : C'EST UNE CROISIÈRE LIÉE ---
-            if has_group:
-                if gid in groupes_affiches: 
-                    continue # On saute si déjà affiché
+            # --- LOGIQUE DE GROUPEMENT ---
+            # On groupe si on a un Group_ID OU si le nom de navigation est identique aux voisins
+            if (pd.notna(gid) and str(gid).lower() != "none") or (nav_nom != "" and nav_nom.lower() != "navigation"):
                 
-                group_data = df_v[df_v['Group_ID'] == gid].sort_values(by='dt')
-                if not group_data.empty:
+                # On définit le critère de groupe (ID ou Nom)
+                if pd.notna(gid) and str(gid).lower() != "none":
+                    group_data = df_v[df_v['Group_ID'] == gid].sort_values(by='dt')
+                    id_check = gid
+                else:
+                    group_data = df_v[df_v['Navigation'] == nav_nom].sort_values(by='dt')
+                    id_check = nav_nom
+                
+                if id_check in groupes_vus: continue
+                
+                # Si le groupe a plus d'une ligne, on affiche le bloc bleu
+                if len(group_data) > 1:
                     total_m = group_data['TotalMil'].sum()
-                    n_j = len(group_data)
                     itineraire = " → ".join(group_data['PortArr'].astype(str))
                     
                     st.markdown(f"""
                         <div style="background:#eef2f7; color:#2c3e50; padding:15px; border-radius:10px; margin-bottom:12px; border-left: 8px solid #3498db; border: 1px solid #d1d9e6;">
                             <div style="display:flex; justify-content:space-between; font-size:0.8rem; font-weight:bold; color:#5d6d7e;">
-                                <span>🚢 CROISIÈRE • {n_j} JOURS</span>
-                                <span>{group_data.iloc[0].get('Navigation', 'Voyage')}</span>
+                                <span>🚢 NAVIGATION GROUPÉE • {len(group_data)} JOURS</span>
+                                <span>{nav_nom}</span>
                             </div>
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
                                 <div>
@@ -1072,10 +1076,11 @@ if st.session_state.page == "LOG":
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
-                    groupes_affiches.add(gid)
+                    groupes_vus.add(id_check)
+                    continue # On passe à la suite
 
-            # --- CAS 2 : TOUT LE RESTE (Tes 10 lignes de février/mars) ---
-            else:
+            # --- AFFICHAGE SORTIE SIMPLE (Si pas de groupe ou 1 seule ligne) ---
+            if idx not in [i for g in [df_v[df_v['Group_ID'] == v].index if pd.notna(v) else [] for v in groupes_vus] for i in g]:
                 st.markdown(f"""
                     <div style="background:white; border:1px solid #dee2e6; padding:10px 15px; border-radius:5px; margin-bottom:5px; display: flex; justify-content: space-between; align-items:center;">
                         <div style="width: 100px; border-right: 2px solid #f2f2f2;">
@@ -1083,7 +1088,7 @@ if st.session_state.page == "LOG":
                         </div>
                         <div style="flex: 2; padding-left:15px;">
                             <span style="font-weight:bold;">⚓ {row['PortArr']}</span> 
-                            <span style="color:#7f8c8d; font-size:0.8rem; margin-left:10px;">({row.get('Navigation', '')})</span>
+                            <span style="color:#7f8c8d; font-size:0.8rem; margin-left:10px;">({nav_nom})</span>
                         </div>
                         <div style="width: 80px; text-align: right; font-weight: bold; color:#27ae60;">
                             {row['TotalMil']} NM
