@@ -231,7 +231,6 @@ if st.session_state.page == "CONTACTS":
             tri_ordre = True
 
         df_aff = df_c[mask_aff].copy().sort_values(by='dt_sort', ascending=tri_ordre)
-
         # --- BOUCLE D'AFFICHAGE DES FICHES ---
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
@@ -241,39 +240,52 @@ if st.session_state.page == "CONTACTS":
             p_aco = to_f(row.get('Acompte', 0))
             reste = p_total - p_aco
             
-            # Personnalisation par société (Couleur & Fond)
+            # Gestion des couleurs et icônes de paiement
+            pay_status = str(row.get('Paiement', 'Unpaid')).upper()
+            pay_icon = "✅" if pay_status == "PAID" else "⏳"
+            pay_color = "#27AE60" if pay_status == "PAID" else "#E67E22"
+            
+            # Personnalisation par société
             soc_name = str(row.get('Société', 'PERSO')).upper()
-            border_col = "#3498DB" if soc_name == "CMN" else "#2ECC71" if soc_name == "CLICK" else "#95A5A6"
-            bg_card = "#EBF5FB" if soc_name == "CMN" else "white"
+            if soc_name == "CMN":
+                border_col, bg_card, text_soc = "#2980B9", "#EBF5FB", "🔵 CMN"
+            elif soc_name == "CLICK":
+                border_col, bg_card, text_soc = "#27AE60", "#EAFAF1", "🟢 CLICK"
+            elif soc_name == "VOG":
+                border_col, bg_card, text_soc = "#8E44AD", "#F5EEF8", "🟣 VOG"
+            else:
+                border_col, bg_card, text_soc = "#7F8C8D", "#FDFEFE", "⚪ PERSO"
 
-            # Affichage de la fiche HTML
+            # Affichage de la fiche HTML colorée
             st.markdown(f"""
-            <div style="background:{bg_card}; padding:15px; border-radius:10px; border-left:8px solid {border_col}; 
-                        box-shadow: 2px 2px 5px rgba(0,0,0,0.1); margin-bottom:10px; color: black;">
-                <div style="display:flex; justify-content:space-between;">
-                    <span style="font-size:1.1rem; font-weight:bold;">{row['Prénom']} {row['Nom']}</span>
-                    <span style="background:{border_col}; color:white; padding:2px 8px; border-radius:5px; font-size:0.8rem; font-weight:bold;">{soc_name}</span>
+            <div style="background:{bg_card}; padding:15px; border-radius:12px; border-left:10px solid {border_col}; 
+                        box-shadow: 4px 4px 10px rgba(0,0,0,0.08); margin-bottom:15px; color: black;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:1.2rem; font-weight:bold; color:#2C3E50;">{row['Prénom']} {row['Nom']}</span>
+                    <span style="background:{border_col}; color:white; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:bold;">{text_soc}</span>
                 </div>
-                <div style="margin-top:5px; font-size:0.9rem;">
+                <div style="margin-top:8px; font-size:0.95rem; line-height:1.4;">
                     <b>📅 Date :</b> {row['DateNav']} | <b>👥 Pers :</b> {row['Pers']} | <b>☀️ Jours :</b> {row['Jours']}<br>
-                    <b>💰 Total :</b> {int(p_total)}€ | <b>💸 Acompte :</b> {int(p_aco)}€ | 
-                    <b style="color:{'red' if reste > 0 else 'green'};">⌛ Reste : {int(reste)}€</b><br>
-                    <hr style="margin:8px 0; border: 0.5px solid #eee;">
-                    <i>📝 {row['Notes']}</i>
+                    <div style="margin-top:5px; padding:5px; background:rgba(255,255,255,0.5); border-radius:5px;">
+                        <b>💰 Total :</b> {int(p_total)}€ | <b>💸 Acompte :</b> {int(p_aco)}€ | 
+                        <b style="color:{'#C0392B' if reste > 0 else '#27AE60'};">⌛ Reste : {int(reste)}€</b>
+                    </div>
+                    <div style="margin-top:5px; font-weight:bold; color:{pay_color};">
+                        {pay_icon} Statut : {pay_status}
+                    </div>
+                    <hr style="margin:10px 0; border: 0.5px solid rgba(0,0,0,0.1);">
+                    <i style="color:#566573;">📝 {row['Notes']}</i>
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # --- BOUTONS D'ACTION PAR FICHE ---
+            # --- BOUTONS D'ACTION ---
             c1, c2, c3 = st.columns([1, 1, 1])
-            
-            # Bouton Édition
             if c1.button("✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx
                 st.session_state.page = "MODIFIER_CONTACT"
                 st.rerun()
 
-            # Système de Suppression avec Confirmation
             if f"confirm_del_{idx}" not in st.session_state:
                 if c2.button("🗑️ SUPPRIMER", key=f"del_{idx}", use_container_width=True):
                     st.session_state[f"confirm_del_{idx}"] = True
@@ -290,7 +302,6 @@ if st.session_state.page == "CONTACTS":
                     del st.session_state[f"confirm_del_{idx}"]
                     st.rerun()
             
-            # Bouton de clôture rapide (Uniquement pour "En cours")
             if st.session_state.vue_contact == "En cours":
                 if c3.button("🏁 FINIR", key=f"fin_{idx}", use_container_width=True):
                     df_all = charger_data('contacts.json')
