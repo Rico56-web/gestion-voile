@@ -6,87 +6,61 @@ import urllib.parse
 from datetime import datetime, date, timedelta
 import calendar
 
-# --- INITIALISATION DU SESSION STATE (Ménage de début de script) ---
+# --- INITIALISATION DU SESSION STATE ---
 if 'log_edit_idx' not in st.session_state:
     st.session_state.log_edit_idx = None
-
-# Vous pouvez faire de même pour les autres modes d'édition si vous en avez
 if 'edit_mode' not in st.session_state:
     st.session_state.edit_mode = False
+if 'page' not in st.session_state: 
+    st.session_state.page = "CONTACTS"
 
-# --- FONCTIONS UTILITAIRES GLOBALES (À mettre au début du fichier) ---
+# --- FONCTIONS UTILITAIRES GLOBALES ---
 def to_f(val):
     if pd.isna(val) or val == "": 
         return 0.0
     try: 
-        # Nettoyage complet des caractères monétaires et espaces
         return float(str(val).replace('€','').replace(' ','').replace(',','.').strip())
     except: 
         return 0.0
+
+def bouton_export_excel(df, nom_fichier):
+    """Fonction standardisée pour l'archivage et l'export Excel"""
+    if df.empty:
+        return st.warning(f"Aucune donnée à exporter pour {nom_fichier}")
+    
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+    
+    st.download_button(
+        label=f"📊 EXPORTER {nom_fichier.upper()} (EXCEL)",
+        data=buffer.getvalue(),
+        file_name=f"Vesta_{nom_fichier}_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
+
 # =================================================================
-# --- 1. FONCTIONS DE SÉCURITÉ UNIVERSELLES ---
+# --- 1. FONCTIONS DE SÉCURITÉ & GITHUB ---
 # =================================================================
 
 def clean_num(val, default=0):
-    """Nettoie les prix et nombres (gère €, espaces et nan)"""
     try:
-        if pd.isna(val) or str(val).lower() in ["nan", "", "none"]: 
-            return default
-        # Nettoyage des caractères parasites
+        if pd.isna(val) or str(val).lower() in ["nan", "", "none"]: return default
         clean_val = str(val).replace('€','').replace(' ','').replace(',','.').strip()
         return int(float(clean_val))
-    except:
-        return default
-
-def clean_text(val):
-    """Nettoie les textes et évite les injections HTML dans les notes"""
-    if val is None or pd.isna(val): return ""
-    v = str(val).replace('nan', '').replace('None', '').strip()
-    if "<div" in v or "<a " in v: 
-        return "Note à corriger (HTML détecté)"
-    return v if v else "---"
-
-def preparer_log_safe(df):
-    """Garantit que le DataFrame des logs possède les colonnes minimales pour éviter les crashs"""
-    cols_requises = ['Date', 'PortDep', 'PortArr', 'Bateau', 'Skipper', 'Action', 'Details']
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        return pd.DataFrame(columns=cols_requises)
-    for col in cols_requises:
-        if col not in df.columns: 
-            df[col] = ""
-    return df
-
-def format_tel_lien(tel):
-    """Prépare le numéro pour les liens cliquables tel:"""
-    if not tel: return ""
-    return "".join(filter(str.isdigit, str(tel)))
-
-def formater_date_affichage(date_val):
-    """Convertit les dates ISO en format français JJ/MM/AAAA"""
-    if pd.isna(date_val) or str(date_val).strip() in ["", "None", "nan"]: 
-        return "---"
-    try: 
-        return datetime.strptime(str(date_val)[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
-    except: 
-        return str(date_val)
-        # ... (garde tes imports et fonctions clean_num, clean_text, etc.)
-
-# =================================================================
-# --- 2. GESTION GITHUB (BASE DE DONNÉES) ---
-# =================================================================
+    except: return default
 
 def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
-        # Ajout du paramètre v=time pour éviter le cache GitHub
         res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
         if res.status_code == 200:
             content = base64.b64decode(res.json()['content']).decode('utf-8')
             return pd.DataFrame(json.loads(content))
         return pd.DataFrame()
-    except: 
-        return pd.DataFrame()
+    except: return pd.DataFrame()
 
 def sauvegarder_data(df, file):
     try:
@@ -94,52 +68,15 @@ def sauvegarder_data(df, file):
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
         res = requests.get(url, headers={"Authorization": f"token {token}"})
         sha = res.json().get('sha') if res.status_code == 200 else None
-        
-        df_export = df.copy()
-        # On utilise to_json pour transformer le DataFrame en texte JSON
-        content_str = df_export.to_json(orient="records", indent=4)
+        content_str = df.to_json(orient="records", indent=4)
         content_b64 = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
-        
         requests.put(url, headers={"Authorization": f"token {token}"}, 
                      json={"message": f"Update {file}", "content": content_b64, "sha": sha})
-    except Exception as e: 
-        st.error(f"Erreur sauvegarde {file} : {e}")
+    except Exception as e: st.error(f"Erreur sauvegarde {file} : {e}")
 
-# --- AJOUT DES FONCTIONS DE PARAMÈTRES POUR LA VIDANGE ---
-
-def charger_params():
-    """Charge les réglages (cible vidange) depuis GitHub (params.json)"""
-    try:
-        # On réutilise ta fonction charger_data
-        df = charger_data('params.json')
-        if not df.empty:
-            # On convertit la première ligne du DataFrame en dictionnaire
-            return df.iloc[0].to_dict()
-    except:
-        pass
-    # Valeurs par défaut si le fichier n'existe pas ou est vide
-    return {"prochaine_vidange": 2450.0, "cible_vidange": 2450.0}
-
-def sauvegarder_params(dict_params):
-    """Sauvegarde les réglages dans params.json sur GitHub"""
-    try:
-        # On transforme le dictionnaire en DataFrame d'une seule ligne pour sauvegarder
-        df = pd.DataFrame([dict_params])
-        sauvegarder_data(df, 'params.json')
-    except Exception as e:
-        st.error(f"Erreur params : {e}")
-
-# --- SÉCURISATION ---
 def charger_data_safe(fichier):
-    try:
-        data = charger_data(fichier)
-        if data is None or (isinstance(data, list) and len(data) == 0):
-            return pd.DataFrame()
-        return pd.DataFrame(data)
-    except Exception as e:
-        print(f"Erreur sur {fichier}: {e}")
-        return pd.DataFrame()
-
+    df = charger_data(fichier)
+    return df if not df.empty else pd.DataFrame()
 
 # =================================================================
 # --- CONFIGURATION & STYLE ---
@@ -157,17 +94,10 @@ st.markdown(f"""<style>
 </style>""", unsafe_allow_html=True)
 
 # =================================================================
-# --- SESSION & SÉCURITÉ ---
+# --- NAVIGATION ---
 # =================================================================
-keys_to_init = {
-    'authenticated': False, 'page': "CONTACTS", 'edit_idx': None, 
-    'vue_contact': "En cours"
-}
-for key, val in keys_to_init.items():
-    if key not in st.session_state: st.session_state[key] = val
-
-if not st.session_state.authenticated:
-    st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
+if not st.session_state.get('authenticated', False):
+    st.markdown('<div class="main-header">⚓ VESTA 2026</div>', unsafe_allow_html=True)
     pw = st.text_input("Code d'accès :", type="password")
     if st.button("ACCÉDER", use_container_width=True):
         if pw == "Skipper2026":
@@ -175,46 +105,91 @@ if not st.session_state.authenticated:
             st.rerun()
         else: st.error("Code incorrect.")
     st.stop()
-# =================================================================
-# --- NAVIGATION (VERSION CORRIGÉE) ---
-# =================================================================
-st.markdown('<div class="main-header">⚓ VESTA SKIPPER 2026</div>', unsafe_allow_html=True)
+
+st.markdown('<div class="main-header">⚓ VESTA 2026</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=True)
 
-# 1. Mise à jour de la liste (Ajout de FACTURES)
-# J'ai raccourci "FACTURES" en "FACT" pour que ça tienne bien sur mobile
-menu = ["CONTACTS", "PLANNING", "STATS", "MAINT", "LOG", "FACT"]
+# Barre de navigation avec NOTES et FACTURES
+menu = ["CONTACTS", "STATS", "MAINT", "LOG", "NOTES", "FACT"]
+icones = {"CONTACTS": "👤", "STATS": "📊", "MAINT": "🛠️", "LOG": "📖", "NOTES": "📝", "FACT": "📑"}
 
-# 2. Mise à jour des icônes
-icones = {
-    "CONTACTS": "👤", 
-    "PLANNING": "🗓️", 
-    "STATS": "📊", 
-    "MAINT": "🛠️", 
-    "LOG": "📖",
-    "FACT": "📑"   # Nouvelle icône pour la facturation
-}
-
-# 3. Génération des colonnes de navigation
 cols_nav = st.columns(len(menu))
-
 for i, name in enumerate(menu):
-    # Mapping du nom court (FACT) vers le nom de page utilisé dans votre code (FACTURES)
-    page_target = "FACTURES" if name == "FACT" else name
-    
-    # Détermination du style (Bleu "Primary" si on est sur la page)
+    page_target = "MEMOS" if name == "NOTES" else ("FACTURES" if name == "FACT" else name)
     is_active = st.session_state.page == page_target
-    
-    if cols_nav[i].button(
-        f"{icones[name]}\n{name}", # Affiche l'icône ET le nom en dessous
-        key=f"nav_{name}", 
-        use_container_width=True, 
-        type="primary" if is_active else "secondary"
-    ):
+    if cols_nav[i].button(f"{icones[name]}\n{name}", key=f"nav_{name}", use_container_width=True, type="primary" if is_active else "secondary"):
         st.session_state.page = page_target
         st.rerun()
 
 st.divider()
+
+# =================================================================
+# --- 2. MENU MÉMOS (NOTES LIBRES) ---
+# =================================================================
+if st.session_state.page == "MEMOS":
+    st.markdown("### 📝 Mémos & Notes de Bord")
+    df_memos = charger_data_safe('memos.json')
+
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        with st.expander("➕ AJOUTER UN MÉMO", expanded=False):
+            with st.form("new_memo_form"):
+                m_date = st.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
+                m_desc = st.text_area("Description / Rappel")
+                m_statut = st.selectbox("Statut", ["Normal", "Urgent", "Fait"])
+                if st.form_submit_button("Enregistrer"):
+                    new_m = pd.DataFrame([{"Date": m_date, "Description": m_desc, "Statut": m_statut}])
+                    df_memos = pd.concat([df_memos, new_m], ignore_index=True)
+                    sauvegarder_data(df_memos, 'memos.json')
+                    st.rerun()
+    with c2:
+        bouton_export_excel(df_memos, "memos")
+
+    if not df_memos.empty:
+        # Tri inverse pour voir les plus récents en haut
+        for idx, row in df_memos.sort_index(ascending=False).iterrows():
+            bg_color = "#D5F5E3" if row['Statut'] == "Fait" else ("#FADBD8" if row['Statut'] == "Urgent" else "#FEF9E7")
+            st.markdown(f"""
+            <div style="background:{bg_color}; padding:12px; border-radius:10px; border-left:5px solid #34495E; margin-bottom:10px; color:black;">
+                <small>{row['Date']} — <b>{row['Statut'].upper()}</b></small><br>
+                {row['Description']}
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button(f"🗑️ Supprimer #{idx}", key=f"del_m_{idx}"):
+                df_memos = df_memos.drop(idx).reset_index(drop=True)
+                sauvegarder_data(df_memos, 'memos.json')
+                st.rerun()
+
+# =================================================================
+# --- 3. BLOC CONTACTS (RECHERCHE SOCIÉTÉ CORRIGÉE) ---
+# =================================================================
+if st.session_state.page == "CONTACTS":
+    st.markdown('<h2 style="text-align:center;">⚓ Gestion des Clients Vesta</h2>', unsafe_allow_html=True)
+    df_raw = charger_data('contacts.json')
+    
+    # Navigation interne (Onglets)
+    n1, n2, n3, n4 = st.columns(4)
+    # ... (Vos boutons Nouveau / En cours / Attente / Terminés) ...
+
+    if not df_raw.empty:
+        df_c = df_raw.copy().fillna("")
+        df_c['orig_idx'] = df_c.index
+        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+        
+        c_search, c_yr = st.columns([2, 1])
+        search = c_search.text_input("🔍 Rechercher (Nom, Prénom, Société...)", "").upper()
+        annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
+        
+        # --- FIX RECHERCHE SOCIÉTÉ ---
+        if search:
+            mask_search = (
+                df_c['Nom'].astype(str).str.upper().str.contains(search) | 
+                df_c['Prénom'].astype(str).str.upper().str.contains(search) | 
+                df_c['Société'].astype(str).str.upper().str.contains(search)
+            )
+            df_c = df_c[mask_search]
+            
+        # ... (Suite du code Contacts habituel) ...
 # =================================================================
 # --- 5. BLOC CONTACTS (V100 - CONFIRMATION & TERMINÉS) ---
 # =================================================================
