@@ -942,14 +942,14 @@ if st.session_state.page == "LOG":
     st.subheader("🚀 Nouvelle Navigation")
     # ... [Garder ton bloc de saisie Date / Titre / data_editor ici] ...
 
-    # 3. AFFICHAGE DANS L'ORDRE SPÉCIFIQUE : 4, 3, 1, 0, 2
+    # 3. AFFICHAGE DANS L'ORDRE SPÉCIFIQUE : 4, 3, 0, 1, 2
     if not df_log.empty:
         st.divider()
         st.subheader("📜 Historique")
 
         # --- LOGIQUE D'ORDRE FORCÉ ---
-        # L'ordre demandé de haut en bas : 2, 0, 1, 3, 4
-        ordre_demande = [2, 0, 1, 3, 4]
+        # L'ordre demandé de haut en bas : 2, 1, 0, 3, 4
+        ordre_demande = [2, 1, 1, 3, 4]
         
         # On vérifie quels index existent réellement dans ton fichier
         index_existants = df_log.index.tolist()
