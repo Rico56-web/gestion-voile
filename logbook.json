@@ -63,5 +63,31 @@
         "TotalMil":72.0,
         "H_Voile":6.0,
         "Notes":"avec Pedro et Benoit Couronne"
+    },
+    {
+        "Date":"12\/03\/2026",
+        "Navigation":"port haliguen ",
+        "PortArr":"Port haliguen",
+        "MotDep":2432.7,
+        "MotArr":2433.7,
+        "TotalMot":1.0,
+        "MilDep":2912.0,
+        "MilArr":2937.0,
+        "TotalMil":25.0,
+        "H_Voile":5.0,
+        "Notes":"avec Camile et Sacha (Cuistot)"
+    },
+    {
+        "Date":"13\/03\/2026",
+        "Navigation":"port haliguen ",
+        "PortArr":"Arzon",
+        "MotDep":2433.7,
+        "MotArr":2436.1,
+        "TotalMot":2.4,
+        "MilDep":2937.0,
+        "MilArr":2963.0,
+        "TotalMil":26.0,
+        "H_Voile":5.0,
+        "Notes":"avec Camile et Sacha (Cuistot)"
     }
 ]
