@@ -956,15 +956,14 @@ if st.session_state.page == "ARCHIVES":
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
 
 # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION GROUPEE ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - DESIGN ADOUCI ---
 # =================================================================
 if st.session_state.page == "LOG":
-    st.markdown('<div style="text-align:center; background-color:#1a2a6c; color:white; padding:10px; border-radius:10px;"><h1>📖 Livre de Bord</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>📖 Livre de Bord</h1></div>', unsafe_allow_html=True)
 
     # 1. CHARGEMENT
     df_log = charger_data_safe('logbook.json')
     
-    # Récupération des compteurs pour pré-remplissage
     last_h, last_m = 0.0, 0.0
     if not df_log.empty:
         try:
@@ -981,7 +980,6 @@ if st.session_state.page == "LOG":
         f_notes = st.text_area("Notes générales", height=70)
 
         n_lignes = int(f_jours)
-        # Création d'un ID de groupe unique si plus de 1 jour
         group_id = f"NAV-{int(time.time())}" if n_lignes > 1 else None
 
         if 'temp_log_df' not in st.session_state or len(st.session_state.temp_log_df) != n_lignes:
@@ -1041,7 +1039,7 @@ if st.session_state.page == "LOG":
         for idx, row in df_v.iterrows():
             gid = row.get('Group_ID')
             
-            # --- CAS CROISIÈRE (Plusieurs jours liés) ---
+            # --- CAS CROISIÈRE (Design adouci Bleu Horizon) ---
             if gid and str(gid).strip() != "" and str(gid).lower() != "none":
                 if gid in groupes_affiches: continue
                 
@@ -1052,29 +1050,29 @@ if st.session_state.page == "LOG":
                     itineraire = " → ".join(group_data['PortArr'].astype(str))
                     
                     st.markdown(f"""
-                        <div style="background:#1a2a6c; color:white; padding:15px; border-radius:10px; margin-bottom:10px; border-left: 10px solid #f1c40f;">
-                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; font-weight:bold; letter-spacing:1px;">
+                        <div style="background:#eef2f7; color:#2c3e50; padding:15px; border-radius:10px; margin-bottom:12px; border-left: 8px solid #3498db; border: 1px solid #d1d9e6;">
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; font-weight:bold; color:#5d6d7e;">
                                 <span>🚢 CROISIÈRE • {n_j} JOURS</span>
-                                <span style="color:#f1c40f;">{group_data.iloc[0]['Navigation']}</span>
+                                <span>{group_data.iloc[0]['Navigation']}</span>
                             </div>
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
                                 <div>
-                                    <b style="font-size:1.1rem;">Du {group_data.iloc[0]['Date']} au {group_data.iloc[-1]['Date']}</b><br>
-                                    <span style="font-size:0.9rem; opacity:0.8;">📍 {itineraire}</span>
+                                    <b style="font-size:1.1rem; color:#1a5276;">Du {group_data.iloc[0]['Date']} au {group_data.iloc[-1]['Date']}</b><br>
+                                    <span style="font-size:0.9rem; color:#566573;">📍 {itineraire}</span>
                                 </div>
                                 <div style="text-align:right;">
-                                    <b style="font-size:1.5rem; color:#f1c40f;">{total_m:.1f} <small>NM</small></b>
+                                    <b style="font-size:1.5rem; color:#2980b9;">{total_m:.1f} <small>NM</small></b>
                                 </div>
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
                     groupes_affiches.add(gid)
 
-            # --- CAS SORTIE SIMPLE (ou anciennes données) ---
+            # --- CAS SORTIE SIMPLE ---
             else:
                 st.markdown(f"""
                     <div style="background:white; border:1px solid #dee2e6; padding:10px 15px; border-radius:5px; margin-bottom:5px; display: flex; justify-content: space-between; align-items:center;">
-                        <div style="width: 100px; border-right: 2px solid #eee;">
+                        <div style="width: 100px; border-right: 2px solid #f2f2f2;">
                             <b style="color:#2c3e50;">{row['Date']}</b>
                         </div>
                         <div style="flex: 2; padding-left:15px;">
@@ -1086,18 +1084,14 @@ if st.session_state.page == "LOG":
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
-    # 4. SUPPRESSION / MODIF RAPIDE
-        with st.expander("🛠️ Administration de l'historique"):
+
+        # 4. ADMINISTRATION
+        with st.expander("🛠️ Administration"):
             df_admin = df_v.copy()
-            # On utilise l'index réel du dataframe pour la suppression
-            df_admin['ID_LIGNE'] = df_admin.index 
-            
+            df_admin['ID_LIGNE'] = df_admin.index
             st.dataframe(df_admin[['ID_LIGNE', 'Date', 'PortArr', 'TotalMil', 'Group_ID']], use_container_width=True, hide_index=True)
-            
-            # Correction de la ligne ici (vérifie bien les parenthèses)
             sel = st.number_input("ID à supprimer", min_value=0, max_value=len(df_log)-1 if not df_log.empty else 0, step=1)
-            
-            if st.button("🗑️ Supprimer la ligne sélectionnée"):
+            if st.button("🗑️ Supprimer la ligne"):
                 df_log = df_log.drop(index=sel).reset_index(drop=True)
                 sauvegarder_data(df_log, 'logbook.json')
                 st.rerun()
