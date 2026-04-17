@@ -965,16 +965,16 @@ if st.session_state.page == "LOG":
         },
         num_rows="dynamic", use_container_width=True, key="log_editor_final"
     )
-
-    if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
+        if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
         if edited_steps is not None and not edited_steps.empty:
             nouvelles = []
             for _, row in edited_steps.iterrows():
                 if row.get("Port"):
-                    h_d, h_a = float(row.get("Mot_Dep", 0.0)), float(row.get("Mot_Arr", 0.0))
-                    m_d, m_a = float(row.get("Mil_Dep", 0.0)), float(row.get("Mil_Arr", 0.0))
+                    # FORCE LE FORMAT ICI
+                    date_fr = f_date.strftime("%d/%m/%Y") 
+                
                     nouvelles.append({
-                        "Date": f_date.strftime("%d/%m/%Y"),
+                        "Date": date_fr, # Enregistré en texte propre
                         "Navigation": f_titre,
                         "PortArr": row.get("Port"),
                         "MotDep": h_d,
