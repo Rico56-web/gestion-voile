@@ -1026,17 +1026,21 @@ if st.session_state.page == "LOG":
                 sauvegarder_data(df_final, 'logbook.json')
                 if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
                 st.rerun()
-
-    # 3. AFFICHAGE DE L'HISTORIQUE
+    # 3. AFFICHAGE DE L'HISTORIQUE (Correction du Tri)
     if not df_log.empty:
         st.divider()
         df_v = df_log.copy()
+        
+        # On force la conversion en date pour le tri, les erreurs deviennent NaT (Not a Time)
         df_v['dt'] = pd.to_datetime(df_v['Date'], dayfirst=True, errors='coerce')
+        
+        # On trie : le plus récent en haut, mais on garde tout
         df_v = df_v.sort_values(by='dt', ascending=False)
 
         groupes_affiches = set()
 
         for idx, row in df_v.iterrows():
+            # ... reste du code d'affichage (Croisière ou Sortie simple) ...
             gid = row.get('Group_ID')
             
             # --- CAS CROISIÈRE (Design adouci Bleu Horizon) ---
