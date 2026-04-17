@@ -955,53 +955,36 @@ if st.session_state.page == "LOG":
     st.subheader("🚀 Nouvelle Navigation")
     c1, c2, c3 = st.columns([2, 1, 2])
     f_date = c1.date_input("Date", datetime.now())
+    f_jours = c2.number_input("Nombre de jours", min_value=1, value=1, step=1)
     f_titre = c3.text_input("Destination / Titre")
 
-    if 'temp_log_df' not in st.session_state:
-        st.session_state.temp_log_df = pd.DataFrame([{
-            "Port": "", "Mot_Dep": last_h, "Mot_Arr": last_h,
-            "Mil_Dep": last_m, "Mil_Arr": last_m, "Voile": 0.0, "Notes": ""
-        }])
+    # Logique pour générer le nombre de lignes selon f_jours
+    if 'temp_log_df' not in st.session_state or len(st.session_state.temp_log_df) != f_jours:
+        lignes = []
+        for i in range(int(f_jours)):
+            lignes.append({
+                "Port": "", 
+                "Mot_Dep": last_h if i == 0 else 0.0, 
+                "Mot_Arr": last_h if i == 0 else 0.0,
+                "Mil_Dep": last_m if i == 0 else 0.0, 
+                "Mil_Arr": last_m if i == 0 else 0.0, 
+                "Voile": 0.0, 
+                "Notes": ""
+            })
+        st.session_state.temp_log_df = pd.DataFrame(lignes)
 
+    # Affichage du tableau de saisie
     edited_steps = st.data_editor(
         st.session_state.temp_log_df,
         column_config={
-            "Port": "📍 Etape", "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
+            "Port": "📍 Etape", 
+            "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
             "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr"
         },
-        num_rows="dynamic", use_container_width=True, key="log_v2026_final"
+        num_rows="dynamic", 
+        use_container_width=True, 
+        key=f"log_editor_{f_jours}" # Le key change avec f_jours pour forcer le refresh
     )
-
-    if st.button("💾 ENREGISTRER LA NAVIGATION", type="primary", use_container_width=True):
-        if edited_steps is not None and not edited_steps.empty:
-            nouvelles = []
-            # On génère la date texte sans l'espace pour le stockage JSON
-            date_pure = f_date.strftime("%d/%m/%Y")
-            
-            for _, row in edited_steps.iterrows():
-                if row.get("Port"):
-                    h_d, h_a = float(row.get("Mot_Dep", 0.0)), float(row.get("Mot_Arr", 0.0))
-                    m_d, m_a = float(row.get("Mil_Dep", 0.0)), float(row.get("Mil_Arr", 0.0))
-                    
-                    nouvelles.append({
-                        "Date": date_pure, 
-                        "Navigation": f_titre,
-                        "PortArr": row.get("Port"),
-                        "MotDep": h_d, "MotArr": h_a,
-                        "TotalMot": round(h_a - h_d, 2),
-                        "MilDep": m_d, "MilArr": m_a,
-                        "TotalMil": round(m_a - m_d, 1),
-                        "H_Voile": float(row.get("Voile", 0.0)),
-                        "Notes": row.get("Notes", "")
-                    })
-            
-            if nouvelles:
-                df_final = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
-                # Nettoyage des espaces avant sauvegarde
-                df_final['Date'] = df_final['Date'].str.strip()
-                sauvegarder_data(df_final, 'logbook.json')
-                if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
-                st.rerun()
 
     # 4. AFFICHAGE (VERROUILLÉ)
     if not df_log.empty:
