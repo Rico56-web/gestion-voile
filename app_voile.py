@@ -1036,7 +1036,7 @@ if st.session_state.page == "LOG":
         # On trie par date, et on met les dates non reconnues à la fin
         df_v = df_v.sort_values(by='dt', ascending=False, na_position='last')     
         st.write(f"Nombre de lignes trouvées dans le fichier : {len(df_log)}")
-        if not df_log.empty:
+    if not df_log.empty:
         st.write("Dates présentes :", df_log['Date'].unique())
 
         groupes_affiches = set()
