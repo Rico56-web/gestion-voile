@@ -799,34 +799,6 @@ if st.session_state.page == "MAINT":
             st.rerun()
 
     st.divider()
-    
-    # --- EXPORT EXCEL (VERSION SÉCURISÉE) ---
-    if not df_m.empty:
-        import io
-        
-        # 1. On prépare les données
-        df_export = df_m.drop(columns=['dt_maint'], errors='ignore').copy()
-        
-        # 2. Création du fichier en mémoire (Moteur standard)
-        buffer = io.BytesIO()
-        try:
-            # On laisse Pandas gérer le moteur automatiquement
-            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                df_export.to_excel(writer, index=False, sheet_name='Maintenance')
-            
-            # 3. Bouton de téléchargement
-            st.download_button(
-                label="📥 Télécharger le suivi (Excel)",
-                data=buffer.getvalue(),
-                file_name=f"Maintenance_Vesta_{sel_y}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
-        except Exception as e:
-            st.error(f"Erreur lors de la préparation de l'Excel : {e}")
-            st.info("Astuce : Vérifiez que 'openpyxl' est présent dans votre fichier requirements.txt")
-    
- 
 
     # 3. FORMULAIRE "EFFECTUER LA VIDANGE"
     with st.expander("🔧 ENREGISTRER UNE VIDANGE FAITE", expanded=False):
@@ -918,6 +890,32 @@ if st.session_state.page == "MAINT":
                 df_final = pd.concat([df_m.drop(columns=['dt_maint'], errors='ignore'), pd.DataFrame([new_row])], ignore_index=True)
                 sauvegarder_data(df_final, 'maintenance.json')
                 st.rerun()
+
+# --- EXPORT EXCEL (À PLACER TOUT EN BAS DU BLOC MAINTENANCE) ---
+    if not df_m.empty:
+        import io
+        
+        # On définit un nom de fichier par défaut au cas où
+        nom_annee = sel_y if 'sel_y' in locals() else "Historique"
+        
+        df_export = df_m.drop(columns=['dt_maint'], errors='ignore').copy()
+        
+        buffer = io.BytesIO()
+        try:
+            # Utilisation de openpyxl (moteur standard de Streamlit)
+            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                df_export.to_excel(writer, index=False, sheet_name='Maintenance')
+            
+            st.write("---") # Une petite ligne de séparation visuelle
+            st.download_button(
+                label="📥 Télécharger le suivi (Excel)",
+                data=buffer.getvalue(),
+                file_name=f"Maintenance_Vesta_{nom_annee}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        except Exception as e:
+            st.error(f"Erreur export : {e}")
 
 
 
