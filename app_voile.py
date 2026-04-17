@@ -799,6 +799,33 @@ if st.session_state.page == "MAINT":
             st.rerun()
 
     st.divider()
+    
+    # --- EXPORT EXCEL ---
+    if not df_m.empty:
+        import io
+
+        # On prépare les données pour l'export (on retire la colonne technique de date)
+        df_export = df_m.drop(columns=['dt_maint'], errors='ignore').copy()
+        
+        # Création du fichier Excel en mémoire
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+            df_export.to_excel(writer, index=False, sheet_name='Maintenance')
+            
+            # Optionnel : Ajustement automatique de la largeur des colonnes
+            worksheet = writer.sheets['Maintenance']
+            for i, col in enumerate(df_export.columns):
+                column_len = max(df_export[col].astype(str).map(len).max(), len(col)) + 2
+                worksheet.set_column(i, i, column_len)
+        
+        # Bouton de téléchargement
+        st.download_button(
+            label="📥 Télécharger le suivi (Excel)",
+            data=buffer.getvalue(),
+            file_name=f"Maintenance_Vesta_{sel_y}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
 
     # 3. FORMULAIRE "EFFECTUER LA VIDANGE"
     with st.expander("🔧 ENREGISTRER UNE VIDANGE FAITE", expanded=False):
