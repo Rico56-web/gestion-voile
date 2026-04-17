@@ -956,152 +956,87 @@ if st.session_state.page == "ARCHIVES":
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
 
 # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION CROISIÈRE ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - GESTION PAR DURÉE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.markdown('<div style="text-align:center; background-color:#1a2a6c; color:white; padding:10px; border-radius:10px;"><h1>📖 Livre de Bord</h1></div>', unsafe_allow_html=True)
 
-    # 1. CHARGEMENT DES DONNÉES
     df_log = charger_data_safe('logbook.json')
     
-    # 2. RÉCUPÉRATION DES DERNIERS COMPTEURS
-    last_h, last_m = 0.0, 0.0
-    if not df_log.empty:
-        try:
-            last_h = float(df_log['MotArr'].max())
-            last_m = float(df_log['MilArr'].max())
-        except: pass
-
-    # 3. FORMULAIRE NOUVELLE NAVIGATION
+    # 1. FORMULAIRE AVEC PARAMÈTRE "NOMBRE DE JOURS"
     with st.expander("🚀 Enregistrer une Navigation", expanded=False):
         c1, c2, c3 = st.columns([2, 1, 2])
         f_date = c1.date_input("Date de départ", datetime.now())
         f_jours = c2.number_input("Nombre de jours", min_value=1, value=1, step=1)
-        f_titre = c3.text_input("Destination / Nom de la croisière")
-        f_notes = st.text_area("Notes de navigation", height=70)
-
+        f_titre = c3.text_input("Destination / Nom du voyage")
+        
         n_lignes = int(f_jours)
+        # Création d'un ID unique pour ce groupe de navigation
+        group_id = f"NAV-{int(time.time())}" if n_lignes > 1 else None
 
+        # ... (Le reste de ton code d'initialisation temp_log_df reste identique) ...
         if 'temp_log_df' not in st.session_state or len(st.session_state.temp_log_df) != n_lignes:
-            lignes = []
-            for i in range(n_lignes):
-                date_etape = (f_date + timedelta(days=i)).strftime("%d/%m/%Y")
-                lignes.append({
-                    "Date": date_etape, "Port": "", 
-                    "Mot_Dep": last_h if i == 0 else 0.0, "Mot_Arr": 0.0, 
-                    "Mil_Dep": last_m if i == 0 else 0.0, "Mil_Arr": 0.0, "Voile": 0.0
-                })
+            lignes = [{"Date": (f_date + timedelta(days=i)).strftime("%d/%m/%Y"), "Port": "", "Mot_Dep": 0.0, "Mot_Arr": 0.0, "Mil_Dep": 0.0, "Mil_Arr": 0.0, "Voile": 0.0} for i in range(n_lignes)]
             st.session_state.temp_log_df = pd.DataFrame(lignes)
-        else:
-            for i in range(len(st.session_state.temp_log_df)):
-                st.session_state.temp_log_df.at[i, "Date"] = (f_date + timedelta(days=i)).strftime("%d/%m/%Y")
 
-        edited_steps = st.data_editor(
-            st.session_state.temp_log_df,
-            column_config={
-                "Date": st.column_config.TextColumn("Date", disabled=True),
-                "Port": "📍 Arrivée", "Mot_Dep": "Mtr Dép", "Mot_Arr": "Mtr Arr",
-                "Mil_Dep": "Mil Dép", "Mil_Arr": "Mil Arr", "Voile": "⛵ Voile"
-            },
-            num_rows="dynamic", use_container_width=True, key="log_editor_v2026"
-        )
+        edited_steps = st.data_editor(st.session_state.temp_log_df, use_container_width=True)
 
-        if st.button("💾 ENREGISTRER TOUTE LA NAVIGATION", type="primary", use_container_width=True):
-            if edited_steps is not None and not edited_steps.empty:
-                nouvelles = []
-                for i, row in edited_steps.iterrows():
-                    if row.get("Port"):
-                        h_d, h_a = float(row.get("Mot_Dep", 0.0)), float(row.get("Mot_Arr", 0.0))
-                        m_d, m_a = float(row.get("Mil_Dep", 0.0)), float(row.get("Mil_Arr", 0.0))
-                        nouvelles.append({
-                            "Date": row.get("Date"),
-                            "Navigation": f_titre or "Navigation libre",
-                            "PortArr": row.get("Port"),
-                            "MotDep": h_d, "MotArr": h_a,
-                            "TotalMot": round(h_a - h_d, 2),
-                            "MilDep": m_d, "MilArr": m_a,
-                            "TotalMil": round(m_a - m_d, 1),
-                            "H_Voile": float(row.get("Voile", 0.0)),
-                            "Notes": f_notes,
-                            "Jours": n_lignes  # On stocke l'info ici pour la différenciation
-                        })
-                
-                if nouvelles:
-                    df_final = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
-                    sauvegarder_data(df_final, 'logbook.json')
-                    if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
-                    st.rerun()
+        if st.button("💾 ENREGISTRER", type="primary", use_container_width=True):
+            nouvelles = []
+            for i, row in edited_steps.iterrows():
+                if row.get("Port"):
+                    nouvelles.append({
+                        "Date": row.get("Date"),
+                        "Navigation": f_titre or "Sortie",
+                        "PortArr": row.get("Port"),
+                        "TotalMot": round(float(row.get("Mot_Arr",0)) - float(row.get("Mot_Dep",0)), 2),
+                        "TotalMil": round(float(row.get("Mil_Arr",0)) - float(row.get("Mil_Dep",0)), 1),
+                        "Group_ID": group_id # C'est cet ID qui permet de lier les 4 jours !
+                    })
+            if nouvelles:
+                df_final = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
+                sauvegarder_data(df_final, 'logbook.json')
+                st.rerun()
 
-    # 4. AFFICHAGE DE L'HISTORIQUE (DISTINCTION VISUELLE FORTE)
+    # 2. AFFICHAGE INTELLIGENT BASÉ SUR L'ID DE GROUPE
     if not df_log.empty:
         st.divider()
-        df_visu = df_log.copy()
-        df_visu['dt_sort'] = pd.to_datetime(df_visu['Date'], dayfirst=True, errors='coerce')
-        df_visu = df_visu.sort_values(by='dt_sort', ascending=False)
+        # On regroupe les lignes qui ont le même Group_ID
+        # Les lignes sans Group_ID (sorties 1j) sont traitées individuellement
+        
+        # On trie pour avoir le plus récent en haut
+        df_log['dt'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+        df_log = df_log.sort_values(by='dt', ascending=False)
 
-        for idx, row in df_visu.iterrows():
-            n_j = int(row.get('Jours', 1))
+        processed_groups = []
+        for idx, row in df_log.iterrows():
+            gid = row.get('Group_ID')
             
-            if n_j > 1:
-                # --- AFFICHAGE "CROISIÈRE" (Grande Fiche) ---
-                try:
-                    d_start = datetime.strptime(row['Date'], "%d/%m/%Y")
-                    d_end = d_start + timedelta(days=n_j-1)
-                    date_txt = f"Du {d_start.strftime('%d/%m')} au {d_end.strftime('%d/%m/%Y')}"
-                except: date_txt = row['Date']
-
+            if gid and gid not in processed_groups:
+                # --- AFFICHAGE CROISIÈRE (Groupe) ---
+                group_data = df_log[df_log['Group_ID'] == gid]
+                total_milles = group_data['TotalMil'].sum()
+                jours_count = len(group_data)
+                
                 st.markdown(f"""
-                    <div style="background:#1a2a6c; color:white; padding:15px; border-radius:10px; margin-bottom:15px; border-left: 10px solid #f1c40f;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="letter-spacing: 2px; font-weight: bold;">🚢 CROISIÈRE DE {n_j} JOURS</span>
-                            <span style="background:#f1c40f; color:#1a2a6c; padding:2px 10px; border-radius:15px; font-weight:bold; font-size:0.8rem;">ID: {idx}</span>
-                        </div>
-                        <div style="margin-top:10px; display: flex; justify-content: space-between;">
-                            <div>
-                                <span style="font-size: 1.4rem; font-weight: bold;">{date_txt}</span><br>
-                                <span style="font-size: 1.1rem; opacity: 0.9;">📍 Arrivée : {row['PortArr']}</span><br>
-                                <i style="font-size: 0.9rem; opacity: 0.7;">{row['Navigation']}</i>
-                            </div>
-                            <div style="text-align: right;">
-                                <span style="font-size: 1.8rem; font-weight: bold; color: #f1c40f;">{row['TotalMil']} NM</span><br>
-                                <span style="font-size: 1rem;">⚙️ {row['TotalMot']}h moteur</span>
-                            </div>
+                    <div style="background:#1a2a6c; color:white; padding:12px; border-radius:10px; margin-bottom:10px; border-left: 8px solid #f1c40f;">
+                        <b style="letter-spacing:1px;">🚢 CROISIÈRE • {jours_count} JOURS</b>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px;">
+                            <span>📍 {group_data.iloc[-1]['PortArr']} → {group_data.iloc[0]['PortArr']}</span>
+                            <b style="font-size:1.2rem; color:#f1c40f;">{total_milles:.1f} NM</b>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
-            
-            else:
-                # --- AFFICHAGE "SORTIE JOURNÉE" (Ligne Simple Compacte) ---
+                processed_groups.append(gid)
+                
+            elif not gid:
+                # --- AFFICHAGE SORTIE SIMPLE ---
                 st.markdown(f"""
-                    <div style="background:white; border:1px solid #dee2e6; padding:8px 15px; border-radius:5px; margin-bottom:5px; display: flex; justify-content: space-between; align-items:center;">
-                        <div style="flex: 1; border-right: 2px solid #eee;">
-                            <b style="color:#2c3e50;">{row['Date']}</b>
-                        </div>
-                        <div style="flex: 2; padding-left:15px;">
-                            <span style="font-weight:bold;">⚓ {row['PortArr']}</span> 
-                            <span style="color:#7f8c8d; font-size:0.8rem; margin-left:10px;">({row['Navigation']})</span>
-                        </div>
-                        <div style="flex: 1; text-align: right; font-weight: bold; color:#27ae60;">
-                            {row['TotalMil']} NM
-                        </div>
-                        <div style="margin-left:15px; background:#f8f9fa; padding:2px 8px; border-radius:4px; font-size:0.7rem; color:#95a5a6;">
-                            ID: {idx}
-                        </div>
+                    <div style="background:white; border:1px solid #ddd; padding:8px 15px; border-radius:5px; margin-bottom:5px; display:flex; justify-content:space-between;">
+                        <span><b>{row['Date']}</b> ⚓ {row['PortArr']}</span>
+                        <b style="color:#27ae60;">{row['TotalMil']} NM</b>
                     </div>
                 """, unsafe_allow_html=True)
-
-        # 5. GESTION ADMINISTRATIVE (MODIFIER/SUPPRIMER)
-        with st.expander("🛠️ Administration de l'historique"):
-            df_admin = df_visu.copy()
-            df_admin.insert(0, 'ID', df_admin.index)
-            st.dataframe(df_admin[['ID', 'Date', 'PortArr', 'TotalMil']], use_container_width=True, hide_index=True)
-            
-            sel_id = st.number_input("Entrer l'ID pour modifier/supprimer", min_value=0, max_value=int(df_admin.index.max()), step=1)
-            
-            if st.button("🗑️ SUPPRIMER CETTE LIGNE", use_container_width=True):
-                df_log = df_log.drop(index=sel_id).reset_index(drop=True)
-                sauvegarder_data(df_log, 'logbook.json')
-                st.rerun()
 
 
 
