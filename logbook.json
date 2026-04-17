@@ -10,7 +10,8 @@
         "MilArr":2643.0,
         "TotalMil":43.0,
         "H_Voile":6.0,
-        "Notes":""
+        "Notes":"",
+        "Group_ID":null
     },
     {
         "Date":"01\/03\/2026",
@@ -23,7 +24,8 @@
         "MilArr":2750.0,
         "TotalMil":107.0,
         "H_Voile":6.0,
-        "Notes":""
+        "Notes":"",
+        "Group_ID":null
     },
     {
         "Date":"01\/03\/2026",
@@ -36,7 +38,8 @@
         "MilArr":2787.0,
         "TotalMil":37.0,
         "H_Voile":6.0,
-        "Notes":""
+        "Notes":"",
+        "Group_ID":null
     },
     {
         "Date":"14\/03\/2026",
@@ -49,7 +52,8 @@
         "MilArr":2840.0,
         "TotalMil":53.0,
         "H_Voile":6.0,
-        "Notes":"avec Pedro et Benoit Couronne"
+        "Notes":"avec Pedro et Benoit Couronne",
+        "Group_ID":null
     },
     {
         "Date":"15\/03\/2026",
@@ -62,7 +66,8 @@
         "MilArr":2912.0,
         "TotalMil":72.0,
         "H_Voile":6.0,
-        "Notes":"avec Pedro et Benoit Couronne"
+        "Notes":"avec Pedro et Benoit Couronne",
+        "Group_ID":null
     },
     {
         "Date":"12\/03\/2026",
@@ -75,7 +80,8 @@
         "MilArr":2937.0,
         "TotalMil":25.0,
         "H_Voile":5.0,
-        "Notes":"avec Camile et Sacha (Cuistot)"
+        "Notes":"avec Camile et Sacha (Cuistot)",
+        "Group_ID":null
     },
     {
         "Date":"13\/03\/2026",
@@ -88,6 +94,49 @@
         "MilArr":2963.0,
         "TotalMil":26.0,
         "H_Voile":5.0,
-        "Notes":"avec Camile et Sacha (Cuistot)"
+        "Notes":"avec Camile et Sacha (Cuistot)",
+        "Group_ID":null
+    },
+    {
+        "Date":"17\/04\/2026",
+        "Navigation":"test croisiere",
+        "PortArr":"vannes",
+        "MotDep":null,
+        "MotArr":null,
+        "TotalMot":0.0,
+        "MilDep":null,
+        "MilArr":null,
+        "TotalMil":0.0,
+        "H_Voile":null,
+        "Notes":null,
+        "Group_ID":"NAV-1776451621"
+    },
+    {
+        "Date":"18\/04\/2026",
+        "Navigation":"test croisiere",
+        "PortArr":"naples ",
+        "MotDep":null,
+        "MotArr":null,
+        "TotalMot":0.0,
+        "MilDep":null,
+        "MilArr":null,
+        "TotalMil":0.0,
+        "H_Voile":null,
+        "Notes":null,
+        "Group_ID":"NAV-1776451621"
+    },
+    {
+        "Date":"19\/04\/2026",
+        "Navigation":"test croisiere",
+        "PortArr":"rio",
+        "MotDep":null,
+        "MotArr":null,
+        "TotalMot":0.0,
+        "MilDep":null,
+        "MilArr":null,
+        "TotalMil":0.0,
+        "H_Voile":null,
+        "Notes":null,
+        "Group_ID":"NAV-1776451621"
     }
 ]
