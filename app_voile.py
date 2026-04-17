@@ -161,37 +161,6 @@ if st.session_state.page == "MEMOS":
                 st.rerun()
 
 # =================================================================
-# --- 3. BLOC CONTACTS (RECHERCHE SOCIÉTÉ CORRIGÉE) ---
-# =================================================================
-if st.session_state.page == "CONTACTS":
-    st.markdown('<h2 style="text-align:center;">⚓ Gestion des Clients Vesta</h2>', unsafe_allow_html=True)
-    df_raw = charger_data('contacts.json')
-    
-    # Navigation interne (Onglets)
-    n1, n2, n3, n4 = st.columns(4)
-    # ... (Vos boutons Nouveau / En cours / Attente / Terminés) ...
-
-    if not df_raw.empty:
-        df_c = df_raw.copy().fillna("")
-        df_c['orig_idx'] = df_c.index
-        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
-        
-        c_search, c_yr = st.columns([2, 1])
-        search = c_search.text_input("🔍 Rechercher (Nom, Prénom, Société...)", "").upper()
-        annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
-        
-        # --- FIX RECHERCHE SOCIÉTÉ ---
-        if search:
-            mask_search = (
-                df_c['Nom'].astype(str).str.upper().str.contains(search) | 
-                df_c['Prénom'].astype(str).str.upper().str.contains(search) | 
-                df_c['Société'].astype(str).str.upper().str.contains(search)
-            )
-            df_c = df_c[mask_search]
-            
-        # ... (Suite du code Contacts habituel) ...
-
-# =================================================================
 # --- 5. BLOC CONTACTS (V101 - RECHERCHE & EXCEL) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
