@@ -1086,13 +1086,22 @@ if st.session_state.page == "LOG":
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
-
-        # 4. SUPPRESSION / MODIF RAPIDE
+    # 4. SUPPRESSION / MODIF RAPIDE
         with st.expander("🛠️ Administration de l'historique"):
             df_admin = df_v.copy()
-            df_admin.insert(0, 'ID_LIGNE', df_admin.index)
+            # On utilise l'index réel du dataframe pour la suppression
+            df_admin['ID_LIGNE'] = df_admin.index 
+            
             st.dataframe(df_admin[['ID_LIGNE', 'Date', 'PortArr', 'TotalMil', 'Group_ID']], use_container_width=True, hide_index=True)
-            sel = st.number_input("ID à supprimer", min_value=0
+            
+            # Correction de la ligne ici (vérifie bien les parenthèses)
+            sel = st.number_input("ID à supprimer", min_value=0, max_value=len(df_log)-1 if not df_log.empty else 0, step=1)
+            
+            if st.button("🗑️ Supprimer la ligne sélectionnée"):
+                df_log = df_log.drop(index=sel).reset_index(drop=True)
+                sauvegarder_data(df_log, 'logbook.json')
+                st.rerun()
+
 
 
 
