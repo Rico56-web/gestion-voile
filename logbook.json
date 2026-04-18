@@ -1,7 +1,7 @@
 [
     {
         "Date":"01\/03\/2026",
-        "Navigation":"Elisabeth Philippe et sa fille",
+        "Navigation":"vers Port haliguen",
         "PortArr":"PORT HALIGUEN",
         "MotDep":2411.0,
         "MotArr":2415.8,
@@ -12,8 +12,8 @@
         "H_Voile":6.0,
         "Notes":"",
         "Group_ID":null,
-        "PortDep":null,
-        "Co\u00e9quipiers":""
+        "PortDep":"nan",
+        "Co\u00e9quipiers":"Elisabeth Philippe et sa fille"
     },
     {
         "Date":"02\/03\/2026",
