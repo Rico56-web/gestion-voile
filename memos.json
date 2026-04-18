@@ -1,13 +1,6 @@
 [
     {
         "Date":"18\/04\/2026",
-        "Description":"Notes: Manque confirmation supprimer \n               Manque bouton modifier \n                Manque bouton \u00e0 cocher fait \/pas fait \n                 Manque bouton archivage",
-        "Statut":"Normal",
-        "Paiement":"Normal",
-        "Archive":"Non Archiv\u00e9"
-    },
-    {
-        "Date":"18\/04\/2026",
         "Description":"\u274c | Dans stars manque Excel\n\u274c | Dans maint manque Excel",
         "Statut":"Normal",
         "Paiement":"Normal",
