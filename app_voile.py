@@ -1132,58 +1132,67 @@ if st.session_state.page == "LOG":
                 if c_annul.button("❌ Annuler"):
                     st.session_state[confirm_key] = False
                     st.rerun()
-
-            # --- FORMULAIRE DE MODIFICATION (SI ACTIVÉ) ---
-            if st.session_state.edit_mode:
-                st.divider()
-                st.subheader(f"📍 Modification de la ligne {st.session_state.edit_id}")
-                row_e = df_log.iloc[st.session_state.edit_id]
+    # --- FORMULAIRE DE MODIFICATION (VERSION FIABLE SANS TABLEAU) ---
+        if st.session_state.edit_mode:
+            st.divider()
+            st.markdown(f"### ✏️ Modification de la ligne ID: {st.session_state.edit_id}")
+            row_e = df_log.iloc[st.session_state.edit_id]
+            
+            with st.form("form_edit_log_simple"):
+                # 1. Infos Générales
+                c1, c2, c3 = st.columns(3)
+                m_date = c1.text_input("Date (JJ/MM/AAAA)", value=str(row_e.get('Date', '')))
+                m_nav = c2.text_input("Nom de la Croisière", value=str(row_e.get('Navigation', '')))
+                m_coep = c3.text_input("Coéquipiers", value=str(row_e.get('Coéquipiers', '')))
                 
-                with st.form("form_edit_log_definitif"):
-                    col1, col2, col3 = st.columns(3)
-                    m_nav = col1.text_input("Navigation", value=str(row_e.get('Navigation', '')))
-                    m_coep = col2.text_input("Coéquipiers", value=str(row_e.get('Coéquipiers', '')))
-                    m_h_voile = col3.number_input("Heures Voile", value=float(row_e.get('H_Voile', 0.0)))
+                # 2. Trajet
+                ct1, ct2 = st.columns(2)
+                m_pdep = ct1.text_input("Port de Départ", value=str(row_e.get('PortDep', '')))
+                m_parr = ct2.text_input("Port d'Arrivée", value=str(row_e.get('PortArr', '')))
+                
+                # 3. Compteurs (Moteur et Milles)
+                st.markdown("**📊 Relevés Compteurs**")
+                cm1, cm2, cm3 = st.columns(3)
+                m_mot_d = cm1.number_input("Moteur Départ", value=float(row_e.get('MotDep', 0.0)), format="%.1f")
+                m_mot_a = cm2.number_input("Moteur Arrivée", value=float(row_e.get('MotArr', 0.0)), format="%.1f")
+                m_h_voile = cm3.number_input("Heures Voile", value=float(row_e.get('H_Voile', 0.0)), format="%.1f")
+                
+                ck1, ck2 = st.columns(2)
+                m_mil_d = ck1.number_input("Milles Départ", value=float(row_e.get('MilDep', 0.0)), format="%.1f")
+                m_mil_a = ck2.number_input("Milles Arrivée", value=float(row_e.get('MilArr', 0.0)), format="%.1f")
+                
+                st.divider()
+                c_val, c_ann = st.columns(2)
+                
+                if c_val.form_submit_button("✅ ENREGISTRER LES MODIFICATIONS", use_container_width=True, type="primary"):
+                    idx = st.session_state.edit_id
                     
-                    # Préparation des données pour l'éditeur de ligne
-                    df_edit = pd.DataFrame([{
-                        "Date": row_e['Date'], 
-                        "Dép": row_e.get('PortDep',''), 
-                        "Arr": row_e.get('PortArr',''),
-                        "Mot Dép": float(row_e.get('MotDep',0.0)), 
-                        "Mot Arr": float(row_e.get('MotArr',0.0)),
-                        "Mil Dép": float(row_e.get('MilDep',0.0)), 
-                        "Mil Arr": float(row_e.get('MilArr',0.0))
-                    }])
+                    # Mise à jour directe (plus de risque de conflit avec le data_editor)
+                    df_log.at[idx, 'Date'] = m_date
+                    df_log.at[idx, 'Navigation'] = m_nav
+                    df_log.at[idx, 'Coéquipiers'] = m_coep
+                    df_log.at[idx, 'PortDep'] = m_pdep
+                    df_log.at[idx, 'PortArr'] = m_parr
                     
-                    res_edit = st.data_editor(df_edit, use_container_width=True, key="editor_admin_final")
+                    df_log.at[idx, 'MotDep'] = m_mot_d
+                    df_log.at[idx, 'MotArr'] = m_mot_a
+                    df_log.at[idx, 'TotalMot'] = round(m_mot_a - m_mot_d, 2)
                     
-                    c_val, c_ann = st.columns(2)
-                    if c_val.form_submit_button("✅ ENREGISTRER", use_container_width=True):
-                        idx = st.session_state.edit_id
-                        r = res_edit.iloc[0]
-                        
-                        # Mise à jour forcée des types numériques
-                        df_log.at[idx, 'Navigation'] = m_nav
-                        df_log.at[idx, 'Coéquipiers'] = m_coep
-                        df_log.at[idx, 'H_Voile'] = m_h_voile
-                        df_log.at[idx, 'Date'] = r['Date']
-                        df_log.at[idx, 'PortDep'] = r['Dép']
-                        df_log.at[idx, 'PortArr'] = r['Arr']
-                        df_log.at[idx, 'MotDep'] = float(r['Mot Dép'])
-                        df_log.at[idx, 'MotArr'] = float(r['Mot Arr'])
-                        df_log.at[idx, 'TotalMot'] = round(float(r['Mot Arr']) - float(r['Mot Dép']), 2)
-                        df_log.at[idx, 'MilDep'] = float(r['Mil Dép'])
-                        df_log.at[idx, 'MilArr'] = float(r['Mil Arr'])
-                        df_log.at[idx, 'TotalMil'] = round(float(r['Mil Arr']) - float(r['Mil Dép']), 2)
-                        
-                        sauvegarder_data(df_log, 'logbook.json')
-                        st.session_state.edit_mode = False
-                        st.rerun()
+                    df_log.at[idx, 'MilDep'] = m_mil_d
+                    df_log.at[idx, 'MilArr'] = m_mil_a
+                    df_log.at[idx, 'TotalMil'] = round(m_mil_a - m_mil_d, 2)
+                    
+                    df_log.at[idx, 'H_Voile'] = m_h_voile
+                    
+                    sauvegarder_data(df_log, 'logbook.json')
+                    st.session_state.edit_mode = False
+                    st.success("✅ Modification enregistrée !")
+                    time.sleep(0.5)
+                    st.rerun()
 
-                    if c_ann.form_submit_button("❌ ANNULER"):
-                        st.session_state.edit_mode = False
-                        st.rerun()
+                if c_ann.form_submit_button("❌ ANNULER", use_container_width=True):
+                    st.session_state.edit_mode = False
+                    st.rerun()
         else:
             st.info("Aucune donnée à gérer.")
 
