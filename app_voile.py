@@ -145,36 +145,115 @@ for i, name in enumerate(menu):
 st.divider()
 
 # =================================================================
-# --- 2. MENU MÉMOS (VERSION TEST DIRECTE) ---
+# --- 2. MENU MÉMOS (VERSION RÉPARÉE & SÉCURISÉE) ---
 # =================================================================
 if st.session_state.page == "MEMOS":
-    st.header("📝 Mémos & Notes de Bord")
+    st.markdown("### 📝 Mémos & Notes de Bord")
     
-    # 1. Chargement et Réparation immédiate
-    df_memos = charger_data_safe('memos.json')
-    
-    # Nettoyage forcé des données (pour les 3 anciennes notes)
-    for c in ['Statut', 'Paiement', 'Archive']:
+    # 1. Chargement avec secours si le fichier est corrompu ou vide
+    try:
+        df_memos = charger_data_safe('memos.json')
+    except:
+        df_memos = pd.DataFrame(columns=['Date', 'Description', 'Statut', 'Paiement', 'Archive'])
+
+    # Initialisation des colonnes si le fichier vient d'être recréé
+    for c in ['Statut', 'Paiement', 'Archive', 'Description', 'Date']:
         if c not in df_memos.columns:
             df_memos[c] = "Non Archivé" if c == "Archive" else "Normal"
-    df_memos = df_memos.fillna({"Statut": "Normal", "Paiement": "N/A", "Archive": "Non Archivé"})
 
-    # 2. Gestion de la Modification (Formulaire en haut)
-    if st.session_state.get('memo_edit_id') is not None:
-        idx = st.session_state.memo_edit_id
-        if idx < len(df_memos):
-            with st.expander("🔧 MODIFICATION EN COURS", expanded=True):
-                with st.form("form_edit_memo"):
-                    new_desc = st.text_area("Note", value=df_memos.at[idx, 'Description'])
-                    if st.form_submit_button("Mettre à jour"):
-                        df_memos.at[idx, 'Description'] = new_desc
+    # État pour la modif
+    if 'memo_edit_id' not in st.session_state: 
+        st.session_state.memo_edit_id = None
+
+    # --- A. FORMULAIRE DE MODIFICATION (S'affiche seulement si on clique sur Modifier) ---
+    if st.session_state.memo_edit_id is not None:
+        idx_e = st.session_state.memo_edit_id
+        # Sécurité : on vérifie que l'index existe encore
+        if idx_e < len(df_memos):
+            row_e = df_memos.iloc[idx_e]
+            st.warning("🔧 Modification en cours...")
+            with st.form("form_update"):
+                new_desc = st.text_area("Texte de la note", value=str(row_e['Description']))
+                c1, c2 = st.columns(2)
+                new_pay = c1.selectbox("Paiement", ["N/A", "À Payer", "Payé"], index=0)
+                new_stat = c2.selectbox("Urgence", ["Normal", "Urgent", "Fait"], index=0)
+                
+                col_btn1, col_btn2 = st.columns(2)
+                if col_btn1.form_submit_button("✅ APPLIQUER LES CHANGEMENTS"):
+                    if new_desc.strip() != "":
+                        df_memos.at[idx_e, 'Description'] = new_desc
+                        df_memos.at[idx_e, 'Paiement'] = new_pay
+                        df_memos.at[idx_e, 'Statut'] = new_stat
                         sauvegarder_data(df_memos, 'memos.json')
                         st.session_state.memo_edit_id = None
+                        st.success("Mis à jour !")
                         st.rerun()
-                if st.button("Annuler modification"):
+                    else:
+                        st.error("La description ne peut pas être vide.")
+                
+                if col_btn2.form_submit_button("❌ ANNULER"):
                     st.session_state.memo_edit_id = None
                     st.rerun()
+        st.divider()
 
+    # --- B. BOUTON AJOUTER (Toujours visible) ---
+    with st.expander("➕ CRÉER UNE NOUVELLE NOTE", expanded=df_memos.empty):
+        with st.form("new_memo_secure"):
+            d = st.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
+            txt = st.text_area("Votre message / Rappel")
+            if st.form_submit_button("💾 Enregistrer la note"):
+                if txt.strip() != "":
+                    new_row = pd.DataFrame([{"Date": d, "Description": txt, "Statut": "Normal", "Paiement": "N/A", "Archive": "Non Archivé"}])
+                    df_memos = pd.concat([df_memos, new_row], ignore_index=True)
+                    sauvegarder_data(df_memos, 'memos.json')
+                    st.rerun()
+                else:
+                    st.error("Écrivez quelque chose avant d'enregistrer.")
+
+    # --- C. AFFICHAGE DES NOTES ---
+    df_show = df_memos[df_memos['Archive'] == "Non Archivé"]
+    
+    if not df_show.empty:
+        for idx, row in df_show.sort_index(ascending=False).iterrows():
+            st.write("---")
+            # ON MET LA CASE À COCHER BIEN EN ÉVIDENCE AU DÉBUT
+            est_fait = (str(row.get('Statut')) == "Fait")
+            
+            # Utilisation de colonnes simples
+            col_c, col_t = st.columns([1, 8])
+            
+            with col_c:
+                # Si tu ne vois pas cette case, c'est que l'ID (idx) pose problème
+                nouveau_check = st.checkbox("FAIT", value=est_fait, key=f"check_final_{idx}")
+                if nouveau_check != est_fait:
+                    df_memos.at[idx, 'Statut'] = "Fait" if nouveau_check else "Normal"
+                    sauvegarder_data(df_memos, 'memos.json')
+                    st.rerun()
+            
+            with col_t:
+                couleur = "#D5F5E3" if est_fait else "#FEF9E7"
+                st.markdown(f"""
+                <div style="background:{couleur}; padding:10px; border-radius:5px; color:black; border:1px solid #ccc;">
+                    <b>{row['Date']}</b> | Status: {row['Statut']}<br>
+                    {row['Description']}
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Boutons
+                b_edit, b_arch, b_suppr = st.columns(3)
+                if b_edit.button("✏️ Modifier", key=f"edit_b_{idx}"):
+                    st.session_state.memo_edit_id = idx
+                    st.rerun()
+                if b_arch.button("📦 Archiver", key=f"arch_b_{idx}"):
+                    df_memos.at[idx, 'Archive'] = "Archivé"
+                    sauvegarder_data(df_memos, 'memos.json')
+                    st.rerun()
+                if b_suppr.button("🗑️ Supprimer", key=f"suppr_b_{idx}"):
+                    df_memos = df_memos.drop(idx).reset_index(drop=True)
+                    sauvegarder_data(df_memos, 'memos.json')
+                    st.rerun()
+    else:
+        st.info("Aucune note active. Utilisez le bouton '+' pour en ajouter une.")
 
 
 
