@@ -981,20 +981,21 @@ if st.session_state.page == "LOG":
     if 'edit_mode' not in st.session_state: st.session_state.edit_mode = False
     if 'edit_id' not in st.session_state: st.session_state.edit_id = None
 
-    # --- 1. FORMULAIRE DE SAISIE SÉCURISÉ (ST.FORM) ---
+    # --- 1. FORMULAIRE DE SAISIE AVEC CLÉ DYNAMIQUE (ANTI-DOUBLON) ---
     if not st.session_state.edit_mode:
-        # On utilise une clé unique pour l'expander afin de pouvoir le "fermer" via le refresh
+        # On crée une clé qui change à chaque seconde pour forcer le reset total après sauvegarde
+        if 'form_key' not in st.session_state:
+            st.session_state.form_key = str(int(time.time()))
+
         with st.expander("🚀 Enregistrer une Navigation", expanded=False):
-            
-            # Création du formulaire
-            with st.form("form_navigation", clear_on_submit=True):
+            # La clé dynamique change après chaque st.rerun()
+            with st.form(key=f"form_nav_{st.session_state.form_key}", clear_on_submit=True):
                 c1, c2, c3 = st.columns([1, 1, 2])
                 f_date = c1.date_input("Date départ", datetime.now())
                 f_jours = c2.number_input("Nombre de jours", min_value=1, value=1)
                 f_nav = c3.text_input("Nom du Voyage")
                 f_coep = st.text_input("Coéquipiers")
                 
-                # Récupération des derniers index
                 last_mot = df_log['MotArr'].max() if not df_log.empty else 0.0
                 last_mil = df_log['MilArr'].max() if not df_log.empty else 0.0
 
@@ -1008,20 +1009,19 @@ if st.session_state.page == "LOG":
                         "Heures Voile": 0.0
                     })
                 
-                # Note: Le data_editor dans un formulaire peut être capricieux, 
-                # on s'assure qu'il capture bien les dernières modifs
-                edited_df = st.data_editor(pd.DataFrame(lignes), use_container_width=True, key="nav_editor_final")
+                # On utilise aussi la clé dynamique ici pour l'éditeur
+                edited_df = st.data_editor(pd.DataFrame(lignes), use_container_width=True, key=f"editor_{st.session_state.form_key}")
 
-                # Bouton de soumission spécifique au formulaire
-                submit_button = st.form_submit_button("💾 ENREGISTRER ET FERMER", use_container_width=True, type="primary")
+                submit_button = st.form_submit_button("💾 VALIDER ET FERMER LE FORMULAIRE", use_container_width=True, type="primary")
 
                 if submit_button:
+                    # Sécurité supplémentaire : on vérifie si l'utilisateur a rempli au moins une arrivée
                     nouvelles = []
                     for _, r in edited_df.iterrows():
-                        m_d, m_a = float(r['Moteur Dép']), float(r['Moteur Arr'])
-                        mi_d, mi_a = float(r['Mille Dép']), float(r['Mille Arr'])
-                        
-                        if r['Arr']: # On n'enregistre que si une destination est saisie
+                        if r['Arr'] and str(r['Arr']).strip() != "":
+                            m_d, m_a = float(r['Moteur Dép']), float(r['Moteur Arr'])
+                            mi_d, mi_a = float(r['Mille Dép']), float(r['Mille Arr'])
+                            
                             nouvelles.append({
                                 "Date": r['Date'], "Navigation": f_nav, "PortDep": r['Dép'], "PortArr": r['Arr'],
                                 "Coéquipiers": f_coep, "MotDep": m_d, "MotArr": m_a, "TotalMot": round(m_a - m_d, 2),
@@ -1032,9 +1032,15 @@ if st.session_state.page == "LOG":
                     if nouvelles:
                         df_log = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
                         sauvegarder_data(df_log, 'logbook.json')
-                        st.success("✅ Navigation enregistrée avec succès !")
-                        time.sleep(1) # Petit temps pour voir le message
-                        st.rerun() # Rafraîchit la page : ferme l'expander et vide le formulaire
+                        
+                        # ON CHANGE LA CLÉ pour forcer la destruction du formulaire au prochain passage
+                        st.session_state.form_key = str(int(time.time()))
+                        
+                        st.success("✅ Enregistré !")
+                        time.sleep(0.5)
+                        st.rerun() # Ferme l'expander et réinitialise tout
+                    else:
+                        st.warning("⚠️ Veuillez saisir au moins un Port d'Arrivée.")
 
     # --- 2. AFFICHAGE DE L'HISTORIQUE ---
     if not df_log.empty:
