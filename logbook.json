@@ -103,20 +103,5 @@
         "Notes":"avec Camile et Sacha (Cuistot)",
         "Group_ID":null,
         "PortDep":null
-    },
-    {
-        "Date":"19\/04\/2026",
-        "Navigation":"test croisiere",
-        "PortArr":"rio",
-        "MotDep":null,
-        "MotArr":null,
-        "TotalMot":0.0,
-        "MilDep":null,
-        "MilArr":null,
-        "TotalMil":0.0,
-        "H_Voile":null,
-        "Notes":null,
-        "Group_ID":"NAV-1776451621",
-        "PortDep":null
     }
 ]
