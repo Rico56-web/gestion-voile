@@ -12,7 +12,7 @@
         "H_Voile":6.0,
         "Notes":"",
         "Group_ID":null,
-        "PortDep":"nan",
+        "PortDep":"Arzon",
         "Co\u00e9quipiers":"Elisabeth Philippe et sa fille"
     },
     {
@@ -97,7 +97,7 @@
     },
     {
         "Date":"13\/03\/2026",
-        "Navigation":"retour vers Arzon ",
+        "Navigation":"retour vers Arzon",
         "PortArr":"Arzon",
         "MotDep":2433.7,
         "MotArr":2436.1,
