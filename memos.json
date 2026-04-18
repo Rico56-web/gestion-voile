@@ -8,5 +8,10 @@
         "Date":"18\/04\/2026",
         "Description":"Notes: Manque confirmation supprimer \n               Manque bouton modifier \n                Manque bouton \u00e0 cocher fait \/pas fait \n                 Manque bouton archivage",
         "Statut":"Normal"
+    },
+    {
+        "Date":"18\/04\/2026",
+        "Description":"Dans stars manque Excel\nDans maint manque Excel\n",
+        "Statut":"Normal"
     }
 ]
