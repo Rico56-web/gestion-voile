@@ -1126,6 +1126,46 @@ if st.session_state.page == "LOG":
             if st.button("❌ Annuler la suppression"):
                 st.session_state[f"confirm_del_{sel_idx}"] = False
                 st.rerun()
+    # --- 3. ADMINISTRATION (MODIFIER / SUPPRIMER AVEC SÉCURITÉ) ---
+    with st.expander("🛠️ Gérer et Modifier les données", expanded=st.session_state.edit_mode):
+        df_adm = df_log.copy()
+        
+        # DÉFINITION DE LA VARIABLE MANQUANTE (Pour éviter le NameError)
+        cols_adm = ['Date', 'Navigation', 'Coéquipiers', 'TotalMot', 'TotalMil']
+        
+        # Affichage du tableau avec les bonnes colonnes
+        st.dataframe(df_adm[cols_adm], use_container_width=True)
+        
+        c_sel, c_mod, c_sup = st.columns([1, 1, 1])
+        sel_idx = c_sel.number_input("ID Ligne", min_value=0, max_value=len(df_log)-1 if not df_log.empty else 0, step=1)
+        
+        # --- BOUTON MODIFIER ---
+        if c_mod.button("✏️ MODIFIER", use_container_width=True):
+            st.session_state.edit_mode = True
+            st.session_state.edit_id = sel_idx
+            st.rerun()
+
+        # --- SYSTÈME DE SUPPRESSION AVEC CONFIRMATION ---
+        confirm_key = f"confirm_del_{sel_idx}"
+        if confirm_key not in st.session_state:
+            st.session_state[confirm_key] = False
+
+        if not st.session_state[confirm_key]:
+            if c_sup.button("🗑️ SUPPRIMER", use_container_width=True):
+                st.session_state[confirm_key] = True
+                st.rerun()
+        else:
+            c_conf, c_annul = st.columns(2)
+            if c_conf.button("⚠️ CONFIRMER ?", use_container_width=True, type="primary"):
+                df_log = df_log.drop(index=sel_idx).reset_index(drop=True)
+                sauvegarder_data(df_log, 'logbook.json')
+                st.session_state[confirm_key] = False
+                st.success(f"Ligne {sel_idx} supprimée.")
+                time.sleep(0.5)
+                st.rerun()
+            if c_annul.button("❌ Annuler"):
+                st.session_state[confirm_key] = False
+                st.rerun()
 
         # --- FORMULAIRE DE MODIFICATION (SI ACTIVÉ) ---
         if st.session_state.edit_mode:
@@ -1133,27 +1173,24 @@ if st.session_state.page == "LOG":
             st.subheader(f"📍 Modification de la ligne {st.session_state.edit_id}")
             row_e = df_log.iloc[st.session_state.edit_id]
             
-            # On utilise un formulaire ici aussi pour éviter les bugs de validation
             with st.form("form_edit_log"):
                 col1, col2, col3 = st.columns(3)
                 m_nav = col1.text_input("Navigation", value=str(row_e['Navigation']))
                 m_coep = col2.text_input("Coéquipiers", value=str(row_e['Coéquipiers']))
                 m_h_voile = col3.number_input("Heures Voile", value=float(row_e['H_Voile']))
                 
-                # Édition des compteurs
                 df_edit = pd.DataFrame([{
                     "Date": row_e['Date'], "Dép": row_e['PortDep'], "Arr": row_e['PortArr'],
                     "Mot Dép": row_e['MotDep'], "Mot Arr": row_e['MotArr'],
                     "Mil Dép": row_e['MilDep'], "Mil Arr": row_e['MilArr']
                 }])
-                res_edit = st.data_editor(df_edit, use_container_width=True, key="editor_modif")
+                res_edit = st.data_editor(df_edit, use_container_width=True, key="editor_modif_secure")
                 
                 c_val, c_ann = st.columns(2)
                 if c_val.form_submit_button("✅ ENREGISTRER LES MODIFICATIONS", use_container_width=True):
                     idx = st.session_state.edit_id
                     r = res_edit.iloc[0]
                     
-                    # Mise à jour avec recalculs
                     df_log.at[idx, 'Navigation'] = m_nav
                     df_log.at[idx, 'Coéquipiers'] = m_coep
                     df_log.at[idx, 'H_Voile'] = m_h_voile
@@ -1176,6 +1213,7 @@ if st.session_state.page == "LOG":
                 if c_ann.form_submit_button("❌ ANNULER"):
                     st.session_state.edit_mode = False
                     st.rerun()
+
  
 
 # --- FIN DU FICHIER ---
