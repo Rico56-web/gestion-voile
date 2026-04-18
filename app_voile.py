@@ -175,46 +175,7 @@ if st.session_state.page == "MEMOS":
                     st.session_state.memo_edit_id = None
                     st.rerun()
 
-    # 3. Liste des notes
-    df_actifs = df_memos[df_memos['Archive'] == "Non Archivé"]
 
-    if not df_actifs.empty:
-        for idx, row in df_actifs.sort_index(ascending=False).iterrows():
-            # --- STRUCTURE ULTRA-SIMPLE SANS HTML ---
-            # On utilise 2 colonnes : une pour la case, une pour tout le reste
-            col_check, col_content = st.columns([1, 10])
-            
-            # LA CASE À COCHER
-            est_fait = (row['Statut'] == "Fait")
-            check = col_check.checkbox(" ", value=est_fait, key=f"v_chk_{idx}")
-            
-            if check != est_fait:
-                df_memos.at[idx, 'Statut'] = "Fait" if check else "Normal"
-                sauvegarder_data(df_memos, 'memos.json')
-                st.rerun()
-            
-            # LE TEXTE ET LES BOUTONS
-            with col_content:
-                # Affichage simple
-                st.write(f"**{row['Date']}** | {row['Statut']} | {row['Paiement']}")
-                st.info(row['Description']) # Utilise un bloc bleu standard Streamlit
-                
-                # Boutons
-                b_mod, b_arc, b_del = st.columns(3)
-                if b_mod.button("✏️ Modifier", key=f"v_mod_{idx}"):
-                    st.session_state.memo_edit_id = idx
-                    st.rerun()
-                if b_arc.button("📦 Archiver", key=f"v_arc_{idx}"):
-                    df_memos.at[idx, 'Archive'] = "Archivé"
-                    sauvegarder_data(df_memos, 'memos.json')
-                    st.rerun()
-                if b_del.button("🗑️ Supprimer", key=f"v_del_{idx}"):
-                    df_memos = df_memos.drop(idx).reset_index(drop=True)
-                    sauvegarder_data(df_memos, 'memos.json')
-                    st.rerun()
-            st.divider()
-    else:
-        st.write("Aucun mémo actif.")
 
 
 # =================================================================
