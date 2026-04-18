@@ -110,5 +110,21 @@
         "Group_ID":null,
         "PortDep":"nan",
         "Co\u00e9quipiers":"camille Varrel et sacha(cuistot)"
+    },
+    {
+        "Date":"18\/04\/2026",
+        "Navigation":"",
+        "PortArr":"arzon",
+        "MotDep":2436.1,
+        "MotArr":2436.1,
+        "TotalMot":0.0,
+        "MilDep":2963.0,
+        "MilArr":2963.0,
+        "TotalMil":0.0,
+        "H_Voile":0.0,
+        "Notes":null,
+        "Group_ID":"",
+        "PortDep":"arzon",
+        "Co\u00e9quipiers":""
     }
 ]
