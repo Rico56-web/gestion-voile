@@ -1,7 +1,7 @@
 [
     {
         "Date":"01\/03\/2026",
-        "Navigation":"Elisabeth Philippe et sa fille ",
+        "Navigation":"Elisabeth Philippe et sa fille",
         "PortArr":"PORT HALIGUEN",
         "MotDep":2411.0,
         "MotArr":2415.8,
@@ -12,11 +12,12 @@
         "H_Voile":6.0,
         "Notes":"",
         "Group_ID":null,
-        "PortDep":null
+        "PortDep":null,
+        "Co\u00e9quipiers":""
     },
     {
         "Date":"01\/03\/2026",
-        "Navigation":"Elisabeth Philippe et sa fille ",
+        "Navigation":"Elisabeth Philippe et sa fille",
         "PortArr":"HOUAT Port st Gildas",
         "MotDep":2415.8,
         "MotArr":2419.5,
@@ -27,11 +28,12 @@
         "H_Voile":6.0,
         "Notes":"",
         "Group_ID":null,
-        "PortDep":""
+        "PortDep":"",
+        "Co\u00e9quipiers":""
     },
     {
         "Date":"01\/03\/2026",
-        "Navigation":"Elisabeth Philippe et sa fille ",
+        "Navigation":"Elisabeth Philippe et sa fille",
         "PortArr":"LE PALAIS",
         "MotDep":2419.5,
         "MotArr":2422.6,
@@ -42,7 +44,8 @@
         "H_Voile":6.0,
         "Notes":"",
         "Group_ID":null,
-        "PortDep":null
+        "PortDep":null,
+        "Co\u00e9quipiers":""
     },
     {
         "Date":"14\/03\/2026",
@@ -57,7 +60,8 @@
         "H_Voile":6.0,
         "Notes":"avec Pedro et Benoit Couronne",
         "Group_ID":null,
-        "PortDep":null
+        "PortDep":null,
+        "Co\u00e9quipiers":""
     },
     {
         "Date":"15\/03\/2026",
@@ -72,7 +76,8 @@
         "H_Voile":6.0,
         "Notes":"avec Pedro et Benoit Couronne",
         "Group_ID":null,
-        "PortDep":null
+        "PortDep":null,
+        "Co\u00e9quipiers":""
     },
     {
         "Date":"12\/03\/2026",
@@ -87,7 +92,8 @@
         "H_Voile":5.0,
         "Notes":"avec Camile et Sacha (Cuistot)",
         "Group_ID":null,
-        "PortDep":null
+        "PortDep":null,
+        "Co\u00e9quipiers":""
     },
     {
         "Date":"13\/03\/2026",
@@ -102,6 +108,7 @@
         "H_Voile":5.0,
         "Notes":"avec Camile et Sacha (Cuistot)",
         "Group_ID":null,
-        "PortDep":null
+        "PortDep":null,
+        "Co\u00e9quipiers":""
     }
 ]
