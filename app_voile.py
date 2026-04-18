@@ -957,6 +957,11 @@ if st.session_state.page == "ARCHIVES":
 # =================================================================
 # --- 12. PAGE LIVRE DE BORD (LOG) - AVEC COMPTEURS MOTEUR/MIL ---
 # =================================================================
+if st.button("🔍 Vérifier le contenu brut du fichier JSON"):
+    import json
+    with open('logbook.json', 'r') as f:
+        data = json.load(f)
+        st.json(data) # Ceci affichera TOUT ce qui est réellement enregistré
 if st.session_state.page == "LOG":
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>📖 Livre de Bord</h1></div>', unsafe_allow_html=True)
 
