@@ -954,32 +954,37 @@ if st.session_state.page == "ARCHIVES":
     with t1: st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
+
 # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION INTÉGRALE ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION COMPLÈTE & CORRIGÉE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>📖 Livre de Bord</h1></div>', unsafe_allow_html=True)
 
-    # Chargement et nettoyage initial
+    # 1. CHARGEMENT ET NETTOYAGE STRICT DES TYPES
     df_log = charger_data_safe('logbook.json')
     
-    # Sécurité colonnes et nettoyage des "nan"
+    # Initialisation des colonnes si manquantes
     for col in ['Navigation', 'Coéquipiers', 'PortDep', 'PortArr', 'TotalMil', 'Group_ID']:
         if col not in df_log.columns:
             df_log[col] = ""
-        df_log[col] = df_log[col].fillna("").astype(str).replace("nan", "").str.strip()
+    
+    # Forcer les types pour éviter les crashs (TypeError)
+    df_log['TotalMil'] = pd.to_numeric(df_log['TotalMil'], errors='coerce').fillna(0.0)
+    df_log['Coéquipiers'] = df_log['Coéquipiers'].fillna("").astype(str).str.strip()
+    df_log['Navigation'] = df_log['Navigation'].fillna("").astype(str).str.strip()
 
     if 'edit_mode' not in st.session_state: st.session_state.edit_mode = False
     if 'edit_id' not in st.session_state: st.session_state.edit_id = None
 
-    # --- 1. FORMULAIRE D'ENREGISTREMENT (NOUVEAU) ---
+    # --- SECTION A : FORMULAIRE NOUVELLE NAVIGATION ---
     if not st.session_state.edit_mode:
         with st.expander("🚀 Enregistrer une Nouvelle Navigation", expanded=False):
             c1, c2, c3 = st.columns([1, 1, 2])
             f_date = c1.date_input("Date départ", datetime.now())
             f_jours = c2.number_input("Nombre de jours", min_value=1, value=1)
-            f_nav = c3.text_input("Nom du Voyage (ex: Croisière Sud)")
-            f_coep = st.text_input("Coéquipiers (Identiques pour grouper les jours)")
+            f_nav = c3.text_input("Nom du Voyage")
+            f_coep = st.text_input("Coéquipiers (Ex: Elisabeth)")
             
             n_lignes = int(f_jours)
             gid = f"NAV-{int(time.time())}" if n_lignes > 1 else ""
@@ -988,11 +993,11 @@ if st.session_state.page == "LOG":
             for i in range(n_lignes):
                 lignes.append({
                     "Date": (f_date + timedelta(days=i)).strftime("%d/%m/%Y"),
-                    "Départ": "Questembert" if i == 0 and not df_log.empty else "", 
+                    "Départ": "Questembert" if (i == 0 and not df_log.empty) else "", 
                     "Arrivée": "", "Milles": 0.0
                 })
             df_temp = pd.DataFrame(lignes)
-            edited_df = st.data_editor(df_temp, use_container_width=True, key="new_nav_editor")
+            edited_df = st.data_editor(df_temp, use_container_width=True, key="new_log_input")
 
             if st.button("💾 SAUVEGARDER LE VOYAGE", type="primary", use_container_width=True):
                 nouvelles = []
@@ -1008,12 +1013,12 @@ if st.session_state.page == "LOG":
                     sauvegarder_data(df_log, 'logbook.json')
                     st.rerun()
 
-    # --- 2. AFFICHAGE DE L'HISTORIQUE (VISU UTILISATEUR) ---
+    # --- SECTION B : AFFICHAGE DE L'HISTORIQUE (VUE UTILISATEUR) ---
     if not df_log.empty:
         st.divider()
         df_v = df_log.copy()
         df_v['dt'] = pd.to_datetime(df_v['Date'], dayfirst=True, errors='coerce')
-        df_v = df_v.sort_values(by='dt') # Tri pour calculer les suites
+        df_v = df_v.sort_values(by='dt')
 
         blocs = []
         current_bloc = []
@@ -1025,7 +1030,7 @@ if st.session_state.page == "LOG":
             else:
                 prev_row = current_bloc[-1]
                 
-                # CRITÈRE : Même coéquipiers (non vide) ET Date J+1
+                # CRITÈRE : Même coéquipiers (strip() déjà fait) ET Date J+1
                 meme_coep = (row['Coéquipiers'] == prev_row['Coéquipiers']) and row['Coéquipiers'] != ""
                 date_suivante = (row['dt'] - prev_row['dt']).days == 1
                 
@@ -1037,7 +1042,6 @@ if st.session_state.page == "LOG":
         if current_bloc:
             blocs.append(current_bloc)
 
-        # Affichage inversé (plus récent en haut)
         for bloc in reversed(blocs):
             df_b = pd.DataFrame(bloc)
             if len(bloc) > 1:
@@ -1066,10 +1070,9 @@ if st.session_state.page == "LOG":
                     </div>
                 """, unsafe_allow_html=True)
 
-    # --- 3. ADMINISTRATION (MODIFIER / SUPPRIMER) ---
+    # --- SECTION C : ADMINISTRATION (MODIFIER / SUPPRIMER) ---
     with st.expander("🛠️ Gérer et Modifier les données", expanded=st.session_state.edit_mode):
         df_adm = df_log.copy()
-        # Affichage avec Navigation en premier à gauche
         cols_adm = ['Navigation', 'Coéquipiers', 'Date', 'PortDep', 'PortArr', 'TotalMil']
         st.dataframe(df_adm[cols_adm], use_container_width=True)
         
@@ -1086,35 +1089,39 @@ if st.session_state.page == "LOG":
             sauvegarder_data(df_log, 'logbook.json')
             st.rerun()
 
-        # FORMULAIRE DE MODIFICATION (S'affiche ici quand on clique sur modifier)
         if st.session_state.edit_mode:
-            st.info(f"Modification en cours de la ligne ID : {st.session_state.edit_id}")
+            st.info(f"📍 Mode Modification - ID : {st.session_state.edit_id}")
             row_e = df_log.iloc[st.session_state.edit_id]
             
             cm1, cm2 = st.columns(2)
-            m_nav = cm1.text_input("Nom de la Navigation", value=row_e.get('Navigation', ''))
-            m_coep = cm2.text_input("Coéquipiers", value=row_e.get('Coéquipiers', ''))
+            m_nav = cm1.text_input("Nom de la Navigation", value=str(row_e['Navigation']))
+            m_coep = cm2.text_input("Coéquipiers", value=str(row_e['Coéquipiers']))
             
-            # Édition des détails techniques
             df_mod_row = pd.DataFrame([{
-                "Date": row_e['Date'], "Départ": row_e.get('PortDep', ''), 
-                "Arrivée": row_e['PortArr'], "Milles": row_e['TotalMil']
+                "Date": str(row_e['Date']), "Départ": str(row_e['PortDep']), 
+                "Arrivée": str(row_e['PortArr']), "Milles": float(row_e['TotalMil'])
             }])
-            edited_row = st.data_editor(df_mod_row, use_container_width=True, key="editor_proxi")
+            edited_row = st.data_editor(df_mod_row, use_container_width=True, key="row_editor_final")
             
             cb1, cb2 = st.columns(2)
             if cb1.button("✅ VALIDER LES CHANGEMENTS", type="primary", use_container_width=True):
                 idx = st.session_state.edit_id
                 r = edited_row.iloc[0]
-                df_log.at[idx, 'Navigation'] = m_nav
-                df_log.at[idx, 'Coéquipiers'] = m_coep
-                df_log.at[idx, 'Date'] = r['Date']
-                df_log.at[idx, 'PortDep'] = r['Départ']
-                df_log.at[idx, 'PortArr'] = r['Arrivée']
+                
+                # Ré-application forcée du type numérique pour éviter le TypeError
+                df_log['TotalMil'] = pd.to_numeric(df_log['TotalMil'], errors='coerce').fillna(0.0)
+                
+                df_log.at[idx, 'Navigation'] = str(m_nav)
+                df_log.at[idx, 'Coéquipiers'] = str(m_coep)
+                df_log.at[idx, 'Date'] = str(r['Date'])
+                df_log.at[idx, 'PortDep'] = str(r['Départ'])
+                df_log.at[idx, 'PortArr'] = str(r['Arrivée'])
                 df_log.at[idx, 'TotalMil'] = float(r['Milles'])
+                
                 sauvegarder_data(df_log, 'logbook.json')
                 st.session_state.edit_mode = False
                 st.rerun()
+                
             if cb2.button("❌ ANNULER", use_container_width=True):
                 st.session_state.edit_mode = False
                 st.rerun()
