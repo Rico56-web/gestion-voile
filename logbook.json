@@ -65,7 +65,7 @@
     },
     {
         "Date":"15\/03\/2026",
-        "Navigation":"Pedro et Benoit",
+        "Navigation":"retour vesr arzon",
         "PortArr":"Arzon",
         "MotDep":2428.7,
         "MotArr":2432.7,
@@ -76,8 +76,8 @@
         "H_Voile":6.0,
         "Notes":"avec Pedro et Benoit Couronne",
         "Group_ID":null,
-        "PortDep":null,
-        "Co\u00e9quipiers":""
+        "PortDep":"nan",
+        "Co\u00e9quipiers":"Pedro et Benoit"
     },
     {
         "Date":"12\/03\/2026",
