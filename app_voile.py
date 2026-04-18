@@ -150,6 +150,7 @@ st.divider()
 if st.session_state.page == "MEMOS":
     st.markdown("### 📝 Mémos & Notes de Bord")
     
+    
     # 1. Chargement avec secours si le fichier est corrompu ou vide
     try:
         df_memos = charger_data_safe('memos.json')
@@ -164,6 +165,11 @@ if st.session_state.page == "MEMOS":
     # État pour la modif
     if 'memo_edit_id' not in st.session_state: 
         st.session_state.memo_edit_id = None
+
+    # Convertit le texte simple en liste pour le data_editor si besoin
+    def preparer_liste(texte):
+        lines = str(texte).split('\n')
+        return pd.DataFrame([{"Fait": False, "Tâche": l} for l in lines if l.strip() != ""])
 
     # --- A. FORMULAIRE DE MODIFICATION (S'affiche seulement si on clique sur Modifier) ---
     if st.session_state.memo_edit_id is not None:
@@ -210,52 +216,77 @@ if st.session_state.page == "MEMOS":
                 else:
                     st.error("Écrivez quelque chose avant d'enregistrer.")
 
-    # --- C. AFFICHAGE DES NOTES ---
+
+    else:
+        st.info("Aucune note active. Utilisez le bouton '+' pour en ajouter une.")
+
+# --- C. AFFICHAGE DES NOTES AVEC LISTE INTERNE ---
     df_show = df_memos[df_memos['Archive'] == "Non Archivé"]
     
     if not df_show.empty:
         for idx, row in df_show.sort_index(ascending=False).iterrows():
-            st.write("---")
-            # ON MET LA CASE À COCHER BIEN EN ÉVIDENCE AU DÉBUT
-            est_fait = (str(row.get('Statut')) == "Fait")
-            
-            # Utilisation de colonnes simples
-            col_c, col_t = st.columns([1, 8])
-            
-            with col_c:
-                # Si tu ne vois pas cette case, c'est que l'ID (idx) pose problème
-                nouveau_check = st.checkbox("FAIT", value=est_fait, key=f"check_final_{idx}")
-                if nouveau_check != est_fait:
-                    df_memos.at[idx, 'Statut'] = "Fait" if nouveau_check else "Normal"
+            with st.container():
+                # Entête de la fiche
+                col_h1, col_h2 = st.columns([3, 1])
+                col_h1.subheader(f"📅 {row['Date']}")
+                
+                # Couleur selon urgence
+                color = "#FADBD8" if row['Statut'] == "Urgent" else "#D5F5E3" if row['Statut'] == "Fait" else "#FEF9E7"
+                
+                st.markdown(f'<div style="background-color:{color}; padding:5px; border-radius:5px; border-left:10px solid #34495E;">', unsafe_allow_html=True)
+                
+                # --- LE CŒUR : LISTE LIGNE PAR LIGNE ---
+                # On transforme la description en DataFrame temporaire pour l'éditer
+                lignes = str(row['Description']).split('\n')
+                data_liste = []
+                for l in lignes:
+                    if " | " in l: # Si on a déjà des données formatées
+                        etat_str, texte_tache = l.split(" | ", 1)
+                        data_liste.append({"Fait": (etat_str == "✅"), "Tâche": texte_tache})
+                    else:
+                        data_liste.append({"Fait": False, "Tâche": l})
+                
+                df_temp = pd.DataFrame(data_liste)
+                
+                # Affichage du tableau interactif
+                edited_df = st.data_editor(
+                    df_temp,
+                    key=f"editor_{idx}",
+                    hide_index=True,
+                    column_config={
+                        "Fait": st.column_config.CheckboxColumn(default=False),
+                        "Tâche": st.column_config.TextColumn(width="large")
+                    },
+                    use_container_width=True
+                )
+                
+                # Sauvegarde automatique si changement dans la liste
+                if not edited_df.equals(df_temp):
+                    nouvelle_desc = ""
+                    for _, r in edited_df.iterrows():
+                        pref = "✅" if r['Fait'] else "❌"
+                        nouvelle_desc += f"{pref} | {r['Tâche']}\n"
+                    
+                    df_memos.at[idx, 'Description'] = nouvelle_desc.strip()
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
-            
-            with col_t:
-                couleur = "#D5F5E3" if est_fait else "#FEF9E7"
-                st.markdown(f"""
-                <div style="background:{couleur}; padding:10px; border-radius:5px; color:black; border:1px solid #ccc;">
-                    <b>{row['Date']}</b> | Status: {row['Statut']}<br>
-                    {row['Description']}
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Boutons
-                b_edit, b_arch, b_suppr = st.columns(3)
-                if b_edit.button("✏️ Modifier", key=f"edit_b_{idx}"):
+
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                # Boutons d'action
+                b1, b2, b3 = st.columns(3)
+                if b1.button("✏️ Modifier Titre/Urgence", key=f"ed_{idx}"):
                     st.session_state.memo_edit_id = idx
                     st.rerun()
-                if b_arch.button("📦 Archiver", key=f"arch_b_{idx}"):
+                if b2.button("📦 Archiver", key=f"ar_{idx}"):
                     df_memos.at[idx, 'Archive'] = "Archivé"
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
-                if b_suppr.button("🗑️ Supprimer", key=f"suppr_b_{idx}"):
+                if b3.button("🗑️ Supprimer", key=f"del_{idx}"):
                     df_memos = df_memos.drop(idx).reset_index(drop=True)
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
-    else:
-        st.info("Aucune note active. Utilisez le bouton '+' pour en ajouter une.")
-
-
+            st.divider()
 
 # =================================================================
 # --- 5. BLOC CONTACTS (V102 - COMPLET : RELANCES & COULEURS) ---
