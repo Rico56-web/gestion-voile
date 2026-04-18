@@ -32,7 +32,7 @@
         "Co\u00e9quipiers":""
     },
     {
-        "Date":"01\/03\/2026",
+        "Date":"03\/03\/2026",
         "Navigation":"Elisabeth Philippe et sa fille",
         "PortArr":"LE PALAIS",
         "MotDep":2419.5,
@@ -44,7 +44,7 @@
         "H_Voile":6.0,
         "Notes":"",
         "Group_ID":null,
-        "PortDep":null,
+        "PortDep":"nan",
         "Co\u00e9quipiers":""
     },
     {
