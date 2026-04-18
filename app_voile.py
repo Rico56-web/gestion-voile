@@ -194,62 +194,69 @@ if st.session_state.page == "MEMOS":
                 df_memos = pd.concat([df_memos, new_m], ignore_index=True)
                 sauvegarder_data(df_memos, 'memos.json')
                 st.rerun()
+    # --- C. LISTE DES MÉMOS (CORRECTION KEYERROR) ---
+    # Sécurité : on s'assure que la colonne Archive existe avant de filtrer
+    if 'Archive' not in df_memos.columns:
+        df_memos['Archive'] = "Non Archivé"
 
-    # --- C. LISTE DES MÉMOS ---
-    df_actifs = df_memos[df_memos.get('Archive', 'Non Archivé') == "Non Archivé"]
+    # Filtrage correct pour Pandas
+    df_actifs = df_memos[df_memos['Archive'] == "Non Archivé"]
     
-    for idx, row in df_actifs.sort_index(ascending=False).iterrows():
-        est_fait = (row['Statut'] == "Fait")
-        bg = "#D5F5E3" if est_fait else ("#FADBD8" if row['Statut'] == "Urgent" else "#FEF9E7")
-        
-        # Affichage de la ligne
-        with st.container():
-            c_check, c_text = st.columns([0.1, 0.9])
+    if not df_actifs.empty:
+        # Tri : les plus récents en haut
+        for idx, row in df_actifs.sort_index(ascending=False).iterrows():
+            est_fait = (row.get('Statut') == "Fait")
+            bg = "#D5F5E3" if est_fait else ("#FADBD8" if row.get('Statut') == "Urgent" else "#FEF9E7")
             
-            # Case à cocher pour le statut "Fait"
-            if c_check.checkbox("", value=est_fait, key=f"chk_{idx}"):
-                if not est_fait:
-                    df_memos.at[idx, 'Statut'] = "Fait"
-                    sauvegarder_data(df_memos, 'memos.json')
-                    st.rerun()
-            else:
-                if est_fait:
-                    df_memos.at[idx, 'Statut'] = "Normal"
+            with st.container():
+                c_check, c_text = st.columns([0.1, 0.9])
+                
+                # Case à cocher simplifiée
+                val_check = c_check.checkbox("", value=est_fait, key=f"chk_v3_{idx}")
+                
+                # Si on clique sur la case, on met à jour le statut
+                if val_check != est_fait:
+                    df_memos.at[idx, 'Statut'] = "Fait" if val_check else "Normal"
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
 
-            with c_text:
-                p_label = f" | **{row['Paiement']}**" if row.get('Paiement') != "N/A" else ""
-                st.markdown(f"""<div style="background:{bg}; padding:10px; border-radius:8px; border-left:5px solid #34495E; color:black;">
-                    <small>{row['Date']} — <b>{row['Statut'].upper()}</b>{p_label}</small><br>{row['Description']}</div>""", unsafe_allow_html=True)
+                with c_text:
+                    p_label = f" | **{row.get('Paiement', 'N/A')}**" if row.get('Paiement') != "N/A" else ""
+                    st.markdown(f"""
+                    <div style="background:{bg}; padding:10px; border-radius:8px; border-left:5px solid #34495E; color:black;">
+                        <small>{row.get('Date', '')} — <b>{str(row.get('Statut', '')).upper()}</b>{p_label}</small><br>
+                        {row.get('Description', '')}
+                    </div>
+                    """, unsafe_allow_html=True)
 
-            # Boutons d'action
-            b1, b2, b3 = st.columns([1, 1, 1])
-            if b1.button("✏️ Modifier", key=f"btn_ed_{idx}"):
-                st.session_state.memo_edit_id = idx
-                st.rerun()
-            
-            if b2.button("📦 Archiver", key=f"btn_ar_{idx}"):
-                df_memos.at[idx, 'Archive'] = "Archivé"
-                sauvegarder_data(df_memos, 'memos.json')
-                st.rerun()
-
-            # Suppression sécurisée
-            conf_k = f"del_c_{idx}"
-            if st.session_state.get(conf_k):
-                if b3.button("⚠️ CONFIRMER ?", key=f"real_d_{idx}", type="primary"):
-                    df_memos = df_memos.drop(idx).reset_index(drop=True)
+                # Boutons d'action
+                b1, b2, b3 = st.columns([1, 1, 1])
+                if b1.button("✏️ Modifier", key=f"btn_ed_v3_{idx}"):
+                    st.session_state.memo_edit_id = idx
+                    st.rerun()
+                
+                if b2.button("📦 Archiver", key=f"btn_ar_v3_{idx}"):
+                    df_memos.at[idx, 'Archive'] = "Archivé"
                     sauvegarder_data(df_memos, 'memos.json')
-                    st.session_state[conf_k] = False
                     st.rerun()
-                if st.button("Annuler", key=f"ann_d_{idx}"):
-                    st.session_state[conf_k] = False
-                    st.rerun()
-            else:
-                if b3.button("🗑️ Supprimer", key=f"pre_d_{idx}"):
-                    st.session_state[conf_k] = True
-                    st.rerun()
-        st.divider()
+
+                # Suppression avec sécurité
+                conf_k = f"del_c_v3_{idx}"
+                if st.session_state.get(conf_k):
+                    if b3.button("⚠️ CONFIRMER ?", key=f"real_d_v3_{idx}", type="primary"):
+                        df_memos = df_memos.drop(idx).reset_index(drop=True)
+                        sauvegarder_data(df_memos, 'memos.json')
+                        st.session_state[conf_k] = False
+                        st.rerun()
+                    if st.button("Annuler", key=f"ann_d_v3_{idx}"):
+                        st.session_state[conf_k] = False
+                        st.rerun()
+                else:
+                    if b3.button("🗑️ Supprimer", key=f"pre_d_v3_{idx}"):
+                        st.session_state[conf_k] = True
+                        st.rerun()
+            st.divider()
+
 
 # =================================================================
 # --- 5. BLOC CONTACTS (V102 - COMPLET : RELANCES & COULEURS) ---
