@@ -216,10 +216,6 @@ if st.session_state.page == "MEMOS":
                 else:
                     st.error("Écrivez quelque chose avant d'enregistrer.")
 
-
-    else:
-        st.info("Aucune note active. Utilisez le bouton '+' pour en ajouter une.")
-
 # --- C. AFFICHAGE DES NOTES AVEC LISTE INTERNE ---
     df_show = df_memos[df_memos['Archive'] == "Non Archivé"]
     
