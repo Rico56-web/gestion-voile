@@ -144,8 +144,9 @@ for i, name in enumerate(menu):
 
 st.divider()
 
-# =================================================================
-# --- 2. MENU MÉMOS (VERSION CORRIGÉE AVEC MODIFICATION ACTIVE) ---
+
+    # =================================================================
+# --- 2. MENU MÉMOS (VERSION CORRIGÉE ET SÉCURISÉE) ---
 # =================================================================
 if st.session_state.page == "MEMOS":
     st.markdown("### 📝 Mémos & Notes de Bord")
@@ -153,33 +154,35 @@ if st.session_state.page == "MEMOS":
 
     # Initialisation des états
     if 'memo_edit_id' not in st.session_state: st.session_state.memo_edit_id = None
+    if 'Archive' not in df_memos.columns: df_memos['Archive'] = "Non Archivé"
     
-    # --- A. FORMULAIRE DE MODIFICATION (S'AFFICHE SI ON CLIQUE SUR MODIFIER) ---
+    # --- A. FORMULAIRE DE MODIFICATION (PRIORITAIRE) ---
     if st.session_state.memo_edit_id is not None:
         idx_e = st.session_state.memo_edit_id
-        row_e = df_memos.iloc[idx_e]
-        
-        st.warning(f"🔧 Modification du Mémo #{idx_e}")
-        with st.form("form_edit_memo_global"):
-            e_desc = st.text_area("Description", value=row_e['Description'])
-            c1, c2 = st.columns(2)
-            e_pay = c1.selectbox("Paiement", ["N/A", "À Payer", "Payé"], 
-                                 index=["N/A", "À Payer", "Payé"].index(row_e.get('Paiement', 'N/A')))
-            e_stat = c2.selectbox("Urgence", ["Normal", "Urgent", "Fait"], 
-                                  index=["Normal", "Urgent", "Fait"].index(row_e.get('Statut', 'Normal')))
-            
-            col_b1, col_b2 = st.columns(2)
-            if col_b1.form_submit_button("✅ ENREGISTRER"):
-                df_memos.at[idx_e, 'Description'] = e_desc
-                df_memos.at[idx_e, 'Paiement'] = e_pay
-                df_memos.at[idx_e, 'Statut'] = e_stat
-                sauvegarder_data(df_memos, 'memos.json')
-                st.session_state.memo_edit_id = None
-                st.rerun()
-            if col_b2.form_submit_button("❌ ANNULER"):
-                st.session_state.memo_edit_id = None
-                st.rerun()
-        st.divider()
+        # Sécurité si l'index a disparu entre temps
+        if idx_e < len(df_memos):
+            row_e = df_memos.iloc[idx_e]
+            st.warning(f"🔧 Modification du Mémo #{idx_e}")
+            with st.form("form_edit_memo_global"):
+                e_desc = st.text_area("Description", value=row_e['Description'])
+                c1, c2 = st.columns(2)
+                e_pay = c1.selectbox("Paiement", ["N/A", "À Payer", "Payé"], 
+                                     index=["N/A", "À Payer", "Payé"].index(row_e.get('Paiement', 'N/A')))
+                e_stat = c2.selectbox("Urgence", ["Normal", "Urgent", "Fait"], 
+                                      index=["Normal", "Urgent", "Fait"].index(row_e.get('Statut', 'Normal')))
+                
+                cb1, cb2 = st.columns(2)
+                if cb1.form_submit_button("✅ ENREGISTRER"):
+                    df_memos.at[idx_e, 'Description'] = e_desc
+                    df_memos.at[idx_e, 'Paiement'] = e_pay
+                    df_memos.at[idx_e, 'Statut'] = e_stat
+                    sauvegarder_data(df_memos, 'memos.json')
+                    st.session_state.memo_edit_id = None
+                    st.rerun()
+                if cb2.form_submit_button("❌ ANNULER"):
+                    st.session_state.memo_edit_id = None
+                    st.rerun()
+            st.divider()
 
     # --- B. AJOUT D'UN NOUVEAU MÉMO ---
     with st.expander("➕ AJOUTER UN MÉMO OU UNE FACTURE", expanded=False):
@@ -195,75 +198,66 @@ if st.session_state.page == "MEMOS":
                 sauvegarder_data(df_memos, 'memos.json')
                 st.rerun()
 
-# --- LISTE DES MÉMOS AVEC ALIGNEMENT CASE / TEXTE ---
-    if 'Archive' not in df_memos.columns:
-        df_memos['Archive'] = "Non Archivé"
-
+    # --- C. LISTE DES MÉMOS ACTIFS ---
     df_actifs = df_memos[df_memos['Archive'] == "Non Archivé"]
     
     if not df_actifs.empty:
+        # On trie pour avoir les plus récents en premier
         for idx, row in df_actifs.sort_index(ascending=False).iterrows():
             est_fait = (row.get('Statut') == "Fait")
-            # Couleur de fond
             bg = "#D5F5E3" if est_fait else ("#FADBD8" if row.get('Statut') == "Urgent" else "#FEF9E7")
             
-            # --- STRUCTURE EN COLONNES POUR ALIGNER LA CASE ---
-            # On utilise un ratio 1/20 pour que la case soit bien collée à gauche
-            c_check, c_text = st.columns([1, 15])
-            
-            # 1. LA CASE (Colonne 1)
-            # On utilise un container pour s'assurer que le widget est bien rendu
-            with c_check:
-                # On ajoute un petit espace vertical pour centrer la case avec le texte
-                st.write("") 
-                val_check = st.checkbox("", value=est_fait, key=f"chk_v4_{idx}")
+            # Utilisation d'un container pour regrouper la ligne
+            with st.container():
+                # On utilise un ratio qui laisse de la place au checkbox
+                c_check, c_text = st.columns([1, 10])
                 
-                if val_check != est_fait:
-                    df_memos.at[idx, 'Statut'] = "Fait" if val_check else "Normal"
+                # 1. LA CASE À COCHER (Indépendante du HTML)
+                # On utilise label_visibility="collapsed" pour gagner de la place
+                check_val = c_check.checkbox("Fait", value=est_fait, key=f"chk_f_{idx}", label_visibility="collapsed")
+                
+                if check_val != est_fait:
+                    df_memos.at[idx, 'Statut'] = "Fait" if check_val else "Normal"
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
 
-            # 2. LE TEXTE (Colonne 2)
-            with c_text:
-                p_label = f" | <b style='color:darkred;'>{row.get('Paiement', 'N/A')}</b>" if row.get('Paiement') != "N/A" else ""
-                st.markdown(f"""
-                <div style="background:{bg}; padding:12px; border-radius:10px; border-left:5px solid #34495E; color:black; line-height:1.4;">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                        <span style="font-size:0.8rem; font-weight:bold;">📅 {row.get('Date', '')}</span>
-                        <span style="font-size:0.8rem;">{p_label}</span>
+                # 2. LE CONTENU TEXTUEL
+                with c_text:
+                    p_label = f" | <b style='color:darkred;'>{row.get('Paiement', 'N/A')}</b>" if row.get('Paiement') != "N/A" else ""
+                    st.markdown(f"""
+                    <div style="background:{bg}; padding:10px; border-radius:8px; border-left:5px solid #34495E; color:black;">
+                        <small><b>{row.get('Date', '')}</b>{p_label}</small><br>
+                        {row.get('Description', '')}
                     </div>
-                    <div style="font-size:1rem;">{row.get('Description', '')}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
 
-            # 3. LES BOUTONS (Sous le texte)
-            # On aligne les boutons sur la colonne du texte pour garder l'alignement
-            with c_text:
-                b1, b2, b3 = st.columns([1, 1, 1])
-                if b1.button("✏️ Modifier", key=f"ed_v4_{idx}"):
-                    st.session_state.memo_edit_id = idx
-                    st.rerun()
-                
-                if b2.button("📦 Archiver", key=f"ar_v4_{idx}"):
-                    df_memos.at[idx, 'Archive'] = "Archivé"
-                    sauvegarder_data(df_memos, 'memos.json')
-                    st.rerun()
-
-                # Suppression sécurisée
-                conf_k = f"del_v4_{idx}"
-                if st.session_state.get(conf_k):
-                    if b3.button("⚠️ CONFIRMER", key=f"real_v4_{idx}", type="primary"):
-                        df_memos = df_memos.drop(idx).reset_index(drop=True)
+                    # 3. LES BOUTONS D'ACTION (Alignés sous le texte)
+                    b1, b2, b3 = st.columns([1, 1, 1])
+                    if b1.button("✏️ Modifier", key=f"ed_b_{idx}"):
+                        st.session_state.memo_edit_id = idx
+                        st.rerun()
+                    
+                    if b2.button("📦 Archiver", key=f"ar_b_{idx}"):
+                        df_memos.at[idx, 'Archive'] = "Archivé"
                         sauvegarder_data(df_memos, 'memos.json')
-                        st.session_state[conf_k] = False
                         st.rerun()
-                else:
-                    if b3.button("🗑️ Supprimer", key=f"pre_v4_{idx}"):
-                        st.session_state[conf_k] = True
-                        st.rerun()
-            
-            st.write("---") # Séparateur discret
 
+                    # Suppression avec confirmation
+                    conf_k = f"del_confirm_{idx}"
+                    if st.session_state.get(conf_k):
+                        if b3.button("⚠️ CONFIRMER", key=f"real_d_{idx}", type="primary"):
+                            df_memos = df_memos.drop(idx).reset_index(drop=True)
+                            sauvegarder_data(df_memos, 'memos.json')
+                            st.session_state[conf_k] = False
+                            st.rerun()
+                        if st.button("Annuler", key=f"ann_d_{idx}"):
+                            st.session_state[conf_k] = False
+                            st.rerun()
+                    else:
+                        if b3.button("🗑️ Supprimer", key=f"pre_d_{idx}"):
+                            st.session_state[conf_k] = True
+                            st.rerun()
+            st.divider()
 
 
 # =================================================================
