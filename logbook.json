@@ -81,7 +81,7 @@
     },
     {
         "Date":"12\/03\/2026",
-        "Navigation":"camille Varrel et sacha(cuistot)",
+        "Navigation":"port haliguen",
         "PortArr":"Port haliguen",
         "MotDep":2432.7,
         "MotArr":2433.7,
@@ -92,8 +92,8 @@
         "H_Voile":5.0,
         "Notes":"avec Camile et Sacha (Cuistot)",
         "Group_ID":null,
-        "PortDep":null,
-        "Co\u00e9quipiers":""
+        "PortDep":"nan",
+        "Co\u00e9quipiers":"camille Varrel et sacha(cuistot)"
     },
     {
         "Date":"13\/03\/2026",
