@@ -1014,18 +1014,31 @@ if st.session_state.page == "LOG":
         blocs = []
         current_bloc = []
 
+       # --- LOGIQUE DE DÉTECTION DES BLOCS (SÉCURISÉE) ---
+        blocs = []
+        current_bloc = []
+
         for i in range(len(df_v)):
             row = df_v.iloc[i]
             if not current_bloc:
                 current_bloc.append(row)
             else:
                 prev_row = current_bloc[-1]
-                # CRITÈRES DE GROUPEMENT : Même coéquipiers ET Date consécutive (J+1)
-                meme_coep = str(row['Coéquipiers']).strip() == str(prev_row['Coéquipiers']).strip()
+                
+                # UTILISATION DE .get() POUR ÉVITER LE KEYERROR
+                # Si la colonne n'existe pas encore, on utilise une chaîne vide ""
+                coep_actuel = str(row.get('Coéquipiers', '')).strip()
+                coep_prec = str(prev_row.get('Coéquipiers', '')).strip()
+                
+                meme_coep = (coep_actuel == coep_prec) and coep_actuel != ""
+                
+                # Vérification de la date
                 date_suivante = (row['dt'] - prev_row['dt']).days == 1
                 
-                # Optionnel : On peut aussi grouper si ils ont le même Group_ID explicite
-                meme_gid = pd.notna(row.get('Group_ID')) and row.get('Group_ID') == prev_row.get('Group_ID')
+                # Vérification du Group_ID (sécurisé aussi)
+                gid_actuel = row.get('Group_ID')
+                gid_prec = prev_row.get('Group_ID')
+                meme_gid = pd.notna(gid_actuel) and gid_actuel == gid_prec and str(gid_actuel) != "None"
 
                 if (meme_coep and date_suivante) or meme_gid:
                     current_bloc.append(row)
@@ -1034,6 +1047,9 @@ if st.session_state.page == "LOG":
                     current_bloc = [row]
         if current_bloc:
             blocs.append(current_bloc)
+              
+                
+  
 
         # Affichage (Inversé pour avoir le plus récent en haut)
         for bloc in reversed(blocs):
