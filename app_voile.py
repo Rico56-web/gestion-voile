@@ -194,68 +194,76 @@ if st.session_state.page == "MEMOS":
                 df_memos = pd.concat([df_memos, new_m], ignore_index=True)
                 sauvegarder_data(df_memos, 'memos.json')
                 st.rerun()
-    # --- C. LISTE DES MÉMOS (CORRECTION KEYERROR) ---
-    # Sécurité : on s'assure que la colonne Archive existe avant de filtrer
+
+# --- LISTE DES MÉMOS AVEC ALIGNEMENT CASE / TEXTE ---
     if 'Archive' not in df_memos.columns:
         df_memos['Archive'] = "Non Archivé"
 
-    # Filtrage correct pour Pandas
     df_actifs = df_memos[df_memos['Archive'] == "Non Archivé"]
     
     if not df_actifs.empty:
-        # Tri : les plus récents en haut
         for idx, row in df_actifs.sort_index(ascending=False).iterrows():
             est_fait = (row.get('Statut') == "Fait")
+            # Couleur de fond
             bg = "#D5F5E3" if est_fait else ("#FADBD8" if row.get('Statut') == "Urgent" else "#FEF9E7")
             
-            with st.container():
-                c_check, c_text = st.columns([0.1, 0.9])
+            # --- STRUCTURE EN COLONNES POUR ALIGNER LA CASE ---
+            # On utilise un ratio 1/20 pour que la case soit bien collée à gauche
+            c_check, c_text = st.columns([1, 15])
+            
+            # 1. LA CASE (Colonne 1)
+            # On utilise un container pour s'assurer que le widget est bien rendu
+            with c_check:
+                # On ajoute un petit espace vertical pour centrer la case avec le texte
+                st.write("") 
+                val_check = st.checkbox("", value=est_fait, key=f"chk_v4_{idx}")
                 
-                # Case à cocher simplifiée
-                val_check = c_check.checkbox("", value=est_fait, key=f"chk_v3_{idx}")
-                
-                # Si on clique sur la case, on met à jour le statut
                 if val_check != est_fait:
                     df_memos.at[idx, 'Statut'] = "Fait" if val_check else "Normal"
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
 
-                with c_text:
-                    p_label = f" | **{row.get('Paiement', 'N/A')}**" if row.get('Paiement') != "N/A" else ""
-                    st.markdown(f"""
-                    <div style="background:{bg}; padding:10px; border-radius:8px; border-left:5px solid #34495E; color:black;">
-                        <small>{row.get('Date', '')} — <b>{str(row.get('Statut', '')).upper()}</b>{p_label}</small><br>
-                        {row.get('Description', '')}
+            # 2. LE TEXTE (Colonne 2)
+            with c_text:
+                p_label = f" | <b style='color:darkred;'>{row.get('Paiement', 'N/A')}</b>" if row.get('Paiement') != "N/A" else ""
+                st.markdown(f"""
+                <div style="background:{bg}; padding:12px; border-radius:10px; border-left:5px solid #34495E; color:black; line-height:1.4;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <span style="font-size:0.8rem; font-weight:bold;">📅 {row.get('Date', '')}</span>
+                        <span style="font-size:0.8rem;">{p_label}</span>
                     </div>
-                    """, unsafe_allow_html=True)
+                    <div style="font-size:1rem;">{row.get('Description', '')}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
-                # Boutons d'action
+            # 3. LES BOUTONS (Sous le texte)
+            # On aligne les boutons sur la colonne du texte pour garder l'alignement
+            with c_text:
                 b1, b2, b3 = st.columns([1, 1, 1])
-                if b1.button("✏️ Modifier", key=f"btn_ed_v3_{idx}"):
+                if b1.button("✏️ Modifier", key=f"ed_v4_{idx}"):
                     st.session_state.memo_edit_id = idx
                     st.rerun()
                 
-                if b2.button("📦 Archiver", key=f"btn_ar_v3_{idx}"):
+                if b2.button("📦 Archiver", key=f"ar_v4_{idx}"):
                     df_memos.at[idx, 'Archive'] = "Archivé"
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
 
-                # Suppression avec sécurité
-                conf_k = f"del_c_v3_{idx}"
+                # Suppression sécurisée
+                conf_k = f"del_v4_{idx}"
                 if st.session_state.get(conf_k):
-                    if b3.button("⚠️ CONFIRMER ?", key=f"real_d_v3_{idx}", type="primary"):
+                    if b3.button("⚠️ CONFIRMER", key=f"real_v4_{idx}", type="primary"):
                         df_memos = df_memos.drop(idx).reset_index(drop=True)
                         sauvegarder_data(df_memos, 'memos.json')
                         st.session_state[conf_k] = False
                         st.rerun()
-                    if st.button("Annuler", key=f"ann_d_v3_{idx}"):
-                        st.session_state[conf_k] = False
-                        st.rerun()
                 else:
-                    if b3.button("🗑️ Supprimer", key=f"pre_d_v3_{idx}"):
+                    if b3.button("🗑️ Supprimer", key=f"pre_v4_{idx}"):
                         st.session_state[conf_k] = True
                         st.rerun()
-            st.divider()
+            
+            st.write("---") # Séparateur discret
+
 
 
 # =================================================================
