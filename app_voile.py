@@ -145,133 +145,76 @@ for i, name in enumerate(menu):
 st.divider()
 
 # =================================================================
-# --- 2. MENU MÉMOS (VERSION FINALE SÉCURISÉE PC) ---
+# --- 2. MENU MÉMOS (VERSION TEST DIRECTE) ---
 # =================================================================
 if st.session_state.page == "MEMOS":
-    st.markdown("### 📝 Mémos & Notes de Bord")
+    st.header("📝 Mémos & Notes de Bord")
     
-    # Chargement des données
+    # 1. Chargement et Réparation immédiate
     df_memos = charger_data_safe('memos.json')
-
-    # . NETTOYAGE AUTOMATIQUE DES ANCIENNES NOTES (AUTO-FIX)
-    if not df_memos.empty:
-        if 'Statut' not in df_memos.columns: df_memos['Statut'] = "Normal"
-        if 'Paiement' not in df_memos.columns: df_memos['Paiement'] = "N/A"
-        if 'Archive' not in df_memos.columns: df_memos['Archive'] = "Non Archivé"
-        
-        # Remplit les cases vides (NaN) des anciennes notes
-        df_memos['Statut'] = df_memos['Statut'].fillna("Normal")
-        df_memos['Paiement'] = df_memos['Paiement'].fillna("N/A")
-        df_memos['Archive'] = df_memos['Archive'].fillna("Non Archivé")
-
-    # --- AUTO-FIX DES COLONNES (Indispensable pour l'affichage) ---
-    for col in ['Statut', 'Paiement', 'Archive', 'Description', 'Date']:
-        if col not in df_memos.columns:
-            df_memos[col] = "Non Archivé" if col == "Archive" else ("Normal" if col == "Statut" else "N/A")
-
-    # État pour la modification
-    if 'memo_edit_id' not in st.session_state: 
-        st.session_state.memo_edit_id = None
-
-    # --- A. FORMULAIRE DE MODIFICATION ---
-    if st.session_state.memo_edit_id is not None:
-        idx_e = st.session_state.memo_edit_id
-        if idx_e < len(df_memos):
-            row_e = df_memos.iloc[idx_e]
-            st.info(f"🔧 Modification du mémo sélectionné")
-            with st.form("edit_memo_form"):
-                e_desc = st.text_area("Description", value=str(row_e['Description']))
-                c1, c2 = st.columns(2)
-                # On force la conversion en string pour éviter les erreurs d'index
-                p_list = ["N/A", "À Payer", "Payé"]
-                s_list = ["Normal", "Urgent", "Fait"]
-                
-                curr_p = str(row_e.get('Paiement', 'N/A'))
-                curr_s = str(row_e.get('Statut', 'Normal'))
-                
-                e_pay = c1.selectbox("Paiement", p_list, index=p_list.index(curr_p) if curr_p in p_list else 0)
-                e_stat = c2.selectbox("Urgence", s_list, index=s_list.index(curr_s) if curr_s in s_list else 0)
-                
-                cb1, cb2 = st.columns(2)
-                if cb1.form_submit_button("✅ SAUVEGARDER"):
-                    df_memos.at[idx_e, 'Description'] = e_desc
-                    df_memos.at[idx_e, 'Paiement'] = e_pay
-                    df_memos.at[idx_e, 'Statut'] = e_stat
-                    sauvegarder_data(df_memos, 'memos.json')
-                    st.session_state.memo_edit_id = None
-                    st.rerun()
-                if cb2.form_submit_button("❌ ANNULER"):
-                    st.session_state.memo_edit_id = None
-                    st.rerun()
-            st.divider()
-
-    # --- B. AJOUT NOUVEAU MÉMO ---
-    with st.expander("➕ AJOUTER UN MÉMO / FACTURE", expanded=False):
-        with st.form("new_memo_form"):
-            c1, c2 = st.columns(2)
-            m_date = c1.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
-            m_pay = c2.selectbox("Paiement", ["N/A", "À Payer", "Payé"])
-            m_desc = st.text_area("Description")
-            m_statut = st.selectbox("Urgence", ["Normal", "Urgent", "Fait"])
-            if st.form_submit_button("💾 Enregistrer"):
-                new_m = pd.DataFrame([{"Date": m_date, "Description": m_desc, "Statut": m_statut, "Paiement": m_pay, "Archive": "Non Archivé"}])
-                df_memos = pd.concat([df_memos, new_m], ignore_index=True)
-                sauvegarder_data(df_memos, 'memos.json')
-                st.rerun()
-
-    # --- C. LISTE DYNAMIQUE ---
-    df_actifs = df_memos[df_memos['Archive'] == "Non Archivé"]
     
+    # Nettoyage forcé des données (pour les 3 anciennes notes)
+    for c in ['Statut', 'Paiement', 'Archive']:
+        if c not in df_memos.columns:
+            df_memos[c] = "Non Archivé" if c == "Archive" else "Normal"
+    df_memos = df_memos.fillna({"Statut": "Normal", "Paiement": "N/A", "Archive": "Non Archivé"})
+
+    # 2. Gestion de la Modification (Formulaire en haut)
+    if st.session_state.get('memo_edit_id') is not None:
+        idx = st.session_state.memo_edit_id
+        if idx < len(df_memos):
+            with st.expander("🔧 MODIFICATION EN COURS", expanded=True):
+                with st.form("form_edit_memo"):
+                    new_desc = st.text_area("Note", value=df_memos.at[idx, 'Description'])
+                    if st.form_submit_button("Mettre à jour"):
+                        df_memos.at[idx, 'Description'] = new_desc
+                        sauvegarder_data(df_memos, 'memos.json')
+                        st.session_state.memo_edit_id = None
+                        st.rerun()
+                if st.button("Annuler modification"):
+                    st.session_state.memo_edit_id = None
+                    st.rerun()
+
+    # 3. Liste des notes
+    df_actifs = df_memos[df_memos['Archive'] == "Non Archivé"]
+
     if not df_actifs.empty:
         for idx, row in df_actifs.sort_index(ascending=False).iterrows():
-            est_fait = (str(row.get('Statut')) == "Fait")
-            bg = "#D5F5E3" if est_fait else ("#FADBD8" if row.get('Statut') == "Urgent" else "#FEF9E7")
+            # --- STRUCTURE ULTRA-SIMPLE SANS HTML ---
+            # On utilise 2 colonnes : une pour la case, une pour tout le reste
+            col_check, col_content = st.columns([1, 10])
             
-            # --- LA LIGNE AVEC CASE À COCHER ---
-            col_check, col_content = st.columns([1, 15])
+            # LA CASE À COCHER
+            est_fait = (row['Statut'] == "Fait")
+            check = col_check.checkbox(" ", value=est_fait, key=f"v_chk_{idx}")
             
-            with col_check:
-                # La case est ici. Si elle n'apparaît pas, Streamlit masque la colonne.
-                st.write(" ") # Petit décalage pour aligner
-                check = st.checkbox("", value=est_fait, key=f"chk_{idx}")
-                if check != est_fait:
-                    df_memos.at[idx, 'Statut'] = "Fait" if check else "Normal"
-                    sauvegarder_data(df_memos, 'memos.json')
-                    st.rerun()
-
+            if check != est_fait:
+                df_memos.at[idx, 'Statut'] = "Fait" if check else "Normal"
+                sauvegarder_data(df_memos, 'memos.json')
+                st.rerun()
+            
+            # LE TEXTE ET LES BOUTONS
             with col_content:
-                # Affichage du bloc note
-                pay_val = row.get('Paiement', 'N/A')
-                pay_style = "color:red; font-weight:bold;" if pay_val == "À Payer" else "color:green;"
-                
-                st.markdown(f"""
-                <div style="background:{bg}; padding:10px; border-radius:8px; border-left:5px solid #34495E; color:black;">
-                    <div style="display:flex; justify-content:space-between;">
-                        <span>📅 {row.get('Date')}</span>
-                        <span style="{pay_style}">{pay_val}</span>
-                    </div>
-                    <div style="margin-top:5px;">{row.get('Description')}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                # Affichage simple
+                st.write(f"**{row['Date']}** | {row['Statut']} | {row['Paiement']}")
+                st.info(row['Description']) # Utilise un bloc bleu standard Streamlit
                 
                 # Boutons
-                b1, b2, b3 = st.columns(3)
-                if b1.button("✏️ Modif", key=f"ed_{idx}"):
+                b_mod, b_arc, b_del = st.columns(3)
+                if b_mod.button("✏️ Modifier", key=f"v_mod_{idx}"):
                     st.session_state.memo_edit_id = idx
                     st.rerun()
-                if b2.button("📦 Archive", key=f"ar_{idx}"):
+                if b_arc.button("📦 Archiver", key=f"v_arc_{idx}"):
                     df_memos.at[idx, 'Archive'] = "Archivé"
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
-                
-                # Supprimer simplifié pour le test
-                if b3.button("🗑️ Suppr", key=f"del_{idx}"):
+                if b_del.button("🗑️ Supprimer", key=f"v_del_{idx}"):
                     df_memos = df_memos.drop(idx).reset_index(drop=True)
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
-            st.write("") # Espace entre les notes
+            st.divider()
     else:
-        st.write("Aucun mémo en cours.")
+        st.write("Aucun mémo actif.")
 
 
 # =================================================================
