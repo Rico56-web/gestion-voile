@@ -956,112 +956,145 @@ if st.session_state.page == "ARCHIVES":
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
 
 # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - LOGIQUE DÉPART/ARRIVÉE ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION FINALE RÉTABLIE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>📖 Livre de Bord</h1></div>', unsafe_allow_html=True)
 
     df_log = charger_data_safe('logbook.json')
     
-    # 1. FORMULAIRE AVEC DÉPART ET ARRIVÉE
-    with st.expander("🚀 Enregistrer une Navigation", expanded=False):
+    # --- GESTION ÉDITION ---
+    if 'edit_mode' not in st.session_state: st.session_state.edit_mode = False
+    if 'edit_id' not in st.session_state: st.session_state.edit_id = None
+
+    # 1. FORMULAIRE (ADAPTATIF)
+    titre_expander = "📝 MODIFIER LA NAVIGATION" if st.session_state.edit_mode else "🚀 ENREGISTRER UNE NAVIGATION"
+    with st.expander(titre_expander, expanded=st.session_state.edit_mode):
         c1, c2, c3 = st.columns([2, 1, 2])
-        f_date = c1.date_input("Date de départ", datetime.now())
-        f_jours = c2.number_input("Nombre de jours", min_value=1, value=1, step=1)
-        f_titre = c3.text_input("Nom du voyage (Optionnel)")
         
-        n_lignes = int(f_jours)
-        # L'ID unique garantit que seules ces lignes seront groupées ensemble
-        group_id = f"NAV-{int(time.time())}" if n_lignes > 1 else None
+        # Valeurs par défaut
+        d_val = datetime.now()
+        t_val = ""
+        if st.session_state.edit_mode and st.session_state.edit_id is not None:
+            row_e = df_log.loc[st.session_state.edit_id]
+            d_val = pd.to_datetime(row_e['Date'], dayfirst=True)
+            t_val = row_e.get('Navigation', '')
 
-        if 'temp_log_df' not in st.session_state or len(st.session_state.temp_log_df) != n_lignes:
-            lignes = []
-            for i in range(n_lignes):
-                lignes.append({
-                    "Date": (f_date + timedelta(days=i)).strftime("%d/%m/%Y"),
-                    "Départ": "Questembert" if i == 0 else "", 
-                    "Arrivée": "", "Milles": 0.0
-                })
-            st.session_state.temp_log_df = pd.DataFrame(lignes)
+        f_date = c1.date_input("Date", d_val)
+        f_jours = c2.number_input("Jours", min_value=1, value=1, disabled=st.session_state.edit_mode)
+        f_titre = c3.text_input("Voyage / Destination", value=t_val)
 
-        edited_df = st.data_editor(st.session_state.temp_log_df, use_container_width=True)
+        if not st.session_state.edit_mode:
+            n_lignes = int(f_jours)
+            gid = f"NAV-{int(time.time())}" if n_lignes > 1 else None
+            if 'temp_log_df' not in st.session_state or len(st.session_state.temp_log_df) != n_lignes:
+                lignes = [{"Date": (f_date + timedelta(days=i)).strftime("%d/%m/%Y"), "Départ": "", "Arrivée": "", "Milles": 0.0} for i in range(n_lignes)]
+                st.session_state.temp_log_df = pd.DataFrame(lignes)
+        else:
+            row_e = df_log.loc[st.session_state.edit_id]
+            st.session_state.temp_log_df = pd.DataFrame([{
+                "Date": row_e['Date'], "Départ": row_e.get('PortDep', ''), "Arrivée": row_e['PortArr'], "Milles": row_e['TotalMil']
+            }])
 
-        if st.button("💾 ENREGISTRER LA NAVIGATION", type="primary", use_container_width=True):
-            nouvelles = []
-            for i, row in edited_df.iterrows():
-                if row.get("Arrivée"):
-                    nouvelles.append({
-                        "Date": row.get("Date"),
-                        "Navigation": f_titre or "Navigation",
-                        "PortDep": row.get("Départ"), # Nouveau champ
-                        "PortArr": row.get("Arrivée"),
-                        "TotalMil": float(row.get("Milles", 0)),
-                        "Group_ID": group_id # Seul ce lien compte pour le groupe
-                    })
-            if nouvelles:
-                df_final = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
-                sauvegarder_data(df_final, 'logbook.json')
+        edited_df = st.data_editor(st.session_state.temp_log_df, use_container_width=True, key="log_edit_2026")
+
+        cb1, cb2 = st.columns(2)
+        if st.session_state.edit_mode:
+            if cb1.button("✅ ENREGISTRER MODIFS", type="primary", use_container_width=True):
+                idx = st.session_state.edit_id
+                row_mod = edited_df.iloc[0]
+                df_log.at[idx, 'Date'] = row_mod['Date']
+                df_log.at[idx, 'PortDep'] = row_mod['Départ']
+                df_log.at[idx, 'PortArr'] = row_mod['Arrivée']
+                df_log.at[idx, 'TotalMil'] = float(row_mod['Milles'])
+                df_log.at[idx, 'Navigation'] = f_titre
+                sauvegarder_data(df_log, 'logbook.json')
+                st.session_state.edit_mode = False
                 st.rerun()
+            if cb2.button("❌ ANNULER", use_container_width=True):
+                st.session_state.edit_mode = False
+                st.rerun()
+        else:
+            if st.button("💾 SAUVEGARDER LA NAVIGATION", type="primary", use_container_width=True):
+                nouvelles = []
+                for _, r in edited_df.iterrows():
+                    if r['Arrivée']:
+                        nouvelles.append({
+                            "Date": r['Date'], "Navigation": f_titre or "Navigation",
+                            "PortDep": r['Départ'], "PortArr": r['Arrivée'],
+                            "TotalMil": float(r['Milles']), "Group_ID": gid
+                        })
+                if nouvelles:
+                    df_log = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
+                    sauvegarder_data(df_log, 'logbook.json')
+                    st.session_state.temp_log_df = None
+                    st.rerun()
 
-    # 2. AFFICHAGE DE L'HISTORIQUE (ORDRE CHRONO & SÉCURITÉ NOM)
+    # 2. AFFICHAGE DE L'HISTORIQUE
     if not df_log.empty:
         st.divider()
         df_v = df_log.copy()
         df_v['dt'] = pd.to_datetime(df_v['Date'], dayfirst=True, errors='coerce')
         df_v = df_v.sort_values(by='dt', ascending=False)
 
-        groupes_vus = set()
-
+        vus = set()
         for idx, row in df_v.iterrows():
             gid = row.get('Group_ID')
+            nom = str(row.get('Navigation', '')).strip()
             
-            # --- CONDITION DE GROUPEMENT STRICTE ---
-            # On ne groupe QUE si un Group_ID existe (créé lors de la saisie multi-jours)
-            if pd.notna(gid) and str(gid).lower() != "none":
-                if gid in groupes_vus: continue
-                
-                group_data = df_v[df_v['Group_ID'] == gid].sort_values(by='dt')
-                
-                if len(group_data) > 1:
-                    total_m = group_data['TotalMil'].sum()
-                    # On construit l'itinéraire proprement
-                    depart_initial = group_data.iloc[0].get('PortDep', '---')
-                    etapes = " → ".join(group_data['PortArr'].astype(str))
-                    
-                    st.markdown(f"""
-                        <div style="background:#eef2f7; color:#2c3e50; padding:15px; border-radius:10px; margin-bottom:12px; border-left: 8px solid #3498db; border: 1px solid #d1d9e6;">
-                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; font-weight:bold; color:#5d6d7e;">
-                                <span>🚢 VOYAGE : {row.get('Navigation', '').upper()}</span>
-                                <span>{len(group_data)} JOURS</span>
-                            </div>
-                            <div style="margin-top:8px;">
-                                <b style="font-size:1.1rem; color:#1a5276;">{group_data.iloc[0]['Date']} au {group_data.iloc[-1]['Date']}</b><br>
-                                <span style="font-size:0.9rem; color:#566573;">📍 {depart_initial} → {etapes}</span>
-                            </div>
-                            <div style="text-align:right; margin-top:-20px;">
-                                <b style="font-size:1.5rem; color:#2980b9;">{total_m:.1f} NM</b>
-                            </div>
+            # --- LOGIQUE DE GROUPEMENT (Hybride pour récupérer tes navs de mars) ---
+            if pd.notna(gid) and str(gid) != "None":
+                mask = df_v['Group_ID'] == gid
+                id_grp = gid
+            elif nom != "" and nom.lower() != "navigation":
+                mask = df_v['Navigation'] == nom
+                id_grp = nom
+            else:
+                mask = None
+
+            if mask is not None and len(df_v[mask]) > 1:
+                if id_grp in vus: continue
+                grp = df_v[mask].sort_values(by='dt')
+                total = grp['TotalMil'].sum()
+                st.markdown(f"""
+                    <div style="background:#eef2f7; color:#2c3e50; padding:12px; border-radius:10px; margin-bottom:10px; border-left: 8px solid #3498db; border: 1px solid #d1d9e6;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; font-weight:bold; color:#5d6d7e;">
+                            <span>🚢 {nom.upper()}</span><span>{len(grp)} JOURS</span>
                         </div>
-                    """, unsafe_allow_html=True)
-                    groupes_vus.add(gid)
-                    continue
+                        <div style="margin-top:5px;">
+                            <b style="font-size:1.1rem; color:#1a5276;">{grp.iloc[0]['Date']} → {grp.iloc[-1]['Date']}</b><br>
+                            <span style="font-size:0.9rem;">📍 {grp.iloc[0].get('PortDep','?')} → {" → ".join(grp['PortArr'].astype(str))}</span>
+                        </div>
+                        <div style="text-align:right; margin-top:-20px;"><b style="font-size:1.4rem; color:#2980b9;">{total:.1f} NM</b></div>
+                    </div>
+                """, unsafe_allow_html=True)
+                vus.add(id_grp)
+            elif mask is None or (mask is not None and len(df_v[mask]) <= 1):
+                # Sortie simple (si pas déjà affiché dans un groupe)
+                if idx in [i for g in [df_v[df_v['Group_ID'] == v].index if pd.notna(v) else [] for v in vus] for i in g]: continue
+                st.markdown(f"""
+                    <div style="background:white; border:1px solid #dee2e6; padding:10px; border-radius:5px; margin-bottom:5px; display:flex; justify-content:space-between;">
+                        <span><b>{row['Date']}</b> : {row.get('PortDep','')} → {row['PortArr']}</span>
+                        <b style="color:#27ae60;">{row['TotalMil']} NM</b>
+                    </div>
+                """, unsafe_allow_html=True)
 
-            # --- AFFICHAGE SORTIE SIMPLE ---
-            # Si pas de Group_ID, la ligne est traitée individuellement
-            st.markdown(f"""
-                <div style="background:white; border:1px solid #dee2e6; padding:10px 15px; border-radius:5px; margin-bottom:5px; display: flex; justify-content: space-between; align-items:center;">
-                    <div style="width: 100px; border-right: 2px solid #f2f2f2;">
-                        <b style="color:#2c3e50;">{row['Date']}</b>
-                    </div>
-                    <div style="flex: 2; padding-left:15px;">
-                        <span style="font-weight:bold;">⚓ {row.get('PortDep', '')} → {row['PortArr']}</span> 
-                    </div>
-                    <div style="width: 80px; text-align: right; font-weight: bold; color:#27ae60;">
-                        {row['TotalMil']} NM
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-
+        # 3. ADMINISTRATION (MODIFIER / SUPPRIMER)
+        with st.expander("🛠️ Administration (Modifier / Supprimer)"):
+            df_adm = df_v.copy()
+            df_adm['ID'] = df_adm.index
+            st.dataframe(df_adm[['ID', 'Date', 'PortArr', 'Navigation']], use_container_width=True, hide_index=True)
+            
+            c_sel, c_btn1, c_btn2 = st.columns([1,1,1])
+            sel_id = c_sel.number_input("Sélectionner ID", min_value=0, max_value=2000, step=1)
+            if c_btn1.button("✏️ Modifier"):
+                st.session_state.edit_mode = True
+                st.session_state.edit_id = sel_id
+                st.rerun()
+            if c_btn2.button("🗑️ Supprimer"):
+                df_log = df_log.drop(index=sel_id).reset_index(drop=True)
+                sauvegarder_data(df_log, 'logbook.json')
+                st.rerun()
 
 
 # --- FIN DU FICHIER ---
