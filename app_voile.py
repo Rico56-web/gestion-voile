@@ -1029,13 +1029,18 @@ if st.session_state.page == "LOG":
                 sauvegarder_data(df_final, 'logbook.json')
                 if 'temp_log_df' in st.session_state: del st.session_state.temp_log_df
                 st.rerun()
-
-    # 3. AFFICHAGE DE L'HISTORIQUE (GROUPEMENT INTELLIGENT & RÉPARATION)
+        # 3. AFFICHAGE DE L'HISTORIQUE (TRI CHRONO INVERSÉ GARANTI)
     if not df_log.empty:
         st.divider()
         df_v = df_log.copy()
+        
+        # 1. On convertit proprement en dates (dayfirst=True est crucial pour le format français)
         df_v['dt'] = pd.to_datetime(df_v['Date'], dayfirst=True, errors='coerce')
-        df_v = df_v.sort_values(by='dt', ascending=False)
+        
+        # 2. On trie par 'dt' de manière DESCENDANTE (False)
+        # na_position='last' envoie les dates invalides tout en bas
+        df_v = df_v.sort_values(by='dt', ascending=False, na_position='last')
+ 
 
         groupes_vus = set()
 
