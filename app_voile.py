@@ -145,144 +145,129 @@ for i, name in enumerate(menu):
 st.divider()
 
 # =================================================================
-# --- 2. MENU MÉMOS (VERSION RÉPARÉE & SÉCURISÉE) ---
+# --- 2. MENU MÉMOS (CHECK-LIST COULEUR & GESTION TOTALE) ---
 # =================================================================
 if st.session_state.page == "MEMOS":
-    st.markdown("### 📝 Mémos & Notes de Bord")
-    
-    
-    # 1. Chargement avec secours si le fichier est corrompu ou vide
-    try:
-        df_memos = charger_data_safe('memos.json')
-    except:
-        df_memos = pd.DataFrame(columns=['Date', 'Description', 'Statut', 'Paiement', 'Archive'])
+    st.markdown("<h2 style='text-align: center; color: #34495E;'>⚓ Mémos & Check-lists de Bord</h2>", unsafe_allow_html=True)
+    df_memos = charger_data_safe('memos.json')
 
-    # Initialisation des colonnes si le fichier vient d'être recréé
+    # --- AUTO-REPARATION ---
     for c in ['Statut', 'Paiement', 'Archive', 'Description', 'Date']:
         if c not in df_memos.columns:
             df_memos[c] = "Non Archivé" if c == "Archive" else "Normal"
 
-    # État pour la modif
-    if 'memo_edit_id' not in st.session_state: 
-        st.session_state.memo_edit_id = None
+    if 'memo_edit_id' not in st.session_state: st.session_state.memo_edit_id = None
 
-    # Convertit le texte simple en liste pour le data_editor si besoin
-    def preparer_liste(texte):
-        lines = str(texte).split('\n')
-        return pd.DataFrame([{"Fait": False, "Tâche": l} for l in lines if l.strip() != ""])
-
-    # --- A. FORMULAIRE DE MODIFICATION (S'affiche seulement si on clique sur Modifier) ---
+    # --- A. FORMULAIRE DE MODIFICATION ---
     if st.session_state.memo_edit_id is not None:
         idx_e = st.session_state.memo_edit_id
-        # Sécurité : on vérifie que l'index existe encore
         if idx_e < len(df_memos):
             row_e = df_memos.iloc[idx_e]
-            st.warning("🔧 Modification en cours...")
-            with st.form("form_update"):
-                new_desc = st.text_area("Texte de la note", value=str(row_e['Description']))
+            with st.form("edit_memo_fun"):
+                st.markdown(f"#### ✏️ Modifier la note du {row_e['Date']}")
+                e_desc = st.text_area("Modifier le contenu (une ligne = une tâche)", value=str(row_e['Description']), height=150)
                 c1, c2 = st.columns(2)
-                new_pay = c1.selectbox("Paiement", ["N/A", "À Payer", "Payé"], index=0)
-                new_stat = c2.selectbox("Urgence", ["Normal", "Urgent", "Fait"], index=0)
+                e_pay = c1.selectbox("Paiement", ["N/A", "À Payer", "Payé"], index=0)
+                e_stat = c2.selectbox("Urgence", ["Normal", "Urgent", "Fait"], index=0)
                 
-                col_btn1, col_btn2 = st.columns(2)
-                if col_btn1.form_submit_button("✅ APPLIQUER LES CHANGEMENTS"):
-                    if new_desc.strip() != "":
-                        df_memos.at[idx_e, 'Description'] = new_desc
-                        df_memos.at[idx_e, 'Paiement'] = new_pay
-                        df_memos.at[idx_e, 'Statut'] = new_stat
-                        sauvegarder_data(df_memos, 'memos.json')
-                        st.session_state.memo_edit_id = None
-                        st.success("Mis à jour !")
-                        st.rerun()
-                    else:
-                        st.error("La description ne peut pas être vide.")
-                
-                if col_btn2.form_submit_button("❌ ANNULER"):
+                if st.form_submit_button("🚀 VALIDER LES CHANGEMENTS", use_container_width=True):
+                    df_memos.at[idx_e, 'Description'] = e_desc
+                    df_memos.at[idx_e, 'Paiement'] = e_pay
+                    df_memos.at[idx_e, 'Statut'] = e_stat
+                    sauvegarder_data(df_memos, 'memos.json')
                     st.session_state.memo_edit_id = None
                     st.rerun()
+            if st.button("❌ Annuler"):
+                st.session_state.memo_edit_id = None
+                st.rerun()
         st.divider()
 
-    # --- B. BOUTON AJOUTER (Toujours visible) ---
-    with st.expander("➕ CRÉER UNE NOUVELLE NOTE", expanded=df_memos.empty):
-        with st.form("new_memo_secure"):
-            d = st.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
-            txt = st.text_area("Votre message / Rappel")
-            if st.form_submit_button("💾 Enregistrer la note"):
-                if txt.strip() != "":
-                    new_row = pd.DataFrame([{"Date": d, "Description": txt, "Statut": "Normal", "Paiement": "N/A", "Archive": "Non Archivé"}])
-                    df_memos = pd.concat([df_memos, new_row], ignore_index=True)
+    # --- B. AJOUT NOUVELLE NOTE ---
+    with st.expander("➕ CRÉER UNE NOUVELLE CHECK-LIST", expanded=df_memos.empty):
+        with st.form("new_fun_memo"):
+            c1, c2 = st.columns(2)
+            m_date = c1.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
+            m_urg = c2.selectbox("Niveau d'urgence", ["Normal", "Urgent"])
+            m_txt = st.text_area("Saisissez vos lignes (Ex: Pain, Eau, Plein gasoil...)")
+            if st.form_submit_button("💾 ENREGISTRER SUR LE BORD"):
+                if m_txt.strip():
+                    new_r = pd.DataFrame([{"Date": m_date, "Description": m_txt, "Statut": m_urg, "Paiement": "N/A", "Archive": "Non Archivé"}])
+                    df_memos = pd.concat([df_memos, new_r], ignore_index=True)
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
-                else:
-                    st.error("Écrivez quelque chose avant d'enregistrer.")
 
-# --- C. AFFICHAGE DES NOTES AVEC LISTE INTERNE ---
+    # --- C. AFFICHAGE DES FICHES COLORÉES ---
     df_show = df_memos[df_memos['Archive'] == "Non Archivé"]
     
     if not df_show.empty:
         for idx, row in df_show.sort_index(ascending=False).iterrows():
-            with st.container():
-                # Entête de la fiche
-                col_h1, col_h2 = st.columns([3, 1])
-                col_h1.subheader(f"📅 {row['Date']}")
-                
-                # Couleur selon urgence
-                color = "#FADBD8" if row['Statut'] == "Urgent" else "#D5F5E3" if row['Statut'] == "Fait" else "#FEF9E7"
-                
-                st.markdown(f'<div style="background-color:{color}; padding:5px; border-radius:5px; border-left:10px solid #34495E;">', unsafe_allow_html=True)
-                
-                # --- LE CŒUR : LISTE LIGNE PAR LIGNE ---
-                # On transforme la description en DataFrame temporaire pour l'éditer
-                lignes = str(row['Description']).split('\n')
-                data_liste = []
-                for l in lignes:
-                    if " | " in l: # Si on a déjà des données formatées
-                        etat_str, texte_tache = l.split(" | ", 1)
-                        data_liste.append({"Fait": (etat_str == "✅"), "Tâche": texte_tache})
+            # Détermination de la couleur de la fiche
+            if row['Statut'] == "Urgent":
+                header_color, bg_color = "#E74C3C", "#FDEDEC" # Rouge
+            elif row['Statut'] == "Fait":
+                header_color, bg_color = "#27AE60", "#EAFAF1" # Vert
+            else:
+                header_color, bg_color = "#2980B9", "#EBF5FB" # Bleu marin
+
+            # Style de la fiche
+            st.markdown(f"""
+                <div style="background-color:{bg_color}; border-left: 10px solid {header_color}; padding: 15px; border-radius: 10px; margin-bottom: 5px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: bold; font-size: 1.1rem; color: #2C3E50;">📅 {row['Date']}</span>
+                        <span style="background-color: {header_color}; color: white; padding: 2px 10px; border-radius: 15px; font-size: 0.8rem;">{row['Statut'].upper()}</span>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # --- LISTE LIGNE PAR LIGNE INTERACTIVE ---
+            lignes = str(row['Description']).split('\n')
+            data_list = []
+            for l in lignes:
+                if l.strip():
+                    if " | " in l:
+                        status, item = l.split(" | ", 1)
+                        data_list.append({"Fait": (status == "✅"), "Tâche": item})
                     else:
-                        data_liste.append({"Fait": False, "Tâche": l})
-                
-                df_temp = pd.DataFrame(data_liste)
-                
-                # Affichage du tableau interactif
-                edited_df = st.data_editor(
-                    df_temp,
-                    key=f"editor_{idx}",
-                    hide_index=True,
-                    column_config={
-                        "Fait": st.column_config.CheckboxColumn(default=False),
-                        "Tâche": st.column_config.TextColumn(width="large")
-                    },
-                    use_container_width=True
-                )
-                
-                # Sauvegarde automatique si changement dans la liste
-                if not edited_df.equals(df_temp):
-                    nouvelle_desc = ""
-                    for _, r in edited_df.iterrows():
-                        pref = "✅" if r['Fait'] else "❌"
-                        nouvelle_desc += f"{pref} | {r['Tâche']}\n"
-                    
-                    df_memos.at[idx, 'Description'] = nouvelle_desc.strip()
-                    sauvegarder_data(df_memos, 'memos.json')
-                    st.rerun()
+                        data_list.append({"Fait": False, "Tâche": l})
+            
+            df_temp = pd.DataFrame(data_list)
+            
+            # Éditeur de lignes (Check-list)
+            edited_df = st.data_editor(
+                df_temp, 
+                key=f"editor_{idx}", 
+                hide_index=True, 
+                use_container_width=True,
+                column_config={
+                    "Fait": st.column_config.CheckboxColumn("Etat", default=False),
+                    "Tâche": st.column_config.TextColumn("Détail de la ligne")
+                }
+            )
 
-                st.markdown('</div>', unsafe_allow_html=True)
+            # Sauvegarde auto si changement dans les cases à cocher
+            if not edited_df.equals(df_temp):
+                new_desc = "\n".join([f"{'✅' if r['Fait'] else '❌'} | {r['Tâche']}" for _, r in edited_df.iterrows()])
+                df_memos.at[idx, 'Description'] = new_desc
+                sauvegarder_data(df_memos, 'memos.json')
+                st.rerun()
 
-                # Boutons d'action
-                b1, b2, b3 = st.columns(3)
-                if b1.button("✏️ Modifier Titre/Urgence", key=f"ed_{idx}"):
-                    st.session_state.memo_edit_id = idx
-                    st.rerun()
-                if b2.button("📦 Archiver", key=f"ar_{idx}"):
-                    df_memos.at[idx, 'Archive'] = "Archivé"
-                    sauvegarder_data(df_memos, 'memos.json')
-                    st.rerun()
-                if b3.button("🗑️ Supprimer", key=f"del_{idx}"):
-                    df_memos = df_memos.drop(idx).reset_index(drop=True)
-                    sauvegarder_data(df_memos, 'memos.json')
-                    st.rerun()
-            st.divider()
+            # --- BARRE D'ACTIONS ---
+            c1, c2, c3 = st.columns(3)
+            if c1.button("✏️ Modif", key=f"ed_b_{idx}"):
+                st.session_state.memo_edit_id = idx
+                st.rerun()
+            if c2.button("📦 Archiver", key=f"ar_b_{idx}"):
+                df_memos.at[idx, 'Archive'] = "Archivé"
+                sauvegarder_data(df_memos, 'memos.json')
+                st.rerun()
+            if c3.button("🗑️ Suppr", key=f"del_b_{idx}"):
+                df_memos = df_memos.drop(idx).reset_index(drop=True)
+                sauvegarder_data(df_memos, 'memos.json')
+                st.rerun()
+            st.markdown("<br>", unsafe_allow_html=True)
+    else:
+        st.info("Le journal des mémos est vide. Prêt pour une nouvelle liste ?")
+
 
 # =================================================================
 # --- 5. BLOC CONTACTS (V102 - COMPLET : RELANCES & COULEURS) ---
