@@ -1090,93 +1090,17 @@ if st.session_state.page == "LOG":
                         <b style="color:#27ae60;">{row['TotalMil']} NM</b>
                     </div>
                 """, unsafe_allow_html=True)
-# --- 3. ADMINISTRATION (MODIFIER / SUPPRIMER AVEC SÉCURITÉ) ---
-    with st.expander("🛠️ Gérer et Modifier les données", expanded=st.session_state.edit_mode):
-        df_adm = df_log.copy()
-        # On affiche les colonnes essentielles pour le repérage
-        cols_visibles = ['Date', 'Navigation', 'Coéquipiers', 'TotalMot', 'TotalMil']
-        st.dataframe(df_adm[cols_adm], use_container_width=True)
-        
-        c_sel, c_mod, c_sup = st.columns([1, 1, 1])
-        sel_idx = c_sel.number_input("ID Ligne", min_value=0, max_value=len(df_log)-1 if not df_log.empty else 0, step=1)
-        
-        # Bouton Modifier
-        if c_mod.button("✏️ MODIFIER", use_container_width=True):
-            st.session_state.edit_mode = True
-            st.session_state.edit_id = sel_idx
-            st.rerun()
-
-        # Système de suppression avec confirmation
-        if f"confirm_del_{sel_idx}" not in st.session_state:
-            st.session_state[f"confirm_del_{sel_idx}"] = False
-
-        if not st.session_state[f"confirm_del_{sel_idx}"]:
-            if c_sup.button("🗑️ SUPPRIMER", use_container_width=True):
-                st.session_state[f"confirm_del_{sel_idx}"] = True
-                st.rerun()
-        else:
-            # Le bouton de confirmation n'apparaît qu'après le premier clic
-            if c_sup.button("⚠️ CONFIRMER SUPPRESSION ?", use_container_width=True, type="primary"):
-                df_log = df_log.drop(index=sel_idx).reset_index(drop=True)
-                sauvegarder_data(df_log, 'logbook.json')
-                st.session_state[f"confirm_del_{sel_idx}"] = False
-                st.success(f"Ligne {sel_idx} supprimée.")
-                time.sleep(1)
-                st.rerun()
-            if st.button("❌ Annuler la suppression"):
-                st.session_state[f"confirm_del_{sel_idx}"] = False
-                st.rerun()
-    # --- 3. ADMINISTRATION (MODIFIER / SUPPRIMER AVEC SÉCURITÉ) ---
-    with st.expander("🛠️ Gérer et Modifier les données", expanded=st.session_state.edit_mode):
-        df_adm = df_log.copy()
-        
-        # DÉFINITION DE LA VARIABLE MANQUANTE (Pour éviter le NameError)
-        cols_adm = ['Date', 'Navigation', 'Coéquipiers', 'TotalMot', 'TotalMil']
-        
-        # Affichage du tableau avec les bonnes colonnes
-        st.dataframe(df_adm[cols_adm], use_container_width=True)
-        
-        c_sel, c_mod, c_sup = st.columns([1, 1, 1])
-        sel_idx = c_sel.number_input("ID Ligne", min_value=0, max_value=len(df_log)-1 if not df_log.empty else 0, step=1)
-        
-        # --- BOUTON MODIFIER ---
-        if c_mod.button("✏️ MODIFIER", use_container_width=True):
-            st.session_state.edit_mode = True
-            st.session_state.edit_id = sel_idx
-            st.rerun()
-
-        # --- SYSTÈME DE SUPPRESSION AVEC CONFIRMATION ---
-        confirm_key = f"confirm_del_{sel_idx}"
-        if confirm_key not in st.session_state:
-            st.session_state[confirm_key] = False
-
-        if not st.session_state[confirm_key]:
-            if c_sup.button("🗑️ SUPPRIMER", use_container_width=True):
-                st.session_state[confirm_key] = True
-                st.rerun()
-        else:
-            c_conf, c_annul = st.columns(2)
-            if c_conf.button("⚠️ CONFIRMER ?", use_container_width=True, type="primary"):
-                df_log = df_log.drop(index=sel_idx).reset_index(drop=True)
-                sauvegarder_data(df_log, 'logbook.json')
-                st.session_state[confirm_key] = False
-                st.success(f"Ligne {sel_idx} supprimée.")
-                time.sleep(0.5)
-                st.rerun()
-            if c_annul.button("❌ Annuler"):
-                st.session_state[confirm_key] = False
-                st.rerun()
-
     # --- 3. ADMINISTRATION (MODIFIER / SUPPRIMER AVEC SÉCURITÉ) ---
     with st.expander("🛠️ Gérer et Modifier les données", expanded=st.session_state.edit_mode):
         if not df_log.empty:
             df_adm = df_log.copy()
             
-            # --- DÉFINITION DE LA VARIABLE (Correction du NameError) ---
+            # --- FIX NAMEERROR: Définition explicite des colonnes à afficher ---
             cols_adm = ['Date', 'Navigation', 'Coéquipiers', 'TotalMot', 'TotalMil']
             
-            # Affichage du tableau de gestion
-            st.dataframe(df_adm[cols_adm], use_container_width=True)
+            # On vérifie que ces colonnes existent bien dans le fichier avant d'afficher
+            cols_existantes = [c for c in cols_adm if c in df_adm.columns]
+            st.dataframe(df_adm[cols_existantes], use_container_width=True)
             
             c_sel, c_mod, c_sup = st.columns([1, 1, 1])
             sel_idx = c_sel.number_input("Sélectionner l'ID ligne", min_value=0, max_value=len(df_log)-1, step=1)
@@ -1215,24 +1139,31 @@ if st.session_state.page == "LOG":
                 st.subheader(f"📍 Modification de la ligne {st.session_state.edit_id}")
                 row_e = df_log.iloc[st.session_state.edit_id]
                 
-                with st.form("form_edit_log_final"):
+                with st.form("form_edit_log_definitif"):
                     col1, col2, col3 = st.columns(3)
                     m_nav = col1.text_input("Navigation", value=str(row_e.get('Navigation', '')))
                     m_coep = col2.text_input("Coéquipiers", value=str(row_e.get('Coéquipiers', '')))
                     m_h_voile = col3.number_input("Heures Voile", value=float(row_e.get('H_Voile', 0.0)))
                     
+                    # Préparation des données pour l'éditeur de ligne
                     df_edit = pd.DataFrame([{
-                        "Date": row_e['Date'], "Dép": row_e.get('PortDep',''), "Arr": row_e.get('PortArr',''),
-                        "Mot Dép": float(row_e.get('MotDep',0.0)), "Mot Arr": float(row_e.get('MotArr',0.0)),
-                        "Mil Dép": float(row_e.get('MilDep',0.0)), "Mil Arr": float(row_e.get('MilArr',0.0))
+                        "Date": row_e['Date'], 
+                        "Dép": row_e.get('PortDep',''), 
+                        "Arr": row_e.get('PortArr',''),
+                        "Mot Dép": float(row_e.get('MotDep',0.0)), 
+                        "Mot Arr": float(row_e.get('MotArr',0.0)),
+                        "Mil Dép": float(row_e.get('MilDep',0.0)), 
+                        "Mil Arr": float(row_e.get('MilArr',0.0))
                     }])
-                    res_edit = st.data_editor(df_edit, use_container_width=True, key="editor_modif_secure_v2")
+                    
+                    res_edit = st.data_editor(df_edit, use_container_width=True, key="editor_admin_final")
                     
                     c_val, c_ann = st.columns(2)
                     if c_val.form_submit_button("✅ ENREGISTRER", use_container_width=True):
                         idx = st.session_state.edit_id
                         r = res_edit.iloc[0]
                         
+                        # Mise à jour forcée des types numériques
                         df_log.at[idx, 'Navigation'] = m_nav
                         df_log.at[idx, 'Coéquipiers'] = m_coep
                         df_log.at[idx, 'H_Voile'] = m_h_voile
@@ -1248,15 +1179,13 @@ if st.session_state.page == "LOG":
                         
                         sauvegarder_data(df_log, 'logbook.json')
                         st.session_state.edit_mode = False
-                        st.success("Modifications enregistrées !")
-                        time.sleep(0.5)
                         st.rerun()
 
                     if c_ann.form_submit_button("❌ ANNULER"):
                         st.session_state.edit_mode = False
                         st.rerun()
         else:
-            st.info("Le livre de bord est vide.")
+            st.info("Aucune donnée à gérer.")
 
  
 
