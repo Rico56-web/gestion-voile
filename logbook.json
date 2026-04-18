@@ -11,11 +11,12 @@
         "TotalMil":43.0,
         "H_Voile":6.0,
         "Notes":"",
-        "Group_ID":null
+        "Group_ID":null,
+        "PortDep":null
     },
     {
         "Date":"01\/03\/2026",
-        "Navigation":"belle ile",
+        "Navigation":"Elisabeth Philippe et sa fille ",
         "PortArr":"HOUAT Port st Gildas",
         "MotDep":2415.8,
         "MotArr":2419.5,
@@ -25,7 +26,8 @@
         "TotalMil":107.0,
         "H_Voile":6.0,
         "Notes":"",
-        "Group_ID":null
+        "Group_ID":null,
+        "PortDep":""
     },
     {
         "Date":"01\/03\/2026",
@@ -39,7 +41,8 @@
         "TotalMil":37.0,
         "H_Voile":6.0,
         "Notes":"",
-        "Group_ID":null
+        "Group_ID":null,
+        "PortDep":null
     },
     {
         "Date":"14\/03\/2026",
@@ -53,7 +56,8 @@
         "TotalMil":53.0,
         "H_Voile":6.0,
         "Notes":"avec Pedro et Benoit Couronne",
-        "Group_ID":null
+        "Group_ID":null,
+        "PortDep":null
     },
     {
         "Date":"15\/03\/2026",
@@ -67,7 +71,8 @@
         "TotalMil":72.0,
         "H_Voile":6.0,
         "Notes":"avec Pedro et Benoit Couronne",
-        "Group_ID":null
+        "Group_ID":null,
+        "PortDep":null
     },
     {
         "Date":"12\/03\/2026",
@@ -81,7 +86,8 @@
         "TotalMil":25.0,
         "H_Voile":5.0,
         "Notes":"avec Camile et Sacha (Cuistot)",
-        "Group_ID":null
+        "Group_ID":null,
+        "PortDep":null
     },
     {
         "Date":"13\/03\/2026",
@@ -95,7 +101,8 @@
         "TotalMil":26.0,
         "H_Voile":5.0,
         "Notes":"avec Camile et Sacha (Cuistot)",
-        "Group_ID":null
+        "Group_ID":null,
+        "PortDep":null
     },
     {
         "Date":"17\/04\/2026",
@@ -109,7 +116,8 @@
         "TotalMil":0.0,
         "H_Voile":null,
         "Notes":null,
-        "Group_ID":"NAV-1776451621"
+        "Group_ID":"NAV-1776451621",
+        "PortDep":null
     },
     {
         "Date":"18\/04\/2026",
@@ -123,7 +131,8 @@
         "TotalMil":0.0,
         "H_Voile":null,
         "Notes":null,
-        "Group_ID":"NAV-1776451621"
+        "Group_ID":"NAV-1776451621",
+        "PortDep":null
     },
     {
         "Date":"19\/04\/2026",
@@ -137,6 +146,7 @@
         "TotalMil":0.0,
         "H_Voile":null,
         "Notes":null,
-        "Group_ID":"NAV-1776451621"
+        "Group_ID":"NAV-1776451621",
+        "PortDep":null
     }
 ]
