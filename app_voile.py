@@ -196,77 +196,57 @@ if st.session_state.page == "MEMOS":
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
 
-    # --- C. AFFICHAGE DES FICHES COLORÉES ---
+    # --- C. AFFICHAGE DES FICHES COLORÉES AVEC CONFIRMATION DE SUPPRESSION ---
     df_show = df_memos[df_memos['Archive'] == "Non Archivé"]
     
     if not df_show.empty:
         for idx, row in df_show.sort_index(ascending=False).iterrows():
-            # Détermination de la couleur de la fiche
-            if row['Statut'] == "Urgent":
-                header_color, bg_color = "#E74C3C", "#FDEDEC" # Rouge
-            elif row['Statut'] == "Fait":
-                header_color, bg_color = "#27AE60", "#EAFAF1" # Vert
-            else:
-                header_color, bg_color = "#2980B9", "#EBF5FB" # Bleu marin
-
-            # Style de la fiche
+            # (Garder ici le code des couleurs et du st.markdown de la fiche précédent...)
+            
+            # --- STRUCTURE DE LA FICHE (Rappel rapide) ---
             st.markdown(f"""
                 <div style="background-color:{bg_color}; border-left: 10px solid {header_color}; padding: 15px; border-radius: 10px; margin-bottom: 5px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: bold; font-size: 1.1rem; color: #2C3E50;">📅 {row['Date']}</span>
-                        <span style="background-color: {header_color}; color: white; padding: 2px 10px; border-radius: 15px; font-size: 0.8rem;">{row['Statut'].upper()}</span>
-                    </div>
+                    <b>📅 {row['Date']}</b> | {row['Statut'].upper()}
                 </div>
             """, unsafe_allow_html=True)
 
-            # --- LISTE LIGNE PAR LIGNE INTERACTIVE ---
-            lignes = str(row['Description']).split('\n')
-            data_list = []
-            for l in lignes:
-                if l.strip():
-                    if " | " in l:
-                        status, item = l.split(" | ", 1)
-                        data_list.append({"Fait": (status == "✅"), "Tâche": item})
-                    else:
-                        data_list.append({"Fait": False, "Tâche": l})
-            
-            df_temp = pd.DataFrame(data_list)
-            
-            # Éditeur de lignes (Check-list)
-            edited_df = st.data_editor(
-                df_temp, 
-                key=f"editor_{idx}", 
-                hide_index=True, 
-                use_container_width=True,
-                column_config={
-                    "Fait": st.column_config.CheckboxColumn("Etat", default=False),
-                    "Tâche": st.column_config.TextColumn("Détail de la ligne")
-                }
-            )
+            # ... (Garder ici le bloc st.data_editor pour la check-list) ...
 
-            # Sauvegarde auto si changement dans les cases à cocher
-            if not edited_df.equals(df_temp):
-                new_desc = "\n".join([f"{'✅' if r['Fait'] else '❌'} | {r['Tâche']}" for _, r in edited_df.iterrows()])
-                df_memos.at[idx, 'Description'] = new_desc
-                sauvegarder_data(df_memos, 'memos.json')
-                st.rerun()
-
-            # --- BARRE D'ACTIONS ---
+            # --- BARRE D'ACTIONS AVEC SÉCURITÉ DE SUPPRESSION ---
             c1, c2, c3 = st.columns(3)
+            
             if c1.button("✏️ Modif", key=f"ed_b_{idx}"):
                 st.session_state.memo_edit_id = idx
                 st.rerun()
+                
             if c2.button("📦 Archiver", key=f"ar_b_{idx}"):
                 df_memos.at[idx, 'Archive'] = "Archivé"
                 sauvegarder_data(df_memos, 'memos.json')
                 st.rerun()
-            if c3.button("🗑️ Suppr", key=f"del_b_{idx}"):
-                df_memos = df_memos.drop(idx).reset_index(drop=True)
-                sauvegarder_data(df_memos, 'memos.json')
-                st.rerun()
+
+            # --- LOGIQUE DE SUPPRESSION SÉCURISÉE ---
+            conf_key = f"confirm_del_{idx}"
+            if conf_key not in st.session_state:
+                st.session_state[conf_key] = False
+
+            if not st.session_state[conf_key]:
+                # Premier bouton : demande la suppression
+                if c3.button("🗑️ Supprimer", key=f"pre_del_{idx}"):
+                    st.session_state[conf_key] = True
+                    st.rerun()
+            else:
+                # Deuxième bouton : confirme la suppression (en rouge)
+                col_c1, col_c2 = c3.columns(2)
+                if col_c1.button("⚠️ OUI", key=f"real_del_{idx}", type="primary"):
+                    df_memos = df_memos.drop(idx).reset_index(drop=True)
+                    sauvegarder_data(df_memos, 'memos.json')
+                    st.session_state[conf_key] = False
+                    st.rerun()
+                if col_c2.button("NON", key=f"cancel_del_{idx}"):
+                    st.session_state[conf_key] = False
+                    st.rerun()
+
             st.markdown("<br>", unsafe_allow_html=True)
-    else:
-        st.info("Le journal des mémos est vide. Prêt pour une nouvelle liste ?")
 
 
 # =================================================================
