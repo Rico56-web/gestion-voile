@@ -143,43 +143,130 @@ for i, name in enumerate(menu):
 
 
 st.divider()
-
 # =================================================================
-# --- 2. MENU MÉMOS (NOTES LIBRES) ---
+# --- 2. MENU MÉMOS (NOTES, PAIEMENTS & ARCHIVES) ---
 # =================================================================
 if st.session_state.page == "MEMOS":
     st.markdown("### 📝 Mémos & Notes de Bord")
     df_memos = charger_data_safe('memos.json')
 
-    c1, c2 = st.columns([2, 1])
-    with c1:
-        with st.expander("➕ AJOUTER UN MÉMO", expanded=False):
-            with st.form("new_memo_form"):
-                m_date = st.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
-                m_desc = st.text_area("Description / Rappel")
-                m_statut = st.selectbox("Statut", ["Normal", "Urgent", "Fait"])
-                if st.form_submit_button("Enregistrer"):
-                    new_m = pd.DataFrame([{"Date": m_date, "Description": m_desc, "Statut": m_statut}])
-                    df_memos = pd.concat([df_memos, new_m], ignore_index=True)
-                    sauvegarder_data(df_memos, 'memos.json')
-                    st.rerun()
-    with c2:
-        bouton_export_excel(df_memos, "memos")
+    # Initialisation des colonnes manquantes pour les anciennes notes
+    for col in ['Paiement', 'Archive']:
+        if col not in df_memos.columns:
+            df_memos[col] = "Non Archivé" if col == "Archive" else "N/A"
 
-    if not df_memos.empty:
-        # Tri inverse pour voir les plus récents en haut
-        for idx, row in df_memos.sort_index(ascending=False).iterrows():
-            bg_color = "#D5F5E3" if row['Statut'] == "Fait" else ("#FADBD8" if row['Statut'] == "Urgent" else "#FEF9E7")
-            st.markdown(f"""
-            <div style="background:{bg_color}; padding:12px; border-radius:10px; border-left:5px solid #34495E; margin-bottom:10px; color:black;">
-                <small>{row['Date']} — <b>{row['Statut'].upper()}</b></small><br>
-                {row['Description']}
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button(f"🗑️ Supprimer #{idx}", key=f"del_m_{idx}"):
-                df_memos = df_memos.drop(idx).reset_index(drop=True)
+    if 'memo_edit_id' not in st.session_state: st.session_state.memo_edit_id = None
+
+    # --- A. AJOUT D'UN MÉMO ---
+    with st.expander("➕ AJOUTER UN MÉMO OU UNE FACTURE", expanded=False):
+        with st.form("new_memo_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            m_date = col1.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
+            m_pay = col2.selectbox("Statut Paiement", ["N/A", "À Payer", "Payé"])
+            m_desc = st.text_area("Description / Rappel / Détails facture")
+            m_statut = st.selectbox("Urgence", ["Normal", "Urgent", "Fait"])
+            
+            if st.form_submit_button("💾 Enregistrer"):
+                new_m = pd.DataFrame([{
+                    "Date": m_date, "Description": m_desc, 
+                    "Statut": m_statut, "Paiement": m_pay, "Archive": "Non Archivé"
+                }])
+                df_memos = pd.concat([df_memos, new_m], ignore_index=True)
                 sauvegarder_data(df_memos, 'memos.json')
                 st.rerun()
+
+    # --- B. AFFICHAGE DES NOTES ACTIVES (NON ARCHIVÉES) ---
+    df_actifs = df_memos[df_memos['Archive'] == "Non Archivé"]
+    
+    if not df_actifs.empty:
+        # Tri : les plus récents en haut
+        for idx, row in df_actifs.sort_index(ascending=False).iterrows():
+            # Couleur selon statut
+            bg = "#D5F5E3" if row['Statut'] == "Fait" else ("#FADBD8" if row['Statut'] == "Urgent" else "#FEF9E7")
+            pay_color = "green" if row['Paiement'] == "Payé" else "red"
+            
+            st.markdown(f"""
+            <div style="background:{bg}; padding:15px; border-radius:10px; border-left:8px solid #34495E; margin-bottom:5px; color:black;">
+                <div style="display:flex; justify-content:space-between;">
+                    <small>📅 {row['Date']} — <b>{row['Statut'].upper()}</b></small>
+                    <b style="color:{pay_color};">{row['Paiement']}</b>
+                </div>
+                <div style="margin-top:8px; font-size:1.1rem;">{row['Description']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # --- BARRE D'OUTILS (Modif, Fait, Archive, Suppr) ---
+            c1, c2, c3, c4 = st.columns(4)
+            
+            # 1. Bouton Fait/Pas Fait
+            label_fait = "✅ Marquer Fait" if row['Statut'] != "Fait" else "🔄 Réactiver"
+            if c1.button(label_fait, key=f"fait_{idx}"):
+                df_memos.at[idx, 'Statut'] = "Fait" if row['Statut'] != "Fait" else "Normal"
+                sauvegarder_data(df_memos, 'memos.json')
+                st.rerun()
+
+            # 2. Bouton Modifier
+            if c2.button("✏️ Modifier", key=f"edit_{idx}"):
+                st.session_state.memo_edit_id = idx
+                st.rerun()
+
+            # 3. Bouton Archiver
+            if c3.button("📦 Archiver", key=f"arch_{idx}"):
+                df_memos.at[idx, 'Archive'] = "Archivé"
+                sauvegarder_data(df_memos, 'memos.json')
+                st.rerun()
+
+            # 4. Bouton Supprimer (Double sécurité)
+            conf_key = f"confirm_del_memo_{idx}"
+            if conf_key not in st.session_state: st.session_state[conf_key] = False
+            
+            if not st.session_state[conf_key]:
+                if c4.button("🗑️ Supprimer", key=f"pre_del_{idx}"):
+                    st.session_state[conf_key] = True
+                    st.rerun()
+            else:
+                if c4.button("⚠️ CONFIRMER ?", key=f"real_del_{idx}", type="primary"):
+                    df_memos = df_memos.drop(idx).reset_index(drop=True)
+                    sauvegarder_data(df_memos, 'memos.json')
+                    st.session_state[conf_key] = False
+                    st.rerun()
+                if st.button("Annuler", key=f"can_del_{idx}"):
+                    st.session_state[conf_key] = False
+                    st.rerun()
+
+            # --- FORMULAIRE DE MODIFICATION ---
+            if st.session_state.memo_edit_id == idx:
+                with st.form(f"edit_form_{idx}"):
+                    st.info("Modification en cours...")
+                    e_desc = st.text_area("Description", value=row['Description'])
+                    e_pay = st.selectbox("Paiement", ["N/A", "À Payer", "Payé"], index=["N/A", "À Payer", "Payé"].index(row['Paiement']))
+                    e_stat = st.selectbox("Urgence", ["Normal", "Urgent", "Fait"], index=["Normal", "Urgent", "Fait"].index(row['Statut']))
+                    
+                    col_b1, col_b2 = st.columns(2)
+                    if col_b1.form_submit_button("✅ Valider"):
+                        df_memos.at[idx, 'Description'] = e_desc
+                        df_memos.at[idx, 'Paiement'] = e_pay
+                        df_memos.at[idx, 'Statut'] = e_stat
+                        sauvegarder_data(df_memos, 'memos.json')
+                        st.session_state.memo_edit_id = None
+                        st.rerun()
+                    if col_b2.form_submit_button("❌ Annuler"):
+                        st.session_state.memo_edit_id = None
+                        st.rerun()
+            st.divider()
+
+    # --- C. ARCHIVES (Masquées par défaut) ---
+    with st.expander("📁 Voir les Archives (Notes archivées)"):
+        df_archives = df_memos[df_memos['Archive'] == "Archivé"]
+        if not df_archives.empty:
+            st.table(df_archives[['Date', 'Description', 'Paiement']])
+            if st.button("🗑️ Vider les archives"):
+                df_memos = df_memos[df_memos['Archive'] == "Non Archivé"].reset_index(drop=True)
+                sauvegarder_data(df_memos, 'memos.json')
+                st.rerun()
+        else:
+            st.write("Aucune note archivée.")
+
 # =================================================================
 # --- 5. BLOC CONTACTS (V102 - COMPLET : RELANCES & COULEURS) ---
 # =================================================================
