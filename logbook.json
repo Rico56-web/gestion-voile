@@ -97,7 +97,7 @@
     },
     {
         "Date":"13\/03\/2026",
-        "Navigation":"camille Varrel et sacha(cuistot)",
+        "Navigation":"retour vers Arzon ",
         "PortArr":"Arzon",
         "MotDep":2433.7,
         "MotArr":2436.1,
@@ -108,7 +108,7 @@
         "H_Voile":5.0,
         "Notes":"avec Camile et Sacha (Cuistot)",
         "Group_ID":null,
-        "PortDep":null,
-        "Co\u00e9quipiers":""
+        "PortDep":"nan",
+        "Co\u00e9quipiers":"camille Varrel et sacha(cuistot)"
     }
 ]
