@@ -153,6 +153,17 @@ if st.session_state.page == "MEMOS":
     # Chargement des données
     df_memos = charger_data_safe('memos.json')
 
+    # . NETTOYAGE AUTOMATIQUE DES ANCIENNES NOTES (AUTO-FIX)
+    if not df_memos.empty:
+        if 'Statut' not in df_memos.columns: df_memos['Statut'] = "Normal"
+        if 'Paiement' not in df_memos.columns: df_memos['Paiement'] = "N/A"
+        if 'Archive' not in df_memos.columns: df_memos['Archive'] = "Non Archivé"
+        
+        # Remplit les cases vides (NaN) des anciennes notes
+        df_memos['Statut'] = df_memos['Statut'].fillna("Normal")
+        df_memos['Paiement'] = df_memos['Paiement'].fillna("N/A")
+        df_memos['Archive'] = df_memos['Archive'].fillna("Non Archivé")
+
     # --- AUTO-FIX DES COLONNES (Indispensable pour l'affichage) ---
     for col in ['Statut', 'Paiement', 'Archive', 'Description', 'Date']:
         if col not in df_memos.columns:
