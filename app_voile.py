@@ -1119,7 +1119,6 @@ if st.session_state.page == "LOG":
                 st.session_state.edit_mode = False
                 st.rerun()
 
-
 # --- FIN DU FICHIER ---
 
 
