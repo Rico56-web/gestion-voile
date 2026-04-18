@@ -955,27 +955,31 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
 # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - GROUPEMENT PAR COÉQUIPIERS ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION SÉCURISÉE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>📖 Livre de Bord</h1></div>', unsafe_allow_html=True)
 
     df_log = charger_data_safe('logbook.json')
     
+    # Sécurité : On s'assure que les colonnes de base existent dans le DataFrame
+    for col in ['Navigation', 'Coéquipiers', 'PortDep', 'PortArr', 'TotalMil', 'Group_ID']:
+        if col not in df_log.columns:
+            df_log[col] = ""
+
     if 'edit_mode' not in st.session_state: st.session_state.edit_mode = False
     if 'edit_id' not in st.session_state: st.session_state.edit_id = None
 
-    # 1. FORMULAIRE D'ENREGISTREMENT
+    # 1. FORMULAIRE D'ENREGISTREMENT (En haut)
     if not st.session_state.edit_mode:
         with st.expander("🚀 Enregistrer une Navigation", expanded=False):
             c1, c2, c3 = st.columns([1, 1, 2])
             f_date = c1.date_input("Date départ", datetime.now())
             f_jours = c2.number_input("Nombre de jours", min_value=1, value=1)
-            f_nav = c3.text_input("Nom du Voyage (ex: Croisière Avril)")
-            f_coep = st.text_input("Coéquipiers (Copier-coller précis pour le groupement)")
+            f_nav = c3.text_input("Nom du Voyage")
+            f_coep = st.text_input("Coéquipiers")
             
             n_lignes = int(f_jours)
-            # On garde le Group_ID pour les nouvelles saisies groupées (sécurité sup)
             gid = f"NAV-{int(time.time())}" if n_lignes > 1 else None
 
             lignes = []
@@ -985,7 +989,7 @@ if st.session_state.page == "LOG":
                     "Départ": "", "Arrivée": "", "Milles": 0.0
                 })
             df_temp = pd.DataFrame(lignes)
-            edited_df = st.data_editor(df_temp, use_container_width=True, key="editor_new")
+            edited_df = st.data_editor(df_temp, use_container_width=True, key="new_nav_editor")
 
             if st.button("💾 SAUVEGARDER", type="primary", use_container_width=True):
                 nouvelles = []
@@ -1001,20 +1005,13 @@ if st.session_state.page == "LOG":
                     sauvegarder_data(df_log, 'logbook.json')
                     st.rerun()
 
-    # 2. AFFICHAGE DE L'HISTORIQUE (LOGIQUE CHRONO-ÉQUIPAGE)
+    # 2. AFFICHAGE DE L'HISTORIQUE (LOGIQUE SÉCURISÉE)
     if not df_log.empty:
         st.divider()
         df_v = df_log.copy()
         df_v['dt'] = pd.to_datetime(df_v['Date'], dayfirst=True, errors='coerce')
-        # On trie du plus ancien au plus récent pour détecter les suites, 
-        # mais on affichera le résultat final en inversé.
-        df_v = df_v.sort_values(by='dt')
+        df_v = df_v.sort_values(by='dt') # Tri pour le calcul des groupes
 
-        # Algorithme de détection des blocs
-        blocs = []
-        current_bloc = []
-
-       # --- LOGIQUE DE DÉTECTION DES BLOCS (SÉCURISÉE) ---
         blocs = []
         current_bloc = []
 
@@ -1025,20 +1022,16 @@ if st.session_state.page == "LOG":
             else:
                 prev_row = current_bloc[-1]
                 
-                # UTILISATION DE .get() POUR ÉVITER LE KEYERROR
-                # Si la colonne n'existe pas encore, on utilise une chaîne vide ""
+                # Récupération sécurisée des valeurs
                 coep_actuel = str(row.get('Coéquipiers', '')).strip()
                 coep_prec = str(prev_row.get('Coéquipiers', '')).strip()
-                
+                gid_actuel = str(row.get('Group_ID', ''))
+                gid_prec = str(prev_row.get('Group_ID', ''))
+
+                # Critères : Dates consécutives + Même équipage OU même Group_ID
                 meme_coep = (coep_actuel == coep_prec) and coep_actuel != ""
-                
-                # Vérification de la date
                 date_suivante = (row['dt'] - prev_row['dt']).days == 1
-                
-                # Vérification du Group_ID (sécurisé aussi)
-                gid_actuel = row.get('Group_ID')
-                gid_prec = prev_row.get('Group_ID')
-                meme_gid = pd.notna(gid_actuel) and gid_actuel == gid_prec and str(gid_actuel) != "None"
+                meme_gid = (gid_actuel == gid_prec) and gid_actuel not in ["", "None", "nan"]
 
                 if (meme_coep and date_suivante) or meme_gid:
                     current_bloc.append(row)
@@ -1047,58 +1040,50 @@ if st.session_state.page == "LOG":
                     current_bloc = [row]
         if current_bloc:
             blocs.append(current_bloc)
-              
-                
-  
 
-        # Affichage (Inversé pour avoir le plus récent en haut)
+        # Affichage final (du plus récent au plus ancien)
         for bloc in reversed(blocs):
+            df_b = pd.DataFrame(bloc)
             if len(bloc) > 1:
-                # Affichage Bloc Bleu (Croisière)
-                df_b = pd.DataFrame(bloc)
                 total_m = df_b['TotalMil'].sum()
-                nav_title = bloc[0].get('Navigation') or "Navigation"
-                coeps = bloc[0].get('Coéquipiers') or "Seul"
-                
                 st.markdown(f"""
                     <div style="background:#eef2f7; color:#2c3e50; padding:12px; border-radius:10px; margin-bottom:10px; border-left: 8px solid #3498db; border: 1px solid #d1d9e6;">
                         <div style="display:flex; justify-content:space-between; font-size:0.8rem; font-weight:bold; color:#5d6d7e;">
-                            <span>🚢 {nav_title.upper()}</span>
-                            <span>👥 {coeps}</span>
+                            <span>🚢 {str(bloc[0].get('Navigation','')).upper()}</span>
+                            <span>👥 {str(bloc[0].get('Coéquipiers',''))}</span>
                         </div>
                         <div style="margin-top:5px;">
                             <b style="font-size:1.1rem; color:#1a5276;">Du {bloc[0]['Date']} au {bloc[-1]['Date']}</b><br>
-                            <span style="font-size:0.9rem;">📍 {bloc[0].get('PortDep','?')} → {" → ".join(df_b['PortArr'].astype(str))}</span>
+                            <span style="font-size:0.9rem;">📍 {bloc[0].get('PortDep','')} → {" → ".join(df_b['PortArr'].astype(str))}</span>
                         </div>
                         <div style="text-align:right; margin-top:-20px;"><b style="font-size:1.4rem; color:#2980b9;">{total_m:.1f} NM</b></div>
                     </div>
                 """, unsafe_allow_html=True)
             else:
-                # Affichage Ligne Simple
                 row = bloc[0]
                 st.markdown(f"""
                     <div style="background:white; border:1px solid #dee2e6; padding:10px; border-radius:5px; margin-bottom:5px; display:flex; justify-content:space-between;">
-                        <span><b>{row['Date']}</b> : {row.get('PortDep','')} → {row['PortArr']} <small style="color:gray;">({row.get('Coéquipiers','')})</small></span>
+                        <span><b>{row['Date']}</b> : {row.get('PortDep','')} → {row['PortArr']} <small>({row.get('Coéquipiers','')})</small></span>
                         <b style="color:#27ae60;">{row['TotalMil']} NM</b>
                     </div>
                 """, unsafe_allow_html=True)
 
     # 3. ADMINISTRATION (MODIFIER / SUPPRIMER)
-    with st.expander("🛠️ Administration des données", expanded=st.session_state.edit_mode):
+    with st.expander("🛠️ Gérer et Modifier les données", expanded=st.session_state.edit_mode):
         df_adm = df_log.copy()
-        # On affiche bien Navigation en premier
-        cols = ['Navigation', 'Coéquipiers', 'Date', 'PortDep', 'PortArr', 'TotalMil']
-        st.dataframe(df_adm[[c for c in cols if c in df_adm.columns]], use_container_width=True)
+        # On définit l'ordre d'affichage
+        cols_display = ['Navigation', 'Coéquipiers', 'Date', 'PortDep', 'PortArr', 'TotalMil']
+        st.dataframe(df_adm[[c for c in cols_display if c in df_adm.columns]], use_container_width=True)
         
-        c_sel, c_mod, c_sup = st.columns([1,1,1])
+        c_sel, c_mod, c_sup = st.columns([1, 1, 1])
         sel_idx = c_sel.number_input("ID Ligne", min_value=0, max_value=len(df_log)-1 if not df_log.empty else 0, step=1)
         
-        if c_mod.button("✏️ MODIFIER", use_container_width=True):
+        if c_mod.button("✏️ MODIFIER"):
             st.session_state.edit_mode = True
             st.session_state.edit_id = sel_idx
             st.rerun()
-            
-        if c_sup.button("🗑️ SUPPRIMER", use_container_width=True):
+
+        if c_sup.button("🗑️ SUPPRIMER"):
             df_log = df_log.drop(index=sel_idx).reset_index(drop=True)
             sauvegarder_data(df_log, 'logbook.json')
             st.rerun()
@@ -1106,15 +1091,15 @@ if st.session_state.page == "LOG":
         if st.session_state.edit_mode:
             st.divider()
             row_e = df_log.iloc[st.session_state.edit_id]
-            col_m1, col_m2 = st.columns(2)
-            m_nav = col_m1.text_input("Nom Navigation", value=row_e.get('Navigation', ''))
-            m_coep = col_m2.text_input("Coéquipiers", value=row_e.get('Coéquipiers', ''))
+            col1, col2 = st.columns(2)
+            m_nav = col1.text_input("Nom Nav", value=row_e.get('Navigation', ''))
+            m_coep = col2.text_input("Coéquipiers", value=row_e.get('Coéquipiers', ''))
             
             m_data = st.data_editor(pd.DataFrame([{
                 "Date": row_e['Date'], "Départ": row_e.get('PortDep',''), "Arrivée": row_e['PortArr'], "Milles": row_e['TotalMil']
-            }]), use_container_width=True, key="edit_editor")
+            }]), use_container_width=True, key="row_editor_adm")
 
-            if st.button("✅ VALIDER LES MODIFICATIONS"):
+            if st.button("✅ VALIDER"):
                 idx = st.session_state.edit_id
                 r = m_data.iloc[0]
                 df_log.at[idx, 'Navigation'] = m_nav
