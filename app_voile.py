@@ -242,13 +242,14 @@ if st.session_state.page == "MEMOS":
             stat_row = str(row.get('Statut', 'Normal'))
             h_col, bg_col = ("#E74C3C", "#FDEDEC") if stat_row == "Urgent" else (("#27AE60", "#EAFAF1") if stat_row == "Fait" else ("#2980B9", "#EBF5FB"))
 
+           # --- TITRE ÉPURÉ 
             st.markdown(f"""
                 <div style="margin-top: 20px; margin-bottom: 10px;">
-                    <h4 style="color: {h_col}; margin-bottom: 0px;">📝 Note du {row['Date']}</h4>
+                    <h4 style="color: {h_col}; margin-bottom: 0px;">📝 {row['Date']}</h4>
                 </div>
                 <div style="background-color:{bg_col}; border-left: 10px solid {h_col}; padding: 15px; border-radius: 10px 10px 0px 0px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: bold; color: #2C3E50;">📌 Récapitulatif de bord</span>
+                        <span style="font-weight: bold; color: #2C3E50;">📌 Détails</span>
                         <span style="background-color: {h_col}; color: white; padding: 2px 10px; border-radius: 15px; font-size: 0.8rem;">{stat_row.upper()}</span>
                     </div>
                 </div>
