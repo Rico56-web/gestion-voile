@@ -189,18 +189,35 @@ if st.session_state.page == "MEMOS":
         st.divider()
 
     # --- B. AJOUT NOUVELLE NOTE ---
-    with st.expander("➕ CRÉER UNE NOUVELLE CHECK-LIST", expanded=df_memos.empty):
-        with st.form("new_memo_form"):
+    # Initialisation de l'état d'ouverture de l'expander si non présent
+    if 'memos_open' not in st.session_state:
+        st.session_state.memos_open = df_memos.empty
+
+    with st.expander("➕ CRÉER UNE NOUVELLE CHECK-LIST", expanded=st.session_state.memos_open):
+        with st.form("new_memo_form", clear_on_submit=True): # clear_on_submit vide les champs après validation
             c1, c2 = st.columns(2)
             m_date = c1.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
             m_urg = c2.selectbox("Urgence", ["Normal", "Urgent"])
             m_txt = st.text_area("Saisissez vos tâches (une par ligne)")
+            
             if st.form_submit_button("💾 ENREGISTRER"):
                 if m_txt.strip():
-                    new_r = pd.DataFrame([{"Date": m_date, "Description": m_txt, "Statut": m_urg, "Paiement": "N/A", "Archive": "Non Archivé"}])
+                    new_r = pd.DataFrame([{
+                        "Date": m_date, 
+                        "Description": m_txt, 
+                        "Statut": m_urg, 
+                        "Paiement": "N/A", 
+                        "Archive": "Non Archivé"
+                    }])
                     df_memos = pd.concat([df_memos, new_r], ignore_index=True)
                     sauvegarder_data(df_memos, 'memos.json')
+                    
+                    # FERMETURE DU FORMULAIRE :
+                    st.session_state.memos_open = False 
+                    st.success("Note enregistrée !") # Petit message de confirmation
                     st.rerun()
+                else:
+                    st.warning("Le contenu est vide.")
 
     # --- C. AFFICHAGE DES FICHES COLORÉES ---
     df_show = df_memos[df_memos['Archive'] == "Non Archivé"]
