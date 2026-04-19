@@ -126,5 +126,21 @@
         "Group_ID":"",
         "PortDep":"Piriac",
         "Co\u00e9quipiers":""
+    },
+    {
+        "Date":"19\/04\/2026",
+        "Navigation":"",
+        "PortArr":"Piriac ",
+        "MotDep":2441.1,
+        "MotArr":0.0,
+        "TotalMot":-2441.1,
+        "MilDep":3028.0,
+        "MilArr":0.0,
+        "TotalMil":-3028.0,
+        "H_Voile":0.0,
+        "Notes":null,
+        "Group_ID":"",
+        "PortDep":"",
+        "Co\u00e9quipiers":""
     }
 ]
