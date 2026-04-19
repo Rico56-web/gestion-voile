@@ -189,18 +189,21 @@ if st.session_state.page == "MEMOS":
         st.divider()
 
     # --- B. AJOUT NOUVELLE NOTE ---
-    # Initialisation de l'état d'ouverture de l'expander si non présent
+    # On initialise l'état de l'expander s'il n'existe pas
     if 'memos_open' not in st.session_state:
-        st.session_state.memos_open = df_memos.empty
+        st.session_state.memos_open = False
 
+    # Utilisation de st.session_state.memos_open pour contrôler l'ouverture
     with st.expander("➕ CRÉER UNE NOUVELLE CHECK-LIST", expanded=st.session_state.memos_open):
-        with st.form("new_memo_form", clear_on_submit=True): # clear_on_submit vide les champs après validation
+        with st.form("new_memo_form", clear_on_submit=True):
             c1, c2 = st.columns(2)
             m_date = c1.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
             m_urg = c2.selectbox("Urgence", ["Normal", "Urgent"])
             m_txt = st.text_area("Saisissez vos tâches (une par ligne)")
             
-            if st.form_submit_button("💾 ENREGISTRER"):
+            submit = st.form_submit_button("💾 ENREGISTRER", use_container_width=True)
+            
+            if submit:
                 if m_txt.strip():
                     new_r = pd.DataFrame([{
                         "Date": m_date, 
@@ -212,12 +215,18 @@ if st.session_state.page == "MEMOS":
                     df_memos = pd.concat([df_memos, new_r], ignore_index=True)
                     sauvegarder_data(df_memos, 'memos.json')
                     
-                    # FERMETURE DU FORMULAIRE :
+                    # --- LA CLÉ POUR FERMER ---
                     st.session_state.memos_open = False 
-                    st.success("Note enregistrée !") # Petit message de confirmation
-                    st.rerun()
+                    st.rerun() 
                 else:
-                    st.warning("Le contenu est vide.")
+                    st.error("Le texte est vide !")
+
+    # Petit bouton discret pour ouvrir le formulaire si besoin 
+    # (car l'expander restera fermé par défaut maintenant)
+    if not st.session_state.memos_open:
+        if st.button("📝 Rédiger une note"):
+            st.session_state.memos_open = True
+            st.rerun()
 
     # --- C. AFFICHAGE DES FICHES COLORÉES ---
     df_show = df_memos[df_memos['Archive'] == "Non Archivé"]
