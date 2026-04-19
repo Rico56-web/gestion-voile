@@ -159,37 +159,43 @@ if st.session_state.page == "MEMOS":
     if 'memo_edit_id' not in st.session_state: 
         st.session_state.memo_edit_id = None
 
-    # --- A. FORMULAIRE DE MODIFICATION (BIEN INDENTÉ DANS LA PAGE) ---
+    # --- A. FORMULAIRE DE MODIFICATION ---
     if st.session_state.memo_edit_id is not None:
         idx_e = st.session_state.memo_edit_id
-        # Sécurité : on vérifie que l'index existe toujours
         if idx_e < len(df_memos):
             row_e = df_memos.iloc[idx_e]
+            
+            # Nettoyage
             texte_propre = str(row_e['Description']).replace("✅ | ", "").replace("❌ | ", "")
             
             with st.container(border=True):
-                st.markdown(f"### ✏️ Modification en cours")
+                st.markdown("### ✏️ Modification de la note")
+
+                # --- LA CORRECTION EST ICI ---
+                # On utilise une key unique basée sur l'index ET on récupère la valeur saisie
+                new_date = st.text_input("Titre / Date de la note", value=str(row_e['Date']), key=f"input_date_{idx_e}")
                 
-                # On utilise des variables locales pour capter les saisies
-                new_date = st.text_input("Date / Titre", value=row_e['Date'], key=f"edit_date_{idx_e}")
-                e_desc = st.text_area("Contenu", value=texte_propre, height=150, key=f"edit_area_{idx_e}")
+                e_desc = st.text_area("Contenu des tâches", value=texte_propre, height=150, key=f"input_desc_{idx_e}")
                 
                 c_ed1, c_ed2 = st.columns(2)
                 e_pay = c_ed1.selectbox("Paiement", ["N/A", "À Payer", "Payé"], 
-                                        index=["N/A", "À Payer", "Payé"].index(row_e.get('Paiement', 'N/A')))
+                                        index=["N/A", "À Payer", "Payé"].index(row_e.get('Paiement', 'N/A')), key=f"pay_{idx_e}")
                 e_stat = c_ed2.selectbox("Urgence", ["Normal", "Urgent", "Fait"], 
-                                         index=["Normal", "Urgent", "Fait"].index(row_e.get('Statut', 'Normal')))
+                                         index=["Normal", "Urgent", "Fait"].index(row_e.get('Statut', 'Normal')), key=f"stat_{idx_e}")
                 
                 col_btn1, col_btn2 = st.columns(2)
+                
                 if col_btn1.button("🚀 ENREGISTRER LES MODIFICATIONS", type="primary", use_container_width=True):
-                    # On applique les modifs au DataFrame
-                    df_memos.at[idx_e, 'Date'] = new_date
-                    df_memos.at[idx_e, 'Description'] = e_desc
-                    df_memos.at[idx_e, 'Paiement'] = e_pay
-                    df_memos.at[idx_e, 'Statut'] = e_stat
+                    # MISE À JOUR EXPLICITE : On force les nouvelles valeurs dans le DataFrame
+                    df_memos.loc[idx_e, 'Date'] = new_date
+                    df_memos.loc[idx_e, 'Description'] = e_desc
+                    df_memos.loc[idx_e, 'Paiement'] = e_pay
+                    df_memos.loc[idx_e, 'Statut'] = e_stat
                     
+                    # Sauvegarde et nettoyage de l'état
                     sauvegarder_data(df_memos, 'memos.json')
                     st.session_state.memo_edit_id = None
+                    st.success("Modification enregistrée !")
                     st.rerun()
                     
                 if col_btn2.button("❌ ANNULER", use_container_width=True):
