@@ -159,67 +159,55 @@ if st.session_state.page == "MEMOS":
     if 'memo_edit_id' not in st.session_state: 
         st.session_state.memo_edit_id = None
 
-    # --- A. FORMULAIRE DE MODIFICATION ---
-if st.session_state.memo_edit_id is not None:
-    idx_e = st.session_state.memo_edit_id
-    if idx_e < len(df_memos):
-        row_e = df_memos.iloc[idx_e]
-        
-        # On nettoie le texte pour l'édition
-        texte_propre = str(row_e['Description']).replace("✅ | ", "").replace("❌ | ", "")
-        
-        with st.container(border=True):
-            st.markdown(f"### ✏️ Modification en cours")
+    # --- A. FORMULAIRE DE MODIFICATION (BIEN INDENTÉ DANS LA PAGE) ---
+    if st.session_state.memo_edit_id is not None:
+        idx_e = st.session_state.memo_edit_id
+        # Sécurité : on vérifie que l'index existe toujours
+        if idx_e < len(df_memos):
+            row_e = df_memos.iloc[idx_e]
+            texte_propre = str(row_e['Description']).replace("✅ | ", "").replace("❌ | ", "")
             
-            # 1. Champ Date (pour pouvoir changer le titre/date)
-            new_date = st.text_input("Date / Titre", value=row_e['Date'], key=f"edit_date_{idx_e}")
-            
-            # 2. Champ Description avec une KEY UNIQUE pour forcer la mise à jour
-            e_desc = st.text_area("Contenu", value=texte_propre, height=150, key=f"edit_area_{idx_e}")
-            
-            c_ed1, c_ed2 = st.columns(2)
-            e_pay = c_ed1.selectbox("Paiement", ["N/A", "À Payer", "Payé"], 
-                                    index=["N/A", "À Payer", "Payé"].index(row_e.get('Paiement', 'N/A')))
-            e_stat = c_ed2.selectbox("Urgence", ["Normal", "Urgent", "Fait"], 
-                                     index=["Normal", "Urgent", "Fait"].index(row_e.get('Statut', 'Normal')))
-            
-            st.write("") # Espace
-            
-            col_btn1, col_btn2 = st.columns(2)
-            
-            if col_btn1.button("🚀 ENREGISTRER LES MODIFICATIONS", type="primary", use_container_width=True):
-                # Mise à jour des données dans le DataFrame
-                df_memos.at[idx_e, 'Date'] = new_date
-                df_memos.at[idx_e, 'Description'] = e_desc
-                df_memos.at[idx_e, 'Paiement'] = e_pay
-                df_memos.at[idx_e, 'Statut'] = e_stat
+            with st.container(border=True):
+                st.markdown(f"### ✏️ Modification en cours")
                 
-                # Sauvegarde physique
-                sauvegarder_data(df_memos, 'memos.json')
+                # On utilise des variables locales pour capter les saisies
+                new_date = st.text_input("Date / Titre", value=row_e['Date'], key=f"edit_date_{idx_e}")
+                e_desc = st.text_area("Contenu", value=texte_propre, height=150, key=f"edit_area_{idx_e}")
                 
-                # Reset de l'ID de modification et rafraîchissement
-                st.session_state.memo_edit_id = None
-                st.rerun()
+                c_ed1, c_ed2 = st.columns(2)
+                e_pay = c_ed1.selectbox("Paiement", ["N/A", "À Payer", "Payé"], 
+                                        index=["N/A", "À Payer", "Payé"].index(row_e.get('Paiement', 'N/A')))
+                e_stat = c_ed2.selectbox("Urgence", ["Normal", "Urgent", "Fait"], 
+                                         index=["Normal", "Urgent", "Fait"].index(row_e.get('Statut', 'Normal')))
                 
-            if col_btn2.button("❌ ANNULER", use_container_width=True):
-                st.session_state.memo_edit_id = None
-                st.rerun()
-    st.divider()
+                col_btn1, col_btn2 = st.columns(2)
+                if col_btn1.button("🚀 ENREGISTRER LES MODIFICATIONS", type="primary", use_container_width=True):
+                    # On applique les modifs au DataFrame
+                    df_memos.at[idx_e, 'Date'] = new_date
+                    df_memos.at[idx_e, 'Description'] = e_desc
+                    df_memos.at[idx_e, 'Paiement'] = e_pay
+                    df_memos.at[idx_e, 'Statut'] = e_stat
+                    
+                    sauvegarder_data(df_memos, 'memos.json')
+                    st.session_state.memo_edit_id = None
+                    st.rerun()
+                    
+                if col_btn2.button("❌ ANNULER", use_container_width=True):
+                    st.session_state.memo_edit_id = None
+                    st.rerun()
+        st.divider()
 
-# --- B. AJOUT NOUVELLE NOTE ---
-    # On utilise une variable de contrôle simple
+    # --- B. AJOUT NOUVELLE NOTE ---
     if 'memos_open' not in st.session_state:
         st.session_state.memos_open = False
 
-    # 1. Le bouton pour ouvrir (si fermé)
     if not st.session_state.memos_open:
         if st.button("➕ CRÉER UNE NOUVELLE CHECK-LIST", use_container_width=True):
             st.session_state.memos_open = True
             st.rerun()
 
-    # 2. La zone de saisie (si ouvert)
     if st.session_state.memos_open:
-        with st.container(border=True): # Remplace l'expander pour plus de fiabilité
+        with st.container(border=True):
             st.markdown("### 📝 Nouveau Mémo")
             c1, c2 = st.columns(2)
             m_date = c1.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
@@ -229,41 +217,25 @@ if st.session_state.memo_edit_id is not None:
             col_b1, col_b2 = st.columns(2)
             if col_b1.button("💾 ENREGISTRER", type="primary", use_container_width=True):
                 if m_txt.strip():
-                    new_r = pd.DataFrame([{
-                        "Date": m_date, 
-                        "Description": m_txt, 
-                        "Statut": m_urg, 
-                        "Paiement": "N/A", 
-                        "Archive": "Non Archivé"
-                    }])
+                    new_r = pd.DataFrame([{"Date": m_date, "Description": m_txt, "Statut": m_urg, "Paiement": "N/A", "Archive": "Non Archivé"}])
                     df_memos = pd.concat([df_memos, new_r], ignore_index=True)
                     sauvegarder_data(df_memos, 'memos.json')
-                    
-                    # ICI : On ferme et on rafraîchit
                     st.session_state.memos_open = False
                     st.rerun()
-                else:
-                    st.error("Le contenu est vide.")
-            
+
             if col_b2.button("❌ ANNULER", use_container_width=True):
                 st.session_state.memos_open = False
                 st.rerun()
 
-    # --- C. AFFICHAGE DES FICHES COLORÉES ---
+    # --- C. AFFICHAGE DES FICHES ---
     df_show = df_memos[df_memos['Archive'] == "Non Archivé"]
     
     if not df_show.empty:
-       for idx, row in df_show.sort_index(ascending=False).iterrows():
-            # Calcul des couleurs
+        # On trie pour avoir les plus récents en haut
+        for idx, row in df_show.sort_index(ascending=False).iterrows():
             stat_row = str(row.get('Statut', 'Normal'))
-            if stat_row == "Urgent":
-                h_col, bg_col = "#E74C3C", "#FDEDEC" 
-            elif stat_row == "Fait":
-                h_col, bg_col = "#27AE60", "#EAFAF1"
-            else:
-                h_col, bg_col = "#2980B9", "#EBF5FB"
+            h_col, bg_col = ("#E74C3C", "#FDEDEC") if stat_row == "Urgent" else (("#27AE60", "#EAFAF1") if stat_row == "Fait" else ("#2980B9", "#EBF5FB"))
 
-            # --- AJOUT DU TITRE ET DU BANDEAU DE DATE ---
             st.markdown(f"""
                 <div style="margin-top: 20px; margin-bottom: 10px;">
                     <h4 style="color: {h_col}; margin-bottom: 0px;">📝 Note du {row['Date']}</h4>
@@ -276,53 +248,34 @@ if st.session_state.memo_edit_id is not None:
                 </div>
             """, unsafe_allow_html=True)
 
-            # ... la suite du code (st.data_editor) reste la même ...
-
-            # --- LOGIQUE DE LA CHECK-LIST INTERNE ---
+            # Check-list interne
             lignes = str(row.get('Description', '')).split('\n')
-            data_list = []
-            for l in lignes:
-                if l.strip():
-                    is_done = l.startswith("✅ | ")
-                    clean_text = l.replace("✅ | ", "").replace("❌ | ", "")
-                    data_list.append({"Fait": is_done, "Tâche": clean_text})
+            data_list = [{"Fait": l.startswith("✅ | "), "Tâche": l.replace("✅ | ", "").replace("❌ | ", "")} for l in lignes if l.strip()]
             
-            df_temp = pd.DataFrame(data_list)
-            
-            edited_df = st.data_editor(
-                df_temp, 
-                key=f"editor_{idx}", 
-                hide_index=True, 
-                use_container_width=True,
-                column_config={
-                    "Fait": st.column_config.CheckboxColumn("Etat", default=False),
-                    "Tâche": st.column_config.TextColumn("Détail de la ligne")
-                }
-            )
+            if data_list:
+                df_temp = pd.DataFrame(data_list)
+                edited_df = st.data_editor(df_temp, key=f"editor_{idx}", hide_index=True, use_container_width=True,
+                                          column_config={"Fait": st.column_config.CheckboxColumn("Etat", default=False), "Tâche": st.column_config.TextColumn("Détail")})
 
-            # Sauvegarde auto (Format discret : ✅ pour fait, rien pour à faire)
-            if not edited_df.equals(df_temp):
-                new_desc = "\n".join([f"{'✅ | ' if r['Fait'] else ''}{r['Tâche']}" for _, r in edited_df.iterrows()])
-                df_memos.at[idx, 'Description'] = new_desc
-                sauvegarder_data(df_memos, 'memos.json')
-                st.rerun()
+                if not edited_df.equals(df_temp):
+                    new_desc = "\n".join([f"{'✅ | ' if r['Fait'] else ''}{r['Tâche']}" for _, r in edited_df.iterrows()])
+                    df_memos.at[idx, 'Description'] = new_desc
+                    sauvegarder_data(df_memos, 'memos.json')
+                    st.rerun()
 
-            # --- ACTIONS & CONFIRMATION DE SUPPRESSION ---
+            # Actions
             c1, c2, c3 = st.columns(3)
-           
             if c1.button("✏️ Modif", key=f"ed_{idx}"):
-                # 1. On définit l'ID à modifier
                 st.session_state.memo_edit_id = idx
-                # 2. On s'assure que le formulaire d'ajout est FERMÉ pour éviter les conflits
                 st.session_state.memos_open = False
-                # 3. On relance pour que le formulaire de modification (Bloc A) apparaisse en haut
-                st.rerun() 
+                st.rerun()
+            
             if c2.button("📦 Archive", key=f"ar_{idx}"):
                 df_memos.at[idx, 'Archive'] = "Archivé"
                 sauvegarder_data(df_memos, 'memos.json')
                 st.rerun()
 
-            # Sécurité Suppression
+            # Suppression
             conf_k = f"del_c_{idx}"
             if not st.session_state.get(conf_k, False):
                 if c3.button("🗑️ Supprimer", key=f"pre_{idx}"):
@@ -338,7 +291,6 @@ if st.session_state.memo_edit_id is not None:
                 if sub2.button("❌ NON", key=f"no_{idx}"):
                     st.session_state[conf_k] = False
                     st.rerun()
-            st.write("")
 
 
 # =================================================================
