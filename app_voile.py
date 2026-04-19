@@ -159,31 +159,52 @@ if st.session_state.page == "MEMOS":
     if 'memo_edit_id' not in st.session_state: 
         st.session_state.memo_edit_id = None
 
-     # --- A. FORMULAIRE DE MODIFICATION ---
-    if st.session_state.memo_edit_id is not None:
-        idx_e = st.session_state.memo_edit_id
-        if idx_e < len(df_memos):
-            row_e = df_memos.iloc[idx_e]
-            texte_propre = str(row_e['Description']).replace("✅ | ", "").replace("❌ | ", "")
+    # --- A. FORMULAIRE DE MODIFICATION ---
+if st.session_state.memo_edit_id is not None:
+    idx_e = st.session_state.memo_edit_id
+    if idx_e < len(df_memos):
+        row_e = df_memos.iloc[idx_e]
+        
+        # On nettoie le texte pour l'édition
+        texte_propre = str(row_e['Description']).replace("✅ | ", "").replace("❌ | ", "")
+        
+        with st.container(border=True):
+            st.markdown(f"### ✏️ Modification en cours")
             
-            with st.container(border=True): # Un cadre pour bien le voir
-                st.markdown(f"### ✏️ Modification : Note du {row_e['Date']}")
-                e_desc = st.text_area("Contenu", value=texte_propre, height=150)
+            # 1. Champ Date (pour pouvoir changer le titre/date)
+            new_date = st.text_input("Date / Titre", value=row_e['Date'], key=f"edit_date_{idx_e}")
+            
+            # 2. Champ Description avec une KEY UNIQUE pour forcer la mise à jour
+            e_desc = st.text_area("Contenu", value=texte_propre, height=150, key=f"edit_area_{idx_e}")
+            
+            c_ed1, c_ed2 = st.columns(2)
+            e_pay = c_ed1.selectbox("Paiement", ["N/A", "À Payer", "Payé"], 
+                                    index=["N/A", "À Payer", "Payé"].index(row_e.get('Paiement', 'N/A')))
+            e_stat = c_ed2.selectbox("Urgence", ["Normal", "Urgent", "Fait"], 
+                                     index=["Normal", "Urgent", "Fait"].index(row_e.get('Statut', 'Normal')))
+            
+            st.write("") # Espace
+            
+            col_btn1, col_btn2 = st.columns(2)
+            
+            if col_btn1.button("🚀 ENREGISTRER LES MODIFICATIONS", type="primary", use_container_width=True):
+                # Mise à jour des données dans le DataFrame
+                df_memos.at[idx_e, 'Date'] = new_date
+                df_memos.at[idx_e, 'Description'] = e_desc
+                df_memos.at[idx_e, 'Paiement'] = e_pay
+                df_memos.at[idx_e, 'Statut'] = e_stat
                 
-                # ... tes selectbox Urgence et Paiement ...
-
-                cb1, cb2 = st.columns(2)
-                if cb1.button("🚀 ENREGISTRER LES MODIFS", type="primary"):
-                    df_memos.at[idx_e, 'Description'] = e_desc
-                    # ... mise à jour Paiement et Statut ...
-                    sauvegarder_data(df_memos, 'memos.json')
-                    st.session_state.memo_edit_id = None # ON FERME
-                    st.rerun()
+                # Sauvegarde physique
+                sauvegarder_data(df_memos, 'memos.json')
                 
-                if cb2.button("❌ ANNULER"):
-                    st.session_state.memo_edit_id = None # ON FERME
-                    st.rerun()
-        st.divider()
+                # Reset de l'ID de modification et rafraîchissement
+                st.session_state.memo_edit_id = None
+                st.rerun()
+                
+            if col_btn2.button("❌ ANNULER", use_container_width=True):
+                st.session_state.memo_edit_id = None
+                st.rerun()
+    st.divider()
 
 # --- B. AJOUT NOUVELLE NOTE ---
     # On utilise une variable de contrôle simple
