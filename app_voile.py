@@ -235,7 +235,7 @@ if st.session_state.page == "MEMOS":
     df_show = df_memos[df_memos['Archive'] == "Non Archivé"]
     
     if not df_show.empty:
-        for idx, row in df_show.sort_index(ascending=False).iterrows():
+       for idx, row in df_show.sort_index(ascending=False).iterrows():
             # Calcul des couleurs
             stat_row = str(row.get('Statut', 'Normal'))
             if stat_row == "Urgent":
@@ -245,14 +245,20 @@ if st.session_state.page == "MEMOS":
             else:
                 h_col, bg_col = "#2980B9", "#EBF5FB"
 
+            # --- AJOUT DU TITRE ET DU BANDEAU DE DATE ---
             st.markdown(f"""
-                <div style="background-color:{bg_col}; border-left: 10px solid {h_col}; padding: 15px; border-radius: 10px; margin-bottom: 5px;">
+                <div style="margin-top: 20px; margin-bottom: 10px;">
+                    <h4 style="color: {h_col}; margin-bottom: 0px;">📝 Note du {row['Date']}</h4>
+                </div>
+                <div style="background-color:{bg_col}; border-left: 10px solid {h_col}; padding: 15px; border-radius: 10px 10px 0px 0px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: bold; color: #2C3E50;">📅 {row['Date']}</span>
+                        <span style="font-weight: bold; color: #2C3E50;">📌 Récapitulatif de bord</span>
                         <span style="background-color: {h_col}; color: white; padding: 2px 10px; border-radius: 15px; font-size: 0.8rem;">{stat_row.upper()}</span>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
+
+            # ... la suite du code (st.data_editor) reste la même ...
 
             # --- LOGIQUE DE LA CHECK-LIST INTERNE ---
             lignes = str(row.get('Description', '')).split('\n')
