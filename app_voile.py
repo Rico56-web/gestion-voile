@@ -291,9 +291,14 @@ if st.session_state.page == "MEMOS":
 
             # --- ACTIONS & CONFIRMATION DE SUPPRESSION ---
             c1, c2, c3 = st.columns(3)
+           
             if c1.button("✏️ Modif", key=f"ed_{idx}"):
+                # 1. On définit l'ID à modifier
                 st.session_state.memo_edit_id = idx
-                st.rerun()
+                # 2. On s'assure que le formulaire d'ajout est FERMÉ pour éviter les conflits
+                st.session_state.memos_open = False
+                # 3. On relance pour que le formulaire de modification (Bloc A) apparaisse en haut
+                st.rerun() 
             if c2.button("📦 Archive", key=f"ar_{idx}"):
                 df_memos.at[idx, 'Archive'] = "Archivé"
                 sauvegarder_data(df_memos, 'memos.json')
