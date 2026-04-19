@@ -669,14 +669,26 @@ if st.session_state.page == "STATS":
         
         if mode_bilan == "À ce jour" and not df_f.empty:
             df_f = df_f[df_f['dt_vrai'] <= pd.Timestamp.now().normalize()].copy()
-
         def est_comptabilise(row):
             soc = str(row.get('Société', '')).upper()
             paiement = str(row.get('Paiement', '')).upper()
             statut = str(row.get('Statut', '')).upper()
-            if "LISTE D'ATTENTE" in statut: return False
-            # On compte si c'est CMN (pro) ou si c'est payé
-            return "CMN" in soc or paiement == "PAID"
+
+            # --- CAS 1 : MODE RÉEL (À ce jour) ---
+            if mode_bilan == "À ce jour":
+                # On ne prend que ce qui est payé ET qui n'est pas annulé/en attente
+                # Le statut doit être "Terminé" ou similaire (selon tes labels)
+                est_fini = "TERMINÉ" in statut or "FAIT" in statut or "ARCHIVÉ" in statut
+                return paiement == "PAID" and est_fini
+
+            # --- CAS 2 : MODE ESTIMATION (Année Complète) ---
+            else:
+                # On exclut uniquement les brouillons ou les annulations
+                if "LISTE D'ATTENTE" in statut or "ANNULÉ" in statut: 
+                    return False
+                # On prend tout le reste (En cours, Confirmé, Payé, CMN, etc.)
+                return True
+ 
 
         df_final = df_f[df_f.apply(est_comptabilise, axis=1)].copy() if not df_f.empty else pd.DataFrame()
         
