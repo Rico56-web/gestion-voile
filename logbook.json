@@ -128,19 +128,19 @@
         "Co\u00e9quipiers":"farncoise RIOU, Philippe DESGAGNY, Yannick BAILLY et J Louis DUGAVE"
     },
     {
-        "Date":"19\/04\/2026",
-        "Navigation":"",
-        "PortArr":"Piriac ",
+        "Date":"22\/04\/2026",
+        "Navigation":"Test \u00e9quipe ESPAGNE",
+        "PortArr":"Arzon",
         "MotDep":2441.1,
-        "MotArr":0.0,
-        "TotalMot":-2441.1,
+        "MotArr":2441.1,
+        "TotalMot":0.0,
         "MilDep":3028.0,
-        "MilArr":0.0,
-        "TotalMil":-3028.0,
-        "H_Voile":0.0,
+        "MilArr":3126.0,
+        "TotalMil":98.0,
+        "H_Voile":0.01,
         "Notes":null,
         "Group_ID":"",
-        "PortDep":"",
-        "Co\u00e9quipiers":""
+        "PortDep":"Port Tudy",
+        "Co\u00e9quipiers":"F RIOU, P. Desgagny; Y BAILLY et J. L. DUGAVE"
     }
 ]
