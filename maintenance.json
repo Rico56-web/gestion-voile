@@ -173,5 +173,12 @@
         "M_Num":70.0,
         "Statut":"Fait",
         "Type":"Assurances"
+    },
+    {
+        "Date":"22\/04\/2026",
+        "Objet":"achats fermeture de coffres (poussoir) chez Dufour  magasin",
+        "M_Num":20.5,
+        "Statut":"Fait",
+        "Type":"Maintenance"
     }
 ]
