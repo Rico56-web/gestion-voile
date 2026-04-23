@@ -995,7 +995,36 @@ if st.session_state.page == "MAINT":
             st.rerun()
 
     st.divider()
+    
+    # --- 7. DASHBOARD CARBURANT (Plus visible) ---
+    st.markdown("### ⛽ Suivi Carburant")
+    df_carb = charger_data_safe('carburant.json')
+    
+    col_c1, col_c2, col_c3 = st.columns(3)
+    if not df_carb.empty:
+        total_l = df_carb['Litres'].sum()
+        total_e = df_carb['Prix'].sum()
+        dernier_pu = df_carb['PU'].iloc[-1] if 'PU' in df_carb.columns else 0
+        col_c1.metric("Total Litres", f"{total_l:.0f} L")
+        col_c2.metric("Total Dépensé", f"{total_e:.2f} €")
+        col_c3.metric("Dernier Prix/L", f"{dernier_pu:.3f} €")
 
+    with st.expander("➕ Enregistrer un plein / Voir l'historique", expanded=False):
+        with st.form("form_fuel"):
+            c1, c2, c3 = st.columns(3)
+            d_f = c1.date_input("Date du plein")
+            l_f = c2.number_input("Litres", min_value=0.0)
+            p_f = c3.number_input("Total TTC (€)", min_value=0.0)
+        
+            if st.form_submit_button("Enregistrer le plein"):
+                new_f = {"Date": d_f.strftime("%d/%m/%Y"), "Litres": l_f, "Prix": p_f, "PU": p_f/l_f if l_f > 0 else 0}
+                df_carb = pd.concat([df_carb, pd.DataFrame([new_f])], ignore_index=True)
+                sauvegarder_data(df_carb, 'carburant.json')
+                st.rerun()
+
+        if not df_carb.empty:
+            st.table(df_carb.tail(5)) # Affiche les 5 derniers pleins
+            
     # --- INITIALISATION DES ÉTATS DE VISIBILITÉ ---
     if 'show_form_classique' not in st.session_state: st.session_state.show_form_classique = False
     if 'show_form_vidange' not in st.session_state: st.session_state.show_form_vidange = False
@@ -1162,25 +1191,7 @@ if st.session_state.page == "MAINT":
                         sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
                         st.rerun()
                         
-    # gestion carburant
-    with st.expander("⛽ Suivi Carburant (Station Crouesty)", expanded=False):
-        df_carb = charger_data_safe('carburant.json')
-    
-        with st.form("form_fuel"):
-            c1, c2, c3 = st.columns(3)
-            d_f = c1.date_input("Date du plein")
-            l_f = c2.number_input("Litres", min_value=0.0)
-            p_f = c3.number_input("Total TTC (€)", min_value=0.0)
-        
-            if st.form_submit_button("Enregistrer"):
-                new_f = {"Date": d_f.strftime("%d/%m/%Y"), "Litres": l_f, "Prix": p_f, "PU": p_f/l_f if l_f > 0 else 0}
-                df_carb = pd.concat([df_carb, pd.DataFrame([new_f])], ignore_index=True)
-                sauvegarder_data(df_carb, 'carburant.json')
-                st.rerun()
-
-        if not df_carb.empty:
-            st.dataframe(df_carb.tail(5), use_container_width=True)
-    # --- 8. EXPORT EXCEL ---
+     # --- 8. EXPORT EXCEL ---
     if not df_m.empty:
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
