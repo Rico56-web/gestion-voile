@@ -941,7 +941,8 @@ if st.session_state.page == "MAINT":
 
     st.divider()
 
-    # --- 4. FORMULAIRES D'AJOUT (CHOIX ENTRE CLASSIQUE ET VIDANGE) ---
+    
+        # --- 4. FORMULAIRES D'AJOUT (AVEC BOUTONS FERMER) ---
     tab_classique, tab_vidange = st.tabs(["🔧 Intervention Classique", "🛢️ Révision Moteur / Vidange"])
 
     with tab_classique:
@@ -954,14 +955,19 @@ if st.session_state.page == "MAINT":
             f_notes = st.text_area("Notes détaillées", key="n1")
             f_statut = st.selectbox("Statut", ["À prévoir", "Fait"], index=0, key="s1")
             
-            if st.form_submit_button("💾 ENREGISTRER L'INTERVENTION"):
+            # BOUTONS ALIGNÉS
+            b_col1, b_col2 = st.columns(2)
+            if b_col1.form_submit_button("💾 ENREGISTRER", use_container_width=True, type="primary"):
                 new_row = {
                     "Date": f_d.strftime("%d/%m/%Y"), "Objet": f_obj, "M_Num": f_m, 
                     "Statut": f_statut, "Type": f_t, "Notes": f_notes
                 }
                 df_m = pd.concat([df_m, pd.DataFrame([new_row])], ignore_index=True)
                 sauvegarder_data(df_m, 'maintenance.json')
-                st.success("Intervention enregistrée")
+                st.rerun()
+            
+            if b_col2.form_submit_button("❌ ANNULER / FERMER", use_container_width=True):
+                # Le simple fait de submit sans rien faire "ferme" visuellement le focus du formulaire
                 st.rerun()
 
     with tab_vidange:
@@ -981,40 +987,29 @@ if st.session_state.page == "MAINT":
             chk_impeller = col_c3.checkbox("Impeller (Turbine)")
             
             v_cout = st.number_input("Coût total des fournitures (€)", min_value=0.0)
-            v_notes = st.text_area("Autres observations (ex: tension courroie, fuite...)")
-            
+            v_notes = st.text_area("Observations")
             increment_h = st.selectbox("Prochaine vidange dans :", [50, 100, 150, 200], index=1)
             
-            if st.form_submit_button("💾 VALIDER LA RÉVISION MOTEUR"):
-                # Construction du libellé détaillé
-                travaux = []
-                if chk_huile: travaux.append("Vidange Huile")
-                if chk_f_huile: travaux.append("Filtre Huile")
-                if chk_f_gasoil: travaux.append("Filtre Gasoil")
-                if chk_f_pre: travaux.append("Pré-filtre")
-                if chk_courroie: travaux.append("Courroies")
-                if chk_impeller: travaux.append("Impeller")
+            # BOUTONS ALIGNÉS
+            bv_col1, bv_col2 = st.columns(2)
+            if bv_col1.form_submit_button("💾 VALIDER RÉVISION", use_container_width=True, type="primary"):
+                travaux = [t for t, c in zip(["Vidange Huile", "Filtre Huile", "Filtre Gasoil", "Pré-filtre", "Courroies", "Impeller"], 
+                                             [chk_huile, chk_f_huile, chk_f_gasoil, chk_f_pre, chk_courroie, chk_impeller]) if c]
                 
-                details_vidange = f"Révision moteur à {v_heures}h.\nTravaux : {', '.join(travaux)}.\nNotes : {v_notes}"
-                
+                details_vidange = f"Révision moteur à {v_heures}h. Travaux : {', '.join(travaux)}. Notes : {v_notes}"
                 new_row = {
-                    "Date": v_date.strftime("%d/%m/%Y"), 
-                    "Objet": f"RÉVISION MOTEUR ({v_heures}h)", 
-                    "M_Num": v_cout, 
-                    "Statut": "Fait", 
-                    "Type": "Maintenance", 
-                    "Notes": details_vidange
+                    "Date": v_date.strftime("%d/%m/%Y"), "Objet": f"RÉVISION MOTEUR ({v_heures}h)", 
+                    "M_Num": v_cout, "Statut": "Fait", "Type": "Maintenance", "Notes": details_vidange
                 }
-                
-                # Mise à jour des paramètres de vidange
                 params['prochaine_vidange'] = round(v_heures + increment_h, 1)
                 sauvegarder_params(params)
-                
-                # Sauvegarde
                 df_m = pd.concat([df_m, pd.DataFrame([new_row])], ignore_index=True)
                 sauvegarder_data(df_m, 'maintenance.json')
-                st.balloons()
                 st.rerun()
+
+            if bv_col2.form_submit_button("❌ ANNULER / FERMER", use_container_width=True):
+                st.rerun()
+
 
     # --- 5. SYSTÈME DE FILTRES ---
     st.divider()
