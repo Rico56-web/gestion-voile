@@ -941,77 +941,87 @@ if st.session_state.page == "MAINT":
 
     st.divider()
 
-    
-        # --- 4. FORMULAIRES D'AJOUT (AVEC BOUTONS FERMER) ---
-    tab_classique, tab_vidange = st.tabs(["🔧 Intervention Classique", "🛢️ Révision Moteur / Vidange"])
+    # --- INITIALISATION DES ÉTATS DE VISIBILITÉ ---
+    if 'show_form_classique' not in st.session_state: st.session_state.show_form_classique = False
+    if 'show_form_vidange' not in st.session_state: st.session_state.show_form_vidange = False
 
-    with tab_classique:
+    # --- 4. BOUTONS D'APPEL ---
+    col_btn1, col_btn2 = st.columns(2)
+    if col_btn1.button("🔧 NOUVELLE INTERVENTION", use_container_width=True):
+        st.session_state.show_form_classique = True
+        st.session_state.show_form_vidange = False
+        st.rerun()
+    
+    if col_btn2.button("🛢️ RÉVISION MOTEUR", use_container_width=True):
+        st.session_state.show_form_vidange = True
+        st.session_state.show_form_classique = False
+        st.rerun()
+
+    # --- 5. FORMULAIRE CLASSIQUE ---
+    if st.session_state.show_form_classique:
         with st.form("form_new_maint"):
-            f_obj = st.text_input("Désignation de l'intervention")
+            st.subheader("🔧 Nouvelle Intervention")
+            f_obj = st.text_input("Désignation")
             c1, c2, c3 = st.columns(3)
-            f_d = c1.date_input("Date", datetime.now(), key="d1")
-            f_m = c2.number_input("Montant (€)", min_value=0.0, key="m1")
-            f_t = c3.selectbox("Catégorie", ["Maintenance", "Sécurité", "Port", "Assurances", "Autres"], key="t1")
-            f_notes = st.text_area("Notes détaillées", key="n1")
-            f_statut = st.selectbox("Statut", ["À prévoir", "Fait"], index=0, key="s1")
+            f_d = c1.date_input("Date", datetime.now())
+            f_m = c2.number_input("Montant (€)", min_value=0.0)
+            f_t = c3.selectbox("Catégorie", ["Maintenance", "Sécurité", "Port", "Assurances", "Autres"])
+            f_notes = st.text_area("Notes détaillées")
+            f_statut = st.selectbox("Statut", ["À prévoir", "Fait"])
             
-            # BOUTONS ALIGNÉS
             b_col1, b_col2 = st.columns(2)
-            if b_col1.form_submit_button("💾 ENREGISTRER", use_container_width=True, type="primary"):
-                new_row = {
-                    "Date": f_d.strftime("%d/%m/%Y"), "Objet": f_obj, "M_Num": f_m, 
-                    "Statut": f_statut, "Type": f_t, "Notes": f_notes
-                }
+            if b_col1.form_submit_button("✅ ENREGISTRER", use_container_width=True, type="primary"):
+                new_row = {"Date": f_d.strftime("%d/%m/%Y"), "Objet": f_obj, "M_Num": f_m, "Statut": f_statut, "Type": f_t, "Notes": f_notes}
                 df_m = pd.concat([df_m, pd.DataFrame([new_row])], ignore_index=True)
                 sauvegarder_data(df_m, 'maintenance.json')
+                st.session_state.show_form_classique = False
                 st.rerun()
             
-            if b_col2.form_submit_button("❌ ANNULER / FERMER", use_container_width=True):
-                # Le simple fait de submit sans rien faire "ferme" visuellement le focus du formulaire
+            if b_col2.form_submit_button("❌ FERMER", use_container_width=True):
+                st.session_state.show_form_classique = False # On force la fermeture ici
                 st.rerun()
 
-    with tab_vidange:
+    # --- 6. FORMULAIRE VIDANGE ---
+    if st.session_state.show_form_vidange:
         with st.form("form_vidange_moteur"):
-            st.subheader("Check-list Révision Moteur")
+            st.subheader("🛢️ Révision Moteur")
             c_v1, c_v2 = st.columns(2)
-            v_date = c_v1.date_input("Date de la révision", datetime.now())
-            v_heures = c_v2.number_input("Heures moteur à la révision", value=float(releve_h))
+            v_date = c_v1.date_input("Date", datetime.now())
+            v_heures = c_v2.number_input("Heures moteur", value=float(releve_h))
             
-            st.markdown("**Travaux effectués :**")
+            st.markdown("**Check-list :**")
             col_c1, col_c2, col_c3 = st.columns(3)
             chk_huile = col_c1.checkbox("Vidange Huile")
-            chk_f_huile = col_c1.checkbox("Filtre à Huile")
+            chk_f_huile = col_c1.checkbox("Filtre Huile")
             chk_f_gasoil = col_c2.checkbox("Filtre Gasoil")
-            chk_f_pre = col_c2.checkbox("Pré-filtre Gasoil")
+            chk_f_pre = col_c2.checkbox("Pré-filtre")
             chk_courroie = col_c3.checkbox("Courroies")
-            chk_impeller = col_c3.checkbox("Impeller (Turbine)")
+            chk_impeller = col_c3.checkbox("Impeller")
             
-            v_cout = st.number_input("Coût total des fournitures (€)", min_value=0.0)
+            v_cout = st.number_input("Coût fournitures (€)", min_value=0.0)
             v_notes = st.text_area("Observations")
-            increment_h = st.selectbox("Prochaine vidange dans :", [50, 100, 150, 200], index=1)
+            inc_h = st.selectbox("Prochaine vidange (+h)", [50, 100, 150, 200], index=1)
             
-            # BOUTONS ALIGNÉS
             bv_col1, bv_col2 = st.columns(2)
-            if bv_col1.form_submit_button("💾 VALIDER RÉVISION", use_container_width=True, type="primary"):
-                travaux = [t for t, c in zip(["Vidange Huile", "Filtre Huile", "Filtre Gasoil", "Pré-filtre", "Courroies", "Impeller"], 
+            if bv_col1.form_submit_button("✅ VALIDER RÉVISION", use_container_width=True, type="primary"):
+                travaux = [t for t, c in zip(["Huile", "F-Huile", "F-Gasoil", "Pré-filtre", "Courroies", "Impeller"], 
                                              [chk_huile, chk_f_huile, chk_f_gasoil, chk_f_pre, chk_courroie, chk_impeller]) if c]
-                
-                details_vidange = f"Révision moteur à {v_heures}h. Travaux : {', '.join(travaux)}. Notes : {v_notes}"
-                new_row = {
-                    "Date": v_date.strftime("%d/%m/%Y"), "Objet": f"RÉVISION MOTEUR ({v_heures}h)", 
-                    "M_Num": v_cout, "Statut": "Fait", "Type": "Maintenance", "Notes": details_vidange
-                }
-                params['prochaine_vidange'] = round(v_heures + increment_h, 1)
+                details = f"Révision à {v_heures}h. Travaux : {', '.join(travaux)}. Notes : {v_notes}"
+                new_row = {"Date": v_date.strftime("%d/%m/%Y"), "Objet": f"RÉVISION MOTEUR ({v_heures}h)", "M_Num": v_cout, "Statut": "Fait", "Type": "Maintenance", "Notes": details}
+                params['prochaine_vidange'] = round(v_heures + inc_h, 1)
                 sauvegarder_params(params)
                 df_m = pd.concat([df_m, pd.DataFrame([new_row])], ignore_index=True)
                 sauvegarder_data(df_m, 'maintenance.json')
+                st.session_state.show_form_vidange = False
                 st.rerun()
 
-            if bv_col2.form_submit_button("❌ ANNULER / FERMER", use_container_width=True):
+            if bv_col2.form_submit_button("❌ FERMER", use_container_width=True):
+                st.session_state.show_form_vidange = False # On force la fermeture ici
                 st.rerun()
 
 
-    # --- 5. SYSTÈME DE FILTRES ---
+
+    # --- 7. SYSTÈME DE FILTRES ---
     st.divider()
     col_menu1, col_menu2, col_menu3 = st.columns([2, 1.2, 1.2])
     filter_statut = col_menu1.radio("Afficher :", ["Tout", "⏳ À faire", "✅ Fait"], horizontal=True)
@@ -1097,7 +1107,7 @@ if st.session_state.page == "MAINT":
                         sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
                         st.rerun()
 
-    # --- 6. EXPORT EXCEL ---
+    # --- 8. EXPORT EXCEL ---
     if not df_m.empty:
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
