@@ -145,18 +145,18 @@
     },
     {
         "Date":"25\/04\/2026",
-        "Navigation":"",
+        "Navigation":"test \u00e9quipe espagne ",
         "PortArr":"port tudy , Arzon",
         "MotDep":0.0,
         "MotArr":2443.8,
-        "TotalMot":2.7,
+        "TotalMot":2443.8,
         "MilDep":0.0,
         "MilArr":3126.0,
-        "TotalMil":98.0,
+        "TotalMil":3126.0,
         "H_Voile":0.0,
         "Notes":null,
         "Group_ID":null,
         "PortDep":"Escale",
-        "Co\u00e9quipiers":""
+        "Co\u00e9quipiers":"Philippe Desgagny, Francoise Riou, jean louis Dugave et Yannick Bailly"
     }
 ]
