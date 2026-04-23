@@ -287,6 +287,12 @@ if st.session_state.page == "MEMOS":
                         df_memos.at[idx, 'Description'] = new_desc
                         sauvegarder_data(df_memos, 'memos.json')
                         st.rerun()
+        # Dans ton bloc NOTES ou LOG
+    if st.button("🖋️ Signer numériquement le rapport"):
+        signature = f"Validé par Skipper Vesta le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"
+        # On ajoute cette ligne à la fin de la note ou du log
+        st.success(f"Rapport signé : {signature}")
+                
         # --- ACTIONS (Barre d'outils mise à jour) ---
                 btn_c1, btn_c2, btn_c3, btn_c4 = st.columns(4) # On passe à 4 colonnes
                 
@@ -323,7 +329,11 @@ if st.session_state.page == "MEMOS":
                         st.rerun()
  
             st.write("")
-
+    # --- À mettre en bas de tes fiches Mémos ou Logbook ---
+    if st.button("🖋️ Signer le rapport de bord"):
+        signature = f"VALIDÉ PAR SKIPPER VESTA - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        st.info(signature)
+        # Option : Sauvegarder cette ligne dans ton logbook
 
 # =================================================================
 # --- 5. BLOC CONTACTS (V102 - COMPLET : RELANCES & COULEURS) ---
@@ -547,6 +557,64 @@ if st.session_state.page == "MODIFIER_CONTACT":
 # --- 6. PAGE PLANNING (V18.5 - OPTIMISÉ) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
+    st.markdown("## ⚓ Tableau de Bord - Port Crouesty")
+    
+    # Widget Météo Windy (Arzon)
+    st.markdown("""
+        <iframe width="100%" height="300" src="https://www.windy.com/47.545/-2.894?47.200,-2.894,8,m:eX3agmS" frameborder="0"></iframe>
+    """, unsafe_allow_html=True)
+
+    col_v1, col_v2, col_v3 = st.columns(3)
+    
+    # A. Alerte Vidange (ex: seuil à 100h)
+    df_log = charger_data_safe('logbook.json')
+    derniere_heure = to_f(df_log['Heures moteur'].max()) if not df_log.empty else 0
+    vidange_seuil = 100 # À adapter selon ton moteur
+    heures_restantes = vidange_seuil - (derniere_heure % vidange_seuil)
+    
+    if heures_restantes < 15:
+        col_v1.error(f"🛠️ Vidange imminente : {heures_restantes:.1f}h restantes")
+    else:
+        col_v1.success(f"⚙️ Moteur : {heures_restantes:.1f}h avant révision")
+
+    # B. Facturation en attente
+    df_f = charger_data_safe('contacts.json')
+    nb_unpaid = len(df_f[df_f['Paiement'] == "Unpaid"]) if not df_f.empty else 0
+    col_v2.metric("Factures Unpaid", f"{nb_unpaid}", delta="- " if nb_unpaid > 0 else "OK")
+
+    # C. Marée (Lien rapide)
+    col_v3.link_button("🌊 Marées Crouesty", "https://maree.info/104")
+    
+    st.divider()
+
+# --- BLOC VIGIE (DASHBOARD) ---
+if st.session_state.page == "PLANNING":
+    st.markdown("### ⚓ État de la Vigie")
+    col_v1, col_v2, col_v3 = st.columns(3)
+
+    # A. Alerte Maintenance (Heures Moteur)
+    params = charger_params()
+    df_log = charger_data_safe('logbook.json')
+    derniere_heure = to_f(df_log['Heures moteur'].max()) if not df_log.empty else 0
+    heures_restantes = params['prochaine_vidange'] - derniere_heure
+    
+    if heures_restantes < 20:
+        col_v1.warning(f"🛠️ Maintenance : Vidange dans {heures_restantes:.1f}h !")
+    else:
+        col_v1.success(f"⚙️ Moteur OK ({heures_restantes:.1f}h avant vidange)")
+
+    # B. Alerte Paiements (Unpaid)
+    df_f = charger_data_safe('contacts.json')
+    nb_unpaid = len(df_f[df_f['Paiement'] == "Unpaid"]) if not df_f.empty else 0
+    if nb_unpaid > 0:
+        col_v2.error(f"💰 Facturation : {nb_unpaid} impayé(s) !")
+    else:
+        col_v2.success("💰 Finances à jour")
+
+    # C. Widget Météo (Exemple rapide pour Lorient/Port Tudy)
+    col_v3.info("🌬️ Météo : [Consulter Windguru]") # Tu peux mettre un lien direct vers ta zone
+    st.divider()
+
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>🗓️ PLANNING</h1></div>', unsafe_allow_html=True)
     
     if st.button("📂 ACCÉDER AUX ARCHIVES", key="k_arch_p", use_container_width=True):
@@ -1112,7 +1180,25 @@ if st.session_state.page == "MAINT":
                         df_m = df_m.drop(idx)
                         sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
                         st.rerun()
+                        
+    # gestion carburant
+    with st.expander("⛽ Suivi Carburant (Station Crouesty)", expanded=False):
+        df_carb = charger_data_safe('carburant.json')
+    
+        with st.form("form_fuel"):
+            c1, c2, c3 = st.columns(3)
+            d_f = c1.date_input("Date du plein")
+            l_f = c2.number_input("Litres", min_value=0.0)
+            p_f = c3.number_input("Total TTC (€)", min_value=0.0)
+        
+            if st.form_submit_button("Enregistrer"):
+                new_f = {"Date": d_f.strftime("%d/%m/%Y"), "Litres": l_f, "Prix": p_f, "PU": p_f/l_f if l_f > 0 else 0}
+                df_carb = pd.concat([df_carb, pd.DataFrame([new_f])], ignore_index=True)
+                sauvegarder_data(df_carb, 'carburant.json')
+                st.rerun()
 
+        if not df_carb.empty:
+            st.dataframe(df_carb.tail(5), use_container_width=True)
     # --- 8. EXPORT EXCEL ---
     if not df_m.empty:
         buffer = io.BytesIO()
@@ -1359,6 +1445,69 @@ if st.session_state.page == "LOG":
 
     # --- 4. POSTE DE CONTRÔLE (BAS DE PAGE) ---
     # ... (Garder le code du poste de contrôle précédent ici) ...
+
+=================================================================
+
+# --- 11. PAGE ARCHIVES ---
+
+# =================================================================
+
+if st.session_state.page == "ARCHIVES":
+
+    st.title("📂 Archives")
+
+    if st.button("⬅️ Retour au Planning"):
+
+        st.session_state.page = "PLANNING"
+
+        st.rerun()
+
+
+
+    t1, t2, t3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook"])
+
+    with t1: st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
+
+    with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
+
+    with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
+
+    # À ajouter dans ton bloc ARCHIVES (Onglet existant ou nouveau)
+with st.expander("🚨 Zone Danger : Clôture de Saison"):
+    st.warning("Cette action va basculer les contacts payés dans les archives et vider la liste active.")
+    annee_saison = datetime.now().year
+    
+    if st.button(f"🔒 CLÔTURER LA SAISON {annee_saison}"):
+        # 1. Archive des contacts payés
+        df_f = charger_data_safe('contacts.json')
+        df_paid = df_f[df_f['Paiement'] == "Paid"]
+        df_unpaid = df_f[df_f['Paiement'] != "Paid"]
+        
+        if not df_paid.empty:
+            df_arch_contacts = charger_data_safe(f'archives_contacts_{annee_saison}.json')
+            df_arch_contacts = pd.concat([df_arch_contacts, df_paid], ignore_index=True)
+            sauvegarder_data(df_arch_contacts, f'archives_contacts_{annee_saison}.json')
+            
+            # On ne garde que les impayés dans le fichier actif
+            sauvegarder_data(df_unpaid, 'contacts.json')
+            st.success("Saison archivée avec succès !")
+            st.rerun()
+    # --- À ajouter dans ton bloc ARCHIVES ---
+    st.divider()
+    st.subheader("🏁 Clôture de Saison")
+    if st.button("📦 Archiver les sorties payées de 2026"):
+            df_f = charger_data_safe('contacts.json')
+        df_paid = df_f[df_f['Paiement'] == "Paid"]
+        df_unpaid = df_f[df_f['Paiement'] != "Paid"]
+    
+        if not df_paid.empty:
+            # On sauve dans un fichier historique
+            sauvegarder_data(df_paid, 'archives_contacts_2026.json')
+            # On ne garde que ce qui reste à payer dans le fichier actif
+            sauvegarder_data(df_unpaid, 'contacts.json')
+            st.success("Données de 2026 mises en coffre-fort !")
+        else:
+            st.info("Rien à archiver pour le moment.")
 # --- FIN DU FICHIER ---
 
 
