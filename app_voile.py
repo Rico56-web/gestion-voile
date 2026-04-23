@@ -558,11 +558,17 @@ if st.session_state.page == "MODIFIER_CONTACT":
 if st.session_state.page == "PLANNING":
     # --- 1. DASHBOARD VIGIE : CROUESTY ---
     st.markdown("## ⚓ Tableau de Bord - Port Crouesty")
-    
-    # Widget Météo Windy (Arzon / Le Crouesty)
+
+    # Widget Météo Windy (Version Embed autorisée)
     st.markdown("""
-        <iframe width="100%" height="300" src="https://www.windy.com/47.545/-2.894?47.200,-2.894,8,m:eX3agmS" frameborder="0"></iframe>
+        <iframe 
+            width="100%" 
+            height="350" 
+            src="https://www.windy.com/embed2.html?lat=47.545&lon=-2.894&detailLat=47.545&detailLon=-2.894&width=650&height=350&zoom=10&level=surface&overlay=wind&product=ecmwf&menu=&message=&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=kt&metricTemp=%C2%B0C&radarRange=-1" 
+            frameborder="0">
+        </iframe>
     """, unsafe_allow_html=True)
+    
 
     col_v1, col_v2, col_v3 = st.columns(3)
     
