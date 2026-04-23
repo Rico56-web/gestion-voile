@@ -965,23 +965,32 @@ if st.session_state.page == "MAINT":
                 sauvegarder_data(df_m, 'maintenance.json')
                 st.rerun()
 
-    # --- 5. SYSTÈME DE FILTRES ---
-    col_menu1, col_menu2, col_menu3 = st.columns([2, 1, 1])
-    # MENU DE SÉLECTION DU STATUT
+    # --- 5. SYSTÈME DE FILTRES (CORRIGÉ) ---
+    col_menu1, col_menu2, col_menu3 = st.columns([2, 1.2, 1.2])
+    
+    # Choix du statut (À faire / Fait)
     filter_statut = col_menu1.radio("Afficher :", ["Tout", "⏳ À faire", "✅ Fait"], horizontal=True)
-    sel_y = col_menu2.selectbox("Année :", [2025, 2026, 2027], index=1)
-    mode_m = col_menu3.radio("Période :", ["année", "a ce jour"], horizontal=True)
+    
+    # Choix de la période (À ce jour / Année Complète)
+    mode_m = col_menu2.radio("Période :", ["À ce jour", "Année complète"], horizontal=True)
+    
+    # Choix de l'année
+    sel_y = col_menu3.selectbox("Année :", [2025, 2026, 2027], index=1)
 
     if not df_m.empty:
-        # Conversion date pour le tri
+        # Conversion date pour le tri et filtrage
         df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+        
+        # 1. Filtrage par Année
         df_filtre = df_m[df_m['dt_maint'].dt.year == sel_y].copy()
         
-        # Filtre par période (Passé)
-        if mode_m == "Passé":
-            df_filtre = df_filtre[df_filtre['dt_maint'] <= pd.Timestamp.now().normalize()]
+        # 2. Filtrage par Période (À ce jour vs Année complète)
+        if mode_m == "À ce jour":
+            # On ne garde que ce qui est antérieur ou égal à aujourd'hui
+            aujourdhui = pd.Timestamp.now().normalize()
+            df_filtre = df_filtre[df_filtre['dt_maint'] <= aujourdhui]
 
-        # FILTRE PAR MENU (À faire / Fait)
+        # 3. Filtrage par Statut (À faire / Fait)
         if filter_statut == "⏳ À faire":
             df_filtre = df_filtre[df_filtre['Statut'] == "À prévoir"]
         elif filter_statut == "✅ Fait":
@@ -989,87 +998,88 @@ if st.session_state.page == "MAINT":
 
         df_filtre = df_filtre.sort_values('dt_maint', ascending=False)
 
-        st.subheader(f"📋 Suivi : {filter_statut}")
+        st.subheader(f"📋 Suivi : {filter_statut} ({mode_m})")
 
-        for idx, row in df_filtre.iterrows():
-            # Détermination de la couleur de la fiche
-            est_fait = (row['Statut'] == "Fait")
-            border_color = "#27AE60" if est_fait else "#F39C12"
-            bg_color = "#EAFAF1" if est_fait else "#FEF5E7"
-            icon_stat = "✅" if est_fait else "⏳"
+        if df_filtre.empty:
+            st.info("Aucune fiche ne correspond à ces filtres.")
+        else:
+            for idx, row in df_filtre.iterrows():
+                est_fait = (row['Statut'] == "Fait")
+                border_color = "#27AE60" if est_fait else "#F39C12"
+                bg_color = "#EAFAF1" if est_fait else "#FEF5E7"
+                icon_stat = "✅" if est_fait else "⏳"
 
-            # --- MODE ÉDITION ---
-            if st.session_state.maint_edit_id == idx:
-                with st.form(key=f"edit_maint_{idx}"):
-                    e_obj = st.text_input("Désignation", value=row['Objet'])
-                    c1, c2 = st.columns(2)
-                    e_dat = c1.text_input("Date", value=row['Date'])
-                    e_mon = c2.number_input("Montant (€)", value=float(row['M_Num']))
-                    e_not = st.text_area("Notes", value=row.get('Notes', ''))
-                    e_sta = st.selectbox("Statut", ["À prévoir", "Fait"], index=1 if est_fait else 0)
-                    
-                    cb1, cb2 = st.columns(2)
-                    if cb1.form_submit_button("✅ SAUVER"):
-                        df_m.at[idx, 'Objet'], df_m.at[idx, 'Date'] = e_obj, e_dat
-                        df_m.at[idx, 'M_Num'], df_m.at[idx, 'Notes'] = e_mon, e_not
-                        df_m.at[idx, 'Statut'] = e_sta
-                        sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
-                        st.session_state.maint_edit_id = None
-                        st.rerun()
-                    if cb2.form_submit_button("❌ ANNULER"):
-                        st.session_state.maint_edit_id = None
-                        st.rerun()
-            
-            # --- MODE AFFICHAGE ---
-            else:
-                st.markdown(f"""
-                    <div style="background-color:{bg_color}; border-left: 10px solid {border_color}; padding: 15px; border-radius: 10px; margin-bottom: 5px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-weight: bold; font-size: 1.1em;">{icon_stat} {row['Objet']}</span>
-                            <span style="color: #555;">📅 {row['Date']}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; margin-top: 5px;">
-                            <small>Catégorie : <b>{row['Type']}</b></small>
-                            <small>Coût : <b>{row['M_Num']} €</b></small>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-                if row.get('Notes'): st.caption(f"📝 {row['Notes']}")
-
-                # BARRE D'OUTILS
-                bc1, bc2, bc3, bc4 = st.columns(4)
+                # --- MODE ÉDITION ---
+                if st.session_state.maint_edit_id == idx:
+                    with st.form(key=f"edit_maint_{idx}"):
+                        e_obj = st.text_input("Désignation", value=row['Objet'])
+                        c1, c2 = st.columns(2)
+                        e_dat = c1.text_input("Date", value=row['Date'])
+                        e_mon = c2.number_input("Montant (€)", value=float(row['M_Num']))
+                        e_not = st.text_area("Notes", value=row.get('Notes', ''))
+                        e_sta = st.selectbox("Statut", ["À prévoir", "Fait"], index=1 if est_fait else 0)
+                        
+                        cb1, cb2 = st.columns(2)
+                        if cb1.form_submit_button("✅ SAUVER"):
+                            df_m.at[idx, 'Objet'] = e_obj
+                            df_m.at[idx, 'Date'] = e_dat
+                            df_m.at[idx, 'M_Num'] = e_mon
+                            df_m.at[idx, 'Notes'] = e_not
+                            df_m.at[idx, 'Statut'] = e_sta
+                            sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
+                            st.session_state.maint_edit_id = None
+                            st.rerun()
+                        if cb2.form_submit_button("❌ ANNULER"):
+                            st.session_state.maint_edit_id = None
+                            st.rerun()
                 
-                if bc1.button("✏️ Modif", key=f"ed_m_{idx}"):
-                    st.session_state.maint_edit_id = idx
-                    st.rerun()
-                
-                with bc2:
-                    bouton_imprimer_fiche_maint(row['Objet'], row['Date'], row.get('Notes', 'N/A'), row['Statut'])
-                
-                # BOUTON DE BASCULE RAPIDE (FAIT / À FAIRE)
-                label_toggle = "⏳ À prévoir" if est_fait else "✅ Marquer FAIT"
-                if bc3.button(label_toggle, key=f"st_m_{idx}"):
-                    df_m.at[idx, 'Statut'] = "À prévoir" if est_fait else "Fait"
-                    sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
-                    st.rerun()
-
-                # Suppression avec confirmation
-                dk = f"del_m_{idx}"
-                if not st.session_state.get(dk, False):
-                    if bc4.button("🗑️ Suppr", key=f"pre_m_{idx}"):
-                        st.session_state[dk] = True
-                        st.rerun()
+                # --- MODE AFFICHAGE ---
                 else:
-                    s1, s2 = bc4.columns(2)
-                    if s1.button("OK", key=f"y_m_{idx}", type="primary"):
-                        df_m = df_m.drop(idx)
+                    st.markdown(f"""
+                        <div style="background-color:{bg_color}; border-left: 10px solid {border_color}; padding: 15px; border-radius: 10px; margin-bottom: 5px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-weight: bold; font-size: 1.1em;">{icon_stat} {row['Objet']}</span>
+                                <span style="color: #555;">📅 {row['Date']}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                <small>Catégorie : <b>{row['Type']}</b></small>
+                                <small>Coût : <b>{row['M_Num']} €</b></small>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    if row.get('Notes'): st.caption(f"📝 {row['Notes']}")
+
+                    bc1, bc2, bc3, bc4 = st.columns(4)
+                    
+                    if bc1.button("✏️ Modif", key=f"ed_m_{idx}"):
+                        st.session_state.maint_edit_id = idx
+                        st.rerun()
+                    
+                    with bc2:
+                        bouton_imprimer_fiche_maint(row['Objet'], row['Date'], row.get('Notes', 'N/A'), row['Statut'])
+                    
+                    label_toggle = "⏳ À prévoir" if est_fait else "✅ Marquer FAIT"
+                    if bc3.button(label_toggle, key=f"st_m_{idx}"):
+                        df_m.at[idx, 'Statut'] = "À prévoir" if est_fait else "Fait"
                         sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
-                        st.session_state[dk] = False
                         st.rerun()
-                    if s2.button("NO", key=f"n_m_{idx}"):
-                        st.session_state[dk] = False
-                        st.rerun()
-            st.write("")
+
+                    dk = f"del_m_{idx}"
+                    if not st.session_state.get(dk, False):
+                        if bc4.button("🗑️ Suppr", key=f"pre_m_{idx}"):
+                            st.session_state[dk] = True
+                            st.rerun()
+                    else:
+                        s1, s2 = bc4.columns(2)
+                        if s1.button("OK", key=f"y_m_{idx}", type="primary"):
+                            df_m = df_m.drop(idx)
+                            sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
+                            st.session_state[dk] = False
+                            st.rerun()
+                        if s2.button("NO", key=f"n_m_{idx}"):
+                            st.session_state[dk] = False
+                            st.rerun()
+                st.write("")
 
     # --- 6. EXPORT EXCEL ---
     if not df_m.empty:
