@@ -1238,69 +1238,74 @@ if st.session_state.page == "LOG":
                         <span style="font-size:0.8em; color:#555;">⚙️ {row['TotalMot']:.1f}h | ⛵ {row['H_Voile']:.1f}h | <b>{row['TotalMil']:.1f} NM</b></span>
                     </div>
                 """, unsafe_allow_html=True)
-
-        # --- 3. POSTE DE CONTRÔLE (MODIFICATION INDIVIDUELLE) ---
+        # --- 3. POSTE DE CONTRÔLE (VERSION AVEC FERMETURE RÉELLE) ---
     st.divider()
+    
+    # Initialisation de l'état d'édition si inexistant
+    if 'display_edit' not in st.session_state:
+        st.session_state.display_edit = False
+
     st.subheader("🛠️ Modifier une étape précise")
     
     if not df_log.empty:
-        # On utilise une colonne pour placer un bouton de reset à côté de l'ID
-        c_id, c_reset = st.columns([3, 1])
+        col_sel, col_btn = st.columns([3, 1])
         
-        # Sélection de l'ID
-        sel_id = c_id.number_input("Entrez l'ID (chiffre en rouge ci-dessus) :", 
-                                 min_value=0, max_value=len(df_log)-1, step=1, key="input_id_ctrl")
+        # Le sélecteur d'ID
+        target_id = col_sel.number_input("Choisir l'ID à modifier :", 
+                                        min_value=0, max_value=len(df_log)-1, step=1)
         
-        # Bouton pour "Fermer" / Annuler la sélection
-        if c_reset.button("❌ FERMER", use_container_width=True, help="Réinitialise la sélection"):
-            st.rerun() # Relance la page et nettoie l'affichage
-        
-        # Chargement des données de la ligne
-        row_sel = df_log.loc[sel_id]
-        
-        # Formulaire de modification
-        with st.form(key=f"form_update_{sel_id}"):
-            st.markdown(f"### 📝 Édition ID: `{sel_id}`")
-            
-            c1, c2 = st.columns(2)
-            u_but = c1.text_input("Nom du Voyage (But)", value=str(row_sel.get('Navigation', '')))
-            u_dat = c2.text_input("Date", value=row_sel['Date'])
-            
-            u_eq = st.text_area("Équipage", value=str(row_sel.get('Coéquipiers', '')))
-            
-            col1, col2, col3 = st.columns(3)
-            u_md = col1.number_input("Moteur Dép.", value=float(row_sel['MotDep']), format="%.1f")
-            u_ma = col2.number_input("Moteur Arr.", value=float(row_sel['MotArr']), format="%.1f")
-            u_hv = col3.number_input("Heures Voile", value=float(row_sel['H_Voile']), format="%.1f")
-            
-            ck1, ck2 = st.columns(2)
-            u_kd = ck1.number_input("Milles Dép.", value=float(row_sel['MilDep']), format="%.1f")
-            u_ka = ck2.number_input("Milles Arr.", value=float(row_sel['MilArr']), format="%.1f")
+        # Le bouton qui active l'affichage du formulaire
+        if col_btn.button("✏️ MODIFIER", use_container_width=True, type="primary"):
+            st.session_state.display_edit = True
+            st.session_state.active_id = target_id
 
-            # Boutons d'action
-            b_save, b_del = st.columns(2)
+        # LE FORMULAIRE NE S'AFFICHE QUE SI display_edit EST TRUE
+        if st.session_state.display_edit:
+            idx = st.session_state.active_id
+            row_sel = df_log.loc[idx]
             
-            if b_save.form_submit_button("✅ VALIDER LES CHANGEMENTS", use_container_width=True, type="primary"):
-                df_log.at[sel_id, 'Navigation'] = u_but
-                df_log.at[sel_id, 'Date'] = u_dat
-                df_log.at[sel_id, 'Coéquipiers'] = u_eq
-                df_log.at[sel_id, 'MotDep'], df_log.at[sel_id, 'MotArr'] = u_md, u_ma
-                df_log.at[sel_id, 'TotalMot'] = round(u_ma - u_md, 2)
-                df_log.at[sel_id, 'MilDep'], df_log.at[sel_id, 'MilArr'] = u_kd, u_ka
-                df_log.at[sel_id, 'TotalMil'] = round(u_ka - u_kd, 2)
-                df_log.at[sel_id, 'H_Voile'] = u_hv
-                
-                sauvegarder_data(df_log, 'logbook.json')
-                st.success(f"Ligne {sel_id} mise à jour !")
-                time.sleep(1)
+            # Bouton pour FERMER (Annuler l'affichage)
+            if st.button("❌ FERMER LE FORMULAIRE", use_container_width=True):
+                st.session_state.display_edit = False
                 st.rerun()
+
+            with st.form(key=f"form_stable_edit_{idx}"):
+                st.markdown(f"### 📝 Édition de la ligne `{idx}`")
                 
-            if b_del.form_submit_button("🗑️ SUPPRIMER CETTE LIGNE", use_container_width=True):
-                df_log = df_log.drop(index=sel_id).reset_index(drop=True)
-                sauvegarder_data(df_log, 'logbook.json')
-                st.warning("Ligne supprimée.")
-                time.sleep(1)
-                st.rerun()
+                # ... (Vos champs de saisie habituels) ...
+                c1, c2 = st.columns(2)
+                u_but = c1.text_input("But / Voyage", value=str(row_sel.get('Navigation', '')))
+                u_dat = c2.text_input("Date", value=row_sel['Date'])
+                
+                u_eq = st.text_area("Équipage", value=str(row_sel.get('Coéquipiers', '')))
+                
+                col1, col2, col3 = st.columns(3)
+                u_md = col1.number_input("Moteur Dép.", value=float(row_sel['MotDep']))
+                u_ma = col2.number_input("Moteur Arr.", value=float(row_sel['MotArr']))
+                u_hv = col3.number_input("Heures Voile", value=float(row_sel['H_Voile']))
+
+                # Boutons de validation internes au formulaire
+                b_save, b_del = st.columns(2)
+                
+                if b_save.form_submit_button("✅ ENREGISTRER"):
+                    # Logique de mise à jour
+                    df_log.at[idx, 'Navigation'] = u_but
+                    df_log.at[idx, 'Date'] = u_dat
+                    df_log.at[idx, 'Coéquipiers'] = u_eq
+                    df_log.at[idx, 'MotDep'], df_log.at[idx, 'MotArr'] = u_md, u_ma
+                    df_log.at[idx, 'TotalMot'] = round(u_ma - u_md, 2)
+                    df_log.at[idx, 'H_Voile'] = u_hv
+                    
+                    sauvegarder_data(df_log, 'logbook.json')
+                    st.session_state.display_edit = False # On ferme après succès
+                    st.success("Mis à jour !")
+                    st.rerun()
+                
+                if b_del.form_submit_button("🗑️ SUPPRIMER"):
+                    df_log = df_log.drop(index=idx).reset_index(drop=True)
+                    sauvegarder_data(df_log, 'logbook.json')
+                    st.session_state.display_edit = False
+                    st.rerun()
 
 # --- FIN DU FICHIER ---
 
