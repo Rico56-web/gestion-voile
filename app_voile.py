@@ -1168,8 +1168,8 @@ if st.session_state.page == "ARCHIVES":
     with t1: st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
-    # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - POSTE DE CONTRÔLE DYNAMIQUE ---
+# =================================================================
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION STABLE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>📖 Livre de Bord</h1></div>', unsafe_allow_html=True)
@@ -1182,7 +1182,7 @@ if st.session_state.page == "LOG":
             c1, c2 = st.columns(2)
             f_date = c1.date_input("Date de début", datetime.now())
             f_jours = c2.number_input("Nombre de jours", min_value=1, value=1)
-            f_but = st.text_input("Nom du Voyage / But")
+            f_but = st.text_input("Nom du Voyage / But (ex: Croisière Avril)")
             f_equipage = st.text_area("Équipage")
             
             st.markdown("---")
@@ -1203,12 +1203,13 @@ if st.session_state.page == "LOG":
                 avg_mot = round((m_arr - m_dep) / nb_j, 2)
                 avg_mil = round((k_arr - k_dep) / nb_j, 2)
                 avg_voile = round(h_voile / nb_j, 2)
+                
                 nouvelles = []
                 for i in range(nb_j):
                     curr_date = (f_date + timedelta(days=i)).strftime("%d/%m/%Y")
                     nouvelles.append({
                         "Date": curr_date, "Navigation": f_but, "Coéquipiers": f_equipage,
-                        "PortDep": "Escale", "PortArr": "Escale", # À ajuster en manuel si besoin
+                        "PortDep": "Escale", "PortArr": "Escale",
                         "MotDep": round(m_dep + (avg_mot * i), 2),
                         "MotArr": round(m_dep + (avg_mot * (i+1)), 2),
                         "TotalMot": avg_mot,
@@ -1223,69 +1224,70 @@ if st.session_state.page == "LOG":
     # --- 2. AFFICHAGE DE L'HISTORIQUE (VUE GROUPÉE) ---
     if not df_log.empty:
         st.divider()
+        # On ne trie pas l'index original pour garder les ID stables
         df_v = df_log.copy()
         df_v['dt'] = pd.to_datetime(df_v['Date'], dayfirst=True, errors='coerce')
         df_v = df_v.sort_values(by=['dt', 'Navigation'], ascending=[False, False])
 
         for nav_name, group in df_v.groupby('Navigation', sort=False):
-            st.markdown(f'<div style="background:#2c3e50; color:white; padding:8px; border-radius:5px; margin-top:15px;"><b>🚢 {nav_name or "Navigation"}</b></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="background:#2c3e50; color:white; padding:8px; border-radius:5px; margin-top:15px;"><b>🚢 {nav_name or "Navigation isolée"}</b></div>', unsafe_allow_html=True)
             for idx, row in group.iterrows():
                 st.markdown(f"""
                     <div style="background:white; border-left:4px solid #3498db; border-bottom:1px solid #eee; padding:5px 15px; margin-left:10px; display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size:0.9em;"><b>{row['Date']}</b> | ID:{idx}</span>
+                        <span style="font-size:0.9em;"><b>{row['Date']}</b> | ID: <code style="color:red;">{idx}</code></span>
                         <span style="font-size:0.8em; color:#555;">⚙️ {row['TotalMot']:.1f}h | ⛵ {row['H_Voile']:.1f}h | <b>{row['TotalMil']:.1f} NM</b></span>
                     </div>
                 """, unsafe_allow_html=True)
 
-    # --- 3. LE POSTE DE CONTRÔLE (MODIFICATION & SUPPRESSION) ---
+    # --- 3. POSTE DE CONTRÔLE (MODIFICATION INDIVIDUELLE) ---
     st.divider()
-    st.subheader("🛠️ Poste de Contrôle Maintenance")
+    st.subheader("🛠️ Modifier une étape précise")
     
     if not df_log.empty:
-        # Sélection de la ligne
-        sel_idx = st.number_input("Entrez l'ID de la ligne à modifier ou supprimer :", 
-                                  min_value=0, max_value=len(df_log)-1, step=1, key="ctrl_id")
+        # 1. Sélection de l'ID (On utilise une clé unique pour éviter les conflits)
+        sel_id = st.number_input("Entrez l'ID (chiffre en rouge ci-dessus) :", 
+                                 min_value=0, max_value=len(df_log)-1, step=1, key="input_id_ctrl")
         
-        # Récupération automatique des données de la ligne choisie
-        row_sel = df_log.iloc[sel_idx]
+        # 2. Chargement des données de la ligne
+        row_sel = df_log.loc[sel_id]
         
-        # Formulaire qui s'adapte à la ligne sélectionnée
-        with st.form(key=f"form_ctrl_{sel_idx}"):
-            st.info(f"Modifiez les détails pour l'ID {sel_idx} (Date: {row_sel['Date']})")
+        # 3. Formulaire de modification
+        with st.form(key=f"form_update_{sel_id}"):
+            st.write(f"Modification de la ligne **{sel_id}** du **{row_sel['Date']}**")
             
             c1, c2 = st.columns(2)
-            e_but = c1.text_input("But / Voyage", value=str(row_sel.get('Navigation', '')))
-            e_dat = c2.text_input("Date (JJ/MM/AAAA)", value=row_sel['Date'])
+            u_but = c1.text_input("Nom du Voyage (But)", value=str(row_sel.get('Navigation', '')))
+            u_dat = c2.text_input("Date", value=row_sel['Date'])
             
-            e_eq = st.text_area("Équipage", value=str(row_sel.get('Coéquipiers', '')))
+            u_eq = st.text_area("Équipage", value=str(row_sel.get('Coéquipiers', '')))
             
             col1, col2, col3 = st.columns(3)
-            e_md = col1.number_input("Moteur Dép", value=float(row_sel['MotDep']))
-            e_ma = col2.number_input("Moteur Arr", value=float(row_sel['MotArr']))
-            e_hv = col3.number_input("Heures Voile", value=float(row_sel['H_Voile']))
+            u_md = col1.number_input("Moteur Dép.", value=float(row_sel['MotDep']))
+            u_ma = col2.number_input("Moteur Arr.", value=float(row_sel['MotArr']))
+            u_hv = col3.number_input("Heures Voile", value=float(row_sel['H_Voile']))
             
             ck1, ck2 = st.columns(2)
-            e_kd = ck1.number_input("Milles Dép", value=float(row_sel['MilDep']))
-            e_ka = ck2.number_input("Milles Arr", value=float(row_sel['MilArr']))
+            u_kd = ck1.number_input("Milles Dép.", value=float(row_sel['MilDep']))
+            u_ka = ck2.number_input("Milles Arr.", value=float(row_sel['MilArr']))
 
-            # Boutons d'action dans le formulaire
-            btn_save, btn_del = st.columns(2)
-            
-            if btn_save.form_submit_button("💾 ENREGISTRER MODIFS", use_container_width=True, type="primary"):
-                df_log.at[sel_idx, 'Navigation'] = e_but
-                df_log.at[sel_idx, 'Date'] = e_dat
-                df_log.at[sel_idx, 'Coéquipiers'] = e_eq
-                df_log.at[sel_idx, 'MotDep'], df_log.at[sel_idx, 'MotArr'] = e_md, e_ma
-                df_log.at[sel_idx, 'TotalMot'] = round(e_ma - e_md, 2)
-                df_log.at[sel_idx, 'MilDep'], df_log.at[sel_idx, 'MilArr'] = e_kd, e_ka
-                df_log.at[sel_idx, 'TotalMil'] = round(e_ka - e_kd, 2)
-                df_log.at[sel_idx, 'H_Voile'] = e_hv
+            b1, b2 = st.columns(2)
+            if b1.form_submit_button("✅ VALIDER LES CHANGEMENTS", use_container_width=True, type="primary"):
+                # Mise à jour précise de la ligne sans toucher aux autres
+                df_log.at[sel_id, 'Navigation'] = u_but
+                df_log.at[sel_id, 'Date'] = u_dat
+                df_log.at[sel_id, 'Coéquipiers'] = u_eq
+                df_log.at[sel_id, 'MotDep'], df_log.at[sel_id, 'MotArr'] = u_md, u_ma
+                df_log.at[sel_id, 'TotalMot'] = round(u_ma - u_md, 2)
+                df_log.at[sel_id, 'MilDep'], df_log.at[sel_id, 'MilArr'] = u_kd, u_ka
+                df_log.at[sel_id, 'TotalMil'] = round(u_ka - u_kd, 2)
+                df_log.at[sel_id, 'H_Voile'] = u_hv
+                
                 sauvegarder_data(df_log, 'logbook.json')
-                st.success("Ligne mise à jour !")
+                st.success("Modifications enregistrées !")
                 st.rerun()
                 
-            if btn_del.form_submit_button("🗑️ SUPPRIMER CETTE LIGNE", use_container_width=True):
-                df_log = df_log.drop(index=sel_idx).reset_index(drop=True)
+            if b2.form_submit_button("🗑️ SUPPRIMER CETTE LIGNE", use_container_width=True):
+                df_log = df_log.drop(index=sel_id).reset_index(drop=True)
                 sauvegarder_data(df_log, 'logbook.json')
                 st.warning("Ligne supprimée.")
                 st.rerun()
