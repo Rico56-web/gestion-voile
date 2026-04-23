@@ -158,21 +158,5 @@
         "Group_ID":null,
         "PortDep":"Escale",
         "Co\u00e9quipiers":"moi et autres"
-    },
-    {
-        "Date":"23\/04\/2026",
-        "Navigation":"test appli",
-        "PortArr":"Escale",
-        "MotDep":2443.85,
-        "MotArr":2443.9,
-        "TotalMot":0.05,
-        "MilDep":3126.45,
-        "MilArr":3126.9,
-        "TotalMil":0.45,
-        "H_Voile":0.0,
-        "Notes":null,
-        "Group_ID":null,
-        "PortDep":"Escale",
-        "Co\u00e9quipiers":"moi et autres"
     }
 ]
