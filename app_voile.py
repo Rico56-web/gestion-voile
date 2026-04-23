@@ -1168,88 +1168,78 @@ if st.session_state.page == "ARCHIVES":
     with t1: st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
-        # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION FINALE INTÉGRALE ---
+
+# =================================================================
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION EXPERT ---
 # =================================================================
 if st.session_state.page == "LOG":
-    st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>📖 Livre de Bord</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>📖 Livre de Bord & Statistiques</h1></div>', unsafe_allow_html=True)
 
     df_log = charger_data_safe('logbook.json')
     
-    # --- INITIALISATION DES ÉTATS (SESSION STATE) ---
     if 'saisie_ouverte' not in st.session_state: st.session_state.saisie_ouverte = False
     if 'display_edit' not in st.session_state: st.session_state.display_edit = False
-        # --- 1. SAISIE RAPIDE (HAUT DE PAGE) ---
+
+    # --- 1. SAISIE RAPIDE AMÉLIORÉE (MÉTÉO & NOTES) ---
     if not st.session_state.saisie_ouverte:
-        if st.button("➕ AJOUTER UNE NAVIGATION", use_container_width=True):
-            st.session_state.saisie_ouverte = True
-            st.rerun()
+        st.button("➕ NOUVELLE NAVIGATION", on_click=lambda: st.session_state.update({"saisie_ouverte": True}), use_container_width=True)
     
-    # L'expander est piloté par la variable de session
-    with st.expander("🚀 Formulaire de Saisie Globale", expanded=st.session_state.saisie_ouverte):
-        with st.form(key="form_nav_new"):
-            st.info("Remplissez les détails du voyage. Les heures et milles seront répartis sur chaque jour.")
+    with st.expander("🚀 Formulaire de Saisie", expanded=st.session_state.saisie_ouverte):
+        with st.form(key="form_nav_expert"):
             c1, c2 = st.columns(2)
             f_date = c1.date_input("Date de début", datetime.now())
-            f_jours = c2.number_input("Nombre de jours", min_value=1, value=1, step=1)
-            f_but = st.text_input("But de la navigation / Nom du voyage")
-            f_equipage = st.text_area("Équipage / Coéquipiers")
+            f_jours = c2.number_input("Nombre de jours", min_value=1, value=1)
+            f_but = st.text_input("Nom du Voyage")
+            f_equipage = st.text_area("Équipage", height=60)
+            
+            # Nouveaux champs
+            c_m1, c_m2 = st.columns(2)
+            f_meteo = c_m1.text_input("Météo (Vent/Mer)", placeholder="ex: NW 12-15kts, belle")
+            f_notes = c_m2.text_area("Observations / Souvenirs", height=60)
             
             st.markdown("---")
             last_mot = df_log['MotArr'].max() if not df_log.empty else 0.0
             last_mil = df_log['MilArr'].max() if not df_log.empty else 0.0
             
             col1, col2, col3 = st.columns(3)
-            m_dep = col1.number_input("Moteur Dép. (h)", value=float(last_mot), format="%.1f")
-            m_arr = col2.number_input("Moteur Arr. (h)", value=float(last_mot), format="%.1f")
-            h_voile = col3.number_input("Total Voile (h)", value=0.0, format="%.1f")
+            m_dep = col1.number_input("Moteur Dép.", value=float(last_mot))
+            m_arr = col2.number_input("Moteur Arr.", value=float(last_mot))
+            h_voile = col3.number_input("Total Voile (h)", value=0.0)
             
-            colk1, colk2 = st.columns(2)
-            k_dep = colk1.number_input("Milles Dép. (NM)", value=float(last_mil), format="%.1f")
-            k_arr = colk2.number_input("Milles Arr. (NM)", value=float(last_mil), format="%.1f")
+            ck1, ck2 = st.columns(2)
+            k_dep = ck1.number_input("Milles Dép.", value=float(last_mil))
+            k_arr = ck2.number_input("Milles Arr.", value=float(last_mil))
 
-            # BOUTONS D'ACTION : CRÉER OU ANNULER
             b_creer, b_annuler = st.columns(2)
-            
-            if b_creer.form_submit_button("💾 CRÉER LE VOYAGE", use_container_width=True, type="primary"):
-                # (Logique de vérification des doublons et création identique au bloc précédent...)
+            if b_creer.form_submit_button("💾 ENREGISTRER", use_container_width=True, type="primary"):
                 dates_a_creer = [(f_date + timedelta(days=i)).strftime("%d/%m/%Y") for i in range(int(f_jours))]
-                dates_existantes = df_log['Date'].tolist() if not df_log.empty else []
-                doublons = [d for d in dates_a_creer if d in dates_existantes]
-                
-                if doublons:
-                    st.error(f"⚠️ Erreur : Une navigation existe déjà pour le : {', '.join(doublons)}")
+                if any(d in (df_log['Date'].tolist() if not df_log.empty else []) for d in dates_a_creer):
+                    st.error("⚠️ Une navigation existe déjà à ces dates.")
                 else:
                     nb_j = int(f_jours)
-                    avg_mot = round((m_arr - m_dep) / nb_j, 2)
-                    avg_mil = round((k_arr - k_dep) / nb_j, 2)
-                    avg_voile = round(h_voile / nb_j, 2)
-                    
                     nouvelles = []
                     for i in range(nb_j):
-                        curr_date = dates_a_creer[i]
                         nouvelles.append({
-                            "Date": curr_date, "Navigation": f_but, "Coéquipiers": f_equipage,
+                            "Date": dates_a_creer[i], "Navigation": f_but, "Coéquipiers": f_equipage,
+                            "Meteo": f_meteo, "Notes": f_notes,
                             "PortDep": "Escale", "PortArr": "Escale",
-                            "MotDep": round(m_dep + (avg_mot * i), 2),
-                            "MotArr": round(m_dep + (avg_mot * (i+1)), 2),
-                            "TotalMot": avg_mot,
-                            "MilDep": round(k_dep + (avg_mil * i), 2),
-                            "MilArr": round(k_dep + (avg_mil * (i+1)), 2),
-                            "TotalMil": avg_mil, "H_Voile": avg_voile
+                            "MotDep": round(m_dep + ((m_arr-m_dep)/nb_j * i), 2),
+                            "MotArr": round(m_dep + ((m_arr-m_dep)/nb_j * (i+1)), 2),
+                            "TotalMot": round((m_arr-m_dep)/nb_j, 2),
+                            "MilDep": round(k_dep + ((k_arr-k_dep)/nb_j * i), 2),
+                            "MilArr": round(k_dep + ((k_arr-k_dep)/nb_j * (i+1)), 2),
+                            "TotalMil": round((k_arr-k_dep)/nb_j, 2), 
+                            "H_Voile": round(h_voile/nb_j, 2)
                         })
                     df_log = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
                     sauvegarder_data(df_log, 'logbook.json')
                     st.session_state.saisie_ouverte = False
                     st.rerun()
-
-            # Le bouton Annuler à l'intérieur du formulaire
-            if b_annuler.form_submit_button("❌ ANNULER / RETOUR", use_container_width=True):
+            if b_annuler.form_submit_button("❌ ANNULER"):
                 st.session_state.saisie_ouverte = False
                 st.rerun()
- 
 
-    # --- 2. AFFICHAGE DE L'HISTORIQUE (VUE GROUPÉE) ---
+    # --- 2. AFFICHAGE GROUPÉ AVEC BILAN (IDÉE 1) ---
     if not df_log.empty:
         st.divider()
         df_v = df_log.copy()
@@ -1257,72 +1247,51 @@ if st.session_state.page == "LOG":
         df_v = df_v.sort_values(by=['dt', 'Navigation'], ascending=[False, False])
 
         for nav_name, group in df_v.groupby('Navigation', sort=False):
-            st.markdown(f'<div style="background:#2c3e50; color:white; padding:8px; border-radius:5px; margin-top:15px;"><b>🚢 {nav_name or "Navigation"}</b></div>', unsafe_allow_html=True)
-            for idx, row in group.iterrows():
-                st.markdown(f"""
-                    <div style="background:white; border-left:4px solid #3498db; border-bottom:1px solid #eee; padding:5px 15px; margin-left:10px; display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size:0.9em;"><b>{row['Date']}</b> | ID: <code style="color:red;">{idx}</code></span>
-                        <span style="font-size:0.8em; color:#555;">⚙️ {row['TotalMot']:.1f}h | ⛵ {row['H_Voile']:.1f}h | <b>{row['TotalMil']:.1f} NM</b></span>
-                    </div>
-                """, unsafe_allow_html=True)
-
-    # --- 3. POSTE DE CONTRÔLE (MODIFICATION EN BAS) ---
-    st.divider()
-    st.subheader("🛠️ Poste de Contrôle")
-    
-    if not df_log.empty:
-        col_sel, col_btn = st.columns([3, 1])
-        target_id = col_sel.number_input("ID à modifier :", min_value=0, max_value=len(df_log)-1, step=1)
-        
-        if col_btn.button("✏️ MODIFIER", use_container_width=True, type="primary"):
-            st.session_state.display_edit = True
-            st.session_state.active_id = target_id
-
-        if st.session_state.display_edit:
-            idx = st.session_state.active_id
-            row_sel = df_log.loc[idx]
+            # Calculs du voyage
+            t_mil = group['TotalMil'].sum()
+            t_mot = group['TotalMot'].sum()
+            t_voile = group['H_Voile'].sum()
+            total_h = t_mot + t_voile
+            vitesse = round(t_mil / total_h, 1) if total_h > 0 else 0
+            ratio_v = round((t_voile / total_h)*100) if total_h > 0 else 0
             
-            # Bouton de fermeture du formulaire de motif
-            if st.button("❌ ANNULER / FERMER LA MODIFICATION", use_container_width=True):
-                st.session_state.display_edit = False
-                st.rerun()
+            st.markdown(f"""
+                <div style="background:#2c3e50; color:white; padding:10px; border-radius:8px; margin-top:15px;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <b>🚢 {nav_name or "Navigation"}</b>
+                        <span>📍 {t_mil:.1f} NM | ⚡ {vitesse} kts moy.</span>
+                    </div>
+                    <div style="font-size:0.8em; color:#bdc3c7;">
+                        📊 Ratio Voile: {ratio_v}% | Moteur: {t_mot:.1f}h | Voile: {t_voile:.1f}h
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            for idx, row in group.iterrows():
+                with st.container():
+                    st.markdown(f"""
+                        <div style="background:white; border-left:4px solid #3498db; padding:8px 15px; margin-left:10px; border-bottom:1px solid #eee;">
+                            <div style="display:flex; justify-content:space-between;">
+                                <b>📅 {row['Date']}</b>
+                                <span style="font-size:0.8em; color:red;">ID:{idx}</span>
+                            </div>
+                            <div style="font-size:0.9em; color:#2c3e50;">☁️ {row.get('Meteo','-')} | 📝 <small>{row.get('Notes','')}</small></div>
+                            <div style="display:flex; justify-content:space-between; font-size:0.85em; margin-top:5px; color:#273c75;">
+                                <span>⚙️ {row['TotalMot']:.1f}h mot.</span>
+                                <span>⛵ {row['H_Voile']:.1f}h voile</span>
+                                <b>{row['TotalMil']:.1f} NM</b>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
 
-            with st.form(key=f"form_stable_edit_{idx}"):
-                st.markdown(f"### 📝 Édition de la ligne `{idx}` ({row_sel['Date']})")
-                c1, c2 = st.columns(2)
-                u_but = c1.text_input("But / Voyage", value=str(row_sel.get('Navigation', '')))
-                u_dat = c2.text_input("Date", value=row_sel['Date'])
-                u_eq = st.text_area("Équipage", value=str(row_sel.get('Coéquipiers', '')))
-                
-                col1, col2, col3 = st.columns(3)
-                u_md = col1.number_input("Moteur Dép", value=float(row_sel['MotDep']), format="%.1f")
-                u_ma = col2.number_input("Moteur Arr", value=float(row_sel['MotArr']), format="%.1f")
-                u_hv = col3.number_input("Heures Voile", value=float(row_sel['H_Voile']), format="%.1f")
-                
-                ck1, ck2 = st.columns(2)
-                u_kd = ck1.number_input("Milles Dép", value=float(row_sel['MilDep']), format="%.1f")
-                u_ka = ck2.number_input("Milles Arr", value=float(row_sel['MilArr']), format="%.1f")
+    # --- 3. EXPORT CSV (IDÉE 2) ---
+    if not df_log.empty:
+        st.divider()
+        csv = df_log.to_csv(index=False).encode('utf-8')
+        st.download_button(label="📥 Télécharger le Livre de Bord (Excel/CSV)", data=csv, file_name='livre_de_bord_vesta.csv', mime='text/csv', use_container_width=True)
 
-                b_save, b_del = st.columns(2)
-                if b_save.form_submit_button("✅ ENREGISTRER", use_container_width=True, type="primary"):
-                    df_log.at[idx, 'Navigation'] = u_but
-                    df_log.at[idx, 'Date'] = u_dat
-                    df_log.at[idx, 'Coéquipiers'] = u_eq
-                    df_log.at[idx, 'MotDep'], df_log.at[idx, 'MotArr'] = u_md, u_ma
-                    df_log.at[idx, 'TotalMot'] = round(u_ma - u_md, 2)
-                    df_log.at[idx, 'MilDep'], df_log.at[idx, 'MilArr'] = u_kd, u_ka
-                    df_log.at[idx, 'TotalMil'] = round(u_ka - u_kd, 2)
-                    df_log.at[idx, 'H_Voile'] = u_hv
-                    sauvegarder_data(df_log, 'logbook.json')
-                    st.session_state.display_edit = False
-                    st.success("Modifications validées !")
-                    st.rerun()
-                
-                if b_del.form_submit_button("🗑️ SUPPRIMER CETTE LIGNE", use_container_width=True):
-                    df_log = df_log.drop(index=idx).reset_index(drop=True)
-                    sauvegarder_data(df_log, 'logbook.json')
-                    st.session_state.display_edit = False
-                    st.rerun()
+    # --- 4. POSTE DE CONTRÔLE (BAS DE PAGE) ---
+    # ... (Garder le code du poste de contrôle précédent ici) ...
 # --- FIN DU FICHIER ---
 
 
