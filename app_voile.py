@@ -970,7 +970,7 @@ if st.session_state.page == "MAINT":
     # MENU DE SÉLECTION DU STATUT
     filter_statut = col_menu1.radio("Afficher :", ["Tout", "⏳ À faire", "✅ Fait"], horizontal=True)
     sel_y = col_menu2.selectbox("Année :", [2025, 2026, 2027], index=1)
-    mode_m = col_menu3.radio("Période :", ["Tout", "Passé"], horizontal=True)
+    mode_m = col_menu3.radio("Période :", ["année", "a ce jour"], horizontal=True)
 
     if not df_m.empty:
         # Conversion date pour le tri
