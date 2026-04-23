@@ -145,12 +145,11 @@ for i, name in enumerate(menu):
 st.divider()
 
 # =================================================================
-# --- 2. MENU MÉMOS (VERSION FINALE : ÉDITION LOCALE & FLUIDE) ---
+# --- 2. MENU MÉMOS (VERSION FINALE : BASCULE FLUIDE & ÉDITION) ---
 # =================================================================
 if st.session_state.page == "MEMOS":
     st.markdown("<h2 style='text-align: center; color: #34495E;'>⚓ Mémos & Check-lists de Bord</h2>", unsafe_allow_html=True)
     
-    # 1. Chargement des données
     df_memos = charger_data_safe('memos.json')
 
     # --- AUTO-RÉPARATION ---
@@ -158,11 +157,10 @@ if st.session_state.page == "MEMOS":
         if c not in df_memos.columns:
             df_memos[c] = "Non Archivé" if c == "Archive" else "Normal"
 
-    # État pour savoir quelle fiche est en cours de modification
     if 'memo_edit_id' not in st.session_state: 
         st.session_state.memo_edit_id = None
 
-    # --- A. AJOUT NOUVELLE NOTE (Haut de page) ---
+    # --- A. AJOUT NOUVELLE NOTE ---
     with st.expander("➕ CRÉER UNE NOUVELLE CHECK-LIST", expanded=df_memos.empty):
         with st.form("new_memo_form_final"):
             c1, c2 = st.columns(2)
@@ -174,49 +172,50 @@ if st.session_state.page == "MEMOS":
                     new_r = pd.DataFrame([{"Date": m_date, "Description": m_txt, "Statut": m_urg, "Paiement": "N/A", "Archive": "Non Archivé"}])
                     df_memos = pd.concat([df_memos, new_r], ignore_index=True)
                     sauvegarder_data(df_memos, 'memos.json')
-                    st.session_state.memo_edit_id = None # Ferme toute modif si on en crée une nouvelle
+                    st.session_state.memo_edit_id = None # Ferme toute modif
                     st.rerun()
 
     # --- B. AFFICHAGE DES FICHES ---
     df_show = df_memos[df_memos['Archive'] == "Non Archivé"]
     
     if not df_show.empty:
-        # On trie pour avoir les plus récents en haut
         for idx, row in df_show.sort_index(ascending=False).iterrows():
             
-            # --- CAS 1 : FORMULAIRE DE MODIFICATION (S'affiche à la place de la fiche) ---
+            # --- CAS 1 : FORMULAIRE DE MODIFICATION ---
             if st.session_state.memo_edit_id == idx:
-                # Nettoyage des préfixes ✅ pour une édition propre
                 texte_edition = str(row['Description']).replace("✅ | ", "").replace("❌ | ", "")
                 
-                st.warning(f"🔧 Modification en cours - Note du {row['Date']}")
+                # Style encadré pour la modif
+                st.markdown(f"✨ **Modification en cours : Note du {row['Date']}**")
                 with st.form(key=f"edit_form_loc_{idx}"):
                     e_desc = st.text_area("Éditer la liste", value=texte_edition, height=150)
                     c1, c2 = st.columns(2)
-                    e_pay = c1.selectbox("Paiement", ["N/A", "À Payer", "Payé"], 
-                                         index=["N/A", "À Payer", "Payé"].index(row.get('Paiement', 'N/A')))
-                    e_stat = c2.selectbox("Urgence", ["Normal", "Urgent", "Fait"], 
-                                          index=["Normal", "Urgent", "Fait"].index(row.get('Statut', 'Normal')))
+                    
+                    # Sécurisation des index pour les selectbox
+                    p_opts = ["N/A", "À Payer", "Payé"]
+                    s_opts = ["Normal", "Urgent", "Fait"]
+                    
+                    curr_p = row.get('Paiement', 'N/A')
+                    curr_s = row.get('Statut', 'Normal')
+                    
+                    e_pay = c1.selectbox("Paiement", p_opts, index=p_opts.index(curr_p) if curr_p in p_opts else 0)
+                    e_stat = c2.selectbox("Urgence", s_opts, index=s_opts.index(curr_s) if curr_s in s_opts else 0)
                     
                     col_save, col_cancel = st.columns(2)
                     if col_save.form_submit_button("✅ ENREGISTRER"):
-                        # 1. Mise à jour
                         df_memos.at[idx, 'Description'] = e_desc
                         df_memos.at[idx, 'Paiement'] = e_pay
                         df_memos.at[idx, 'Statut'] = e_stat
-                        # 2. Sauvegarde
                         sauvegarder_data(df_memos, 'memos.json')
-                        # 3. Fermeture du formulaire
-                        st.session_state.memo_edit_id = None
+                        st.session_state.memo_edit_id = None # Fermeture
                         st.rerun()
                         
-                    if col_cancel.form_submit_button("❌ ANNULER / FERMER"):
+                    if col_cancel.form_submit_button("❌ FERMER"):
                         st.session_state.memo_edit_id = None
                         st.rerun()
             
-            # --- CAS 2 : AFFICHAGE NORMAL DE LA FICHE ---
+            # --- CAS 2 : AFFICHAGE NORMAL ---
             else:
-                # Couleurs dynamiques
                 stat_val = str(row.get('Statut', 'Normal'))
                 if stat_val == "Urgent": h_c, bg_c = "#E74C3C", "#FDEDEC" 
                 elif stat_val == "Fait": h_c, bg_c = "#27AE60", "#EAFAF1"
@@ -231,7 +230,6 @@ if st.session_state.page == "MEMOS":
                     </div>
                 """, unsafe_allow_html=True)
 
-                # Check-list interactive (Data Editor)
                 lignes = str(row.get('Description', '')).split('\n')
                 data_list = [{"Fait": l.startswith("✅ | "), "Tâche": l.replace("✅ | ", "").replace("❌ | ", "")} 
                              for l in lignes if l.strip()]
@@ -244,22 +242,21 @@ if st.session_state.page == "MEMOS":
                         use_container_width=True,
                         column_config={
                             "Fait": st.column_config.CheckboxColumn("État", default=False),
-                            "Tâche": st.column_config.TextColumn("Détail de la tâche")
+                            "Tâche": st.column_config.TextColumn("Détail")
                         }
                     )
 
-                    # Sauvegarde automatique si on coche/décoche
                     if not edited_df.equals(pd.DataFrame(data_list)):
                         new_desc = "\n".join([f"{'✅ | ' if r['Fait'] else ''}{r['Tâche']}" for _, r in edited_df.iterrows()])
                         df_memos.at[idx, 'Description'] = new_desc
                         sauvegarder_data(df_memos, 'memos.json')
                         st.rerun()
 
-                # Barre d'outils
                 btn_c1, btn_c2, btn_c3 = st.columns(3)
                 
+                # ICI : La bascule automatique
                 if btn_c1.button("✏️ Modifier", key=f"edit_btn_{idx}"):
-                    st.session_state.memo_edit_id = idx # Ouvre cette fiche, ferme les autres
+                    st.session_state.memo_edit_id = idx # Écrase l'ancien ID ouvert
                     st.rerun()
                     
                 if btn_c2.button("📦 Archiver", key=f"arch_btn_{idx}"):
@@ -267,8 +264,7 @@ if st.session_state.page == "MEMOS":
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
                 
-                # Suppression avec double confirmation
-                conf_del_key = f"del_confirm_state_{idx}"
+                conf_del_key = f"del_confirm_{idx}"
                 if not st.session_state.get(conf_del_key, False):
                     if btn_c3.button("🗑️ Supprimer", key=f"del_pre_{idx}"):
                         st.session_state[conf_del_key] = True
@@ -284,7 +280,6 @@ if st.session_state.page == "MEMOS":
                         st.session_state[conf_del_key] = False
                         st.rerun()
             st.write("")
-
 
 
 # =================================================================
