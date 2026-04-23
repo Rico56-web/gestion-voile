@@ -294,22 +294,22 @@ if st.session_state.page == "MEMOS":
         st.success(f"Rapport signé : {signature}")
                 
         # --- ACTIONS (Barre d'outils mise à jour) ---
-                btn_c1, btn_c2, btn_c3, btn_c4 = st.columns(4) # On passe à 4 colonnes
+    btn_c1, btn_c2, btn_c3, btn_c4 = st.columns(4) # On passe à 4 colonnes
                 
-                if btn_c1.button("✏️ Modifier", key=f"edit_btn_{idx}"):
-                    st.session_state.memo_edit_id = idx
-                    st.rerun()
+    if btn_c1.button("✏️ Modifier", key=f"edit_btn_{idx}"):
+        st.session_state.memo_edit_id = idx
+        t.rerun()
                     
-                if btn_c2.button("📦 Archive", key=f"arch_btn_{idx}"):
-                    df_memos.at[idx, 'Archive'] = "Archivé"
-                    sauvegarder_data(df_memos, 'memos.json')
-                    st.rerun()
+     if btn_c2.button("📦 Archive", key=f"arch_btn_{idx}"):
+        df_memos.at[idx, 'Archive'] = "Archivé"
+        sauvegarder_data(df_memos, 'memos.json')
+        st.rerun()
                 
-                # Le bouton d'impression (Appel de notre fonction JS)
-                with btn_c3:
-                    # On nettoie le texte des ✅ pour l'impression propre
-                    texte_impr = str(row['Description']).replace("✅ | ", "[FAIT] ")
-                    bouton_imprimer_fiche(row['Date'], texte_impr, stat_val)
+    # Le bouton d'impression (Appel de notre fonction JS)
+     with btn_c3:
+        # On nettoie le texte des ✅ pour l'impression propre
+        texte_impr = str(row['Description']).replace("✅ | ", "[FAIT] ")
+        bouton_imprimer_fiche(row['Date'], texte_impr, stat_val)
 
                 # Suppression avec double confirmation (dans la 4ème colonne)
                 conf_del_key = f"del_confirm_{idx}"
