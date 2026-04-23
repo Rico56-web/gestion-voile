@@ -110,5 +110,53 @@
         "Group_ID":null,
         "PortDep":"nan",
         "Co\u00e9quipiers":"camille Varrel et sacha(cuistot)"
+    },
+    {
+        "Date":"23\/04\/2026",
+        "Navigation":"",
+        "PortArr":"Escale",
+        "MotDep":2441.1,
+        "MotArr":0.0,
+        "TotalMot":0.0,
+        "MilDep":3028.0,
+        "MilArr":0.0,
+        "TotalMil":0.0,
+        "H_Voile":0.0,
+        "Notes":null,
+        "Group_ID":null,
+        "PortDep":"arzon",
+        "Co\u00e9quipiers":""
+    },
+    {
+        "Date":"24\/04\/2026",
+        "Navigation":"",
+        "PortArr":"Escale",
+        "MotDep":0.0,
+        "MotArr":0.0,
+        "TotalMot":0.0,
+        "MilDep":0.0,
+        "MilArr":0.0,
+        "TotalMil":0.0,
+        "H_Voile":0.0,
+        "Notes":null,
+        "Group_ID":null,
+        "PortDep":"Escale",
+        "Co\u00e9quipiers":""
+    },
+    {
+        "Date":"25\/04\/2026",
+        "Navigation":"",
+        "PortArr":"port tudy , Arzon",
+        "MotDep":0.0,
+        "MotArr":2443.8,
+        "TotalMot":2.7,
+        "MilDep":0.0,
+        "MilArr":3126.0,
+        "TotalMil":98.0,
+        "H_Voile":0.0,
+        "Notes":null,
+        "Group_ID":null,
+        "PortDep":"Escale",
+        "Co\u00e9quipiers":""
     }
 ]
