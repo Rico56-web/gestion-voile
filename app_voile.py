@@ -553,29 +553,31 @@ if st.session_state.page == "MODIFIER_CONTACT":
         st.session_state.page = "CONTACTS"
         st.rerun()
 # =================================================================
-# --- 6. PAGE PLANNING (V19.0 - DASHBOARD & VIGIE INTÉGRÉS) ---
+# --- 6. PAGE PLANNING (V19.2 - CALIBRÉ SUR TON LOGBOOK) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
     # --- 1. DASHBOARD VIGIE : CROUESTY ---
     st.markdown("## ⚓ Tableau de Bord - Port Crouesty")
     
-    # Widget Météo Windy (Arzon)
+    # Widget Météo Windy (Arzon / Le Crouesty)
     st.markdown("""
         <iframe width="100%" height="300" src="https://www.windy.com/47.545/-2.894?47.200,-2.894,8,m:eX3agmS" frameborder="0"></iframe>
     """, unsafe_allow_html=True)
 
     col_v1, col_v2, col_v3 = st.columns(3)
     
-    # A. Alerte Maintenance (Sécurisée contre KeyError)
+    # --- A. ALERTE MAINTENANCE (MOTARR) ---
     df_log = charger_data_safe('logbook.json')
     derniere_heure = 0
     if not df_log.empty:
-        # Recherche flexible de la colonne heures
-        cols_h = [c for c in df_log.columns if "Heure" in c or "Compteur" in c]
-        if cols_h:
-            derniere_heure = to_f(df_log[cols_h[0]].max())
+        # On ignore les lignes à 0.0 pour avoir le vrai dernier relevé
+        df_valid = df_log[df_log['MotArr'] > 0]
+        if not df_valid.empty:
+            derniere_heure = to_f(df_valid['MotArr'].max())
+        else:
+            derniere_heure = to_f(df_log['MotArr'].max())
     
-    # Récupération du seuil depuis les paramètres ou 100h par défaut
+    # Récupération du seuil (ex: 100h)
     params = charger_params()
     seuil_v = params.get('prochaine_vidange', 100)
     heures_restantes = seuil_v - (derniere_heure % seuil_v) if seuil_v > 0 else 0
@@ -583,16 +585,16 @@ if st.session_state.page == "PLANNING":
     if heures_restantes < 15:
         col_v1.error(f"🛠️ Vidange : {heures_restantes:.1f}h !")
     else:
-        col_v1.success(f"⚙️ Moteur : {heures_restantes:.1f}h OK")
+        col_v1.success(f"⚙️ Moteur : {derniere_heure:.1f}h OK")
 
-    # B. Facturation en attente
+    # --- B. FACTURATION EN ATTENTE ---
     df_f = charger_data_safe('contacts.json')
     nb_unpaid = 0
     if not df_f.empty and 'Paiement' in df_f.columns:
         nb_unpaid = len(df_f[df_f['Paiement'] == "Unpaid"])
     col_v2.metric("Factures Unpaid", f"{nb_unpaid}", delta=f"{nb_unpaid}" if nb_unpaid > 0 else "OK", delta_color="inverse")
 
-    # C. Marée (Lien rapide)
+    # --- C. MARÉES ---
     col_v3.link_button("🌊 Marées Crouesty", "https://maree.info/104", use_container_width=True)
     
     st.divider()
@@ -610,7 +612,7 @@ if st.session_state.page == "PLANNING":
     # --- 3. INITIALISATION TEMPORELLE & SÉLECTEURS ---
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     maintenant = datetime.now()
-    aujourdhui = date(maintenant.year maintenant.month, maintenant.day)
+    aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
     
     if 'curr_month_idx' not in st.session_state: st.session_state.curr_month_idx = aujourdhui.month - 1
     if 'curr_year' not in st.session_state: st.session_state.curr_year = aujourdhui.year
@@ -656,19 +658,16 @@ if st.session_state.page == "PLANNING":
                 dt_end = dt_start + timedelta(days=max(0, n_j-1))
                 prix_val = to_f(r.get('Prix', 0))
 
-                # Couleurs
                 if "CMN" in soc: color = "#3498db"
                 elif any(x in statut for x in ["annul", "refus"]): color = "#bdc3c7"
                 elif dt_start < aujourdhui: color = "#34495e"
                 else: color = "#27ae60"
 
-                # Remplissage calendrier
                 for i in range(n_j):
                     curr = dt_start + timedelta(days=i)
                     if curr.month == sel_m and curr.year == sel_y:
                         jours_occ[curr.day] = {"c": color}
 
-                # Ajout à la liste du mois
                 if (dt_start.year == sel_y and dt_start.month == sel_m) or (dt_end.year == sel_y and dt_end.month == sel_m):
                     missions_list.append({
                         'r': r, 'idx': idx, 'start': dt_start, 'end': dt_end, 
@@ -679,6 +678,7 @@ if st.session_state.page == "PLANNING":
             except: continue
 
     # --- 5. AFFICHAGE CALENDRIER HTML ---
+    import calendar
     h_cal = '<table style="width:100%; text-align:center; border-collapse:collapse; background:white; border:1px solid #ddd;">'
     h_cal += '<tr style="background:#f8f9fa; font-size:12px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td>Sa</td><td>Di</td></tr>'
     
@@ -706,11 +706,10 @@ if st.session_state.page == "PLANNING":
     if missions_list:
         missions_list.sort(key=lambda x: x['start'])
         for m in missions_list:
-            prix_p = f"{m['prix']:.0f} €"
             col1, col2 = st.columns([1, 3.5])
             with col1:
                 st.markdown(f"""<div style='background:{m['color']}; color:white; border-radius:5px; text-align:center; padding:5px;'>
-                    <span style='font-size:0.75rem;'>{m['start'].strftime('%d/%m')}</span><br><b>{prix_p}</b>
+                    <span style='font-size:0.75rem;'>{m['start'].strftime('%d/%m')}</span><br><b>{m['prix']:.0f} €</b>
                 </div>""", unsafe_allow_html=True)
             with col2:
                 nom_affiche = f"{str(m['r'].get('Prénom','')).upper()} {str(m['r'].get('Nom','')).upper()}"
