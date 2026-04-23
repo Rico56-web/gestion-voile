@@ -154,7 +154,7 @@ if not st.session_state.get('authenticated', False):
 st.markdown('<div class="main-header">⚓ VESTA 2026</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=True)
 
-# Barre de navigation harmonisée
+# --- BARRE DE NAVIGATION HARMONISÉE ---
 menu = ["PLANNING", "CONTACTS", "STATS", "MAINT", "LOG", "NOTES", "FACT"]
 icones = {
     "PLANNING": "📅", "CONTACTS": "👤", "STATS": "📊", 
@@ -163,10 +163,13 @@ icones = {
 
 cols_nav = st.columns(len(menu))
 for i, name in enumerate(menu):
-    # On utilise directement 'name' pour la page (ex: "NOTES", "FACT")
-    is_active = st.session_state.page == name
+    # ICI : On s'assure que si on clique sur "NOTES", la page devient "MEMOS"
+    # Et si on clique sur "FACT", la page devient "FACT"
+    target = "MEMOS" if name == "NOTES" else name
+    
+    is_active = st.session_state.page == target
     if cols_nav[i].button(f"{icones[name]}\n{name}", key=f"nav_{name}", use_container_width=True, type="primary" if is_active else "secondary"):
-        st.session_state.page = name
+        st.session_state.page = target
         st.rerun()
 
 
@@ -189,20 +192,24 @@ if st.session_state.page == "MEMOS":
     if 'memo_edit_id' not in st.session_state: 
         st.session_state.memo_edit_id = None
 
-    # --- A. AJOUT NOUVELLE NOTE ---
+    # --- A. AJOUT NOUVELLE NOTE (AVEC BOUTON FERMER) ---
     with st.expander("➕ CRÉER UNE NOUVELLE CHECK-LIST", expanded=df_memos.empty):
         with st.form("new_memo_form_final"):
             c1, c2 = st.columns(2)
             m_date = c1.text_input("Date", value=datetime.now().strftime("%d/%m/%Y"))
             m_urg = c2.selectbox("Urgence de départ", ["Normal", "Urgent"])
             m_txt = st.text_area("Contenu (une ligne par tâche)")
-            if st.form_submit_button("💾 ENREGISTRER LA NOTE"):
+            
+            btn_save, btn_close = st.columns(2)
+            if btn_save.form_submit_button("💾 ENREGISTRER LA NOTE", use_container_width=True, type="primary"):
                 if m_txt.strip():
                     new_r = pd.DataFrame([{"Date": m_date, "Description": m_txt, "Statut": m_urg, "Paiement": "N/A", "Archive": "Non Archivé"}])
                     df_memos = pd.concat([df_memos, new_r], ignore_index=True)
                     sauvegarder_data(df_memos, 'memos.json')
-                    st.session_state.memo_edit_id = None # Ferme toute modif
                     st.rerun()
+
+            if btn_close.form_submit_button("❌ FERMER", use_container_width=True):
+                st.rerun() # Referme l'expander visuellement au rechargement
 
     # --- B. AFFICHAGE DES FICHES ---
     df_show = df_memos[df_memos['Archive'] == "Non Archivé"]
