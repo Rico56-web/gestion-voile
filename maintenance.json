@@ -211,7 +211,7 @@
         "Date":"23\/04\/2026",
         "Objet":"Test eprib",
         "M_Num":0.0,
-        "Statut":"Fait",
+        "Statut":"\u00c0 pr\u00e9voir",
         "Type":"Maintenance",
         "Notes":""
     }
