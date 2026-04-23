@@ -1444,69 +1444,82 @@ if st.session_state.page == "LOG":
 
     # --- 4. POSTE DE CONTRÔLE (BAS DE PAGE) ---
     # ... (Garder le code du poste de contrôle précédent ici) ...
-
-=================================================================
-
-# --- 11. PAGE ARCHIVES ---
-
+    # =================================================================
+# --- 11. PAGE ARCHIVES (VERSION CORRIGÉE & COMPLÈTE) ---
 # =================================================================
-
 if st.session_state.page == "ARCHIVES":
-
-    st.title("📂 Archives")
-
+    st.title("📂 Archives & Historique")
+    
+    # Bouton de retour rapide
     if st.button("⬅️ Retour au Planning"):
-
         st.session_state.page = "PLANNING"
-
         st.rerun()
 
-
-
-    t1, t2, t3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook"])
-
-    with t1: st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
-
-    with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
-
-    with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
-
-    # À ajouter dans ton bloc ARCHIVES (Onglet existant ou nouveau)
-with st.expander("🚨 Zone Danger : Clôture de Saison"):
-    st.warning("Cette action va basculer les contacts payés dans les archives et vider la liste active.")
-    annee_saison = datetime.now().year
+    # --- SECTION 1 : CONSULTATION DES DONNÉES ARCHIVÉES ---
+    st.markdown("### 🔍 Consultation des historiques")
+    t1, t2, t3, t4 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook", "👤 Contacts"])
     
-    if st.button(f"🔒 CLÔTURER LA SAISON {annee_saison}"):
-        # 1. Archive des contacts payés
-        df_f = charger_data_safe('contacts.json')
-        df_paid = df_f[df_f['Paiement'] == "Paid"]
-        df_unpaid = df_f[df_f['Paiement'] != "Paid"]
-        
-        if not df_paid.empty:
-            df_arch_contacts = charger_data_safe(f'archives_contacts_{annee_saison}.json')
-            df_arch_contacts = pd.concat([df_arch_contacts, df_paid], ignore_index=True)
-            sauvegarder_data(df_arch_contacts, f'archives_contacts_{annee_saison}.json')
-            
-            # On ne garde que les impayés dans le fichier actif
-            sauvegarder_data(df_unpaid, 'contacts.json')
-            st.success("Saison archivée avec succès !")
-            st.rerun()
-    # --- À ajouter dans ton bloc ARCHIVES ---
+    with t1: 
+        st.subheader("Archives Maintenance")
+        st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
+    
+    with t2: 
+        st.subheader("Archives Planning")
+        st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
+    
+    with t3: 
+        st.subheader("Archives Logbook")
+        st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
+
+    with t4:
+        st.subheader("Archives Contacts (Saisons passées)")
+        # On tente de charger l'archive spécifique 2026 créée par la clôture
+        st.dataframe(charger_data_safe('archives_contacts_2026.json'), use_container_width=True)
+
     st.divider()
-    st.subheader("🏁 Clôture de Saison")
-    if st.button("📦 Archiver les sorties payées de 2026"):
-            df_f = charger_data_safe('contacts.json')
-        df_paid = df_f[df_f['Paiement'] == "Paid"]
-        df_unpaid = df_f[df_f['Paiement'] != "Paid"]
+
+    # --- SECTION 2 : OUTILS DE FIN DE SAISON ---
+    st.markdown("### 🏁 Clôture de Saison 2026")
     
-        if not df_paid.empty:
-            # On sauve dans un fichier historique
-            sauvegarder_data(df_paid, 'archives_contacts_2026.json')
-            # On ne garde que ce qui reste à payer dans le fichier actif
-            sauvegarder_data(df_unpaid, 'contacts.json')
-            st.success("Données de 2026 mises en coffre-fort !")
-        else:
-            st.info("Rien à archiver pour le moment.")
+    with st.expander("🚨 ZONE DE DANGER : Archiver la saison en cours", expanded=False):
+        st.warning("""
+            **Attention :** Cette action va déplacer toutes les fiches marquées comme **'Paid'** depuis ta liste de contacts active vers le fichier des archives 2026. 
+            Cela permet de vider ton menu Facturation pour la saison suivante.
+        """)
+        
+        if st.button("🔒 EXÉCUTER L'ARCHIVAGE DES CONTACTS RÉGLÉS", use_container_width=True, type="primary"):
+            # 1. Chargement des contacts actuels
+            df_f = charger_data_safe('contacts.json')
+            
+            if not df_f.empty:
+                # 2. Séparation Payé / Non Payé
+                # On s'assure que la colonne Paiement existe
+                if 'Paiement' not in df_f.columns:
+                    df_f['Paiement'] = "Unpaid"
+                
+                df_paid = df_f[df_f['Paiement'] == "Paid"]
+                df_unpaid = df_f[df_f['Paiement'] != "Paid"]
+                
+                if not df_paid.empty:
+                    # 3. Sauvegarde dans l'archive 2026
+                    # On récupère l'archive existante pour ne pas écraser si on clique plusieurs fois
+                    df_hist = charger_data_safe('archives_contacts_2026.json')
+                    df_new_hist = pd.concat([df_hist, df_paid], ignore_index=True)
+                    sauvegarder_data(df_new_hist, 'archives_contacts_2026.json')
+                    
+                    # 4. Mise à jour du fichier actif (on ne garde que les impayés)
+                    sauvegarder_data(df_unpaid, 'contacts.json')
+                    
+                    st.success(f"✅ {len(df_paid)} fiches archivées avec succès dans 'archives_contacts_2026.json'.")
+                    st.rerun()
+                else:
+                    st.info("Aucune fiche marquée comme 'Paid' (Payée) n'a été trouvée.")
+            else:
+                st.error("Le fichier de contacts est vide.")
+
+    # Petit rappel de sécurité en bas de page
+    st.caption("Note : Les fichiers d'archives sont stockés au format JSON sur votre dépôt GitHub.")
+
 # --- FIN DU FICHIER ---
 
 
