@@ -866,31 +866,27 @@ if st.session_state.page == "MAINT":
     import pandas as pd
     import io
     import streamlit.components.v1 as components
-    from datetime import datetime, timedelta
+    from datetime import datetime
 
-    # --- FONCTION TECHNIQUE : IMPRESSION ---
+    # --- 1. FONCTION D'IMPRESSION ---
     def bouton_imprimer_fiche_maint(titre, date, details, statut):
         html_content = f"""
         <html>
         <head>
-            <title>Maintenance - Vesta Skipper 2026</title>
             <style>
-                body {{ font-family: Arial, sans-serif; padding: 30px; line-height: 1.6; color: #2C3E50; }}
+                body {{ font-family: Arial, sans-serif; padding: 30px; color: #2C3E50; }}
                 .header {{ border-bottom: 3px solid #2980B9; padding-bottom: 10px; margin-bottom: 20px; }}
                 .statut {{ display: inline-block; padding: 5px 15px; border-radius: 20px; background: #eee; font-weight: bold; }}
                 .content {{ background: #f9f9f9; padding: 20px; border: 1px solid #ddd; white-space: pre-wrap; font-size: 1.1em; }}
-                footer {{ margin-top: 50px; font-size: 0.8em; color: #7F8C8D; border-top: 1px solid #eee; padding-top: 10px; }}
             </style>
         </head>
         <body>
             <div class='header'>
                 <h1>🛠️ {titre}</h1>
-                <p><b>Date :</b> {date}</p>
-                <div class='statut'>État : {statut}</div>
+                <p><b>Date :</b> {date} | <span class='statut'>État : {statut}</span></p>
             </div>
-            <h3>Détails techniques :</h3>
             <div class='content'>{details}</div>
-            <footer>Généré par Vesta Skipper 2026</footer>
+            <p style='font-size: 0.8em; color: gray; margin-top: 40px;'>Vesta Skipper 2026</p>
         </body>
         </html>
         """
@@ -903,43 +899,39 @@ if st.session_state.page == "MAINT":
             setTimeout(function(){{ win.print(); }}, 500);
         }}
         </script>
-        <button onclick="printFiche()" style="padding: 5px 12px; border-radius: 5px; cursor: pointer; background: #ffffff; border: 1px solid #d1d5db; color: #2C3E50; font-weight: bold;">
-            🖨️ Imprimer cette fiche
+        <button onclick="printFiche()" style="padding: 5px 10px; border-radius: 5px; cursor: pointer; background: #ffffff; border: 1px solid #d1d5db; width: 100%;">
+            🖨️ Imprimer
         </button>
         """
         components.html(js, height=45)
 
-    # 1. CHARGEMENT DES DONNÉES
+    # --- 2. CHARGEMENT DES DONNÉES ---
     df_m = charger_data_safe('maintenance.json')
     df_log = charger_data_safe('logbook.json')
-    
     releve_h = pd.to_numeric(df_log['MotArr'], errors='coerce').max() if not df_log.empty else 0.0
+    
     params = charger_params()
     if 'prochaine_vidange' not in params:
-        params['prochaine_vidange'] = 2450.0 
+        params['prochaine_vidange'] = 2450.0
         sauvegarder_params(params)
+
+    if 'maint_edit_id' not in st.session_state:
+        st.session_state.maint_edit_id = None
 
     st.title("🛠️ MAINTENANCE & VIDANGE")
 
-    # 2. TABLEAU DE BORD VIDANGE
+    # --- 3. TABLEAU DE BORD VIDANGE ---
     heures_restantes = params['prochaine_vidange'] - releve_h
     color_v = "#2e7d32" if heures_restantes > 10 else "#c62828"
     
     col_v1, col_v2 = st.columns([2, 1])
-    
     with col_v1:
         st.markdown(f"""
             <div style="background-color: {color_v}15; border: 2px solid {color_v}; padding: 15px; border-radius: 10px; text-align: center;">
                 <h3 style="margin:0; color: {color_v};">{heures_restantes:.1f} h restantes</h3>
-                <p style="margin:0;">Prochaine vidange prévue à : <b>{params['prochaine_vidange']:.1f} h</b></p>
-                <small>Compteur actuel : {releve_h:.1f} h</small>
+                <p style="margin:0;">Cible vidange : <b>{params['prochaine_vidange']:.1f} h</b> | Actuel : {releve_h:.1f} h</p>
             </div>
         """, unsafe_allow_html=True)
-        # Bouton pour imprimer l'état actuel de la vidange
-        bouton_imprimer_fiche_maint("ÉTAT VIDANGE MOTEUR", datetime.now().strftime("%d/%m/%Y"), 
-                                   f"Compteur actuel : {releve_h} h\nProchaine échéance : {params['prochaine_vidange']} h\nHeures restantes : {heures_restantes:.1f} h", 
-                                   "EN ATTENTE" if heures_restantes > 0 else "À FAIRE D'URGENCE")
-
     with col_v2:
         new_target = st.number_input("Ajuster cible (h)", value=float(params['prochaine_vidange']), step=10.0)
         if new_target != params['prochaine_vidange']:
@@ -949,105 +941,115 @@ if st.session_state.page == "MAINT":
 
     st.divider()
 
-    # 3. FORMULAIRE "EFFECTUER LA VIDANGE"
-    with st.expander("🔧 ENREGISTRER UNE VIDANGE FAITE", expanded=False):
-        with st.form("form_vidange_v2026"):
-            c1, c2 = st.columns(2)
-            v_date = c1.date_input("Date de la vidange", datetime.now())
-            v_compteur = c2.number_input("Valeur compteur (h)", value=releve_h, step=0.1)
-            v_travaux = st.text_area("Travaux effectués", placeholder="Ex: Vidange, Filtre huile, Filtre gasoil...")
+    # --- 4. FORMULAIRE D'AJOUT (VIDANGE OU AUTRE) ---
+    with st.expander("➕ ENREGISTRER UNE NOUVELLE INTERVENTION", expanded=False):
+        with st.form("form_new_maint"):
+            f_obj = st.text_input("Désignation (ex: Vidange Moteur, Changement Anode...)")
+            c1, c2, c3 = st.columns(3)
+            f_d = c1.date_input("Date", datetime.now())
+            f_m = c2.number_input("Montant (€)", min_value=0.0)
+            f_t = c3.selectbox("Catégorie", ["Maintenance", "Sécurité", "Port", "Assurances", "Autres"])
+            f_notes = st.text_area("Notes détaillées")
+            is_vidange = st.checkbox("C'est une vidange (recalculer +90h)")
             
-            st.info(f"💡 Action : La prochaine échéance sera reglée à {v_compteur + 90:.1f} h")
-            
-            if st.form_submit_button("VALIDER ET RECALCULER (+90h)"):
-                nouvelle_vidange = {
-                    "Date": v_date.strftime("%d/%m/%Y"),
-                    "Objet": "VIDANGE MOTEUR",
-                    "M_Num": 0.0,
-                    "Statut": "Fait",
-                    "Type": "Maintenance",
-                    "Notes": v_travaux
+            if st.form_submit_button("💾 ENREGISTRER"):
+                new_row = {
+                    "Date": f_d.strftime("%d/%m/%Y"), "Objet": f_obj, "M_Num": f_m, 
+                    "Statut": "Fait", "Type": f_t, "Notes": f_notes
                 }
-                df_m = pd.concat([df_m, pd.DataFrame([nouvelle_vidange])], ignore_index=True)
+                df_m = pd.concat([df_m, pd.DataFrame([new_row])], ignore_index=True)
+                if is_vidange:
+                    params['prochaine_vidange'] = round(releve_h + 90.0, 1)
+                    sauvegarder_params(params)
                 sauvegarder_data(df_m, 'maintenance.json')
-                params['prochaine_vidange'] = round(v_compteur + 90.0, 1)
-                sauvegarder_params(params)
                 st.rerun()
 
-    # 4. FILTRES D'AFFICHAGE
-    col_sel1, col_sel2 = st.columns(2)
-    mode_maint = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
-    sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
+    # --- 5. FILTRES & AFFICHAGE DES FICHES ---
+    col_f1, col_f2 = st.columns(2)
+    mode_m = col_f1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
+    sel_y = col_f2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-    # 5. TABLEAU DE SUIVI
     if not df_m.empty:
         df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
         df_filtre = df_m[df_m['dt_maint'].dt.year == sel_y].copy()
-        if mode_maint == "À ce jour":
+        if mode_m == "À ce jour":
             df_filtre = df_filtre[df_filtre['dt_maint'] <= pd.Timestamp.now().normalize()].copy()
-
+        
         df_filtre = df_filtre.sort_values('dt_maint', ascending=False)
 
-        st.subheader(f"📋 Suivi Maintenance {sel_y}")
-        
-        # Éditeur de tableau
-        edited_df = st.data_editor(
-            df_filtre.drop(columns=['dt_maint']),
-            column_config={
-                "M_Num": st.column_config.NumberColumn("€", format="%.2f"),
-                "Statut": st.column_config.SelectboxColumn("Etat", options=["À prévoir", "Fait"]),
-                "Type": st.column_config.SelectboxColumn("Cat", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
-            },
-            use_container_width=True,
-            key="maint_editor_final"
-        )
-        
-        if st.button("💾 ENREGISTRER LES MODIFICATIONS DU TABLEAU", type="primary", use_container_width=True):
-            df_non_affiches = df_m[~df_m.index.isin(df_filtre.index)].drop(columns=['dt_maint'], errors='ignore')
-            df_final_save = pd.concat([df_non_affiches, edited_df], ignore_index=True)
-            sauvegarder_data(df_final_save, 'maintenance.json')
-            st.success("✅ Données sauvegardées")
-            st.rerun()
-
-        # --- OPTION : IMPRESSION INDIVIDUELLE ---
-        with st.expander("🖨️ IMPRIMER UNE FICHE DÉTAILLÉE"):
-            choix_fiche = st.selectbox("Sélectionner une intervention", df_filtre['Objet'].tolist())
-            row_p = df_filtre[df_filtre['Objet'] == choix_fiche].iloc[0]
-            bouton_imprimer_fiche_maint(
-                row_p['Objet'], 
-                row_p['Date'], 
-                row_p.get('Notes', 'Aucune note détaillée'), 
-                row_p['Statut']
-            )
-
-    # 6. FORMULAIRE D'AJOUT RAPIDE
-    st.write("---")
-    with st.expander("➕ AJOUTER UN AUTRE TRAVAIL OU FRAIS"):
-        with st.form("form_add_maint", clear_on_submit=True):
-            f_obj = st.text_input("Désignation")
-            c1, c2 = st.columns(2)
-            f_d = c1.date_input("Date", datetime.now())
-            f_m = c2.number_input("Montant (€)", min_value=0.0)
-            f_t = st.selectbox("Catégorie", ["Port", "Assurances", "Maintenance", "Sécurité", "Autres"], index=2)
-            f_s = st.selectbox("Statut", ["À prévoir", "Fait"], index=1)
+        for idx, row in df_filtre.iterrows():
+            # --- MODE ÉDITION ---
+            if st.session_state.maint_edit_id == idx:
+                with st.form(key=f"edit_maint_{idx}"):
+                    e_obj = st.text_input("Désignation", value=row['Objet'])
+                    c1, c2 = st.columns(2)
+                    e_dat = c1.text_input("Date", value=row['Date'])
+                    e_mon = c2.number_input("Montant (€)", value=float(row['M_Num']))
+                    e_not = st.text_area("Notes", value=row.get('Notes', ''))
+                    
+                    cb1, cb2 = st.columns(2)
+                    if cb1.form_submit_button("✅ SAUVER"):
+                        df_m.at[idx, 'Objet'], df_m.at[idx, 'Date'] = e_obj, e_dat
+                        df_m.at[idx, 'M_Num'], df_m.at[idx, 'Notes'] = e_mon, e_not
+                        sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
+                        st.session_state.maint_edit_id = None
+                        st.rerun()
+                    if cb2.form_submit_button("❌ ANNULER"):
+                        st.session_state.maint_edit_id = None
+                        st.rerun()
             
-            if st.form_submit_button("💾 AJOUTER"):
-                new_row = {"Date": f_d.strftime("%d/%m/%Y"), "Objet": f_obj, "M_Num": f_m, "Statut": f_s, "Type": f_t, "Notes": ""}
-                df_final = pd.concat([df_m.drop(columns=['dt_maint'], errors='ignore'), pd.DataFrame([new_row])], ignore_index=True)
-                sauvegarder_data(df_final, 'maintenance.json')
-                st.rerun()
+            # --- MODE AFFICHAGE ---
+            else:
+                st.markdown(f"""
+                    <div style="background-color:#F8F9F9; border-left: 10px solid #2980B9; padding: 15px; border-radius: 10px; margin-bottom: 5px;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="font-weight: bold;">{row['Objet']}</span>
+                            <span>📅 {row['Date']}</span>
+                        </div>
+                        <small>{row['Type']} | {row['M_Num']} €</small>
+                    </div>
+                """, unsafe_allow_html=True)
+                if row.get('Notes'): st.caption(f"📝 {row['Notes']}")
 
-    # 7. EXPORT EXCEL
+                # BARRE D'OUTILS
+                bc1, bc2, bc3, bc4 = st.columns(4)
+                if bc1.button("✏️ Modif", key=f"ed_m_{idx}"):
+                    st.session_state.maint_edit_id = idx
+                    st.rerun()
+                with bc2:
+                    bouton_imprimer_fiche_maint(row['Objet'], row['Date'], row.get('Notes', 'N/A'), row['Statut'])
+                
+                # Changement Statut Rapide
+                if bc3.button("✅ Fait" if row['Statut'] != "Fait" else "⏳ À faire", key=f"st_m_{idx}"):
+                    df_m.at[idx, 'Statut'] = "Fait" if row['Statut'] != "Fait" else "À prévoir"
+                    sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
+                    st.rerun()
+
+                # Suppression avec confirmation
+                dk = f"del_m_{idx}"
+                if not st.session_state.get(dk, False):
+                    if bc4.button("🗑️ Suppr", key=f"pre_m_{idx}"):
+                        st.session_state[dk] = True
+                        st.rerun()
+                else:
+                    s1, s2 = bc4.columns(2)
+                    if s1.button("OK", key=f"y_m_{idx}", type="primary"):
+                        df_m = df_m.drop(idx)
+                        sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
+                        st.session_state[dk] = False
+                        st.rerun()
+                    if s2.button("NO", key=f"n_m_{idx}"):
+                        st.session_state[dk] = False
+                        st.rerun()
+            st.write("")
+
+    # --- 6. EXPORT EXCEL ---
     if not df_m.empty:
         buffer = io.BytesIO()
-        try:
-            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                df_m.drop(columns=['dt_maint'], errors='ignore').to_excel(writer, index=False, sheet_name='Maintenance')
-            st.download_button(label="📥 Télécharger le suivi (Excel)", data=buffer.getvalue(), 
-                             file_name=f"Maintenance_Vesta_{sel_y}.xlsx", mime="application/vnd.ms-excel", use_container_width=True)
-        except Exception as e:
-            st.error(f"Erreur export : {e}")
-
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df_m.drop(columns=['dt_maint'], errors='ignore').to_excel(writer, index=False)
+        st.download_button("📥 Télécharger Excel", data=buffer.getvalue(), 
+                           file_name=f"Maintenance_{sel_y}.xlsx", use_container_width=True)
 
 # =================================================================
 # --- PAGE : FACTURATION & SUIVI PAIEMENTS (FACT) ---
