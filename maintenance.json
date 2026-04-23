@@ -209,14 +209,6 @@
     },
     {
         "Date":"23\/04\/2026",
-        "Objet":"test Epirb",
-        "M_Num":0.0,
-        "Statut":"Fait",
-        "Type":"Maintenance",
-        "Notes":""
-    },
-    {
-        "Date":"23\/04\/2026",
         "Objet":"Test eprib",
         "M_Num":0.0,
         "Statut":"Fait",
