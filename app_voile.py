@@ -300,7 +300,7 @@ if st.session_state.page == "MEMOS":
         st.session_state.memo_edit_id = idx
         t.rerun()
                     
-     if btn_c2.button("📦 Archive", key=f"arch_btn_{idx}"):
+    if btn_c2.button("📦 Archive", key=f"arch_btn_{idx}"):
         df_memos.at[idx, 'Archive'] = "Archivé"
         sauvegarder_data(df_memos, 'memos.json')
         st.rerun()
