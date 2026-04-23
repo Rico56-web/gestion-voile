@@ -1179,24 +1179,20 @@ if st.session_state.page == "LOG":
     # --- INITIALISATION DES ÉTATS (SESSION STATE) ---
     if 'saisie_ouverte' not in st.session_state: st.session_state.saisie_ouverte = False
     if 'display_edit' not in st.session_state: st.session_state.display_edit = False
-
-    # --- 1. SAISIE RAPIDE (HAUT DE PAGE) ---
-    # Le bouton change d'état pour ouvrir/fermer l'expander
+        # --- 1. SAISIE RAPIDE (HAUT DE PAGE) ---
     if not st.session_state.saisie_ouverte:
         if st.button("➕ AJOUTER UNE NAVIGATION", use_container_width=True):
             st.session_state.saisie_ouverte = True
             st.rerun()
-    else:
-        if st.button("🔼 FERMER LE FORMULAIRE DE SAISIE", use_container_width=True):
-            st.session_state.saisie_ouverte = False
-            st.rerun()
-
+    
+    # L'expander est piloté par la variable de session
     with st.expander("🚀 Formulaire de Saisie Globale", expanded=st.session_state.saisie_ouverte):
         with st.form(key="form_nav_new"):
+            st.info("Remplissez les détails du voyage. Les heures et milles seront répartis sur chaque jour.")
             c1, c2 = st.columns(2)
             f_date = c1.date_input("Date de début", datetime.now())
             f_jours = c2.number_input("Nombre de jours", min_value=1, value=1, step=1)
-            f_but = st.text_input("But de la navigation / Nom du voyage", placeholder="Ex: Croisière d'été")
+            f_but = st.text_input("But de la navigation / Nom du voyage")
             f_equipage = st.text_area("Équipage / Coéquipiers")
             
             st.markdown("---")
@@ -1212,8 +1208,11 @@ if st.session_state.page == "LOG":
             k_dep = colk1.number_input("Milles Dép. (NM)", value=float(last_mil), format="%.1f")
             k_arr = colk2.number_input("Milles Arr. (NM)", value=float(last_mil), format="%.1f")
 
-            if st.form_submit_button("💾 CRÉER LE VOYAGE", use_container_width=True, type="primary"):
-                # --- VÉRIFICATION DES DOUBLONS ---
+            # BOUTONS D'ACTION : CRÉER OU ANNULER
+            b_creer, b_annuler = st.columns(2)
+            
+            if b_creer.form_submit_button("💾 CRÉER LE VOYAGE", use_container_width=True, type="primary"):
+                # (Logique de vérification des doublons et création identique au bloc précédent...)
                 dates_a_creer = [(f_date + timedelta(days=i)).strftime("%d/%m/%Y") for i in range(int(f_jours))]
                 dates_existantes = df_log['Date'].tolist() if not df_log.empty else []
                 doublons = [d for d in dates_a_creer if d in dates_existantes]
@@ -1241,9 +1240,14 @@ if st.session_state.page == "LOG":
                         })
                     df_log = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
                     sauvegarder_data(df_log, 'logbook.json')
-                    st.session_state.saisie_ouverte = False # Fermeture auto
-                    st.success("Voyage enregistré !")
+                    st.session_state.saisie_ouverte = False
                     st.rerun()
+
+            # Le bouton Annuler à l'intérieur du formulaire
+            if b_annuler.form_submit_button("❌ ANNULER / RETOUR", use_container_width=True):
+                st.session_state.saisie_ouverte = False
+                st.rerun()
+ 
 
     # --- 2. AFFICHAGE DE L'HISTORIQUE (VUE GROUPÉE) ---
     if not df_log.empty:
