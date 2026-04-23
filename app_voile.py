@@ -1169,247 +1169,130 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
 # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - SYNCHRONISÉE AVEC VOS DONNÉES ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION CROISIÈRE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>📖 Livre de Bord</h1></div>', unsafe_allow_html=True)
 
     df_log = charger_data_safe('logbook.json')
     
-    # --- HARMONISATION DES COLONNES (Basé sur tes données réelles) ---
-    # On s'assure que les colonnes de ton JSON sont bien reconnues par l'interface
-    mapping = {
-        'MotDep': 'MotDep', 'MotArr': 'MotArr', 'TotalMot': 'TotalMot',
-        'MilDep': 'MilDep', 'MilArr': 'MilArr', 'TotalMil': 'TotalMil',
-        'H_Voile': 'H_Voile', 'Coéquipiers': 'Coéquipiers', 'Navigation': 'Navigation'
-    }
-    
-    for col in mapping.values():
-        if col not in df_log.columns:
-            df_log[col] = 0.0 if "Mot" in col or "Mil" in col or "H_" in col else ""
-
-    # Conversion numérique pour les calculs de maintenance
-    for col in ['TotalMot', 'TotalMil', 'MotDep', 'MotArr', 'MilDep', 'MilArr', 'H_Voile']:
-        df_log[col] = pd.to_numeric(df_log[col], errors='coerce').fillna(0.0)
-
+    # Initialisation session_state
     if 'edit_mode' not in st.session_state: st.session_state.edit_mode = False
     if 'edit_id' not in st.session_state: st.session_state.edit_id = None
 
-    # --- 1. FORMULAIRE DE SAISIE AVEC CLÉ DYNAMIQUE (ANTI-DOUBLON) ---
-    if not st.session_state.edit_mode:
-        # On crée une clé qui change à chaque seconde pour forcer le reset total après sauvegarde
-        if 'form_key' not in st.session_state:
-            st.session_state.form_key = str(int(time.time()))
+    # --- 1. FORMULAIRE DE SAISIE (OPTIMISÉ POUR PLUSIEURS JOURS) ---
+    with st.expander("🚀 Enregistrer une Navigation (Escale ou Croisière)", expanded=not st.session_state.edit_mode):
+        with st.form(key="form_nav_new"):
+            c1, c2 = st.columns(2)
+            f_date = c1.date_input("Date de début", datetime.now())
+            f_jours = c2.number_input("Nombre de jours de navigation", min_value=1, value=1)
+            
+            f_nav = st.text_input("Nom du Voyage / Destination", placeholder="Ex: Tour de Belle-Île")
+            f_coep = st.text_input("Coéquipiers")
+            
+            st.markdown("---")
+            st.markdown("**📊 Relevés Compteurs (Départ et Arrivée finale)**")
+            
+            # Récupération derniers index connus
+            last_mot = df_log['MotArr'].max() if not df_log.empty else 0.0
+            last_mil = df_log['MilArr'].max() if not df_log.empty else 0.0
+            
+            col_m1, col_m2, col_m3 = st.columns(3)
+            m_dep = col_m1.number_input("Compteur Moteur Dép.", value=float(last_mot), format="%.1f")
+            m_arr = col_m2.number_input("Compteur Moteur Arr.", value=float(last_mot), format="%.1f")
+            h_voile = col_m3.number_input("Total Heures Voile", value=0.0, format="%.1f")
+            
+            col_k1, col_k2 = st.columns(2)
+            k_dep = col_k1.number_input("Compteur Milles Dép.", value=float(last_mil), format="%.1f")
+            k_arr = col_k2.number_input("Compteur Milles Arr.", value=float(last_mil), format="%.1f")
 
-        with st.expander("🚀 Enregistrer une Navigation", expanded=False):
-            # La clé dynamique change après chaque st.rerun()
-            with st.form(key=f"form_nav_{st.session_state.form_key}", clear_on_submit=True):
-                c1, c2, c3 = st.columns([1, 1, 2])
-                f_date = c1.date_input("Date départ", datetime.now())
-                f_jours = c2.number_input("Nombre de jours", min_value=1, value=1)
-                f_nav = c3.text_input("Nom du Voyage")
-                f_coep = st.text_input("Coéquipiers")
+            st.markdown("---")
+            st.markdown("**📍 Itinéraire**")
+            p_dep = st.text_input("Port de départ initial")
+            p_arr = st.text_input("Port d'arrivée final (ou escales séparées par des virgules)")
+
+            if st.form_submit_button("💾 ENREGISTRER LA NAVIGATION", use_container_width=True, type="primary"):
+                nouvelles_lignes = []
                 
-                last_mot = df_log['MotArr'].max() if not df_log.empty else 0.0
-                last_mil = df_log['MilArr'].max() if not df_log.empty else 0.0
-
-                lignes = []
                 for i in range(int(f_jours)):
-                    lignes.append({
-                        "Date": (f_date + timedelta(days=i)).strftime("%d/%m/%Y"),
-                        "Dép": "", "Arr": "",
-                        "Moteur Dép": last_mot if i == 0 else 0.0, "Moteur Arr": 0.0,
-                        "Mille Dép": last_mil if i == 0 else 0.0, "Mille Arr": 0.0,
-                        "Heures Voile": 0.0
-                    })
-                
-                # On utilise aussi la clé dynamique ici pour l'éditeur
-                edited_df = st.data_editor(pd.DataFrame(lignes), use_container_width=True, key=f"editor_{st.session_state.form_key}")
-
-                submit_button = st.form_submit_button("💾 VALIDER ET FERMER LE FORMULAIRE", use_container_width=True, type="primary")
-
-                if submit_button:
-                    # Sécurité supplémentaire : on vérifie si l'utilisateur a rempli au moins une arrivée
-                    nouvelles = []
-                    for _, r in edited_df.iterrows():
-                        if r['Arr'] and str(r['Arr']).strip() != "":
-                            m_d, m_a = float(r['Moteur Dép']), float(r['Moteur Arr'])
-                            mi_d, mi_a = float(r['Mille Dép']), float(r['Mille Arr'])
-                            
-                            nouvelles.append({
-                                "Date": r['Date'], "Navigation": f_nav, "PortDep": r['Dép'], "PortArr": r['Arr'],
-                                "Coéquipiers": f_coep, "MotDep": m_d, "MotArr": m_a, "TotalMot": round(m_a - m_d, 2),
-                                "MilDep": mi_d, "MilArr": mi_a, "TotalMil": round(mi_a - mi_d, 2),
-                                "H_Voile": float(r['Heures Voile']), "Group_ID": ""
-                            })
+                    current_date = (f_date + timedelta(days=i)).strftime("%d/%m/%Y")
                     
-                    if nouvelles:
-                        df_log = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
-                        sauvegarder_data(df_log, 'logbook.json')
-                        
-                        # ON CHANGE LA CLÉ pour forcer la destruction du formulaire au prochain passage
-                        st.session_state.form_key = str(int(time.time()))
-                        
-                        st.success("✅ Enregistré !")
-                        time.sleep(0.5)
-                        st.rerun() # Ferme l'expander et réinitialise tout
-                    else:
-                        st.warning("⚠️ Veuillez saisir au moins un Port d'Arrivée.")
+                    # Pour ne pas fausser les stats, on met les totaux sur la dernière ligne 
+                    # ou on divise par le nombre de jours. Ici, on met tout sur la globale :
+                    is_last = (i == f_jours - 1)
+                    
+                    row = {
+                        "Date": current_date,
+                        "Navigation": f_nav,
+                        "Coéquipiers": f_coep,
+                        "PortDep": p_dep if i == 0 else "Escale",
+                        "PortArr": p_arr if is_last else "Escale",
+                        "MotDep": m_dep if i == 0 else 0.0,
+                        "MotArr": m_arr if is_last else 0.0,
+                        "TotalMot": round(m_arr - m_dep, 2) if is_last else 0.0,
+                        "MilDep": k_dep if i == 0 else 0.0,
+                        "MilArr": k_arr if is_last else 0.0,
+                        "TotalMil": round(k_arr - k_dep, 2) if is_last else 0.0,
+                        "H_Voile": h_voile if is_last else 0.0
+                    }
+                    nouvelles_lignes.append(row)
+                
+                df_log = pd.concat([df_log, pd.DataFrame(nouvelles_lignes)], ignore_index=True)
+                sauvegarder_data(df_log, 'logbook.json')
+                st.success("✅ Navigation enregistrée !")
+                time.sleep(1)
+                st.rerun()
 
     # --- 2. AFFICHAGE DE L'HISTORIQUE ---
     if not df_log.empty:
         st.divider()
         df_v = df_log.copy()
         df_v['dt'] = pd.to_datetime(df_v['Date'], dayfirst=True, errors='coerce')
-        df_v = df_v.sort_values(by='dt')
+        df_v = df_v.sort_values(by='dt', ascending=False) # Plus récent en haut
 
-        # Logique de groupement par Coéquipiers
-        blocs = []; current_bloc = []
-        for i in range(len(df_v)):
-            row = df_v.iloc[i]
-            if not current_bloc: current_bloc.append(row)
-            else:
-                prev_row = current_bloc[-1]
-                date_suivante = (row['dt'] - prev_row['dt']).days == 1
-                meme_coep = str(row['Coéquipiers']).strip().lower() == str(prev_row['Coéquipiers']).strip().lower()
-                if date_suivante and meme_coep and str(row['Coéquipiers']) != "": current_bloc.append(row)
-                else:
-                    blocs.append(current_bloc); current_bloc = [row]
-        if current_bloc: blocs.append(current_bloc)
+        for idx, row in df_v.iterrows():
+            # Style différent si c'est une ligne avec du mouvement (Total > 0)
+            has_data = row['TotalMil'] > 0 or row['TotalMot'] > 0
+            bg = "#f0f7ff" if has_data else "white"
+            border = "2px solid #3498db" if has_data else "1px solid #dee2e6"
+            
+            st.markdown(f"""
+                <div style="background:{bg}; border:{border}; padding:15px; border-radius:10px; margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:bold; font-size:1.1rem;">📅 {row['Date']}</span>
+                        <span style="background:#34495e; color:white; padding:2px 8px; border-radius:5px; font-size:0.8rem;">ID: {idx}</span>
+                    </div>
+                    <div style="margin-top:5px;">
+                        <b>{row['Navigation']}</b> : {row['PortDep']} → {row['PortArr']}
+                    </div>
+                    <div style="display:flex; gap:15px; margin-top:8px; font-size:0.9rem; color:#555;">
+                        <span>⚙️ {row['TotalMot']}h moteur</span>
+                        <span>⛵ {row['H_Voile']}h voile</span>
+                        <span>👥 {row['Coéquipiers']}</span>
+                    </div>
+                    <div style="text-align:right; margin-top:-20px;">
+                        <b style="font-size:1.4rem; color:#27ae60;">{row['TotalMil']} NM</b>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
-        for bloc in reversed(blocs):
-            df_b = pd.DataFrame(bloc)
-            if len(bloc) > 1:
-                t_mil = df_b['TotalMil'].sum()
-                t_mot = df_b['TotalMot'].sum()
-                st.markdown(f"""
-                    <div style="background:#eef2f7; color:#2c3e50; padding:12px; border-radius:10px; margin-bottom:10px; border-left: 8px solid #3498db;">
-                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; font-weight:bold;">
-                            <span>🚢 {str(bloc[0]['Navigation']).upper() or "VOYAGE"}</span>
-                            <span>⚙️ {t_mot:.1f}h Moteur | ⛵ {df_b['H_Voile'].sum():.1f}h Voile</span>
-                        </div>
-                        <div style="margin-top:5px;">
-                            <b>Du {bloc[0]['Date']} au {bloc[-1]['Date']}</b><br>
-                            <span style="font-size:0.9rem;">📍 {bloc[0]['PortDep']} → {bloc[-1]['PortArr']}</span>
-                        </div>
-                        <div style="text-align:right; margin-top:-15px;"><b style="font-size:1.3rem; color:#2980b9;">{t_mil:.1f} NM</b></div>
-                    </div>
-                """, unsafe_allow_html=True)
-            else:
-                row = bloc[0]
-                st.markdown(f"""
-                    <div style="background:white; border:1px solid #dee2e6; padding:10px; border-radius:5px; margin-bottom:5px; display:flex; justify-content:space-between;">
-                        <span><b>{row['Date']}</b> : {row['PortDep']} → {row['PortArr']} <br>
-                        <small>⚙️ {row['TotalMot']}h mot. | ⛵ {row['H_Voile']}h voile | 👥 {row['Coéquipiers']}</small></span>
-                        <b style="color:#27ae60;">{row['TotalMil']} NM</b>
-                    </div>
-                """, unsafe_allow_html=True)
-    # --- 3. ADMINISTRATION (MODIFIER / SUPPRIMER AVEC SÉCURITÉ) ---
-    with st.expander("🛠️ Gérer et Modifier les données", expanded=st.session_state.edit_mode):
+    # --- 3. ADMINISTRATION (MODIFIER / SUPPRIMER) ---
+    with st.expander("🛠️ OPTIONS D'ADMINISTRATION"):
         if not df_log.empty:
-            df_adm = df_log.copy()
-            
-            # --- FIX NAMEERROR: Définition explicite des colonnes à afficher ---
-            cols_adm = ['Date', 'Navigation', 'Coéquipiers', 'TotalMot', 'TotalMil']
-            
-            # On vérifie que ces colonnes existent bien dans le fichier avant d'afficher
-            cols_existantes = [c for c in cols_adm if c in df_adm.columns]
-            st.dataframe(df_adm[cols_existantes], use_container_width=True)
-            
             c_sel, c_mod, c_sup = st.columns([1, 1, 1])
-            sel_idx = c_sel.number_input("Sélectionner l'ID ligne", min_value=0, max_value=len(df_log)-1, step=1)
+            sel_idx = c_sel.number_input("Ligne à modifier/supprimer (ID)", min_value=0, max_value=len(df_log)-1, step=1)
             
-            # --- BOUTON MODIFIER ---
-            if c_mod.button("✏️ MODIFIER", use_container_width=True):
+            if c_mod.button("✏️ MODIFIER CETTE LIGNE", use_container_width=True):
                 st.session_state.edit_mode = True
                 st.session_state.edit_id = sel_idx
                 st.rerun()
 
-            # --- SYSTÈME DE SUPPRESSION AVEC CONFIRMATION ---
-            confirm_key = f"confirm_del_{sel_idx}"
-            if confirm_key not in st.session_state:
-                st.session_state[confirm_key] = False
-
-            if not st.session_state[confirm_key]:
-                if c_sup.button("🗑️ SUPPRIMER", use_container_width=True):
-                    st.session_state[confirm_key] = True
-                    st.rerun()
-            else:
-                c_conf, c_annul = st.columns(2)
-                if c_conf.button("⚠️ CONFIRMER ?", use_container_width=True, type="primary"):
-                    df_log = df_log.drop(index=sel_idx).reset_index(drop=True)
-                    sauvegarder_data(df_log, 'logbook.json')
-                    st.session_state[confirm_key] = False
-                    st.success(f"Ligne {sel_idx} supprimée.")
-                    time.sleep(0.5)
-                    st.rerun()
-                if c_annul.button("❌ Annuler"):
-                    st.session_state[confirm_key] = False
-                    st.rerun()
-    # --- FORMULAIRE DE MODIFICATION (VERSION FIABLE SANS TABLEAU) ---
-        if st.session_state.edit_mode:
-            st.divider()
-            st.markdown(f"### ✏️ Modification de la ligne ID: {st.session_state.edit_id}")
-            row_e = df_log.iloc[st.session_state.edit_id]
-            
-            with st.form("form_edit_log_simple"):
-                # 1. Infos Générales
-                c1, c2, c3 = st.columns(3)
-                m_date = c1.text_input("Date (JJ/MM/AAAA)", value=str(row_e.get('Date', '')))
-                m_nav = c2.text_input("Nom de la Croisière", value=str(row_e.get('Navigation', '')))
-                m_coep = c3.text_input("Coéquipiers", value=str(row_e.get('Coéquipiers', '')))
-                
-                # 2. Trajet
-                ct1, ct2 = st.columns(2)
-                m_pdep = ct1.text_input("Port de Départ", value=str(row_e.get('PortDep', '')))
-                m_parr = ct2.text_input("Port d'Arrivée", value=str(row_e.get('PortArr', '')))
-                
-                # 3. Compteurs (Moteur et Milles)
-                st.markdown("**📊 Relevés Compteurs**")
-                cm1, cm2, cm3 = st.columns(3)
-                m_mot_d = cm1.number_input("Moteur Départ", value=float(row_e.get('MotDep', 0.0)), format="%.1f")
-                m_mot_a = cm2.number_input("Moteur Arrivée", value=float(row_e.get('MotArr', 0.0)), format="%.1f")
-                m_h_voile = cm3.number_input("Heures Voile", value=float(row_e.get('H_Voile', 0.0)), format="%.1f")
-                
-                ck1, ck2 = st.columns(2)
-                m_mil_d = ck1.number_input("Milles Départ", value=float(row_e.get('MilDep', 0.0)), format="%.1f")
-                m_mil_a = ck2.number_input("Milles Arrivée", value=float(row_e.get('MilArr', 0.0)), format="%.1f")
-                
-                st.divider()
-                c_val, c_ann = st.columns(2)
-                
-                if c_val.form_submit_button("✅ ENREGISTRER LES MODIFICATIONS", use_container_width=True, type="primary"):
-                    idx = st.session_state.edit_id
-                    
-                    # Mise à jour directe (plus de risque de conflit avec le data_editor)
-                    df_log.at[idx, 'Date'] = m_date
-                    df_log.at[idx, 'Navigation'] = m_nav
-                    df_log.at[idx, 'Coéquipiers'] = m_coep
-                    df_log.at[idx, 'PortDep'] = m_pdep
-                    df_log.at[idx, 'PortArr'] = m_parr
-                    
-                    df_log.at[idx, 'MotDep'] = m_mot_d
-                    df_log.at[idx, 'MotArr'] = m_mot_a
-                    df_log.at[idx, 'TotalMot'] = round(m_mot_a - m_mot_d, 2)
-                    
-                    df_log.at[idx, 'MilDep'] = m_mil_d
-                    df_log.at[idx, 'MilArr'] = m_mil_a
-                    df_log.at[idx, 'TotalMil'] = round(m_mil_a - m_mil_d, 2)
-                    
-                    df_log.at[idx, 'H_Voile'] = m_h_voile
-                    
-                    sauvegarder_data(df_log, 'logbook.json')
-                    st.session_state.edit_mode = False
-                    st.success("✅ Modification enregistrée !")
-                    time.sleep(0.5)
-                    st.rerun()
-
-                if c_ann.form_submit_button("❌ ANNULER", use_container_width=True):
-                    st.session_state.edit_mode = False
-                    st.rerun()
-        else:
-            st.info("Aucune donnée à gérer.")
-
+            if c_sup.button("🗑️ SUPPRIMER CETTE LIGNE", use_container_width=True, type="primary"):
+                df_log = df_log.drop(index=sel_idx).reset_index(drop=True)
+                sauvegarder_data(df_log, 'logbook.json')
+                st.success("Ligne supprimée.")
+                time.sleep(1)
+                st.rerun()
  
 
 # --- FIN DU FICHIER ---
