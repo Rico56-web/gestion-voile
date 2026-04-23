@@ -1169,51 +1169,58 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
         # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - SAISIE AVEC VÉRIFICATION ---
+# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION FINALE INTÉGRALE ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>📖 Livre de Bord</h1></div>', unsafe_allow_html=True)
 
     df_log = charger_data_safe('logbook.json')
     
-    # --- 1. SAISIE RAPIDE AVEC ANTI-DOUBLON ---
-    # On utilise une clé dans session_state pour décider si l'expander est ouvert
-    if 'saisie_ouverte' not in st.session_state:
-        st.session_state.saisie_ouverte = False
+    # --- INITIALISATION DES ÉTATS (SESSION STATE) ---
+    if 'saisie_ouverte' not in st.session_state: st.session_state.saisie_ouverte = False
+    if 'display_edit' not in st.session_state: st.session_state.display_edit = False
 
-    with st.expander("🚀 Nouvelle Navigation (Saisie Globale)", expanded=st.session_state.saisie_ouverte):
+    # --- 1. SAISIE RAPIDE (HAUT DE PAGE) ---
+    # Le bouton change d'état pour ouvrir/fermer l'expander
+    if not st.session_state.saisie_ouverte:
+        if st.button("➕ AJOUTER UNE NAVIGATION", use_container_width=True):
+            st.session_state.saisie_ouverte = True
+            st.rerun()
+    else:
+        if st.button("🔼 FERMER LE FORMULAIRE DE SAISIE", use_container_width=True):
+            st.session_state.saisie_ouverte = False
+            st.rerun()
+
+    with st.expander("🚀 Formulaire de Saisie Globale", expanded=st.session_state.saisie_ouverte):
         with st.form(key="form_nav_new"):
             c1, c2 = st.columns(2)
             f_date = c1.date_input("Date de début", datetime.now())
-            f_jours = c2.number_input("Nombre de jours", min_value=1, value=1)
-            f_but = st.text_input("Nom du Voyage / But")
-            f_equipage = st.text_area("Équipage")
+            f_jours = c2.number_input("Nombre de jours", min_value=1, value=1, step=1)
+            f_but = st.text_input("But de la navigation / Nom du voyage", placeholder="Ex: Croisière d'été")
+            f_equipage = st.text_area("Équipage / Coéquipiers")
             
             st.markdown("---")
-            # Calcul des compteurs par défaut
             last_mot = df_log['MotArr'].max() if not df_log.empty else 0.0
             last_mil = df_log['MilArr'].max() if not df_log.empty else 0.0
             
             col1, col2, col3 = st.columns(3)
-            m_dep = col1.number_input("Moteur Dép.", value=float(last_mot))
-            m_arr = col2.number_input("Moteur Arr.", value=float(last_mot))
-            h_voile = col3.number_input("Total Voile", value=0.0)
+            m_dep = col1.number_input("Moteur Dép. (h)", value=float(last_mot), format="%.1f")
+            m_arr = col2.number_input("Moteur Arr. (h)", value=float(last_mot), format="%.1f")
+            h_voile = col3.number_input("Total Voile (h)", value=0.0, format="%.1f")
             
             colk1, colk2 = st.columns(2)
-            k_dep = colk1.number_input("Milles Dép.", value=float(last_mil))
-            k_arr = colk2.number_input("Milles Arr.", value=float(last_mil))
+            k_dep = colk1.number_input("Milles Dép. (NM)", value=float(last_mil), format="%.1f")
+            k_arr = colk2.number_input("Milles Arr. (NM)", value=float(last_mil), format="%.1f")
 
             if st.form_submit_button("💾 CRÉER LE VOYAGE", use_container_width=True, type="primary"):
-                # --- VÉRIFICATION DES DOUBLONS DE DATE ---
+                # --- VÉRIFICATION DES DOUBLONS ---
                 dates_a_creer = [(f_date + timedelta(days=i)).strftime("%d/%m/%Y") for i in range(int(f_jours))]
                 dates_existantes = df_log['Date'].tolist() if not df_log.empty else []
-                
                 doublons = [d for d in dates_a_creer if d in dates_existantes]
                 
                 if doublons:
-                    st.error(f"⚠️ Impossible d'enregistrer : Une navigation existe déjà pour le(s) jour(s) suivant(s) : {', '.join(doublons)}")
+                    st.error(f"⚠️ Erreur : Une navigation existe déjà pour le : {', '.join(doublons)}")
                 else:
-                    # --- LOGIQUE DE CRÉATION ---
                     nb_j = int(f_jours)
                     avg_mot = round((m_arr - m_dep) / nb_j, 2)
                     avg_mil = round((k_arr - k_dep) / nb_j, 2)
@@ -1232,20 +1239,86 @@ if st.session_state.page == "LOG":
                             "MilArr": round(k_dep + (avg_mil * (i+1)), 2),
                             "TotalMil": avg_mil, "H_Voile": avg_voile
                         })
-                    
                     df_log = pd.concat([df_log, pd.DataFrame(nouvelles)], ignore_index=True)
                     sauvegarder_data(df_log, 'logbook.json')
-                    
-                    # --- FERMETURE ET RAFRAÎCHISSEMENT ---
-                    st.session_state.saisie_ouverte = False 
-                    st.success("Voyage créé avec succès !")
+                    st.session_state.saisie_ouverte = False # Fermeture auto
+                    st.success("Voyage enregistré !")
                     st.rerun()
 
-    # Si l'utilisateur veut juste ouvrir le formulaire
-    if not st.session_state.saisie_ouverte:
-        if st.button("➕ Ajouter une nouvelle navigation"):
-            st.session_state.saisie_ouverte = True
-            st.rerun()
+    # --- 2. AFFICHAGE DE L'HISTORIQUE (VUE GROUPÉE) ---
+    if not df_log.empty:
+        st.divider()
+        df_v = df_log.copy()
+        df_v['dt'] = pd.to_datetime(df_v['Date'], dayfirst=True, errors='coerce')
+        df_v = df_v.sort_values(by=['dt', 'Navigation'], ascending=[False, False])
+
+        for nav_name, group in df_v.groupby('Navigation', sort=False):
+            st.markdown(f'<div style="background:#2c3e50; color:white; padding:8px; border-radius:5px; margin-top:15px;"><b>🚢 {nav_name or "Navigation"}</b></div>', unsafe_allow_html=True)
+            for idx, row in group.iterrows():
+                st.markdown(f"""
+                    <div style="background:white; border-left:4px solid #3498db; border-bottom:1px solid #eee; padding:5px 15px; margin-left:10px; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:0.9em;"><b>{row['Date']}</b> | ID: <code style="color:red;">{idx}</code></span>
+                        <span style="font-size:0.8em; color:#555;">⚙️ {row['TotalMot']:.1f}h | ⛵ {row['H_Voile']:.1f}h | <b>{row['TotalMil']:.1f} NM</b></span>
+                    </div>
+                """, unsafe_allow_html=True)
+
+    # --- 3. POSTE DE CONTRÔLE (MODIFICATION EN BAS) ---
+    st.divider()
+    st.subheader("🛠️ Poste de Contrôle")
+    
+    if not df_log.empty:
+        col_sel, col_btn = st.columns([3, 1])
+        target_id = col_sel.number_input("ID à modifier :", min_value=0, max_value=len(df_log)-1, step=1)
+        
+        if col_btn.button("✏️ MODIFIER", use_container_width=True, type="primary"):
+            st.session_state.display_edit = True
+            st.session_state.active_id = target_id
+
+        if st.session_state.display_edit:
+            idx = st.session_state.active_id
+            row_sel = df_log.loc[idx]
+            
+            # Bouton de fermeture du formulaire de motif
+            if st.button("❌ ANNULER / FERMER LA MODIFICATION", use_container_width=True):
+                st.session_state.display_edit = False
+                st.rerun()
+
+            with st.form(key=f"form_stable_edit_{idx}"):
+                st.markdown(f"### 📝 Édition de la ligne `{idx}` ({row_sel['Date']})")
+                c1, c2 = st.columns(2)
+                u_but = c1.text_input("But / Voyage", value=str(row_sel.get('Navigation', '')))
+                u_dat = c2.text_input("Date", value=row_sel['Date'])
+                u_eq = st.text_area("Équipage", value=str(row_sel.get('Coéquipiers', '')))
+                
+                col1, col2, col3 = st.columns(3)
+                u_md = col1.number_input("Moteur Dép", value=float(row_sel['MotDep']), format="%.1f")
+                u_ma = col2.number_input("Moteur Arr", value=float(row_sel['MotArr']), format="%.1f")
+                u_hv = col3.number_input("Heures Voile", value=float(row_sel['H_Voile']), format="%.1f")
+                
+                ck1, ck2 = st.columns(2)
+                u_kd = ck1.number_input("Milles Dép", value=float(row_sel['MilDep']), format="%.1f")
+                u_ka = ck2.number_input("Milles Arr", value=float(row_sel['MilArr']), format="%.1f")
+
+                b_save, b_del = st.columns(2)
+                if b_save.form_submit_button("✅ ENREGISTRER", use_container_width=True, type="primary"):
+                    df_log.at[idx, 'Navigation'] = u_but
+                    df_log.at[idx, 'Date'] = u_dat
+                    df_log.at[idx, 'Coéquipiers'] = u_eq
+                    df_log.at[idx, 'MotDep'], df_log.at[idx, 'MotArr'] = u_md, u_ma
+                    df_log.at[idx, 'TotalMot'] = round(u_ma - u_md, 2)
+                    df_log.at[idx, 'MilDep'], df_log.at[idx, 'MilArr'] = u_kd, u_ka
+                    df_log.at[idx, 'TotalMil'] = round(u_ka - u_kd, 2)
+                    df_log.at[idx, 'H_Voile'] = u_hv
+                    sauvegarder_data(df_log, 'logbook.json')
+                    st.session_state.display_edit = False
+                    st.success("Modifications validées !")
+                    st.rerun()
+                
+                if b_del.form_submit_button("🗑️ SUPPRIMER CETTE LIGNE", use_container_width=True):
+                    df_log = df_log.drop(index=idx).reset_index(drop=True)
+                    sauvegarder_data(df_log, 'logbook.json')
+                    st.session_state.display_edit = False
+                    st.rerun()
 # --- FIN DU FICHIER ---
 
 
