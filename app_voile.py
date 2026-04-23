@@ -1239,21 +1239,28 @@ if st.session_state.page == "LOG":
                     </div>
                 """, unsafe_allow_html=True)
 
-    # --- 3. POSTE DE CONTRÔLE (MODIFICATION INDIVIDUELLE) ---
+        # --- 3. POSTE DE CONTRÔLE (MODIFICATION INDIVIDUELLE) ---
     st.divider()
     st.subheader("🛠️ Modifier une étape précise")
     
     if not df_log.empty:
-        # 1. Sélection de l'ID (On utilise une clé unique pour éviter les conflits)
-        sel_id = st.number_input("Entrez l'ID (chiffre en rouge ci-dessus) :", 
+        # On utilise une colonne pour placer un bouton de reset à côté de l'ID
+        c_id, c_reset = st.columns([3, 1])
+        
+        # Sélection de l'ID
+        sel_id = c_id.number_input("Entrez l'ID (chiffre en rouge ci-dessus) :", 
                                  min_value=0, max_value=len(df_log)-1, step=1, key="input_id_ctrl")
         
-        # 2. Chargement des données de la ligne
+        # Bouton pour "Fermer" / Annuler la sélection
+        if c_reset.button("❌ FERMER", use_container_width=True, help="Réinitialise la sélection"):
+            st.rerun() # Relance la page et nettoie l'affichage
+        
+        # Chargement des données de la ligne
         row_sel = df_log.loc[sel_id]
         
-        # 3. Formulaire de modification
+        # Formulaire de modification
         with st.form(key=f"form_update_{sel_id}"):
-            st.write(f"Modification de la ligne **{sel_id}** du **{row_sel['Date']}**")
+            st.markdown(f"### 📝 Édition ID: `{sel_id}`")
             
             c1, c2 = st.columns(2)
             u_but = c1.text_input("Nom du Voyage (But)", value=str(row_sel.get('Navigation', '')))
@@ -1262,17 +1269,18 @@ if st.session_state.page == "LOG":
             u_eq = st.text_area("Équipage", value=str(row_sel.get('Coéquipiers', '')))
             
             col1, col2, col3 = st.columns(3)
-            u_md = col1.number_input("Moteur Dép.", value=float(row_sel['MotDep']))
-            u_ma = col2.number_input("Moteur Arr.", value=float(row_sel['MotArr']))
-            u_hv = col3.number_input("Heures Voile", value=float(row_sel['H_Voile']))
+            u_md = col1.number_input("Moteur Dép.", value=float(row_sel['MotDep']), format="%.1f")
+            u_ma = col2.number_input("Moteur Arr.", value=float(row_sel['MotArr']), format="%.1f")
+            u_hv = col3.number_input("Heures Voile", value=float(row_sel['H_Voile']), format="%.1f")
             
             ck1, ck2 = st.columns(2)
-            u_kd = ck1.number_input("Milles Dép.", value=float(row_sel['MilDep']))
-            u_ka = ck2.number_input("Milles Arr.", value=float(row_sel['MilArr']))
+            u_kd = ck1.number_input("Milles Dép.", value=float(row_sel['MilDep']), format="%.1f")
+            u_ka = ck2.number_input("Milles Arr.", value=float(row_sel['MilArr']), format="%.1f")
 
-            b1, b2 = st.columns(2)
-            if b1.form_submit_button("✅ VALIDER LES CHANGEMENTS", use_container_width=True, type="primary"):
-                # Mise à jour précise de la ligne sans toucher aux autres
+            # Boutons d'action
+            b_save, b_del = st.columns(2)
+            
+            if b_save.form_submit_button("✅ VALIDER LES CHANGEMENTS", use_container_width=True, type="primary"):
                 df_log.at[sel_id, 'Navigation'] = u_but
                 df_log.at[sel_id, 'Date'] = u_dat
                 df_log.at[sel_id, 'Coéquipiers'] = u_eq
@@ -1283,13 +1291,15 @@ if st.session_state.page == "LOG":
                 df_log.at[sel_id, 'H_Voile'] = u_hv
                 
                 sauvegarder_data(df_log, 'logbook.json')
-                st.success("Modifications enregistrées !")
+                st.success(f"Ligne {sel_id} mise à jour !")
+                time.sleep(1)
                 st.rerun()
                 
-            if b2.form_submit_button("🗑️ SUPPRIMER CETTE LIGNE", use_container_width=True):
+            if b_del.form_submit_button("🗑️ SUPPRIMER CETTE LIGNE", use_container_width=True):
                 df_log = df_log.drop(index=sel_id).reset_index(drop=True)
                 sauvegarder_data(df_log, 'logbook.json')
                 st.warning("Ligne supprimée.")
+                time.sleep(1)
                 st.rerun()
 
 # --- FIN DU FICHIER ---
