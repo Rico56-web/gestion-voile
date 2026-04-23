@@ -154,7 +154,7 @@ if not st.session_state.get('authenticated', False):
 st.markdown('<div class="main-header">⚓ VESTA 2026</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=True)
 
-# Barre de navigation mise à jour
+# Barre de navigation corrigée
 menu = ["PLANNING", "CONTACTS", "STATS", "MAINT", "LOG", "NOTES", "FACT"]
 icones = {
     "PLANNING": "📅", "CONTACTS": "👤", "STATS": "📊", 
@@ -163,12 +163,10 @@ icones = {
 
 cols_nav = st.columns(len(menu))
 for i, name in enumerate(menu):
-    # Gestion des redirections de noms
-    page_target = "MEMOS" if name == "NOTES" else ("FACTURES" if name == "FACT" else name)
-    
-    is_active = st.session_state.page == page_target
+    # On garde le nom exact du menu pour la navigation
+    is_active = st.session_state.page == name
     if cols_nav[i].button(f"{icones[name]}\n{name}", key=f"nav_{name}", use_container_width=True, type="primary" if is_active else "secondary"):
-        st.session_state.page = page_target
+        st.session_state.page = name
         st.rerun()
 
 
