@@ -553,9 +553,10 @@ if st.session_state.page == "MODIFIER_CONTACT":
         st.session_state.page = "CONTACTS"
         st.rerun()
 # =================================================================
-# --- 6. PAGE PLANNING (V18.5 - OPTIMISÉ) ---
+# --- 6. PAGE PLANNING (V19.0 - DASHBOARD & VIGIE INTÉGRÉS) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
+    # --- 1. DASHBOARD VIGIE : CROUESTY ---
     st.markdown("## ⚓ Tableau de Bord - Port Crouesty")
     
     # Widget Météo Windy (Arzon)
@@ -565,56 +566,39 @@ if st.session_state.page == "PLANNING":
 
     col_v1, col_v2, col_v3 = st.columns(3)
     
-    # A. Alerte Vidange (ex: seuil à 100h)
+    # A. Alerte Maintenance (Sécurisée contre KeyError)
     df_log = charger_data_safe('logbook.json')
-    derniere_heure = to_f(df_log['Heures moteur'].max()) if not df_log.empty else 0
-    vidange_seuil = 100 # À adapter selon ton moteur
-    heures_restantes = vidange_seuil - (derniere_heure % vidange_seuil)
+    derniere_heure = 0
+    if not df_log.empty:
+        # Recherche flexible de la colonne heures
+        cols_h = [c for c in df_log.columns if "Heure" in c or "Compteur" in c]
+        if cols_h:
+            derniere_heure = to_f(df_log[cols_h[0]].max())
+    
+    # Récupération du seuil depuis les paramètres ou 100h par défaut
+    params = charger_params()
+    seuil_v = params.get('prochaine_vidange', 100)
+    heures_restantes = seuil_v - (derniere_heure % seuil_v) if seuil_v > 0 else 0
     
     if heures_restantes < 15:
-        col_v1.error(f"🛠️ Vidange imminente : {heures_restantes:.1f}h restantes")
+        col_v1.error(f"🛠️ Vidange : {heures_restantes:.1f}h !")
     else:
-        col_v1.success(f"⚙️ Moteur : {heures_restantes:.1f}h avant révision")
+        col_v1.success(f"⚙️ Moteur : {heures_restantes:.1f}h OK")
 
     # B. Facturation en attente
     df_f = charger_data_safe('contacts.json')
-    nb_unpaid = len(df_f[df_f['Paiement'] == "Unpaid"]) if not df_f.empty else 0
-    col_v2.metric("Factures Unpaid", f"{nb_unpaid}", delta="- " if nb_unpaid > 0 else "OK")
+    nb_unpaid = 0
+    if not df_f.empty and 'Paiement' in df_f.columns:
+        nb_unpaid = len(df_f[df_f['Paiement'] == "Unpaid"])
+    col_v2.metric("Factures Unpaid", f"{nb_unpaid}", delta=f"{nb_unpaid}" if nb_unpaid > 0 else "OK", delta_color="inverse")
 
     # C. Marée (Lien rapide)
-    col_v3.link_button("🌊 Marées Crouesty", "https://maree.info/104")
+    col_v3.link_button("🌊 Marées Crouesty", "https://maree.info/104", use_container_width=True)
     
     st.divider()
 
-# --- BLOC VIGIE (DASHBOARD) ---
-if st.session_state.page == "PLANNING":
-    st.markdown("### ⚓ État de la Vigie")
-    col_v1, col_v2, col_v3 = st.columns(3)
-
-    # A. Alerte Maintenance (Heures Moteur)
-    params = charger_params()
-    df_log = charger_data_safe('logbook.json')
-    derniere_heure = to_f(df_log['Heures moteur'].max()) if not df_log.empty else 0
-    heures_restantes = params['prochaine_vidange'] - derniere_heure
-    
-    if heures_restantes < 20:
-        col_v1.warning(f"🛠️ Maintenance : Vidange dans {heures_restantes:.1f}h !")
-    else:
-        col_v1.success(f"⚙️ Moteur OK ({heures_restantes:.1f}h avant vidange)")
-
-    # B. Alerte Paiements (Unpaid)
-    df_f = charger_data_safe('contacts.json')
-    nb_unpaid = len(df_f[df_f['Paiement'] == "Unpaid"]) if not df_f.empty else 0
-    if nb_unpaid > 0:
-        col_v2.error(f"💰 Facturation : {nb_unpaid} impayé(s) !")
-    else:
-        col_v2.success("💰 Finances à jour")
-
-    # C. Widget Météo (Exemple rapide pour Lorient/Port Tudy)
-    col_v3.info("🌬️ Météo : [Consulter Windguru]") # Tu peux mettre un lien direct vers ta zone
-    st.divider()
-
-    st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>🗓️ PLANNING</h1></div>', unsafe_allow_html=True)
+    # --- 2. HEADER PLANNING ---
+    st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>🗓️ PLANNING DES SORTIES</h1></div>', unsafe_allow_html=True)
     
     if st.button("📂 ACCÉDER AUX ARCHIVES", key="k_arch_p", use_container_width=True):
         st.session_state.last_page = "PLANNING"
@@ -623,15 +607,11 @@ if st.session_state.page == "PLANNING":
 
     st.divider()
 
-    # Initialisation temporelle
+    # --- 3. INITIALISATION TEMPORELLE & SÉLECTEURS ---
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     maintenant = datetime.now()
-    aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
+    aujourdhui = date(maintenant.year maintenant.month, maintenant.day)
     
-    jours_occ = {}
-    total_mois = 0
-    missions_list = []
-
     if 'curr_month_idx' not in st.session_state: st.session_state.curr_month_idx = aujourdhui.month - 1
     if 'curr_year' not in st.session_state: st.session_state.curr_year = aujourdhui.year
 
@@ -648,28 +628,26 @@ if st.session_state.page == "PLANNING":
         st.session_state.curr_year = aujourdhui.year
         st.rerun()
 
-    # --- CHARGEMENT ---
+    # --- 4. TRAITEMENT DES DONNÉES ---
+    jours_occ = {}
+    total_mois = 0
+    missions_list = []
     df_p = charger_data('contacts.json')
 
-    # --- TRAITEMENT ---
     if not df_p.empty:
         df_p = df_p.fillna("")
-        
         for idx, r in df_p.iterrows():
             try:
                 nom_client = str(r.get('Nom', '')).strip().upper()
                 if nom_client in ["", "CONTACT", "NAN"]: continue
                 
                 d_brute = str(r.get('DateNav', '')).strip().split(' ')[0]
-                if d_brute.lower() in ["nan", "---", "", "none"]: continue
-
                 dt_start = None
                 for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
                     try:
                         dt_start = datetime.strptime(d_brute, fmt).date()
                         break
                     except: continue
-                
                 if not dt_start: continue 
 
                 n_j = int(float(str(r.get('Jours', 1) or 1))) 
@@ -684,24 +662,23 @@ if st.session_state.page == "PLANNING":
                 elif dt_start < aujourdhui: color = "#34495e"
                 else: color = "#27ae60"
 
-                # Remplissage calendrier (uniquement si dans le mois affiché)
+                # Remplissage calendrier
                 for i in range(n_j):
                     curr = dt_start + timedelta(days=i)
                     if curr.month == sel_m and curr.year == sel_y:
                         jours_occ[curr.day] = {"c": color}
 
-                # Ajout à la liste si la mission touche le mois sélectionné
+                # Ajout à la liste du mois
                 if (dt_start.year == sel_y and dt_start.month == sel_m) or (dt_end.year == sel_y and dt_end.month == sel_m):
                     missions_list.append({
                         'r': r, 'idx': idx, 'start': dt_start, 'end': dt_end, 
                         'n_j': n_j, 'color': color, 'prix': prix_val, 'statut': statut
                     })
-                    # On ne compte dans le CA du mois que si la mission commence ce mois-ci et n'est pas annulée
                     if dt_start.month == sel_m and not any(x in statut for x in ["annul", "refus"]):
                         total_mois += prix_val
             except: continue
 
-    # --- AFFICHAGE CALENDRIER ---
+    # --- 5. AFFICHAGE CALENDRIER HTML ---
     h_cal = '<table style="width:100%; text-align:center; border-collapse:collapse; background:white; border:1px solid #ddd;">'
     h_cal += '<tr style="background:#f8f9fa; font-size:12px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td>Sa</td><td>Di</td></tr>'
     
@@ -724,7 +701,7 @@ if st.session_state.page == "PLANNING":
         h_cal += '</tr>'
     st.markdown(h_cal + '</table>', unsafe_allow_html=True)
 
-    # LISTE DES MISSIONS
+    # --- 6. LISTE DES MISSIONS ---
     st.markdown(f"### 📋 Missions de {sel_m_nom}")
     if missions_list:
         missions_list.sort(key=lambda x: x['start'])
