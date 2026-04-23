@@ -5,6 +5,36 @@ import plotly.express as px
 import urllib.parse
 from datetime import datetime, date, timedelta
 import calendar
+import streamlit.components.v1 as components
+
+def bouton_imprimer_fiche(date, contenu, statut):
+    # Prépare le contenu HTML pour l'impression
+    html_content = f"""
+    <html>
+    <head><title>Impression Note - Vesta Skipper</title></head>
+    <body style='font-family: sans-serif;'>
+        <h1>Note du {date}</h1>
+        <p><b>Statut :</b> {statut}</p>
+        <hr>
+        <pre style='font-size: 1.2rem;'>{contenu}</pre>
+    </body>
+    </html>
+    """
+    # Ce script ouvre une fenêtre et lance l'impression
+    js = f"""
+    <script>
+    function printNote() {{
+        var win = window.open('', '', 'height=500, width=500');
+        win.document.write({repr(html_content)});
+        win.document.close();
+        win.print();
+    }}
+    </script>
+    <button onclick="printNote()" style="padding: 5px 10px; border-radius: 5px; cursor: pointer; background: #f0f2f6; border: 1px solid #d1d5db;">
+        🖨️ Imprimer la fiche
+    </button>
+    """
+    components.html(js, height=45)
 
 # --- INITIALISATION DU SESSION STATE ---
 if 'log_edit_idx' not in st.session_state:
@@ -251,34 +281,41 @@ if st.session_state.page == "MEMOS":
                         df_memos.at[idx, 'Description'] = new_desc
                         sauvegarder_data(df_memos, 'memos.json')
                         st.rerun()
-
-                btn_c1, btn_c2, btn_c3 = st.columns(3)
+        # --- ACTIONS (Barre d'outils mise à jour) ---
+                btn_c1, btn_c2, btn_c3, btn_c4 = st.columns(4) # On passe à 4 colonnes
                 
-                # ICI : La bascule automatique
                 if btn_c1.button("✏️ Modifier", key=f"edit_btn_{idx}"):
-                    st.session_state.memo_edit_id = idx # Écrase l'ancien ID ouvert
+                    st.session_state.memo_edit_id = idx
                     st.rerun()
                     
-                if btn_c2.button("📦 Archiver", key=f"arch_btn_{idx}"):
+                if btn_c2.button("📦 Archive", key=f"arch_btn_{idx}"):
                     df_memos.at[idx, 'Archive'] = "Archivé"
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
                 
+                # Le bouton d'impression (Appel de notre fonction JS)
+                with btn_c3:
+                    # On nettoie le texte des ✅ pour l'impression propre
+                    texte_impr = str(row['Description']).replace("✅ | ", "[FAIT] ")
+                    bouton_imprimer_fiche(row['Date'], texte_impr, stat_val)
+
+                # Suppression avec double confirmation (dans la 4ème colonne)
                 conf_del_key = f"del_confirm_{idx}"
                 if not st.session_state.get(conf_del_key, False):
-                    if btn_c3.button("🗑️ Supprimer", key=f"del_pre_{idx}"):
+                    if btn_c4.button("🗑️ Suppr", key=f"del_pre_{idx}"):
                         st.session_state[conf_del_key] = True
                         st.rerun()
                 else:
-                    sub_c1, sub_c2 = btn_c3.columns(2)
-                    if sub_c1.button("✅ OUI", key=f"del_yes_{idx}", type="primary"):
+                    sub_c1, sub_c2 = btn_c4.columns(2)
+                    if sub_c1.button("✅", key=f"del_yes_{idx}", type="primary"):
                         df_memos = df_memos.drop(idx).reset_index(drop=True)
                         sauvegarder_data(df_memos, 'memos.json')
                         st.session_state[conf_del_key] = False
                         st.rerun()
-                    if sub_c2.button("❌ NON", key=f"del_no_{idx}"):
+                    if sub_c2.button("❌", key=f"del_no_{idx}"):
                         st.session_state[conf_del_key] = False
                         st.rerun()
+ 
             st.write("")
 
 
