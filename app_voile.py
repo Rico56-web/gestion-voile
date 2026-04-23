@@ -1120,43 +1120,33 @@ if st.session_state.page == "MAINT":
             df_m.drop(columns=['dt_maint'], errors='ignore').to_excel(writer, index=False)
         st.download_button("📥 Télécharger Historique Complet (Excel)", data=buffer.getvalue(), 
                            file_name=f"Maintenance_Vesta_Skipper.xlsx", use_container_width=True)
+
 # =================================================================
 # --- PAGE : FACTURATION (FACT) ---
 # =================================================================
 if st.session_state.page == "FACT":
     st.title("📑 Suivi de Facturation")
     
-    # On charge 'contacts.json' (ton fichier contient bien les Prix/Paiement)
     df_f = charger_data_safe('contacts.json')
 
     if df_f.empty:
         st.warning("Aucune donnée de contact trouvée.")
     else:
-        # Nettoyage automatique des noms de colonnes (pour les accents)
+        # 1. NETTOYAGE ET PRÉPARATION
         df_f = df_f.rename(columns={'Prénom': 'Prenom', 'Société': 'Societe'})
-        
-        # Sécurité sur les colonnes indispensables
         if 'Paiement' not in df_f.columns: df_f['Paiement'] = "Unpaid"
         
-        # Conversion des prix en nombres (utilise ta fonction to_f définie au début)
         df_f['Prix'] = df_f['Prix'].apply(to_f)
         df_f['Acompte'] = df_f['Acompte'].apply(to_f)
 
-        # --- FILTRES ---
-        c1, c2 = st.columns(2)
-        f_statut = c1.selectbox("Filtrer paiement", ["Tous", "Paid", "Unpaid"])
-        f_search = c2.text_input("🔍 Rechercher un client", "").lower()
+        # 2. TRI CHRONOLOGIQUE INVERSÉ
+        # On convertit temporairement en date pour trier, puis on remet l'index à zéro
+        df_f['dt_tri'] = pd.to_datetime(df_f['DateNav'], format='%d/%m/%Y', errors='coerce')
+        df_f = df_f.sort_values(by='dt_tri', ascending=False).reset_index(drop=True)
 
-        df_visu = df_f.copy()
-        if f_statut != "Tous":
-            df_visu = df_visu[df_visu['Paiement'] == f_statut]
-        if f_search:
-            df_visu = df_visu[df_visu['Nom'].str.lower().str.contains(f_search, na=False) | 
-                             df_visu['Prenom'].str.lower().str.contains(f_search, na=False)]
-
-        # --- METRIQUES ---
-        total_ca = df_visu['Prix'].sum()
-        total_encaisse = df_visu['Acompte'].sum()
+        # 3. RÉSUMÉ FINANCIER (Metrics)
+        total_ca = df_f['Prix'].sum()
+        total_encaisse = df_f['Acompte'].sum()
         reste = total_ca - total_encaisse
 
         m1, m2, m3 = st.columns(3)
@@ -1165,92 +1155,65 @@ if st.session_state.page == "FACT":
         m3.metric("Reste à percevoir", f"{reste:,.2f} €", delta=f"-{reste:.2f}" if reste > 0 else None, delta_color="inverse")
 
         st.divider()
-        # --- BOUTON D'ENVOI CMN ---
-        st.subheader("✉️ Communication")
-        
-        # 1. On repart sur une base propre et on force l'index
-        df_cmn_filter = df_f.copy()
-        df_cmn_filter = df_cmn_filter.loc[:, ~df_cmn_filter.columns.duplicated()].reset_index(drop=True)
 
-        # 2. Paramètres du mois
-        # On utilise datetime.now() pour le mois en cours
-        current_month = datetime.now().month
-        pattern_mois = f"/{current_month:02d}/" 
+        # 4. SOUS-MENUS (TABS)
+        tab_unpaid, tab_paid = st.tabs(["⏳ À PERCEVOIR (Unpaid)", "✅ ENCAISSÉ (Paid)"])
 
-        # 3. FILTRAGE SÉCURISÉ (Méthode .loc pour éviter le problème d'index)
-        if 'Societe' in df_cmn_filter.columns and 'DateNav' in df_cmn_filter.columns:
+        # Fonction interne pour éviter de répéter le code d'affichage
+        def afficher_fiches_facturation(dataframe, type_paiement):
+            subset = dataframe[dataframe['Paiement'] == type_paiement]
             
-            # On filtre ligne par ligne via une lambda pour éviter les conflits d'index Pandas
-            df_cmn = df_cmn_filter[
-                df_cmn_filter.apply(lambda x: 
-                    str(x['Societe']) == 'CMN' and 
-                    pattern_mois in str(x['DateNav']), 
-                axis=1)
-            ]
+            if subset.empty:
+                st.info(f"Aucune fiche dans la catégorie : {type_paiement}")
+                return
 
-            if st.button("📧 Préparer le mail pour le Trésorier CMN", use_container_width=True):
-                if df_cmn.empty:
-                    st.warning(f"Aucune sortie CMN trouvée pour le mois {current_month}.")
-                else:
-                    # Construction du mail
-                    destinataire = "tresorier@cmn-asso.fr"
-                    objet = f"Facturation Vesta Skipper - {mois_fr[current_month-1]} {datetime.now().year}"
-                    
-                    corps_mail = f"Bonjour Monsieur le Trésorier,\n\n"
-                    corps_mail += f"Voici le récapitulatif des sorties CMN pour ce mois-ci :\n\n"
-                    
-                    total_cmn = 0
-                    for _, row in df_cmn.iterrows():
-                        p = to_f(row.get('Prix', 0))
-                        corps_mail += f"- Le {row['DateNav']} : {p:.2f} €\n"
-                        total_cmn += p
-                    
-                    corps_mail += f"\nTOTAL : {total_cmn:.2f} €\n\nCordialement."
-
-                    # Encodage URL Mailto
-                    mailto_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
-                    
-                    st.markdown(f"""
-                        <a href="{mailto_link}" target="_blank" style="text-decoration: none;">
-                            <div style="text-align: center; background-color: #1a2a6c; color: white; padding: 12px; border-radius: 8px; font-weight: bold;">
-                                🚀 Cliquer ici pour ouvrir votre messagerie
-                            </div>
-                        </a>
-                    """, unsafe_allow_html=True)
+            for idx, r in subset.iterrows():
+                color = "#d32f2f" if type_paiement == "Unpaid" else "#2e7d32"
                 
-        # --- AFFICHAGE ---
-        for idx, r in df_visu.iterrows():
-            is_paid = r['Paiement'] == "Paid"
-            color = "#2e7d32" if is_paid else "#d32f2f"
-            
-            st.markdown(f"""
-                <div style="border-left: 8px solid {color}; background: white; padding: 12px; border-radius: 8px; margin-bottom: 10px; border-top: 1px solid #eee; border-right: 1px solid #eee; border-bottom: 1px solid #eee;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <b>{r['Nom']} {r['Prenom']}</b><br>
-                            <small>📅 {r['DateNav']} | 🏢 {r['Societe']}</small>
-                        </div>
-                        <div style="text-align: right;">
-                            <span style="color: {color}; font-weight: bold;">{ '✅ PAYÉ' if is_paid else '⏳ EN ATTENTE' }</span><br>
-                            <span style="font-size: 1.1em;">{r['Prix'] - r['Acompte']:,.2f} €</span>
+                # Condition spéciale pour le bleu CMN selon tes préférences
+                bg_card = "#E3F2FD" if str(r['Societe']).upper() == "CMN" else "white"
+                
+                st.markdown(f"""
+                    <div style="border-left: 10px solid {color}; background: {bg_card}; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-top: 1px solid #eee; border-right: 1px solid #eee; border-bottom: 1px solid #eee;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <b style="font-size: 1.1rem;">{r['Nom']} {r['Prenom']}</b><br>
+                                <small>📅 {r['DateNav']} | 🏢 {r['Societe']}</small>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="color: {color}; font-weight: bold;">{r['Prix']:.2f} €</span><br>
+                                <small style="color: #666;">{'Reste : ' + str(r['Prix']-r['Acompte']) + ' €' if type_paiement == "Unpaid" else 'Réglé'}</small>
+                            </div>
                         </div>
                     </div>
-                </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
 
-            # Boutons d'action
-            ca, cb, _ = st.columns([2, 2, 6])
-            if not is_paid:
-                if ca.button("💰 Encaisser", key=f"pay_fact_{idx}"):
-                    df_f.at[idx, 'Paiement'] = "Paid"
-                    df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix']
-                    sauvegarder_data(df_f, 'contacts.json')
+                # Boutons d'action
+                ca, cb, _ = st.columns([2, 2, 6])
+                if type_paiement == "Unpaid":
+                    if ca.button("💰 Encaisser", key=f"pay_f_{idx}"):
+                        # On retrouve la ligne dans le DataFrame global via l'index d'origine
+                        df_f.at[idx, 'Paiement'] = "Paid"
+                        df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix']
+                        sauvegarder_data(df_f, 'contacts.json')
+                        st.rerun()
+                
+                if cb.button("✏️ Modifier", key=f"edit_f_{idx}"):
+                    st.session_state.contact_edit_idx = idx
+                    st.session_state.page = "CONTACTS"
                     st.rerun()
-            if cb.button("✏️ Modifier", key=f"edit_fact_{idx}"):
-                st.session_state.contact_edit_idx = idx
-                st.session_state.page = "CONTACTS"
-                st.rerun()
 
+        # Remplissage des onglets
+        with tab_unpaid:
+            afficher_fiches_facturation(df_f, "Unpaid")
+
+        with tab_paid:
+            afficher_fiches_facturation(df_f, "Paid")
+
+        st.divider()
+        
+        # --- BLOC ENVOI CMN (Placé après les listes) ---
+        # (Insère ici le code du bouton CMN que nous avons validé ensemble)
 
 # =================================================================
 # --- 11. PAGE ARCHIVES ---
