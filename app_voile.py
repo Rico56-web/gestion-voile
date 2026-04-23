@@ -864,26 +864,65 @@ if st.session_state.page == "STATS":
 # =================================================================
 if st.session_state.page == "MAINT":
     import pandas as pd
+    import io
+    import streamlit.components.v1 as components
     from datetime import datetime, timedelta
+
+    # --- FONCTION TECHNIQUE : IMPRESSION ---
+    def bouton_imprimer_fiche_maint(titre, date, details, statut):
+        html_content = f"""
+        <html>
+        <head>
+            <title>Maintenance - Vesta Skipper 2026</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; padding: 30px; line-height: 1.6; color: #2C3E50; }}
+                .header {{ border-bottom: 3px solid #2980B9; padding-bottom: 10px; margin-bottom: 20px; }}
+                .statut {{ display: inline-block; padding: 5px 15px; border-radius: 20px; background: #eee; font-weight: bold; }}
+                .content {{ background: #f9f9f9; padding: 20px; border: 1px solid #ddd; white-space: pre-wrap; font-size: 1.1em; }}
+                footer {{ margin-top: 50px; font-size: 0.8em; color: #7F8C8D; border-top: 1px solid #eee; padding-top: 10px; }}
+            </style>
+        </head>
+        <body>
+            <div class='header'>
+                <h1>🛠️ {titre}</h1>
+                <p><b>Date :</b> {date}</p>
+                <div class='statut'>État : {statut}</div>
+            </div>
+            <h3>Détails techniques :</h3>
+            <div class='content'>{details}</div>
+            <footer>Généré par Vesta Skipper 2026</footer>
+        </body>
+        </html>
+        """
+        js = f"""
+        <script>
+        function printFiche() {{
+            var win = window.open('', '', 'height=600, width=800');
+            win.document.write({repr(html_content)});
+            win.document.close();
+            setTimeout(function(){{ win.print(); }}, 500);
+        }}
+        </script>
+        <button onclick="printFiche()" style="padding: 5px 12px; border-radius: 5px; cursor: pointer; background: #ffffff; border: 1px solid #d1d5db; color: #2C3E50; font-weight: bold;">
+            🖨️ Imprimer cette fiche
+        </button>
+        """
+        components.html(js, height=45)
 
     # 1. CHARGEMENT DES DONNÉES
     df_m = charger_data_safe('maintenance.json')
     df_log = charger_data_safe('logbook.json')
     
-    # Récupération du compteur réel (Valeur max à l'arrivée dans le log)
     releve_h = pd.to_numeric(df_log['MotArr'], errors='coerce').max() if not df_log.empty else 0.0
-    
-    # Gestion des paramètres de vidange
     params = charger_params()
     if 'prochaine_vidange' not in params:
-        params['prochaine_vidange'] = 2450.0 # Valeur par défaut
+        params['prochaine_vidange'] = 2450.0 
         sauvegarder_params(params)
 
     st.title("🛠️ MAINTENANCE & VIDANGE")
 
     # 2. TABLEAU DE BORD VIDANGE
     heures_restantes = params['prochaine_vidange'] - releve_h
-    # Alerte rouge si moins de 10h restantes
     color_v = "#2e7d32" if heures_restantes > 10 else "#c62828"
     
     col_v1, col_v2 = st.columns([2, 1])
@@ -896,9 +935,12 @@ if st.session_state.page == "MAINT":
                 <small>Compteur actuel : {releve_h:.1f} h</small>
             </div>
         """, unsafe_allow_html=True)
+        # Bouton pour imprimer l'état actuel de la vidange
+        bouton_imprimer_fiche_maint("ÉTAT VIDANGE MOTEUR", datetime.now().strftime("%d/%m/%Y"), 
+                                   f"Compteur actuel : {releve_h} h\nProchaine échéance : {params['prochaine_vidange']} h\nHeures restantes : {heures_restantes:.1f} h", 
+                                   "EN ATTENTE" if heures_restantes > 0 else "À FAIRE D'URGENCE")
 
     with col_v2:
-        # Permet de modifier la cible manuellement
         new_target = st.number_input("Ajuster cible (h)", value=float(params['prochaine_vidange']), step=10.0)
         if new_target != params['prochaine_vidange']:
             params['prochaine_vidange'] = new_target
@@ -913,14 +955,11 @@ if st.session_state.page == "MAINT":
             c1, c2 = st.columns(2)
             v_date = c1.date_input("Date de la vidange", datetime.now())
             v_compteur = c2.number_input("Valeur compteur (h)", value=releve_h, step=0.1)
-            
-            v_travaux = st.text_area("Travaux effectués", 
-                                    placeholder="Ex: Vidange, Filtre huile, Filtre gasoil, Contrôle courroie, Turbine...")
+            v_travaux = st.text_area("Travaux effectués", placeholder="Ex: Vidange, Filtre huile, Filtre gasoil...")
             
             st.info(f"💡 Action : La prochaine échéance sera reglée à {v_compteur + 90:.1f} h")
             
             if st.form_submit_button("VALIDER ET RECALCULER (+90h)"):
-                # Ajout à l'historique maintenance
                 nouvelle_vidange = {
                     "Date": v_date.strftime("%d/%m/%Y"),
                     "Objet": "VIDANGE MOTEUR",
@@ -931,25 +970,19 @@ if st.session_state.page == "MAINT":
                 }
                 df_m = pd.concat([df_m, pd.DataFrame([nouvelle_vidange])], ignore_index=True)
                 sauvegarder_data(df_m, 'maintenance.json')
-                
-                # Mise à jour auto de la cible
                 params['prochaine_vidange'] = round(v_compteur + 90.0, 1)
                 sauvegarder_params(params)
-                
-                st.success(f"✅ Vidange enregistrée. Prochaine à {params['prochaine_vidange']} h")
                 st.rerun()
 
-    # 4. FILTRES D'AFFICHAGE DU TABLEAU
+    # 4. FILTRES D'AFFICHAGE
     col_sel1, col_sel2 = st.columns(2)
     mode_maint = col_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
     sel_y = col_sel2.selectbox("Année :", [2025, 2026, 2027], index=1)
 
-    # 5. GESTION DU TABLEAU (MODIFICATION & SUPPRESSION)
+    # 5. TABLEAU DE SUIVI
     if not df_m.empty:
-        # Tri et filtrage
         df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
         df_filtre = df_m[df_m['dt_maint'].dt.year == sel_y].copy()
-        
         if mode_maint == "À ce jour":
             df_filtre = df_filtre[df_filtre['dt_maint'] <= pd.Timestamp.now().normalize()].copy()
 
@@ -957,18 +990,15 @@ if st.session_state.page == "MAINT":
 
         st.subheader(f"📋 Suivi Maintenance {sel_y}")
         
+        # Éditeur de tableau
         edited_df = st.data_editor(
             df_filtre.drop(columns=['dt_maint']),
             column_config={
-                "Date": st.column_config.TextColumn("Date"),
-                "Objet": st.column_config.TextColumn("Désignation"),
                 "M_Num": st.column_config.NumberColumn("€", format="%.2f"),
                 "Statut": st.column_config.SelectboxColumn("Etat", options=["À prévoir", "Fait"]),
                 "Type": st.column_config.SelectboxColumn("Cat", options=["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
             },
-            hide_index=False,
             use_container_width=True,
-            num_rows="dynamic",
             key="maint_editor_final"
         )
         
@@ -979,7 +1009,18 @@ if st.session_state.page == "MAINT":
             st.success("✅ Données sauvegardées")
             st.rerun()
 
-    # 6. FORMULAIRE D'AJOUT RAPIDE (HORS VIDANGE)
+        # --- OPTION : IMPRESSION INDIVIDUELLE ---
+        with st.expander("🖨️ IMPRIMER UNE FICHE DÉTAILLÉE"):
+            choix_fiche = st.selectbox("Sélectionner une intervention", df_filtre['Objet'].tolist())
+            row_p = df_filtre[df_filtre['Objet'] == choix_fiche].iloc[0]
+            bouton_imprimer_fiche_maint(
+                row_p['Objet'], 
+                row_p['Date'], 
+                row_p.get('Notes', 'Aucune note détaillée'), 
+                row_p['Statut']
+            )
+
+    # 6. FORMULAIRE D'AJOUT RAPIDE
     st.write("---")
     with st.expander("➕ AJOUTER UN AUTRE TRAVAIL OU FRAIS"):
         with st.form("form_add_maint", clear_on_submit=True):
@@ -987,43 +1028,25 @@ if st.session_state.page == "MAINT":
             c1, c2 = st.columns(2)
             f_d = c1.date_input("Date", datetime.now())
             f_m = c2.number_input("Montant (€)", min_value=0.0)
-            
-            c3, c4 = st.columns(2)
-            f_t = c3.selectbox("Catégorie", ["Port", "Assurances", "Maintenance", "Sécurité", "Autres"], index=2)
-            f_s = c4.selectbox("Statut", ["À prévoir", "Fait"], index=1)
+            f_t = st.selectbox("Catégorie", ["Port", "Assurances", "Maintenance", "Sécurité", "Autres"], index=2)
+            f_s = st.selectbox("Statut", ["À prévoir", "Fait"], index=1)
             
             if st.form_submit_button("💾 AJOUTER"):
-                new_row = {"Date": f_d.strftime("%d/%m/%Y"), "Objet": f_obj, "M_Num": f_m, "Statut": f_s, "Type": f_t}
+                new_row = {"Date": f_d.strftime("%d/%m/%Y"), "Objet": f_obj, "M_Num": f_m, "Statut": f_s, "Type": f_t, "Notes": ""}
                 df_final = pd.concat([df_m.drop(columns=['dt_maint'], errors='ignore'), pd.DataFrame([new_row])], ignore_index=True)
                 sauvegarder_data(df_final, 'maintenance.json')
                 st.rerun()
 
-# --- EXPORT EXCEL (À PLACER TOUT EN BAS DU BLOC MAINTENANCE) ---
+    # 7. EXPORT EXCEL
     if not df_m.empty:
-        import io
-        
-        # On définit un nom de fichier par défaut au cas où
-        nom_annee = sel_y if 'sel_y' in locals() else "Historique"
-        
-        df_export = df_m.drop(columns=['dt_maint'], errors='ignore').copy()
-        
         buffer = io.BytesIO()
         try:
-            # Utilisation de openpyxl (moteur standard de Streamlit)
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                df_export.to_excel(writer, index=False, sheet_name='Maintenance')
-            
-            st.write("---") # Une petite ligne de séparation visuelle
-            st.download_button(
-                label="📥 Télécharger le suivi (Excel)",
-                data=buffer.getvalue(),
-                file_name=f"Maintenance_Vesta_{nom_annee}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
+                df_m.drop(columns=['dt_maint'], errors='ignore').to_excel(writer, index=False, sheet_name='Maintenance')
+            st.download_button(label="📥 Télécharger le suivi (Excel)", data=buffer.getvalue(), 
+                             file_name=f"Maintenance_Vesta_{sel_y}.xlsx", mime="application/vnd.ms-excel", use_container_width=True)
         except Exception as e:
             st.error(f"Erreur export : {e}")
-
 
 
 # =================================================================
