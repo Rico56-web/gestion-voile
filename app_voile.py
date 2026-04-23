@@ -1114,72 +1114,95 @@ if st.session_state.page == "MAINT":
             df_m.drop(columns=['dt_maint'], errors='ignore').to_excel(writer, index=False)
         st.download_button("📥 Télécharger Historique Complet (Excel)", data=buffer.getvalue(), 
                            file_name=f"Maintenance_Vesta_Skipper.xlsx", use_container_width=True)
-
 # =================================================================
 # --- PAGE : FACTURATION & SUIVI PAIEMENTS (FACT) ---
 # =================================================================
 if st.session_state.page == "FACT":
     st.title("📑 Facturation & Suivi")
+    
+    # Chargement du fichier Contacts (qui contient les prix)
     df_f = charger_data_safe('contacts.json')
 
     if df_f.empty:
-        st.warning("Aucune donnée de facturation trouvée.")
+        st.warning("Aucune donnée de facturation trouvée dans contacts.json.")
     else:
-        for col in ['Prix', 'Acompte', 'Jours', 'Pers']:
-            if col in df_f.columns:
-                df_f[col] = pd.to_numeric(df_f[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+        # --- SÉCURISATION DES COLONNES ---
+        # On renomme ou on s'assure de l'existence des colonnes clés
+        mapping = {'Prénom': 'Prenom', 'Société': 'Societe'}
+        df_f = df_f.rename(columns=mapping)
+        
+        # On s'assure que Paiement existe
+        if 'Paiement' not in df_f.columns:
+            df_f['Paiement'] = "Unpaid"
 
-        col_f1, col_f2 = st.columns(2)
-        filtre_paye = col_f1.selectbox("Filtrer par paiement", ["Tous", "Paid", "Unpaid"])
-        search_nom = col_f2.text_input("Rechercher un client", "").lower()
+        # Conversion numérique propre de Prix et Acompte
+        for col in ['Prix', 'Acompte']:
+            df_f[col] = pd.to_numeric(df_f[col], errors='coerce').fillna(0.0)
 
+        # --- FILTRES ---
+        c_f1, c_f2 = st.columns(2)
+        filtre_paye = c_f1.selectbox("Statut Paiement", ["Tous", "Paid", "Unpaid"])
+        search = c_f2.text_input("🔍 Rechercher (Nom, Prénom, Société)", "").lower()
+
+        # Filtrage
         df_visu = df_f.copy()
         if filtre_paye != "Tous":
             df_visu = df_visu[df_visu['Paiement'] == filtre_paye]
-        if search_nom:
-            df_visu = df_visu[df_visu['Nom'].str.lower().str.contains(search_nom, na=False)]
+        
+        if search:
+            mask = (
+                df_visu['Nom'].str.lower().str.contains(search, na=False) | 
+                df_visu['Prenom'].str.lower().str.contains(search, na=False) |
+                df_visu['Societe'].str.lower().str.contains(search, na=False)
+            )
+            df_visu = df_visu[mask]
 
-        df_visu['dt_tri'] = pd.to_datetime(df_visu['DateNav'], dayfirst=True, errors='coerce')
-        df_visu = df_visu.sort_values('dt_tri', ascending=False)
-
+        # --- RÉSUMÉ FINANCIER ---
         total_du = df_visu['Prix'].sum()
         total_recu = df_visu['Acompte'].sum()
-        reste_a_percevoir = total_du - total_recu
+        reste = total_du - total_recu
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric("CA Total", f"{total_du:,.2f} €")
-        c2.metric("Encaissé", f"{total_recu:,.2f} €")
-        c3.metric("Reste", f"{reste_a_percevoir:,.2f} €")
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Total Dû", f"{total_du:,.2f} €")
+        m2.metric("Encaissé", f"{total_recu:,.2f} €")
+        m3.metric("Reste", f"{reste:,.2f} €", delta=f"-{reste:,.2f}" if reste > 0 else None, delta_color="inverse")
 
         st.divider()
 
+        # --- AFFICHAGE DES FICHES ---
         for idx, r in df_visu.iterrows():
-            solde = r['Prix'] - r['Acompte']
-            is_paid = r['Paiement'] == "Paid"
-            color_border = "#2e7d32" if is_paid else "#d32f2f"
-            bg_label = "rgba(46, 125, 50, 0.1)" if is_paid else "rgba(211, 47, 47, 0.1)"
-            status_text = "✅ PAYÉ" if is_paid else "⏳ EN ATTENTE"
-
+            is_paid = (r['Paiement'] == "Paid")
+            color = "#2e7d32" if is_paid else "#d32f2f"
+            
+            # Affichage de la carte
             st.markdown(f"""
-                <div style="border: 1px solid #ddd; padding: 12px; border-radius: 10px; margin-bottom: 8px; border-left: 10px solid {color_border}; background: white;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div><b>{r['Nom']} {r['Prénom']}</b><br><small>📅 {r['DateNav']} | 🏢 {r.get('Société', 'PERSO')}</small></div>
-                        <div style="text-align: right;"><span style="background: {bg_label}; color: {color_border}; padding: 4px 8px; border-radius: 5px; font-weight: bold;">{status_text}</span><br><b>{solde:,.2f} €</b></div>
+                <div style="border-left: 10px solid {color}; background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-top: 1px solid #eee; border-right: 1px solid #eee; border-bottom: 1px solid #eee;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="font-size: 1.1em;"><b>{r['Nom']} {r['Prenom']}</b></span>
+                        <span style="font-weight: bold; color: {color};">{'✅ PAYÉ' if is_paid else '⏳ EN ATTENTE'}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px; color: #666;">
+                        <small>📅 Nav: {r['DateNav']} | 🏢 {r['Societe']}</small>
+                        <span><b>{r['Prix'] - r['Acompte']:,.2f} €</b></span>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
 
-            ca, cb, cc = st.columns([2, 2, 6])
+            # Actions
+            col1, col2, _ = st.columns([2, 2, 6])
             if not is_paid:
-                if ca.button("💰 PAYÉ", key=f"pay_{idx}"):
+                if col1.button("💰 Encaisser", key=f"btn_pay_{idx}"):
+                    # On met à jour le DataFrame original (df_f)
                     df_f.at[idx, 'Paiement'] = "Paid"
                     df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix']
                     sauvegarder_data(df_f, 'contacts.json')
                     st.rerun()
-            if cb.button("✏️ Modifier", key=f"edit_f_{idx}"):
+            
+            if col2.button("✏️ Détails", key=f"btn_edit_{idx}"):
                 st.session_state.contact_edit_idx = idx
                 st.session_state.page = "CONTACTS"
                 st.rerun()
+
 
 # =================================================================
 # --- 11. PAGE ARCHIVES ---
