@@ -1113,90 +1113,80 @@ if st.session_state.page == "MAINT":
         st.download_button("📥 Télécharger Historique Complet (Excel)", data=buffer.getvalue(), 
                            file_name=f"Maintenance_Vesta_Skipper.xlsx", use_container_width=True)
 # =================================================================
-# --- PAGE : FACTURATION & SUIVI PAIEMENTS (FACT) ---
+# --- PAGE : FACTURATION (FACT) ---
 # =================================================================
 if st.session_state.page == "FACT":
-    st.title("📑 Facturation & Suivi")
+    st.title("📑 Suivi de Facturation")
     
-    # Chargement du fichier Contacts (qui contient les prix)
+    # On charge 'contacts.json' (ton fichier contient bien les Prix/Paiement)
     df_f = charger_data_safe('contacts.json')
 
     if df_f.empty:
-        st.warning("Aucune donnée de facturation trouvée dans contacts.json.")
+        st.warning("Aucune donnée de contact trouvée.")
     else:
-        # --- SÉCURISATION DES COLONNES ---
-        # On renomme ou on s'assure de l'existence des colonnes clés
-        mapping = {'Prénom': 'Prenom', 'Société': 'Societe'}
-        df_f = df_f.rename(columns=mapping)
+        # Nettoyage automatique des noms de colonnes (pour les accents)
+        df_f = df_f.rename(columns={'Prénom': 'Prenom', 'Société': 'Societe'})
         
-        # On s'assure que Paiement existe
-        if 'Paiement' not in df_f.columns:
-            df_f['Paiement'] = "Unpaid"
-
-        # Conversion numérique propre de Prix et Acompte
-        for col in ['Prix', 'Acompte']:
-            df_f[col] = pd.to_numeric(df_f[col], errors='coerce').fillna(0.0)
+        # Sécurité sur les colonnes indispensables
+        if 'Paiement' not in df_f.columns: df_f['Paiement'] = "Unpaid"
+        
+        # Conversion des prix en nombres (utilise ta fonction to_f définie au début)
+        df_f['Prix'] = df_f['Prix'].apply(to_f)
+        df_f['Acompte'] = df_f['Acompte'].apply(to_f)
 
         # --- FILTRES ---
-        c_f1, c_f2 = st.columns(2)
-        filtre_paye = c_f1.selectbox("Statut Paiement", ["Tous", "Paid", "Unpaid"])
-        search = c_f2.text_input("🔍 Rechercher (Nom, Prénom, Société)", "").lower()
+        c1, c2 = st.columns(2)
+        f_statut = c1.selectbox("Filtrer paiement", ["Tous", "Paid", "Unpaid"])
+        f_search = c2.text_input("🔍 Rechercher un client", "").lower()
 
-        # Filtrage
         df_visu = df_f.copy()
-        if filtre_paye != "Tous":
-            df_visu = df_visu[df_visu['Paiement'] == filtre_paye]
-        
-        if search:
-            mask = (
-                df_visu['Nom'].str.lower().str.contains(search, na=False) | 
-                df_visu['Prenom'].str.lower().str.contains(search, na=False) |
-                df_visu['Societe'].str.lower().str.contains(search, na=False)
-            )
-            df_visu = df_visu[mask]
+        if f_statut != "Tous":
+            df_visu = df_visu[df_visu['Paiement'] == f_statut]
+        if f_search:
+            df_visu = df_visu[df_visu['Nom'].str.lower().str.contains(f_search, na=False) | 
+                             df_visu['Prenom'].str.lower().str.contains(f_search, na=False)]
 
-        # --- RÉSUMÉ FINANCIER ---
-        total_du = df_visu['Prix'].sum()
-        total_recu = df_visu['Acompte'].sum()
-        reste = total_du - total_recu
+        # --- METRIQUES ---
+        total_ca = df_visu['Prix'].sum()
+        total_encaisse = df_visu['Acompte'].sum()
+        reste = total_ca - total_encaisse
 
         m1, m2, m3 = st.columns(3)
-        m1.metric("Total Dû", f"{total_du:,.2f} €")
-        m2.metric("Encaissé", f"{total_recu:,.2f} €")
-        m3.metric("Reste", f"{reste:,.2f} €", delta=f"-{reste:,.2f}" if reste > 0 else None, delta_color="inverse")
+        m1.metric("Chiffre d'Affaires", f"{total_ca:,.2f} €")
+        m2.metric("Encaissé", f"{total_encaisse:,.2f} €")
+        m3.metric("Reste à percevoir", f"{reste:,.2f} €", delta=f"-{reste:.2f}" if reste > 0 else None, delta_color="inverse")
 
         st.divider()
 
-        # --- AFFICHAGE DES FICHES ---
+        # --- AFFICHAGE ---
         for idx, r in df_visu.iterrows():
-            is_paid = (r['Paiement'] == "Paid")
+            is_paid = r['Paiement'] == "Paid"
             color = "#2e7d32" if is_paid else "#d32f2f"
             
-            # Affichage de la carte
             st.markdown(f"""
-                <div style="border-left: 10px solid {color}; background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-top: 1px solid #eee; border-right: 1px solid #eee; border-bottom: 1px solid #eee;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="font-size: 1.1em;"><b>{r['Nom']} {r['Prenom']}</b></span>
-                        <span style="font-weight: bold; color: {color};">{'✅ PAYÉ' if is_paid else '⏳ EN ATTENTE'}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-top: 5px; color: #666;">
-                        <small>📅 Nav: {r['DateNav']} | 🏢 {r['Societe']}</small>
-                        <span><b>{r['Prix'] - r['Acompte']:,.2f} €</b></span>
+                <div style="border-left: 8px solid {color}; background: white; padding: 12px; border-radius: 8px; margin-bottom: 10px; border-top: 1px solid #eee; border-right: 1px solid #eee; border-bottom: 1px solid #eee;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <b>{r['Nom']} {r['Prenom']}</b><br>
+                            <small>📅 {r['DateNav']} | 🏢 {r['Societe']}</small>
+                        </div>
+                        <div style="text-align: right;">
+                            <span style="color: {color}; font-weight: bold;">{ '✅ PAYÉ' if is_paid else '⏳ EN ATTENTE' }</span><br>
+                            <span style="font-size: 1.1em;">{r['Prix'] - r['Acompte']:,.2f} €</span>
+                        </div>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
 
-            # Actions
-            col1, col2, _ = st.columns([2, 2, 6])
+            # Boutons d'action
+            ca, cb, _ = st.columns([2, 2, 6])
             if not is_paid:
-                if col1.button("💰 Encaisser", key=f"btn_pay_{idx}"):
-                    # On met à jour le DataFrame original (df_f)
+                if ca.button("💰 Encaisser", key=f"pay_fact_{idx}"):
                     df_f.at[idx, 'Paiement'] = "Paid"
                     df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix']
                     sauvegarder_data(df_f, 'contacts.json')
                     st.rerun()
-            
-            if col2.button("✏️ Détails", key=f"btn_edit_{idx}"):
+            if cb.button("✏️ Modifier", key=f"edit_fact_{idx}"):
                 st.session_state.contact_edit_idx = idx
                 st.session_state.page = "CONTACTS"
                 st.rerun()
