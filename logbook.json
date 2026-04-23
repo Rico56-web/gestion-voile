@@ -176,22 +176,6 @@
         "Co\u00e9quipiers":"moi et autres"
     },
     {
-        "Date":"22\/04\/2026",
-        "Navigation":"test appli",
-        "PortArr":"Escale",
-        "MotDep":2443.9,
-        "MotArr":2443.4,
-        "TotalMot":-0.5,
-        "MilDep":3126.9,
-        "MilArr":3127.9,
-        "TotalMil":1.0,
-        "H_Voile":0.0,
-        "Notes":null,
-        "Group_ID":null,
-        "PortDep":"Escale",
-        "Co\u00e9quipiers":"moi et autres"
-    },
-    {
         "Date":"23\/04\/2026",
         "Navigation":"test appli",
         "PortArr":"Escale",
