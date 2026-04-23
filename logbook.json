@@ -142,21 +142,5 @@
         "Group_ID":null,
         "PortDep":"Escale",
         "Co\u00e9quipiers":"Philippe Desgagny, Francoise Riou, jean louis Dugave et Yannick Bailly"
-    },
-    {
-        "Date":"22\/04\/2026",
-        "Navigation":"test appli",
-        "PortArr":"Escale",
-        "MotDep":2443.8,
-        "MotArr":2443.85,
-        "TotalMot":0.05,
-        "MilDep":3126.0,
-        "MilArr":3126.45,
-        "TotalMil":0.45,
-        "H_Voile":0.0,
-        "Notes":null,
-        "Group_ID":null,
-        "PortDep":"Escale",
-        "Co\u00e9quipiers":"moi et autres"
     }
 ]
