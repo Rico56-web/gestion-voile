@@ -1165,49 +1165,59 @@ if st.session_state.page == "FACT":
         m3.metric("Reste à percevoir", f"{reste:,.2f} €", delta=f"-{reste:.2f}" if reste > 0 else None, delta_color="inverse")
 
         st.divider()
-        # --- BOUTON D'ENVOI CMN ---
+ # --- BOUTON D'ENVOI CMN ---
         st.subheader("✉️ Communication")
         
-        # 1. On filtre les données pour CMN ce mois-ci
+        # 1. On prépare une copie propre pour éviter l'erreur de "duplicate labels"
+        df_cmn_filter = df_f.copy().reset_index(drop=True) 
+
+        # 2. On définit les critères (Mois actuel)
         mois_actuel = mois_fr[datetime.now().month - 1]
         annee_actuelle = datetime.now().year
-        
-        df_cmn = df_f[
-            (df_f['Societe'] == 'CMN') & 
-            (df_f['DateNav'].str.contains(f"/{datetime.now().month:02d}/", na=False))
-        ]
+        pattern_mois = f"/{datetime.now().month:02d}/" # cherche /04/ pour Avril
 
-        if st.button("📧 Préparer le mail pour le Trésorier CMN", use_container_width=True):
-            if df_cmn.empty:
-                st.warning(f"Aucune sortie enregistrée pour CMN en {mois_actuel}.")
-            else:
-                # 2. Construction du corps du mail
-                destinataire = "tresorier@cmn-asso.fr"
-                objet = f"Facturation Vesta Skipper - {mois_actuel} {annee_actuelle}"
-                
-                corps_mail = f"Bonjour Monsieur le Trésorier,\n\n"
-                corps_mail += f"Veuillez trouver ci-dessous le récapitulatif des sorties effectuées pour la CMN pour le mois de {mois_actuel} {annee_actuelle} :\n\n"
-                
-                total_cmn = 0
-                for _, row in df_cmn.iterrows():
-                    corps_mail += f"- Le {row['DateNav']} : {row['Prix']:.2f} €\n"
-                    total_cmn += row['Prix']
-                
-                corps_mail += f"\nTOTAL À RÉGLER : {total_cmn:.2f} €\n\n"
-                corps_mail += "Je reste à votre disposition pour toute information complémentaire.\n"
-                corps_mail += "Bien cordialement,\n\nVotre Skipper Vesta"
+        # 3. Filtrage sécurisé
+        # On vérifie d'abord si les colonnes existent pour éviter un autre crash
+        if 'Societe' in df_cmn_filter.columns and 'DateNav' in df_cmn_filter.columns:
+            
+            mask_cmn = (df_cmn_filter['Societe'] == 'CMN')
+            mask_date = (df_cmn_filter['DateNav'].str.contains(pattern_mois, na=False))
+            
+            df_cmn = df_cmn_filter[mask_cmn & mask_date]
 
-                # 3. Encodage pour URL Mailto
-                mailto_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
-                
-                # Petit script JS pour ouvrir le mail
-                st.markdown(f"""
-                    <a href="{mailto_link}" target="_blank" style="text-decoration: none;">
-                        <div style="text-align: center; background-color: #1a2a6c; color: white; padding: 10px; border-radius: 5px;">
-                            🚀 Cliquer ici pour ouvrir votre messagerie
-                        </div>
-                    </a>
-                """, unsafe_allow_html=True)
+            if st.button("📧 Préparer le mail pour le Trésorier CMN", use_container_width=True):
+                if df_cmn.empty:
+                    st.warning(f"Aucune sortie enregistrée pour la CMN en {mois_actuel} {annee_actuelle}.")
+                else:
+                    # Construction du mail
+                    destinataire = "tresorier@cmn-asso.fr"
+                    objet = f"Facturation Vesta Skipper - {mois_actuel} {annee_actuelle}"
+                    
+                    corps_mail = f"Bonjour Monsieur le Trésorier,\n\n"
+                    corps_mail += f"Veuillez trouver ci-dessous le récapitulatif des sorties effectuées pour la CMN pour le mois de {mois_actuel} {annee_actuelle} :\n\n"
+                    
+                    total_cmn = 0
+                    for _, row in df_cmn.iterrows():
+                        p = to_f(row.get('Prix', 0))
+                        corps_mail += f"- Le {row['DateNav']} : {p:.2f} €\n"
+                        total_cmn += p
+                    
+                    corps_mail += f"\nTOTAL À RÉGLER : {total_cmn:.2f} €\n\n"
+                    corps_mail += "Je reste à votre disposition pour toute information complémentaire.\n"
+                    corps_mail += "Bien cordialement,\n\nVotre Skipper Vesta"
+
+                    # Encodage URL
+                    mailto_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
+                    
+                    st.markdown(f"""
+                        <a href="{mailto_link}" target="_blank" style="text-decoration: none;">
+                            <div style="text-align: center; background-color: #1a2a6c; color: white; padding: 12px; border-radius: 8px; font-weight: bold;">
+                                🚀 Cliquer ici pour ouvrir votre messagerie
+                            </div>
+                        </a>
+                    """, unsafe_allow_html=True)
+        else:
+            st.error("Les colonnes 'Société' ou 'DateNav' sont introuvables pour le filtrage.")
                 
         # --- AFFICHAGE ---
         for idx, r in df_visu.iterrows():
