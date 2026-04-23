@@ -922,7 +922,7 @@ if st.session_state.page == "MAINT":
 
     # --- 3. TABLEAU DE BORD VIDANGE ---
     heures_restantes = params['prochaine_vidange'] - releve_h
-    color_v = "#2e7d32" if heures_restantes > 10 else "#c62828"
+    color_v = "#2e7d32" if heures_restantes > 15 else "#c62828"
     
     col_v1, col_v2 = st.columns([2, 1])
     with col_v1:
@@ -941,56 +941,96 @@ if st.session_state.page == "MAINT":
 
     st.divider()
 
-    # --- 4. FORMULAIRE D'AJOUT ---
-    with st.expander("➕ ENREGISTRER UNE NOUVELLE INTERVENTION", expanded=False):
+    # --- 4. FORMULAIRES D'AJOUT (CHOIX ENTRE CLASSIQUE ET VIDANGE) ---
+    tab_classique, tab_vidange = st.tabs(["🔧 Intervention Classique", "🛢️ Révision Moteur / Vidange"])
+
+    with tab_classique:
         with st.form("form_new_maint"):
-            f_obj = st.text_input("Désignation")
+            f_obj = st.text_input("Désignation de l'intervention")
             c1, c2, c3 = st.columns(3)
-            f_d = c1.date_input("Date", datetime.now())
-            f_m = c2.number_input("Montant (€)", min_value=0.0)
-            f_t = c3.selectbox("Catégorie", ["Maintenance", "Sécurité", "Port", "Assurances", "Autres"])
-            f_notes = st.text_area("Notes détaillées")
-            f_statut = st.selectbox("Statut initial", ["À prévoir", "Fait"], index=0)
-            is_vidange = st.checkbox("C'est une vidange (recalculer +90h)")
+            f_d = c1.date_input("Date", datetime.now(), key="d1")
+            f_m = c2.number_input("Montant (€)", min_value=0.0, key="m1")
+            f_t = c3.selectbox("Catégorie", ["Maintenance", "Sécurité", "Port", "Assurances", "Autres"], key="t1")
+            f_notes = st.text_area("Notes détaillées", key="n1")
+            f_statut = st.selectbox("Statut", ["À prévoir", "Fait"], index=0, key="s1")
             
-            if st.form_submit_button("💾 ENREGISTRER"):
+            if st.form_submit_button("💾 ENREGISTRER L'INTERVENTION"):
                 new_row = {
                     "Date": f_d.strftime("%d/%m/%Y"), "Objet": f_obj, "M_Num": f_m, 
                     "Statut": f_statut, "Type": f_t, "Notes": f_notes
                 }
                 df_m = pd.concat([df_m, pd.DataFrame([new_row])], ignore_index=True)
-                if is_vidange:
-                    params['prochaine_vidange'] = round(releve_h + 90.0, 1)
-                    sauvegarder_params(params)
                 sauvegarder_data(df_m, 'maintenance.json')
+                st.success("Intervention enregistrée")
                 st.rerun()
 
-    # --- 5. SYSTÈME DE FILTRES (CORRIGÉ) ---
+    with tab_vidange:
+        with st.form("form_vidange_moteur"):
+            st.subheader("Check-list Révision Moteur")
+            c_v1, c_v2 = st.columns(2)
+            v_date = c_v1.date_input("Date de la révision", datetime.now())
+            v_heures = c_v2.number_input("Heures moteur à la révision", value=float(releve_h))
+            
+            st.markdown("**Travaux effectués :**")
+            col_c1, col_c2, col_c3 = st.columns(3)
+            chk_huile = col_c1.checkbox("Vidange Huile")
+            chk_f_huile = col_c1.checkbox("Filtre à Huile")
+            chk_f_gasoil = col_c2.checkbox("Filtre Gasoil")
+            chk_f_pre = col_c2.checkbox("Pré-filtre Gasoil")
+            chk_courroie = col_c3.checkbox("Courroies")
+            chk_impeller = col_c3.checkbox("Impeller (Turbine)")
+            
+            v_cout = st.number_input("Coût total des fournitures (€)", min_value=0.0)
+            v_notes = st.text_area("Autres observations (ex: tension courroie, fuite...)")
+            
+            increment_h = st.selectbox("Prochaine vidange dans :", [50, 100, 150, 200], index=1)
+            
+            if st.form_submit_button("💾 VALIDER LA RÉVISION MOTEUR"):
+                # Construction du libellé détaillé
+                travaux = []
+                if chk_huile: travaux.append("Vidange Huile")
+                if chk_f_huile: travaux.append("Filtre Huile")
+                if chk_f_gasoil: travaux.append("Filtre Gasoil")
+                if chk_f_pre: travaux.append("Pré-filtre")
+                if chk_courroie: travaux.append("Courroies")
+                if chk_impeller: travaux.append("Impeller")
+                
+                details_vidange = f"Révision moteur à {v_heures}h.\nTravaux : {', '.join(travaux)}.\nNotes : {v_notes}"
+                
+                new_row = {
+                    "Date": v_date.strftime("%d/%m/%Y"), 
+                    "Objet": f"RÉVISION MOTEUR ({v_heures}h)", 
+                    "M_Num": v_cout, 
+                    "Statut": "Fait", 
+                    "Type": "Maintenance", 
+                    "Notes": details_vidange
+                }
+                
+                # Mise à jour des paramètres de vidange
+                params['prochaine_vidange'] = round(v_heures + increment_h, 1)
+                sauvegarder_params(params)
+                
+                # Sauvegarde
+                df_m = pd.concat([df_m, pd.DataFrame([new_row])], ignore_index=True)
+                sauvegarder_data(df_m, 'maintenance.json')
+                st.balloons()
+                st.rerun()
+
+    # --- 5. SYSTÈME DE FILTRES ---
+    st.divider()
     col_menu1, col_menu2, col_menu3 = st.columns([2, 1.2, 1.2])
-    
-    # Choix du statut (À faire / Fait)
     filter_statut = col_menu1.radio("Afficher :", ["Tout", "⏳ À faire", "✅ Fait"], horizontal=True)
-    
-    # Choix de la période (À ce jour / Année Complète)
     mode_m = col_menu2.radio("Période :", ["À ce jour", "Année complète"], horizontal=True)
-    
-    # Choix de l'année
     sel_y = col_menu3.selectbox("Année :", [2025, 2026, 2027], index=1)
 
     if not df_m.empty:
-        # Conversion date pour le tri et filtrage
         df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-        
-        # 1. Filtrage par Année
         df_filtre = df_m[df_m['dt_maint'].dt.year == sel_y].copy()
         
-        # 2. Filtrage par Période (À ce jour vs Année complète)
         if mode_m == "À ce jour":
-            # On ne garde que ce qui est antérieur ou égal à aujourd'hui
             aujourdhui = pd.Timestamp.now().normalize()
             df_filtre = df_filtre[df_filtre['dt_maint'] <= aujourdhui]
 
-        # 3. Filtrage par Statut (À faire / Fait)
         if filter_statut == "⏳ À faire":
             df_filtre = df_filtre[df_filtre['Statut'] == "À prévoir"]
         elif filter_statut == "✅ Fait":
@@ -998,10 +1038,8 @@ if st.session_state.page == "MAINT":
 
         df_filtre = df_filtre.sort_values('dt_maint', ascending=False)
 
-        st.subheader(f"📋 Suivi : {filter_statut} ({mode_m})")
-
         if df_filtre.empty:
-            st.info("Aucune fiche ne correspond à ces filtres.")
+            st.info("Aucune fiche pour ces filtres.")
         else:
             for idx, row in df_filtre.iterrows():
                 est_fait = (row['Statut'] == "Fait")
@@ -1009,7 +1047,6 @@ if st.session_state.page == "MAINT":
                 bg_color = "#EAFAF1" if est_fait else "#FEF5E7"
                 icon_stat = "✅" if est_fait else "⏳"
 
-                # --- MODE ÉDITION ---
                 if st.session_state.maint_edit_id == idx:
                     with st.form(key=f"edit_maint_{idx}"):
                         e_obj = st.text_input("Désignation", value=row['Objet'])
@@ -1032,8 +1069,6 @@ if st.session_state.page == "MAINT":
                         if cb2.form_submit_button("❌ ANNULER"):
                             st.session_state.maint_edit_id = None
                             st.rerun()
-                
-                # --- MODE AFFICHAGE ---
                 else:
                     st.markdown(f"""
                         <div style="background-color:{bg_color}; border-left: 10px solid {border_color}; padding: 15px; border-radius: 10px; margin-bottom: 5px;">
@@ -1050,11 +1085,9 @@ if st.session_state.page == "MAINT":
                     if row.get('Notes'): st.caption(f"📝 {row['Notes']}")
 
                     bc1, bc2, bc3, bc4 = st.columns(4)
-                    
                     if bc1.button("✏️ Modif", key=f"ed_m_{idx}"):
                         st.session_state.maint_edit_id = idx
                         st.rerun()
-                    
                     with bc2:
                         bouton_imprimer_fiche_maint(row['Objet'], row['Date'], row.get('Notes', 'N/A'), row['Statut'])
                     
@@ -1064,22 +1097,10 @@ if st.session_state.page == "MAINT":
                         sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
                         st.rerun()
 
-                    dk = f"del_m_{idx}"
-                    if not st.session_state.get(dk, False):
-                        if bc4.button("🗑️ Suppr", key=f"pre_m_{idx}"):
-                            st.session_state[dk] = True
-                            st.rerun()
-                    else:
-                        s1, s2 = bc4.columns(2)
-                        if s1.button("OK", key=f"y_m_{idx}", type="primary"):
-                            df_m = df_m.drop(idx)
-                            sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
-                            st.session_state[dk] = False
-                            st.rerun()
-                        if s2.button("NO", key=f"n_m_{idx}"):
-                            st.session_state[dk] = False
-                            st.rerun()
-                st.write("")
+                    if bc4.button("🗑️ Suppr", key=f"pre_m_{idx}"):
+                        df_m = df_m.drop(idx)
+                        sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
+                        st.rerun()
 
     # --- 6. EXPORT EXCEL ---
     if not df_m.empty:
