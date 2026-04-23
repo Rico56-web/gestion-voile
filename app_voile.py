@@ -1165,36 +1165,39 @@ if st.session_state.page == "FACT":
         m3.metric("Reste à percevoir", f"{reste:,.2f} €", delta=f"-{reste:.2f}" if reste > 0 else None, delta_color="inverse")
 
         st.divider()
- # --- BOUTON D'ENVOI CMN ---
+        # --- BOUTON D'ENVOI CMN ---
         st.subheader("✉️ Communication")
         
-        # 1. On prépare une copie propre pour éviter l'erreur de "duplicate labels"
-        df_cmn_filter = df_f.copy().reset_index(drop=True) 
+        # 1. On repart sur une base propre et on force l'index
+        df_cmn_filter = df_f.copy()
+        df_cmn_filter = df_cmn_filter.loc[:, ~df_cmn_filter.columns.duplicated()].reset_index(drop=True)
 
-        # 2. On définit les critères (Mois actuel)
-        mois_actuel = mois_fr[datetime.now().month - 1]
-        annee_actuelle = datetime.now().year
-        pattern_mois = f"/{datetime.now().month:02d}/" # cherche /04/ pour Avril
+        # 2. Paramètres du mois
+        # On utilise datetime.now() pour le mois en cours
+        current_month = datetime.now().month
+        pattern_mois = f"/{current_month:02d}/" 
 
-        # 3. Filtrage sécurisé
-        # On vérifie d'abord si les colonnes existent pour éviter un autre crash
+        # 3. FILTRAGE SÉCURISÉ (Méthode .loc pour éviter le problème d'index)
         if 'Societe' in df_cmn_filter.columns and 'DateNav' in df_cmn_filter.columns:
             
-            mask_cmn = (df_cmn_filter['Societe'] == 'CMN')
-            mask_date = (df_cmn_filter['DateNav'].str.contains(pattern_mois, na=False))
-            
-            df_cmn = df_cmn_filter[mask_cmn & mask_date]
+            # On filtre ligne par ligne via une lambda pour éviter les conflits d'index Pandas
+            df_cmn = df_cmn_filter[
+                df_cmn_filter.apply(lambda x: 
+                    str(x['Societe']) == 'CMN' and 
+                    pattern_mois in str(x['DateNav']), 
+                axis=1)
+            ]
 
             if st.button("📧 Préparer le mail pour le Trésorier CMN", use_container_width=True):
                 if df_cmn.empty:
-                    st.warning(f"Aucune sortie enregistrée pour la CMN en {mois_actuel} {annee_actuelle}.")
+                    st.warning(f"Aucune sortie CMN trouvée pour le mois {current_month}.")
                 else:
                     # Construction du mail
                     destinataire = "tresorier@cmn-asso.fr"
-                    objet = f"Facturation Vesta Skipper - {mois_actuel} {annee_actuelle}"
+                    objet = f"Facturation Vesta Skipper - {mois_fr[current_month-1]} {datetime.now().year}"
                     
                     corps_mail = f"Bonjour Monsieur le Trésorier,\n\n"
-                    corps_mail += f"Veuillez trouver ci-dessous le récapitulatif des sorties effectuées pour la CMN pour le mois de {mois_actuel} {annee_actuelle} :\n\n"
+                    corps_mail += f"Voici le récapitulatif des sorties CMN pour ce mois-ci :\n\n"
                     
                     total_cmn = 0
                     for _, row in df_cmn.iterrows():
@@ -1202,11 +1205,9 @@ if st.session_state.page == "FACT":
                         corps_mail += f"- Le {row['DateNav']} : {p:.2f} €\n"
                         total_cmn += p
                     
-                    corps_mail += f"\nTOTAL À RÉGLER : {total_cmn:.2f} €\n\n"
-                    corps_mail += "Je reste à votre disposition pour toute information complémentaire.\n"
-                    corps_mail += "Bien cordialement,\n\nVotre Skipper Vesta"
+                    corps_mail += f"\nTOTAL : {total_cmn:.2f} €\n\nCordialement."
 
-                    # Encodage URL
+                    # Encodage URL Mailto
                     mailto_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
                     
                     st.markdown(f"""
@@ -1216,8 +1217,6 @@ if st.session_state.page == "FACT":
                             </div>
                         </a>
                     """, unsafe_allow_html=True)
-        else:
-            st.error("Les colonnes 'Société' ou 'DateNav' sont introuvables pour le filtrage.")
                 
         # --- AFFICHAGE ---
         for idx, r in df_visu.iterrows():
