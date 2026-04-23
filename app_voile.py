@@ -306,27 +306,26 @@ if st.session_state.page == "MEMOS":
         st.rerun()
                 
     # Le bouton d'impression (Appel de notre fonction JS)
-     with btn_c3:
-        # On nettoie le texte des ✅ pour l'impression propre
+    with btn_c3:
         texte_impr = str(row['Description']).replace("✅ | ", "[FAIT] ")
         bouton_imprimer_fiche(row['Date'], texte_impr, stat_val)
 
-                # Suppression avec double confirmation (dans la 4ème colonne)
-                conf_del_key = f"del_confirm_{idx}"
-                if not st.session_state.get(conf_del_key, False):
-                    if btn_c4.button("🗑️ Suppr", key=f"del_pre_{idx}"):
-                        st.session_state[conf_del_key] = True
-                        st.rerun()
-                else:
-                    sub_c1, sub_c2 = btn_c4.columns(2)
-                    if sub_c1.button("✅", key=f"del_yes_{idx}", type="primary"):
-                        df_memos = df_memos.drop(idx).reset_index(drop=True)
-                        sauvegarder_data(df_memos, 'memos.json')
-                        st.session_state[conf_del_key] = False
-                        st.rerun()
-                    if sub_c2.button("❌", key=f"del_no_{idx}"):
-                        st.session_state[conf_del_key] = False
-                        st.rerun()
+    # Suppression avec double confirmation (dans la 4ème colonne)
+    conf_del_key = f"del_confirm_{idx}"
+    if not st.session_state.get(conf_del_key, False):
+        if btn_c4.button("🗑️ Suppr", key=f"del_pre_{idx}"):
+            st.session_state[conf_del_key] = True
+            st.rerun()
+    else:
+        sub_c1, sub_c2 = btn_c4.columns(2)
+        if sub_c1.button("✅", key=f"del_yes_{idx}", type="primary"):
+            df_memos = df_memos.drop(idx).reset_index(drop=True)
+            sauvegarder_data(df_memos, 'memos.json')
+            st.session_state[conf_del_key] = False
+            st.rerun()
+        if sub_c2.button("❌", key=f"del_no_{idx}"):
+            st.session_state[conf_del_key] = False
+            st.rerun()
  
             st.write("")
     # --- À mettre en bas de tes fiches Mémos ou Logbook ---
