@@ -1217,13 +1217,14 @@ if st.session_state.page == "MAINT":
             df_m.drop(columns=['dt_maint'], errors='ignore').to_excel(writer, index=False)
         st.download_button("📥 Télécharger Historique Complet (Excel)", data=buffer.getvalue(), 
                            file_name=f"Maintenance_Vesta_Skipper.xlsx", use_container_width=True)
+
 # =================================================================
 # --- 7. PAGE FACTURATION (FACT) ---
 # =================================================================
 if st.session_state.page == "FACT":
     st.markdown("<h2 style='text-align: center;'>📑 Suivi de Facturation</h2>", unsafe_allow_html=True)
     
-    # Chargement des données
+    # On recharge les données fraîches
     df_fact = charger_data_safe('contacts.json')
 
     if df_fact.empty:
@@ -1245,18 +1246,19 @@ if st.session_state.page == "FACT":
         if 'Paiement' not in df_fact.columns: 
             df_fact['Paiement'] = "Unpaid"
         
-        # Conversion temporaire en format date pour un tri précis (plus récent en haut)
+        # TRI : On convertit en vraie date pour mettre le plus récent en haut
         df_fact['dt_temp'] = pd.to_datetime(df_fact['DateNav'], dayfirst=True, errors='coerce')
+        # ascending=False place la date la plus proche de nous en haut de la liste
         df_fact = df_fact.sort_values(by='dt_temp', ascending=False).drop(columns=['dt_temp'])
 
         t1, t2 = st.tabs(["⏳ À ENCAISSER", "✅ PAYÉ"])
 
         def afficher_onglet(status_filtre):
-            # Filtrage par statut (Unpaid ou Paid)
+            # Filtrage selon l'onglet
             df_vue = df_fact[df_fact['Paiement'] == status_filtre]
             
             if df_vue.empty:
-                st.write(f"Aucune fiche '{status_filtre}'.")
+                st.write(f"Rien à afficher dans '{status_filtre}'.")
             else:
                 for idx, row in df_vue.iterrows():
                     # Style visuel (Bleu pour CMN)
@@ -1278,15 +1280,16 @@ if st.session_state.page == "FACT":
                     c1, c2, _ = st.columns([2, 2, 6])
                     
                     if status_filtre == "Unpaid":
+                        # BOUTON ENCAISSER
                         if c1.button(f"💰 Encaisser", key=f"pay_btn_{idx}"):
                             df_fact.at[idx, 'Paiement'] = "Paid"
                             df_fact.at[idx, 'Acompte'] = df_fact.at[idx, 'Prix']
                             sauvegarder_data(df_fact, 'contacts.json')
-                            st.success("Paiement enregistré !")
+                            st.success("Paiement validé !")
                             time.sleep(0.5)
                             st.rerun()
 
-                    if c2.button(f"✏️ Voir / Modifier", key=f"edit_f_{idx}"):
+                    if c2.button(f"✏️ Voir", key=f"edit_f_{idx}"):
                         st.session_state.edit_idx = idx
                         st.session_state.page = "MODIFIER_CONTACT"
                         st.rerun()
@@ -1295,7 +1298,6 @@ if st.session_state.page == "FACT":
             afficher_onglet("Unpaid")
         with t2: 
             afficher_onglet("Paid")
-
 # =================================================================
 # --- 11. PAGE ARCHIVES ---
 # =================================================================
