@@ -1234,25 +1234,27 @@ if st.session_state.page == "FACT":
         df_f = df_f.rename(columns={'Prénom': 'Prenom', 'Société': 'Societe'})
         if 'Paiement' not in df_f.columns: df_f['Paiement'] = "Unpaid"
 
-        # --- FIX PB 1 : LE TRI (PLUS RÉCENT EN HAUT) ---
-        # On crée une clé AAAAMMJJ manuelle pour ne pas utiliser d'objets 'Date' complexes
-        def get_clean_key(d):
+        # --- FIX PB 1 : TRI CHRONOLOGIQUE INFAILLIBLE ---
+        # On crée une fonction de tri qui transforme "25/03/2026" en (2026, 3, 25) pour un tri réel
+        def cle_tri_python(row):
             try:
-                p = str(d).strip().split('/')
-                if len(p) == 3:
-                    return f"{p[2]}{p[1]}{p[0]}" # 20260525
-            except: return "00000000"
-            return "00000000"
+                d_str = str(row['DateNav']).strip()
+                p = d_str.split('/')
+                # On retourne un tuple (Année, Mois, Jour) pour le tri
+                return (int(p[2]), int(p[1]), int(p[0]))
+            except:
+                return (0, 0, 0)
 
-        df_f['tmp_tri'] = df_f['DateNav'].apply(get_clean_key)
+        # On convertit le DF en liste de dictionnaires pour trier en Python pur
+        data_list = df_f.to_dict('records')
+        # On trie la liste : reverse=True pour avoir le plus récent en premier
+        data_sorted = sorted(data_list, key=cle_tri_python, reverse=True)
         
-        # TRI DESCENDANT (2026 avant 2025)
-        df_f = df_f.sort_values(by='tmp_tri', ascending=False)
-        
-        # RÉINDEXATION : Crucial pour que 'at[idx]' pointe la bonne ligne
-        df_f = df_f.reset_index(drop=True)
+        # On reconstruit le DataFrame à partir de la liste triée
+        df_f = pd.DataFrame(data_sorted)
 
         # 2. RÉSUMÉ FINANCIER
+        # On s'assure que les valeurs sont traitables
         v_prix = pd.to_numeric(df_f['Prix'].apply(to_f), errors='coerce').fillna(0)
         v_enc = pd.to_numeric(df_f['Acompte'].apply(to_f), errors='coerce').fillna(0)
         
@@ -1263,14 +1265,14 @@ if st.session_state.page == "FACT":
 
         st.divider()
 
-        # 3. ONGLETS
+        # 3. AFFICHAGE DES ONGLETS
         t_unpaid, t_paid = st.tabs(["⏳ À PERCEVOIR", "✅ ENCAISSÉ"])
 
         def afficher_fiches(dataframe, type_p):
             subset = dataframe[dataframe['Paiement'] == type_p]
             
             if subset.empty:
-                st.info("Aucune fiche.")
+                st.info("Rien ici.")
             else:
                 for idx, r in subset.iterrows():
                     # Style visuel
@@ -1291,23 +1293,22 @@ if st.session_state.page == "FACT":
                     c1, c2, _ = st.columns([2, 2, 6])
                     
                     if type_p == "Unpaid":
-                        # key unique pour Streamlit
+                        # Utilisation d'une clé unique basée sur le nom et l'index
                         if c1.button("💰 Encaisser", key=f"p_{idx}_{r['Nom']}"):
-                            # MODIFICATION DIRECTE
+                            # MODIFICATION : On modifie le DataFrame trié
                             df_f.at[idx, 'Paiement'] = "Paid"
                             df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix']
                             
-                            # --- FIX PB 2 : ERREUR SAUVEGARDE ---
-                            # On retire TOUTES les colonnes temporaires et on convertit en types simples
-                            # avant d'envoyer à la fonction de sauvegarde.
-                            df_final = df_f.drop(columns=['tmp_tri'], errors='ignore')
-                            
+                            # --- FIX PB 2 : SAUVEGARDE SÉCURISÉE ---
+                            # On reconvertit tout en types Python simples (dictionnaires)
+                            # pour éviter que 'sauvegarder_data' ne bloque sur des objets Pandas
                             try:
-                                # On force la sauvegarde du dataframe complet (df_f) mis à jour
-                                sauvegarder_data(df_final, 'contacts.json')
+                                # On convertit le DataFrame en liste de dicts (format JSON standard)
+                                final_to_save = df_f.to_dict('records')
+                                sauvegarder_data(final_to_save, 'contacts.json')
                                 st.rerun()
                             except Exception as e:
-                                st.error(f"Erreur fatale : {e}")
+                                st.error(f"Erreur : {e}")
 
                     if c2.button("✏️ Modifier", key=f"e_{idx}_{r['Nom']}"):
                         st.session_state.contact_edit_idx = idx
