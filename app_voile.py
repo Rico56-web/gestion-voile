@@ -1205,57 +1205,67 @@ if st.session_state.page == "MAINT":
 if st.session_state.page == "FACT":
     st.title("📑 Suivi de Facturation")
     
-    # 1. CHARGEMENT
     df_f = charger_data_safe('contacts.json')
 
     if df_f.empty:
         st.warning("Aucune donnée de contact trouvée.")
     else:
-        # Nettoyage de base
+        # 1. NETTOYAGE DES COLONNES
         df_f = df_f.rename(columns={'Prénom': 'Prenom', 'Société': 'Societe'})
         if 'Paiement' not in df_f.columns: df_f['Paiement'] = "Unpaid"
 
         # --- FIX PB 1 : TRI (PLUS RÉCENT EN HAUT) ---
-        # On convertit DateNav en vraie date. 'dayfirst=True' est crucial.
-        df_f['dt_tri'] = pd.to_datetime(df_f['DateNav'], dayfirst=True, errors='coerce')
+        # Méthode manuelle infaillible : transformation "25/03/2026" -> "20260325"
+        def calcul_cle_tri(date_str):
+            try:
+                p = str(date_str).split('/')
+                if len(p) == 3:
+                    # On crée une chaîne AAAAMMJJ qui se trie parfaitement par ordre alphabétique
+                    return f"{p[2]}{p[1]}{p[0]}"
+            except:
+                return "00000000"
+            return "00000000"
+
+        df_f['tmp_tri'] = df_f['DateNav'].apply(calcul_cle_tri)
         
-        # On trie : ascending=False met 2026 avant 2025
-        df_f = df_f.sort_values(by='dt_tri', ascending=False)
+        # Tri descendant : les dates les plus élevées (plus récentes) en premier
+        df_f = df_f.sort_values(by='tmp_tri', ascending=False)
         
-        # ON RE-INDEXE : C'est ce qui répare le bouton "Encaisser"
+        # RÉINDEXATION TOTALE : Indispensable pour que le bouton Encaisser vise juste
         df_f = df_f.reset_index(drop=True)
 
         # 2. RÉSUMÉ FINANCIER
-        # Conversion forcée en nombres pour éviter les erreurs de calcul
-        total_ca = pd.to_numeric(df_f['Prix'].apply(to_f), errors='coerce').sum()
-        total_enc = pd.to_numeric(df_f['Acompte'].apply(to_f), errors='coerce').sum()
+        # Conversion forcée pour éviter les erreurs de type
+        v_prix = pd.to_numeric(df_f['Prix'].apply(to_f), errors='coerce').fillna(0)
+        v_acompte = pd.to_numeric(df_f['Acompte'].apply(to_f), errors='coerce').fillna(0)
         
         m1, m2, m3 = st.columns(3)
-        m1.metric("Total Dû", f"{total_ca:,.2f} €")
-        m2.metric("Encaissé", f"{total_enc:,.2f} €")
-        m3.metric("Reste", f"{(total_ca - total_enc):,.2f} €")
+        m1.metric("Total Dû", f"{v_prix.sum():,.2f} €")
+        m2.metric("Encaissé", f"{v_acompte.sum():,.2f} €")
+        m3.metric("Reste", f"{(v_prix.sum() - v_acompte.sum()):,.2f} €")
 
         st.divider()
 
-        # 3. AFFICHAGE DES ONGLETS
-        tab_unpaid, tab_paid = st.tabs(["⏳ À PERCEVOIR", "✅ ENCAISSÉ"])
+        # 3. AFFICHAGE DES TABS
+        t_u, t_p = st.tabs(["⏳ À PERCEVOIR", "✅ ENCAISSÉ"])
 
-        def afficher_fiches(dataframe, type_paiement):
-            subset = dataframe[dataframe['Paiement'] == type_paiement]
+        def afficher_fiches(dataframe, type_p):
+            subset = dataframe[dataframe['Paiement'] == type_p]
             
             if subset.empty:
-                st.info("Rien ici.")
+                st.info("Aucun dossier.")
             else:
                 for idx, r in subset.iterrows():
-                    # Style visuel (Bleu pour CMN)
-                    bg_card = "#E3F2FD" if str(r['Societe']).upper() == "CMN" else "white"
-                    color = "#d32f2f" if type_paiement == "Unpaid" else "#2e7d32"
+                    # Style visuel
+                    is_cmn = str(r['Societe']).upper() == "CMN"
+                    bg = "#E3F2FD" if is_cmn else "white"
+                    bc = "#d32f2f" if type_p == "Unpaid" else "#2e7d32"
                     
                     st.markdown(f"""
-                        <div style="border-left: 10px solid {color}; background: {bg_card}; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #eee;">
+                        <div style="border-left: 10px solid {bc}; background: {bg}; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #eee;">
                             <div style="display: flex; justify-content: space-between;">
                                 <b>{r['Nom']} {r['Prenom']}</b>
-                                <b style="color: {color};">{to_f(r['Prix']):.2f} €</b>
+                                <b style="color: {bc};">{to_f(r['Prix']):.2f} €</b>
                             </div>
                             <small>📅 {r['DateNav']} | 🏢 {r['Societe']}</small>
                         </div>
@@ -1264,30 +1274,27 @@ if st.session_state.page == "FACT":
                     # --- FIX PB 2 : LE BOUTON ENCAISSER ---
                     c1, c2, _ = st.columns([2, 2, 6])
                     
-                    if type_paiement == "Unpaid":
-                        # On utilise l'index 'idx' qui est maintenant PARFAITEMENT synchronisé
-                        if c1.button("💰 Encaisser", key=f"pay_{idx}"):
-                            # 1. Mise à jour dans le dataframe principal
+                    if type_p == "Unpaid":
+                        # Clé unique pour Streamlit
+                        if c1.button("💰 Encaisser", key=f"p_{idx}_{r['Nom']}"):
+                            # Mise à jour sur la ligne 'idx' synchronisée
                             df_f.at[idx, 'Paiement'] = "Paid"
                             df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix']
                             
-                            # 2. NETTOYAGE CRITIQUE : On enlève 'dt_tri' avant de sauvegarder
+                            # NETTOYAGE AVANT SAUVEGARDE (On retire la colonne temporaire)
                             # C'est ce qui évite le message d'erreur rouge !
-                            df_a_sauver = df_f.drop(columns=['dt_tri'])
+                            df_final = df_f.drop(columns=['tmp_tri'])
                             
-                            sauvegarder_data(df_a_sauver, 'contacts.json')
+                            sauvegarder_data(df_final, 'contacts.json')
                             st.rerun()
 
-                    if c2.button("✏️ Modifier", key=f"edit_{idx}"):
+                    if c2.button("✏️ Modifier", key=f"e_{idx}_{r['Nom']}"):
                         st.session_state.contact_edit_idx = idx
                         st.session_state.page = "CONTACTS"
                         st.rerun()
 
-        with tab_unpaid:
-            afficher_fiches(df_f, "Unpaid")
-
-        with tab_paid:
-            afficher_fiches(df_f, "Paid")
+        with t_u: afficher_fiches(df_f, "Unpaid")
+        with t_p: afficher_fiches(df_f, "Paid")
 
 # =================================================================
 # --- 11. PAGE ARCHIVES ---
