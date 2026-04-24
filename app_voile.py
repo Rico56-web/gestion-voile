@@ -123,6 +123,25 @@ def charger_data_safe(fichier):
     df = charger_data(fichier)
     return df if not df.empty else pd.DataFrame()
 
+#===============================================================
+# --- CHARGEMENT ET TRI GLOBAL (À placer en haut de votre script) ---
+df = charger_data_safe('contacts.json')
+
+if not df.empty:
+    # 1. On crée une clé de tri invisible YYYYMMDD
+    def create_sort_key(d):
+        try:
+            p = str(d).split('/')
+            return f"{p[2]}{p[1]}{p[0]}" # ex: 20260525
+        except: return "00000000"
+
+    df['tmp_sort'] = df['DateNav'].apply(create_sort_key)
+    
+    # 2. On trie du plus récent au plus ancien
+    df = df.sort_values(by='tmp_sort', ascending=False).reset_index(drop=True)
+    
+    # 3. On nettoie pour ne pas polluer le reste du code
+    df = df.drop(columns=['tmp_sort'])
 # =================================================================
 # --- CONFIGURATION & STYLE ---
 # =================================================================
