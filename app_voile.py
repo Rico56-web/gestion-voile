@@ -1223,14 +1223,13 @@ if st.session_state.page == "MAINT":
 if st.session_state.page == "FACT":
     st.markdown("<h2 style='text-align: center;'>📑 Suivi de Facturation</h2>", unsafe_allow_html=True)
     
-    # On recharge les données fraîches pour éviter les décalages
+    # Chargement des données
     df_fact = charger_data_safe('contacts.json')
 
     if df_fact.empty:
         st.info("Aucune donnée de facturation.")
     else:
         # --- CALCULS ---
-        # Utilisation de la fonction to_f que vous avez déjà définie
         total_ca = sum(df_fact['Prix'].apply(to_f))
         total_enc = sum(df_fact['Acompte'].apply(to_f))
         reste_a_percevoir = total_ca - total_enc
@@ -1242,35 +1241,29 @@ if st.session_state.page == "FACT":
 
         st.divider()
 
-        # --- FILTRAGE ET TRI ---
-        # On s'assure que le statut existe
-        if 'Paiement' not in df_fact.columns: df_fact['Paiement'] = "Unpaid"
+        # --- FILTRAGE ET TRI CHRONOLOGIQUE INVERSÉ ---
+        if 'Paiement' not in df_fact.columns: 
+            df_fact['Paiement'] = "Unpaid"
         
-        # TRI PAR DATE (Plus récent en haut)
-        def sort_key_fact(d):
-            try:
-                p = str(d).split('/')
-                return f"{p[2]}{p[1]}{p[0]}"
-            except: return "00000000"
-        
-        df_fact['tmp_sort'] = df_fact['DateNav'].apply(sort_key_fact)
-        df_fact = df_fact.sort_values(by='tmp_sort', ascending=False).drop(columns=['tmp_sort'])
+        # Conversion temporaire en format date pour un tri précis (plus récent en haut)
+        df_fact['dt_temp'] = pd.to_datetime(df_fact['DateNav'], dayfirst=True, errors='coerce')
+        df_fact = df_fact.sort_values(by='dt_temp', ascending=False).drop(columns=['dt_temp'])
 
         t1, t2 = st.tabs(["⏳ À ENCAISSER", "✅ PAYÉ"])
 
         def afficher_onglet(status_filtre):
-            # Filtrage
+            # Filtrage par statut (Unpaid ou Paid)
             df_vue = df_fact[df_fact['Paiement'] == status_filtre]
             
             if df_vue.empty:
-                st.write("Rien dans cette catégorie.")
+                st.write(f"Aucune fiche '{status_filtre}'.")
             else:
                 for idx, row in df_vue.iterrows():
-                    # Style visuel (Bleu pour CMN comme demandé dans vos préférences)
+                    # Style visuel (Bleu pour CMN)
                     soc = str(row.get('Société', 'PERSO')).upper()
-                    is_cmn = soc == "CMN"
+                    is_cmn = "CMN" in soc
                     card_bg = "#E3F2FD" if is_cmn else "#F9F9F9"
-                    accent = "#2980B9" if is_cmn else "#7F8C8D"
+                    accent = "#3498db" if is_cmn else "#7F8C8D"
                     
                     st.markdown(f"""
                         <div style="background:{card_bg}; border-left:10px solid {accent}; padding:15px; border-radius:8px; margin-bottom:10px; color:black; border: 1px solid #ddd;">
@@ -1285,25 +1278,23 @@ if st.session_state.page == "FACT":
                     c1, c2, _ = st.columns([2, 2, 6])
                     
                     if status_filtre == "Unpaid":
-                        # BOUTON ENCAISSER
-                        # La clé doit être unique : on utilise l'index réel du DataFrame
                         if c1.button(f"💰 Encaisser", key=f"pay_btn_{idx}"):
-                            # 1. On modifie directement dans le DF global chargé au début du bloc
                             df_fact.at[idx, 'Paiement'] = "Paid"
                             df_fact.at[idx, 'Acompte'] = df_fact.at[idx, 'Prix']
-                            # 2. SAUVEGARDE
                             sauvegarder_data(df_fact, 'contacts.json')
-                            st.success("Payé !")
+                            st.success("Paiement enregistré !")
                             time.sleep(0.5)
                             st.rerun()
 
-                    if c2.button(f"✏️ Voir", key=f"edit_f_{idx}"):
+                    if c2.button(f"✏️ Voir / Modifier", key=f"edit_f_{idx}"):
                         st.session_state.edit_idx = idx
                         st.session_state.page = "MODIFIER_CONTACT"
                         st.rerun()
 
-        with t1: afficher_onglet("Unpaid")
-        with t2: afficher_onglet("Paid")
+        with t1: 
+            afficher_onglet("Unpaid")
+        with t2: 
+            afficher_onglet("Paid")
 
 # =================================================================
 # --- 11. PAGE ARCHIVES ---
