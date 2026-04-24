@@ -1205,33 +1205,33 @@ if st.session_state.page == "MAINT":
 if st.session_state.page == "FACT":
     st.title("📑 Suivi de Facturation")
     
+    # On recharge les données proprement
     df_f = charger_data_safe('contacts.json')
 
     if df_f.empty:
         st.warning("Aucune donnée de contact trouvée.")
     else:
-        # 1. NETTOYAGE ET PRÉPARATION
+        # 1. NETTOYAGE DES COLONNES
         df_f = df_f.rename(columns={'Prénom': 'Prenom', 'Société': 'Societe'})
         if 'Paiement' not in df_f.columns: df_f['Paiement'] = "Unpaid"
         
-        # On s'assure que les prix sont des nombres
-        df_f['Prix'] = df_f['Prix'].apply(to_f)
-        df_f['Acompte'] = df_f['Acompte'].apply(to_f)
+        # Conversion numérique pour être sûr des calculs
+        df_f['Prix'] = pd.to_numeric(df_f['Prix'].apply(to_f), errors='coerce').fillna(0)
+        df_f['Acompte'] = pd.to_numeric(df_f['Acompte'].apply(to_f), errors='coerce').fillna(0)
 
-        # --- LE TRI CRITIQUE (PLUS RÉCENT EN HAUT) ---
-        # On force la conversion en spécifiant que le jour est en premier (format FR)
-        df_f['dt_tri'] = pd.to_datetime(df_f['DateNav'], dayfirst=True, errors='coerce')
+        # --- FORCE LE TRI CHRONOLOGIQUE INVERSÉ (RÉCENT EN HAUT) ---
+        # On nettoie les dates (enlève les espaces) et convertit
+        df_f['dt_tri'] = pd.to_datetime(df_f['DateNav'].astype(str).str.strip(), dayfirst=True, errors='coerce')
         
-        # On trie : ascending=False met les dates les plus récentes en haut
+        # TRI : ascending=False (2026 avant 2025)
         df_f = df_f.sort_values(by='dt_tri', ascending=False)
         
-        # IMPORTANT : On réinitialise l'index APRES le tri pour que le bouton 
-        # "Encaisser" vise la bonne ligne en mémoire.
+        # RÉINDEXATION : Crucial pour que le bouton Encaisser sache quelle ligne il touche
         df_f = df_f.reset_index(drop=True)
 
-        # 2. BOUTON D'ENVOI CMN (Inchangé)
+        # 2. BOUTON D'ENVOI CMN (Placé ici pour visibilité)
         with st.expander("✉️ ENVOYER RAPPORT MENSUEL CMN", expanded=False):
-            # ... votre code mailto ...
+            # ... (votre bloc mailto reste le même) ...
             pass
 
         st.divider()
@@ -1249,11 +1249,10 @@ if st.session_state.page == "FACT":
         tab_unpaid, tab_paid = st.tabs(["⏳ À PERCEVOIR", "✅ ENCAISSÉ"])
 
         def afficher_fiches(dataframe, type_paiement):
-            # On filtre sur le dataframe déjà trié et réindexé
             subset = dataframe[dataframe['Paiement'] == type_paiement]
             
             if subset.empty:
-                st.info(f"Rien dans cette catégorie.")
+                st.info(f"Aucune fiche.")
             else:
                 for idx, r in subset.iterrows():
                     color = "#d32f2f" if type_paiement == "Unpaid" else "#2e7d32"
@@ -1270,17 +1269,20 @@ if st.session_state.page == "FACT":
                     """, unsafe_allow_html=True)
 
                     c1, c2, _ = st.columns([2, 2, 6])
+                    
                     if type_paiement == "Unpaid":
-                        # L'index idx est maintenant celui du dataframe df_f réindexé
+                        # key=f"p_btn_{idx}" utilise l'index du dataframe RÉINDEXÉ
                         if c1.button("💰 Encaisser", key=f"p_btn_{idx}"):
-                            # Modification directe dans la source
-                            df_f.at[idx, 'Paiement'] = "Paid"
-                            df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix']
+                            # MODIFICATION DIRECTE DANS LE DATAFRAME SOURCE
+                            df_f.loc[idx, 'Paiement'] = "Paid"
+                            df_f.loc[idx, 'Acompte'] = df_f.loc[idx, 'Prix']
                             
+                            # Sauvegarde
                             sauvegarder_data(df_f, 'contacts.json')
+                            # Le rerun est obligatoire pour rafraîchir l'affichage
                             st.rerun()
                             
-                    if c2.button("✏️ Modifier", key=f"e_btn_{idx}"):
+                    if c2.button("✏️ Modifier", key=f"edit_btn_{idx}"):
                         st.session_state.contact_edit_idx = idx
                         st.session_state.page = "CONTACTS"
                         st.rerun()
