@@ -1211,90 +1211,74 @@ if st.session_state.page == "FACT":
     if df_f.empty:
         st.warning("Aucune donnée de contact trouvée.")
     else:
-        # Nettoyage des colonnes
+        # Nettoyage de base
         df_f = df_f.rename(columns={'Prénom': 'Prenom', 'Société': 'Societe'})
         if 'Paiement' not in df_f.columns: df_f['Paiement'] = "Unpaid"
 
-        # --- FIX PB 1 : LE CLASSEMENT (PLUS RÉCENT EN HAUT) ---
-        # On décompose manuellement la date JJ/MM/AAAA pour créer une clé de tri 100% fiable
-        def force_sort_key(date_str):
-            try:
-                # On nettoie et on découpe "25/03/2026"
-                parts = str(date_str).strip().split('/')
-                if len(parts) == 3:
-                    # Retourne un entier YYYYMMDD (ex: 20260325)
-                    return int(parts[2] + parts[1] + parts[0])
-            except:
-                return 0
-            return 0
-
-        df_f['sort_key'] = df_f['DateNav'].apply(force_sort_key)
+        # --- FIX PB 1 : TRI (PLUS RÉCENT EN HAUT) ---
+        # On convertit DateNav en vraie date. 'dayfirst=True' est crucial.
+        df_f['dt_tri'] = pd.to_datetime(df_f['DateNav'], dayfirst=True, errors='coerce')
         
-        # TRI : ascending=False met 20260525 (Mai) AVANT 20260310 (Mars)
-        df_f = df_f.sort_values(by='sort_key', ascending=False)
+        # On trie : ascending=False met 2026 avant 2025
+        df_f = df_f.sort_values(by='dt_tri', ascending=False)
         
-        # IMPORTANT : On réindexe pour que le bouton 'Encaisser' sache où il habite
+        # ON RE-INDEXE : C'est ce qui répare le bouton "Encaisser"
         df_f = df_f.reset_index(drop=True)
 
         # 2. RÉSUMÉ FINANCIER
-        # On force la conversion en float pour éviter les erreurs de calcul
-        df_f['Prix'] = pd.to_numeric(df_f['Prix'].apply(to_f), errors='coerce').fillna(0)
-        df_f['Acompte'] = pd.to_numeric(df_f['Acompte'].apply(to_f), errors='coerce').fillna(0)
-        
-        total_ca = df_f['Prix'].sum()
-        total_encaisse = df_f['Acompte'].sum()
-        reste = total_ca - total_encaisse
+        # Conversion forcée en nombres pour éviter les erreurs de calcul
+        total_ca = pd.to_numeric(df_f['Prix'].apply(to_f), errors='coerce').sum()
+        total_enc = pd.to_numeric(df_f['Acompte'].apply(to_f), errors='coerce').sum()
         
         m1, m2, m3 = st.columns(3)
         m1.metric("Total Dû", f"{total_ca:,.2f} €")
-        m2.metric("Encaissé", f"{total_encaisse:,.2f} €")
-        m3.metric("Reste", f"{reste:,.2f} €")
+        m2.metric("Encaissé", f"{total_enc:,.2f} €")
+        m3.metric("Reste", f"{(total_ca - total_enc):,.2f} €")
 
         st.divider()
 
-        # 3. ONGLETS
+        # 3. AFFICHAGE DES ONGLETS
         tab_unpaid, tab_paid = st.tabs(["⏳ À PERCEVOIR", "✅ ENCAISSÉ"])
 
         def afficher_fiches(dataframe, type_paiement):
             subset = dataframe[dataframe['Paiement'] == type_paiement]
             
             if subset.empty:
-                st.info(f"Rien ici.")
+                st.info("Rien ici.")
             else:
                 for idx, r in subset.iterrows():
-                    color = "#d32f2f" if type_paiement == "Unpaid" else "#2e7d32"
+                    # Style visuel (Bleu pour CMN)
                     bg_card = "#E3F2FD" if str(r['Societe']).upper() == "CMN" else "white"
+                    color = "#d32f2f" if type_paiement == "Unpaid" else "#2e7d32"
                     
                     st.markdown(f"""
                         <div style="border-left: 10px solid {color}; background: {bg_card}; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #eee;">
                             <div style="display: flex; justify-content: space-between;">
                                 <b>{r['Nom']} {r['Prenom']}</b>
-                                <b style="color: {color};">{r['Prix']:.2f} €</b>
+                                <b style="color: {color};">{to_f(r['Prix']):.2f} €</b>
                             </div>
                             <small>📅 {r['DateNav']} | 🏢 {r['Societe']}</small>
                         </div>
                     """, unsafe_allow_html=True)
 
+                    # --- FIX PB 2 : LE BOUTON ENCAISSER ---
                     c1, c2, _ = st.columns([2, 2, 6])
                     
                     if type_paiement == "Unpaid":
-                        # Clé de bouton unique pour éviter les conflits Streamlit
-                        if c1.button("💰 Encaisser", key=f"btn_pay_{idx}"):
-                            # MODIFICATION DIRECTE DU DATAFRAME SOURCE
+                        # On utilise l'index 'idx' qui est maintenant PARFAITEMENT synchronisé
+                        if c1.button("💰 Encaisser", key=f"pay_{idx}"):
+                            # 1. Mise à jour dans le dataframe principal
                             df_f.at[idx, 'Paiement'] = "Paid"
                             df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix']
                             
-                            # SUPPRESSION DE LA COLONNE DE TRI AVANT SAUVEGARDE (pour éviter l'erreur de format JSON)
-                            df_save = df_f.drop(columns=['sort_key'])
+                            # 2. NETTOYAGE CRITIQUE : On enlève 'dt_tri' avant de sauvegarder
+                            # C'est ce qui évite le message d'erreur rouge !
+                            df_a_sauver = df_f.drop(columns=['dt_tri'])
                             
-                            try:
-                                sauvegarder_data(df_save, 'contacts.json')
-                                st.success("Paiement enregistré !")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Erreur de sauvegarde : {e}")
+                            sauvegarder_data(df_a_sauver, 'contacts.json')
+                            st.rerun()
 
-                    if c2.button("✏️ Modifier", key=f"btn_ed_{idx}"):
+                    if c2.button("✏️ Modifier", key=f"edit_{idx}"):
                         st.session_state.contact_edit_idx = idx
                         st.session_state.page = "CONTACTS"
                         st.rerun()
