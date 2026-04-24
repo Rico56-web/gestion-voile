@@ -1217,58 +1217,63 @@ if st.session_state.page == "MAINT":
             df_m.drop(columns=['dt_maint'], errors='ignore').to_excel(writer, index=False)
         st.download_button("📥 Télécharger Historique Complet (Excel)", data=buffer.getvalue(), 
                            file_name=f"Maintenance_Vesta_Skipper.xlsx", use_container_width=True)
-
 # =================================================================
 # --- PAGE : FACTURATION (FACT) ---
 # =================================================================
 if st.session_state.page == "FACT":
     st.title("📑 Suivi de Facturation")
     
-    # 1. CHARGEMENT
-    df_f = charger_data_safe('contacts.json')
+    # 1. CHARGEMENT ET TRI MANUEL (HORS PANDAS POUR PLUS DE FIABILITÉ)
+    raw_data = charger_data_safe('contacts.json')
+    
+    # Conversion en liste de dictionnaires si c'est un DataFrame
+    if isinstance(raw_data, pd.DataFrame):
+        data_list = raw_data.to_dict('records')
+    else:
+        data_list = raw_data
 
-    if df_f.empty:
+    if not data_list:
         st.warning("Aucune donnée de contact trouvée.")
     else:
-        # Nettoyage initial
+        # --- FONCTION DE TRI CHRONOLOGIQUE INVERSÉ ---
+        def cle_tri_infaillible(item):
+            try:
+                # On nettoie la date " 25 / 03 / 2026 " -> "25/03/2026"
+                d_str = str(item.get('DateNav', '01/01/2000')).replace(" ", "")
+                p = d_str.split('/')
+                # Retourne un entier YYYYMMDD pour un tri mathématique parfait
+                return int(f"{p[2]}{p[1].zfill(2)}{p[0].zfill(2)}")
+            except:
+                return 0
+
+        # On trie la LISTE (reverse=True pour mettre le plus grand/récent en haut)
+        data_sorted = sorted(data_list, key=cle_tri_infaillible, reverse=True)
+        
+        # On crée le DataFrame à partir de la liste déjà triée
+        df_f = pd.DataFrame(data_sorted)
+        
+        # Nettoyage des noms de colonnes et initialisation
         df_f = df_f.rename(columns={'Prénom': 'Prenom', 'Société': 'Societe'})
         if 'Paiement' not in df_f.columns: df_f['Paiement'] = "Unpaid"
-
-        # --- FIX PB 1 : TRI CHRONOLOGIQUE INFAILLIBLE ---
-        # On crée une fonction de tri qui transforme "25/03/2026" en (2026, 3, 25) pour un tri réel
-        def cle_tri_python(row):
-            try:
-                d_str = str(row['DateNav']).strip()
-                p = d_str.split('/')
-                # On retourne un tuple (Année, Mois, Jour) pour le tri
-                return (int(p[2]), int(p[1]), int(p[0]))
-            except:
-                return (0, 0, 0)
-
-        # On convertit le DF en liste de dictionnaires pour trier en Python pur
-        data_list = df_f.to_dict('records')
-        # On trie la liste : reverse=True pour avoir le plus récent en premier
-        data_sorted = sorted(data_list, key=cle_tri_python, reverse=True)
-        
-        # On reconstruit le DataFrame à partir de la liste triée
-        df_f = pd.DataFrame(data_sorted)
+        if 'Acompte' not in df_f.columns: df_f['Acompte'] = 0
 
         # 2. RÉSUMÉ FINANCIER
-        # On s'assure que les valeurs sont traitables
-        v_prix = pd.to_numeric(df_f['Prix'].apply(to_f), errors='coerce').fillna(0)
-        v_enc = pd.to_numeric(df_f['Acompte'].apply(to_f), errors='coerce').fillna(0)
+        # On utilise une conversion sécurisée via to_f
+        total_ca = sum(to_f(x.get('Prix', 0)) for x in data_sorted)
+        total_enc = sum(to_f(x.get('Acompte', 0)) for x in data_sorted)
         
         m1, m2, m3 = st.columns(3)
-        m1.metric("Total Dû", f"{v_prix.sum():,.2f} €")
-        m2.metric("Encaissé", f"{v_enc.sum():,.2f} €")
-        m3.metric("Reste", f"{(v_prix.sum() - v_enc.sum()):,.2f} €")
+        m1.metric("Total Dû", f"{total_ca:,.2f} €")
+        m2.metric("Encaissé", f"{total_enc:,.2f} €")
+        m3.metric("Reste", f"{(total_ca - total_enc):,.2f} €")
 
         st.divider()
 
-        # 3. AFFICHAGE DES ONGLETS
+        # 3. AFFICHAGE DES TABS
         t_unpaid, t_paid = st.tabs(["⏳ À PERCEVOIR", "✅ ENCAISSÉ"])
 
         def afficher_fiches(dataframe, type_p):
+            # On filtre sur le DataFrame déjà trié
             subset = dataframe[dataframe['Paiement'] == type_p]
             
             if subset.empty:
@@ -1276,41 +1281,39 @@ if st.session_state.page == "FACT":
             else:
                 for idx, r in subset.iterrows():
                     # Style visuel
-                    is_cmn = str(r['Societe']).upper() == "CMN"
+                    is_cmn = str(r.get('Societe', '')).upper() == "CMN"
                     bg = "#E3F2FD" if is_cmn else "white"
                     bc = "#d32f2f" if type_p == "Unpaid" else "#2e7d32"
                     
                     st.markdown(f"""
                         <div style="border-left: 10px solid {bc}; background: {bg}; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #eee;">
                             <div style="display: flex; justify-content: space-between;">
-                                <b>{r['Nom']} {r['Prenom']}</b>
-                                <b style="color: {bc};">{to_f(r['Prix']):.2f} €</b>
+                                <b>{r.get('Nom','')} {r.get('Prenom','')}</b>
+                                <b style="color: {bc};">{to_f(r.get('Prix',0)):.2f} €</b>
                             </div>
-                            <small>📅 {r['DateNav']} | 🏢 {r['Societe']}</small>
+                            <small>📅 {r.get('DateNav','')} | 🏢 {r.get('Societe','')}</small>
                         </div>
                     """, unsafe_allow_html=True)
 
                     c1, c2, _ = st.columns([2, 2, 6])
                     
                     if type_p == "Unpaid":
-                        # Utilisation d'une clé unique basée sur le nom et l'index
-                        if c1.button("💰 Encaisser", key=f"p_{idx}_{r['Nom']}"):
-                            # MODIFICATION : On modifie le DataFrame trié
+                        # BOUTON ENCAISSER
+                        if c1.button("💰 Encaisser", key=f"pay_{idx}_{r.get('Nom','')}"):
+                            # On met à jour directement le DataFrame principal
                             df_f.at[idx, 'Paiement'] = "Paid"
                             df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix']
                             
-                            # --- FIX PB 2 : SAUVEGARDE SÉCURISÉE ---
-                            # On reconvertit tout en types Python simples (dictionnaires)
-                            # pour éviter que 'sauvegarder_data' ne bloque sur des objets Pandas
+                            # --- SAUVEGARDE SÉCURISÉE ---
+                            # On repasse en liste de dicts pour éviter les erreurs de format JSON
+                            final_to_save = df_f.to_dict('records')
                             try:
-                                # On convertit le DataFrame en liste de dicts (format JSON standard)
-                                final_to_save = df_f.to_dict('records')
                                 sauvegarder_data(final_to_save, 'contacts.json')
                                 st.rerun()
                             except Exception as e:
-                                st.error(f"Erreur : {e}")
+                                st.error(f"Erreur de sauvegarde : {e}")
 
-                    if c2.button("✏️ Modifier", key=f"e_{idx}_{r['Nom']}"):
+                    if c2.button("✏️ Modifier", key=f"edit_{idx}_{r.get('Nom','')}"):
                         st.session_state.contact_edit_idx = idx
                         st.session_state.page = "CONTACTS"
                         st.rerun()
