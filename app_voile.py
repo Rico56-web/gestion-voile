@@ -1224,51 +1224,56 @@ if st.session_state.page == "MAINT":
 if st.session_state.page == "FACT":
     st.title("📑 Suivi de Facturation")
     
-    # 1. CHARGEMENT ET TRI (PLUS RÉCENT EN HAUT)
+    # 1. CHARGEMENT
     df_f = charger_data_safe('contacts.json')
 
     if df_f.empty:
         st.warning("Aucune donnée de contact trouvée.")
     else:
-        # Nettoyage des colonnes
+        # Nettoyage initial
         df_f = df_f.rename(columns={'Prénom': 'Prenom', 'Société': 'Societe'})
         if 'Paiement' not in df_f.columns: df_f['Paiement'] = "Unpaid"
 
-        # --- LOGIQUE DE TRI INFALLIBLE ---
-        # On crée une clé AAAAMMJJ pour un tri chronologique réel
-        def get_sort_key(d):
+        # --- FIX PB 1 : LE TRI (PLUS RÉCENT EN HAUT) ---
+        # On crée une clé AAAAMMJJ manuelle pour ne pas utiliser d'objets 'Date' complexes
+        def get_clean_key(d):
             try:
-                p = str(d).split('/')
-                return f"{p[2]}{p[1]}{p[0]}" # Transforme 25/03/2026 en 20260325
+                p = str(d).strip().split('/')
+                if len(p) == 3:
+                    return f"{p[2]}{p[1]}{p[0]}" # 20260525
             except: return "00000000"
+            return "00000000"
 
-        df_f['tmp_tri'] = df_f['DateNav'].apply(get_sort_key)
+        df_f['tmp_tri'] = df_f['DateNav'].apply(get_clean_key)
         
-        # Tri descendant (plus récent en haut) et reset de l'index pour le bouton
-        df_f = df_f.sort_values(by='tmp_tri', ascending=False).reset_index(drop=True)
+        # TRI DESCENDANT (2026 avant 2025)
+        df_f = df_f.sort_values(by='tmp_tri', ascending=False)
+        
+        # RÉINDEXATION : Crucial pour que 'at[idx]' pointe la bonne ligne
+        df_f = df_f.reset_index(drop=True)
 
         # 2. RÉSUMÉ FINANCIER
         v_prix = pd.to_numeric(df_f['Prix'].apply(to_f), errors='coerce').fillna(0)
-        v_acompte = pd.to_numeric(df_f['Acompte'].apply(to_f), errors='coerce').fillna(0)
+        v_enc = pd.to_numeric(df_f['Acompte'].apply(to_f), errors='coerce').fillna(0)
         
         m1, m2, m3 = st.columns(3)
         m1.metric("Total Dû", f"{v_prix.sum():,.2f} €")
-        m2.metric("Encaissé", f"{v_acompte.sum():,.2f} €")
-        m3.metric("Reste", f"{(v_prix.sum() - v_acompte.sum()):,.2f} €")
+        m2.metric("Encaissé", f"{v_enc.sum():,.2f} €")
+        m3.metric("Reste", f"{(v_prix.sum() - v_enc.sum()):,.2f} €")
 
         st.divider()
 
-        # 3. AFFICHAGE DES ONGLETS
+        # 3. ONGLETS
         t_unpaid, t_paid = st.tabs(["⏳ À PERCEVOIR", "✅ ENCAISSÉ"])
 
         def afficher_fiches(dataframe, type_p):
             subset = dataframe[dataframe['Paiement'] == type_p]
             
             if subset.empty:
-                st.info("Aucun dossier dans cette catégorie.")
+                st.info("Aucune fiche.")
             else:
                 for idx, r in subset.iterrows():
-                    # Style visuel (Bleu pour CMN)
+                    # Style visuel
                     is_cmn = str(r['Societe']).upper() == "CMN"
                     bg = "#E3F2FD" if is_cmn else "white"
                     bc = "#d32f2f" if type_p == "Unpaid" else "#2e7d32"
@@ -1286,18 +1291,25 @@ if st.session_state.page == "FACT":
                     c1, c2, _ = st.columns([2, 2, 6])
                     
                     if type_p == "Unpaid":
-                        if c1.button("💰 Encaisser", key=f"pay_{idx}_{r['Nom']}"):
-                            # Modification de la ligne synchronisée
+                        # key unique pour Streamlit
+                        if c1.button("💰 Encaisser", key=f"p_{idx}_{r['Nom']}"):
+                            # MODIFICATION DIRECTE
                             df_f.at[idx, 'Paiement'] = "Paid"
                             df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix']
                             
-                            # --- PROTECTION SAUVEGARDE ---
-                            # On retire la colonne temporaire de tri avant d'enregistrer
-                            df_final = df_f.drop(columns=['tmp_tri'])
-                            sauvegarder_data(df_final, 'contacts.json')
-                            st.rerun()
+                            # --- FIX PB 2 : ERREUR SAUVEGARDE ---
+                            # On retire TOUTES les colonnes temporaires et on convertit en types simples
+                            # avant d'envoyer à la fonction de sauvegarde.
+                            df_final = df_f.drop(columns=['tmp_tri'], errors='ignore')
+                            
+                            try:
+                                # On force la sauvegarde du dataframe complet (df_f) mis à jour
+                                sauvegarder_data(df_final, 'contacts.json')
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erreur fatale : {e}")
 
-                    if c2.button("✏️ Modifier", key=f"ed_{idx}_{r['Nom']}"):
+                    if c2.button("✏️ Modifier", key=f"e_{idx}_{r['Nom']}"):
                         st.session_state.contact_edit_idx = idx
                         st.session_state.page = "CONTACTS"
                         st.rerun()
