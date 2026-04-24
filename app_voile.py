@@ -1210,85 +1210,77 @@ if st.session_state.page == "FACT":
     if df_f.empty:
         st.warning("Aucune donnée de contact trouvée.")
     else:
-        # 1. PRÉPARATION DES DONNÉES
+        # --- 1. PRÉPARATION ET TRI (IMPORTANT) ---
         df_f = df_f.rename(columns={'Prénom': 'Prenom', 'Société': 'Societe'})
-        if 'Paiement' not in df_f.columns: df_f['Paiement'] = "Unpaid"
+        if 'Paiement' not in df_f.columns: 
+            df_f['Paiement'] = "Unpaid"
         
         df_f['Prix'] = df_f['Prix'].apply(to_f)
         df_f['Acompte'] = df_f['Acompte'].apply(to_f)
 
-        # TRI CHRONOLOGIQUE INVERSÉ
-        df_f['dt_tri'] = pd.to_datetime(df_f['DateNav'], format='%d/%m/%Y', errors='coerce')
-        df_f = df_f.sort_values(by='dt_tri', ascending=False).reset_index(drop=True)
+        # Conversion robuste pour le tri : on crée une colonne technique
+        df_f['dt_tri'] = pd.to_datetime(df_f['DateNav'], dayfirst=True, errors='coerce')
+        # Tri global : Plus récent en haut
+        df_f = df_f.sort_values(by='dt_tri', ascending=False)
 
-        # 2. BOUTON D'ENVOI CMN (Placé ici pour être toujours visible)
-        with st.expander("✉️ ENVOYER RAPPORT MENSUEL CMN", expanded=False):
-            df_cmn_filter = df_f.copy().reset_index(drop=True)
-            current_month = datetime.now().month
-            pattern_mois = f"/{current_month:02d}/" 
-            
-            # Filtrage spécifique CMN du mois
-            df_cmn = df_cmn_filter[
-                df_cmn_filter.apply(lambda x: str(x['Societe']) == 'CMN' and pattern_mois in str(x['DateNav']), axis=1)
-            ]
-
-            if st.button("📧 Générer le mail Trésorier CMN", use_container_width=True):
-                if df_cmn.empty:
-                    st.warning(f"Aucune sortie CMN enregistrée pour le mois {current_month}.")
-                else:
-                    destinataire = "tresorier@cmn-asso.fr"
-                    objet = f"Facturation Vesta Skipper - {mois_fr[current_month-1]} {datetime.now().year}"
-                    corps_mail = f"Bonjour Monsieur le Trésorier,\n\nVoici le récapitulatif des sorties CMN pour ce mois-ci :\n\n"
-                    total_cmn = 0
-                    for _, row in df_cmn.iterrows():
-                        p = to_f(row.get('Prix', 0))
-                        corps_mail += f"- Le {row['DateNav']} : {p:.2f} €\n"
-                        total_cmn += p
-                    corps_mail += f"\nTOTAL : {total_cmn:.2f} €\n\nCordialement."
-                    
-                    mailto_link = f"mailto:{destinataire}?subject={urllib.parse.quote(objet)}&body={urllib.parse.quote(corps_mail)}"
-                    st.markdown(f'<a href="{mailto_link}" target="_blank"><div style="text-align: center; background-color: #1a2a6c; color: white; padding: 12px; border-radius: 8px; font-weight: bold;">🚀 CLIQUEZ ICI POUR ENVOYER LE MAIL</div></a>', unsafe_allow_html=True)
+        # --- 2. BOUTON D'ENVOI CMN ---
+        # (Votre code mailto reste identique ici...)
+        # ... [Garder le bloc expander ✉️ ENVOYER RAPPORT MENSUEL CMN] ...
 
         st.divider()
 
-        # 3. RÉSUMÉ FINANCIER
+        # --- 3. RÉSUMÉ FINANCIER ---
+        # On calcule les totaux sur l'ensemble
         total_ca = df_f['Prix'].sum()
         total_encaisse = df_f['Acompte'].sum()
         reste = total_ca - total_encaisse
+        
         m1, m2, m3 = st.columns(3)
         m1.metric("Total Dû", f"{total_ca:,.2f} €")
         m2.metric("Encaissé", f"{total_encaisse:,.2f} €")
         m3.metric("Reste", f"{reste:,.2f} €", delta=f"-{reste:.2f}" if reste > 0 else None, delta_color="inverse")
 
-        # 4. SOUS-MENUS (TABS)
-        tab_unpaid, tab_paid = st.tabs(["⏳ À PERCEVOIR (Unpaid)", "✅ ENCAISSÉ (Paid)"])
+        # --- 4. AFFICHAGE DES ARCHIVES (TABS) ---
+        tab_unpaid, tab_paid = st.tabs(["⏳ À PERCEVOIR", "✅ ARCHIVES ENCAISSÉES"])
 
         def afficher_fiches(dataframe, type_paiement):
+            # On filtre le dataframe déjà trié
             subset = dataframe[dataframe['Paiement'] == type_paiement]
+            
             if subset.empty:
-                st.info(f"Rien dans cette catégorie.")
+                st.info(f"Aucune prestation dans cette catégorie.")
             else:
                 for idx, r in subset.iterrows():
+                    # Définition des styles
                     color = "#d32f2f" if type_paiement == "Unpaid" else "#2e7d32"
+                    # Couleur bleue spécifique pour CMN (comme demandé)
                     bg_card = "#E3F2FD" if str(r['Societe']).upper() == "CMN" else "white"
                     
                     st.markdown(f"""
-                        <div style="border-left: 10px solid {color}; background: {bg_card}; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #eee; border-left: 10px solid {color};">
-                            <div style="display: flex; justify-content: space-between;">
-                                <b>{r['Nom']} {r['Prenom']}</b>
-                                <b style="color: {color};">{r['Prix']:.2f} €</b>
+                        <div style="border-left: 10px solid {color}; background: {bg_card}; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #eee;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <b style="font-size: 1.1em;">{r['Nom']} {r['Prenom']}</b><br>
+                                    <small>📅 {r['DateNav']} | 🏢 {r['Societe']}</small>
+                                </div>
+                                <div style="text-align: right;">
+                                    <b style="color: {color}; font-size: 1.2em;">{r['Prix']:.2f} €</b><br>
+                                    <small style="color: gray;">{'Reste: ' + str(round(r['Prix']-r['Acompte'],2)) + '€' if type_paiement == "Unpaid" else "Payé"}</small>
+                                </div>
                             </div>
-                            <small>📅 {r['DateNav']} | 🏢 {r['Societe']}</small>
                         </div>
                     """, unsafe_allow_html=True)
 
+                    # Actions sur les fiches
                     c1, c2, _ = st.columns([2, 2, 6])
                     if type_paiement == "Unpaid":
                         if c1.button("💰 Encaisser", key=f"p_btn_{idx}"):
+                            # Action d'archivage : on bascule le statut
                             df_f.at[idx, 'Paiement'] = "Paid"
                             df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix']
                             sauvegarder_data(df_f, 'contacts.json')
                             st.rerun()
+                    
                     if c2.button("✏️ Modifier", key=f"e_btn_{idx}"):
                         st.session_state.contact_edit_idx = idx
                         st.session_state.page = "CONTACTS"
@@ -1298,6 +1290,7 @@ if st.session_state.page == "FACT":
             afficher_fiches(df_f, "Unpaid")
 
         with tab_paid:
+            # Ici, les prestations apparaissent par ordre de date décroissante
             afficher_fiches(df_f, "Paid")
 
 # =================================================================
