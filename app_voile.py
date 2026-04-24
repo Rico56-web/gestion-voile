@@ -1217,109 +1217,94 @@ if st.session_state.page == "MAINT":
             df_m.drop(columns=['dt_maint'], errors='ignore').to_excel(writer, index=False)
         st.download_button("📥 Télécharger Historique Complet (Excel)", data=buffer.getvalue(), 
                            file_name=f"Maintenance_Vesta_Skipper.xlsx", use_container_width=True)
-
 # =================================================================
-# --- PAGE : FACTURATION (FACT) ---
+# --- 7. PAGE FACTURATION (FACT) ---
 # =================================================================
 if st.session_state.page == "FACT":
-    st.title("📑 Suivi de Facturation")
+    st.markdown("<h2 style='text-align: center;'>📑 Suivi de Facturation</h2>", unsafe_allow_html=True)
     
-    # 1. CHARGEMENT EN FORMAT "LISTE" (Plus stable que DataFrame pour le tri)
-    data_brute = charger_data_safe('contacts.json')
-    
-    # On force la conversion en liste de dictionnaires pour manipuler du texte pur
-    if isinstance(data_brute, pd.DataFrame):
-        ma_liste = data_brute.to_dict('records')
+    # On recharge les données fraîches pour éviter les décalages
+    df_fact = charger_data_safe('contacts.json')
+
+    if df_fact.empty:
+        st.info("Aucune donnée de facturation.")
     else:
-        ma_liste = data_brute
+        # --- CALCULS ---
+        # Utilisation de la fonction to_f que vous avez déjà définie
+        total_ca = sum(df_fact['Prix'].apply(to_f))
+        total_enc = sum(df_fact['Acompte'].apply(to_f))
+        reste_a_percevoir = total_ca - total_enc
 
-    if not ma_liste:
-        st.warning("Aucune donnée trouvée.")
-    else:
-        # --- FIX PB 1 : TRI CHRONOLOGIQUE MANUEL (AAAAMMJJ) ---
-        def generer_cle_tri(item):
-            d = str(item.get('DateNav', '01/01/2000')).strip()
-            try:
-                # On transforme "28/04/2026" en "20260428"
-                p = d.split('/')
-                return f"{p[2]}{p[1]}{p[0]}"
-            except:
-                return "00000000"
-
-        # On trie la liste : reverse=True place 2026 avant 2025
-        ma_liste_triee = sorted(ma_liste, key=generer_cle_tri, reverse=True)
-        
-        # On ne crée le DataFrame QUE pour l'affichage final
-        df_f = pd.DataFrame(ma_liste_triee)
-        
-        # Nettoyage express des noms de colonnes
-        df_f = df_f.rename(columns={'Prénom': 'Prenom', 'Société': 'Societe'})
-
-        # 2. RÉSUMÉ FINANCIER (Calculé sur la liste pour éviter les erreurs d'index)
-        total_ca = sum(to_f(x.get('Prix', 0)) for x in ma_liste_triee)
-        total_enc = sum(to_f(x.get('Acompte', 0)) for x in ma_liste_triee)
-        
         m1, m2, m3 = st.columns(3)
-        m1.metric("Total Dû", f"{total_ca:,.2f} €")
-        m2.metric("Encaissé", f"{total_enc:,.2f} €")
-        m3.metric("Reste", f"{(total_ca - total_enc):,.2f} €")
+        m1.metric("Total CA", f"{total_ca:,.0f} €")
+        m2.metric("Encaissé", f"{total_enc:,.0f} €", delta=f"{total_enc}", delta_color="normal")
+        m3.metric("Reste à percevoir", f"{reste_a_percevoir:,.0f} €", delta=f"-{reste_a_percevoir}" if reste_a_percevoir > 0 else "OK", delta_color="inverse")
 
         st.divider()
 
-        # 3. ONGLETS
-        t_unpaid, t_paid = st.tabs(["⏳ À PERCEVOIR", "✅ ENCAISSÉ"])
+        # --- FILTRAGE ET TRI ---
+        # On s'assure que le statut existe
+        if 'Paiement' not in df_fact.columns: df_fact['Paiement'] = "Unpaid"
+        
+        # TRI PAR DATE (Plus récent en haut)
+        def sort_key_fact(d):
+            try:
+                p = str(d).split('/')
+                return f"{p[2]}{p[1]}{p[0]}"
+            except: return "00000000"
+        
+        df_fact['tmp_sort'] = df_fact['DateNav'].apply(sort_key_fact)
+        df_fact = df_fact.sort_values(by='tmp_sort', ascending=False).drop(columns=['tmp_sort'])
 
-        def afficher_fiches(df_source, status_recherche):
-            # On filtre localement
-            subset = df_source[df_source.get('Paiement', 'Unpaid') == status_recherche]
+        t1, t2 = st.tabs(["⏳ À ENCAISSER", "✅ PAYÉ"])
+
+        def afficher_onglet(status_filtre):
+            # Filtrage
+            df_vue = df_fact[df_fact['Paiement'] == status_filtre]
             
-            if subset.empty:
-                st.info("Rien à afficher.")
+            if df_vue.empty:
+                st.write("Rien dans cette catégorie.")
             else:
-                for idx, r in subset.iterrows():
-                    # Style visuel (Bleu pour CMN)
-                    is_cmn = str(r.get('Societe', '')).upper() == "CMN"
-                    bg = "#E3F2FD" if is_cmn else "white"
-                    bc = "#d32f2f" if status_recherche == "Unpaid" else "#2e7d32"
+                for idx, row in df_vue.iterrows():
+                    # Style visuel (Bleu pour CMN comme demandé dans vos préférences)
+                    soc = str(row.get('Société', 'PERSO')).upper()
+                    is_cmn = soc == "CMN"
+                    card_bg = "#E3F2FD" if is_cmn else "#F9F9F9"
+                    accent = "#2980B9" if is_cmn else "#7F8C8D"
                     
                     st.markdown(f"""
-                        <div style="border-left: 10px solid {bc}; background: {bg}; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #eee;">
-                            <div style="display: flex; justify-content: space-between;">
-                                <b>{r.get('Nom','')} {r.get('Prenom','')}</b>
-                                <b style="color: {bc};">{to_f(r.get('Prix',0)):.2f} €</b>
+                        <div style="background:{card_bg}; border-left:10px solid {accent}; padding:15px; border-radius:8px; margin-bottom:10px; color:black; border: 1px solid #ddd;">
+                            <div style="display:flex; justify-content:space-between;">
+                                <b>{row.get('Nom','')} {row.get('Prénom','')}</b>
+                                <span style="font-size:1.1rem; font-weight:bold;">{to_f(row.get('Prix',0)):.0f} €</span>
                             </div>
-                            <small>📅 {r.get('DateNav','')} | 🏢 {r.get('Societe','')}</small>
+                            <small>📅 {row.get('DateNav','')} | 🏢 {soc}</small>
                         </div>
                     """, unsafe_allow_html=True)
 
                     c1, c2, _ = st.columns([2, 2, 6])
                     
-                    if status_recherche == "Unpaid":
-                        # --- FIX PB 2 : BOUTON & SAUVEGARDE ---
-                        # On utilise le nom et l'index pour une clé de bouton 100% unique
-                        if c1.button("💰 Encaisser", key=f"btn_p_{idx}_{r.get('Nom','').replace(' ','')}"):
-                            # 1. On modifie directement la ligne dans le DataFrame trié
-                            df_f.at[idx, 'Paiement'] = "Paid"
-                            df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix']
-                            
-                            # 2. On transforme le DataFrame en liste de dicts simples
-                            # C'est l'étape CRUCIALE pour supprimer l'erreur de sauvegarde
-                            liste_propre = df_f.to_dict('records')
-                            
-                            try:
-                                sauvegarder_data(liste_propre, 'contacts.json')
-                                st.success("Paiement validé !")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Erreur technique : {e}")
+                    if status_filtre == "Unpaid":
+                        # BOUTON ENCAISSER
+                        # La clé doit être unique : on utilise l'index réel du DataFrame
+                        if c1.button(f"💰 Encaisser", key=f"pay_btn_{idx}"):
+                            # 1. On modifie directement dans le DF global chargé au début du bloc
+                            df_fact.at[idx, 'Paiement'] = "Paid"
+                            df_fact.at[idx, 'Acompte'] = df_fact.at[idx, 'Prix']
+                            # 2. SAUVEGARDE
+                            sauvegarder_data(df_fact, 'contacts.json')
+                            st.success("Payé !")
+                            time.sleep(0.5)
+                            st.rerun()
 
-                    if c2.button("✏️ Modifier", key=f"btn_e_{idx}_{r.get('Nom','').replace(' ','')}"):
-                        st.session_state.contact_edit_idx = idx
-                        st.session_state.page = "CONTACTS"
+                    if c2.button(f"✏️ Voir", key=f"edit_f_{idx}"):
+                        st.session_state.edit_idx = idx
+                        st.session_state.page = "MODIFIER_CONTACT"
                         st.rerun()
 
-        with t_unpaid: afficher_fiches(df_f, "Unpaid")
-        with t_paid: afficher_fiches(df_f, "Paid")
+        with t1: afficher_onglet("Unpaid")
+        with t2: afficher_onglet("Paid")
+
 # =================================================================
 # --- 11. PAGE ARCHIVES ---
 # =================================================================
