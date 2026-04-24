@@ -1223,32 +1223,30 @@ if st.session_state.page == "MAINT":
 if st.session_state.page == "FACT":
     st.markdown("<h2 style='text-align: center;'>📑 Suivi de Facturation</h2>", unsafe_allow_html=True)
     
-    # Chargement des données
     df_fact = charger_data_safe('contacts.json')
 
     if df_fact.empty:
         st.info("Aucune donnée de facturation.")
     else:
-        # --- CALCULS ---
+        # --- CALCULS SÉCURISÉS ---
         total_ca = sum(df_fact['Prix'].apply(to_f))
         total_enc = sum(df_fact['Acompte'].apply(to_f))
-        reste_a_percevoir = total_ca - total_enc
+        reste_a_percevoir = max(0, total_ca - total_enc) # Évite un reste négatif bizarre
 
+        # Affichage avec séparateur d'espace pour le look "Compta"
         m1, m2, m3 = st.columns(3)
-        m1.metric("Total CA", f"{total_ca:,.0f} €")
-        m2.metric("Encaissé", f"{total_enc:,.0f} €", delta=f"{total_enc}", delta_color="normal")
-        m3.metric("Reste à percevoir", f"{reste_a_percevoir:,.0f} €", delta=f"-{reste_a_percevoir}" if reste_a_percevoir > 0 else "OK", delta_color="inverse")
+        m1.metric("Total CA", f"{total_ca:,.0f} €".replace(",", " "))
+        m2.metric("Encaissé", f"{total_enc:,.0f} €".replace(",", " "))
+        m3.metric("Reste à percevoir", f"{reste_a_percevoir:,.0f} €".replace(",", " "), 
+                  delta=f"-{reste_a_percevoir:,.0f}" if reste_a_percevoir > 0 else None, 
+                  delta_color="inverse")
 
         st.divider()
 
-        # --- FILTRAGE ET TRI CHRONOLOGIQUE (MAI AVANT JUIN) ---
-        if 'Paiement' not in df_fact.columns: 
-            df_fact['Paiement'] = "Unpaid"
+        # --- FILTRAGE ET TRI ---
+        if 'Paiement' not in df_fact.columns: df_fact['Paiement'] = "Unpaid"
         
-        # 1. Conversion en format date pour un tri mathématique
         df_fact['dt_temp'] = pd.to_datetime(df_fact['DateNav'], dayfirst=True, errors='coerce')
-        
-        # 2. TRI : ascending=True pour avoir l'ordre normal (ex: 01/05 avant 01/06)
         df_fact = df_fact.sort_values(by='dt_temp', ascending=True).drop(columns=['dt_temp'])
 
         t1, t2 = st.tabs(["⏳ À ENCAISSER", "✅ PAYÉ"])
@@ -1257,22 +1255,33 @@ if st.session_state.page == "FACT":
             df_vue = df_fact[df_fact['Paiement'] == status_filtre]
             
             if df_vue.empty:
-                st.write(f"Rien à afficher dans '{status_filtre}'.")
+                st.write(f"Rien à afficher.")
             else:
+                # Récupérer la date du jour pour comparer
+                aujourdhui = pd.Timestamp.now().normalize()
+
                 for idx, row in df_vue.iterrows():
-                    # Style visuel (Bleu pour CMN)
                     soc = str(row.get('Société', 'PERSO')).upper()
                     is_cmn = "CMN" in soc
+                    
+                    # Logique d'alerte si retard (Date passée et non payée)
+                    date_nav = pd.to_datetime(row.get('DateNav',''), dayfirst=True, errors='coerce')
+                    retard = status_filtre == "Unpaid" and date_nav < aujourdhui
+                    
                     card_bg = "#E3F2FD" if is_cmn else "#F9F9F9"
-                    accent = "#3498db" if is_cmn else "#7F8C8D"
+                    # Si retard, on met une bordure rouge
+                    border_color = "#E74C3C" if retard else ("#3498db" if is_cmn else "#7F8C8D")
                     
                     st.markdown(f"""
-                        <div style="background:{card_bg}; border-left:10px solid {accent}; padding:15px; border-radius:8px; margin-bottom:10px; color:black; border: 1px solid #ddd;">
+                        <div style="background:{card_bg}; border-left:10px solid {border_color}; padding:15px; border-radius:8px; margin-bottom:10px; color:black; border: 1px solid #ddd;">
                             <div style="display:flex; justify-content:space-between;">
                                 <b>{row.get('Nom','')} {row.get('Prénom','')}</b>
                                 <span style="font-size:1.1rem; font-weight:bold;">{to_f(row.get('Prix',0)):.0f} €</span>
                             </div>
-                            <small>📅 {row.get('DateNav','')} | 🏢 {soc}</small>
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <small>📅 {row.get('DateNav','')} | 🏢 {soc}</small>
+                                {"<span style='color:#E74C3C; font-weight:bold; font-size:0.8rem;'>⚠️ RETARD</span>" if retard else ""}
+                            </div>
                         </div>
                     """, unsafe_allow_html=True)
 
@@ -1292,10 +1301,8 @@ if st.session_state.page == "FACT":
                         st.session_state.page = "MODIFIER_CONTACT"
                         st.rerun()
 
-        with t1: 
-            afficher_onglet("Unpaid")
-        with t2: 
-            afficher_onglet("Paid")
+        with t1: afficher_onglet("Unpaid")
+        with t2: afficher_onglet("Paid")
 
 # =================================================================
 # --- 11. PAGE ARCHIVES ---
