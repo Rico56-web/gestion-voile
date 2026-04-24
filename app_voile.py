@@ -1210,26 +1210,29 @@ if st.session_state.page == "FACT":
     if df_f.empty:
         st.warning("Aucune donnée de contact trouvée.")
     else:
-        # 1. PRÉPARATION ET NETTOYAGE
+        # 1. NETTOYAGE ET PRÉPARATION
         df_f = df_f.rename(columns={'Prénom': 'Prenom', 'Société': 'Societe'})
         if 'Paiement' not in df_f.columns: df_f['Paiement'] = "Unpaid"
         
-        # Conversion des montants
+        # On s'assure que les prix sont des nombres
         df_f['Prix'] = df_f['Prix'].apply(to_f)
         df_f['Acompte'] = df_f['Acompte'].apply(to_f)
 
-        # --- CORRECTION DU TRI : DU PLUS RÉCENT AU PLUS ANCIEN ---
-        # On force le format jour/mois/année pour éviter les inversions US
-        df_f['dt_tri'] = pd.to_datetime(df_f['DateNav'], format='%d/%m/%Y', errors='coerce')
+        # --- LE TRI CRITIQUE (PLUS RÉCENT EN HAUT) ---
+        # On force la conversion en spécifiant que le jour est en premier (format FR)
+        df_f['dt_tri'] = pd.to_datetime(df_f['DateNav'], dayfirst=True, errors='coerce')
         
-        # ascending=False : les dates les plus grandes (plus récentes) arrivent en premier
-        # reset_index(drop=True) : INDISPENSABLE pour que le bouton 'Encaisser' fonctionne
-        df_f = df_f.sort_values(by='dt_tri', ascending=False).reset_index(drop=True)
+        # On trie : ascending=False met les dates les plus récentes en haut
+        df_f = df_f.sort_values(by='dt_tri', ascending=False)
+        
+        # IMPORTANT : On réinitialise l'index APRES le tri pour que le bouton 
+        # "Encaisser" vise la bonne ligne en mémoire.
+        df_f = df_f.reset_index(drop=True)
 
-        # 2. BOUTON D'ENVOI CMN
+        # 2. BOUTON D'ENVOI CMN (Inchangé)
         with st.expander("✉️ ENVOYER RAPPORT MENSUEL CMN", expanded=False):
-            # ... (votre bloc mailto reste identique) ...
-            pass # (Gardez votre code ici)
+            # ... votre code mailto ...
+            pass
 
         st.divider()
 
@@ -1242,17 +1245,16 @@ if st.session_state.page == "FACT":
         m2.metric("Encaissé", f"{total_encaisse:,.2f} €")
         m3.metric("Reste", f"{reste:,.2f} €", delta=f"-{reste:.2f}" if reste > 0 else None, delta_color="inverse")
 
-        # 4. SOUS-MENUS (TABS)
+        # 4. AFFICHAGE DES TABS
         tab_unpaid, tab_paid = st.tabs(["⏳ À PERCEVOIR", "✅ ENCAISSÉ"])
 
         def afficher_fiches(dataframe, type_paiement):
-            # Filtrage selon le statut
+            # On filtre sur le dataframe déjà trié et réindexé
             subset = dataframe[dataframe['Paiement'] == type_paiement]
             
             if subset.empty:
-                st.info(f"Rien ici.")
+                st.info(f"Rien dans cette catégorie.")
             else:
-                # IMPORTANT : On itère sur le dataframe trié et réindexé
                 for idx, r in subset.iterrows():
                     color = "#d32f2f" if type_paiement == "Unpaid" else "#2e7d32"
                     bg_card = "#E3F2FD" if str(r['Societe']).upper() == "CMN" else "white"
@@ -1269,13 +1271,12 @@ if st.session_state.page == "FACT":
 
                     c1, c2, _ = st.columns([2, 2, 6])
                     if type_paiement == "Unpaid":
-                        # L'index 'idx' est maintenant fiable grâce au reset_index précédent
+                        # L'index idx est maintenant celui du dataframe df_f réindexé
                         if c1.button("💰 Encaisser", key=f"p_btn_{idx}"):
-                            # Mise à jour directe dans le dataframe parent df_f
+                            # Modification directe dans la source
                             df_f.at[idx, 'Paiement'] = "Paid"
                             df_f.at[idx, 'Acompte'] = df_f.at[idx, 'Prix']
                             
-                            # Sauvegarde immédiate
                             sauvegarder_data(df_f, 'contacts.json')
                             st.rerun()
                             
