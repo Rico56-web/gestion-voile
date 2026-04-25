@@ -293,27 +293,33 @@ if st.session_state.page == "MEMOS":
             st.divider()
 
 # =================================================================
-# --- 5. BLOC CONTACTS (V102 - COMPLET : RELANCES & COULEURS) ---
+# --- 5. BLOC CONTACTS (V105 - HABITUÉS & DUPLICATION) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
+    from datetime import datetime
+    import pandas as pd
+
     # --- CHARGEMENT DES DONNÉES ---
     df_raw = charger_data('contacts.json')
     
-    # --- NAVIGATION ET EXCEL (ARCHIVAGE) ---
-    # Ajout d'une colonne pour le 4ème onglet "RELANCES"
+    # --- NAVIGATION ET EXCEL ---
     n1, n2, n3, n4, n5 = st.columns([1, 1, 1, 1, 1.5])
     
+    # Styles de navigation
     if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
         st.session_state.vue_contact = "En cours"; st.rerun()
-    if n2.button("⌛ ATTENTE", use_container_width=True, type="primary" if st.session_state.vue_contact == "Attente" else "secondary"): 
+    if n2.button("⏳ DEMANDES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Attente" else "secondary"): 
         st.session_state.vue_contact = "Attente"; st.rerun()
-    if n3.button("📞 RELANCES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Relances" else "secondary"): 
+    
+    # Distinction visuelle forte pour les HABITUÉS (Orange)
+    if n3.button("⭐ HABITUÉS", use_container_width=True, type="primary" if st.session_state.vue_contact == "Relances" else "secondary"): 
         st.session_state.vue_contact = "Relances"; st.rerun()
+        
     if n4.button("✅ ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
         st.session_state.vue_contact = "Archives"; st.rerun()
 
     with n5:
-        bouton_export_excel(df_raw, "Planning_General")
+        bouton_export_excel(df_raw, "Planning_Vesta_2026")
 
     st.divider()
 
@@ -324,8 +330,8 @@ if st.session_state.page == "CONTACTS":
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         
         c_search, c_yr, c_new = st.columns([2, 1, 1])
-        search = c_search.text_input("🔍 Rechercher (Nom, Prénom, Société...)", "", key="search_bar_contacts").upper()
-        annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1, key="saison_contacts")
+        search = c_search.text_input("🔍 Rechercher un contact...", "", key="search_bar_contacts").upper()
+        annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
         
         if c_new.button("➕ NOUVEAU", use_container_width=True):
             new_r = {
@@ -339,15 +345,7 @@ if st.session_state.page == "CONTACTS":
             st.session_state.page = "MODIFIER_CONTACT"
             st.rerun()
 
-        # Application des filtres
-        mask = (df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna())
-        if search:
-            mask = mask & (df_c['Nom'].astype(str).str.upper().str.contains(search) | 
-                           df_c['Prénom'].astype(str).str.upper().str.contains(search) | 
-                           df_c['Société'].astype(str).str.upper().str.contains(search))
-        df_c = df_c[mask].copy()
-
-        # --- LOGIQUE DE SÉPARATION DES ONGLETS ---
+        # --- LOGIQUE DE SÉPARATION DES ONGLETS (V105) ---
         statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
         relance_clean = df_c['Relancer'].fillna("Non").str.upper()
         
@@ -355,18 +353,21 @@ if st.session_state.page == "CONTACTS":
             mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
             tri_ordre = False 
         elif st.session_state.vue_contact == "Relances":
-            # Uniquement ceux qui sont Terminés ET marqués "A recontacter : Oui"
-            mask_aff = (statut_clean.str.contains("termine")) & (relance_clean == "OUI")
-            tri_ordre = True
+            mask_aff = (relance_clean == "OUI") # Tous tes VIP
+            tri_ordre = False
+            st.warning("✨ Carnet des Habitués : Utilisez 🔄 RE-RÉSERVER pour dupliquer un contact vers une nouvelle date.")
         elif st.session_state.vue_contact == "Attente":
-            # Uniquement la vraie liste d'attente (pas les terminés)
             mask_aff = (statut_clean == "liste d'attente")
             tri_ordre = True  
         else: # EN COURS
             mask_aff = ~(statut_clean.str.contains("termine|annule|refuse")) & (statut_clean != "liste d'attente")
             tri_ordre = True
 
-        df_aff = df_c[mask_aff].copy().sort_values(by='dt_sort', ascending=tri_ordre)
+        df_aff = df_c[mask_aff & ((df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna()))].copy()
+        if search:
+            df_aff = df_aff[df_aff['Nom'].str.contains(search) | df_aff['Prénom'].str.contains(search) | df_aff['Société'].str.contains(search)]
+        
+        df_aff = df_aff.sort_values(by='dt_sort', ascending=tri_ordre)
 
         # --- BOUCLE D'AFFICHAGE DES FICHES ---
         for _, row in df_aff.iterrows():
@@ -374,70 +375,67 @@ if st.session_state.page == "CONTACTS":
             p_total, p_aco = to_f(row.get('Prix', 0)), to_f(row.get('Acompte', 0))
             reste = p_total - p_aco
             
-            # Couleurs de société (avec Jaune pour PERSO)
-            soc_name = str(row.get('Société', 'PERSO')).upper()
-            if soc_name == "CMN": border_col, bg_card, text_soc = "#2980B9", "#EBF5FB", "🔵 CMN"
-            elif soc_name == "CLICK": border_col, bg_card, text_soc = "#27AE60", "#EAFAF1", "🟢 CLICK"
-            elif soc_name == "VOG": border_col, bg_card, text_soc = "#8E44AD", "#F5EEF8", "🟣 VOG"
-            elif soc_name == "PERSO": border_col, bg_card, text_soc = "#F1C40F", "#FEF9E7", "🟡 PERSO"
-            else: border_col, bg_card, text_soc = "#7F8C8D", "#FDFEFE", "⚪ " + soc_name
-
-            # Icônes de paiement
-            pay_status = str(row.get('Paiement', 'Unpaid')).upper()
-            pay_icon = "✅" if pay_status == "PAID" else "⏳"
+            # Badge VIP / Habitué
+            is_vip = str(row.get('Relancer', 'Non')).upper() == "OUI"
+            badge_vip = "⭐ " if is_vip else ""
             
-            # Style spécial si c'est une relance
-            style_relance = "border: 2px dashed #E67E22;" if st.session_state.vue_contact == "Relances" else ""
+            # Couleurs de société
+            soc_name = str(row.get('Société', 'PERSO')).upper()
+            colors = {"CMN": ("#2980B9", "#EBF5FB"), "CLICK": ("#27AE60", "#EAFAF1"), 
+                      "VOG": ("#8E44AD", "#F5EEF8"), "PERSO": ("#F1C40F", "#FEF9E7")}
+            border_col, bg_card = colors.get(soc_name, ("#7F8C8D", "#FDFEFE"))
 
             st.markdown(f"""
             <div style="background:{bg_card}; padding:15px; border-radius:12px; border-left:10px solid {border_col}; 
-                        box-shadow: 4px 4px 10px rgba(0,0,0,0.08); margin-bottom:15px; color: black; {style_relance}">
+                        box-shadow: 4px 4px 10px rgba(0,0,0,0.08); margin-bottom:10px; color: black;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:1.2rem; font-weight:bold; color:#2C3E50;">{row['Prénom']} {row['Nom']}</span>
-                    <span style="background:{border_col}; color:{'black' if soc_name == 'PERSO' else 'white'}; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:bold;">{text_soc}</span>
+                    <span style="font-size:1.1rem; font-weight:bold;">{badge_vip}{row['Prénom']} {row['Nom']}</span>
+                    <span style="background:{border_col}; color:white; padding:2px 8px; border-radius:10px; font-size:0.7rem;">{soc_name}</span>
                 </div>
-                <div style="margin-top:8px; font-size:0.95rem;">
-                    📅 <b>{row['DateNav']}</b> | 👥 {row['Pers']} pers | ☀️ {row['Jours']}j<br>
-                    <div style="margin-top:5px; padding:5px; background:rgba(255,255,255,0.6); border-radius:5px;">
-                        💰 {int(p_total)}€ | 💸 {int(p_aco)}€ | <b style="color:{'#C0392B' if reste > 0 else '#27AE60'};">⌛ Reste : {int(reste)}€</b>
-                    </div>
-                    <div style="margin-top:5px; font-weight:bold;">{pay_icon} {pay_status} | 🏁 {row['Statut']}</div>
-                    <hr style="margin:10px 0; border: 0.5px solid rgba(0,0,0,0.1);">
-                    <i style="color:#566573;">📝 {row['Notes']}</i>
+                <div style="font-size:0.9rem; margin-top:5px;">
+                    📅 <b>{row['DateNav']}</b> | 💸 Reste : <b>{int(reste)}€</b> | Statut : {row['Statut']}
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # --- BOUTONS ---
-            c1, c2, c3 = st.columns([1, 1, 1])
+            # --- BOUTONS D'ACTION ---
+            c1, c2, c3 = st.columns(3)
+            
             if c1.button("✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx
                 st.session_state.page = "MODIFIER_CONTACT"
                 st.rerun()
 
-            if f"confirm_del_{idx}" not in st.session_state:
-                if c2.button("🗑️ SUPPRIMER", key=f"del_{idx}", use_container_width=True):
-                    st.session_state[f"confirm_del_{idx}"] = True
+            if st.session_state.vue_contact == "Relances":
+                # BOUTON RE-RÉSERVER (Duplication)
+                if c2.button("🔄 RE-RÉSERVER", key=f"dup_{idx}", use_container_width=True):
+                    df_db = charger_data('contacts.json')
+                    new_entry = row.to_dict()
+                    new_entry.update({
+                        "DateNav": datetime.now().strftime("%d/%m/%Y"),
+                        "Statut": "En attente", "Paiement": "Unpaid", "Prix": 0, "Acompte": 0,
+                        "Notes": f"Nouvelle résa (Habitué). Ancienne nav le {row['DateNav']}"
+                    })
+                    # Purge des index temporaires
+                    for k in ['orig_idx', 'dt_sort']: new_entry.pop(k, None)
+                    
+                    df_new = pd.concat([pd.DataFrame([new_entry]), df_db], ignore_index=True)
+                    sauvegarder_data(df_new, 'contacts.json')
+                    st.session_state.edit_idx = 0 # Le nouveau est en haut
+                    st.session_state.page = "MODIFIER_CONTACT"
                     st.rerun()
             else:
-                st.error(f"Supprimer {row['Nom']} ?")
-                co1, co2 = st.columns(2)
-                if co1.button("✅ OUI", key=f"y_{idx}"):
+                # SUPPRIMER classique
+                if c2.button("🗑️ SUPPRIMER", key=f"del_{idx}", use_container_width=True):
                     df_db = charger_data('contacts.json').drop(idx).reset_index(drop=True)
                     sauvegarder_data(df_db, 'contacts.json')
-                    del st.session_state[f"confirm_del_{idx}"]; st.rerun()
-                if co2.button("❌ NON", key=f"n_{idx}"):
-                    del st.session_state[f"confirm_del_{idx}"]; st.rerun()
-            
-            if st.session_state.vue_contact == "En cours":
-                if c3.button("🏁 FINIR", key=f"fin_{idx}", use_container_width=True):
-                    df_all = charger_data('contacts.json')
-                    df_all.loc[idx, 'Statut'] = "Terminé"
-                    df_all.loc[idx, 'Paiement'] = "Paid"
-                    sauvegarder_data(df_all, 'contacts.json')
                     st.rerun()
-    else:
-        st.info("La base de données est vide.")
+
+            if st.session_state.vue_contact == "En cours" and c3.button("🏁 FINIR", key=f"fin_{idx}", use_container_width=True):
+                df_all = charger_data('contacts.json')
+                df_all.loc[idx, ['Statut', 'Paiement']] = ["Terminé", "Paid"]
+                sauvegarder_data(df_all, 'contacts.json')
+                st.rerun()
 
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT ---
