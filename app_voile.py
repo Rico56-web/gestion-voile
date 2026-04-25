@@ -312,41 +312,39 @@ if st.session_state.page == "MEMOS":
         # On ajoute cette ligne à la fin de la note ou du log
         st.success(f"Rapport signé : {signature}")
                 
-        # --- ACTIONS (Barre d'outils mise à jour) ---
-    btn_c1, btn_c2, btn_c3, btn_c4 = st.columns(4) # On passe à 4 colonnes
+      # --- ACTIONS (À l'intérieur de la boucle for) ---
+btn_c1, btn_c2, btn_c3, btn_c4 = st.columns(4) 
                 
-    if btn_c1.button("✏️ Modifier", key=f"edit_btn_{idx}"):
-        st.session_state.memo_edit_id = idx
-        st.rerun()
+if btn_c1.button("✏️ Modifier", key=f"edit_btn_{idx}"):
+    st.session_state.memo_edit_id = idx
+    st.rerun()  # Corrigé : st au lieu de t
                     
-    if btn_c2.button("📦 Archive", key=f"arch_btn_{idx}"):
-        df_memos.at[idx, 'Archive'] = "Archivé"
-        sauvegarder_data(df_memos, 'memos.json')
-        st.rerun()
+if btn_c2.button("📦 Archive", key=f"arch_btn_{idx}"):
+    df_memos.at[idx, 'Archive'] = "Archivé"
+    sauvegarder_data(df_memos, 'memos.json')
+    st.rerun()
                 
-    # Le bouton d'impression (Appel de notre fonction JS)
-    with btn_c3:
-        texte_impr = str(row['Description']).replace("✅ | ", "[FAIT] ")
-        bouton_imprimer_fiche(row['Date'], texte_impr, stat_val)
+# Bouton impression
+with btn_c3:
+    texte_impr = str(row['Description']).replace("✅ | ", "[FAIT] ")
+    bouton_imprimer_fiche(row['Date'], texte_impr, stat_val)
 
-    # Suppression avec double confirmation (dans la 4ème colonne)
-    conf_del_key = f"del_confirm_{idx}"
-    if not st.session_state.get(conf_del_key, False):
-        if btn_c4.button("🗑️ Suppr", key=f"del_pre_{idx}"):
-            st.session_state[conf_del_key] = True
-            st.rerun()
-    else:
-        sub_c1, sub_c2 = btn_c4.columns(2)
-        if sub_c1.button("✅", key=f"del_yes_{idx}", type="primary"):
-            df_memos = df_memos.drop(idx).reset_index(drop=True)
-            sauvegarder_data(df_memos, 'memos.json')
-            st.session_state[conf_del_key] = False
-            st.rerun()
-        if sub_c2.button("❌", key=f"del_no_{idx}"):
-            st.session_state[conf_del_key] = False
-            st.rerun()
- 
-            st.write("")
+# Suppression avec double confirmation
+conf_del_key = f"del_confirm_{idx}"
+if not st.session_state.get(conf_del_key, False):
+    if btn_c4.button("🗑️ Suppr", key=f"del_pre_{idx}"):
+        st.session_state[conf_del_key] = True
+        st.rerun()
+else:
+    sub_c1, sub_c2 = btn_c4.columns(2)
+    if sub_c1.button("✅", key=f"del_yes_{idx}", type="primary"):
+        df_memos = df_memos.drop(idx).reset_index(drop=True)
+        sauvegarder_data(df_memos, 'memos.json')
+        st.session_state[conf_del_key] = False
+        st.rerun()
+    if sub_c2.button("❌", key=f"del_no_{idx}"):
+        st.session_state[conf_del_key] = False
+        st.rerun()
     # --- À mettre en bas de tes fiches Mémos ou Logbook ---
     if st.button("🖋️ Signer le rapport de bord"):
         signature = f"VALIDÉ PAR SKIPPER VESTA - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
