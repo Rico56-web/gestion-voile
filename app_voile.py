@@ -194,7 +194,6 @@ for i, name in enumerate(menu):
 
 
 st.divider()
-
 # =================================================================
 # --- 2. MENU MÉMOS (VERSION FINALE : BASCULE FLUIDE & ÉDITION) ---
 # =================================================================
@@ -211,7 +210,7 @@ if st.session_state.page == "MEMOS":
     if 'memo_edit_id' not in st.session_state: 
         st.session_state.memo_edit_id = None
 
-    # --- A. AJOUT NOUVELLE NOTE (AVEC BOUTON FERMER) ---
+    # --- A. AJOUT NOUVELLE NOTE ---
     with st.expander("➕ CRÉER UNE NOUVELLE CHECK-LIST", expanded=df_memos.empty):
         with st.form("new_memo_form_final"):
             c1, c2 = st.columns(2)
@@ -228,33 +227,33 @@ if st.session_state.page == "MEMOS":
                     st.rerun()
 
             if btn_close.form_submit_button("❌ FERMER", use_container_width=True):
-                st.rerun() # Referme l'expander visuellement au rechargement
+                st.rerun()
 
     # --- B. AFFICHAGE DES FICHES ---
     df_show = df_memos[df_memos['Archive'] == "Non Archivé"]
     
     if not df_show.empty:
+        # On trie pour voir les plus récents en haut
         for idx, row in df_show.sort_index(ascending=False).iterrows():
+            
+            # --- PRÉPARATION DES VARIABLES (Évite NameError) ---
+            stat_val = str(row.get('Statut', 'Normal'))
+            pay_val = str(row.get('Paiement', 'N/A'))
             
             # --- CAS 1 : FORMULAIRE DE MODIFICATION ---
             if st.session_state.memo_edit_id == idx:
                 texte_edition = str(row['Description']).replace("✅ | ", "").replace("❌ | ", "")
                 
-                # Style encadré pour la modif
                 st.markdown(f"✨ **Modification en cours : Note du {row['Date']}**")
                 with st.form(key=f"edit_form_loc_{idx}"):
                     e_desc = st.text_area("Éditer la liste", value=texte_edition, height=150)
                     c1, c2 = st.columns(2)
                     
-                    # Sécurisation des index pour les selectbox
                     p_opts = ["N/A", "À Payer", "Payé"]
                     s_opts = ["Normal", "Urgent", "Fait"]
                     
-                    curr_p = row.get('Paiement', 'N/A')
-                    curr_s = row.get('Statut', 'Normal')
-                    
-                    e_pay = c1.selectbox("Paiement", p_opts, index=p_opts.index(curr_p) if curr_p in p_opts else 0)
-                    e_stat = c2.selectbox("Urgence", s_opts, index=s_opts.index(curr_s) if curr_s in s_opts else 0)
+                    e_pay = c1.selectbox("Paiement", p_opts, index=p_opts.index(pay_val) if pay_val in p_opts else 0)
+                    e_stat = c2.selectbox("Urgence", s_opts, index=s_opts.index(stat_val) if stat_val in s_opts else 0)
                     
                     col_save, col_cancel = st.columns(2)
                     if col_save.form_submit_button("✅ ENREGISTRER"):
@@ -262,29 +261,31 @@ if st.session_state.page == "MEMOS":
                         df_memos.at[idx, 'Paiement'] = e_pay
                         df_memos.at[idx, 'Statut'] = e_stat
                         sauvegarder_data(df_memos, 'memos.json')
-                        st.session_state.memo_edit_id = None # Fermeture
+                        st.session_state.memo_edit_id = None 
                         st.rerun()
                         
-                    if col_cancel.form_submit_button("❌ FERMER"):
+                    if col_cancel.form_submit_button("❌ ANNULER"):
                         st.session_state.memo_edit_id = None
                         st.rerun()
             
             # --- CAS 2 : AFFICHAGE NORMAL ---
             else:
-                stat_val = str(row.get('Statut', 'Normal'))
+                # Couleurs selon statut
                 if stat_val == "Urgent": h_c, bg_c = "#E74C3C", "#FDEDEC" 
                 elif stat_val == "Fait": h_c, bg_c = "#27AE60", "#EAFAF1"
                 else: h_c, bg_c = "#2980B9", "#EBF5FB"
 
+                # En-tête de la fiche
                 st.markdown(f"""
                     <div style="background-color:{bg_c}; border-left: 10px solid {h_c}; padding: 15px; border-radius: 10px; margin-bottom: 5px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-weight: bold; color: #2C3E50;">📅 {row['Date']}</span>
+                            <span style="font-weight: bold; color: #2C3E50;">📅 {row['Date']} | 💰 {pay_val}</span>
                             <span style="background-color: {h_c}; color: white; padding: 2px 10px; border-radius: 15px; font-size: 0.8rem;">{stat_val.upper()}</span>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
 
+                # Liste de tâches interactive
                 lignes = str(row.get('Description', '')).split('\n')
                 data_list = [{"Fait": l.startswith("✅ | "), "Tâche": l.replace("✅ | ", "").replace("❌ | ", "")} 
                              for l in lignes if l.strip()]
@@ -301,55 +302,54 @@ if st.session_state.page == "MEMOS":
                         }
                     )
 
+                    # Sauvegarde auto si on coche une case
                     if not edited_df.equals(pd.DataFrame(data_list)):
                         new_desc = "\n".join([f"{'✅ | ' if r['Fait'] else ''}{r['Tâche']}" for _, r in edited_df.iterrows()])
                         df_memos.at[idx, 'Description'] = new_desc
                         sauvegarder_data(df_memos, 'memos.json')
                         st.rerun()
-        # Dans ton bloc NOTES ou LOG
-    if st.button("🖋️ Signer numériquement le rapport"):
-        signature = f"Validé par Skipper Vesta le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"
-        # On ajoute cette ligne à la fin de la note ou du log
-        st.success(f"Rapport signé : {signature}")
-                
-      # --- ACTIONS (À l'intérieur de la boucle for) ---
-btn_c1, btn_c2, btn_c3, btn_c4 = st.columns(4) 
-                
-if btn_c1.button("✏️ Modifier", key=f"edit_btn_{idx}"):
-    st.session_state.memo_edit_id = idx
-    st.rerun()  # Corrigé : st au lieu de t
-                    
-if btn_c2.button("📦 Archive", key=f"arch_btn_{idx}"):
-    df_memos.at[idx, 'Archive'] = "Archivé"
-    sauvegarder_data(df_memos, 'memos.json')
-    st.rerun()
-                
-# Bouton impression
-with btn_c3:
-    texte_impr = str(row['Description']).replace("✅ | ", "[FAIT] ")
-    bouton_imprimer_fiche(row['Date'], texte_impr, stat_val)
 
-# Suppression avec double confirmation
-conf_del_key = f"del_confirm_{idx}"
-if not st.session_state.get(conf_del_key, False):
-    if btn_c4.button("🗑️ Suppr", key=f"del_pre_{idx}"):
-        st.session_state[conf_del_key] = True
-        st.rerun()
-else:
-    sub_c1, sub_c2 = btn_c4.columns(2)
-    if sub_c1.button("✅", key=f"del_yes_{idx}", type="primary"):
-        df_memos = df_memos.drop(idx).reset_index(drop=True)
-        sauvegarder_data(df_memos, 'memos.json')
-        st.session_state[conf_del_key] = False
-        st.rerun()
-    if sub_c2.button("❌", key=f"del_no_{idx}"):
-        st.session_state[conf_del_key] = False
-        st.rerun()
-    # --- À mettre en bas de tes fiches Mémos ou Logbook ---
+                # --- BARRE D'OUTILS (ACTIONS) ---
+                btn_c1, btn_c2, btn_c3, btn_c4 = st.columns(4)
+                
+                if btn_c1.button("✏️ Modifier", key=f"edit_btn_{idx}"):
+                    st.session_state.memo_edit_id = idx
+                    st.rerun()
+                    
+                if btn_c2.button("📦 Archive", key=f"arch_btn_{idx}"):
+                    df_memos.at[idx, 'Archive'] = "Archivé"
+                    sauvegarder_data(df_memos, 'memos.json')
+                    st.rerun()
+                
+                with btn_c3:
+                    texte_impr = str(row['Description']).replace("✅ | ", "[FAIT] ")
+                    bouton_imprimer_fiche(row['Date'], texte_impr, stat_val)
+
+                # Suppression avec double confirmation
+                conf_del_key = f"del_confirm_{idx}"
+                if not st.session_state.get(conf_del_key, False):
+                    if btn_c4.button("🗑️ Suppr", key=f"del_pre_{idx}"):
+                        st.session_state[conf_del_key] = True
+                        st.rerun()
+                else:
+                    sub_c1, sub_c2 = btn_c4.columns(2)
+                    if sub_c1.button("✅", key=f"del_yes_{idx}", type="primary"):
+                        df_memos = df_memos.drop(idx).reset_index(drop=True)
+                        sauvegarder_data(df_memos, 'memos.json')
+                        st.session_state[conf_del_key] = False
+                        st.rerun()
+                    if sub_c2.button("❌", key=f"del_no_{idx}"):
+                        st.session_state[conf_del_key] = False
+                        st.rerun()
+                
+                st.divider()
+
+    # --- PIED DE PAGE : SIGNATURE ---
+    st.write("")
     if st.button("🖋️ Signer le rapport de bord"):
         signature = f"VALIDÉ PAR SKIPPER VESTA - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
         st.info(signature)
-        # Option : Sauvegarder cette ligne dans ton logbook
+
 
 # =================================================================
 # --- 5. BLOC CONTACTS (V102 - COMPLET : RELANCES & COULEURS) ---
