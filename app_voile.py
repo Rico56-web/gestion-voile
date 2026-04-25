@@ -317,7 +317,7 @@ if st.session_state.page == "MEMOS":
                 
     if btn_c1.button("✏️ Modifier", key=f"edit_btn_{idx}"):
         st.session_state.memo_edit_id = idx
-        t.rerun()
+        st.rerun()
                     
     if btn_c2.button("📦 Archive", key=f"arch_btn_{idx}"):
         df_memos.at[idx, 'Archive'] = "Archivé"
