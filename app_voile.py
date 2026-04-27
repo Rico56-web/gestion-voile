@@ -706,12 +706,11 @@ if st.session_state.page == "STATS":
     df_arch = charger_data_safe('archives_planning.json')
     df_m = charger_data_safe('maintenance.json') 
     df_log = charger_data_safe('logbook.json')
-    params = charger_params() # La fonction doit être définie en haut du script
+    params = charger_params()
     
     # Fusion actif + archives
     df_all = pd.concat([df_actif, df_arch], ignore_index=True) if not df_arch.empty else df_actif
 
-    # --- FONCTION LOCALE POUR LA CONVERSION ---
     def to_f_local(val):
         if pd.isna(val) or val == "": return 0.0
         try: return float(str(val).replace('€','').replace(' ','').replace(',','.').strip())
@@ -720,107 +719,92 @@ if st.session_state.page == "STATS":
     if not df_all.empty:
         # --- A. FILTRES ---
         c_sel1, c_sel2 = st.columns(2)
-        mode_bilan = c_sel1.radio("Période :", ["À ce jour", "Année Complète"], horizontal=True)
-        sel_y = c_sel2.selectbox("Année :", [2025, 2026, 2027], index=1, key="saison_stats")
+        mode_bilan = c_sel1.radio("Mode d'analyse :", ["Réel (Encaissé)", "Prévisionnel (Saison)"], horizontal=True)
+        sel_y = c_sel2.selectbox("Saison :", [2025, 2026, 2027], index=1, key="saison_stats")
 
-        # Filtrage Revenus
+        # Préparation des dates
         df_all['dt_vrai'] = pd.to_datetime(df_all['DateNav'], dayfirst=True, errors='coerce')
         df_f = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
         
-        if mode_bilan == "À ce jour" and not df_f.empty:
-            df_f = df_f[df_f['dt_vrai'] <= pd.Timestamp.now().normalize()].copy()
+        # Logique de comptabilisation cohérente avec les nouveaux onglets
         def est_comptabilise(row):
-            soc = str(row.get('Société', '')).upper()
-            paiement = str(row.get('Paiement', '')).upper()
             statut = str(row.get('Statut', '')).upper()
+            paiement = str(row.get('Paiement', '')).upper()
 
-            # --- CAS 1 : MODE RÉEL (À ce jour) ---
-            if mode_bilan == "À ce jour":
-                # On ne prend que ce qui est payé ET qui n'est pas annulé/en attente
-                # Le statut doit être "Terminé" ou similaire (selon tes labels)
-                est_fini = "TERMINÉ" in statut or "FAIT" in statut or "ARCHIVÉ" in statut
+            if mode_bilan == "Réel (Encaissé)":
+                # Uniquement ce qui est fini ET payé
+                est_fini = any(s in statut for s in ["TERMINÉ", "FAIT", "ARCHIVÉ"])
                 return paiement == "PAID" and est_fini
-
-            # --- CAS 2 : MODE ESTIMATION (Année Complète) ---
             else:
-                # On exclut uniquement les brouillons ou les annulations
-                if "LISTE D'ATTENTE" in statut or "ANNULÉ" in statut: 
+                # Année complète : On prend le carnet de commande sérieux
+                # On exclut "En attente" car c'est dans l'onglet DEMANDES (non validé)
+                if any(s in statut for s in ["ANNULÉ", "REFUSÉ", "EN ATTENTE"]): 
                     return False
-                # On prend tout le reste (En cours, Confirmé, Payé, CMN, etc.)
-                return True
- 
+                return True # On garde : Confirmé, Habitué, Terminé
 
         df_final = df_f[df_f.apply(est_comptabilise, axis=1)].copy() if not df_f.empty else pd.DataFrame()
         
-        # Filtrage Maintenance & Logbook
+        # Calcul du CA en attente (Le "réservoir" des Demandes)
+        df_potentielles = df_f[df_f['Statut'].str.upper() == "EN ATTENTE"]
+        ca_demandes = sum(to_f_local(x) for x in df_potentielles['Prix'])
+
+        # --- B. TOUS LES CALCULS ---
+        total_ca = sum(to_f_local(x) for x in df_final['Prix']) if not df_final.empty else 0.0
+        nb_jours = len(df_final)
+        
+        # Maintenance & Dépenses
         df_m_y = pd.DataFrame()
         if not df_m.empty:
             df_m['dt_maint'] = pd.to_datetime(df_m.get('Date', ''), dayfirst=True, errors='coerce')
             df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m.get('Statut', '') == "Fait")].copy()
         
-        df_log_y = pd.DataFrame()
-        if not df_log.empty:
-            df_log['dt_log'] = pd.to_datetime(df_log.get('Date', ''), dayfirst=True, errors='coerce')
-            df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
-
-        # --- B. TOUS LES CALCULS ---
-        total_ca = sum(to_f_local(x) for x in df_final['Prix']) if not df_final.empty else 0.0
-        nb_jours = len(df_final)
-        ca_moyen_jour = total_ca / nb_jours if nb_jours > 0 else 0.0
-        
-        # Maintenance : recherche de la colonne montant
         col_m_val = next((c for c in ['M_Num', 'Montant', 'Prix'] if c in df_m_y.columns), None)
         t_maint = sum(to_f_local(x) for x in df_m_y[col_m_val]) if col_m_val and not df_m_y.empty else 0.0
         
-        # Gazoil
+        df_log_y = df_log[pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce').dt.year == sel_y] if not df_log.empty else pd.DataFrame()
         col_gazoil = next((c for c in ['Cout Gazoil', 'Cout_Gazoil', 'Gazoil'] if c in df_log_y.columns), None)
         t_gasoil_eur = df_log_y[col_gazoil].sum() if col_gazoil and not df_log_y.empty else 0.0
         total_dep = t_maint + t_gasoil_eur
-        
-        # Performance moteur/voile
-        t_milles = df_log_y['TotalMil'].sum() if 'TotalMil' in df_log_y.columns else 0
-        t_mot_p = df_log_y['TotalMot'].sum() if 'TotalMot' in df_log_y.columns else (df_log_y['Moteur'].sum() if 'Moteur' in df_log_y.columns else 0)
-        t_voile = df_log_y['H_Voile'].sum() if 'H_Voile' in df_log_y.columns else 0
-        
-        revenu_par_h_moteur = total_ca / t_mot_p if t_mot_p > 0 else 0
-        ratio_maintenance = (total_dep / total_ca * 100) if total_ca > 0 else 0
-        mille_par_sortie = t_milles / nb_jours if nb_jours > 0 else 0
-
-        # Vidange Synchro
-        # On calcule les heures restantes : Cible - Heures déjà faites
-        h_moteur_total = pd.to_numeric(df_log['MotArr'], errors='coerce').max() if 'MotArr' in df_log.columns else 0.0
-        h_restantes = params.get('prochaine_vidange', 2450.0) - h_moteur_total
 
         # --- C. BILAN SANTÉ ---
-        st.markdown("### 🩺 Bilan de Santé")
+        if ca_demandes > 0:
+            st.warning(f"⏳ **Potentiel à transformer (Onglet DEMANDES) : {ca_demandes:,.0f} €**")
+
+        st.markdown("### 🩺 Indicateurs Clés")
         b1, b2, b3 = st.columns(3)
-        # Seuil de rentabilité fixé à 6500€
         progression_ca = min(100, int((total_ca/6500)*100)) if total_ca > 0 else 0
-        b1.metric("🎯 Rentabilité", f"{progression_ca}%", help="Seuil 6500€")
+        b1.metric("🎯 Seuil Rentabilité", f"{progression_ca}%", help="Objectif 6500€")
         
-        indice_eco = (t_voile / (t_mot_p + t_voile) * 100) if (t_mot_p + t_voile) > 0 else 0
-        b2.metric("🌿 Indice Éco", f"{indice_eco:.0f}%", help="Ratio Voile / (Moteur + Voile)")
-        
+        # Heures moteur et Vidange
+        h_moteur_total = pd.to_numeric(df_log['MotArr'], errors='coerce').max() if 'MotArr' in df_log.columns else 0.0
+        h_restantes = params.get('prochaine_vidange', 2450.0) - h_moteur_total
         color_vidange = "normal" if h_restantes > 10 else "inverse"
-        b3.metric("⚙️ Vidange dans", f"{h_restantes:.1f}h", delta=f"Cible: {params.get('prochaine_vidange', 0):.0f}h", delta_color=color_vidange)
+        b2.metric("⚙️ Vidange dans", f"{h_restantes:.1f}h", delta=f"Cible: {params.get('prochaine_vidange', 0):.0f}h", delta_color=color_vidange)
+        
+        b3.metric("📅 Journées", f"{nb_jours} jrs")
 
-        # --- D. PERFORMANCE ---
-        st.write("---")
-        st.markdown("### 📈 Performance Opérationnelle")
-        p1, p2, p3 = st.columns(3)
-        p1.metric("💎 Rendement/H", f"{revenu_par_h_moteur:.1f} €/h moteur")
-        p2.metric("📉 Poids Frais", f"{ratio_maintenance:.1f} %", help="Part des dépenses sur le CA")
-        p3.metric("📏 Moy. Sortie", f"{mille_par_sortie:.1f} NM")
-
-        # --- E. INDICATEURS FINANCIERS ---
+        # --- D. FINANCES ---
         st.divider()
         c1, c2, c3 = st.columns(3)
-        c1.metric("💰 CA", f"{total_ca:,.0f} €")
+        label_ca = "💰 CA Encaissé" if mode_bilan == "Réel (Encaissé)" else "💰 CA Prévisionnel"
+        c1.metric(label_ca, f"{total_ca:,.0f} €")
         c2.metric("💸 Dépenses", f"{total_dep:,.0f} €")
         c3.metric("⚖️ Net", f"{(total_ca - total_dep):,.0f} €")
 
-        # --- F. GRAPHES ---
-        st.subheader("📉 Évolution Mensuelle")
+        # --- E. GRAPHES ---
+        st.subheader("📉 Répartition par Statut Mission")
+        if not df_f.empty:
+            df_status = df_f['Statut'].value_counts().reset_index()
+            df_status.columns = ['Statut', 'Nombre']
+            # Map couleur cohérent : Vert=Confirmé, Bleu=Habitué, Orange=En attente
+            color_map = {"Confirmé": "#27AE60", "Habitué": "#2980B9", "En attente": "#F39C12", "Terminé": "#7F8C8D"}
+            
+            fig = px.pie(df_status, names='Statut', values='Nombre', 
+                         color='Statut', color_discrete_map=color_map, hole=0.4)
+            fig.update_layout(height=300, margin=dict(l=20, r=20, t=20, b=20))
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.subheader("📊 Évolution Mensuelle")
         ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
         nom_mois_map = {i+1: m for i, m in enumerate(ordre_mois)}
         df_evo = pd.DataFrame(index=range(1, 13))
@@ -837,51 +821,14 @@ if st.session_state.page == "STATS":
         df_evo.index = pd.Categorical(df_evo.index, categories=ordre_mois, ordered=True)
         st.bar_chart(df_evo.sort_index(), height=220)
 
-        # --- G. RÉPARTITION ---
-        st.write("---")
-        st.subheader("🍕 Répartition des Volumes")
-        col_pie1, col_pie2 = st.columns(2)
-        
-        with col_pie1:
-            if not df_final.empty and 'Société' in df_final.columns:
-                st.write("**Sorties par Société**")
-                df_rep_soc = df_final['Société'].value_counts().reset_index()
-                df_rep_soc.columns = ['Société', 'Nombre']
-                st.bar_chart(df_rep_soc.set_index('Société'), horizontal=True, height=200)
-            
-        with col_pie2:
-            if not df_m_y.empty and 'Type' in df_m_y.columns:
-                st.write("**Maintenance par Cat. (€)**")
-                df_rep_maint = df_m_y.groupby('Type')[col_m_val].sum()
-                st.bar_chart(df_rep_maint, horizontal=True, height=200)
-
-        # --- H. TABLEAUX DÉTAILLÉS ---
-        st.write("---")
-        t1, t2 = st.tabs(["💰 Détails CA", "🛠️ Détails Dépenses"])
-        
-        with t1:
+        # --- F. TABLEAU DÉTAILLÉ ---
+        with st.expander("📄 Voir le détail des lignes comptabilisées"):
             if not df_final.empty:
-                df_final_clean = df_final.sort_values(by='dt_vrai', ascending=False)
-                cols_r = [c for c in ['DateNav', 'Société', 'Prix'] if c in df_final_clean.columns]
-                st.dataframe(df_final_clean[cols_r], use_container_width=True, hide_index=True)
-                st.success(f"**TOTAL RECETTES : {total_ca:,.2f} €**")
-        
-        with t2:
-            if not df_m_y.empty:
-                df_m_y_clean = df_m_y.sort_values(by='dt_maint', ascending=False)
-                st.write("**🔧 Maintenance :**")
-                col_nom_m = next((c for c in ['Objet', 'Titre', 'Description'] if c in df_m_y_clean.columns), 'Détail')
-                cols_m = [c for c in ['Date', col_nom_m, col_m_val] if c in df_m_y_clean.columns]
-                st.dataframe(df_m_y_clean[cols_m], use_container_width=True, hide_index=True)
-            
-            if t_gasoil_eur > 0:
-                st.write("**⛽ Carburant :**")
-                df_log_y_clean = df_log_y[df_log_y[col_gazoil]>0].sort_values(by='dt_log', ascending=False)
-                st.dataframe(df_log_y_clean[['Date', 'PortArr', col_gazoil]], use_container_width=True, hide_index=True)
-            
-            st.error(f"**TOTAL DÉPENSES : {total_dep:,.2f} €**")
+                st.dataframe(df_final[['DateNav', 'Prénom', 'Nom', 'Société', 'Statut', 'Prix']], use_container_width=True, hide_index=True)
+            else:
+                st.info("Aucune ligne dans cette catégorie.")
     else:
-        st.info("Aucune donnée disponible pour générer les statistiques.")
+        st.info("⚓ Aucune donnée trouvée pour cette saison.")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (GESTION VIDANGE & TRAVAUX) ---
