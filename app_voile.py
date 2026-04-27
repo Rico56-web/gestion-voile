@@ -394,15 +394,15 @@ else:
         st.dataframe(df_display[['DateNav', 'Prénom', 'Nom', 'Statut', 'Prix']], use_container_width=True, hide_index=True)
     else:
         st.info("Aucun dossier dans cet onglet.")
-
 # =================================================================
-# --- 6. PAGE MODIFIER CONTACT ---
+# --- 6. PAGE MODIFIER CONTACT : VERSION SÉCURISÉE ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
     st.markdown('<h3 style="text-align:center;">✏️ Modifier le Contact</h3>', unsafe_allow_html=True)
     
     idx_to_edit = st.session_state.get('edit_idx')
-    df_m = charger_data('contacts.json')
+    # On utilise charger_data_safe pour plus de stabilité
+    df_m = charger_data_safe('contacts.json')
 
     if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
         row = df_m.loc[idx_to_edit]
@@ -417,7 +417,8 @@ if st.session_state.page == "MODIFIER_CONTACT":
             
             liste_soc = ["PERSO", "CLICK", "CMN", "VOG"]
             curr_soc = str(row.get('Société', 'PERSO')).upper().strip()
-            if curr_soc not in liste_soc and curr_soc != "": liste_soc.append(curr_soc)
+            if curr_soc not in liste_soc and curr_soc != "": 
+                liste_soc.append(curr_soc)
             soc_idx = liste_soc.index(curr_soc) if curr_soc in liste_soc else 0
             new_soc = c4.selectbox("Société", liste_soc, index=soc_idx)
             
@@ -437,17 +438,24 @@ if st.session_state.page == "MODIFIER_CONTACT":
             s_list = ["En attente", "Confirmé", "Habitué", "Terminé", "Annulé", "Refusé"]
             curr_s = str(row.get('Statut', 'En attente')).strip()
 
-            # On adapte l'index pour que "Habitué" soit bien sélectionné si c'était l'ancien "Liste d'attente"
+            # Gestion de l'index du statut (y compris conversion Liste d'attente -> Habitué)
             if curr_s == "Liste d'attente":
-                s_idx = 2 # Index de "Habitué"
+                s_idx = 2  # Index de "Habitué"
             else:
                 s_idx = next((i for i, s in enumerate(s_list) if s.lower() in curr_s.lower()), 0)
 
             new_statut = s1.selectbox("Statut Mission", s_list, index=s_idx)
             
-            # Matching souple pour l'index
-            s_idx = next((i for i, s in enumerate(s_list) if s.lower() in curr_s.lower()), 0)
-            new_statut = s1.selectbox("Statut Mission", s_list, index=s_idx)
+            # --- SYSTÈME ANTI-CONFLIT ---
+            conflit = df_m[(df_m['DateNav'] == new_date) & 
+                           (df_m['Statut'] == "Confirmé") & 
+                           (df_m.index != idx_to_edit)]
+            
+            if not conflit.empty:
+                if new_statut == "Confirmé":
+                    st.error(f"🚨 CONFLIT : {conflit.iloc[0]['Prénom']} est déjà confirmé ce jour-là !")
+                else:
+                    st.warning("ℹ️ Note : Une sortie est déjà confirmée à cette date.")
             
             sub1, sub2 = s2.columns(2)
             p_list = ["Unpaid", "Paid"]
@@ -460,21 +468,31 @@ if st.session_state.page == "MODIFIER_CONTACT":
             new_notes = st.text_area("Notes", value=str(row.get('Notes', '')).replace('nan',''))
 
             if st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True):
-                maj = {
-                    'Prénom': new_pre.upper(), 'Nom': new_nom.upper(), 'DateNav': new_date,
-                    'Société': new_soc.upper(), 'Téléphone': new_tel.strip(), 'Email': new_mail.strip(),
-                    'Jours': int(new_jours), 'Pers': int(new_pers), 'Prix': int(new_prix),
-                    'Acompte': int(new_aco), 'Statut': new_statut, 'Paiement': new_pay,
-                    'Relancer': new_relance, 'Notes': str(new_notes).strip()
-                }
-                df_m.loc[idx_to_edit, maj.keys()] = list(maj.values())
+                # Mise à jour des données
+                df_m.at[idx_to_edit, 'Prénom'] = new_pre.upper()
+                df_m.at[idx_to_edit, 'Nom'] = new_nom.upper()
+                df_m.at[idx_to_edit, 'DateNav'] = new_date
+                df_m.at[idx_to_edit, 'Société'] = new_soc.upper()
+                df_m.at[idx_to_edit, 'Téléphone'] = new_tel.strip()
+                df_m.at[idx_to_edit, 'Email'] = new_mail.strip()
+                df_m.at[idx_to_edit, 'Jours'] = int(new_jours)
+                df_m.at[idx_to_edit, 'Pers'] = int(new_pers)
+                df_m.at[idx_to_edit, 'Prix'] = int(new_prix)
+                df_m.at[idx_to_edit, 'Acompte'] = int(new_aco)
+                df_m.at[idx_to_edit, 'Statut'] = new_statut
+                df_m.at[idx_to_edit, 'Paiement'] = new_pay
+                df_m.at[idx_to_edit, 'Relancer'] = new_relance
+                df_m.at[idx_to_edit, 'Notes'] = str(new_notes).strip()
+                
                 sauvegarder_data(df_m, 'contacts.json')
+                st.success("Modifications enregistrées !")
                 st.session_state.page = "CONTACTS"
                 st.rerun()
 
     if st.button("⬅️ RETOUR"):
         st.session_state.page = "CONTACTS"
         st.rerun()
+
 # =================================================================
 # --- 6. PAGE PLANNING (V19.2 - CALIBRÉ SUR TON LOGBOOK) ---
 # =================================================================
