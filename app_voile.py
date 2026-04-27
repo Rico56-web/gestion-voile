@@ -344,24 +344,28 @@ if st.session_state.page == "CONTACTS":
             st.session_state.edit_idx = 0 
             st.session_state.page = "MODIFIER_CONTACT"
             st.rerun()
+            statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
+            relance_clean = df_c['Relancer'].fillna("Non").str.upper()
 
-        # --- LOGIQUE DE SÉPARATION DES ONGLETS (V105) ---
-        statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
-        relance_clean = df_c['Relancer'].fillna("Non").str.upper()
-        
-        if st.session_state.vue_contact == "Archives":
-            mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
-            tri_ordre = False 
-        elif st.session_state.vue_contact == "Relances":
-            mask_aff = (relance_clean == "OUI") # Tous tes VIP
-            tri_ordre = False
-            st.warning("✨ Carnet des Habitués : Utilisez 🔄 RE-RÉSERVER pour dupliquer un contact vers une nouvelle date.")
-        elif st.session_state.vue_contact == "Attente":
-            mask_aff = (statut_clean == "liste d'attente")
-            tri_ordre = True  
-        else: # EN COURS
-            mask_aff = ~(statut_clean.str.contains("termine|annule|refuse")) & (statut_clean != "liste d'attente")
-            tri_ordre = True
+            if st.session_state.vue_contact == "Archives":
+                # On garde les missions finies/annulées
+                mask_aff = (statut_clean.str.contains("termine|annule|refuse"))
+                tri_ordre = False 
+
+            elif st.session_state.vue_contact == "Relances":
+                # ⭐ HABITUÉS : Affiche ceux cochés "Relancer" OU ayant le statut "Habitué"
+                mask_aff = (relance_clean == "OUI") | (statut_clean == "habitue")
+                tri_ordre = False
+
+            elif st.session_state.vue_contact == "Attente":
+                # ⏳ DEMANDES : Uniquement ceux qui sont "En attente"
+                mask_aff = (statut_clean == "en attente")
+                tri_ordre = True  
+
+            else: # 🟢 EN COURS
+                # Affiche uniquement les missions "Confirmées"
+                mask_aff = (statut_clean == "confirme")
+                tri_ordre = True
 
         df_aff = df_c[mask_aff & ((df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna()))].copy()
         if search:
@@ -476,8 +480,17 @@ if st.session_state.page == "MODIFIER_CONTACT":
             new_aco = f2.number_input("Acompte (€)", value=int(clean_num(row.get('Acompte', 0))))
             
             s1, s2 = st.columns(2)
-            s_list = ["En attente", "Confirmé", "Terminé", "Annulé", "Refusé", "Liste d'attente"]
+            s_list = ["En attente", "Confirmé", "Habitué", "Terminé", "Annulé", "Refusé"]
             curr_s = str(row.get('Statut', 'En attente')).strip()
+
+            # On adapte l'index pour que "Habitué" soit bien sélectionné si c'était l'ancien "Liste d'attente"
+            if curr_s == "Liste d'attente":
+                s_idx = 2 # Index de "Habitué"
+            else:
+                s_idx = next((i for i, s in enumerate(s_list) if s.lower() in curr_s.lower()), 0)
+
+            new_statut = s1.selectbox("Statut Mission", s_list, index=s_idx)
+            
             # Matching souple pour l'index
             s_idx = next((i for i, s in enumerate(s_list) if s.lower() in curr_s.lower()), 0)
             new_statut = s1.selectbox("Statut Mission", s_list, index=s_idx)
