@@ -708,7 +708,7 @@ if st.session_state.page == "STATS":
     df_log = charger_data_safe('logbook.json')
     params = charger_params()
     
-    # Fusion actif + archives
+    # Fusion actif + archives pour historique complet
     df_all = pd.concat([df_actif, df_arch], ignore_index=True) if not df_arch.empty else df_actif
 
     def to_f_local(val):
@@ -726,107 +726,110 @@ if st.session_state.page == "STATS":
         df_all['dt_vrai'] = pd.to_datetime(df_all['DateNav'], dayfirst=True, errors='coerce')
         df_f = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
         
-        # Logique de comptabilisation cohérente avec les nouveaux onglets
+        # Logique de comptabilisation
         def est_comptabilise(row):
             statut = str(row.get('Statut', '')).upper()
             paiement = str(row.get('Paiement', '')).upper()
-
             if mode_bilan == "Réel (Encaissé)":
-                # Uniquement ce qui est fini ET payé
                 est_fini = any(s in statut for s in ["TERMINÉ", "FAIT", "ARCHIVÉ"])
                 return paiement == "PAID" and est_fini
             else:
-                # Année complète : On prend le carnet de commande sérieux
-                # On exclut "En attente" car c'est dans l'onglet DEMANDES (non validé)
-                if any(s in statut for s in ["ANNULÉ", "REFUSÉ", "EN ATTENTE"]): 
-                    return False
-                return True # On garde : Confirmé, Habitué, Terminé
+                if any(s in statut for s in ["ANNULÉ", "REFUSÉ", "EN ATTENTE"]): return False
+                return True
 
         df_final = df_f[df_f.apply(est_comptabilise, axis=1)].copy() if not df_f.empty else pd.DataFrame()
         
-        # Calcul du CA en attente (Le "réservoir" des Demandes)
+        # Calcul du CA potentiel (Onglet DEMANDES)
         df_potentielles = df_f[df_f['Statut'].str.upper() == "EN ATTENTE"]
         ca_demandes = sum(to_f_local(x) for x in df_potentielles['Prix'])
 
-        # --- B. TOUS LES CALCULS ---
+        # --- B. CALCULS FINANCIERS & LOGBOOK ---
         total_ca = sum(to_f_local(x) for x in df_final['Prix']) if not df_final.empty else 0.0
         nb_jours = len(df_final)
         
-        # Maintenance & Dépenses
+        # Maintenance
         df_m_y = pd.DataFrame()
         if not df_m.empty:
             df_m['dt_maint'] = pd.to_datetime(df_m.get('Date', ''), dayfirst=True, errors='coerce')
             df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m.get('Statut', '') == "Fait")].copy()
-        
         col_m_val = next((c for c in ['M_Num', 'Montant', 'Prix'] if c in df_m_y.columns), None)
         t_maint = sum(to_f_local(x) for x in df_m_y[col_m_val]) if col_m_val and not df_m_y.empty else 0.0
         
+        # Gazole & Heures (Logbook)
         df_log_y = df_log[pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce').dt.year == sel_y] if not df_log.empty else pd.DataFrame()
-        col_gazoil = next((c for c in ['Cout Gazoil', 'Cout_Gazoil', 'Gazoil'] if c in df_log_y.columns), None)
-        t_gasoil_eur = df_log_y[col_gazoil].sum() if col_gazoil and not df_log_y.empty else 0.0
+        vol_gazole = df_log_y['VolumeGazole'].sum() if 'VolumeGazole' in df_log_y.columns else 0.0
+        col_g_eur = next((c for c in ['Cout Gazoil', 'Cout_Gazoil', 'Gazoil'] if c in df_log_y.columns), None)
+        t_gasoil_eur = df_log_y[col_g_eur].sum() if col_g_eur and not df_log_y.empty else 0.0
+        
+        t_mot_p = df_log_y['TotalMot'].sum() if 'TotalMot' in df_log_y.columns else 0.0
+        t_milles = df_log_y['TotalMil'].sum() if 'TotalMil' in df_log_y.columns else 0.0
         total_dep = t_maint + t_gasoil_eur
 
-        # --- C. BILAN SANTÉ ---
+        # --- C. AFFICHAGE DES INDICATEURS ---
         if ca_demandes > 0:
             st.warning(f"⏳ **Potentiel à transformer (Onglet DEMANDES) : {ca_demandes:,.0f} €**")
 
-        st.markdown("### 🩺 Indicateurs Clés")
+        st.markdown("### 🩺 Bilan de Santé & Maintenance")
         b1, b2, b3 = st.columns(3)
         progression_ca = min(100, int((total_ca/6500)*100)) if total_ca > 0 else 0
         b1.metric("🎯 Seuil Rentabilité", f"{progression_ca}%", help="Objectif 6500€")
         
-        # Heures moteur et Vidange
         h_moteur_total = pd.to_numeric(df_log['MotArr'], errors='coerce').max() if 'MotArr' in df_log.columns else 0.0
-        h_restantes = params.get('prochaine_vidange', 2450.0) - h_moteur_total
-        color_vidange = "normal" if h_restantes > 10 else "inverse"
-        b2.metric("⚙️ Vidange dans", f"{h_restantes:.1f}h", delta=f"Cible: {params.get('prochaine_vidange', 0):.0f}h", delta_color=color_vidange)
-        
-        b3.metric("📅 Journées", f"{nb_jours} jrs")
+        h_restantes = params.get('prochaine_vidange', 2500.0) - h_moteur_total
+        b2.metric("⚙️ Vidange dans", f"{h_restantes:.1f}h", delta_color="normal" if h_restantes > 15 else "inverse")
+        b3.metric("📅 Sorties", f"{nb_jours} jrs")
 
-        # --- D. FINANCES ---
         st.divider()
-        c1, c2, c3 = st.columns(3)
-        label_ca = "💰 CA Encaissé" if mode_bilan == "Réel (Encaissé)" else "💰 CA Prévisionnel"
-        c1.metric(label_ca, f"{total_ca:,.0f} €")
-        c2.metric("💸 Dépenses", f"{total_dep:,.0f} €")
-        c3.metric("⚖️ Net", f"{(total_ca - total_dep):,.0f} €")
-
-        # --- E. GRAPHES ---
-        st.subheader("📉 Répartition par Statut Mission")
-        if not df_f.empty:
-            df_status = df_f['Statut'].value_counts().reset_index()
-            df_status.columns = ['Statut', 'Nombre']
-            # Map couleur cohérent : Vert=Confirmé, Bleu=Habitué, Orange=En attente
-            color_map = {"Confirmé": "#27AE60", "Habitué": "#2980B9", "En attente": "#F39C12", "Terminé": "#7F8C8D"}
+        st.markdown("### 📈 Performance Opérationnelle")
+        p1, p2, p3, p4 = st.columns(4)
+        
+        rev_h = total_ca / t_mot_p if t_mot_p > 0 else 0
+        p1.metric("💎 Rendement", f"{rev_h:.1f} €/h")
+        
+        if t_mot_p > 0 and vol_gazole > 0:
+            conso_lh = vol_gazole / t_mot_p
+            p2.metric("⛽ Conso Moy.", f"{conso_lh:.1f} L/h")
+        else:
+            p2.metric("⛽ Conso Moy.", "N/A")
             
-            fig = px.pie(df_status, names='Statut', values='Nombre', 
-                         color='Statut', color_discrete_map=color_map, hole=0.4)
-            fig.update_layout(height=300, margin=dict(l=20, r=20, t=20, b=20))
-            st.plotly_chart(fig, use_container_width=True)
+        p3.metric("📉 Poids Frais", f"{(total_dep/total_ca*100):.1f} %" if total_ca > 0 else "0%")
+        p4.metric("📏 Moy. Sortie", f"{(t_milles/nb_jours):.1f} NM" if nb_jours > 0 else "0 NM")
 
-        st.subheader("📊 Évolution Mensuelle")
-        ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
-        nom_mois_map = {i+1: m for i, m in enumerate(ordre_mois)}
-        df_evo = pd.DataFrame(index=range(1, 13))
-        
-        if not df_final.empty:
-            df_final['Mois'] = df_final['dt_vrai'].dt.month
-            df_evo['Recettes'] = df_final.groupby('Mois')['Prix'].sum()
-        if not df_m_y.empty and col_m_val:
-            df_m_y['Mois'] = df_m_y['dt_maint'].dt.month
-            df_evo['Dépenses'] = df_m_y.groupby('Mois')[col_m_val].sum()
-        
-        df_evo = df_evo.fillna(0)
-        df_evo.index = df_evo.index.map(nom_mois_map)
-        df_evo.index = pd.Categorical(df_evo.index, categories=ordre_mois, ordered=True)
-        st.bar_chart(df_evo.sort_index(), height=220)
+        st.divider()
+        # --- D. FINANCES ---
+        c1, c2, c3 = st.columns(3)
+        c1.metric("💰 Chiffre d'Affaires", f"{total_ca:,.0f} €")
+        c2.metric("💸 Total Dépenses", f"{total_dep:,.0f} €")
+        c3.metric("⚖️ Résultat Net", f"{(total_ca - total_dep):,.0f} €")
 
-        # --- F. TABLEAU DÉTAILLÉ ---
-        with st.expander("📄 Voir le détail des lignes comptabilisées"):
+        # --- E. VISUELS ---
+        st.subheader("📊 Répartition & Évolution")
+        col_g1, col_g2 = st.columns([1, 2])
+        
+        with col_g1:
+            if not df_f.empty:
+                df_status = df_f['Statut'].value_counts().reset_index()
+                df_status.columns = ['Statut', 'Nombre']
+                color_map = {"Confirmé": "#27AE60", "Habitué": "#2980B9", "En attente": "#F39C12", "Terminé": "#7F8C8D"}
+                fig = px.pie(df_status, names='Statut', values='Nombre', color='Statut', 
+                             color_discrete_map=color_map, hole=0.4)
+                fig.update_layout(height=250, showlegend=False, margin=dict(l=0, r=0, t=0, b=0))
+                st.plotly_chart(fig, use_container_width=True)
+
+        with col_g2:
+            ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+            df_evo = pd.DataFrame(index=range(1, 13))
             if not df_final.empty:
-                st.dataframe(df_final[['DateNav', 'Prénom', 'Nom', 'Société', 'Statut', 'Prix']], use_container_width=True, hide_index=True)
-            else:
-                st.info("Aucune ligne dans cette catégorie.")
+                df_final['Mois'] = df_final['dt_vrai'].dt.month
+                df_evo['CA'] = df_final.groupby('Mois')['Prix'].sum()
+            df_evo = df_evo.fillna(0)
+            df_evo.index = [ordre_mois[i-1] for i in df_evo.index]
+            st.bar_chart(df_evo, height=250)
+
+        # --- F. DÉTAILS ---
+        with st.expander("📄 Voir le détail des lignes"):
+            st.dataframe(df_final[['DateNav', 'Société', 'Statut', 'Prix']], use_container_width=True, hide_index=True)
+
     else:
         st.info("⚓ Aucune donnée trouvée pour cette saison.")
 
