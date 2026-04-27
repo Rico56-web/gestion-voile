@@ -358,27 +358,30 @@ elif st.session_state.page in ["NOUVEAU_CONTACT", "MODIFIER_CONTACT"]:
     new_date = st.date_input("Date de navigation", value=val_date)
     s_list = ["En attente", "Confirmé", "Habitué", "Terminé", "Annulé", "Refusé"]
     new_statut = st.selectbox("Statut Mission", s_list)
+# --- SYSTÈME ANTI-CONFLIT SÉCURISÉ ---
+date_str = new_date.strftime("%d/%m/%Y")
 
-    # --- SYSTÈME ANTI-CONFLIT SÉCURISÉ ---
-    date_str = new_date.strftime("%d/%m/%Y")
+# On identifie quel DataFrame utiliser (df_c ou df_actif selon ton script)
+df_travail = None
+if 'df_c' in locals(): df_travail = df_c
+elif 'df_actif' in locals(): df_travail = df_actif
+elif 'df_all' in locals(): df_travail = df_all
 
-    # 1. Vérifie bien que df_c existe et n'est pas vide
-    if 'df_c' in locals() and not df_c.empty:
-    
-        # 2. Recherche du conflit
-        conflit = df_c[(df_c['DateNav'] == date_str) & 
-                       (df_c['Statut'] == "Confirmé") & 
-                       (df_c['id'] != st.session_state.get('edit_id', ''))]
+if df_travail is not None and not df_travail.empty:
+    # Recherche du conflit
+    conflit = df_travail[(df_travail['DateNav'] == date_str) & 
+                         (df_travail['Statut'] == "Confirmé") & 
+                         (df_travail.get('id') != st.session_state.get('edit_id'))]
 
-        # 3. On ne tente l'affichage QUE si conflit contient au moins une ligne
-        if not conflit.empty:
-            prenom_conflit = conflit.iloc[0].get('Prénom', 'Inconnu')
-            nom_conflit = conflit.iloc[0].get('Nom', 'Inconnu')
+    if not conflit.empty:
+        # On récupère les noms avec .get() pour éviter une autre erreur si la colonne manque
+        p_conf = conflit.iloc[0].get('Prénom', 'Client')
+        n_conf = conflit.iloc[0].get('Nom', '')
         
-            if new_statut == "Confirmé":
-                st.error(f"🚨 **CONFLIT :** Le créneau est déjà pris par **{prenom_conflit} {nom_conflit}**")
-            else:
-                st.warning(f"ℹ️ **INFO :** Une sortie est déjà confirmée ce jour-là par {prenom_conflit}.")
+        if new_statut == "Confirmé":
+            st.error(f"🚨 **CONFLIT :** Le créneau est déjà pris par **{p_conf} {n_conf}**")
+        else:
+            st.warning(f"ℹ️ **INFO :** Une sortie est déjà confirmée ce jour-là.")
 
     # ... (reste de tes champs : Prix, Accompte, Société...)
 
