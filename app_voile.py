@@ -359,17 +359,26 @@ elif st.session_state.page in ["NOUVEAU_CONTACT", "MODIFIER_CONTACT"]:
     s_list = ["En attente", "Confirmé", "Habitué", "Terminé", "Annulé", "Refusé"]
     new_statut = st.selectbox("Statut Mission", s_list)
 
-    # --- SYSTÈME ANTI-CONFLIT ---
+    # --- SYSTÈME ANTI-CONFLIT SÉCURISÉ ---
     date_str = new_date.strftime("%d/%m/%Y")
-    conflit = df_c[(df_c['DateNav'] == date_str) & 
-                   (df_c['Statut'] == "Confirmé") & 
-                   (df_c['id'] != st.session_state.get('edit_id'))]
 
-    if not conflit.empty:
-        if new_statut == "Confirmé":
-            st.error(f"🚨 **CONFLIT :** Le créneau est déjà pris par **{conflit.iloc[0]['Prénom']} {conflit.iloc[0]['Nom']}**")
-        else:
-            st.warning(f"ℹ️ **INFO :** Une sortie est déjà confirmée ce jour-là.")
+    # 1. Vérifie bien que df_c existe et n'est pas vide
+    if 'df_c' in locals() and not df_c.empty:
+    
+        # 2. Recherche du conflit
+        conflit = df_c[(df_c['DateNav'] == date_str) & 
+                       (df_c['Statut'] == "Confirmé") & 
+                       (df_c['id'] != st.session_state.get('edit_id', ''))]
+
+        # 3. On ne tente l'affichage QUE si conflit contient au moins une ligne
+        if not conflit.empty:
+            prenom_conflit = conflit.iloc[0].get('Prénom', 'Inconnu')
+            nom_conflit = conflit.iloc[0].get('Nom', 'Inconnu')
+        
+            if new_statut == "Confirmé":
+                st.error(f"🚨 **CONFLIT :** Le créneau est déjà pris par **{prenom_conflit} {nom_conflit}**")
+            else:
+                st.warning(f"ℹ️ **INFO :** Une sortie est déjà confirmée ce jour-là par {prenom_conflit}.")
 
     # ... (reste de tes champs : Prix, Accompte, Société...)
 
