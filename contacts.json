@@ -647,8 +647,8 @@
     {
         "Pr\u00e9nom":"ANNE",
         "Nom":"GEOFFROY",
-        "Statut":"En attente",
-        "Paiement":"Unpaid",
+        "Statut":"Termin\u00e9",
+        "Paiement":"Paid",
         "Relancer":"Oui",
         "DateNav":"",
         "Soci\u00e9t\u00e9":"PERSO",
