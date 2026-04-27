@@ -297,7 +297,6 @@ if st.session_state.page == "MEMOS":
 # =================================================================
 
 # --- SÉCURITÉ INITIALE ---
-# On s'assure que df_c existe avant toute manipulation pour éviter les NameError
 if 'df_c' not in locals() and 'df_c' not in globals():
     df_c = charger_data_safe('contacts.json')
 if df_c is None or df_c.empty:
@@ -309,91 +308,74 @@ relance_clean = df_c['Relancer'].fillna("Non").str.upper()
 
 if st.session_state.vue_contact == "Archives":
     mask_aff = (statut_clean.str.contains("termine|annule|refuse"))
-    tri_ordre = False 
-
 elif st.session_state.vue_contact == "Relances":
-    # ⭐ HABITUÉS
     mask_aff = (relance_clean == "OUI") | (statut_clean == "habitue")
-    tri_ordre = False
-
 elif st.session_state.vue_contact == "Attente":
-    # ⏳ DEMANDES
     mask_aff = (statut_clean == "en attente")
-    tri_ordre = True  
-
 else: # 🟢 EN COURS
     mask_aff = (statut_clean == "confirme")
-    tri_ordre = True
 
 df_display = df_c[mask_aff].copy()
 
-# 2. AFFICHAGE DE L'ONGLET HABITUÉS (AVEC ALERTES RELANCE)
-if st.session_state.vue_contact == "Relances":
+# 2. AFFICHAGE DE L'ONGLET HABITUÉS (RELANCES)
+if st.session_state.vue_contact == "Relances" and st.session_state.page == "CONTACTS":
     st.markdown("### ⭐ Carnet des Habitués")
     seuil_froid = pd.Timestamp.now() - pd.Timedelta(days=365)
-
     if not df_display.empty:
-        for i, row in df_display.iterrows():
-            d_nav = pd.to_datetime(row['DateNav'], dayfirst=True, errors='coerce')
+        for i, row_item in df_display.iterrows():
+            d_nav = pd.to_datetime(row_item['DateNav'], dayfirst=True, errors='coerce')
             with st.container(border=True):
                 c1, c2 = st.columns([0.85, 0.15])
                 with c1:
-                    if pd.notna(d_nav) and d_nav < seuil_froid:
-                        st.markdown(f"🔴 **{row['Prénom']} {row['Nom']}**")
-                        st.caption(f"⚠️ À recontacter (Dernière : {row['DateNav']})")
-                    else:
-                        st.markdown(f"🟢 **{row['Prénom']} {row['Nom']}**")
-                        st.caption(f"Dernière : {row['DateNav']}")
+                    icon = "🔴" if pd.notna(d_nav) and d_nav < seuil_froid else "🟢"
+                    st.markdown(f"{icon} **{row_item['Prénom']} {row_item['Nom']}**")
+                    st.caption(f"Dernière : {row_item['DateNav']}")
                 with c2:
                     if st.button("✏️", key=f"edit_hab_{i}"):
-                        st.session_state.edit_id = row['id']
+                        st.session_state.edit_idx = i
                         st.session_state.page = "MODIFIER_CONTACT"
                         st.rerun()
-    else:
-        st.info("Aucun habitué répertorié.")
 
-# 3. FORMULAIRE (NOUVEAU / MODIFIER) AVEC ANTI-CONFLIT SÉCURISÉ
+# 3. FORMULAIRE (NOUVEAU / MODIFIER) SÉCURISÉ
 elif st.session_state.page in ["NOUVEAU_CONTACT", "MODIFIER_CONTACT"]:
     st.subheader("📝 Détails de la réservation")
     
-    # Récupération de la date par défaut
-    date_par_defaut = pd.Timestamp.now()
-    if 'row_edit' in locals() and pd.notna(row_edit.get('DateNav')):
-        date_par_defaut = pd.to_datetime(row_edit['DateNav'], dayfirst=True, errors='coerce')
+    # --- HARMONISATION : On récupère 'row' de manière sûre ---
+    idx_to_edit = st.session_state.get('edit_idx')
+    row = {} # Par défaut vide (Nouveau Contact)
+    
+    if st.session_state.page == "MODIFIER_CONTACT" and idx_to_edit in df_c.index:
+        row = df_c.loc[idx_to_edit]
 
-    new_date = st.date_input("Date de navigation", value=date_par_defaut)
+    # Date par défaut
+    date_val = pd.Timestamp.now()
+    if row.get('DateNav'):
+        date_val = pd.to_datetime(row['DateNav'], dayfirst=True, errors='coerce') or pd.Timestamp.now()
+
+    new_date = st.date_input("Date de navigation", value=date_val)
     s_list = ["En attente", "Confirmé", "Habitué", "Terminé", "Annulé", "Refusé"]
     
-    # On gère l'index du statut pour la modification
-    idx_statut = 0
-    if 'row_edit' in locals():
-        current_s = str(row_edit.get('Statut', 'En attente'))
-        if current_s in s_list: idx_statut = s_list.index(current_s)
-    
-    new_statut = st.selectbox("Statut Mission", s_list, index=idx_statut)
+    # Calcul index statut (Ligne 370 fixée)
+    curr_s = str(row.get('Statut', 'En attente'))
+    idx_s = s_list.index(curr_s) if curr_s in s_list else 0
+    new_statut = st.selectbox("Statut Mission", s_list, index=idx_s)
 
-    # --- BLOC ANTI-CONFLIT SÉCURISÉ (Ligne 370) ---
+    # --- BLOC ANTI-CONFLIT ---
     date_str = new_date.strftime("%d/%m/%Y")
-    
-    # Recherche sans risque de NameError car df_c est garanti au début
-    conflit = df_c[(df_c['DateNav'] == date_str) & 
-                   (df_c['Statut'] == "Confirmé") & 
-                   (df_c['id'] != st.session_state.get('edit_id', ''))]
+    conflit = df_c[(df_c['DateNav'] == date_str) & (df_c['Statut'] == "Confirmé") & (df_c.index != idx_to_edit)]
 
     if not conflit.empty:
-        p_conf = conflit.iloc[0].get('Prénom', 'Client')
-        n_conf = conflit.iloc[0].get('Nom', '')
         if new_statut == "Confirmé":
-            st.error(f"🚨 **CONFLIT :** Le créneau est déjà pris par **{p_conf} {n_conf}**")
+            st.error(f"🚨 **CONFLIT :** Déjà pris par **{conflit.iloc[0].get('Prénom')} {conflit.iloc[0].get('Nom')}**")
         else:
-            st.warning(f"ℹ️ **INFO :** Une sortie est déjà confirmée ce jour-là.")
+            st.warning(f"ℹ️ Une sortie est déjà confirmée ce jour-là.")
 
-# 4. AFFICHAGE CLASSIQUE POUR LES AUTRES ONGLETS
-else:
+# 4. AFFICHAGE LISTE
+elif st.session_state.page == "CONTACTS":
     if not df_display.empty:
         st.dataframe(df_display[['DateNav', 'Prénom', 'Nom', 'Statut', 'Prix']], use_container_width=True, hide_index=True)
     else:
-        st.info("Aucun dossier dans cet onglet.")
+        st.info("Aucun dossier.")
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT : SÉCURITÉ TOTALE ---
 # =================================================================
