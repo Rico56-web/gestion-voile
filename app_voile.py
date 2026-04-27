@@ -291,31 +291,37 @@ if st.session_state.page == "MEMOS":
                 st.rerun()
             
             st.divider()
+
 # =================================================================
 # --- BLOC CONTACTS : GESTION DYNAMIQUE VESTA 2026 ---
 # =================================================================
 
+# --- SÉCURITÉ INITIALE ---
+# On s'assure que df_c existe avant toute manipulation pour éviter les NameError
+if 'df_c' not in locals() and 'df_c' not in globals():
+    df_c = charger_data_safe('contacts.json')
+if df_c is None or df_c.empty:
+    df_c = pd.DataFrame(columns=['id', 'DateNav', 'Statut', 'Prénom', 'Nom', 'Relancer', 'Société', 'Prix'])
+
 # 1. LOGIQUE DE FILTRAGE DES ONGLETS
-statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
+statut_clean = df_c['Statut'].fillna("En attente").str.lower()
 relance_clean = df_c['Relancer'].fillna("Non").str.upper()
 
 if st.session_state.vue_contact == "Archives":
-    # Uniquement les missions terminées ou annulées
     mask_aff = (statut_clean.str.contains("termine|annule|refuse"))
     tri_ordre = False 
 
 elif st.session_state.vue_contact == "Relances":
-    # ⭐ HABITUÉS : Statut "Habitué" OU case "Relancer" cochée
+    # ⭐ HABITUÉS
     mask_aff = (relance_clean == "OUI") | (statut_clean == "habitue")
     tri_ordre = False
 
 elif st.session_state.vue_contact == "Attente":
-    # ⏳ DEMANDES : Uniquement ce qui est "En attente"
+    # ⏳ DEMANDES
     mask_aff = (statut_clean == "en attente")
     tri_ordre = True  
 
 else: # 🟢 EN COURS
-    # Uniquement les missions "Confirmées"
     mask_aff = (statut_clean == "confirme")
     tri_ordre = True
 
@@ -329,70 +335,65 @@ if st.session_state.vue_contact == "Relances":
     if not df_display.empty:
         for i, row in df_display.iterrows():
             d_nav = pd.to_datetime(row['DateNav'], dayfirst=True, errors='coerce')
-            
             with st.container(border=True):
                 c1, c2 = st.columns([0.85, 0.15])
                 with c1:
-                    # Alerte si pas de navigation depuis 1 an
                     if pd.notna(d_nav) and d_nav < seuil_froid:
                         st.markdown(f"🔴 **{row['Prénom']} {row['Nom']}**")
-                        st.caption(f"⚠️ À relancer (Dernière : {row['DateNav']}) | 📱 {row.get('Téléphone','-')}")
+                        st.caption(f"⚠️ À recontacter (Dernière : {row['DateNav']})")
                     else:
                         st.markdown(f"🟢 **{row['Prénom']} {row['Nom']}**")
-                        st.caption(f"Dernière : {row['DateNav']} | 📱 {row.get('Téléphone','-')}")
+                        st.caption(f"Dernière : {row['DateNav']}")
                 with c2:
                     if st.button("✏️", key=f"edit_hab_{i}"):
                         st.session_state.edit_id = row['id']
                         st.session_state.page = "MODIFIER_CONTACT"
                         st.rerun()
     else:
-        st.info("Aucun habitué pour le moment.")
+        st.info("Aucun habitué répertorié.")
 
-# 3. FORMULAIRE (NOUVEAU / MODIFIER) AVEC ANTI-CONFLIT
+# 3. FORMULAIRE (NOUVEAU / MODIFIER) AVEC ANTI-CONFLIT SÉCURISÉ
 elif st.session_state.page in ["NOUVEAU_CONTACT", "MODIFIER_CONTACT"]:
     st.subheader("📝 Détails de la réservation")
     
-    # Simulation des valeurs pour l'exemple
-    val_date = pd.to_datetime(row_edit.get('DateNav'), dayfirst=True) if 'row_edit' in locals() else pd.Timestamp.now()
-    
-    new_date = st.date_input("Date de navigation", value=val_date)
+    # Récupération de la date par défaut
+    date_par_defaut = pd.Timestamp.now()
+    if 'row_edit' in locals() and pd.notna(row_edit.get('DateNav')):
+        date_par_defaut = pd.to_datetime(row_edit['DateNav'], dayfirst=True, errors='coerce')
+
+    new_date = st.date_input("Date de navigation", value=date_par_defaut)
     s_list = ["En attente", "Confirmé", "Habitué", "Terminé", "Annulé", "Refusé"]
-    new_statut = st.selectbox("Statut Mission", s_list)
-# --- SYSTÈME ANTI-CONFLIT SÉCURISÉ ---
-date_str = new_date.strftime("%d/%m/%Y")
+    
+    # On gère l'index du statut pour la modification
+    idx_statut = 0
+    if 'row_edit' in locals():
+        current_s = str(row_edit.get('Statut', 'En attente'))
+        if current_s in s_list: idx_statut = s_list.index(current_s)
+    
+    new_statut = st.selectbox("Statut Mission", s_list, index=idx_statut)
 
-# On identifie quel DataFrame utiliser (df_c ou df_actif selon ton script)
-df_travail = None
-if 'df_c' in locals(): df_travail = df_c
-elif 'df_actif' in locals(): df_travail = df_actif
-elif 'df_all' in locals(): df_travail = df_all
-
-if df_travail is not None and not df_travail.empty:
-    # Recherche du conflit
-    conflit = df_travail[(df_travail['DateNav'] == date_str) & 
-                         (df_travail['Statut'] == "Confirmé") & 
-                         (df_travail.get('id') != st.session_state.get('edit_id'))]
+    # --- BLOC ANTI-CONFLIT SÉCURISÉ (Ligne 370) ---
+    date_str = new_date.strftime("%d/%m/%Y")
+    
+    # Recherche sans risque de NameError car df_c est garanti au début
+    conflit = df_c[(df_c['DateNav'] == date_str) & 
+                   (df_c['Statut'] == "Confirmé") & 
+                   (df_c['id'] != st.session_state.get('edit_id', ''))]
 
     if not conflit.empty:
-        # On récupère les noms avec .get() pour éviter une autre erreur si la colonne manque
         p_conf = conflit.iloc[0].get('Prénom', 'Client')
         n_conf = conflit.iloc[0].get('Nom', '')
-        
         if new_statut == "Confirmé":
             st.error(f"🚨 **CONFLIT :** Le créneau est déjà pris par **{p_conf} {n_conf}**")
         else:
             st.warning(f"ℹ️ **INFO :** Une sortie est déjà confirmée ce jour-là.")
 
-    # ... (reste de tes champs : Prix, Accompte, Société...)
-
-# 4. AFFICHAGE CLASSIQUE (TABLEAU / LISTE) POUR LES AUTRES ONGLETS
+# 4. AFFICHAGE CLASSIQUE POUR LES AUTRES ONGLETS
 else:
     if not df_display.empty:
-        # Ton code d'affichage habituel pour EN COURS, DEMANDES et ARCHIVES
-        st.dataframe(df_display[['DateNav', 'Prénom', 'Nom', 'Statut', 'Prix']], use_container_width=True)
+        st.dataframe(df_display[['DateNav', 'Prénom', 'Nom', 'Statut', 'Prix']], use_container_width=True, hide_index=True)
     else:
-        st.info("Rien à afficher ici.")
-
+        st.info("Aucun dossier dans cet onglet.")
 
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT ---
