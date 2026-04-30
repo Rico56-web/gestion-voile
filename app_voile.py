@@ -291,98 +291,107 @@ if st.session_state.page == "MEMOS":
                 st.rerun()
             
             st.divider()
+
 # =================================================================
 # --- BLOC CONTACTS : GESTION DYNAMIQUE VESTA 2026 ---
 # =================================================================
 
-# --- SÉCURITÉ INITIALE ---
+# --- 1. SÉCURITÉ ET CHARGEMENT ---
 if 'df_c' not in locals() and 'df_c' not in globals():
     df_c = charger_data_safe('contacts.json')
+
 if df_c is None or df_c.empty:
     df_c = pd.DataFrame(columns=['id', 'DateNav', 'Statut', 'Prénom', 'Nom', 'Relancer', 'Société', 'Prix'])
 
-# 1. LOGIQUE DE FILTRAGE DES ONGLETS (VERSION ROBUSTE)
-# On s'assure que tout est en minuscules et sans espaces inutiles pour comparer
+# --- 2. LOGIQUE DE FILTRAGE (Nettoyage des données pour comparaison) ---
 statut_clean = df_c['Statut'].fillna("En attente").astype(str).str.lower().str.strip()
 relance_clean = df_c['Relancer'].fillna("Non").astype(str).str.upper().str.strip()
 
-# On définit le masque selon l'onglet sélectionné
 if st.session_state.vue_contact == "Archives":
-    # On cherche tout ce qui contient "termine", "annule" ou "refuse"
     mask_aff = statut_clean.str.contains("termine|annule|refuse", na=False)
-
 elif st.session_state.vue_contact == "Relances":
-    # Statut "habitue" OU case "Relancer" à OUI
     mask_aff = (relance_clean == "OUI") | (statut_clean.str.contains("habitue", na=False))
-
 elif st.session_state.vue_contact == "Attente":
-    # On cherche "en attente" ou "attente"
     mask_aff = statut_clean.str.contains("attente", na=False)
-
-else: # 🟢 PAR DÉFAUT : EN COURS (Missions confirmées)
-    # On cherche "confirme" (avec ou sans accent grâce au 'contains' ou une égalité simple)
+else: # Onglet "En cours"
     mask_aff = statut_clean.str.contains("confirme|valid", na=False)
 
-# Application du filtre
 df_display = df_c[mask_aff].copy()
 
-# 2. AFFICHAGE DES ONGLETS OU DES FORMULAIRES
-if st.session_state.page == "MODIFIER_CONTACT" or st.session_state.page == "NOUVEAU_CONTACT":
-    # --- 3. FORMULAIRE (NOUVEAU / MODIFIER) ---
+# --- 3. STRUCTURE D'AFFICHAGE (DISPATCHER) ---
+
+# CAS A : FORMULAIRE DE MODIFICATION OU CRÉATION
+if st.session_state.page in ["MODIFIER_CONTACT", "NOUVEAU_CONTACT"]:
     st.subheader("📝 Détails de la réservation")
     
     idx_to_edit = st.session_state.get('edit_idx')
     row = df_c.loc[idx_to_edit] if (idx_to_edit is not None and idx_to_edit in df_c.index) else {}
 
+    # Préparation de la date
     date_val = pd.Timestamp.now()
     if row.get('DateNav'):
         date_val = pd.to_datetime(row['DateNav'], dayfirst=True, errors='coerce') or pd.Timestamp.now()
 
-    new_date = st.date_input("Date de navigation", value=date_val)
-    s_list = ["En attente", "Confirmé", "Habitué", "Terminé", "Annulé", "Refusé"]
+    # Début du formulaire simplifié
+    with st.form("form_contact_vesta"):
+        c1, c2 = st.columns(2)
+        new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
+        new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
+        
+        new_date = st.date_input("Date de navigation", value=date_val)
+        
+        s_list = ["En attente", "Confirmé", "Habitué", "Terminé", "Annulé", "Refusé"]
+        curr_s = str(row.get('Statut', 'En attente'))
+        idx_s = next((i for i, s in enumerate(s_list) if s.lower() in curr_s.lower()), 0)
+        new_statut = st.selectbox("Statut Mission", s_list, index=idx_s)
+
+        # Anti-conflit
+        date_str = new_date.strftime("%d/%m/%Y")
+        conflit = df_c[(df_c['DateNav'] == date_str) & (df_c['Statut'] == "Confirmé") & (df_c.index != idx_to_edit)]
+        
+        if not conflit.empty:
+            if new_statut == "Confirmé":
+                st.error(f"🚨 CONFLIT : Déjà pris par {conflit.iloc[0].get('Prénom')} {conflit.iloc[0].get('Nom')}")
+            else:
+                st.warning("ℹ️ Une sortie est déjà confirmée ce jour-là.")
+
+        if st.form_submit_button("💾 ENREGISTRER"):
+            # Ici ta logique de sauvegarde (sauvegarder_data...)
+            st.success("Données mises à jour !")
+            st.session_state.page = "CONTACTS"
+            st.rerun()
+
+    if st.button("⬅️ RETOUR"):
+        st.session_state.page = "CONTACTS"
+        st.rerun()
+
+# CAS B : AFFICHAGE DE LA LISTE (Uniquement si on est sur la page CONTACTS)
+elif st.session_state.page == "CONTACTS":
     
-    curr_s = str(row.get('Statut', 'En attente'))
-    idx_s = s_list.index(curr_s) if curr_s in s_list else 0
-    new_statut = st.selectbox("Statut Mission", s_list, index=idx_s)
-
-    # --- BLOC ANTI-CONFLIT ---
-    date_str = new_date.strftime("%d/%m/%Y")
-    conflit = df_c[(df_c['DateNav'] == date_str) & (df_c['Statut'] == "Confirmé") & (df_c.index != idx_to_edit)]
-
-    if not conflit.empty:
-        if new_statut == "Confirmé":
-            st.error(f"🚨 **CONFLIT :** Déjà pris par **{conflit.iloc[0].get('Prénom')} {conflit.iloc[0].get('Nom')}**")
-        else:
-            st.warning(f"ℹ️ Une sortie est déjà confirmée ce jour-là.")
-
-elif st.session_state.vue_contact == "Relances":
-    # --- 2. AFFICHAGE DE L'ONGLET HABITUÉS ---
-    st.markdown("### ⭐ Carnet des Habitués")
-    seuil_froid = pd.Timestamp.now() - pd.Timedelta(days=365)
-    if not df_display.empty:
-        for i, row_item in df_display.iterrows():
-            d_nav = pd.to_datetime(row_item['DateNav'], dayfirst=True, errors='coerce')
-            with st.container(border=True):
-                c1, c2 = st.columns([0.85, 0.15])
-                with c1:
-                    icon = "🔴" if pd.notna(d_nav) and d_nav < seuil_froid else "🟢"
-                    st.markdown(f"{icon} **{row_item['Prénom']} {row_item['Nom']}**")
-                    st.caption(f"Dernière : {row_item['DateNav']}")
-                with c2:
-                    if st.button("✏️", key=f"edit_hab_{i}"):
+    if st.session_state.vue_contact == "Relances":
+        st.markdown("### ⭐ Carnet des Habitués")
+        if not df_display.empty:
+            for i, r in df_display.iterrows():
+                with st.container(border=True):
+                    col1, col2 = st.columns([0.8, 0.2])
+                    col1.write(f"**{r['Prénom']} {r['Nom']}** ({r['DateNav']})")
+                    if col2.button("✏️", key=f"ed_{i}"):
                         st.session_state.edit_idx = i
                         st.session_state.page = "MODIFIER_CONTACT"
                         st.rerun()
+        else:
+            st.info("Aucun habitué à relancer.")
+            
     else:
-        st.info("Aucun habitué répertorié.")
+        st.markdown(f"### 📋 Liste : {st.session_state.vue_contact}")
+        if not df_display.empty:
+            st.dataframe(df_display[['DateNav', 'Prénom', 'Nom', 'Statut', 'Prix']], 
+                         use_container_width=True, hide_index=True)
+        else:
+            # Ce message ne s'affiche plus sur les autres menus !
+            st.warning(f"Aucun dossier dans la catégorie '{st.session_state.vue_contact}'.")
 
-else:
-    # --- 4. AFFICHAGE LISTE CLASSIQUE (Archives, Attente, En cours) ---
-    if not df_display.empty:
-        st.dataframe(df_display[['DateNav', 'Prénom', 'Nom', 'Statut', 'Prix']], use_container_width=True, hide_index=True)
-    else:
-        st.info("Aucun dossier.")
-
+# =================================================================
 # ===============================================================
 # --- 6. PAGE MODIFIER CONTACT : SÉCURITÉ TOTALE ---
 # =================================================================
