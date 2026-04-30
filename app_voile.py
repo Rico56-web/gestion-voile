@@ -291,135 +291,151 @@ if st.session_state.page == "MEMOS":
                 st.rerun()
             
             st.divider()
-
 # =================================================================
-# --- BLOC CONTACTS : GESTION DYNAMIQUE VESTA 2026 ---
+# --- 5. BLOC CONTACTS (V105 - HABITUÉS & DUPLICATION) ---
 # =================================================================
-
-# --- 1. SÉCURITÉ ET CHARGEMENT ---
-if 'df_c' not in locals() and 'df_c' not in globals():
-    df_c = charger_data_safe('contacts.json')
-
-if df_c is None or df_c.empty:
-    df_c = pd.DataFrame(columns=['id', 'DateNav', 'Statut', 'Prénom', 'Nom', 'Relancer', 'Société', 'Prix'])
-
-# --- 1. LOGIQUE DE FILTRAGE (RETOUR AU STANDARD) ---
-# On nettoie pour la comparaison mais on garde l'original pour l'affichage
-statut_compare = df_c['Statut'].fillna("En attente").astype(str).str.lower().str.strip()
-
-if st.session_state.vue_contact == "Archives":
-    mask_aff = statut_compare.str.contains("termine|annule|refuse", na=False)
-elif st.session_state.vue_contact == "Relances":
-    relance_compare = df_c['Relancer'].fillna("Non").astype(str).str.upper()
-    mask_aff = (relance_compare == "OUI") | (statut_compare == "habitue")
-elif st.session_state.vue_contact == "Attente":
-    mask_aff = (statut_compare == "en attente")
-else: # 🟢 "En cours"
-    # On cherche précisément "confirmé" ou "confirme"
-    mask_aff = statut_compare.str.contains("confirme", na=False)
-
-# Création de la liste à afficher
-df_display = df_c[mask_aff].copy()
-
-# --- 2. TRI PAR DATE (Pour retrouver l'ordre chronologique) ---
-if not df_display.empty:
-    # On convertit temporairement en format date pour trier correctement
-    df_display['temp_date'] = pd.to_datetime(df_display['DateNav'], dayfirst=True, errors='coerce')
-    df_display = df_display.sort_values(by='temp_date', ascending=True).drop(columns=['temp_date'])
-
-# --- 3. AFFICHAGE DES COLONNES ---
 if st.session_state.page == "CONTACTS":
-    st.markdown(f"### 📋 Liste : {st.session_state.vue_contact}")
+    from datetime import datetime
+    import pandas as pd
+
+    # --- CHARGEMENT DES DONNÉES ---
+    df_raw = charger_data('contacts.json')
     
-    if not df_display.empty:
-        # On définit exactement les colonnes que tu veux voir, comme avant
-        colonnes_a_voir = ['DateNav', 'Prénom', 'Nom', 'Société', 'Statut', 'Prix', 'Paiement']
-        
-        # On vérifie que ces colonnes existent dans ton fichier avant de les afficher
-        cols_existantes = [c for c in colonnes_a_voir if c in df_display.columns]
-        
-        st.dataframe(
-            df_display[cols_existantes], 
-            use_container_width=True, 
-            hide_index=True
-        )
-    else:
-        st.info(f"Aucun dossier dans la catégorie '{st.session_state.vue_contact}'.")
-
-# --- 3. STRUCTURE D'AFFICHAGE (DISPATCHER) ---
-
-# CAS A : FORMULAIRE DE MODIFICATION OU CRÉATION
-if st.session_state.page in ["MODIFIER_CONTACT", "NOUVEAU_CONTACT"]:
-    st.subheader("📝 Détails de la réservation")
+    # --- NAVIGATION ET EXCEL ---
+    n1, n2, n3, n4, n5 = st.columns([1, 1, 1, 1, 1.5])
     
-    idx_to_edit = st.session_state.get('edit_idx')
-    row = df_c.loc[idx_to_edit] if (idx_to_edit is not None and idx_to_edit in df_c.index) else {}
-
-    # Préparation de la date
-    date_val = pd.Timestamp.now()
-    if row.get('DateNav'):
-        date_val = pd.to_datetime(row['DateNav'], dayfirst=True, errors='coerce') or pd.Timestamp.now()
-
-    # Début du formulaire simplifié
-    with st.form("form_contact_vesta"):
-        c1, c2 = st.columns(2)
-        new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
-        new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
+    # Styles de navigation
+    if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
+        st.session_state.vue_contact = "En cours"; st.rerun()
+    if n2.button("⏳ DEMANDES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Attente" else "secondary"): 
+        st.session_state.vue_contact = "Attente"; st.rerun()
+    
+    # Distinction visuelle forte pour les HABITUÉS (Orange)
+    if n3.button("⭐ HABITUÉS", use_container_width=True, type="primary" if st.session_state.vue_contact == "Relances" else "secondary"): 
+        st.session_state.vue_contact = "Relances"; st.rerun()
         
-        new_date = st.date_input("Date de navigation", value=date_val)
-        
-        s_list = ["En attente", "Confirmé", "Habitué", "Terminé", "Annulé", "Refusé"]
-        curr_s = str(row.get('Statut', 'En attente'))
-        idx_s = next((i for i, s in enumerate(s_list) if s.lower() in curr_s.lower()), 0)
-        new_statut = st.selectbox("Statut Mission", s_list, index=idx_s)
+    if n4.button("✅ ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
+        st.session_state.vue_contact = "Archives"; st.rerun()
 
-        # Anti-conflit
-        date_str = new_date.strftime("%d/%m/%Y")
-        conflit = df_c[(df_c['DateNav'] == date_str) & (df_c['Statut'] == "Confirmé") & (df_c.index != idx_to_edit)]
-        
-        if not conflit.empty:
-            if new_statut == "Confirmé":
-                st.error(f"🚨 CONFLIT : Déjà pris par {conflit.iloc[0].get('Prénom')} {conflit.iloc[0].get('Nom')}")
-            else:
-                st.warning("ℹ️ Une sortie est déjà confirmée ce jour-là.")
+    with n5:
+        bouton_export_excel(df_raw, "Planning_Vesta_2026")
 
-        if st.form_submit_button("💾 ENREGISTRER"):
-            # Ici ta logique de sauvegarde (sauvegarder_data...)
-            st.success("Données mises à jour !")
-            st.session_state.page = "CONTACTS"
+    st.divider()
+
+    # --- FILTRAGE & RECHERCHE ---
+    if not df_raw.empty:
+        df_c = df_raw.copy().fillna("")
+        df_c['orig_idx'] = df_c.index
+        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+        
+        c_search, c_yr, c_new = st.columns([2, 1, 1])
+        search = c_search.text_input("🔍 Rechercher un contact...", "", key="search_bar_contacts").upper()
+        annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
+        
+        if c_new.button("➕ NOUVEAU", use_container_width=True):
+            new_r = {
+                "Prénom": "NOUVEAU", "Nom": "CLIENT", "Statut": "En attente", 
+                "Paiement": "Unpaid", "Relancer": "Non", "DateNav": datetime.now().strftime("%d/%m/%Y"), 
+                "Société": "PERSO", "Jours": 1, "Prix": 0, "Acompte": 0, "Notes": "", "Téléphone": "", "Email": "", "Pers": 1
+            }
+            df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
+            sauvegarder_data(df_new, 'contacts.json')
+            st.session_state.edit_idx = 0 
+            st.session_state.page = "MODIFIER_CONTACT"
             st.rerun()
 
-    if st.button("⬅️ RETOUR"):
-        st.session_state.page = "CONTACTS"
-        st.rerun()
+        # --- LOGIQUE DE SÉPARATION DES ONGLETS (V105) ---
+        statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
+        relance_clean = df_c['Relancer'].fillna("Non").str.upper()
+        
+        if st.session_state.vue_contact == "Archives":
+            mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
+            tri_ordre = False 
+        elif st.session_state.vue_contact == "Relances":
+            mask_aff = (relance_clean == "OUI") # Tous tes VIP
+            tri_ordre = False
+            st.warning("✨ Carnet des Habitués : Utilisez 🔄 RE-RÉSERVER pour dupliquer un contact vers une nouvelle date.")
+        elif st.session_state.vue_contact == "Attente":
+            mask_aff = (statut_clean == "liste d'attente")
+            tri_ordre = True  
+        else: # EN COURS
+            mask_aff = ~(statut_clean.str.contains("termine|annule|refuse")) & (statut_clean != "liste d'attente")
+            tri_ordre = True
 
-# CAS B : AFFICHAGE DE LA LISTE (Uniquement si on est sur la page CONTACTS)
-elif st.session_state.page == "CONTACTS":
-    
-    if st.session_state.vue_contact == "Relances":
-        st.markdown("### ⭐ Carnet des Habitués")
-        if not df_display.empty:
-            for i, r in df_display.iterrows():
-                with st.container(border=True):
-                    col1, col2 = st.columns([0.8, 0.2])
-                    col1.write(f"**{r['Prénom']} {r['Nom']}** ({r['DateNav']})")
-                    if col2.button("✏️", key=f"ed_{i}"):
-                        st.session_state.edit_idx = i
-                        st.session_state.page = "MODIFIER_CONTACT"
-                        st.rerun()
-        else:
-            st.info("Aucun habitué à relancer.")
+        df_aff = df_c[mask_aff & ((df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna()))].copy()
+        if search:
+            df_aff = df_aff[df_aff['Nom'].str.contains(search) | df_aff['Prénom'].str.contains(search) | df_aff['Société'].str.contains(search)]
+        
+        df_aff = df_aff.sort_values(by='dt_sort', ascending=tri_ordre)
+
+        # --- BOUCLE D'AFFICHAGE DES FICHES ---
+        for _, row in df_aff.iterrows():
+            idx = row['orig_idx']
+            p_total, p_aco = to_f(row.get('Prix', 0)), to_f(row.get('Acompte', 0))
+            reste = p_total - p_aco
             
-    else:
-        st.markdown(f"### 📋 Liste : {st.session_state.vue_contact}")
-        if not df_display.empty:
-            st.dataframe(df_display[['DateNav', 'Prénom', 'Nom', 'Statut', 'Prix']], 
-                         use_container_width=True, hide_index=True)
-        else:
-            # Ce message ne s'affiche plus sur les autres menus !
-            st.warning(f"Aucun dossier dans la catégorie '{st.session_state.vue_contact}'.")
+            # Badge VIP / Habitué
+            is_vip = str(row.get('Relancer', 'Non')).upper() == "OUI"
+            badge_vip = "⭐ " if is_vip else ""
+            
+            # Couleurs de société
+            soc_name = str(row.get('Société', 'PERSO')).upper()
+            colors = {"CMN": ("#2980B9", "#EBF5FB"), "CLICK": ("#27AE60", "#EAFAF1"), 
+                      "VOG": ("#8E44AD", "#F5EEF8"), "PERSO": ("#F1C40F", "#FEF9E7")}
+            border_col, bg_card = colors.get(soc_name, ("#7F8C8D", "#FDFEFE"))
 
-# =================================================================
+            st.markdown(f"""
+            <div style="background:{bg_card}; padding:15px; border-radius:12px; border-left:10px solid {border_col}; 
+                        box-shadow: 4px 4px 10px rgba(0,0,0,0.08); margin-bottom:10px; color: black;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:1.1rem; font-weight:bold;">{badge_vip}{row['Prénom']} {row['Nom']}</span>
+                    <span style="background:{border_col}; color:white; padding:2px 8px; border-radius:10px; font-size:0.7rem;">{soc_name}</span>
+                </div>
+                <div style="font-size:0.9rem; margin-top:5px;">
+                    📅 <b>{row['DateNav']}</b> | 💸 Reste : <b>{int(reste)}€</b> | Statut : {row['Statut']}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # --- BOUTONS D'ACTION ---
+            c1, c2, c3 = st.columns(3)
+            
+            if c1.button("✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
+                st.session_state.edit_idx = idx
+                st.session_state.page = "MODIFIER_CONTACT"
+                st.rerun()
+
+            if st.session_state.vue_contact == "Relances":
+                # BOUTON RE-RÉSERVER (Duplication)
+                if c2.button("🔄 RE-RÉSERVER", key=f"dup_{idx}", use_container_width=True):
+                    df_db = charger_data('contacts.json')
+                    new_entry = row.to_dict()
+                    new_entry.update({
+                        "DateNav": datetime.now().strftime("%d/%m/%Y"),
+                        "Statut": "En attente", "Paiement": "Unpaid", "Prix": 0, "Acompte": 0,
+                        "Notes": f"Nouvelle résa (Habitué). Ancienne nav le {row['DateNav']}"
+                    })
+                    # Purge des index temporaires
+                    for k in ['orig_idx', 'dt_sort']: new_entry.pop(k, None)
+                    
+                    df_new = pd.concat([pd.DataFrame([new_entry]), df_db], ignore_index=True)
+                    sauvegarder_data(df_new, 'contacts.json')
+                    st.session_state.edit_idx = 0 # Le nouveau est en haut
+                    st.session_state.page = "MODIFIER_CONTACT"
+                    st.rerun()
+            else:
+                # SUPPRIMER classique
+                if c2.button("🗑️ SUPPRIMER", key=f"del_{idx}", use_container_width=True):
+                    df_db = charger_data('contacts.json').drop(idx).reset_index(drop=True)
+                    sauvegarder_data(df_db, 'contacts.json')
+                    st.rerun()
+
+            if st.session_state.vue_contact == "En cours" and c3.button("🏁 FINIR", key=f"fin_{idx}", use_container_width=True):
+                df_all = charger_data('contacts.json')
+                df_all.loc[idx, ['Statut', 'Paiement']] = ["Terminé", "Paid"]
+                sauvegarder_data(df_all, 'contacts.json')
+                st.rerun()
+
 # ===============================================================
 # --- 6. PAGE MODIFIER CONTACT : SÉCURITÉ TOTALE ---
 # =================================================================
