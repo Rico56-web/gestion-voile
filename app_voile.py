@@ -292,7 +292,7 @@ if st.session_state.page == "MEMOS":
             
             st.divider()
 # =================================================================
-# --- 5. BLOC CONTACTS (V107 - DASHBOARD & SÉCURITÉ SUPPR) ---
+# --- 5. BLOC CONTACTS (V108 - AFFICHAGE COMPLET & SÉCURITÉ) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     from datetime import datetime
@@ -358,7 +358,10 @@ if st.session_state.page == "CONTACTS":
         # --- BOUCLE FICHES ---
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
-            p_tot, p_aco = to_f(row.get('Prix', 0)), to_f(row.get('Acompte', 0))
+            p_tot = to_f(row.get('Prix', 0))
+            p_aco = to_f(row.get('Acompte', 0))
+            nb_jours = row.get('Jours', 1)
+            nb_pers = row.get('Pers', 1)
             
             # Design Fiche
             soc = str(row.get('Société', 'PERSO')).upper()
@@ -366,10 +369,18 @@ if st.session_state.page == "CONTACTS":
             border_col, bg_card = colors.get(soc, ("#7F8C8D", "#FDFEFE"))
             badge_vip = "⭐ " if str(row.get('Relancer', 'Non')).upper() == "OUI" else ""
 
+            # Affichage enrichi (Prix, Acompte, Jours, Personnes)
             st.markdown(f"""
             <div style="background:{bg_card}; padding:15px; border-radius:12px; border-left:10px solid {border_col}; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); margin-bottom:10px; color: black;">
-                <b>{badge_vip}{row['Prénom']} {row['Nom']}</b> ({soc})<br>
-                <small>📅 {row['DateNav']} | 💰 {int(p_tot)}€ (Reste {int(p_tot-p_aco)}€) | 🏁 {row['Statut']}</small>
+                <div style="display:flex; justify-content:space-between;">
+                    <b>{badge_vip}{row['Prénom']} {row['Nom']}</b>
+                    <span style="font-size:0.8rem; font-weight:bold; color:{border_col};">{soc}</span>
+                </div>
+                <div style="margin-top:5px; font-size:0.9rem;">
+                    📅 {row['DateNav'] if row['DateNav'] else 'Date à définir'} | 👥 {int(nb_pers)} pers. | ⏱️ {nb_jours} j.<br>
+                    💰 <b>Total: {int(p_tot)}€</b> | 💳 Acompte: {int(p_aco)}€ | 📉 <b>Reste: {int(p_tot-p_aco)}€</b>
+                </div>
+                <div style="font-style:italic; font-size:0.8rem; color:gray; margin-top:5px;">Statut: {row['Statut']}</div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -378,7 +389,6 @@ if st.session_state.page == "CONTACTS":
             if c1.button("✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx; st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
 
-            # Colonne 2 : Suppression ou Re-réservation
             if st.session_state.vue_contact == "Relances":
                 if c2.button("🔄 RE-RÉSERVER", key=f"dup_{idx}", use_container_width=True):
                     df_db = charger_data('contacts.json')
