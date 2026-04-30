@@ -301,19 +301,29 @@ if 'df_c' not in locals() and 'df_c' not in globals():
 if df_c is None or df_c.empty:
     df_c = pd.DataFrame(columns=['id', 'DateNav', 'Statut', 'Prénom', 'Nom', 'Relancer', 'Société', 'Prix'])
 
-# 1. LOGIQUE DE FILTRAGE DES ONGLETS
-statut_clean = df_c['Statut'].fillna("En attente").str.lower()
-relance_clean = df_c['Relancer'].fillna("Non").str.upper()
+# 1. LOGIQUE DE FILTRAGE DES ONGLETS (VERSION ROBUSTE)
+# On s'assure que tout est en minuscules et sans espaces inutiles pour comparer
+statut_clean = df_c['Statut'].fillna("En attente").astype(str).str.lower().str.strip()
+relance_clean = df_c['Relancer'].fillna("Non").astype(str).str.upper().str.strip()
 
+# On définit le masque selon l'onglet sélectionné
 if st.session_state.vue_contact == "Archives":
-    mask_aff = (statut_clean.str.contains("termine|annule|refuse"))
-elif st.session_state.vue_contact == "Relances":
-    mask_aff = (relance_clean == "OUI") | (statut_clean == "habitue")
-elif st.session_state.vue_contact == "Attente":
-    mask_aff = (statut_clean == "en attente")
-else: # 🟢 EN COURS
-    mask_aff = (statut_clean == "confirme")
+    # On cherche tout ce qui contient "termine", "annule" ou "refuse"
+    mask_aff = statut_clean.str.contains("termine|annule|refuse", na=False)
 
+elif st.session_state.vue_contact == "Relances":
+    # Statut "habitue" OU case "Relancer" à OUI
+    mask_aff = (relance_clean == "OUI") | (statut_clean.str.contains("habitue", na=False))
+
+elif st.session_state.vue_contact == "Attente":
+    # On cherche "en attente" ou "attente"
+    mask_aff = statut_clean.str.contains("attente", na=False)
+
+else: # 🟢 PAR DÉFAUT : EN COURS (Missions confirmées)
+    # On cherche "confirme" (avec ou sans accent grâce au 'contains' ou une égalité simple)
+    mask_aff = statut_clean.str.contains("confirme|valid", na=False)
+
+# Application du filtre
 df_display = df_c[mask_aff].copy()
 
 # 2. AFFICHAGE DES ONGLETS OU DES FORMULAIRES
