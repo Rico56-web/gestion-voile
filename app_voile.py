@@ -291,7 +291,6 @@ if st.session_state.page == "MEMOS":
                 st.rerun()
             
             st.divider()
-
 # =================================================================
 # --- BLOC CONTACTS : GESTION DYNAMIQUE VESTA 2026 ---
 # =================================================================
@@ -317,8 +316,37 @@ else: # 🟢 EN COURS
 
 df_display = df_c[mask_aff].copy()
 
-# 2. AFFICHAGE DE L'ONGLET HABITUÉS (RELANCES)
-if st.session_state.vue_contact == "Relances" and st.session_state.page == "CONTACTS":
+# 2. AFFICHAGE DES ONGLETS OU DES FORMULAIRES
+if st.session_state.page == "MODIFIER_CONTACT" or st.session_state.page == "NOUVEAU_CONTACT":
+    # --- 3. FORMULAIRE (NOUVEAU / MODIFIER) ---
+    st.subheader("📝 Détails de la réservation")
+    
+    idx_to_edit = st.session_state.get('edit_idx')
+    row = df_c.loc[idx_to_edit] if (idx_to_edit is not None and idx_to_edit in df_c.index) else {}
+
+    date_val = pd.Timestamp.now()
+    if row.get('DateNav'):
+        date_val = pd.to_datetime(row['DateNav'], dayfirst=True, errors='coerce') or pd.Timestamp.now()
+
+    new_date = st.date_input("Date de navigation", value=date_val)
+    s_list = ["En attente", "Confirmé", "Habitué", "Terminé", "Annulé", "Refusé"]
+    
+    curr_s = str(row.get('Statut', 'En attente'))
+    idx_s = s_list.index(curr_s) if curr_s in s_list else 0
+    new_statut = st.selectbox("Statut Mission", s_list, index=idx_s)
+
+    # --- BLOC ANTI-CONFLIT ---
+    date_str = new_date.strftime("%d/%m/%Y")
+    conflit = df_c[(df_c['DateNav'] == date_str) & (df_c['Statut'] == "Confirmé") & (df_c.index != idx_to_edit)]
+
+    if not conflit.empty:
+        if new_statut == "Confirmé":
+            st.error(f"🚨 **CONFLIT :** Déjà pris par **{conflit.iloc[0].get('Prénom')} {conflit.iloc[0].get('Nom')}**")
+        else:
+            st.warning(f"ℹ️ Une sortie est déjà confirmée ce jour-là.")
+
+elif st.session_state.vue_contact == "Relances":
+    # --- 2. AFFICHAGE DE L'ONGLET HABITUÉS ---
     st.markdown("### ⭐ Carnet des Habitués")
     seuil_froid = pd.Timestamp.now() - pd.Timedelta(days=365)
     if not df_display.empty:
@@ -335,49 +363,17 @@ if st.session_state.vue_contact == "Relances" and st.session_state.page == "CONT
                         st.session_state.edit_idx = i
                         st.session_state.page = "MODIFIER_CONTACT"
                         st.rerun()
+    else:
+        st.info("Aucun habitué répertorié.")
 
-# 3. FORMULAIRE (NOUVEAU / MODIFIER) SÉCURISÉ
-elif st.session_state.page in ["NOUVEAU_CONTACT", "MODIFIER_CONTACT"]:
-    st.subheader("📝 Détails de la réservation")
-    
-    # --- HARMONISATION : On récupère 'row' de manière sûre ---
-    idx_to_edit = st.session_state.get('edit_idx')
-    row = {} # Par défaut vide (Nouveau Contact)
-    
-    if st.session_state.page == "MODIFIER_CONTACT" and idx_to_edit in df_c.index:
-        row = df_c.loc[idx_to_edit]
-
-    # Date par défaut
-    date_val = pd.Timestamp.now()
-    if row.get('DateNav'):
-        date_val = pd.to_datetime(row['DateNav'], dayfirst=True, errors='coerce') or pd.Timestamp.now()
-
-    new_date = st.date_input("Date de navigation", value=date_val)
-    s_list = ["En attente", "Confirmé", "Habitué", "Terminé", "Annulé", "Refusé"]
-    
-    # Calcul index statut (Ligne 370 fixée)
-    curr_s = str(row.get('Statut', 'En attente'))
-    idx_s = s_list.index(curr_s) if curr_s in s_list else 0
-    new_statut = st.selectbox("Statut Mission", s_list, index=idx_s)
-
-    # --- BLOC ANTI-CONFLIT ---
-    date_str = new_date.strftime("%d/%m/%Y")
-    conflit = df_c[(df_c['DateNav'] == date_str) & (df_c['Statut'] == "Confirmé") & (df_c.index != idx_to_edit)]
-
-    if not conflit.empty:
-        if new_statut == "Confirmé":
-            st.error(f"🚨 **CONFLIT :** Déjà pris par **{conflit.iloc[0].get('Prénom')} {conflit.iloc[0].get('Nom')}**")
 else:
-            st.warning(f"ℹ️ Une sortie est déjà confirmée ce jour-là.")
-# 4. AFFICHAGE LISTE
-elif st.session_state.page == "CONTACTS":
+    # --- 4. AFFICHAGE LISTE CLASSIQUE (Archives, Attente, En cours) ---
     if not df_display.empty:
         st.dataframe(df_display[['DateNav', 'Prénom', 'Nom', 'Statut', 'Prix']], use_container_width=True, hide_index=True)
     else:
         st.info("Aucun dossier.")
-# ============================================================
 
-# =================================================================
+# ===============================================================
 # --- 6. PAGE MODIFIER CONTACT : SÉCURITÉ TOTALE ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
