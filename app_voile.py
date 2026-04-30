@@ -731,15 +731,26 @@ if st.session_state.page == "STATS":
         # --- B. CALCULS ---
         total_ca = sum(to_f(x) for x in df_final['Prix'])
         
-        # Maintenance (Dépenses)
+# --- B. CALCULS (MAINTENANCE) ---
+        t_maint = 0.0
         if not df_m.empty:
             df_m['dt_maint'] = pd.to_datetime(df_m.get('Date', ''), dayfirst=True, errors='coerce')
-            # Filtre selon l'état choisi (Fait ou A faire)
-            mask_m = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == etat_flux)
-            df_m_y = df_m[mask_m].copy()
-            t_maint = sum(to_f(x) for x in df_m_y['Prix']) # Ajusté selon ta colonne prix/montant
+            
+            # Détection dynamique de la colonne de prix dans maintenance
+            # On cherche 'Prix', sinon 'Montant', sinon 'M_Num' (utilisé dans certaines versions)
+            col_prix_maint = next((c for c in ['Prix', 'Montant', 'M_Num'] if c in df_m.columns), None)
+            
+            if col_prix_maint:
+                mask_m = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == etat_flux)
+                df_m_y = df_m[mask_m].copy()
+                t_maint = sum(to_f(x) for x in df_m_y[col_prix_maint])
+            else:
+                # Si aucune colonne n'est trouvée, on crée une DF vide pour éviter les erreurs d'affichage plus bas
+                df_m_y = pd.DataFrame()
+                st.error("⚠️ Colonne financière introuvable dans maintenance.json (Prix ou Montant ?)")
         else:
-            t_maint = 0.0
+            df_m_y = pd.DataFrame()
+
             
         # Gazole (Dépenses)
         t_gasoil_eur = 0.0
