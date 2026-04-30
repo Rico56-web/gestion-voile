@@ -303,25 +303,48 @@ if 'df_c' not in locals() and 'df_c' not in globals():
 if df_c is None or df_c.empty:
     df_c = pd.DataFrame(columns=['id', 'DateNav', 'Statut', 'Prénom', 'Nom', 'Relancer', 'Société', 'Prix'])
 
-# --- 1. LOGIQUE DE FILTRAGE (REBOOT SÉCURISÉ) ---
-# On prépare une version "propre" pour la comparaison
-statut_brut = df_c['Statut'].fillna("En attente").astype(str).str.lower()
+# --- 1. LOGIQUE DE FILTRAGE (RETOUR AU STANDARD) ---
+# On nettoie pour la comparaison mais on garde l'original pour l'affichage
+statut_compare = df_c['Statut'].fillna("En attente").astype(str).str.lower().str.strip()
 
 if st.session_state.vue_contact == "Archives":
-    mask_aff = statut_brut.str.contains("term|annul|refus", na=False)
-
+    mask_aff = statut_compare.str.contains("termine|annule|refuse", na=False)
 elif st.session_state.vue_contact == "Relances":
-    relance_brut = df_c['Relancer'].fillna("Non").astype(str).str.upper()
-    mask_aff = (relance_brut == "OUI") | (statut_brut.str.contains("habit", na=False))
-
+    relance_compare = df_c['Relancer'].fillna("Non").astype(str).str.upper()
+    mask_aff = (relance_compare == "OUI") | (statut_compare == "habitue")
 elif st.session_state.vue_contact == "Attente":
-    mask_aff = statut_brut.str.contains("attent", na=False)
-
+    mask_aff = (statut_compare == "en attente")
 else: # 🟢 "En cours"
-    # On cherche tout ce qui commence par "conf" ou "valid" pour éviter les pièges d'accents
-    mask_aff = statut_brut.str.contains("conf|valid", na=False)
+    # On cherche précisément "confirmé" ou "confirme"
+    mask_aff = statut_compare.str.contains("confirme", na=False)
 
+# Création de la liste à afficher
 df_display = df_c[mask_aff].copy()
+
+# --- 2. TRI PAR DATE (Pour retrouver l'ordre chronologique) ---
+if not df_display.empty:
+    # On convertit temporairement en format date pour trier correctement
+    df_display['temp_date'] = pd.to_datetime(df_display['DateNav'], dayfirst=True, errors='coerce')
+    df_display = df_display.sort_values(by='temp_date', ascending=True).drop(columns=['temp_date'])
+
+# --- 3. AFFICHAGE DES COLONNES ---
+if st.session_state.page == "CONTACTS":
+    st.markdown(f"### 📋 Liste : {st.session_state.vue_contact}")
+    
+    if not df_display.empty:
+        # On définit exactement les colonnes que tu veux voir, comme avant
+        colonnes_a_voir = ['DateNav', 'Prénom', 'Nom', 'Société', 'Statut', 'Prix', 'Paiement']
+        
+        # On vérifie que ces colonnes existent dans ton fichier avant de les afficher
+        cols_existantes = [c for c in colonnes_a_voir if c in df_display.columns]
+        
+        st.dataframe(
+            df_display[cols_existantes], 
+            use_container_width=True, 
+            hide_index=True
+        )
+    else:
+        st.info(f"Aucun dossier dans la catégorie '{st.session_state.vue_contact}'.")
 
 # --- 3. STRUCTURE D'AFFICHAGE (DISPATCHER) ---
 
