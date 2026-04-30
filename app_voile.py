@@ -414,95 +414,109 @@ if st.session_state.page == "CONTACTS":
                 df_all = charger_data('contacts.json')
                 df_all.loc[idx, ['Statut', 'Paiement']] = ["Terminé", "Paid"]
                 sauvegarder_data(df_all, 'contacts.json'); st.rerun()
+
 # ===============================================================
-# --- 6. PAGE MODIFIER CONTACT : SÉCURITÉ TOTALE ---
+# --- 6. PAGE MODIFIER CONTACT : VERSION COMPLÈTE (V110) ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
     st.markdown('<h3 style="text-align:center;">✏️ Modifier le Contact</h3>', unsafe_allow_html=True)
     
-    # 1. On récupère l'index de manière sécurisée
     idx_to_edit = st.session_state.get('edit_idx')
-    
-    # 2. On charge les données
-    df_m = charger_data_safe('contacts.json')
+    df_m = charger_data('contacts.json') # Utilisation de ta fonction standard
 
-    # 3. VÉRIFICATION CRITIQUE : Est-ce qu'on a tout pour travailler ?
     if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
-        
-        # On définit 'row' ici, il ne pourra pas être "indéfini" plus bas
         row = df_m.loc[idx_to_edit]
         
         with st.form("form_edit_v2026"):
-            # --- Ligne Prénom / Nom ---
+            # --- Ligne 1 : Identité ---
             c1, c2 = st.columns(2)
             new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
             new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
             
-            # --- Ligne Date / Société ---
-            c3, c4 = st.columns(2)
+            # --- Ligne 2 : Logistique (Dates, Jours, Pers) ---
+            c3, c4, c5, c6 = st.columns([2, 1, 1, 1])
             new_date = c3.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav', '')))
+            
+            # Récupération sécurisée des numériques (float ou int)
+            try: val_jours = float(row.get('Jours', 1.0))
+            except: val_jours = 1.0
+            try: val_pers = int(float(row.get('Pers', 1.0)))
+            except: val_pers = 1
+                
+            new_jours = c4.number_input("Jours", value=val_jours, step=0.5)
+            new_pers = c5.number_input("Pers.", value=val_pers, step=1)
             
             liste_soc = ["PERSO", "CLICK", "CMN", "VOG"]
             curr_soc = str(row.get('Société', 'PERSO')).upper().strip()
-            if curr_soc not in liste_soc and curr_soc != "": 
-                liste_soc.append(curr_soc)
             soc_idx = liste_soc.index(curr_soc) if curr_soc in liste_soc else 0
-            new_soc = c4.selectbox("Société", liste_soc, index=soc_idx)
+            new_soc = c6.selectbox("Société", liste_soc, index=soc_idx)
             
-            # --- Statuts et Anti-conflit ---
-            s1, s2 = st.columns(2)
-            s_list = ["En attente", "Confirmé", "Habitué", "Terminé", "Annulé", "Refusé"]
+            # --- Ligne 3 : Statuts ---
+            s1, s2, s3 = st.columns([2, 1, 1])
+            s_list = ["En attente", "Confirmé", "Liste d'attente", "Terminé", "Annulé", "Refusé"]
             curr_s = str(row.get('Statut', 'En attente')).strip()
-
-            # Correction de l'index du statut
-            if curr_s == "Liste d'attente":
-                s_idx = 2 # Habitué
-            else:
-                s_idx = next((i for i, s in enumerate(s_list) if s.lower() in curr_s.lower()), 0)
-
+            
+            # On cherche l'index exact ou approchant
+            if curr_s in s_list: s_idx = s_list.index(curr_s)
+            else: s_idx = next((i for i, s in enumerate(s_list) if s.lower() in curr_s.lower()), 0)
+            
             new_statut = s1.selectbox("Statut Mission", s_list, index=s_idx)
             
-            # Vérification conflit
-            conflit = df_m[(df_m['DateNav'] == new_date) & 
-                           (df_m['Statut'] == "Confirmé") & 
-                           (df_m.index != idx_to_edit)]
-            
-            if not conflit.empty:
-                if new_statut == "Confirmé":
-                    st.error(f"🚨 CONFLIT : {conflit.iloc[0].get('Prénom', 'Quelqu\'un')} est déjà confirmé !")
-                else:
-                    st.warning("ℹ️ Note : Une sortie est confirmée ce jour-là.")
-
-            # --- Reste du formulaire ---
-            sub1, sub2 = s2.columns(2)
-            p_list = ["Unpaid", "Paid"]
-            p_idx = 1 if str(row.get('Paiement', '')).upper() == "PAID" else 0
-            new_pay = sub1.selectbox("Paiement", p_list, index=p_idx)
+            p_list = ["Unpaid", "Paid", "Acompte OK"]
+            curr_p = str(row.get('Paiement', 'Unpaid'))
+            p_idx = p_list.index(curr_p) if curr_p in p_list else 0
+            new_pay = s2.selectbox("Paiement", p_list, index=p_idx)
             
             val_r = str(row.get('Relancer', 'Non')).strip().capitalize()
-            new_relance = sub2.selectbox("À recontacter ?", ["Non", "Oui"], index=1 if val_r == "Oui" else 0)
+            new_relance = s3.selectbox("Habitué ?", ["Non", "Oui"], index=1 if val_r == "Oui" else 0)
 
-            if st.form_submit_button("💾 ENREGISTRER"):
-                # Sauvegarde directe par colonnes (plus robuste)
+            # --- Ligne 4 : Finances ---
+            f1, f2, f3 = st.columns(3)
+            try: val_prix = int(float(row.get('Prix', 0)))
+            except: val_prix = 0
+            try: val_acompte = int(float(row.get('Acompte', 0)))
+            except: val_acompte = 0
+                
+            new_prix = f1.number_input("Prix Total (€)", value=val_prix)
+            new_acompte = f2.number_input("Acompte encaissé (€)", value=val_acompte)
+            f3.markdown(f"<br><b style='color:gray;'>Reste : {new_prix - new_acompte} €</b>", unsafe_allow_html=True)
+
+            # --- Ligne 5 : Contact & Notes ---
+            new_tel = st.text_input("Téléphone", value=str(row.get('Téléphone', '')))
+            new_mail = st.text_input("Email", value=str(row.get('Email', '')))
+            new_notes = st.text_area("Notes", value=str(row.get('Notes', '')))
+
+            # --- Validation ---
+            if st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True):
                 df_m.at[idx_to_edit, 'Prénom'] = new_pre.upper()
                 df_m.at[idx_to_edit, 'Nom'] = new_nom.upper()
                 df_m.at[idx_to_edit, 'DateNav'] = new_date
+                df_m.at[idx_to_edit, 'Jours'] = new_jours
+                df_m.at[idx_to_edit, 'Pers'] = new_pers
+                df_m.at[idx_to_edit, 'Société'] = new_soc
                 df_m.at[idx_to_edit, 'Statut'] = new_statut
-                # ... ajoute les autres champs ici ...
+                df_m.at[idx_to_edit, 'Paiement'] = new_pay
+                df_m.at[idx_to_edit, 'Relancer'] = new_relance
+                df_m.at[idx_to_edit, 'Prix'] = new_prix
+                df_m.at[idx_to_edit, 'Acompte'] = new_acompte
+                df_m.at[idx_to_edit, 'Téléphone'] = new_tel
+                df_m.at[idx_to_edit, 'Email'] = new_mail
+                df_m.at[idx_to_edit, 'Notes'] = new_notes
+                
                 sauvegarder_data(df_m, 'contacts.json')
+                st.success("✅ Modifications enregistrées !")
                 st.session_state.page = "CONTACTS"
                 st.rerun()
+
     else:
-        # SI ON ARRIVE ICI SANS DONNÉES : On redirige pour éviter le crash
-        st.error("Erreur de chargement du contact (Index manquant).")
-        if st.button("🔄 Retourner aux contacts"):
+        st.error("Erreur de chargement du contact.")
+        if st.button("🔄 Retour"):
             st.session_state.page = "CONTACTS"
             st.rerun()
 
-    if st.button("⬅️ ANNULER"):
+    if st.button("⬅️ ANNULER ET RETOUR"):
         st.session_state.page = "CONTACTS"
         st.rerun()
-
 # =================================================================
 # --- 6. PAGE PLANNING (V19.2 - CALIBRÉ SUR TON LOGBOOK) ---
 # =================================================================
