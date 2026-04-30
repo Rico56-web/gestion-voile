@@ -367,14 +367,14 @@ elif st.session_state.page in ["NOUVEAU_CONTACT", "MODIFIER_CONTACT"]:
     if not conflit.empty:
         if new_statut == "Confirmé":
             st.error(f"🚨 **CONFLIT :** Déjà pris par **{conflit.iloc[0].get('Prénom')} {conflit.iloc[0].get('Nom')}**")
-        else:
+else:
             st.warning(f"ℹ️ Une sortie est déjà confirmée ce jour-là.")
 
 # 4. AFFICHAGE LISTE
 elif st.session_state.page == "CONTACTS":
     if not df_display.empty:
         st.dataframe(df_display[['DateNav', 'Prénom', 'Nom', 'Statut', 'Prix']], use_container_width=True, hide_index=True)
-    else:
+else:
         st.info("Aucun dossier.")
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT : SÉCURITÉ TOTALE ---
