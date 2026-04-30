@@ -292,7 +292,7 @@ if st.session_state.page == "MEMOS":
             
             st.divider()
 # =================================================================
-# --- 5. BLOC CONTACTS (V105 - HABITUÉS & DUPLICATION) ---
+# --- 5. BLOC CONTACTS (V106 - HABITUÉS & DASHBOARD FINANCIER) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     from datetime import datetime
@@ -304,16 +304,12 @@ if st.session_state.page == "CONTACTS":
     # --- NAVIGATION ET EXCEL ---
     n1, n2, n3, n4, n5 = st.columns([1, 1, 1, 1, 1.5])
     
-    # Styles de navigation
     if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
         st.session_state.vue_contact = "En cours"; st.rerun()
     if n2.button("⏳ DEMANDES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Attente" else "secondary"): 
         st.session_state.vue_contact = "Attente"; st.rerun()
-    
-    # Distinction visuelle forte pour les HABITUÉS (Orange)
     if n3.button("⭐ HABITUÉS", use_container_width=True, type="primary" if st.session_state.vue_contact == "Relances" else "secondary"): 
         st.session_state.vue_contact = "Relances"; st.rerun()
-        
     if n4.button("✅ ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
         st.session_state.vue_contact = "Archives"; st.rerun()
 
@@ -322,20 +318,37 @@ if st.session_state.page == "CONTACTS":
 
     st.divider()
 
-    # --- FILTRAGE & RECHERCHE ---
     if not df_raw.empty:
         df_c = df_raw.copy().fillna("")
         df_c['orig_idx'] = df_c.index
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         
+        # --- FILTRES DE SAISON & RECHERCHE ---
         c_search, c_yr, c_new = st.columns([2, 1, 1])
-        search = c_search.text_input("🔍 Rechercher un contact...", "", key="search_bar_contacts").upper()
+        search = c_search.text_input("🔍 Rechercher...", "", key="search_bar_contacts").upper()
         annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
         
-        if c_new.button("➕ NOUVEAU", use_container_width=True):
+        # --- 📈 DASHBOARD FINANCIER (NOUVEAU) ---
+        # On calcule sur tout ce qui n'est pas Annulé/Refusé pour la saison choisie
+        mask_ca = (df_c['dt_sort'].dt.year == annee_sel) & (~df_c['Statut'].str.lower().str.contains("annule|refuse"))
+        df_ca = df_c[mask_ca]
+        
+        total_prevu = df_ca['Prix'].apply(to_f).sum()
+        total_encaisse = df_ca['Acompte'].apply(to_f).sum()
+        # On ajoute le prix total si le paiement est marqué "Paid"
+        total_paye = df_ca[df_ca['Paiement'].str.upper() == "PAID"]['Prix'].apply(to_f).sum()
+        reste_a_percevoir = total_prevu - total_encaisse - (total_paye - df_ca[df_ca['Paiement'].str.upper() == "PAID"]['Acompte'].apply(to_f).sum())
+
+        col_f1, col_f2, col_f3 = st.columns(3)
+        col_f1.metric(f"CA Prévu {annee_sel}", f"{int(total_prevu)} €")
+        col_f2.metric("Encaissé (Acomptes)", f"{int(total_encaisse)} €", delta=f"{int(total_encaisse/total_prevu*100) if total_prevu>0 else 0}%")
+        col_f3.metric("Reste à percevoir", f"{max(0, int(total_prevu - total_encaisse))} €", delta_color="inverse")
+        st.divider()
+
+        if c_new.button("➕ NOUVEAU CLIENT", use_container_width=True):
             new_r = {
                 "Prénom": "NOUVEAU", "Nom": "CLIENT", "Statut": "En attente", 
-                "Paiement": "Unpaid", "Relancer": "Non", "DateNav": datetime.now().strftime("%d/%m/%Y"), 
+                "Paiement": "Unpaid", "Relancer": "Non", "DateNav": f"01/06/{annee_sel}", 
                 "Société": "PERSO", "Jours": 1, "Prix": 0, "Acompte": 0, "Notes": "", "Téléphone": "", "Email": "", "Pers": 1
             }
             df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
@@ -344,7 +357,7 @@ if st.session_state.page == "CONTACTS":
             st.session_state.page = "MODIFIER_CONTACT"
             st.rerun()
 
-        # --- LOGIQUE DE SÉPARATION DES ONGLETS (V105) ---
+        # --- LOGIQUE DE SÉPARATION DES ONGLETS ---
         statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
         relance_clean = df_c['Relancer'].fillna("Non").str.upper()
         
@@ -352,9 +365,8 @@ if st.session_state.page == "CONTACTS":
             mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (relance_clean != "OUI")
             tri_ordre = False 
         elif st.session_state.vue_contact == "Relances":
-            mask_aff = (relance_clean == "OUI") # Tous tes VIP
+            mask_aff = (relance_clean == "OUI")
             tri_ordre = False
-            st.warning("✨ Carnet des Habitués : Utilisez 🔄 RE-RÉSERVER pour dupliquer un contact vers une nouvelle date.")
         elif st.session_state.vue_contact == "Attente":
             mask_aff = (statut_clean == "liste d'attente")
             tri_ordre = True  
@@ -368,17 +380,15 @@ if st.session_state.page == "CONTACTS":
         
         df_aff = df_aff.sort_values(by='dt_sort', ascending=tri_ordre)
 
-        # --- BOUCLE D'AFFICHAGE DES FICHES ---
+        # --- AFFICHAGE DES FICHES ---
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
             p_total, p_aco = to_f(row.get('Prix', 0)), to_f(row.get('Acompte', 0))
             reste = p_total - p_aco
             
-            # Badge VIP / Habitué
             is_vip = str(row.get('Relancer', 'Non')).upper() == "OUI"
             badge_vip = "⭐ " if is_vip else ""
             
-            # Couleurs de société
             soc_name = str(row.get('Société', 'PERSO')).upper()
             colors = {"CMN": ("#2980B9", "#EBF5FB"), "CLICK": ("#27AE60", "#EAFAF1"), 
                       "VOG": ("#8E44AD", "#F5EEF8"), "PERSO": ("#F1C40F", "#FEF9E7")}
@@ -392,21 +402,18 @@ if st.session_state.page == "CONTACTS":
                     <span style="background:{border_col}; color:white; padding:2px 8px; border-radius:10px; font-size:0.7rem;">{soc_name}</span>
                 </div>
                 <div style="font-size:0.9rem; margin-top:5px;">
-                    📅 <b>{row['DateNav']}</b> | 💸 Reste : <b>{int(reste)}€</b> | Statut : {row['Statut']}
+                    📅 <b>{row['DateNav']}</b> | 👥 {row['Pers']}p | ☀️ {row['Jours']}j | 💰 <b>{int(p_total)}€</b>
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # --- BOUTONS D'ACTION ---
             c1, c2, c3 = st.columns(3)
-            
             if c1.button("✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx
                 st.session_state.page = "MODIFIER_CONTACT"
                 st.rerun()
 
             if st.session_state.vue_contact == "Relances":
-                # BOUTON RE-RÉSERVER (Duplication)
                 if c2.button("🔄 RE-RÉSERVER", key=f"dup_{idx}", use_container_width=True):
                     df_db = charger_data('contacts.json')
                     new_entry = row.to_dict()
@@ -415,16 +422,13 @@ if st.session_state.page == "CONTACTS":
                         "Statut": "En attente", "Paiement": "Unpaid", "Prix": 0, "Acompte": 0,
                         "Notes": f"Nouvelle résa (Habitué). Ancienne nav le {row['DateNav']}"
                     })
-                    # Purge des index temporaires
                     for k in ['orig_idx', 'dt_sort']: new_entry.pop(k, None)
-                    
                     df_new = pd.concat([pd.DataFrame([new_entry]), df_db], ignore_index=True)
                     sauvegarder_data(df_new, 'contacts.json')
-                    st.session_state.edit_idx = 0 # Le nouveau est en haut
+                    st.session_state.edit_idx = 0 
                     st.session_state.page = "MODIFIER_CONTACT"
                     st.rerun()
             else:
-                # SUPPRIMER classique
                 if c2.button("🗑️ SUPPRIMER", key=f"del_{idx}", use_container_width=True):
                     df_db = charger_data('contacts.json').drop(idx).reset_index(drop=True)
                     sauvegarder_data(df_db, 'contacts.json')
@@ -435,7 +439,6 @@ if st.session_state.page == "CONTACTS":
                 df_all.loc[idx, ['Statut', 'Paiement']] = ["Terminé", "Paid"]
                 sauvegarder_data(df_all, 'contacts.json')
                 st.rerun()
-
 # ===============================================================
 # --- 6. PAGE MODIFIER CONTACT : SÉCURITÉ TOTALE ---
 # =================================================================
