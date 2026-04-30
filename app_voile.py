@@ -709,18 +709,20 @@ if st.session_state.page == "STATS":
     sel_y = c_sel2.selectbox("Saison :", [2025, 2026, 2027], index=1)
     etat_flux = c_sel3.selectbox("État des flux :", ["Fait", "À prévoir"])
 
-    # --- B. CALCULS RECETTES (CONTACTS) ---
-    df_actif['dt_vrai'] = pd.to_datetime(df_actif['DateNav'], dayfirst=True, errors='coerce')
-    df_f = df_actif[df_actif['dt_vrai'].dt.year == sel_y].copy()
-    
-    def filtrer_recettes(row):
+    # --- B. NOUVELLE LOGIQUE DE FILTRAGE RECETTES ---
+    def filtrer_recettes_smart(row):
         statut = str(row.get('Statut', '')).upper()
-        if etat_flux == "Fait":
+        paiement = str(row.get('Paiement', '')).upper()
+        
+        if mode_bilan == "Réel (Encaissé)":
+            # On ne prend que l'argent réellement touché
+            return "PAID" in paiement or "ACOMPTE" in paiement
+        else:
+            # Mode Prévisionnel : On prend tout ce qui est validé au planning
+            # même si le client n'a pas encore payé le solde.
             return any(s in statut for s in ["CONFIRMÉ", "TERMINÉ"])
-        return any(s in statut for s in ["ATTENTE", "LISTE"])
 
-    df_recettes_filtrees = df_f[df_f.apply(filtrer_recettes, axis=1)].copy()
-    total_ca = sum(to_f(x) for x in df_recettes_filtrees['Prix']) if not df_recettes_filtrees.empty else 0.0
+    df_recettes_filtrees = df_f[df_f.apply(filtrer_recettes_smart, axis=1)].copy()
 
     # --- C. CALCULS DÉPENSES (MAINTENANCE & LOGBOOK) ---
     total_dep = 0.0
