@@ -374,7 +374,7 @@ else:
 elif st.session_state.page == "CONTACTS":
     if not df_display.empty:
         st.dataframe(df_display[['DateNav', 'Prénom', 'Nom', 'Statut', 'Prix']], use_container_width=True, hide_index=True)
-else:
+    else:
         st.info("Aucun dossier.")
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT : SÉCURITÉ TOTALE ---
