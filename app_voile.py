@@ -692,128 +692,94 @@ if st.session_state.page == "PLANNING":
     else:
         st.info("Aucune mission ce mois-ci.")
 # =================================================================
-# --- PAGE STATS : COCKPIT VESTA SKIPPER PRO 2026 (V112) ---
+# --- PAGE STATS : VERSION FINALE SÉCURISÉE (V114) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">🚀 Cockpit Vesta 2026</h2>', unsafe_allow_html=True)
 
     # 1. Chargement des données
     df_actif = charger_data('contacts.json')
-    df_arch = charger_data('archives_planning.json')
     df_m = charger_data('maintenance.json') 
     df_log = charger_data('logbook.json')
-    params = charger_params()
     
-    df_all = pd.concat([df_actif, df_arch], ignore_index=True) if not df_arch.empty else df_actif
+    # --- A. FILTRES ---
+    c_sel1, c_sel2, c_sel3 = st.columns([2, 1, 1])
+    mode_bilan = c_sel1.radio("Analyse :", ["Réel (Encaissé)", "Prévisionnel (Saison)"], horizontal=True)
+    sel_y = c_sel2.selectbox("Saison :", [2025, 2026, 2027], index=1)
+    # On aligne le sélecteur sur tes vrais statuts JSON
+    etat_flux = c_sel3.selectbox("État des flux :", ["Fait", "À prévoir"])
 
-    if not df_all.empty:
-        # --- A. FILTRES ---
-        c_sel1, c_sel2, c_sel3 = st.columns([2, 1, 1])
-        mode_bilan = c_sel1.radio("Analyse :", ["Réel (Encaissé)", "Prévisionnel (Saison)"], horizontal=True)
-        sel_y = c_sel2.selectbox("Saison :", [2025, 2026, 2027], index=1)
-        etat_flux = c_sel3.selectbox("État des flux :", ["Fait", "A faire"])
+    # --- B. TRAITEMENT RECETTES (CONTACTS) ---
+    df_actif['dt_vrai'] = pd.to_datetime(df_actif['DateNav'], dayfirst=True, errors='coerce')
+    df_f = df_actif[df_actif['dt_vrai'].dt.year == sel_y].copy()
+    
+    def filtrer_recettes(row):
+        statut = str(row.get('Statut', '')).upper()
+        # Si on veut le "Fait", on prend les Confirmés/Terminés
+        if etat_flux == "Fait":
+            return any(s in statut for s in ["CONFIRMÉ", "TERMINÉ"])
+        # Sinon on prend ce qui est en attente
+        return any(s in statut for s in ["ATTENTE", "LISTE"])
 
-        # Préparation des dates
-        df_all['dt_vrai'] = pd.to_datetime(df_all['DateNav'], dayfirst=True, errors='coerce')
-        df_f = df_all[df_all['dt_vrai'].dt.year == sel_y].copy()
-        
-        # Logique de filtrage Recettes
-        def est_comptabilise(row):
-            statut = str(row.get('Statut', '')).upper()
-            paiement = str(row.get('Paiement', '')).upper()
-            if etat_flux == "Fait":
-                return (paiement == "PAID" or paiement == "ACOMPTE OK") and any(s in statut for s in ["TERMINÉ", "CONFIRMÉ"])
-            else:
-                return "ATTENTE" in statut or "LISTE" in statut
+    df_recettes_filtrees = df_f[df_f.apply(filtrer_recettes, axis=1)].copy()
+    total_ca = sum(to_f(x) for x in df_recettes_filtrees['Prix']) if not df_recettes_filtrees.empty else 0.0
 
-        df_final = df_f[df_f.apply(est_comptabilise, axis=1)].copy()
-        
-        # --- B. CALCULS ---
-        total_ca = sum(to_f(x) for x in df_final['Prix'])
-        
-# --- B. CALCULS (MAINTENANCE) ---
-        t_maint = 0.0
-        if not df_m.empty:
-            df_m['dt_maint'] = pd.to_datetime(df_m.get('Date', ''), dayfirst=True, errors='coerce')
-            
-            # Détection dynamique de la colonne de prix dans maintenance
-            # On cherche 'Prix', sinon 'Montant', sinon 'M_Num' (utilisé dans certaines versions)
-            col_prix_maint = next((c for c in ['Prix', 'Montant', 'M_Num'] if c in df_m.columns), None)
-            
-            if col_prix_maint:
-                mask_m = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == etat_flux)
-                df_m_y = df_m[mask_m].copy()
-                t_maint = sum(to_f(x) for x in df_m_y[col_prix_maint])
-            else:
-                # Si aucune colonne n'est trouvée, on crée une DF vide pour éviter les erreurs d'affichage plus bas
-                df_m_y = pd.DataFrame()
-                st.error("⚠️ Colonne financière introuvable dans maintenance.json (Prix ou Montant ?)")
-        else:
-            df_m_y = pd.DataFrame()
+    # --- C. TRAITEMENT DÉPENSES (MAINTENANCE) ---
+    total_dep = 0.0
+    df_m_y = pd.DataFrame()
+    
+    if not df_m.empty:
+        df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+        # Filtre sur l'année et le statut exact du JSON ("À prévoir" ou "Fait")
+        mask_m = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == etat_flux)
+        df_m_y = df_m[mask_m].copy()
+        # Utilisation de ta colonne réelle : M_Num
+        total_dep = sum(to_f(x) for x in df_m_y['M_Num']) if 'M_Num' in df_m_y.columns else 0.0
 
-            
-        # Gazole (Dépenses)
-        t_gasoil_eur = 0.0
-        if not df_log.empty:
-            df_log['dt_l'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
-            df_log_y = df_log[df_log['dt_l'].dt.year == sel_y]
-            col_g_eur = next((c for c in ['Cout Gazoil', 'Gazoil'] if c in df_log_y.columns), None)
-            if col_g_eur: t_gasoil_eur = df_log_y[col_g_eur].sum()
+    # --- D. INDICATEURS CLÉS ---
+    st.divider()
+    i1, i2, i3 = st.columns(3)
+    i1.metric(f"📥 Recettes ({etat_flux})", f"{total_ca:,.0f} €")
+    i2.metric(f"📤 Dépenses ({etat_flux})", f"{total_dep:,.0f} €")
+    i3.metric("⚖️ Solde Net", f"{(total_ca - total_dep):,.0f} €")
 
-        total_dep = t_maint + t_gasoil_eur
+    # --- E. GRAPHIQUE COURBE CROISÉE ---
+    st.subheader("📊 Évolution Mensuelle (Recettes vs Dépenses)")
+    ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+    df_graph = pd.DataFrame({'Mois': range(1, 13), 'NomMois': ordre_mois})
+    
+    # Groupement Recettes
+    if not df_recettes_filtrees.empty:
+        df_recettes_filtrees['MoisNum'] = df_recettes_filtrees['dt_vrai'].dt.month
+        r_mensuel = df_recettes_filtrees.groupby('MoisNum')['Prix'].apply(lambda x: sum(to_f(v) for v in x))
+        df_graph = df_graph.merge(r_mensuel.rename('Recettes'), left_on='Mois', right_index=True, how='left')
+    
+    # Groupement Dépenses
+    if not df_m_y.empty:
+        df_m_y['MoisNum'] = df_m_y['dt_maint'].dt.month
+        d_mensuel = df_m_y.groupby('MoisNum')['M_Num'].apply(lambda x: sum(to_f(v) for v in x))
+        df_graph = df_graph.merge(d_mensuel.rename('Dépenses'), left_on='Mois', right_index=True, how='left')
+    
+    df_graph = df_graph.fillna(0)
 
-        # --- C. INDICATEURS ---
-        st.divider()
-        c1, c2, c3 = st.columns(3)
-        c1.metric(f"💰 Recettes ({etat_flux})", f"{total_ca:,.0f} €")
-        c2.metric(f"💸 Dépenses ({etat_flux})", f"{total_dep:,.0f} €")
-        c3.metric("⚖️ Solde", f"{(total_ca - total_dep):,.0f} €", delta=f"{total_ca - total_dep:,.0f}")
+    import plotly.graph_objects as go
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df_graph['NomMois'], y=df_graph['Recettes'], name='Recettes', line=dict(color='#2ecc71', width=3)))
+    fig.add_trace(go.Scatter(x=df_graph['NomMois'], y=df_graph['Dépenses'], name='Dépenses', line=dict(color='#e74c3c', width=3, dash='dot')))
+    fig.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10), legend=dict(orientation="h", y=1.1))
+    st.plotly_chart(fig, use_container_width=True)
 
-        # --- D. GRAPHIQUE COMPARATIF ---
-        st.subheader("📊 Courbe Recettes vs Dépenses")
-        ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
-        
-        # Préparation des données mensuelles
-        df_mois = pd.DataFrame({'Mois': range(1, 13)})
-        
-        if not df_final.empty:
-            df_final['Mois'] = df_final['dt_vrai'].dt.month
-            recettes_mensuelles = df_final.groupby('Mois')['Prix'].apply(lambda x: sum(to_f(v) for v in x))
-            df_mois = df_mois.merge(recettes_mensuelles.rename('Recettes'), left_on='Mois', right_index=True, how='left')
-        
-        if not df_m.empty:
-            df_m_y['Mois'] = df_m_y['dt_maint'].dt.month
-            depenses_mensuelles = df_m_y.groupby('Mois')['Prix'].apply(lambda x: sum(to_f(v) for v in x))
-            df_mois = df_mois.merge(depenses_mensuelles.rename('Dépenses'), left_on='Mois', right_index=True, how='left')
-
-        df_mois = df_mois.fillna(0)
-        df_mois['NomMois'] = [ordre_mois[i-1] for i in df_mois['Mois']]
-
-        import plotly.graph_objects as go
-        fig_evol = go.Figure()
-        fig_evol.add_trace(go.Scatter(x=df_mois['NomMois'], y=df_mois['Recettes'], name='Recettes', line=dict(color='#27AE60', width=3), mode='lines+markers'))
-        fig_evol.add_trace(go.Scatter(x=df_mois['NomMois'], y=df_mois['Dépenses'], name='Dépenses', line=dict(color='#E74C3C', width=3, dash='dot'), mode='lines+markers'))
-        
-        fig_evol.update_layout(height=350, margin=dict(l=20, r=20, t=20, b=20), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(fig_evol, use_container_width=True)
-
-        # --- E. TABLEAU DES FLUX ---
-        st.subheader(f"📋 Détail des flux : {etat_flux}")
-        tab_r, tab_d = st.tabs(["📥 Recettes détaillées", "📤 Dépenses détaillées"])
-        
-        with tab_r:
-            if not df_final.empty:
-                st.dataframe(df_final[['DateNav', 'Prénom', 'Nom', 'Société', 'Prix']].sort_values('DateNav'), use_container_width=True, hide_index=True)
-            else: st.info("Aucune recette dans cette catégorie.")
-            
-        with tab_d:
-            if not df_m_y.empty:
-                st.dataframe(df_m_y[['Date', 'Titre', 'Catégorie', 'Prix']].sort_values('Date'), use_container_width=True, hide_index=True)
-            else: st.info("Aucune dépense de maintenance dans cette catégorie.")
-
-    else:
-        st.info("⚓ Aucune donnée disponible pour générer les statistiques.")
-
+    # --- F. TABLEAUX DE DÉTAIL ---
+    exp = st.expander("🔍 Voir le détail des flux")
+    col_t1, col_t2 = exp.columns(2)
+    with col_t1:
+        st.caption("📥 Détail Recettes")
+        if not df_recettes_filtrees.empty:
+            st.dataframe(df_recettes_filtrees[['DateNav', 'Nom', 'Prix']], use_container_width=True, hide_index=True)
+    with col_t2:
+        st.caption("📤 Détail Dépenses")
+        if not df_m_y.empty:
+            st.dataframe(df_m_y[['Date', 'Objet', 'M_Num']], use_container_width=True, hide_index=True)
 # =================================================================
 # --- 8. PAGE MAINTENANCE (GESTION VIDANGE & TRAVAUX) ---
 # =================================================================
