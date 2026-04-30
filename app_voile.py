@@ -303,18 +303,23 @@ if 'df_c' not in locals() and 'df_c' not in globals():
 if df_c is None or df_c.empty:
     df_c = pd.DataFrame(columns=['id', 'DateNav', 'Statut', 'Prénom', 'Nom', 'Relancer', 'Société', 'Prix'])
 
-# --- 2. LOGIQUE DE FILTRAGE (Nettoyage des données pour comparaison) ---
-statut_clean = df_c['Statut'].fillna("En attente").astype(str).str.lower().str.strip()
-relance_clean = df_c['Relancer'].fillna("Non").astype(str).str.upper().str.strip()
+# --- 1. LOGIQUE DE FILTRAGE (REBOOT SÉCURISÉ) ---
+# On prépare une version "propre" pour la comparaison
+statut_brut = df_c['Statut'].fillna("En attente").astype(str).str.lower()
 
 if st.session_state.vue_contact == "Archives":
-    mask_aff = statut_clean.str.contains("termine|annule|refuse", na=False)
+    mask_aff = statut_brut.str.contains("term|annul|refus", na=False)
+
 elif st.session_state.vue_contact == "Relances":
-    mask_aff = (relance_clean == "OUI") | (statut_clean.str.contains("habitue", na=False))
+    relance_brut = df_c['Relancer'].fillna("Non").astype(str).str.upper()
+    mask_aff = (relance_brut == "OUI") | (statut_brut.str.contains("habit", na=False))
+
 elif st.session_state.vue_contact == "Attente":
-    mask_aff = statut_clean.str.contains("attente", na=False)
-else: # Onglet "En cours"
-    mask_aff = statut_clean.str.contains("confirme|valid", na=False)
+    mask_aff = statut_brut.str.contains("attent", na=False)
+
+else: # 🟢 "En cours"
+    # On cherche tout ce qui commence par "conf" ou "valid" pour éviter les pièges d'accents
+    mask_aff = statut_brut.str.contains("conf|valid", na=False)
 
 df_display = df_c[mask_aff].copy()
 
