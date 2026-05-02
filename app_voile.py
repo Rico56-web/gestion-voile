@@ -705,6 +705,7 @@ if st.session_state.page == "STATS":
     
     # 2. FILTRES
     c_sel1, c_sel2, c_sel3 = st.columns([2, 1, 1])
+    # Initialisation immédiate via les widgets pour éviter les NameError
     mode_bilan = c_sel1.radio("Calcul des gains :", ["Réel (Encaissé)", "Prévisionnel (Saison)"], horizontal=True)
     sel_y = c_sel2.selectbox("Saison :", [2025, 2026, 2027], index=1)
     etat_flux_maint = c_sel3.selectbox("État Maintenance :", ["Fait", "À prévoir"])
@@ -746,7 +747,7 @@ if st.session_state.page == "STATS":
     m3.metric("⚙️ Heures Mot.", f"{total_h_moteur:.1f} h")
     m4.metric("⛽ Gazole", f"{total_gazole:,.0f} L")
 
-    # Indicateurs de performance (re-calculés)
+    # Indicateurs de performance
     p1, p2, p3 = st.columns(3)
     prog_ca = min(100, int((total_ca/6500)*100)) if total_ca > 0 else 0
     p1.metric("🎯 Seuil Rentabilité (6.5k)", f"{prog_ca}%")
@@ -768,7 +769,6 @@ if st.session_state.page == "STATS":
     if not df_rec_f.empty:
         r_m = df_rec_f.groupby(df_rec_f['dt_vrai'].dt.month)['Prix'].apply(lambda x: sum(to_f(v) for v in x))
         df_graph = df_graph.merge(r_m.rename('Recettes'), left_on='Mois', right_index=True, how='left')
-        # On ajoute le volume d'activité par mois (scaled pour le graph)
         act_m = df_rec_f.groupby(df_rec_f['dt_vrai'].dt.month).size()
         df_graph = df_graph.merge(act_m.rename('Sorties'), left_on='Mois', right_index=True, how='left')
 
@@ -782,37 +782,36 @@ if st.session_state.page == "STATS":
     from plotly.subplots import make_subplots
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
-    # Barres pour les Recettes/Dépenses
     fig.add_trace(go.Bar(x=df_graph['NomMois'], y=df_graph['Recettes'], name='Recettes (€)', marker_color='#2ecc71'), secondary_y=False)
     fig.add_trace(go.Bar(x=df_graph['NomMois'], y=df_graph['Dépenses'], name='Dépenses (€)', marker_color='#e74c3c'), secondary_y=False)
-    # Ligne pour l'activité
     fig.add_trace(go.Scatter(x=df_graph['NomMois'], y=df_graph['Sorties'], name='Nb Sorties', line=dict(color='#3498db', width=3)), secondary_y=True)
 
     fig.update_layout(height=350, barmode='group', margin=dict(l=0,r=0,t=20,b=0), legend=dict(orientation="h", y=1.2))
     st.plotly_chart(fig, use_container_width=True)
-# --- D. DÉTAILS CHRONO ---
-st.divider()
-col_t1, col_t2 = st.columns(2)
 
-with col_t1:
-    st.markdown(f"**📥 RECETTES ({mode_bilan})**")
-    if not df_rec_f.empty:
-        # TECHNIQUE : Trier d'abord l'index ou le DF complet, puis sélectionner les colonnes
-        df_display_rec = df_rec_f.sort_values('dt_vrai')[['DateNav', 'Nom', 'Paiement', 'Prix']]
-        st.dataframe(df_display_rec, use_container_width=True, hide_index=True)
-        st.markdown(f"<div style='text-align:right; font-weight:bold; color:#2ecc71;'>TOTAL : {total_ca:,.2f} €</div>", unsafe_allow_html=True)
-    else:
-        st.info("Aucune recette.")
+    # --- D. DÉTAILS CHRONO (Correction Indentation et Tri) ---
+    st.divider()
+    col_t1, col_t2 = st.columns(2)
 
-with col_t2:
-    st.markdown(f"**📤 MAINTENANCE ({etat_flux_maint})**")
-    if not df_m_y.empty:
-        # Pareil ici : tri sur dt_maint, puis sélection des colonnes visibles
-        df_display_maint = df_m_y.sort_values('dt_maint')[['Date', 'Objet', 'M_Num']]
-        st.dataframe(df_display_maint, use_container_width=True, hide_index=True)
-        st.markdown(f"<div style='text-align:right; font-weight:bold; color:#e74c3c;'>TOTAL : {total_dep:,.2f} €</div>", unsafe_allow_html=True)
-    else:
-        st.info("Aucune dépense.")
+    with col_t1:
+        st.markdown(f"**📥 RECETTES ({mode_bilan})**")
+        if not df_rec_f.empty:
+            # Tri sur la colonne datetime cachée, puis sélection des colonnes d'affichage
+            df_display_rec = df_rec_f.sort_values('dt_vrai')[['DateNav', 'Nom', 'Paiement', 'Prix']]
+            st.dataframe(df_display_rec, use_container_width=True, hide_index=True)
+            st.markdown(f"<div style='text-align:right; font-weight:bold; color:#2ecc71;'>TOTAL : {total_ca:,.2f} €</div>", unsafe_allow_html=True)
+        else:
+            st.info("Aucune recette.")
+
+    with col_t2:
+        st.markdown(f"**📤 MAINTENANCE ({etat_flux_maint})**")
+        if not df_m_y.empty:
+            # Tri sur la colonne datetime cachée, puis sélection des colonnes d'affichage
+            df_display_maint = df_m_y.sort_values('dt_maint')[['Date', 'Objet', 'M_Num']]
+            st.dataframe(df_display_maint, use_container_width=True, hide_index=True)
+            st.markdown(f"<div style='text-align:right; font-weight:bold; color:#e74c3c;'>TOTAL : {total_dep:,.2f} €</div>", unsafe_allow_html=True)
+        else:
+            st.info("Aucune dépense.")
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE (GESTION VIDANGE & TRAVAUX) ---
