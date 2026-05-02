@@ -798,14 +798,24 @@ if st.session_state.page == "STATS":
     with col_t1:
         st.markdown(f"**📥 RECETTES ({mode_bilan})**")
         if not df_rec_f.empty:
-            st.dataframe(df_rec_f[['DateNav', 'Nom', 'Paiement', 'Prix']].sort_values('DateNav'), use_container_width=True, hide_index=True)
+         # On trie par la colonne de type datetime 'dt_vrai'
+        st.dataframe(
+            df_rec_f[['DateNav', 'Nom', 'Paiement', 'Prix']].sort_values('dt_vrai'), 
+            use_container_width=True, 
+            hide_index=True
+        )   
             st.markdown(f"<div style='text-align:right; font-weight:bold; color:#2ecc71;'>TOTAL : {total_ca:,.2f} €</div>", unsafe_allow_html=True)
         else: st.info("Aucune recette.")
 
     with col_t2:
         st.markdown(f"**📤 MAINTENANCE ({etat_flux_maint})**")
         if not df_m_y.empty:
-            st.dataframe(df_m_y[['Date', 'Objet', 'M_Num']].sort_values('Date'), use_container_width=True, hide_index=True)
+            # On trie par la colonne de type datetime 'dt_maint'
+        st.dataframe(
+            df_m_y[['Date', 'Objet', 'M_Num']].sort_values('dt_maint'), 
+            use_container_width=True, 
+            hide_index=True
+        )
             st.markdown(f"<div style='text-align:right; font-weight:bold; color:#e74c3c;'>TOTAL : {total_dep:,.2f} €</div>", unsafe_allow_html=True)
         else: st.info("Aucune dépense.")
 # =================================================================
