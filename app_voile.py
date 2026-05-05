@@ -807,40 +807,49 @@ if st.session_state.page == "STATS":
 
     fig.update_layout(height=350, barmode='group', margin=dict(l=0,r=0,t=20,b=0), legend=dict(orientation="h", y=1.2))
     st.plotly_chart(fig, use_container_width=True)
-# --- NOYVEAU : TABLEAU RÉCAPITULATIF DES RESTES À PERCEVOIR ---
+
+    # --- TABLEAU RÉCAPITULATIF DES RESTES À PERCEVOIR ---
     st.divider()
     st.markdown("### 🔍 Détail des sommes restant à percevoir")
     
-    # On calcule le reste individuel pour chaque ligne
+    # Calcul du reste individuel
     df_reste = df_f.copy()
+    
+    # On s'assure que les colonnes Prénom et Nom existent pour éviter les erreurs
+    for c in ['Nom', 'Prenom']:
+        if c not in df_reste.columns: df_reste[c] = ""
+
     df_reste['Reste'] = df_reste['Prix'] - df_reste['Montant_Encaisse']
     
-    # On ne garde que les dossiers où il manque de l'argent (> 0)
+    # Filtrage : On ne garde que ce qui n'est pas totalement payé
     df_a_percevoir = df_reste[df_reste['Reste'] > 0.01].copy()
     
     if not df_a_percevoir.empty:
-        # On trie par date pour voir les plus urgents en premier
+        # Tri par date
         df_a_percevoir = df_a_percevoir.sort_values('dt_vrai')
         
-        # On prépare l'affichage
-        tableau_reste = df_a_percevoir[['DateNav', 'Nom', 'Prix', 'Acompte', 'Reste']]
+        # Sélection des colonnes demandées
+        tableau_reste = df_a_percevoir[['DateNav', 'Nom', 'Prenom', 'Prix', 'Acompte', 'Reste']]
         
-        # Mise en forme pour le tableau
+        # Affichage optimisé
         st.dataframe(
             tableau_reste, 
             use_container_width=True, 
             hide_index=True,
             column_config={
-                "Prix": st.column_config.NumberColumn("Prix Total", format="%.2f €"),
-                "Acompte": st.column_config.NumberColumn("Déjà Reçu", format="%.2f €"),
-                "Reste": st.column_config.NumberColumn("À percevoir", format="%.2f €"),
+                "DateNav": "Date",
+                "Nom": "Nom",
+                "Prenom": "Prénom",
+                "Prix": st.column_config.NumberColumn("Total (€)", format="%.2f"),
+                "Acompte": st.column_config.NumberColumn("Reçu (€)", format="%.2f"),
+                "Reste": st.column_config.NumberColumn("À percevoir (€)", format="%.2f"),
             }
         )
         
-        # Petit bandeau de résumé
-        st.info(f"👉 Il reste **{len(df_a_percevoir)} dossiers** à solder pour un montant total de **{reste_a_percevoir:,.2f} €**.")
+        st.warning(f"👉 **{len(df_a_percevoir)} dossiers** en attente de règlement total.")
     else:
-        st.success("✅ Bravo ! Toutes les sorties de la saison sont réglées.")
+        st.success("✅ Aucune somme en attente de perception pour cette sélection.")
+
     # --- D. DÉTAILS CHRONO ---
     st.divider()
     col_t1, col_t2 = st.columns(2)
