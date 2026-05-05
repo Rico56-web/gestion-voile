@@ -1283,31 +1283,70 @@ if st.session_state.page == "FACT":
         with t2: 
             afficher_onglet("Paid")
 # =================================================================
-# --- 11. PAGE ARCHIVES ---
+# --- 11. PAGE ARCHIVES & SÉCURITÉ ---
 # =================================================================
 if st.session_state.page == "ARCHIVES":
-    st.title("📂 Archives")
+    st.title("📂 Archives & Sécurité")
+    
     if st.button("⬅️ Retour au Planning"):
         st.session_state.page = "PLANNING"
         st.rerun()
 
+    # --- SECTION 1 : CONSULTATION DES HISTORIQUES ---
+    st.markdown("### 🔍 Consultation des historiques")
     t1, t2, t3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook"])
-    with t1: st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
-    with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
-    with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
+    
+    with t1: 
+        st.subheader("Archives Maintenance")
+        st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
+    
+    with t2: 
+        st.subheader("Archives Planning")
+        st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
+    
+    with t3: 
+        st.subheader("Archives Logbook")
+        st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
 
-with st.expander("💾 Sauvegarde manuelle sur mon ordinateur"):
-    for file in ['contacts.json', 'maintenance.json', 'logbook.json']:
-        data = charger_data_safe(file)
-        csv = pd.DataFrame(data).to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label=f"📥 Télécharger backup_{file}.csv",
-            data=csv,
-            file_name=f"backup_{file}.csv",
-            mime='text/csv',
-            use_container_width=True
-        )
+    st.divider()
 
+    # --- SECTION 2 : COFFRE-FORT (SAUVEGARDE LOCALE) ---
+    st.markdown("### 🛡️ Coffre-fort de sauvegarde")
+    with st.expander("💾 Télécharger les données sur mon ordinateur", expanded=True):
+        st.write("Cliquez sur les boutons ci-dessous pour exporter vos données actuelles au format Excel (CSV).")
+        
+        # Liste des fichiers critiques à sauvegarder
+        fichiers_cible = {
+            "Contacts & Facturation": "contacts.json",
+            "Maintenance & Frais": "maintenance.json",
+            "Livre de Bord (Logbook)": "logbook.json"
+        }
+        
+        col_bak1, col_bak2, col_bak3 = st.columns(3)
+        cols = [col_bak1, col_bak2, col_bak3]
+
+        for i, (nom_affichage, nom_fichier) in enumerate(fichiers_cible.items()):
+            df_bak = charger_data_safe(nom_fichier)
+            
+            if not df_bak.empty:
+                # Encodage utf-8-sig pour que Excel gère bien les accents (Ex: Prénom, Confirmé)
+                csv_data = df_bak.to_csv(index=False).encode('utf-8-sig')
+                
+                # Nom du fichier avec date du jour pour un meilleur classement
+                date_str = datetime.now().strftime("%d_%m_%Y")
+                file_final = f"VESTA_{nom_fichier.replace('.json', '')}_{date_str}.csv"
+                
+                cols[i].download_button(
+                    label=f"📥 {nom_affichage}",
+                    data=csv_data,
+                    file_name=file_final,
+                    mime='text/csv',
+                    use_container_width=True
+                )
+            else:
+                cols[i].caption(f"⚠️ {nom_affichage} est vide.")
+
+    st.caption("Note : Il est conseillé de faire une sauvegarde manuelle après chaque grosse mise à jour de vos données.")
 # =================================================================
 # --- 12. PAGE LIVRE DE BORD (LOG) - VERSION EXPERT ---
 # =================================================================
