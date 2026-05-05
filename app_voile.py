@@ -1296,6 +1296,18 @@ if st.session_state.page == "ARCHIVES":
     with t2: st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
     with t3: st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
 
+with st.expander("💾 Sauvegarde manuelle sur mon ordinateur"):
+    for file in ['contacts.json', 'maintenance.json', 'logbook.json']:
+        data = charger_data_safe(file)
+        csv = pd.DataFrame(data).to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label=f"📥 Télécharger backup_{file}.csv",
+            data=csv,
+            file_name=f"backup_{file}.csv",
+            mime='text/csv',
+            use_container_width=True
+        )
+
 # =================================================================
 # --- 12. PAGE LIVRE DE BORD (LOG) - VERSION EXPERT ---
 # =================================================================
