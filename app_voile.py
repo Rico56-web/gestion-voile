@@ -815,7 +815,6 @@ if st.session_state.page == "STATS":
     # Calcul du reste individuel
     df_reste = df_f.copy()
     
-    # On s'assure que les colonnes Prénom et Nom existent pour éviter les erreurs
     for c in ['Nom', 'Prenom']:
         if c not in df_reste.columns: df_reste[c] = ""
 
@@ -831,7 +830,10 @@ if st.session_state.page == "STATS":
         # Sélection des colonnes demandées
         tableau_reste = df_a_percevoir[['DateNav', 'Nom', 'Prenom', 'Prix', 'Acompte', 'Reste']]
         
-        # Affichage optimisé
+        # Calcul du total des sommes dues
+        total_du = df_a_percevoir['Reste'].sum()
+        
+        # Affichage du tableau
         st.dataframe(
             tableau_reste, 
             use_container_width=True, 
@@ -846,7 +848,13 @@ if st.session_state.page == "STATS":
             }
         )
         
-        st.warning(f"👉 **{len(df_a_percevoir)} dossiers** en attente de règlement total.")
+        # --- LIGNE DE TOTAL ---
+        st.markdown(f"""
+            <div style="text-align:right; background-color:#f8d7da; color:#721c24; padding:10px; border-radius:5px; font-weight:bold; font-size:1.1em;">
+                TOTAL DES SOMMES À RÉCUPÉRER : {total_du:,.2f} €
+            </div>
+        """, unsafe_allow_html=True)
+        
     else:
         st.success("✅ Aucune somme en attente de perception pour cette sélection.")
 
