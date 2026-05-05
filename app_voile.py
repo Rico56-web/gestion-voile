@@ -122,7 +122,25 @@ def sauvegarder_params(dict_params):
 def charger_data_safe(fichier):
     df = charger_data(fichier)
     return df if not df.empty else pd.DataFrame()
+import shutil
+import os
 
+def executer_backup_auto():
+    """Crée une copie de sécurité des fichiers vitaux s'ils existent."""
+    fichiers_a_sauver = ['contacts.json', 'maintenance.json', 'logbook.json']
+    
+    # Créer un dossier backup s'il n'existe pas
+    if not os.path.exists('backups'):
+        os.makedirs('backups')
+        
+    for fichier in fichiers_a_sauver:
+        if os.path.exists(fichier):
+            # On crée une copie dans le dossier backups
+            shutil.copy2(fichier, f"backups/{fichier}.bak")
+
+# --- APPEL DE LA FONCTION ---
+# À placer tout au début de ton code principal (après le st.set_page_config)
+executer_backup_auto()
 #===============================================================
 # --- CHARGEMENT ET TRI GLOBAL (À placer en haut de votre script) ---
 df = charger_data_safe('contacts.json')
