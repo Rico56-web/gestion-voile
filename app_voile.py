@@ -692,48 +692,62 @@ if st.session_state.page == "PLANNING":
     else:
         st.info("Aucune mission ce mois-ci.")
 # =================================================================
-# --- PAGE STATS : DASHBOARD INTÉGRAL VESTA (V120) ---
+# --- PAGE STATS : DASHBOARD HARMONISÉ VESTA (V2026) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Dashboard Intégral Vesta</h2>', unsafe_allow_html=True)
 
     # 1. Chargement des données
-    df_actif = charger_data('contacts.json')
-    df_m = charger_data('maintenance.json') 
-    df_log = charger_data('logbook.json')
+    df_actif = charger_data_safe('contacts.json')
+    df_m = charger_data_safe('maintenance.json') 
+    df_log = charger_data_safe('logbook.json')
     params = charger_params()
     
-    # 2. FILTRES
+    # 2. FILTRES DE NAVIGATION
     c_sel1, c_sel2, c_sel3 = st.columns([2, 1, 1])
-    # Initialisation immédiate via les widgets pour éviter les NameError
-    mode_bilan = c_sel1.radio("Calcul des gains :", ["Réel (Encaissé)", "Prévisionnel (Saison)"], horizontal=True)
+    mode_bilan = c_sel1.radio("Mode de calcul :", ["Réel (Encaissé)", "Prévisionnel (Saison)"], horizontal=True)
     sel_y = c_sel2.selectbox("Saison :", [2025, 2026, 2027], index=1)
     etat_flux_maint = c_sel3.selectbox("État Maintenance :", ["Fait", "À prévoir"])
 
-    # 3. LOGIQUE FILTRAGE RECETTES STRICTE
-    def filtrer_recettes_tresorerie(row):
-        statut = str(row.get('Statut', '')).strip().upper()
-        paiement = str(row.get('Paiement', '')).strip().upper()
-        if mode_bilan == "Réel (Encaissé)":
-            if "UNPAID" in paiement: return False
-            return any(x == paiement for x in ["PAID", "ACOMPTE OK", "OK"])
-        else:
-            return statut in ["CONFIRMÉ", "TERMINÉ"]
-
-    # --- A. PRÉPARATION DES DONNÉES ---
-    # Recettes
+    # --- A. PRÉPARATION ET NETTOYAGE DES DONNÉES ---
+    # Conversion des dates et prix pour les contacts
     df_actif['dt_vrai'] = pd.to_datetime(df_actif['DateNav'], dayfirst=True, errors='coerce')
     df_f = df_actif[df_actif['dt_vrai'].dt.year == sel_y].copy()
-    df_rec_f = df_f[df_f.apply(filtrer_recettes_tresorerie, axis=1)].copy()
-    total_ca = sum(to_f(x) for x in df_rec_f['Prix'])
-    nb_sorties = len(df_rec_f)
+    
+    for col in ['Prix', 'Acompte']:
+        if col in df_f.columns:
+            df_f[col] = df_f[col].apply(to_f)
+        else:
+            df_f[col] = 0.0
+
+    # --- LOGIQUE DE CALCUL HARMONISÉE ---
+    # 1. Calcul du Réel Encaissé (Prix si PAID, sinon Acompte)
+    df_f['Montant_Encaisse'] = df_f.apply(
+        lambda x: x['Prix'] if str(x.get('Paiement', '')).strip().upper() == "PAID" else x['Acompte'], 
+        axis=1
+    )
+    
+    # 2. Calcul du Prévisionnel (Total des Prix)
+    total_ca_saison = df_f['Prix'].sum()
+    total_encaisse_reel = df_f['Montant_Encaisse'].sum()
+    reste_a_percevoir = total_ca_saison - total_encaisse_reel
+    
+    # Sélection de la valeur à afficher selon le mode choisi
+    if mode_bilan == "Réel (Encaissé)":
+        total_ca_display = total_encaisse_reel
+        df_rec_f = df_f[df_f['Montant_Encaisse'] > 0].copy() # On affiche ce qui a généré du cash
+    else:
+        total_ca_display = total_ca_saison
+        df_rec_f = df_f.copy() # On affiche tout
+
+    nb_sorties = len(df_f[df_f['Prix'] > 0])
 
     # Dépenses
     df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
     df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == etat_flux_maint)].copy()
     total_dep = sum(to_f(x) for x in df_m_y['M_Num']) if not df_m_y.empty else 0.0
 
-    # Logbook (Moteur & Gazole)
+    # Logbook
     df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
     df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
     total_h_moteur = df_log_y['TotalMot'].sum() if 'TotalMot' in df_log_y.columns else 0.0
@@ -742,34 +756,39 @@ if st.session_state.page == "STATS":
     # --- B. BLOC INDICATEURS (LE COCKPIT) ---
     st.divider()
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("💰 Solde Net", f"{(total_ca - total_dep):,.0f} €")
+    # Le Solde Net est toujours calculé sur le mode choisi
+    solde_net = total_ca_display - total_dep
+    m1.metric("💰 Solde Net", f"{solde_net:,.0f} €")
     m2.metric("⚓ Sorties", f"{nb_sorties}")
     m3.metric("⚙️ Heures Mot.", f"{total_h_moteur:.1f} h")
     m4.metric("⛽ Gazole", f"{total_gazole:,.0f} L")
 
-    # Indicateurs de performance
-    p1, p2, p3 = st.columns(3)
-    prog_ca = min(100, int((total_ca/6500)*100)) if total_ca > 0 else 0
-    p1.metric("🎯 Seuil Rentabilité (6.5k)", f"{prog_ca}%")
+    # Ligne de performance secondaire
+    p1, p2, p3, p4 = st.columns(4)
+    prog_ca = min(100, int((total_ca_display/6500)*100)) if total_ca_display > 0 else 0
+    p1.metric("🎯 Objectif (6.5k)", f"{prog_ca}%")
+    
+    # Reste à percevoir (Très important pour ton suivi)
+    p2.metric("📩 Reste à percevoir", f"{reste_a_percevoir:,.0f} €", delta=f"Total: {total_ca_saison:,.0f}", delta_color="off")
     
     h_moteur_abs = pd.to_numeric(df_log['MotArr'], errors='coerce').max() if not df_log.empty else 0.0
     h_rest = params.get('prochaine_vidange', 2500.0) - h_moteur_abs
-    p2.metric("🔧 Prochaine Vidange", f"{h_rest:.1f} h", delta=f"{h_moteur_abs:.0f} total", delta_color="off")
+    p3.metric("🔧 Vidange", f"{h_rest:.1f} h")
     
     conso_h = total_gazole / total_h_moteur if total_h_moteur > 0 else 0
-    p3.metric("📉 Conso Moyenne", f"{conso_h:.1f} L/h")
+    p4.metric("📉 Conso", f"{conso_h:.1f} L/h")
 
     # --- C. GRAPHIQUE COMPARATIF ---
     st.divider()
-    st.markdown("### 📈 Analyse Temporelle")
-    
     ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
     df_graph = pd.DataFrame({'Mois': range(1, 13), 'NomMois': ordre_mois})
     
-    if not df_rec_f.empty:
-        r_m = df_rec_f.groupby(df_rec_f['dt_vrai'].dt.month)['Prix'].apply(lambda x: sum(to_f(v) for v in x))
+    if not df_f.empty:
+        # On groupe par la valeur choisie (Réel ou Prévisionnel)
+        val_col = 'Montant_Encaisse' if mode_bilan == "Réel (Encaissé)" else 'Prix'
+        r_m = df_f.groupby(df_f['dt_vrai'].dt.month)[val_col].sum()
         df_graph = df_graph.merge(r_m.rename('Recettes'), left_on='Mois', right_index=True, how='left')
-        act_m = df_rec_f.groupby(df_rec_f['dt_vrai'].dt.month).size()
+        act_m = df_f.groupby(df_f['dt_vrai'].dt.month).size()
         df_graph = df_graph.merge(act_m.rename('Sorties'), left_on='Mois', right_index=True, how='left')
 
     if not df_m_y.empty:
@@ -789,30 +808,32 @@ if st.session_state.page == "STATS":
     fig.update_layout(height=350, barmode='group', margin=dict(l=0,r=0,t=20,b=0), legend=dict(orientation="h", y=1.2))
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- D. DÉTAILS CHRONO (Correction Indentation et Tri) ---
+    # --- D. DÉTAILS CHRONO ---
     st.divider()
     col_t1, col_t2 = st.columns(2)
 
     with col_t1:
-        st.markdown(f"**📥 RECETTES ({mode_bilan})**")
+        st.markdown(f"**📥 DÉTAIL RECETTES ({mode_bilan})**")
         if not df_rec_f.empty:
-            # Tri sur la colonne datetime cachée, puis sélection des colonnes d'affichage
-            df_display_rec = df_rec_f.sort_values('dt_vrai')[['DateNav', 'Nom', 'Paiement', 'Prix']]
+            # Affichage intelligent des colonnes
+            cols_show = ['DateNav', 'Nom', 'Paiement', 'Prix']
+            if mode_bilan == "Réel (Encaissé)":
+                cols_show = ['DateNav', 'Nom', 'Acompte', 'Prix', 'Paiement']
+            
+            df_display_rec = df_rec_f.sort_values('dt_vrai')[cols_show]
             st.dataframe(df_display_rec, use_container_width=True, hide_index=True)
-            st.markdown(f"<div style='text-align:right; font-weight:bold; color:#2ecc71;'>TOTAL : {total_ca:,.2f} €</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:right; font-weight:bold; color:#2ecc71;'>TOTAL : {total_ca_display:,.2f} €</div>", unsafe_allow_html=True)
         else:
-            st.info("Aucune recette.")
+            st.info("Aucune donnée sur cette sélection.")
 
     with col_t2:
-        st.markdown(f"**📤 MAINTENANCE ({etat_flux_maint})**")
+        st.markdown(f"**📤 DÉTAIL MAINTENANCE ({etat_flux_maint})**")
         if not df_m_y.empty:
-            # Tri sur la colonne datetime cachée, puis sélection des colonnes d'affichage
             df_display_maint = df_m_y.sort_values('dt_maint')[['Date', 'Objet', 'M_Num']]
             st.dataframe(df_display_maint, use_container_width=True, hide_index=True)
             st.markdown(f"<div style='text-align:right; font-weight:bold; color:#e74c3c;'>TOTAL : {total_dep:,.2f} €</div>", unsafe_allow_html=True)
         else:
             st.info("Aucune dépense.")
-
 # =================================================================
 # --- 8. PAGE MAINTENANCE (GESTION VIDANGE & TRAVAUX) ---
 # =================================================================
