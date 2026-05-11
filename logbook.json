@@ -185,5 +185,39 @@
         "PortDep":"Escale",
         "Co\u00e9quipiers":"",
         "Meteo":""
+    },
+    {
+        "Date":"02\/05\/2026",
+        "Navigation":"location CMN",
+        "PortArr":"Escale",
+        "MotDep":2476.7,
+        "MotArr":2464.45,
+        "TotalMot":-12.25,
+        "MilDep":3000.0,
+        "MilArr":3100.0,
+        "TotalMil":100.0,
+        "H_Voile":5.0,
+        "Notes":"",
+        "Group_ID":null,
+        "PortDep":"Escale",
+        "Co\u00e9quipiers":"",
+        "Meteo":""
+    },
+    {
+        "Date":"03\/05\/2026",
+        "Navigation":"location CMN",
+        "PortArr":"Escale",
+        "MotDep":2464.45,
+        "MotArr":2452.2,
+        "TotalMot":-12.25,
+        "MilDep":3100.0,
+        "MilArr":3200.0,
+        "TotalMil":100.0,
+        "H_Voile":5.0,
+        "Notes":"",
+        "Group_ID":null,
+        "PortDep":"Escale",
+        "Co\u00e9quipiers":"",
+        "Meteo":""
     }
 ]
