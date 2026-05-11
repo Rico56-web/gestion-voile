@@ -219,5 +219,39 @@
         "PortDep":"Escale",
         "Co\u00e9quipiers":"",
         "Meteo":""
+    },
+    {
+        "Date":"08\/05\/2026",
+        "Navigation":"location perso mai 2026",
+        "PortArr":"Escale",
+        "MotDep":2452.2,
+        "MotArr":2452.2,
+        "TotalMot":0.0,
+        "MilDep":3200.0,
+        "MilArr":3200.0,
+        "TotalMil":0.0,
+        "H_Voile":5.0,
+        "Notes":"baignage a l'ile Dumet \nescale la nuit a Piriac\nrepas le lendemain au mouillage a a la bou\u00e9e a Ho\u00ebdic",
+        "Group_ID":null,
+        "PortDep":"Escale",
+        "Co\u00e9quipiers":"dominique et florence Vasselin\nSonia et sa copine Claire ",
+        "Meteo":""
+    },
+    {
+        "Date":"09\/05\/2026",
+        "Navigation":"location perso mai 2026",
+        "PortArr":"Escale",
+        "MotDep":2452.2,
+        "MotArr":2452.2,
+        "TotalMot":0.0,
+        "MilDep":3200.0,
+        "MilArr":3200.0,
+        "TotalMil":0.0,
+        "H_Voile":5.0,
+        "Notes":"baignage a l'ile Dumet \nescale la nuit a Piriac\nrepas le lendemain au mouillage a a la bou\u00e9e a Ho\u00ebdic",
+        "Group_ID":null,
+        "PortDep":"Escale",
+        "Co\u00e9quipiers":"dominique et florence Vasselin\nSonia et sa copine Claire ",
+        "Meteo":""
     }
 ]
