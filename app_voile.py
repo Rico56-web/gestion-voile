@@ -901,7 +901,56 @@ if st.session_state.page == "STATS":
             c_res2.success(f"**Total Encaissé Saison : {t_reel:,.2f} €**")
         else:
             st.info("Aucune activité enregistrée sur cette saison pour le moment.")
+# --- G. ANALYSE DU POINT MORT (SEUIL DE RENTABILITÉ) ---
+    st.divider()
+    st.markdown("### ⚓ Seuil de Rentabilité (Point Mort)")
 
+    # 1. Définition des Frais Fixes Estimés (A ajuster selon vos factures réelles)
+    # Ces frais courent que le bateau sorte ou non.
+    frais_fixes_estim = {
+        "Place de Port (Arzon)": 3800.0,
+        "Assurance Annuelle": 1200.0,
+        "Entretien / Carénage": 1500.0,
+        "Divers / Administratif": 500.0
+    }
+    total_frais_fixes = sum(frais_fixes_estim.values())
+
+    # 2. Calculs de rentabilité
+    # On utilise le CA Réel (déjà calculé plus haut dans votre code)
+    ca_actuel = total_encaisse_reel 
+    progression = min(1.0, ca_actuel / total_frais_fixes) if total_frais_fixes > 0 else 0
+    manque_a_gagner = max(0.0, total_frais_fixes - ca_actuel)
+
+    # 3. Affichage visuel
+    c_pm1, c_pm2 = st.columns([2, 1])
+
+    with c_pm1:
+        st.write(f"**Objectif : Couvrir les frais fixes annuels ({int(total_frais_fixes)} €)**")
+        # Barre de progression
+        color_bar = "#2ecc71" if progression >= 1 else "#3498db"
+        st.progress(progression)
+        
+        if progression >= 1:
+            st.success(f"🎉 **Seuil de rentabilité atteint !** Le bateau génère maintenant du bénéfice net.")
+        else:
+            st.info(f"Il manque encore **{int(manque_a_gagner)} €** pour couvrir les frais fixes de la saison.")
+
+    with c_pm2:
+        # Petit tableau des charges estimées
+        with st.expander("Détail des charges estimées"):
+            for poste, montant in frais_fixes_estim.items():
+                st.write(f"{poste} : {int(montant)} €")
+            st.write(f"---")
+            st.write(f"**TOTAL : {int(total_frais_fixes)} €**")
+
+    # 4. Projection en nombre de sorties
+    if not df_f.empty and len(df_f) > 0:
+        panier_moyen = total_ca_saison / len(df_f)
+        sorties_pour_point_mort = total_frais_fixes / panier_moyen if panier_moyen > 0 else 0
+        sorties_restantes = max(0, sorties_pour_point_mort - len(df_f))
+        
+        if sorties_restantes > 0:
+            st.markdown(f"💡 *Basé sur votre panier moyen ({int(panier_moyen)} €), il vous reste environ **{int(sorties_restantes) + 1} sorties** à réaliser pour atteindre l'équilibre.*")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (GESTION VIDANGE & TRAVAUX) ---
 # =================================================================
