@@ -905,19 +905,16 @@ if st.session_state.page == "STATS":
     st.divider()
     st.markdown("### ⚓ Seuil de Rentabilité (Point Mort)")
 
-    # 1. Définition des Frais Fixes Estimés (A ajuster selon vos factures réelles)
-    # Ces frais courent que le bateau sorte ou non.
-    frais_fixes_estim = {
-        "Place de Port (Arzon)": 3800.0,
-        "Assurance Annuelle": 1200.0,
-        "Entretien / Carénage": 1500.0,
-        "Divers / Administratif": 500.0
-    }
-    total_frais_fixes = sum(frais_fixes_estim.values())
+    # 1. Récupération des frais fixes depuis les paramètres
+    frais_params = params.get('frais_fixes', {})
+    if not frais_params:
+        # Valeurs de secours si le fichier params est vide
+        frais_params = {"Charges fixes": 7000}
+    
+    total_frais_fixes = sum(to_f(v) for v in frais_params.values())
 
     # 2. Calculs de rentabilité
-    # On utilise le CA Réel (déjà calculé plus haut dans votre code)
-    ca_actuel = total_encaisse_reel 
+    ca_actuel = total_encaisse_reel # Utilise le calcul "Réel" harmonisé avec Contacts
     progression = min(1.0, ca_actuel / total_frais_fixes) if total_frais_fixes > 0 else 0
     manque_a_gagner = max(0.0, total_frais_fixes - ca_actuel)
 
@@ -926,31 +923,33 @@ if st.session_state.page == "STATS":
 
     with c_pm1:
         st.write(f"**Objectif : Couvrir les frais fixes annuels ({int(total_frais_fixes)} €)**")
-        # Barre de progression
-        color_bar = "#2ecc71" if progression >= 1 else "#3498db"
+        # Couleur : Bleu si en cours, Vert si atteint
         st.progress(progression)
         
         if progression >= 1:
-            st.success(f"🎉 **Seuil de rentabilité atteint !** Le bateau génère maintenant du bénéfice net.")
+            st.success(f"🎉 **Seuil de rentabilité atteint !** Le bateau est autofinancé pour {sel_y}.")
         else:
             st.info(f"Il manque encore **{int(manque_a_gagner)} €** pour couvrir les frais fixes de la saison.")
 
     with c_pm2:
-        # Petit tableau des charges estimées
-        with st.expander("Détail des charges estimées"):
-            for poste, montant in frais_fixes_estim.items():
+        with st.expander("Détail des charges fixes"):
+            for poste, montant in frais_params.items():
                 st.write(f"{poste} : {int(montant)} €")
             st.write(f"---")
             st.write(f"**TOTAL : {int(total_frais_fixes)} €**")
 
-    # 4. Projection en nombre de sorties
+    # 4. Projection dynamique
     if not df_f.empty and len(df_f) > 0:
         panier_moyen = total_ca_saison / len(df_f)
-        sorties_pour_point_mort = total_frais_fixes / panier_moyen if panier_moyen > 0 else 0
-        sorties_restantes = max(0, sorties_pour_point_mort - len(df_f))
-        
-        if sorties_restantes > 0:
-            st.markdown(f"💡 *Basé sur votre panier moyen ({int(panier_moyen)} €), il vous reste environ **{int(sorties_restantes) + 1} sorties** à réaliser pour atteindre l'équilibre.*")
+        if panier_moyen > 0:
+            sorties_pour_equilibre = total_frais_fixes / panier_moyen
+            sorties_faites = len(df_f)
+            if sorties_pour_equilibre > sorties_faites:
+                restant = int(sorties_pour_equilibre - sorties_faites) + 1
+                st.markdown(f"💡 *Basé sur votre panier moyen ({int(panier_moyen)} €), il vous reste environ **{restant} sorties** à réaliser pour atteindre l'équilibre.*")
+            else:
+                surplus = ca_actuel - total_frais_fixes
+                st.markdown(f"📈 *Bénéfice net actuel (après frais fixes) : **{int(surplus)} €***")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (GESTION VIDANGE & TRAVAUX) ---
 # =================================================================
