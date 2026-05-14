@@ -113,11 +113,18 @@ def charger_params():
     if not df.empty:
         return df.iloc[0].to_dict()
     return {"prochaine_vidange": 2450.0, "cible_vidange": 250.0}
-
+    
 def sauvegarder_params(dict_params):
-    """Sauvegarde les réglages moteur"""
-    df = pd.DataFrame([dict_params])
-    sauvegarder_data(df, 'params.json')
+    """Sauvegarde les réglages (moteur, frais fixes, etc.) au format JSON propre"""
+    import json
+    try:
+        with open('params.json', 'w', encoding='utf-8') as f:
+            json.dump(dict_params, f, indent=4, ensure_ascii=False)
+        return True
+    except Exception as e:
+        st.error(f"Erreur lors de la sauvegarde des paramètres : {e}")
+        return False
+
 
 def charger_data_safe(fichier):
     df = charger_data(fichier)
@@ -950,6 +957,31 @@ if st.session_state.page == "STATS":
             else:
                 surplus = ca_actuel - total_frais_fixes
                 st.markdown(f"📈 *Bénéfice net actuel (après frais fixes) : **{int(surplus)} €***")
+   # --- H. CONFIGURATION DES CHARGES (MODIFIABLE SANS CODE) ---
+    st.divider()
+    with st.expander("⚙️ Modifier les charges fixes annuelles"):
+        st.info("Modifiez les montants ci-dessous et cliquez sur 'Enregistrer' pour mettre à jour votre seuil de rentabilité.")
+        
+        # On récupère les frais actuels
+        frais_actuels = params.get('frais_fixes', {"Port Arzon": 3800, "Assurance": 1200, "Entretien": 1500, "Divers": 500})
+        
+        # Création d'un formulaire pour modifier les valeurs
+        with st.form("form_frais_fixes"):
+            new_frais = {}
+            # On crée 2 colonnes pour que ce soit compact
+            cols_f = st.columns(2)
+            for i, (poste, montant) in enumerate(frais_actuels.items()):
+                # On alterne entre colonne 1 et 2
+                with cols_f[i % 2]:
+                    new_frais[poste] = st.number_input(f"{poste} (€)", value=float(montant), step=50.0)
+            
+            # Bouton de sauvegarde
+            if st.form_submit_button("💾 ENREGISTRER LES CHARGES"):
+                params['frais_fixes'] = new_frais
+                # On utilise votre fonction de sauvegarde existante
+                sauvegarder_params(params) 
+                st.success("Charges mises à jour !")
+                st.rerun()             
 # =================================================================
 # --- 8. PAGE MAINTENANCE (GESTION VIDANGE & TRAVAUX) ---
 # =================================================================
