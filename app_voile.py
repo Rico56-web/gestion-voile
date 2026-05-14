@@ -310,7 +310,7 @@ if st.session_state.page == "MEMOS":
             
             st.divider()
 # =================================================================
-# --- 5. BLOC CONTACTS (V108 - AFFICHAGE COMPLET & SÉCURITÉ) ---
+# --- 5. BLOC CONTACTS (V112 - LOGIQUE FINANCIÈRE HARMONISÉE) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     from datetime import datetime
@@ -343,16 +343,29 @@ if st.session_state.page == "CONTACTS":
         search = c_search.text_input("🔍 Rechercher...", "", key="search_bar_contacts").upper()
         annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
         
-        # --- 📈 DASHBOARD FINANCIER ---
-        mask_ca = (df_c['dt_sort'].dt.year == annee_sel) & (~df_c['Statut'].str.lower().str.contains("annule|refuse"))
-        df_ca = df_c[mask_ca]
-        total_prevu = df_ca['Prix'].apply(to_f).sum()
-        total_encaisse = df_ca['Acompte'].apply(to_f).sum()
-        
+        # --- 📈 DASHBOARD FINANCIER HARMONISÉ AVEC STATS ---
+        # 1. Filtre identique aux Stats (Exclusion des annulés/refusés)
+        mask_ca = (df_c['dt_sort'].dt.year == annee_sel) & \
+                  (~df_c['Statut'].str.lower().str.contains("annule|refuse", na=False))
+        df_ca = df_c[mask_ca].copy()
+
+        # 2. Logique d'encaissement réelle
+        def get_reel_encaisse(row):
+            p = to_f(row.get('Prix', 0))
+            a = to_f(row.get('Acompte', 0))
+            return p if str(row.get('Paiement', '')).strip().upper() == "PAID" else a
+
+        if not df_ca.empty:
+            total_prevu = df_ca['Prix'].apply(to_f).sum()
+            total_encaisse = df_ca.apply(get_reel_encaisse, axis=1).sum()
+            reste_percevoir = max(0, total_prevu - total_encaisse)
+        else:
+            total_prevu = total_encaisse = reste_percevoir = 0
+
         col_f1, col_f2, col_f3 = st.columns(3)
         col_f1.metric(f"CA Prévu {annee_sel}", f"{int(total_prevu)} €")
-        col_f2.metric("Acomptes encaissés", f"{int(total_encaisse)} €")
-        col_f3.metric("Reste à percevoir", f"{max(0, int(total_prevu - total_encaisse))} €")
+        col_f2.metric("Encaissé (Réel)", f"{int(total_encaisse)} €")
+        col_f3.metric("Reste à percevoir", f"{int(reste_percevoir)} €")
         st.divider()
 
         if c_new.button("➕ NOUVEAU CLIENT", use_container_width=True):
@@ -377,17 +390,14 @@ if st.session_state.page == "CONTACTS":
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']
             p_tot = to_f(row.get('Prix', 0))
-            p_aco = to_f(row.get('Acompte', 0))
-            nb_jours = row.get('Jours', 1)
-            nb_pers = row.get('Pers', 1)
+            # Pour l'affichage individuel de la fiche, on garde le calcul local
+            p_enc = p_tot if str(row.get('Paiement', '')).strip().upper() == "PAID" else to_f(row.get('Acompte', 0))
             
-            # Design Fiche
             soc = str(row.get('Société', 'PERSO')).upper()
             colors = {"CMN": ("#2980B9", "#EBF5FB"), "CLICK": ("#27AE60", "#EAFAF1"), "VOG": ("#8E44AD", "#F5EEF8"), "PERSO": ("#F1C40F", "#FEF9E7")}
             border_col, bg_card = colors.get(soc, ("#7F8C8D", "#FDFEFE"))
             badge_vip = "⭐ " if str(row.get('Relancer', 'Non')).upper() == "OUI" else ""
 
-            # Affichage enrichi (Prix, Acompte, Jours, Personnes)
             st.markdown(f"""
             <div style="background:{bg_card}; padding:15px; border-radius:12px; border-left:10px solid {border_col}; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); margin-bottom:10px; color: black;">
                 <div style="display:flex; justify-content:space-between;">
@@ -395,14 +405,13 @@ if st.session_state.page == "CONTACTS":
                     <span style="font-size:0.8rem; font-weight:bold; color:{border_col};">{soc}</span>
                 </div>
                 <div style="margin-top:5px; font-size:0.9rem;">
-                    📅 {row['DateNav'] if row['DateNav'] else 'Date à définir'} | 👥 {int(nb_pers)} pers. | ⏱️ {nb_jours} j.<br>
-                    💰 <b>Total: {int(p_tot)}€</b> | 💳 Acompte: {int(p_aco)}€ | 📉 <b>Reste: {int(p_tot-p_aco)}€</b>
+                    📅 {row['DateNav'] if row['DateNav'] else 'Date à définir'} | 👥 {int(to_f(row.get('Pers', 1)))} pers. | ⏱️ {row.get('Jours', 1)} j.<br>
+                    💰 <b>Total: {int(p_tot)}€</b> | 💳 Reçu: {int(p_enc)}€ | 📉 <b>Reste: {int(max(0, p_tot-p_enc))}€</b>
                 </div>
-                <div style="font-style:italic; font-size:0.8rem; color:gray; margin-top:5px;">Statut: {row['Statut']}</div>
+                <div style="font-style:italic; font-size:0.8rem; color:gray; margin-top:5px;">Statut: {row['Statut']} | Paiement: {row['Paiement']}</div>
             </div>
             """, unsafe_allow_html=True)
             
-            # --- ACTIONS ---
             c1, c2, c3 = st.columns(3)
             if c1.button("✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
                 st.session_state.edit_idx = idx; st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
@@ -411,7 +420,7 @@ if st.session_state.page == "CONTACTS":
                 if c2.button("🔄 RE-RÉSERVER", key=f"dup_{idx}", use_container_width=True):
                     df_db = charger_data('contacts.json')
                     new_e = row.to_dict()
-                    new_e.update({"DateNav": datetime.now().strftime("%d/%m/%Y"), "Statut": "En attente", "Paiement": "Unpaid", "Prix": 0, "Acompte": 0, "Notes": "Habitué - Nouvelle résa"})
+                    new_e.update({"DateNav": datetime.now().strftime("%d/%m/%Y"), "Statut": "En attente", "Paiement": "Unpaid", "Prix": 0, "Acompte": 0})
                     for k in ['orig_idx', 'dt_sort']: new_e.pop(k, None)
                     df_db = pd.concat([pd.DataFrame([new_e]), df_db], ignore_index=True)
                     sauvegarder_data(df_db, 'contacts.json'); st.session_state.edit_idx = 0; st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
