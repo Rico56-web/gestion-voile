@@ -851,6 +851,57 @@ if st.session_state.page == "STATS":
             st.markdown(f"<div style='text-align:right; font-weight:bold; color:#e74c3c;'>TOTAL : {total_dep:,.2f} €</div>", unsafe_allow_html=True)
         else:
             st.info("Aucune dépense sur cette période.")
+# --- F. RÉCAPITULATIF MENSUEL DU CHIFFRE D'AFFAIRES ---
+    st.divider()
+    st.markdown("### 🗓️ Récapitulatif Mensuel du Chiffre d'Affaires")
+
+    # On prépare un tableau avec tous les mois pour être sûr d'avoir une ligne par mois
+    ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+    recap_mensuel = pd.DataFrame({'Mois_Num': range(1, 13), 'Mois': ordre_mois})
+
+    if not df_f.empty:
+        # Groupement pour le CA Prévu (Prix total)
+        df_prevu = df_f.groupby(df_f['dt_vrai'].dt.month)['Prix'].sum().reset_index()
+        df_prevu.columns = ['Mois_Num', 'CA Prévu (€)']
+        
+        # Groupement pour le CA Encaissé (Logique PAID ou Acompte)
+        df_reel = df_f.groupby(df_f['dt_vrai'].dt.month)['Montant_Encaisse'].sum().reset_index()
+        df_reel.columns = ['Mois_Num', 'CA Réel (€)']
+        
+        # Fusion des données dans le tableau récapitulatif
+        recap_mensuel = recap_mensuel.merge(df_prevu, on='Mois_Num', how='left')
+        recap_mensuel = recap_mensuel.merge(df_reel, on='Mois_Num', how='left')
+        
+        # Calcul du Reste à Percevoir par mois
+        recap_mensuel = recap_mensuel.fillna(0)
+        recap_mensuel['Reste à percevoir (€)'] = recap_mensuel['CA Prévu (€)'] - recap_mensuel['CA Réel (€)']
+        
+        # On ne garde que les mois où il y a eu une activité (CA Prévu > 0)
+        recap_mensuel = recap_mensuel[recap_mensuel['CA Prévu (€)'] > 0]
+
+        if not recap_mensuel.empty:
+            # Affichage du tableau formaté
+            st.dataframe(
+                recap_mensuel.drop(columns=['Mois_Num']), 
+                use_container_width=True, 
+                hide_index=True,
+                column_config={
+                    "CA Prévu (€)": st.column_config.NumberColumn("CA Prévu (€)", format="%.2f"),
+                    "CA Réel (€)": st.column_config.NumberColumn("CA Réel (€)", format="%.2f"),
+                    "Reste à percevoir (€)": st.column_config.NumberColumn("Reste (€)", format="%.2f"),
+                }
+            )
+            
+            # Ligne de total final pour confirmer l'harmonisation
+            t_prev = recap_mensuel['CA Prévu (€)'].sum()
+            t_reel = recap_mensuel['CA Réel (€)'].sum()
+            
+            c_res1, c_res2 = st.columns(2)
+            c_res1.info(f"**Total Prévu Saison : {t_prev:,.2f} €**")
+            c_res2.success(f"**Total Encaissé Saison : {t_reel:,.2f} €**")
+        else:
+            st.info("Aucune activité enregistrée sur cette saison pour le moment.")
+
 # =================================================================
 # --- 8. PAGE MAINTENANCE (GESTION VIDANGE & TRAVAUX) ---
 # =================================================================
