@@ -725,8 +725,8 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
-# =================================================================
-# --- PAGE STATS : DASHBOARD INTÉGRAL VESTA (V2026.3 - COMPLET) ---
+ # =================================================================
+# --- PAGE STATS : DASHBOARD INTÉGRAL VESTA (V2026.3 - HARMONISÉ) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Dashboard Intégral Vesta</h2>', unsafe_allow_html=True)
@@ -797,7 +797,6 @@ if st.session_state.page == "STATS":
     p4.metric("📉 Conso", f"{conso_h:.1f} L/h")
 
     # --- C. GRAPHIQUE ---
-    # ... [Code Plotly inchangé, il fonctionne bien] ...
     st.divider()
     ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
     df_graph = pd.DataFrame({'Mois': range(1, 13), 'NomMois': ordre_mois})
@@ -834,7 +833,7 @@ if st.session_state.page == "STATS":
         else:
             st.success("✅ Aucune somme en attente.")
 
-    # --- E. DÉTAILS CHRONO (LES TABLEAUX QUE VOUS ATTENDIEZ) ---
+    # --- E. DÉTAILS CHRONO ---
     st.divider()
     col_t1, col_t2 = st.columns(2)
 
@@ -858,36 +857,28 @@ if st.session_state.page == "STATS":
             st.markdown(f"<div style='text-align:right; font-weight:bold; color:#e74c3c;'>TOTAL : {total_dep:,.2f} €</div>", unsafe_allow_html=True)
         else:
             st.info("Aucune dépense sur cette période.")
-# --- F. RÉCAPITULATIF MENSUEL DU CHIFFRE D'AFFAIRES ---
+
+    # --- F. RÉCAPITULATIF MENSUEL DU CHIFFRE D'AFFAIRES ---
     st.divider()
     st.markdown("### 🗓️ Récapitulatif Mensuel du Chiffre d'Affaires")
 
-    # On prépare un tableau avec tous les mois pour être sûr d'avoir une ligne par mois
-    ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
     recap_mensuel = pd.DataFrame({'Mois_Num': range(1, 13), 'Mois': ordre_mois})
 
     if not df_f.empty:
-        # Groupement pour le CA Prévu (Prix total)
         df_prevu = df_f.groupby(df_f['dt_vrai'].dt.month)['Prix'].sum().reset_index()
         df_prevu.columns = ['Mois_Num', 'CA Prévu (€)']
         
-        # Groupement pour le CA Encaissé (Logique PAID ou Acompte)
         df_reel = df_f.groupby(df_f['dt_vrai'].dt.month)['Montant_Encaisse'].sum().reset_index()
         df_reel.columns = ['Mois_Num', 'CA Réel (€)']
         
-        # Fusion des données dans le tableau récapitulatif
         recap_mensuel = recap_mensuel.merge(df_prevu, on='Mois_Num', how='left')
         recap_mensuel = recap_mensuel.merge(df_reel, on='Mois_Num', how='left')
         
-        # Calcul du Reste à Percevoir par mois
         recap_mensuel = recap_mensuel.fillna(0)
         recap_mensuel['Reste à percevoir (€)'] = recap_mensuel['CA Prévu (€)'] - recap_mensuel['CA Réel (€)']
-        
-        # On ne garde que les mois où il y a eu une activité (CA Prévu > 0)
         recap_mensuel = recap_mensuel[recap_mensuel['CA Prévu (€)'] > 0]
 
         if not recap_mensuel.empty:
-            # Affichage du tableau formaté
             st.dataframe(
                 recap_mensuel.drop(columns=['Mois_Num']), 
                 use_container_width=True, 
@@ -899,7 +890,6 @@ if st.session_state.page == "STATS":
                 }
             )
             
-            # Ligne de total final pour confirmer l'harmonisation
             t_prev = recap_mensuel['CA Prévu (€)'].sum()
             t_reel = recap_mensuel['CA Réel (€)'].sum()
             
@@ -908,20 +898,19 @@ if st.session_state.page == "STATS":
             c_res2.success(f"**Total Encaissé Saison : {t_reel:,.2f} €**")
         else:
             st.info("Aucune activité enregistrée sur cette saison pour le moment.")
-# --- G. ANALYSE DU POINT MORT (SEUIL DE RENTABILITÉ) ---
+
+    # --- G. ANALYSE DU POINT MORT (SEUIL DE RENTABILITÉ) ---
     st.divider()
     st.markdown("### ⚓ Seuil de Rentabilité (Point Mort)")
 
-    # 1. Récupération des frais fixes depuis les paramètres
-    frais_params = params.get('frais_fixes', {})
-    if not frais_params:
-        # Valeurs de secours si le fichier params est vide
-        frais_params = {"Charges fixes": 7000}
+    # 1. Centralisation des valeurs de secours harmonisées
+    frais_defaut = {"Port Arzon": 3800, "Assurance": 1200, "Entretien": 1500, "Divers": 500}
+    frais_params = params.get('frais_fixes', frais_defaut)
     
     total_frais_fixes = sum(to_f(v) for v in frais_params.values())
 
     # 2. Calculs de rentabilité
-    ca_actuel = total_encaisse_reel # Utilise le calcul "Réel" harmonisé avec Contacts
+    ca_actuel = total_encaisse_reel 
     progression = min(1.0, ca_actuel / total_frais_fixes) if total_frais_fixes > 0 else 0
     manque_a_gagner = max(0.0, total_frais_fixes - ca_actuel)
 
@@ -930,7 +919,6 @@ if st.session_state.page == "STATS":
 
     with c_pm1:
         st.write(f"**Objectif : Couvrir les frais fixes annuels ({int(total_frais_fixes)} €)**")
-        # Couleur : Bleu si en cours, Vert si atteint
         st.progress(progression)
         
         if progression >= 1:
@@ -957,31 +945,29 @@ if st.session_state.page == "STATS":
             else:
                 surplus = ca_actuel - total_frais_fixes
                 st.markdown(f"📈 *Bénéfice net actuel (après frais fixes) : **{int(surplus)} €***")
-   # --- H. CONFIGURATION DES CHARGES (MODIFIABLE SANS CODE) ---
+
+    # --- H. CONFIGURATION DES CHARGES (MODIFIABLE SANS CODE) ---
     st.divider()
     with st.expander("⚙️ Modifier les charges fixes annuelles"):
         st.info("Modifiez les montants ci-dessous et cliquez sur 'Enregistrer' pour mettre à jour votre seuil de rentabilité.")
         
-        # On récupère les frais actuels
-        frais_actuels = params.get('frais_fixes', {"Port Arzon": 3800, "Assurance": 1200, "Entretien": 1500, "Divers": 500})
+        # On utilise le même dictionnaire par défaut ici
+        frais_actuels = params.get('frais_fixes', frais_defaut)
         
         # Création d'un formulaire pour modifier les valeurs
         with st.form("form_frais_fixes"):
             new_frais = {}
-            # On crée 2 colonnes pour que ce soit compact
             cols_f = st.columns(2)
             for i, (poste, montant) in enumerate(frais_actuels.items()):
-                # On alterne entre colonne 1 et 2
                 with cols_f[i % 2]:
                     new_frais[poste] = st.number_input(f"{poste} (€)", value=float(montant), step=50.0)
             
             # Bouton de sauvegarde
             if st.form_submit_button("💾 ENREGISTRER LES CHARGES"):
                 params['frais_fixes'] = new_frais
-                # On utilise votre fonction de sauvegarde existante
                 sauvegarder_params(params) 
                 st.success("Charges mises à jour !")
-                st.rerun()             
+                st.rerun()        
 # =================================================================
 # --- 8. PAGE MAINTENANCE (GESTION VIDANGE & TRAVAUX) ---
 # =================================================================
