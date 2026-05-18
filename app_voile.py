@@ -725,8 +725,8 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
- # =================================================================
-# --- PAGE STATS : DASHBOARD INTÉGRAL VESTA (V2026.3 - HARMONISÉ) ---
+# =================================================================
+# --- PAGE STATS : DASHBOARD INTÉGRAL VESTA (V2026.3 - OPTIMISÉ) ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Dashboard Intégral Vesta</h2>', unsafe_allow_html=True)
@@ -736,6 +736,11 @@ if st.session_state.page == "STATS":
     df_m = charger_data_safe('maintenance.json') 
     df_log = charger_data_safe('logbook.json')
     params = charger_params()
+    
+    # --- CENTRALISATION ET HARMONISATION DES FRAIS FIXES ---
+    frais_defaut = {"Port Arzon": 3800, "Assurance": 1200, "Entretien": 1500, "Divers": 500}
+    if 'frais_fixes' not in params or not params['frais_fixes']:
+        params['frais_fixes'] = frais_defaut
     
     # 2. FILTRES DE NAVIGATION
     c_sel1, c_sel2, c_sel3 = st.columns([2, 1, 1])
@@ -903,18 +908,16 @@ if st.session_state.page == "STATS":
     st.divider()
     st.markdown("### ⚓ Seuil de Rentabilité (Point Mort)")
 
-    # 1. Centralisation des valeurs de secours harmonisées
-    frais_defaut = {"Port Arzon": 3800, "Assurance": 1200, "Entretien": 1500, "Divers": 500}
-    frais_params = params.get('frais_fixes', frais_defaut)
-    
+    # Lecture directe de la source de vérité unique
+    frais_params = params['frais_fixes']
     total_frais_fixes = sum(to_f(v) for v in frais_params.values())
 
-    # 2. Calculs de rentabilité
+    # Calculs de rentabilité
     ca_actuel = total_encaisse_reel 
     progression = min(1.0, ca_actuel / total_frais_fixes) if total_frais_fixes > 0 else 0
     manque_a_gagner = max(0.0, total_frais_fixes - ca_actuel)
 
-    # 3. Affichage visuel
+    # Affichage visuel
     c_pm1, c_pm2 = st.columns([2, 1])
 
     with c_pm1:
@@ -933,7 +936,7 @@ if st.session_state.page == "STATS":
             st.write(f"---")
             st.write(f"**TOTAL : {int(total_frais_fixes)} €**")
 
-    # 4. Projection dynamique
+    # Projection dynamique
     if not df_f.empty and len(df_f) > 0:
         panier_moyen = total_ca_saison / len(df_f)
         if panier_moyen > 0:
@@ -951,8 +954,8 @@ if st.session_state.page == "STATS":
     with st.expander("⚙️ Modifier les charges fixes annuelles"):
         st.info("Modifiez les montants ci-dessous et cliquez sur 'Enregistrer' pour mettre à jour votre seuil de rentabilité.")
         
-        # On utilise le même dictionnaire par défaut ici
-        frais_actuels = params.get('frais_fixes', frais_defaut)
+        # Récupération directe sans doublon
+        frais_actuels = params['frais_fixes']
         
         # Création d'un formulaire pour modifier les valeurs
         with st.form("form_frais_fixes"):
@@ -967,7 +970,7 @@ if st.session_state.page == "STATS":
                 params['frais_fixes'] = new_frais
                 sauvegarder_params(params) 
                 st.success("Charges mises à jour !")
-                st.rerun()        
+                st.rerun()    
 # =================================================================
 # --- 8. PAGE MAINTENANCE (GESTION VIDANGE & TRAVAUX) ---
 # =================================================================
