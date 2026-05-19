@@ -878,13 +878,16 @@ if st.session_state.page == "STATS":
     fig.update_layout(height=350, barmode='group', margin=dict(l=0,r=0,t=20,b=0), legend=dict(orientation="h", y=1.2))
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- 4. TABLEAU DES DÉPENSES DE MAINTENANCE CORRIGÉ (Clés: Objet & Type) ---
+# --- 4. TABLEAU DES DÉPENSES DE MAINTENANCE CORRIGÉ & TRIÉ CHRONOLOGIQUEMENT ---
     st.divider()
     st.markdown(f"### 🔧 Détail des Dépenses de Maintenance ({etat_flux_maint})")
     if not df_m_y.empty:
+        # TRI CHRONOLOGIQUE : du plus ancien au plus récent
+        df_m_trié = df_m_y.sort_values('dt_maint', ascending=True)
+        
         # Correspondance exacte avec les colonnes réelles de votre JSON
         colonnes_souhaitees = ['Date', 'Type', 'Objet', 'M_Num']
-        colonnes_valides = [c for c in colonnes_souhaitees if c in df_m_y.columns]
+        colonnes_valibles = [c for c in colonnes_souhaitees if c in df_m_trié.columns]
         
         # Renommage propre pour l'interface Streamlit
         mapping_renom = {
@@ -893,7 +896,7 @@ if st.session_state.page == "STATS":
             'M_Num': 'Montant (€)'
         }
         
-        df_m_affichage = df_m_y[colonnes_valides].rename(columns=mapping_renom)
+        df_m_affichage = df_m_trié[colonnes_valibles].rename(columns=mapping_renom)
         st.dataframe(df_m_affichage, use_container_width=True, hide_index=True)
     else:
         st.info("Aucun frais enregistré pour cette catégorie de maintenance cette saison.")
