@@ -731,6 +731,7 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
+
 # =================================================================
 # --- 8. PAGE STATS : SOURCE DE VÉRITÉ UNIQUE HARMONISÉE ---
 # =================================================================
@@ -777,10 +778,18 @@ if st.session_state.page == "STATS":
     total_ca_display = total_encaisse_reel if mode_bilan == "Réel (Encaissé)" else total_ca_saison
     df_rec_f = df_f[df_f['Montant_Encaisse'] > 0].copy() if mode_bilan == "Réel (Encaissé)" else df_f.copy()
 
-    # 3. TRAITEMENT DU JOURNAL DE MAINTENANCE
+    # 3. TRAITEMENT DU JOURNAL DE MAINTENANCE & FRAIS REELS
     df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
     df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == etat_flux_maint)].copy() if not df_m.empty else pd.DataFrame()
     total_dep = sum(to_f(x) for x in df_m_y['M_Num']) if not df_m_y.empty else 0.0
+
+    if not df_m_y.empty:
+        mask_frais_fixes = df_m_y['Type'].fillna('').str.lower().str.contains('port|assur', na=False)
+        total_pure_maint = sum(to_f(x) for x in df_m_y[~mask_frais_fixes]['M_Num'])
+        total_reels_fixes = sum(to_f(x) for x in df_m_y[mask_frais_fixes]['M_Num'])
+    else:
+        total_pure_maint = 0.0
+        total_reels_fixes = 0.0
 
     # 4. TRAITEMENT DU LOGBOOK (HEURES, GAZOLE & NAVIGATION)
     if not df_log.empty:
@@ -817,30 +826,40 @@ if st.session_state.page == "STATS":
 
     st.write("") 
 
-    # LIGNE 2 : FINANCES DE LA SAISON
-    st.markdown("##### 💰 Bilan Financier")
-    f1, f2, f3, f4 = st.columns(4)
+    # LIGNE 2 : RECETTES DE LA SAISON
+    st.markdown("##### 💰 Recettes de la Saison")
+    f1, f2, f3 = st.columns(3)
     f1.metric("🎯 CA Prévu", f"{total_ca_saison:,.0f} €")
     f2.metric("📥 Sommes Perçues", f"{total_sommes_percues:,.0f} €")
     f3.metric("📩 Reste à percevoir", f"{reste_a_percevoir:,.0f} €")
-    f4.metric("📊 Solde Net", f"{solde_net_calculé:,.0f} €")
 
-    st.write("") 
+    st.write("")
 
-    # LIGNE 3 : PLANIFICATION MÉCANIQUE (SOUS LE BLOC)
-    st.markdown("##### 🛠️ Planification Mécanique")
+    # LIGNE 3 : SOMMES DÉPENSÉES (NOUVELLE ADJONCTION)
+    st.markdown("##### 💸 Sommes Dépensées (Sélection active)")
+    d1, d2, d3 = st.columns(3)
+    d1.metric("🔧 Dépenses Maint.", f"{total_pure_maint:,.0f} €")
+    d2.metric("📋 Charges Fixes Réelles", f"{total_reels_fixes:,.0f} €")
+    d3.metric("📊 Total Sorties", f"{total_dep:,.0f} €")
+
+    st.write("")
+
+    # LIGNE 4 : SYNTHÈSE GLOBALE & VIDANGE
+    st.markdown("##### 📈 Bilan Net & Maintenance")
     m_col1, m_col2 = st.columns([1, 3])
+    m_col1.metric("📊 Solde Net", f"{solde_net_calculé:,.0f} €")
+    
     h_rest = params.get('prochaine_vidange', 2500.0) - h_moteur_abs
-    m_col1.metric("🔧 Vidange ds", f"{max(0, h_rest):.1f} h")
     
     with m_col2:
-        st.write("") 
+        # Encart Vidange aligné à côté du Solde Net
+        st.write(f"**🔧 Vidange dans : {max(0, h_rest):.1f} h**")
         if h_rest <= 0:
             st.error(f"🚨 Échéance de vidange dépassée de {abs(h_rest):.1f} heures ! Penser à planifier l'entretien du moteur.")
         elif h_rest <= 20:
             st.warning(f"⚠️ Échéance de vidange proche ({h_rest:.1f} h restantes).")
         else:
-            st.caption(f"Compteur absolu actuel : {h_moteur_abs:.1f} h. Prochaine vidange théorique configurée à {params.get('prochaine_vidange', 2500.0):.1f} h.")
+            st.caption(f"Compteur absolu : {h_moteur_abs:.1f} h. Échéance configurée à : {params.get('prochaine_vidange', 2500.0):.1f} h.")
 
     # =================================================================
     # --- LES TABLEAUX ET ANALYSES ---
@@ -920,7 +939,6 @@ if st.session_state.page == "STATS":
     st.divider()
     
     if not df_m_y.empty:
-        mask_frais_fixes = df_m_y['Type'].fillna('').str.lower().str.contains('port|assur', na=False)
         df_pure_maint = df_m_y[~mask_frais_fixes].copy()
         df_reels_fixes = df_m_y[mask_frais_fixes].copy()
     else:
@@ -930,14 +948,12 @@ if st.session_state.page == "STATS":
     colonnes_souhaitees = ['Date', 'Type', 'Objet', 'M_Num']
     mapping_renom = {'Type': 'Catégorie', 'Objet': 'Désignation', 'M_Num': 'Montant (€)'}
 
-    # TABLEAU A : MAINTENANCE TECHNIQUE UNIQUEMENT (SANS PORT NI ASSURANCES)
+    # TABLEAU A : MAINTENANCE TECHNIQUE UNIQUEMENT
     st.markdown(f"### 🔧 Détail des Dépenses de Maintenance Pure ({etat_flux_maint})")
     if not df_pure_maint.empty:
         df_pm_trié = df_pure_maint.sort_values('dt_maint', ascending=True)
         col_val_pm = [c for c in colonnes_souhaitees if c in df_pm_trié.columns]
         st.dataframe(df_pm_trié[col_val_pm].rename(columns=mapping_renom), use_container_width=True, hide_index=True)
-        
-        total_pure_maint = sum(to_f(x) for x in df_pure_maint['M_Num'])
         st.markdown(f"<div style='text-align:right; background:#e8f4fd; padding:10px; border-radius:5px; color:#1d6fa5; font-weight:bold; margin-top:5px; margin-bottom:25px;'>TOTAL MAINTENANCE TECHNIQUE : {total_pure_maint:,.2f} €</div>", unsafe_allow_html=True)
     else:
         st.info("Aucune dépense de maintenance technique enregistrée cette saison.")
@@ -948,8 +964,6 @@ if st.session_state.page == "STATS":
         df_rf_trié = df_reels_fixes.sort_values('dt_maint', ascending=True)
         col_val_rf = [c for c in colonnes_souhaitees if c in df_rf_trié.columns]
         st.dataframe(df_rf_trié[col_val_rf].rename(columns=mapping_renom), use_container_width=True, hide_index=True)
-        
-        total_reels_fixes = sum(to_f(x) for x in df_reels_fixes['M_Num'])
         st.markdown(f"<div style='text-align:right; background:#fef5d1; padding:10px; border-radius:5px; color:#856404; font-weight:bold; margin-top:5px;'>TOTAL FRAIS FIXES RÉELS RELEVÉS : {total_reels_fixes:,.2f} €</div>", unsafe_allow_html=True)
     else:
         st.info("Aucun paiement de type Port ou Assurance relevé dans cette sélection.")
@@ -1011,7 +1025,6 @@ if st.session_state.page == "STATS":
                 sauvegarder_params(params)
                 st.success("Configuration sauvegardée à distance !")
                 st.rerun()
-
 # =================================================================
 # --- 8. PAGE MAINTENANCE : GESTION SÉCURISÉE (V2026) ---
 # =================================================================
