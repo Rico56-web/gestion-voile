@@ -731,13 +731,13 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
-
 # =================================================================
 # --- 8. PAGE STATS : SOURCE DE VÉRITÉ UNIQUE HARMONISÉE ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Dashboard Intégral Vesta</h2>', unsafe_allow_html=True)
     
+    # 1. CHARGEMENT SÉCURISÉ DES DONNÉES
     df_actif = charger_data_safe('contacts.json')
     df_m = charger_data_safe('maintenance.json') 
     df_log = charger_data_safe('logbook.json')
@@ -747,17 +747,20 @@ if st.session_state.page == "STATS":
     if 'frais_fixes' not in params or not params['frais_fixes']:
         params['frais_fixes'] = frais_defaut
     
+    # FILTRES DE LA PAGE
     c_sel1, c_sel2, c_sel3 = st.columns([2, 1, 1])
     mode_bilan = c_sel1.radio("Mode de calcul :", ["Réel (Encaissé)", "Prévisionnel (Saison)"], horizontal=True)
     sel_y = c_sel2.selectbox("Saison :", [2025, 2026, 2027], index=1)
     etat_flux_maint = c_sel3.selectbox("État Maintenance :", ["Fait", "À prévoir"])
 
+    # 2. TRAITEMENT DES RECETTES & CONTRATS
     if not df_actif.empty:
         df_actif['dt_vrai'] = pd.to_datetime(df_actif['DateNav'], dayfirst=True, errors='coerce')
         mask_f = (df_actif['dt_vrai'].dt.year == sel_y) & (~df_actif['Statut'].str.lower().str.contains("annule|refuse", na=False))
         df_f = df_actif[mask_f].copy()
         
-        for col in ['Prix', 'Acompte']: df_f[col] = df_f[col].apply(to_f)
+        for col in ['Prix', 'Acompte']: 
+            df_f[col] = df_f[col].apply(to_f)
         
         # EXCLUSION STRUCTURELLE DES UNPAID DANS LE MODE REEL
         df_f['Montant_Encaisse'] = df_f.apply(
@@ -774,10 +777,12 @@ if st.session_state.page == "STATS":
     total_ca_display = total_encaisse_reel if mode_bilan == "Réel (Encaissé)" else total_ca_saison
     df_rec_f = df_f[df_f['Montant_Encaisse'] > 0].copy() if mode_bilan == "Réel (Encaissé)" else df_f.copy()
 
+    # 3. TRAITEMENT DU JOURNAL DE MAINTENANCE
     df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
     df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == etat_flux_maint)].copy() if not df_m.empty else pd.DataFrame()
     total_dep = sum(to_f(x) for x in df_m_y['M_Num']) if not df_m_y.empty else 0.0
 
+    # 4. TRAITEMENT DU LOGBOOK (HEURES, GAZOLE & NAVIGATION)
     if not df_log.empty:
         df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
         df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
@@ -785,7 +790,6 @@ if st.session_state.page == "STATS":
         total_gazole = df_log_y['VolumeGazole'].sum() if 'VolumeGazole' in df_log_y.columns else 0.0
         h_moteur_abs = pd.to_numeric(df_log['MotArr'], errors='coerce').max()
         
-        # --- DONNÉES DE NAVIGATION AVANCÉES ---
         total_milles = pd.to_numeric(df_log_y['TotalMil'], errors='coerce').sum() if 'TotalMil' in df_log_y.columns else 0.0
         total_h_voile = pd.to_numeric(df_log_y['H_Voile'], errors='coerce').sum() if 'H_Voile' in df_log_y.columns else 0.0
         total_heures_mer = total_h_moteur + total_h_voile
@@ -793,21 +797,54 @@ if st.session_state.page == "STATS":
     else:
         total_h_moteur = total_gazole = h_moteur_abs = total_milles = total_h_voile = ratio_voile = 0.0
 
-    st.divider()
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("💰 Solde Net", f"{(total_ca_display - total_dep):,.0f} €")
-    m2.metric("⚓ Sorties", f"{len(df_f[df_f['Prix'] > 0]) if not df_f.empty else 0}")
-    m3.metric("⚙️ Heures Mot.", f"{total_h_moteur:.1f} h")
-    m4.metric("⛽ Gazole", f"{total_gazole:,.0f} L")
+    # --- CALCULS DES COMPLÉMENTS FINANCIERS ---
+    total_sommes_percues = total_encaisse_reel
+    solde_net_calculé = total_ca_display - total_dep
 
-    p1, p2, p3, p4 = st.columns(4)
-    p1.metric("🎯 CA Prévu", f"{total_ca_saison:,.0f} €")
-    p2.metric("📩 Reste à percevoir", f"{reste_a_percevoir:,.0f} €")
+    # =================================================================
+    # --- AFFICHAGE : BLOC COMPACT DES INDICATEURS VISUELS (METRICS) ---
+    # =================================================================
+    st.divider()
     
-    h_rest = params.get('prochaine_vidange', 2500.0) - h_moteur_abs
-    p3.metric("🔧 Vidange ds", f"{max(0, h_rest):.1f} h")
+    # LIGNE 1 : ACTIVITÉ & TECHNIQUE
+    st.markdown("##### ⚓ Activité & Navigation")
+    t1, t2, t3, t4 = st.columns(4)
+    t1.metric("⛵ Sorties", f"{len(df_f[df_f['Prix'] > 0]) if not df_f.empty else 0}")
+    t2.metric("⚙️ Heures Mot.", f"{total_h_moteur:.1f} h")
+    t3.metric("⛽ Gazole", f"{total_gazole:,.0f} L")
     conso_h = total_gazole / total_h_moteur if total_h_moteur > 0 else 0
-    p4.metric("📉 Conso", f"{conso_h:.1f} L/h")
+    t4.metric("📉 Conso Moyenne", f"{conso_h:.1f} L/h")
+
+    st.write("") 
+
+    # LIGNE 2 : FINANCES DE LA SAISON
+    st.markdown("##### 💰 Bilan Financier")
+    f1, f2, f3, f4 = st.columns(4)
+    f1.metric("🎯 CA Prévu", f"{total_ca_saison:,.0f} €")
+    f2.metric("📥 Sommes Perçues", f"{total_sommes_percues:,.0f} €")
+    f3.metric("📩 Reste à percevoir", f"{reste_a_percevoir:,.0f} €")
+    f4.metric("📊 Solde Net", f"{solde_net_calculé:,.0f} €")
+
+    st.write("") 
+
+    # LIGNE 3 : PLANIFICATION MÉCANIQUE (SOUS LE BLOC)
+    st.markdown("##### 🛠️ Planification Mécanique")
+    m_col1, m_col2 = st.columns([1, 3])
+    h_rest = params.get('prochaine_vidange', 2500.0) - h_moteur_abs
+    m_col1.metric("🔧 Vidange ds", f"{max(0, h_rest):.1f} h")
+    
+    with m_col2:
+        st.write("") 
+        if h_rest <= 0:
+            st.error(f"🚨 Échéance de vidange dépassée de {abs(h_rest):.1f} heures ! Penser à planifier l'entretien du moteur.")
+        elif h_rest <= 20:
+            st.warning(f"⚠️ Échéance de vidange proche ({h_rest:.1f} h restantes).")
+        else:
+            st.caption(f"Compteur absolu actuel : {h_moteur_abs:.1f} h. Prochaine vidange théorique configurée à {params.get('prochaine_vidange', 2500.0):.1f} h.")
+
+    # =================================================================
+    # --- LES TABLEAUX ET ANALYSES ---
+    # =================================================================
 
     # --- 1. TABLEAU REPARTITION TOP CLIENTS / SOCIÉTÉS ---
     st.divider()
@@ -882,7 +919,6 @@ if st.session_state.page == "STATS":
     # --- 4. TABLEAUX SÉPARÉS : MAINTENANCE TECHNIQUE VS FRAIS FIXES RÉELS ---
     st.divider()
     
-    # Filtrage des deux univers
     if not df_m_y.empty:
         mask_frais_fixes = df_m_y['Type'].fillna('').str.lower().str.contains('port|assur', na=False)
         df_pure_maint = df_m_y[~mask_frais_fixes].copy()
@@ -894,7 +930,7 @@ if st.session_state.page == "STATS":
     colonnes_souhaitees = ['Date', 'Type', 'Objet', 'M_Num']
     mapping_renom = {'Type': 'Catégorie', 'Objet': 'Désignation', 'M_Num': 'Montant (€)'}
 
-    # TABLEAU A : MAINTENANCE TECHNIQUE UNIQUEMENT
+    # TABLEAU A : MAINTENANCE TECHNIQUE UNIQUEMENT (SANS PORT NI ASSURANCES)
     st.markdown(f"### 🔧 Détail des Dépenses de Maintenance Pure ({etat_flux_maint})")
     if not df_pure_maint.empty:
         df_pm_trié = df_pure_maint.sort_values('dt_maint', ascending=True)
@@ -906,7 +942,7 @@ if st.session_state.page == "STATS":
     else:
         st.info("Aucune dépense de maintenance technique enregistrée cette saison.")
 
-    # TABLEAU B : FRAIS FIXES RÉELS (PORT & ASSURANCES)
+    # TABLEAU B : SUIVI DES FRAIS FIXES RÉELS DU JOURNAL
     st.markdown(f"### 📋 Suivi Réel des Frais Fixes du Journal ({etat_flux_maint})")
     if not df_reels_fixes.empty:
         df_rf_trié = df_reels_fixes.sort_values('dt_maint', ascending=True)
@@ -931,7 +967,7 @@ if st.session_state.page == "STATS":
         else:
             st.success("✅ Aucune somme en attente.")
 
-    # --- 6. SEUIL DE RENTABILITÉ CALIBRÉ SUR LES CHARGES ANNUELLES ---
+    # --- 6. SEUIL DE RENTABILITÉ CALIBRÉ SUR LE FORMULAIRE DES CHARGES ANNUELLES ---
     st.divider()
     st.markdown("### ⚓ Seuil de Rentabilité (Point Mort Annuel)")
     frais_params = params['frais_fixes']
@@ -975,6 +1011,7 @@ if st.session_state.page == "STATS":
                 sauvegarder_params(params)
                 st.success("Configuration sauvegardée à distance !")
                 st.rerun()
+
 # =================================================================
 # --- 8. PAGE MAINTENANCE : GESTION SÉCURISÉE (V2026) ---
 # =================================================================
