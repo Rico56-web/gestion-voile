@@ -730,13 +730,20 @@ if st.session_state.page == "PLANNING":
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Dashboard Intégral Vesta</h2>', unsafe_allow_html=True)
-
-    # 1. Chargement des données
+    
+# 1. Chargement des données
     df_actif = charger_data_safe('contacts.json')
     df_m = charger_data_safe('maintenance.json') 
     df_log = charger_data_safe('logbook.json')
+    
+    # FORCE LE RECHARGEMENT STRICT DU FICHIER JSON
     params = charger_params()
     
+    # --- DIAGNOSTIC VISUEL TEMPORAIRE ---
+    st.sidebar.write("### 🔍 Debug Params :")
+    st.sidebar.json(params) # Ceci affichera le contenu RÉEL de votre fichier dans la barre latérale
+    # ------------------------------------
+
     # --- CENTRALISATION ET HARMONISATION DES FRAIS FIXES ---
     frais_defaut = {"Port Arzon": 3800, "Assurance": 1200, "Entretien": 1500, "Divers": 500}
     if 'frais_fixes' not in params or not params['frais_fixes']:
