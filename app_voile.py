@@ -809,7 +809,7 @@ if st.session_state.page == "STATS":
     conso_h = total_gazole / total_h_moteur if total_h_moteur > 0 else 0
     p4.metric("📉 Conso", f"{conso_h:.1f} L/h")
 
-    # --- TABLEAU REPARTITION TOP CLIENTS / SOCIÉTÉS ---
+    # --- 1. TABLEAU REPARTITION TOP CLIENTS / SOCIÉTÉS ---
     st.divider()
     st.markdown("### 🏢 Répartition par Client / Entreprise")
     if not df_rec_f.empty:
@@ -825,7 +825,7 @@ if st.session_state.page == "STATS":
     else:
         st.info("Aucune donnée d'entreprise à afficher pour les filtres sélectionnés.")
 
-    # --- TABLEAU STATISTIQUES NAVIGATION VESTA ---
+    # --- 2. TABLEAU COMPLÉMENT NAVIGATION VESTA ---
     st.divider()
     st.markdown("### ⚓ Complément de Navigation Vesta")
     col_n1, col_n2, col_n3 = st.columns(3)
@@ -855,7 +855,7 @@ if st.session_state.page == "STATS":
             use_container_width=True, hide_index=True
         )
 
-    # --- GRAPHIQUE COMPATIBLE ---
+    # --- 3. GRAPHIQUE HISTOGRAMME EVOLUTION ---
     st.divider()
     ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
     df_graph = pd.DataFrame({'Mois': range(1, 13), 'NomMois': ordre_mois})
@@ -879,18 +879,22 @@ if st.session_state.page == "STATS":
     fig.update_layout(height=350, barmode='group', margin=dict(l=0,r=0,t=20,b=0), legend=dict(orientation="h", y=1.2))
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- TABLEAU DU COMPTE DES DÉPENSES DE MAINTENANCE ---
+    # --- 4. TABLEAU DES DÉPENSES DE MAINTENANCE (SÉCURISÉ CONTRE LES KEYERROR) ---
     st.divider()
     st.markdown(f"### 🔧 Détail des Dépenses de Maintenance ({etat_flux_maint})")
     if not df_m_y.empty:
-        st.dataframe(
-            df_m_y[['Date', 'Categorie', 'Titre', 'M_Num']].rename(columns={'M_Num': 'Montant (€)'}),
-            use_container_width=True, hide_index=True
-        )
+        # Sélection adaptative selon les colonnes réellement existantes dans maintenance.json
+        colonnes_souhaitees = ['Date', 'Categorie', 'Titre', 'M_Num']
+        colonnes_valides = [c for c in colonnes_souhaitees if c in df_m_y.columns]
+        
+        mapping_renom = {'M_Num': 'Montant (€)'} if 'M_Num' in colonnes_valides else {}
+        df_m_affichage = df_m_y[colonnes_valides].rename(columns=mapping_renom)
+        
+        st.dataframe(df_m_affichage, use_container_width=True, hide_index=True)
     else:
         st.info("Aucun frais enregistré pour cette catégorie de maintenance cette saison.")
 
-    # --- TABLEAU DES SOMMES RESTANT À PERCEVOIR ---
+    # --- 5. TABLEAU DES SOMMES RESTANT À PERCEVOIR ---
     st.divider()
     st.markdown("### 🔍 Détail des sommes restant à percevoir")
     if not df_f.empty:
@@ -903,7 +907,7 @@ if st.session_state.page == "STATS":
         else:
             st.success("✅ Aucune somme en attente.")
 
-    # --- SEUIL DE RENTABILITÉ ---
+    # --- 6. SEUIL DE RENTABILITÉ ---
     st.divider()
     st.markdown("### ⚓ Seuil de Rentabilité (Point Mort)")
     frais_params = params['frais_fixes']
@@ -929,7 +933,7 @@ if st.session_state.page == "STATS":
             st.write(f"---")
             st.write(f"**TOTAL : {int(total_frais_fixes)} €**")
 
-    # --- CONFIGURATION DES CHARGES ---
+    # --- 7. CONFIGURATION ET MODIFICATION DES CHARGES ---
     st.divider()
     with st.expander("⚙️ Modifier les charges fixes annuelles"):
         st.info("Modifiez les montants ci-dessous et cliquez sur 'Enregistrer'.")
