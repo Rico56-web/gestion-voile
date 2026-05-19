@@ -877,18 +877,15 @@ if st.session_state.page == "STATS":
     fig.add_trace(go.Scatter(x=df_graph['NomMois'], y=df_graph['Sorties'], name='Nb Sorties', line=dict(color='#3498db', width=3)), secondary_y=True)
     fig.update_layout(height=350, barmode='group', margin=dict(l=0,r=0,t=20,b=0), legend=dict(orientation="h", y=1.2))
     st.plotly_chart(fig, use_container_width=True)
-# --- 4. TABLEAU DES DÉPENSES DE MAINTENANCE CORRIGÉ, TRIÉ & TOTALISÉ ---
+
+    # --- 4. TABLEAU DES DÉPENSES DE MAINTENANCE CORRIGÉ, TRIÉ & TOTALISÉ ---
     st.divider()
     st.markdown(f"### 🔧 Détail des Dépenses de Maintenance ({etat_flux_maint})")
     if not df_m_y.empty:
-        # TRI CHRONOLOGIQUE : du plus ancien au plus récent
         df_m_trié = df_m_y.sort_values('dt_maint', ascending=True)
-        
-        # Correspondance exacte avec les colonnes réelles de votre JSON
         colonnes_souhaitees = ['Date', 'Type', 'Objet', 'M_Num']
         colonnes_valibles = [c for c in colonnes_souhaitees if c in df_m_trié.columns]
         
-        # Renommage propre pour l'interface Streamlit
         mapping_renom = {
             'Type': 'Catégorie',
             'Objet': 'Désignation',
@@ -898,16 +895,14 @@ if st.session_state.page == "STATS":
         df_m_affichage = df_m_trié[colonnes_valibles].rename(columns=mapping_renom)
         st.dataframe(df_m_affichage, use_container_width=True, hide_index=True)
         
-        # BANDEAU DU TOTAL DES DÉPENSES
         st.markdown(
-            f"<div style='text-align:right; background:#f8d7da; padding:10px; border-radius:5px; color:#721c24; font-weight:bold; margin-top:10px;'>"
+            f"<div style='text-align:right; background:#f8d7da; padding:10px; border-radius:5px; color:#721c24; font-weight:bold; margin-top:10px;'> "
             f"TOTAL MAINTENANCE ({etat_flux_maint.upper()}) : {total_dep:,.2f} €"
             f"</div>", 
             unsafe_allow_html=True
         )
     else:
         st.info("Aucun frais enregistré pour cette catégorie de maintenance cette saison.")
-
 
     # --- 5. TABLEAU DES SOMMES RESTANT À PERCEVOIR ---
     st.divider()
@@ -922,31 +917,34 @@ if st.session_state.page == "STATS":
         else:
             st.success("✅ Aucune somme en attente.")
 
-    # --- 6. SEUIL DE RENTABILITÉ ---
+    # --- 6. SEUIL DE RENTABILITÉ HARMONISÉ (POINT MORT ABSOLU ACCORDÉ) ---
     st.divider()
-    st.markdown("### ⚓ Seuil de Rentabilité (Point Mort)")
+    st.markdown("### ⚓ Seuil de Rentabilité Réel (Point Mort Absolu)")
     frais_params = params['frais_fixes']
     total_frais_fixes = sum(to_f(v) for v in frais_params.values())
+    
+    # CALCUL DU POINT MORT ABSOLU : Charges Fixes Annuelles + Dépenses Maintenance Courantes
+    point_mort_absolu = total_frais_fixes + total_dep
 
     ca_actuel = total_encaisse_reel 
-    progression = min(1.0, ca_actuel / total_frais_fixes) if total_frais_fixes > 0 else 0
-    manque_a_gagner = max(0.0, total_frais_fixes - ca_actuel)
+    progression = min(1.0, ca_actuel / point_mort_absolu) if point_mort_absolu > 0 else 0
+    manque_a_gagner = max(0.0, point_mort_absolu - ca_actuel)
 
     c_pm1, c_pm2 = st.columns([2, 1])
     with c_pm1:
-        st.write(f"**Objectif : Couvrir les frais fixes annuels ({int(total_frais_fixes)} €)**")
+        st.write(f"**Objectif Réel : Couvrir charges fixes + maintenance courante ({int(point_mort_absolu):,} €)**")
         st.progress(progression)
         if progression >= 1:
-            st.success(f"🎉 **Seuil de rentabilité atteint !** Le bateau est autofinancé pour {sel_y}.")
+            st.success(f"🎉 **Seuil de rentabilité absolue atteint !** Vesta couvre l'intégralité de ses coûts pour {sel_y}.")
         else:
-            st.info(f"Il manque encore **{int(manque_a_gagner)} €** pour couvrir les frais fixes de la saison.")
+            st.info(f"Il manque encore **{int(manque_a_gagner):,} €** pour amortir les frais fixes et la maintenance de cette saison.")
 
     with c_pm2:
-        with st.expander("Détail des charges fixes"):
-            for poste, montant in frais_params.items():
-                st.write(f"{poste} : {int(montant)} €")
+        with st.expander("Détail du calcul du Point Mort"):
+            st.write(f"💼 Charges fixes : {int(total_frais_fixes):,} €")
+            st.write(f"🔧 Maintenance ({etat_flux_maint}) : {int(total_dep):,} €")
             st.write(f"---")
-            st.write(f"**TOTAL : {int(total_frais_fixes)} €**")
+            st.write(f"**TOTAL REQUIS : {int(point_mort_absolu):,} €**")
 
     # --- 7. CONFIGURATION ET MODIFICATION DES CHARGES ---
     st.divider()
