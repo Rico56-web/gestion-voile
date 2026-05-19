@@ -731,6 +731,7 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
+
 # =================================================================
 # --- 8. PAGE STATS : SOURCE DE VÉRITÉ UNIQUE HARMONISÉE ---
 # =================================================================
@@ -784,7 +785,7 @@ if st.session_state.page == "STATS":
         total_gazole = df_log_y['VolumeGazole'].sum() if 'VolumeGazole' in df_log_y.columns else 0.0
         h_moteur_abs = pd.to_numeric(df_log['MotArr'], errors='coerce').max()
         
-        # --- AJOUT SÉCURISÉ DES COMPTEURS NAVIGATION AVANCÉS ---
+        # --- DONNÉES DE NAVIGATION AVANCÉES ---
         total_milles = pd.to_numeric(df_log_y['TotalMil'], errors='coerce').sum() if 'TotalMil' in df_log_y.columns else 0.0
         total_h_voile = pd.to_numeric(df_log_y['H_Voile'], errors='coerce').sum() if 'H_Voile' in df_log_y.columns else 0.0
         total_heures_mer = total_h_moteur + total_h_voile
@@ -808,9 +809,23 @@ if st.session_state.page == "STATS":
     conso_h = total_gazole / total_h_moteur if total_h_moteur > 0 else 0
     p4.metric("📉 Conso", f"{conso_h:.1f} L/h")
 
-    # =================================================================
-    # --- BLOC EN PLUS : STATISTIQUES VESTA (COMPTEURS & VOYAGES) ---
-    # =================================================================
+    # --- TABLEAU REPARTITION TOP CLIENTS / SOCIÉTÉS ---
+    st.divider()
+    st.markdown("### 🏢 Répartition par Client / Entreprise")
+    if not df_rec_f.empty:
+        df_rec_f['Soc_Clean'] = df_rec_f['Société'].fillna('PERSO').str.upper().str.strip()
+        val_somme = 'Montant_Encaisse' if mode_bilan == "Réel (Encaissé)" else 'Prix'
+        stats_soc = df_rec_f.groupby('Soc_Clean')[val_somme].sum().reset_index()
+        stats_soc = stats_soc.sort_values(by=val_somme, ascending=False)
+        stats_soc.columns = ['Société / Client', 'Volume Affaires (€)']
+        st.dataframe(
+            stats_soc.style.format({'Volume Affaires (€)': '{:,.2f} €'}),
+            use_container_width=True, hide_index=True
+        )
+    else:
+        st.info("Aucune donnée d'entreprise à afficher pour les filtres sélectionnés.")
+
+    # --- TABLEAU STATISTIQUES NAVIGATION VESTA ---
     st.divider()
     st.markdown("### ⚓ Complément de Navigation Vesta")
     col_n1, col_n2, col_n3 = st.columns(3)
@@ -837,11 +852,10 @@ if st.session_state.page == "STATS":
                 'Milles parcourus (NM)': '{:.1f} NM',
                 'Heures Moteur': '{:.1f} h'
             }),
-            use_container_width=True,
-            hide_index=True
+            use_container_width=True, hide_index=True
         )
 
-    # --- GRAPHIQUE ---
+    # --- GRAPHIQUE COMPATIBLE ---
     st.divider()
     ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
     df_graph = pd.DataFrame({'Mois': range(1, 13), 'NomMois': ordre_mois})
@@ -865,7 +879,18 @@ if st.session_state.page == "STATS":
     fig.update_layout(height=350, barmode='group', margin=dict(l=0,r=0,t=20,b=0), legend=dict(orientation="h", y=1.2))
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- TABLEAUX DE DETAILS ---
+    # --- TABLEAU DU COMPTE DES DÉPENSES DE MAINTENANCE ---
+    st.divider()
+    st.markdown(f"### 🔧 Détail des Dépenses de Maintenance ({etat_flux_maint})")
+    if not df_m_y.empty:
+        st.dataframe(
+            df_m_y[['Date', 'Categorie', 'Titre', 'M_Num']].rename(columns={'M_Num': 'Montant (€)'}),
+            use_container_width=True, hide_index=True
+        )
+    else:
+        st.info("Aucun frais enregistré pour cette catégorie de maintenance cette saison.")
+
+    # --- TABLEAU DES SOMMES RESTANT À PERCEVOIR ---
     st.divider()
     st.markdown("### 🔍 Détail des sommes restant à percevoir")
     if not df_f.empty:
@@ -904,11 +929,10 @@ if st.session_state.page == "STATS":
             st.write(f"---")
             st.write(f"**TOTAL : {int(total_frais_fixes)} €**")
 
-    # --- H. CONFIGURATION DES CHARGES (CORRIGÉE & SÉCURISÉE GITHUB) ---
+    # --- CONFIGURATION DES CHARGES ---
     st.divider()
     with st.expander("⚙️ Modifier les charges fixes annuelles"):
         st.info("Modifiez les montants ci-dessous et cliquez sur 'Enregistrer'.")
-        
         frais_actuels = params['frais_fixes']
         
         with st.form("form_frais_fixes"):
@@ -923,7 +947,6 @@ if st.session_state.page == "STATS":
                 sauvegarder_params(params)
                 st.success("Configuration sauvegardée à distance !")
                 st.rerun()
-
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE : GESTION SÉCURISÉE (V2026) ---
