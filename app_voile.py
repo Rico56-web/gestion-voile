@@ -970,7 +970,7 @@ if st.session_state.page == "STATS":
                 params['frais_fixes'] = new_frais
                 sauvegarder_params(params) 
                 st.success("Charges mises à jour !")
-                st.rerun()    
+                st.rerun()
 # =================================================================
 # --- 8. PAGE MAINTENANCE (GESTION VIDANGE & TRAVAUX) ---
 # =================================================================
