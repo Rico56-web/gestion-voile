@@ -731,7 +731,6 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
-
 # =================================================================
 # --- 8. PAGE STATS : SOURCE DE VÉRITÉ UNIQUE HARMONISÉE ---
 # =================================================================
@@ -784,8 +783,14 @@ if st.session_state.page == "STATS":
         total_h_moteur = df_log_y['TotalMot'].sum() if 'TotalMot' in df_log_y.columns else 0.0
         total_gazole = df_log_y['VolumeGazole'].sum() if 'VolumeGazole' in df_log_y.columns else 0.0
         h_moteur_abs = pd.to_numeric(df_log['MotArr'], errors='coerce').max()
+        
+        # --- AJOUT SÉCURISÉ DES COMPTEURS NAVIGATION AVANCÉS ---
+        total_milles = pd.to_numeric(df_log_y['TotalMil'], errors='coerce').sum() if 'TotalMil' in df_log_y.columns else 0.0
+        total_h_voile = pd.to_numeric(df_log_y['H_Voile'], errors='coerce').sum() if 'H_Voile' in df_log_y.columns else 0.0
+        total_heures_mer = total_h_moteur + total_h_voile
+        ratio_voile = (total_h_voile / total_heures_mer * 100) if total_heures_mer > 0 else 0.0
     else:
-        total_h_moteur = total_gazole = h_moteur_abs = 0.0
+        total_h_moteur = total_gazole = h_moteur_abs = total_milles = total_h_voile = ratio_voile = 0.0
 
     st.divider()
     m1, m2, m3, m4 = st.columns(4)
@@ -802,6 +807,39 @@ if st.session_state.page == "STATS":
     p3.metric("🔧 Vidange ds", f"{max(0, h_rest):.1f} h")
     conso_h = total_gazole / total_h_moteur if total_h_moteur > 0 else 0
     p4.metric("📉 Conso", f"{conso_h:.1f} L/h")
+
+    # =================================================================
+    # --- BLOC EN PLUS : STATISTIQUES VESTA (COMPTEURS & VOYAGES) ---
+    # =================================================================
+    st.divider()
+    st.markdown("### ⚓ Complément de Navigation Vesta")
+    col_n1, col_n2, col_n3 = st.columns(3)
+    col_n1.metric(label="🌊 Distance Totale Saison", value=f"{total_milles:.1f} NM")
+    col_n2.metric(label="⛵ Heures sous Voile", value=f"{total_h_voile:.1f} h")
+    col_n3.metric(label="📊 Part de la Voile (Ratio)", value=f"{ratio_voile:.1f} %")
+    
+    if not df_log.empty and not df_log_y.empty:
+        st.markdown("#### 🗺️ Synthèse des milles et moteur par Voyage")
+        df_log_y['TotalMil_Num'] = pd.to_numeric(df_log_y['TotalMil'], errors='coerce').fillna(0.0)
+        df_log_y['TotalMot_Num'] = pd.to_numeric(df_log_y['TotalMot'], errors='coerce').fillna(0.0)
+        
+        stats_voyages = df_log_y.groupby('Navigation').agg({
+            'Date': 'count',
+            'TotalMil_Num': 'sum',
+            'TotalMot_Num': 'sum'
+        }).reset_index()
+        
+        stats_voyages.columns = ['Nom de la Croisière', 'Nombre d\'Étapes', 'Milles parcourus (NM)', 'Heures Moteur']
+        stats_voyages = stats_voyages.sort_values(by='Milles parcourus (NM)', ascending=False)
+        
+        st.dataframe(
+            stats_voyages.style.format({
+                'Milles parcourus (NM)': '{:.1f} NM',
+                'Heures Moteur': '{:.1f} h'
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
 
     # --- GRAPHIQUE ---
     st.divider()
@@ -881,11 +919,11 @@ if st.session_state.page == "STATS":
                     new_frais[poste] = st.number_input(f"{poste} (€)", value=float(montant), step=50.0)
             
             if st.form_submit_button("💾 ENREGISTRER LES CHARGES"):
-                # Mise à jour globale et sécurisée via l'API GitHub commune
                 params['frais_fixes'] = new_frais
                 sauvegarder_params(params)
                 st.success("Configuration sauvegardée à distance !")
                 st.rerun()
+
 
 # =================================================================
 # --- 8. PAGE MAINTENANCE : GESTION SÉCURISÉE (V2026) ---
