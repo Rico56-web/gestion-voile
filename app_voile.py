@@ -877,8 +877,7 @@ if st.session_state.page == "STATS":
     fig.add_trace(go.Scatter(x=df_graph['NomMois'], y=df_graph['Sorties'], name='Nb Sorties', line=dict(color='#3498db', width=3)), secondary_y=True)
     fig.update_layout(height=350, barmode='group', margin=dict(l=0,r=0,t=20,b=0), legend=dict(orientation="h", y=1.2))
     st.plotly_chart(fig, use_container_width=True)
-
-# --- 4. TABLEAU DES DÉPENSES DE MAINTENANCE CORRIGÉ & TRIÉ CHRONOLOGIQUEMENT ---
+# --- 4. TABLEAU DES DÉPENSES DE MAINTENANCE CORRIGÉ, TRIÉ & TOTALISÉ ---
     st.divider()
     st.markdown(f"### 🔧 Détail des Dépenses de Maintenance ({etat_flux_maint})")
     if not df_m_y.empty:
@@ -898,8 +897,17 @@ if st.session_state.page == "STATS":
         
         df_m_affichage = df_m_trié[colonnes_valibles].rename(columns=mapping_renom)
         st.dataframe(df_m_affichage, use_container_width=True, hide_index=True)
+        
+        # BANDEAU DU TOTAL DES DÉPENSES
+        st.markdown(
+            f"<div style='text-align:right; background:#f8d7da; padding:10px; border-radius:5px; color:#721c24; font-weight:bold; margin-top:10px;'>"
+            f"TOTAL MAINTENANCE ({etat_flux_maint.upper()}) : {total_dep:,.2f} €"
+            f"</div>", 
+            unsafe_allow_html=True
+        )
     else:
         st.info("Aucun frais enregistré pour cette catégorie de maintenance cette saison.")
+
 
     # --- 5. TABLEAU DES SOMMES RESTANT À PERCEVOIR ---
     st.divider()
