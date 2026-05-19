@@ -736,15 +736,13 @@ if st.session_state.page == "STATS":
     df_m = charger_data_safe('maintenance.json') 
     df_log = charger_data_safe('logbook.json')
     
-    # FORCE LE RECHARGEMENT STRICT DU FICHIER JSON
-    params = charger_params()
+    # On charge les paramètres depuis le fichier au premier démarrage
+    if 'params_vesta' not in st.session_state:
+        st.session_state.params_vesta = charger_params()
     
-    # --- DIAGNOSTIC VISUEL TEMPORAIRE ---
-    st.sidebar.write("### 🔍 Debug Params :")
-    st.sidebar.json(params) # Ceci affichera le contenu RÉEL de votre fichier dans la barre latérale
-    # ------------------------------------
-
-    # --- CENTRALISATION ET HARMONISATION DES FRAIS FIXES ---
+    params = st.session_state.params_vesta
+    
+    # --- HARMONISATION ET SOURCE DE VÉRITÉ UNIQUE ---
     frais_defaut = {"Port Arzon": 3800, "Assurance": 1200, "Entretien": 1500, "Divers": 500}
     if 'frais_fixes' not in params or not params['frais_fixes']:
         params['frais_fixes'] = frais_defaut
@@ -971,25 +969,23 @@ if st.session_state.page == "STATS":
             for i, (poste, montant) in enumerate(frais_actuels.items()):
                 with cols_f[i % 2]:
                     new_frais[poste] = st.number_input(f"{poste} (€)", value=float(montant), step=50.0)
-          # Bouton de sauvegarde sécurisé et forcé
+     # Bouton de sauvegarde synchronisé avec la Session State
             if st.form_submit_button("💾 ENREGISTRER LES CHARGES"):
-                # 1. On met à jour le dictionnaire en mémoire
-                params['frais_fixes'] = new_frais
+                # 1. Mise à jour immédiate de la mémoire vive
+                st.session_state.params_vesta['frais_fixes'] = new_frais
+                if 'prochaine_vidange' in st.session_state.params_vesta:
+                    st.session_state.params_vesta['prochaine_vidange'] = 2500.0
                 
-                # 2. Nettoyage des doublons de vidange pour éviter les bugs JSON
-                if 'prochaine_vidange' in params:
-                    # On ne garde qu'une seule valeur propre (la dernière connue)
-                    params['prochaine_vidange'] = 2500.0 
-                
-                # 3. FORCE L'ÉCRITURE DIRECTE SUR LE DISQUE (Contourne la fonction habituelle)
+                # 2. Sauvegarde sur le disque en arrière-plan
                 import json
                 try:
                     with open('params.json', 'w', encoding='utf-8') as f:
-                        json.dump(params, f, indent=4, ensure_ascii=False)
-                    st.success("✅ Fichier params.json mis à jour avec succès sur le disque !")
-                    st.rerun()
+                        json.dump(st.session_state.params_vesta, f, indent=4, ensure_ascii=False)
                 except Exception as e:
-                    st.error(f"❌ Erreur d'écriture sur le disque : {e}")
+                    st.error(f"Erreur écriture disque : {e}")
+                
+                # 3. Relance instantanée
+                st.rerun()
 # =================================================================
 # --- 8. PAGE MAINTENANCE (GESTION VIDANGE & TRAVAUX) ---
 # =================================================================
