@@ -732,7 +732,7 @@ if st.session_state.page == "PLANNING":
     else:
         st.info("Aucune mission ce mois-ci.")
 
-# =================================================================
+## =================================================================
 # --- 8. PAGE STATS : SOURCE DE VÉRITÉ UNIQUE HARMONISÉE ---
 # =================================================================
 if st.session_state.page == "STATS":
@@ -748,11 +748,10 @@ if st.session_state.page == "STATS":
     if 'frais_fixes' not in params or not params['frais_fixes']:
         params['frais_fixes'] = frais_defaut
     
-    # FILTRES DE LA PAGE
-    c_sel1, c_sel2, c_sel3 = st.columns([2, 1, 1])
+    # FILTRES DE LA PAGE (Sélecteur d'état supprimé car automatisé par le mode de calcul)
+    c_sel1, c_sel2 = st.columns([3, 1])
     mode_bilan = c_sel1.radio("Mode de calcul :", ["Réel (Encaissé)", "Prévisionnel (Saison)"], horizontal=True)
     sel_y = c_sel2.selectbox("Saison :", [2025, 2026, 2027], index=1)
-    etat_flux_maint = c_sel3.selectbox("État Maintenance :", ["Fait", "À prévoir"])
 
     # 2. TRAITEMENT DES RECETTES & CONTRATS
     if not df_actif.empty:
@@ -778,9 +777,23 @@ if st.session_state.page == "STATS":
     total_ca_display = total_encaisse_reel if mode_bilan == "Réel (Encaissé)" else total_ca_saison
     df_rec_f = df_f[df_f['Montant_Encaisse'] > 0].copy() if mode_bilan == "Réel (Encaissé)" else df_f.copy()
 
-    # 3. TRAITEMENT DU JOURNAL DE MAINTENANCE & FRAIS REELS
-    df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-    df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == etat_flux_maint)].copy() if not df_m.empty else pd.DataFrame()
+    # 3. TRAITEMENT AUTOMATISÉ DU JOURNAL DE MAINTENANCE & FRAIS REELS
+    if not df_m.empty:
+        df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+        
+        # Application du filtre dynamique selon le mode choisi
+        if mode_bilan == "Réel (Encaissé)":
+            mask_maint_mode = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")
+            titre_tableaux = "Réelles Encaissées / Faites"
+        else:
+            mask_maint_mode = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'].isin(["Fait", "À prévoir"]))
+            titre_tableaux = "Cumulées (Fait + À prévoir)"
+            
+        df_m_y = df_m[mask_maint_mode].copy()
+    else:
+        df_m_y = pd.DataFrame()
+        titre_tableaux = "Aucune donnée"
+
     total_dep = sum(to_f(x) for x in df_m_y['M_Num']) if not df_m_y.empty else 0.0
 
     if not df_m_y.empty:
@@ -835,8 +848,8 @@ if st.session_state.page == "STATS":
 
     st.write("")
 
-    # LIGNE 3 : SOMMES DÉPENSÉES (NOUVELLE ADJONCTION)
-    st.markdown("##### 💸 Sommes Dépensées (Sélection active)")
+    # LIGNE 3 : SOMMES DÉPENSÉES (AUTOMATISÉES AVEC LE MODE DE CALCUL)
+    st.markdown(f"##### 💸 Sommes Dépensées ({mode_bilan})")
     d1, d2, d3 = st.columns(3)
     d1.metric("🔧 Dépenses Maint.", f"{total_pure_maint:,.0f} €")
     d2.metric("📋 Charges Fixes Réelles", f"{total_reels_fixes:,.0f} €")
@@ -852,7 +865,6 @@ if st.session_state.page == "STATS":
     h_rest = params.get('prochaine_vidange', 2500.0) - h_moteur_abs
     
     with m_col2:
-        # Encart Vidange aligné à côté du Solde Net
         st.write(f"**🔧 Vidange dans : {max(0, h_rest):.1f} h**")
         if h_rest <= 0:
             st.error(f"🚨 Échéance de vidange dépassée de {abs(h_rest):.1f} heures ! Penser à planifier l'entretien du moteur.")
@@ -949,24 +961,24 @@ if st.session_state.page == "STATS":
     mapping_renom = {'Type': 'Catégorie', 'Objet': 'Désignation', 'M_Num': 'Montant (€)'}
 
     # TABLEAU A : MAINTENANCE TECHNIQUE UNIQUEMENT
-    st.markdown(f"### 🔧 Détail des Dépenses de Maintenance Pure ({etat_flux_maint})")
+    st.markdown(f"### 🔧 Détail des Dépenses de Maintenance Pure ({titre_tableaux})")
     if not df_pure_maint.empty:
         df_pm_trié = df_pure_maint.sort_values('dt_maint', ascending=True)
         col_val_pm = [c for c in colonnes_souhaitees if c in df_pm_trié.columns]
         st.dataframe(df_pm_trié[col_val_pm].rename(columns=mapping_renom), use_container_width=True, hide_index=True)
         st.markdown(f"<div style='text-align:right; background:#e8f4fd; padding:10px; border-radius:5px; color:#1d6fa5; font-weight:bold; margin-top:5px; margin-bottom:25px;'>TOTAL MAINTENANCE TECHNIQUE : {total_pure_maint:,.2f} €</div>", unsafe_allow_html=True)
     else:
-        st.info("Aucune dépense de maintenance technique enregistrée cette saison.")
+        st.info("Aucune dépense de maintenance technique enregistrée sur cette sélection.")
 
     # TABLEAU B : SUIVI DES FRAIS FIXES RÉELS DU JOURNAL
-    st.markdown(f"### 📋 Suivi Réel des Frais Fixes du Journal ({etat_flux_maint})")
+    st.markdown(f"### 📋 Suivi Réel des Frais Fixes du Journal ({titre_tableaux})")
     if not df_reels_fixes.empty:
         df_rf_trié = df_reels_fixes.sort_values('dt_maint', ascending=True)
         col_val_rf = [c for c in colonnes_souhaitees if c in df_rf_trié.columns]
         st.dataframe(df_rf_trié[col_val_rf].rename(columns=mapping_renom), use_container_width=True, hide_index=True)
         st.markdown(f"<div style='text-align:right; background:#fef5d1; padding:10px; border-radius:5px; color:#856404; font-weight:bold; margin-top:5px;'>TOTAL FRAIS FIXES RÉELS RELEVÉS : {total_reels_fixes:,.2f} €</div>", unsafe_allow_html=True)
     else:
-        st.info("Aucun paiement de type Port ou Assurance relevé dans cette sélection.")
+        st.info("Aucun paiement de type Port ou Assurance relevé sur cette sélection.")
 
     # --- 5. TABLEAU DES SOMMES RESTANT À PERCEVOIR ---
     st.divider()
