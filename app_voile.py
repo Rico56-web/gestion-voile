@@ -1,4 +1,4 @@
-import requests, base64, json, time, os, html, io
+import requests, base64, json, time, os, html, io, shutil
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -7,20 +7,33 @@ from datetime import datetime, date, timedelta
 import calendar
 import streamlit.components.v1 as components
 
-def bouton_imprimer_fiche(date, contenu, statut):
-    # Prépare le contenu HTML pour l'impression
+# =================================================================
+# --- CONFIGURATION & STYLE REGROUPÉS ---
+# =================================================================
+st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
+
+# --- INITIALISATION DU SESSION STATE ---
+if 'log_edit_idx' not in st.session_state: st.session_state.log_edit_idx = None
+if 'edit_mode' not in st.session_state: st.session_state.edit_mode = False
+if 'page' not in st.session_state: st.session_state.page = "CONTACTS"
+if 'vue_contact' not in st.session_state: st.session_state.vue_contact = "En cours"
+if 'authenticated' not in st.session_state: st.session_state.authenticated = False
+
+# =================================================================
+# --- FONCTIONS UTILITAIRES GLOBALES & IMPRESSION ---
+# =================================================================
+def bouton_imprimer_fiche(date_fiche, contenu, statut):
     html_content = f"""
     <html>
     <head><title>Impression Note - Vesta Skipper</title></head>
     <body style='font-family: sans-serif;'>
-        <h1>Note du {date}</h1>
+        <h1>Note du {date_fiche}</h1>
         <p><b>Statut :</b> {statut}</p>
         <hr>
         <pre style='font-size: 1.2rem;'>{contenu}</pre>
     </body>
     </html>
     """
-    # Ce script ouvre une fenêtre et lance l'impression
     js = f"""
     <script>
     function printNote() {{
@@ -36,34 +49,17 @@ def bouton_imprimer_fiche(date, contenu, statut):
     """
     components.html(js, height=45)
 
-# --- INITIALISATION DU SESSION STATE ---
-if 'log_edit_idx' not in st.session_state:
-    st.session_state.log_edit_idx = None
-if 'edit_mode' not in st.session_state:
-    st.session_state.edit_mode = False
-if 'page' not in st.session_state: 
-    st.session_state.page = "CONTACTS"
-if 'vue_contact' not in st.session_state:
-    st.session_state.vue_contact = "En cours"
-
-# --- FONCTIONS UTILITAIRES GLOBALES ---
 def to_f(val):
-    if pd.isna(val) or val == "": 
-        return 0.0
-    try: 
-        return float(str(val).replace('€','').replace(' ','').replace(',','.').strip())
-    except: 
-        return 0.0
+    """Nettoie et convertit une chaîne financière/numérique en float propre"""
+    if pd.isna(val) or val == "": return 0.0
+    try: return float(str(val).replace('€','').replace(' ','').replace(',','.').strip())
+    except: return 0.0
 
 def bouton_export_excel(df, nom_fichier):
-    """Fonction standardisée pour l'archivage et l'export Excel"""
-    if df.empty:
-        return st.warning(f"Aucune donnée à exporter pour {nom_fichier}")
-    
+    if df.empty: return st.warning(f"Aucune donnée à exporter pour {nom_fichier}")
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
         df.to_excel(writer, index=False)
-    
     st.download_button(
         label=f"📊 EXPORTER {nom_fichier.upper()} (EXCEL)",
         data=buffer.getvalue(),
@@ -73,16 +69,8 @@ def bouton_export_excel(df, nom_fichier):
     )
 
 # =================================================================
-# --- 1. FONCTIONS DE SÉCURITÉ, GITHUB & PARAMS ---
+# --- 1. FONCTIONS DE SÉCURITÉ, GITHUB & PARAMS INTERNATIONAUX ---
 # =================================================================
-
-def clean_num(val, default=0):
-    try:
-        if pd.isna(val) or str(val).lower() in ["nan", "", "none"]: return default
-        clean_val = str(val).replace('€','').replace(' ','').replace(',','.').strip()
-        return int(float(clean_val))
-    except: return default
-
 def charger_data(file):
     try:
         repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
@@ -106,86 +94,54 @@ def sauvegarder_data(df, file):
                      json={"message": f"Update {file}", "content": content_b64, "sha": sha})
     except Exception as e: st.error(f"Erreur sauvegarde {file} : {e}")
 
-# --- NOUVELLES FONCTIONS POUR LA VIDANGE ---
-def charger_params():
-    """Charge les réglages de vidange pour les menus STATS et MAINT"""
-    df = charger_data('params.json')
-    if not df.empty:
-        return df.iloc[0].to_dict()
-    return {"prochaine_vidange": 2450.0, "cible_vidange": 250.0}
-    
-def sauvegarder_params(dict_params):
-    """Sauvegarde les réglages (moteur, frais fixes, etc.) au format JSON propre"""
-    import json
-    try:
-        with open('params.json', 'w', encoding='utf-8') as f:
-            json.dump(dict_params, f, indent=4, ensure_ascii=False)
-        return True
-    except Exception as e:
-        st.error(f"Erreur lors de la sauvegarde des paramètres : {e}")
-        return False
-
-
 def charger_data_safe(fichier):
     df = charger_data(fichier)
     return df if not df.empty else pd.DataFrame()
-import shutil
-import os
+
+# --- CORRECTION DE LA GESTION DES PARAMS (ALIGNÉE GITHUB + SESSION STATE) ---
+def charger_params():
+    if 'params_vesta' in st.session_state:
+        return st.session_state.params_vesta
+    df = charger_data('params.json')
+    if not df.empty:
+        st.session_state.params_vesta = df.iloc[0].to_dict()
+    else:
+        st.session_state.params_vesta = {
+            "prochaine_vidange": 2450.0, 
+            "cible_vidange": 250.0,
+            "frais_fixes": {"Port Arzon": 3800, "Assurance": 1200, "Entretien": 1500, "Divers": 500}
+        }
+    return st.session_state.params_vesta
+    
+def sauvegarder_params(dict_params):
+    st.session_state.params_vesta = dict_params
+    df_params = pd.DataFrame([dict_params])
+    sauvegarder_data(df_params, 'params.json')
 
 def executer_backup_auto():
-    """Crée une copie de sécurité des fichiers vitaux s'ils existent."""
-    fichiers_a_sauver = ['contacts.json', 'maintenance.json', 'logbook.json']
-    
-    # Créer un dossier backup s'il n'existe pas
-    if not os.path.exists('backups'):
-        os.makedirs('backups')
-        
+    """Sauvegarde locale uniquement pour sécurité instantanée du serveur"""
+    fichiers_a_sauver = ['contacts.json', 'maintenance.json', 'logbook.json', 'params.json']
+    if not os.path.exists('backups'): os.makedirs('backups')
     for fichier in fichiers_a_sauver:
         if os.path.exists(fichier):
-            # On crée une copie dans le dossier backups
             shutil.copy2(fichier, f"backups/{fichier}.bak")
 
-# --- APPEL DE LA FONCTION ---
-# À placer tout au début de ton code principal (après le st.set_page_config)
 executer_backup_auto()
-#===============================================================
-# --- CHARGEMENT ET TRI GLOBAL (À placer en haut de votre script) ---
-df = charger_data_safe('contacts.json')
 
-if not df.empty:
-    # 1. On crée une clé de tri invisible YYYYMMDD
-    def create_sort_key(d):
-        try:
-            p = str(d).split('/')
-            return f"{p[2]}{p[1]}{p[0]}" # ex: 20260525
-        except: return "00000000"
-
-    df['tmp_sort'] = df['DateNav'].apply(create_sort_key)
-    
-    # 2. On trie du plus récent au plus ancien
-    df = df.sort_values(by='tmp_sort', ascending=False).reset_index(drop=True)
-    
-    # 3. On nettoie pour ne pas polluer le reste du code
-    df = df.drop(columns=['tmp_sort'])
 # =================================================================
-# --- CONFIGURATION & STYLE ---
+# --- BANDEAU TEMPOREL & LOG-IN ---
 # =================================================================
-st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
-
 now = datetime.now()
 jours_fr = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 mois_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
 date_bandeau = f"&#128197; {jours_fr[now.weekday()]} {now.day} {mois_fr[now.month-1]} {now.year}"
 
-st.markdown(f"""<style>
-    .main-header {{ font-size: 1.8rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 5px; }}
-    .date-header {{ text-align: center; color: #7f8c8d; font-weight: bold; margin-bottom: 20px; border-bottom: 3px solid #1a2a6c; padding-bottom: 10px; }}
+st.markdown("""<style>
+    .main-header { font-size: 1.8rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 5px; }
+    .date-header { text-align: center; color: #7f8c8d; font-weight: bold; margin-bottom: 20px; border-bottom: 3px solid #1a2a6c; padding-bottom: 10px; }
 </style>""", unsafe_allow_html=True)
 
-# =================================================================
-# --- NAVIGATION ---
-# =================================================================
-if not st.session_state.get('authenticated', False):
+if not st.session_state.authenticated:
     st.markdown('<div class="main-header">⚓ VESTA 2026</div>', unsafe_allow_html=True)
     pw = st.text_input("Code d'accès :", type="password")
     if st.button("ACCÉDER", use_container_width=True):
@@ -198,37 +154,28 @@ if not st.session_state.get('authenticated', False):
 st.markdown('<div class="main-header">⚓ VESTA 2026</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=True)
 
-# --- BARRE DE NAVIGATION HARMONISÉE ---
+# --- NAV BAR ---
 menu = ["PLANNING", "CONTACTS", "STATS", "MAINT", "LOG", "NOTES", "FACT"]
-icones = {
-    "PLANNING": "📅", "CONTACTS": "👤", "STATS": "📊", 
-    "MAINT": "🛠️", "LOG": "📖", "NOTES": "📝", "FACT": "📑"
-}
+icones = {"PLANNING": "📅", "CONTACTS": "👤", "STATS": "📊", "MAINT": "🛠️", "LOG": "📖", "NOTES": "📝", "FACT": "📑"}
 
 cols_nav = st.columns(len(menu))
 for i, name in enumerate(menu):
-    # ICI : On s'assure que si on clique sur "NOTES", la page devient "MEMOS"
-    # Et si on clique sur "FACT", la page devient "FACT"
     target = "MEMOS" if name == "NOTES" else name
-    
     is_active = st.session_state.page == target
     if cols_nav[i].button(f"{icones[name]}\n{name}", key=f"nav_{name}", use_container_width=True, type="primary" if is_active else "secondary"):
         st.session_state.page = target
         st.rerun()
 st.divider()
+
 # =================================================================
-# --- 2. MENU MÉMOS (VERSION FINALE) ---
+# --- 2. MENU MÉMOS (VERSION FINALE SECURISEE) ---
 # =================================================================
 if st.session_state.page == "MEMOS":
     st.markdown("<h2 style='text-align: center; color: #34495E;'>⚓ Mémos & Check-lists de Bord</h2>", unsafe_allow_html=True)
-    
     df_memos = charger_data_safe('memos.json')
 
-    # Initialisation de l'état d'édition si absent
-    if 'memo_edit_id' not in st.session_state: 
-        st.session_state.memo_edit_id = None
+    if 'memo_edit_id' not in st.session_state: st.session_state.memo_edit_id = None
 
-    # --- A. AJOUT NOUVELLE NOTE ---
     with st.expander("➕ CRÉER UNE NOUVELLE CHECK-LIST", expanded=df_memos.empty):
         with st.form("new_memo_form"):
             c1, c2 = st.columns(2)
@@ -242,91 +189,78 @@ if st.session_state.page == "MEMOS":
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
 
-    # --- B. AFFICHAGE DES FICHES ---
-    df_show = df_memos[df_memos['Archive'] == "Non Archivé"]
-    
-    for idx, row in df_show.sort_index(ascending=False).iterrows():
-        stat_val = str(row.get('Statut', 'Normal'))
-        pay_val = str(row.get('Paiement', 'N/A'))
+    if not df_memos.empty:
+        if 'Archive' not in df_memos.columns: df_memos['Archive'] = "Non Archivé"
+        df_show = df_memos[df_memos['Archive'] != "Archivé"]
+        
+        for idx, row in df_show.sort_index(ascending=False).iterrows():
+            stat_val = str(row.get('Statut', 'Normal'))
+            pay_val = str(row.get('Paiement', 'N/A'))
 
-        # --- CAS 1 : FORMULAIRE DE MODIFICATION (SI SÉLECTIONNÉ) ---
-        if st.session_state.memo_edit_id == idx:
-            with st.container():
-                st.info(f"Édition de la note du {row['Date']}")
-                with st.form(key=f"form_edit_{idx}"):
-                    e_desc = st.text_area("Description", value=row['Description'], height=150)
-                    c1, c2 = st.columns(2)
-                    e_pay = c1.selectbox("Paiement", ["N/A", "À Payer", "Payé"], index=0)
-                    e_stat = c2.selectbox("Statut", ["Normal", "Urgent", "Fait"], index=0)
-                    
-                    cb1, cb2 = st.columns(2)
-                    if cb1.form_submit_button("✅ VALIDER"):
-                        df_memos.at[idx, 'Description'] = e_desc
-                        df_memos.at[idx, 'Paiement'] = e_pay
-                        df_memos.at[idx, 'Statut'] = e_stat
+            if st.session_state.memo_edit_id == idx:
+                with st.container():
+                    st.info(f"Édition de la note du {row['Date']}")
+                    with st.form(key=f"form_edit_{idx}"):
+                        e_desc = st.text_area("Description", value=row['Description'], height=150)
+                        c1, c2 = st.columns(2)
+                        e_pay = c1.selectbox("Paiement", ["N/A", "À Payer", "Payé"], index=0)
+                        e_stat = c2.selectbox("Statut", ["Normal", "Urgent", "Fait"], index=0)
+                        
+                        cb1, cb2 = st.columns(2)
+                        if cb1.form_submit_button("✅ VALIDER"):
+                            df_memos.at[idx, 'Description'] = e_desc
+                            df_memos.at[idx, 'Paiement'] = e_pay
+                            df_memos.at[idx, 'Statut'] = e_stat
+                            sauvegarder_data(df_memos, 'memos.json')
+                            st.session_state.memo_edit_id = None
+                            st.rerun()
+                        if cb2.form_submit_button("❌ ANNULER"):
+                            st.session_state.memo_edit_id = None
+                            st.rerun()
+            else:
+                if stat_val == "Urgent": h_c, bg_c = "#E74C3C", "#FDEDEC" 
+                elif stat_val == "Fait": h_c, bg_c = "#27AE60", "#EAFAF1"
+                else: h_c, bg_c = "#2980B9", "#EBF5FB"
+
+                st.markdown(f"""
+                    <div style="background-color:{bg_c}; border-left: 10px solid {h_c}; padding: 15px; border-radius: 10px;">
+                        <span style="font-weight: bold; color: black;">📅 {row['Date']} | 💰 {pay_val}</span>
+                    </div>
+                """, unsafe_allow_html=True)
+
+                lignes = str(row.get('Description', '')).split('\n')
+                data_tasks = [{"Fait": l.startswith("✅ | "), "Tâche": l.replace("✅ | ", "").replace("❌ | ", "")} for l in lignes if l.strip()]
+                
+                if data_tasks:
+                    edited_df = st.data_editor(pd.DataFrame(data_tasks), key=f"ed_{idx}", hide_index=True, use_container_width=True)
+                    if not edited_df.equals(pd.DataFrame(data_tasks)):
+                        new_desc = "\n".join([f"{'✅ | ' if r['Fait'] else ''}{r['Tâche']}" for _, r in edited_df.iterrows()])
+                        df_memos.at[idx, 'Description'] = new_desc
                         sauvegarder_data(df_memos, 'memos.json')
-                        st.session_state.memo_edit_id = None
-                        st.rerun()
-                    if cb2.form_submit_button("❌ ANNULER"):
-                        st.session_state.memo_edit_id = None
                         st.rerun()
 
-        # --- CAS 2 : AFFICHAGE NORMAL (AVEC BOUTON MODIFIER) ---
-        else:
-            if stat_val == "Urgent": h_c, bg_c = "#E74C3C", "#FDEDEC" 
-            elif stat_val == "Fait": h_c, bg_c = "#27AE60", "#EAFAF1"
-            else: h_c, bg_c = "#2980B9", "#EBF5FB"
-
-            st.markdown(f"""
-                <div style="background-color:{bg_c}; border-left: 10px solid {h_c}; padding: 15px; border-radius: 10px;">
-                    <span style="font-weight: bold;">📅 {row['Date']} | 💰 {pay_val}</span>
-                </div>
-            """, unsafe_allow_html=True)
-
-            # Liste interactive (Checkbox)
-            lignes = str(row.get('Description', '')).split('\n')
-            data_tasks = [{"Fait": l.startswith("✅ | "), "Tâche": l.replace("✅ | ", "").replace("❌ | ", "")} for l in lignes if l.strip()]
-            
-            if data_tasks:
-                edited_df = st.data_editor(pd.DataFrame(data_tasks), key=f"ed_{idx}", hide_index=True, use_container_width=True)
-                if not edited_df.equals(pd.DataFrame(data_tasks)):
-                    new_desc = "\n".join([f"{'✅ | ' if r['Fait'] else ''}{r['Tâche']}" for _, r in edited_df.iterrows()])
-                    df_memos.at[idx, 'Description'] = new_desc
+                cols = st.columns(4)
+                if cols[0].button("✏️ Modifier", key=f"btn_edit_{idx}"):
+                    st.session_state.memo_edit_id = idx
+                    st.rerun()
+                if cols[1].button("📦 Archiver", key=f"btn_arch_{idx}"):
+                    df_memos.at[idx, 'Archive'] = "Archivé"
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
+                with cols[2]:
+                    bouton_imprimer_fiche(row['Date'], row['Description'], stat_val)
+                if cols[3].button("🗑️ Suppr", key=f"btn_del_{idx}"):
+                    df_memos = df_memos.drop(idx).reset_index(drop=True)
+                    sauvegarder_data(df_memos, 'memos.json')
+                    st.rerun()
+                st.divider()
 
-            # --- BARRE D'OUTILS (C'est ici que se trouve le bouton Modifier) ---
-            cols = st.columns(4)
-            if cols[0].button("✏️ Modifier", key=f"btn_edit_{idx}"):
-                st.session_state.memo_edit_id = idx
-                st.rerun()
-                
-            if cols[1].button("📦 Archiver", key=f"btn_arch_{idx}"):
-                df_memos.at[idx, 'Archive'] = "Archivé"
-                sauvegarder_data(df_memos, 'memos.json')
-                st.rerun()
-            
-            with cols[2]:
-                bouton_imprimer_fiche(row['Date'], row['Description'], stat_val)
-
-            # Suppression simple ou double confirmation
-            if cols[3].button("🗑️ Suppr", key=f"btn_del_{idx}"):
-                df_memos = df_memos.drop(idx).reset_index(drop=True)
-                sauvegarder_data(df_memos, 'memos.json')
-                st.rerun()
-            
-            st.divider()
 # =================================================================
-# --- 5. BLOC CONTACTS (V112 - LOGIQUE FINANCIÈRE HARMONISÉE) ---
+# --- 5. BLOC CONTACTS (LOGIQUE FINANCIÈRE SECURISEE & SANS CONFLIT) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    from datetime import datetime
-    import pandas as pd
-
-    # --- CHARGEMENT DES DONNÉES ---
-    df_raw = charger_data('contacts.json')
+    df_raw = charger_data_safe('contacts.json')
     
-    # --- NAVIGATION ---
     n1, n2, n3, n4, n5 = st.columns([1, 1, 1, 1, 1.5])
     if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
         st.session_state.vue_contact = "En cours"; st.rerun()
@@ -342,21 +276,17 @@ if st.session_state.page == "CONTACTS":
 
     if not df_raw.empty:
         df_c = df_raw.copy().fillna("")
-        df_c['orig_idx'] = df_c.index
+        df_c['orig_idx'] = df_c.index  # CONSERVATION STRICTE DE L'INDEX ORIGINAL
         df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
         
-        # --- FILTRES & RECHERCHE ---
         c_search, c_yr, c_new = st.columns([2, 1, 1])
         search = c_search.text_input("🔍 Rechercher...", "", key="search_bar_contacts").upper()
         annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
         
-        # --- 📈 DASHBOARD FINANCIER HARMONISÉ AVEC STATS ---
-        # 1. Filtre identique aux Stats (Exclusion des annulés/refusés)
-        mask_ca = (df_c['dt_sort'].dt.year == annee_sel) & \
-                  (~df_c['Statut'].str.lower().str.contains("annule|refuse", na=False))
+        # --- DASHBOARD FINANCIER HARMONISÉ ---
+        mask_ca = (df_c['dt_sort'].dt.year == annee_sel) & (~df_c['Statut'].str.lower().str.contains("annule|refuse", na=False))
         df_ca = df_c[mask_ca].copy()
 
-        # 2. Logique d'encaissement réelle
         def get_reel_encaisse(row):
             p = to_f(row.get('Prix', 0))
             a = to_f(row.get('Acompte', 0))
@@ -378,9 +308,11 @@ if st.session_state.page == "CONTACTS":
         if c_new.button("➕ NOUVEAU CLIENT", use_container_width=True):
             new_r = {"Prénom": "NOUVEAU", "Nom": "CLIENT", "Statut": "En attente", "Paiement": "Unpaid", "Relancer": "Non", "DateNav": f"01/06/{annee_sel}", "Société": "PERSO", "Jours": 1, "Prix": 0, "Acompte": 0, "Notes": "", "Téléphone": "", "Email": "", "Pers": 1}
             df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
-            sauvegarder_data(df_new, 'contacts.json'); st.session_state.edit_idx = 0; st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
+            sauvegarder_data(df_new, 'contacts.json')
+            st.session_state.edit_idx = 0  # C'est bien le premier élément car inséré en haut
+            st.session_state.page = "MODIFIER_CONTACT"
+            st.rerun()
 
-        # --- LOGIQUE ONGLETS ---
         statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
         rel_clean = df_c['Relancer'].fillna("Non").str.upper()
         
@@ -391,13 +323,13 @@ if st.session_state.page == "CONTACTS":
 
         df_aff = df_c[mask_aff & ((df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna()))].copy()
         if search: df_aff = df_aff[df_aff['Nom'].str.contains(search) | df_aff['Prénom'].str.contains(search) | df_aff['Société'].str.contains(search)]
+        
+        # Tri d'affichage chronologique (N'impacte pas l'index d'origine grâce à orig_idx)
         df_aff = df_aff.sort_values(by='dt_sort', ascending=True)
 
-        # --- BOUCLE FICHES ---
         for _, row in df_aff.iterrows():
-            idx = row['orig_idx']
+            idx = row['orig_idx']  # UTILISATION DE L'INDEX D'ORIGINE POUR MODIFIER LE FICHIER
             p_tot = to_f(row.get('Prix', 0))
-            # Pour l'affichage individuel de la fiche, on garde le calcul local
             p_enc = p_tot if str(row.get('Paiement', '')).strip().upper() == "PAID" else to_f(row.get('Acompte', 0))
             
             soc = str(row.get('Société', 'PERSO')).upper()
@@ -421,7 +353,9 @@ if st.session_state.page == "CONTACTS":
             
             c1, c2, c3 = st.columns(3)
             if c1.button("✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
-                st.session_state.edit_idx = idx; st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
+                st.session_state.edit_idx = idx  # On transmet l'index réel de la base
+                st.session_state.page = "MODIFIER_CONTACT"
+                st.rerun()
 
             if st.session_state.vue_contact == "Relances":
                 if c2.button("🔄 RE-RÉSERVER", key=f"dup_{idx}", use_container_width=True):
@@ -430,33 +364,40 @@ if st.session_state.page == "CONTACTS":
                     new_e.update({"DateNav": datetime.now().strftime("%d/%m/%Y"), "Statut": "En attente", "Paiement": "Unpaid", "Prix": 0, "Acompte": 0})
                     for k in ['orig_idx', 'dt_sort']: new_e.pop(k, None)
                     df_db = pd.concat([pd.DataFrame([new_e]), df_db], ignore_index=True)
-                    sauvegarder_data(df_db, 'contacts.json'); st.session_state.edit_idx = 0; st.session_state.page = "MODIFIER_CONTACT"; st.rerun()
+                    sauvegarder_data(df_db, 'contacts.json')
+                    st.session_state.edit_idx = 0
+                    st.session_state.page = "MODIFIER_CONTACT"
+                    st.rerun()
             else:
                 if f"confirm_del_{idx}" not in st.session_state:
                     if c2.button("🗑️ SUPPRIMER", key=f"del_{idx}", use_container_width=True):
-                        st.session_state[f"confirm_del_{idx}"] = True; st.rerun()
+                        st.session_state[f"confirm_del_{idx}"] = True
+                        st.rerun()
                 else:
                     st.warning("Confirmer ?")
                     cx, cy = st.columns(2)
                     if cx.button("✅ OUI", key=f"y_{idx}", use_container_width=True):
                         df_db = charger_data('contacts.json').drop(idx).reset_index(drop=True)
-                        sauvegarder_data(df_db, 'contacts.json'); del st.session_state[f"confirm_del_{idx}"]; st.rerun()
+                        sauvegarder_data(df_db, 'contacts.json')
+                        del st.session_state[f"confirm_del_{idx}"]
+                        st.rerun()
                     if cy.button("❌ NON", key=f"n_{idx}", use_container_width=True):
-                        del st.session_state[f"confirm_del_{idx}"]; st.rerun()
+                        del st.session_state[f"confirm_del_{idx}"]
+                        st.rerun()
 
             if st.session_state.vue_contact == "En cours" and c3.button("🏁 FINIR", key=f"fin_{idx}", use_container_width=True):
                 df_all = charger_data('contacts.json')
                 df_all.loc[idx, ['Statut', 'Paiement']] = ["Terminé", "Paid"]
-                sauvegarder_data(df_all, 'contacts.json'); st.rerun()
-
-# ===============================================================
-# --- 6. PAGE MODIFIER CONTACT : VERSION COMPLÈTE (V110) ---
+                sauvegarder_data(df_all, 'contacts.json')
+                st.rerun()
+# =================================================================
+# --- 6. PAGE MODIFIER CONTACT : VERSION SÉCURISÉE (V110) ---
 # =================================================================
 if st.session_state.page == "MODIFIER_CONTACT":
     st.markdown('<h3 style="text-align:center;">✏️ Modifier le Contact</h3>', unsafe_allow_html=True)
     
     idx_to_edit = st.session_state.get('edit_idx')
-    df_m = charger_data('contacts.json') # Utilisation de ta fonction standard
+    df_m = charger_data_safe('contacts.json')
 
     if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
         row = df_m.loc[idx_to_edit]
@@ -467,13 +408,11 @@ if st.session_state.page == "MODIFIER_CONTACT":
             new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
             new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
             
-            # --- Ligne 2 : Logistique (Dates, Jours, Pers) ---
+            # --- Ligne 2 : Logistique ---
             c3, c4, c5, c6 = st.columns([2, 1, 1, 1])
             new_date = c3.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav', '')))
             
-            # Récupération sécurisée des numériques (float ou int)
-            try: val_jours = float(row.get('Jours', 1.0))
-            except: val_jours = 1.0
+            val_jours = to_f(row.get('Jours', 1.0))
             try: val_pers = int(float(row.get('Pers', 1.0)))
             except: val_pers = 1
                 
@@ -490,7 +429,6 @@ if st.session_state.page == "MODIFIER_CONTACT":
             s_list = ["En attente", "Confirmé", "Liste d'attente", "Terminé", "Annulé", "Refusé"]
             curr_s = str(row.get('Statut', 'En attente')).strip()
             
-            # On cherche l'index exact ou approchant
             if curr_s in s_list: s_idx = s_list.index(curr_s)
             else: s_idx = next((i for i, s in enumerate(s_list) if s.lower() in curr_s.lower()), 0)
             
@@ -506,10 +444,8 @@ if st.session_state.page == "MODIFIER_CONTACT":
 
             # --- Ligne 4 : Finances ---
             f1, f2, f3 = st.columns(3)
-            try: val_prix = int(float(row.get('Prix', 0)))
-            except: val_prix = 0
-            try: val_acompte = int(float(row.get('Acompte', 0)))
-            except: val_acompte = 0
+            val_prix = int(to_f(row.get('Prix', 0)))
+            val_acompte = int(to_f(row.get('Acompte', 0)))
                 
             new_prix = f1.number_input("Prix Total (€)", value=val_prix)
             new_acompte = f2.number_input("Acompte encaissé (€)", value=val_acompte)
@@ -520,10 +456,10 @@ if st.session_state.page == "MODIFIER_CONTACT":
             new_mail = st.text_input("Email", value=str(row.get('Email', '')))
             new_notes = st.text_area("Notes", value=str(row.get('Notes', '')))
 
-            # --- Validation ---
+            # --- Validation Sécurisée ---
             if st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True):
-                df_m.at[idx_to_edit, 'Prénom'] = new_pre.upper()
-                df_m.at[idx_to_edit, 'Nom'] = new_nom.upper()
+                df_m.at[idx_to_edit, 'Prénom'] = str(new_pre).upper().strip()
+                df_m.at[idx_to_edit, 'Nom'] = str(new_nom).upper().strip()
                 df_m.at[idx_to_edit, 'DateNav'] = new_date
                 df_m.at[idx_to_edit, 'Jours'] = new_jours
                 df_m.at[idx_to_edit, 'Pers'] = new_pers
@@ -541,80 +477,55 @@ if st.session_state.page == "MODIFIER_CONTACT":
                 st.success("✅ Modifications enregistrées !")
                 st.session_state.page = "CONTACTS"
                 st.rerun()
-
     else:
         st.error("Erreur de chargement du contact.")
-        if st.button("🔄 Retour"):
-            st.session_state.page = "CONTACTS"
-            st.rerun()
 
-    if st.button("⬅️ ANNULER ET RETOUR"):
+    if st.button("⬅️ ANNULER ET RETOUR", key="back_mod_contact"):
         st.session_state.page = "CONTACTS"
         st.rerun()
+
 # =================================================================
-# --- 6. PAGE PLANNING (V19.2 - CALIBRÉ SUR TON LOGBOOK) ---
+# --- 7. PAGE PLANNING (V19.2 - CALIBRÉ SÉCURITÉ) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
-    # --- 1. DASHBOARD VIGIE : CROUESTY ---
     st.markdown("## ⚓ Tableau de Bord - Port Crouesty")
 
-    # Widget Météo Windy (Version Embed autorisée)
+    # Widget Météo Windy
     st.markdown("""
-        <iframe 
-            width="100%" 
-            height="350" 
-            src="https://www.windy.com/embed2.html?lat=47.545&lon=-2.894&detailLat=47.545&detailLon=-2.894&width=650&height=350&zoom=10&level=surface&overlay=wind&product=ecmwf&menu=&message=&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=kt&metricTemp=%C2%B0C&radarRange=-1" 
-            frameborder="0">
-        </iframe>
+        <iframe width="100%" height="350" src="https://www.windy.com/embed2.html?lat=47.545&lon=-2.894&zoom=10&level=surface&overlay=wind&product=ecmwf&metricWind=kt&metricTemp=%C2%B0C" frameborder="0"></iframe>
     """, unsafe_allow_html=True)
     
-
     col_v1, col_v2, col_v3 = st.columns(3)
     
-    # --- A. ALERTE MAINTENANCE (MOTARR) ---
+    # --- A. ALERTE MAINTENANCE (HARMONISÉE ABSOLUE) ---
     df_log = charger_data_safe('logbook.json')
-    derniere_heure = 0
+    derniere_heure = 0.0
     if not df_log.empty:
-        # On ignore les lignes à 0.0 pour avoir le vrai dernier relevé
         df_valid = df_log[df_log['MotArr'] > 0]
-        if not df_valid.empty:
-            derniere_heure = to_f(df_valid['MotArr'].max())
-        else:
-            derniere_heure = to_f(df_log['MotArr'].max())
+        derniere_heure = to_f(df_valid['MotArr'].max()) if not df_valid.empty else to_f(df_log['MotArr'].max())
     
-    # Récupération du seuil (ex: 100h)
     params = charger_params()
-    seuil_v = params.get('prochaine_vidange', 100)
-    heures_restantes = seuil_v - (derniere_heure % seuil_v) if seuil_v > 0 else 0
+    seuil_v = params.get('prochaine_vidange', 2500.0)
+    heures_restantes = seuil_v - derniere_heure
     
     if heures_restantes < 15:
-        col_v1.error(f"🛠️ Vidange : {heures_restantes:.1f}h !")
+        col_v1.error(f"🛠️ Vidange : Proche ({heures_restantes:.1f}h restantes) !")
     else:
-        col_v1.success(f"⚙️ Moteur : {derniere_heure:.1f}h OK")
+        col_v1.success(f"⚙️ Moteur : {derniere_heure:.1f}h (Reste {heures_restantes:.1f}h)")
 
     # --- B. FACTURATION EN ATTENTE ---
     df_f = charger_data_safe('contacts.json')
-    nb_unpaid = 0
-    if not df_f.empty and 'Paiement' in df_f.columns:
-        nb_unpaid = len(df_f[df_f['Paiement'] == "Unpaid"])
+    nb_unpaid = len(df_f[df_f['Paiement'] == "Unpaid"]) if not df_f.empty else 0
     col_v2.metric("Factures Unpaid", f"{nb_unpaid}", delta=f"{nb_unpaid}" if nb_unpaid > 0 else "OK", delta_color="inverse")
 
     # --- C. MARÉES ---
     col_v3.link_button("🌊 Marées Crouesty", "https://maree.info/104", use_container_width=True)
-    
     st.divider()
 
-    # --- 2. HEADER PLANNING ---
+    # --- CALENDRIER & SORTIES ---
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>🗓️ PLANNING DES SORTIES</h1></div>', unsafe_allow_html=True)
-    
-    if st.button("📂 ACCÉDER AUX ARCHIVES", key="k_arch_p", use_container_width=True):
-        st.session_state.last_page = "PLANNING"
-        st.session_state.page = "ARCHIVES"
-        st.rerun()
-
     st.divider()
 
-    # --- 3. INITIALISATION TEMPORELLE & SÉLECTEURS ---
     m_noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
     maintenant = datetime.now()
     aujourdhui = date(maintenant.year, maintenant.month, maintenant.day)
@@ -635,14 +546,12 @@ if st.session_state.page == "PLANNING":
         st.session_state.curr_year = aujourdhui.year
         st.rerun()
 
-    # --- 4. TRAITEMENT DES DONNÉES ---
     jours_occ = {}
     total_mois = 0
     missions_list = []
-    df_p = charger_data('contacts.json')
 
-    if not df_p.empty:
-        df_p = df_p.fillna("")
+    if not df_f.empty:
+        df_p = df_f.fillna("")
         for idx, r in df_p.iterrows():
             try:
                 nom_client = str(r.get('Nom', '')).strip().upper()
@@ -663,6 +572,7 @@ if st.session_state.page == "PLANNING":
                 dt_end = dt_start + timedelta(days=max(0, n_j-1))
                 prix_val = to_f(r.get('Prix', 0))
 
+                # REGLE COULEUR SPECIFIQUE : CMN EN BLEU
                 if "CMN" in soc: color = "#3498db"
                 elif any(x in statut for x in ["annul", "refus"]): color = "#bdc3c7"
                 elif dt_start < aujourdhui: color = "#34495e"
@@ -682,8 +592,6 @@ if st.session_state.page == "PLANNING":
                         total_mois += prix_val
             except: continue
 
-    # --- 5. AFFICHAGE CALENDRIER HTML ---
-    import calendar
     h_cal = '<table style="width:100%; text-align:center; border-collapse:collapse; background:white; border:1px solid #ddd;">'
     h_cal += '<tr style="background:#f8f9fa; font-size:12px; font-weight:bold;"><td>Lu</td><td>Ma</td><td>Me</td><td>Je</td><td>Ve</td><td>Sa</td><td>Di</td></tr>'
     
@@ -706,7 +614,6 @@ if st.session_state.page == "PLANNING":
         h_cal += '</tr>'
     st.markdown(h_cal + '</table>', unsafe_allow_html=True)
 
-    # --- 6. LISTE DES MISSIONS ---
     st.markdown(f"### 📋 Missions de {sel_m_nom}")
     if missions_list:
         missions_list.sort(key=lambda x: x['start'])
@@ -725,45 +632,35 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
+
 # =================================================================
-# --- PAGE STATS : DASHBOARD INTÉGRAL VESTA (V2026.3 - OPTIMISÉ) ---
+# --- 8. PAGE STATS : SOURCE DE VÉRITÉ UNIQUE HARMONISÉE ---
 # =================================================================
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Dashboard Intégral Vesta</h2>', unsafe_allow_html=True)
     
-# 1. Chargement des données
     df_actif = charger_data_safe('contacts.json')
     df_m = charger_data_safe('maintenance.json') 
     df_log = charger_data_safe('logbook.json')
     
-    # On charge les paramètres depuis le fichier au premier démarrage
-    if 'params_vesta' not in st.session_state:
-        st.session_state.params_vesta = charger_params()
-    
-    params = st.session_state.params_vesta
-    
-    # --- HARMONISATION ET SOURCE DE VÉRITÉ UNIQUE ---
+    params = charger_params()
     frais_defaut = {"Port Arzon": 3800, "Assurance": 1200, "Entretien": 1500, "Divers": 500}
     if 'frais_fixes' not in params or not params['frais_fixes']:
         params['frais_fixes'] = frais_defaut
     
-    # 2. FILTRES DE NAVIGATION
     c_sel1, c_sel2, c_sel3 = st.columns([2, 1, 1])
     mode_bilan = c_sel1.radio("Mode de calcul :", ["Réel (Encaissé)", "Prévisionnel (Saison)"], horizontal=True)
     sel_y = c_sel2.selectbox("Saison :", [2025, 2026, 2027], index=1)
     etat_flux_maint = c_sel3.selectbox("État Maintenance :", ["Fait", "À prévoir"])
 
-    # --- A. PRÉPARATION ET NETTOYAGE ---
     if not df_actif.empty:
         df_actif['dt_vrai'] = pd.to_datetime(df_actif['DateNav'], dayfirst=True, errors='coerce')
-        # FILTRE HARMONISÉ (Exclusion des annulations pour ne pas fausser le CA)
         mask_f = (df_actif['dt_vrai'].dt.year == sel_y) & (~df_actif['Statut'].str.lower().str.contains("annule|refuse", na=False))
         df_f = df_actif[mask_f].copy()
         
-        for col in ['Prix', 'Acompte']:
-            df_f[col] = df_f[col].apply(to_f)
+        for col in ['Prix', 'Acompte']: df_f[col] = df_f[col].apply(to_f)
         
-        # Logique de calcul Encaissé
+        # EXCLUSION STRUCTURELLE DES UNPAID DANS LE MODE REEL
         df_f['Montant_Encaisse'] = df_f.apply(
             lambda x: x['Prix'] if str(x.get('Paiement', '')).strip().upper() == "PAID" else x['Acompte'], 
             axis=1
@@ -775,38 +672,39 @@ if st.session_state.page == "STATS":
         df_f = pd.DataFrame()
         total_ca_saison = total_encaisse_reel = reste_a_percevoir = 0.0
 
-    # Sélection de la valeur selon le mode
     total_ca_display = total_encaisse_reel if mode_bilan == "Réel (Encaissé)" else total_ca_saison
     df_rec_f = df_f[df_f['Montant_Encaisse'] > 0].copy() if mode_bilan == "Réel (Encaissé)" else df_f.copy()
 
-    # Maintenance & Logbook
     df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
-    df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == etat_flux_maint)].copy()
+    df_m_y = df_m[(df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == etat_flux_maint)].copy() if not df_m.empty else pd.DataFrame()
     total_dep = sum(to_f(x) for x in df_m_y['M_Num']) if not df_m_y.empty else 0.0
 
-    df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
-    df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
-    total_h_moteur = df_log_y['TotalMot'].sum() if 'TotalMot' in df_log_y.columns else 0.0
-    total_gazole = df_log_y['VolumeGazole'].sum() if 'VolumeGazole' in df_log_y.columns else 0.0
+    if not df_log.empty:
+        df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
+        df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
+        total_h_moteur = df_log_y['TotalMot'].sum() if 'TotalMot' in df_log_y.columns else 0.0
+        total_gazole = df_log_y['VolumeGazole'].sum() if 'VolumeGazole' in df_log_y.columns else 0.0
+        h_moteur_abs = pd.to_numeric(df_log['MotArr'], errors='coerce').max()
+    else:
+        total_h_moteur = total_gazole = h_moteur_abs = 0.0
 
-    # --- B. INDICATEURS ---
     st.divider()
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("💰 Solde Net", f"{(total_ca_display - total_dep):,.0f} €")
-    m2.metric("⚓ Sorties", f"{len(df_f[df_f['Prix'] > 0])}")
+    m2.metric("⚓ Sorties", f"{len(df_f[df_f['Prix'] > 0]) if not df_f.empty else 0}")
     m3.metric("⚙️ Heures Mot.", f"{total_h_moteur:.1f} h")
     m4.metric("⛽ Gazole", f"{total_gazole:,.0f} L")
 
     p1, p2, p3, p4 = st.columns(4)
     p1.metric("🎯 CA Prévu", f"{total_ca_saison:,.0f} €")
     p2.metric("📩 Reste à percevoir", f"{reste_a_percevoir:,.0f} €")
-    h_moteur_abs = pd.to_numeric(df_log['MotArr'], errors='coerce').max() if not df_log.empty else 0.0
+    
     h_rest = params.get('prochaine_vidange', 2500.0) - h_moteur_abs
     p3.metric("🔧 Vidange ds", f"{max(0, h_rest):.1f} h")
     conso_h = total_gazole / total_h_moteur if total_h_moteur > 0 else 0
     p4.metric("📉 Conso", f"{conso_h:.1f} L/h")
 
-    # --- C. GRAPHIQUE ---
+    # --- GRAPHIQUE ---
     st.divider()
     ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
     df_graph = pd.DataFrame({'Mois': range(1, 13), 'NomMois': ordre_mois})
@@ -830,7 +728,7 @@ if st.session_state.page == "STATS":
     fig.update_layout(height=350, barmode='group', margin=dict(l=0,r=0,t=20,b=0), legend=dict(orientation="h", y=1.2))
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- D. TABLEAU DES RESTES (ALERTE) ---
+    # --- TABLEAUX DE DETAILS ---
     st.divider()
     st.markdown("### 🔍 Détail des sommes restant à percevoir")
     if not df_f.empty:
@@ -843,92 +741,20 @@ if st.session_state.page == "STATS":
         else:
             st.success("✅ Aucune somme en attente.")
 
-    # --- E. DÉTAILS CHRONO ---
-    st.divider()
-    col_t1, col_t2 = st.columns(2)
-
-    with col_t1:
-        st.markdown(f"**📥 DÉTAIL RECETTES ({mode_bilan})**")
-        if not df_rec_f.empty:
-            cols_show = ['DateNav', 'Nom', 'Paiement', 'Prix']
-            if mode_bilan == "Réel (Encaissé)":
-                cols_show = ['DateNav', 'Nom', 'Montant_Encaisse', 'Prix', 'Paiement']
-            df_display_rec = df_rec_f.sort_values('dt_vrai')[cols_show]
-            st.dataframe(df_display_rec, use_container_width=True, hide_index=True)
-            st.markdown(f"<div style='text-align:right; font-weight:bold; color:#2ecc71;'>TOTAL : {total_ca_display:,.2f} €</div>", unsafe_allow_html=True)
-        else:
-            st.info("Aucune recette enregistrée.")
-
-    with col_t2:
-        st.markdown(f"**📤 DÉTAIL MAINTENANCE ({etat_flux_maint})**")
-        if not df_m_y.empty:
-            df_display_maint = df_m_y.sort_values('dt_maint')[['Date', 'Objet', 'M_Num']]
-            st.dataframe(df_display_maint, use_container_width=True, hide_index=True)
-            st.markdown(f"<div style='text-align:right; font-weight:bold; color:#e74c3c;'>TOTAL : {total_dep:,.2f} €</div>", unsafe_allow_html=True)
-        else:
-            st.info("Aucune dépense sur cette période.")
-
-    # --- F. RÉCAPITULATIF MENSUEL DU CHIFFRE D'AFFAIRES ---
-    st.divider()
-    st.markdown("### 🗓️ Récapitulatif Mensuel du Chiffre d'Affaires")
-
-    recap_mensuel = pd.DataFrame({'Mois_Num': range(1, 13), 'Mois': ordre_mois})
-
-    if not df_f.empty:
-        df_prevu = df_f.groupby(df_f['dt_vrai'].dt.month)['Prix'].sum().reset_index()
-        df_prevu.columns = ['Mois_Num', 'CA Prévu (€)']
-        
-        df_reel = df_f.groupby(df_f['dt_vrai'].dt.month)['Montant_Encaisse'].sum().reset_index()
-        df_reel.columns = ['Mois_Num', 'CA Réel (€)']
-        
-        recap_mensuel = recap_mensuel.merge(df_prevu, on='Mois_Num', how='left')
-        recap_mensuel = recap_mensuel.merge(df_reel, on='Mois_Num', how='left')
-        
-        recap_mensuel = recap_mensuel.fillna(0)
-        recap_mensuel['Reste à percevoir (€)'] = recap_mensuel['CA Prévu (€)'] - recap_mensuel['CA Réel (€)']
-        recap_mensuel = recap_mensuel[recap_mensuel['CA Prévu (€)'] > 0]
-
-        if not recap_mensuel.empty:
-            st.dataframe(
-                recap_mensuel.drop(columns=['Mois_Num']), 
-                use_container_width=True, 
-                hide_index=True,
-                column_config={
-                    "CA Prévu (€)": st.column_config.NumberColumn("CA Prévu (€)", format="%.2f"),
-                    "CA Réel (€)": st.column_config.NumberColumn("CA Réel (€)", format="%.2f"),
-                    "Reste à percevoir (€)": st.column_config.NumberColumn("Reste (€)", format="%.2f"),
-                }
-            )
-            
-            t_prev = recap_mensuel['CA Prévu (€)'].sum()
-            t_reel = recap_mensuel['CA Réel (€)'].sum()
-            
-            c_res1, c_res2 = st.columns(2)
-            c_res1.info(f"**Total Prévu Saison : {t_prev:,.2f} €**")
-            c_res2.success(f"**Total Encaissé Saison : {t_reel:,.2f} €**")
-        else:
-            st.info("Aucune activité enregistrée sur cette saison pour le moment.")
-
-    # --- G. ANALYSE DU POINT MORT (SEUIL DE RENTABILITÉ) ---
+    # --- SEUIL DE RENTABILITÉ ---
     st.divider()
     st.markdown("### ⚓ Seuil de Rentabilité (Point Mort)")
-
-    # Lecture directe de la source de vérité unique
     frais_params = params['frais_fixes']
     total_frais_fixes = sum(to_f(v) for v in frais_params.values())
 
-    # Calculs de rentabilité
     ca_actuel = total_encaisse_reel 
     progression = min(1.0, ca_actuel / total_frais_fixes) if total_frais_fixes > 0 else 0
     manque_a_gagner = max(0.0, total_frais_fixes - ca_actuel)
 
-    # Affichage visuel
     c_pm1, c_pm2 = st.columns([2, 1])
-
     with c_pm1:
         st.write(f"**Objectif : Couvrir les frais fixes annuels ({int(total_frais_fixes)} €)**")
         st.progress(progression)
-        
         if progression >= 1:
             st.success(f"🎉 **Seuil de rentabilité atteint !** Le bateau est autofinancé pour {sel_y}.")
         else:
@@ -941,53 +767,29 @@ if st.session_state.page == "STATS":
             st.write(f"---")
             st.write(f"**TOTAL : {int(total_frais_fixes)} €**")
 
-    # Projection dynamique
-    if not df_f.empty and len(df_f) > 0:
-        panier_moyen = total_ca_saison / len(df_f)
-        if panier_moyen > 0:
-            sorties_pour_equilibre = total_frais_fixes / panier_moyen
-            sorties_faites = len(df_f)
-            if sorties_pour_equilibre > sorties_faites:
-                restant = int(sorties_pour_equilibre - sorties_faites) + 1
-                st.markdown(f"💡 *Basé sur votre panier moyen ({int(panier_moyen)} €), il vous reste environ **{restant} sorties** à réaliser pour atteindre l'équilibre.*")
-            else:
-                surplus = ca_actuel - total_frais_fixes
-                st.markdown(f"📈 *Bénéfice net actuel (après frais fixes) : **{int(surplus)} €***")
-
-    # --- H. CONFIGURATION DES CHARGES (MODIFIABLE SANS CODE) ---
+    # --- H. CONFIGURATION DES CHARGES (CORRIGÉE & SÉCURISÉE GITHUB) ---
     st.divider()
     with st.expander("⚙️ Modifier les charges fixes annuelles"):
-        st.info("Modifiez les montants ci-dessous et cliquez sur 'Enregistrer' pour mettre à jour votre seuil de rentabilité.")
+        st.info("Modifiez les montants ci-dessous et cliquez sur 'Enregistrer'.")
         
-        # Récupération directe sans doublon
         frais_actuels = params['frais_fixes']
         
-        # Création d'un formulaire pour modifier les valeurs
         with st.form("form_frais_fixes"):
             new_frais = {}
             cols_f = st.columns(2)
             for i, (poste, montant) in enumerate(frais_actuels.items()):
                 with cols_f[i % 2]:
                     new_frais[poste] = st.number_input(f"{poste} (€)", value=float(montant), step=50.0)
-     # Bouton de sauvegarde synchronisé avec la Session State
+            
             if st.form_submit_button("💾 ENREGISTRER LES CHARGES"):
-                # 1. Mise à jour immédiate de la mémoire vive
-                st.session_state.params_vesta['frais_fixes'] = new_frais
-                if 'prochaine_vidange' in st.session_state.params_vesta:
-                    st.session_state.params_vesta['prochaine_vidange'] = 2500.0
-                
-                # 2. Sauvegarde sur le disque en arrière-plan
-                import json
-                try:
-                    with open('params.json', 'w', encoding='utf-8') as f:
-                        json.dump(st.session_state.params_vesta, f, indent=4, ensure_ascii=False)
-                except Exception as e:
-                    st.error(f"Erreur écriture disque : {e}")
-                
-                # 3. Relance instantanée
+                # Mise à jour globale et sécurisée via l'API GitHub commune
+                params['frais_fixes'] = new_frais
+                sauvegarder_params(params)
+                st.success("Configuration sauvegardée à distance !")
                 st.rerun()
+
 # =================================================================
-# --- 8. PAGE MAINTENANCE (GESTION VIDANGE & TRAVAUX) ---
+# --- 8. PAGE MAINTENANCE : GESTION SÉCURISÉE (V2026) ---
 # =================================================================
 if st.session_state.page == "MAINT":
     import pandas as pd
@@ -1000,6 +802,7 @@ if st.session_state.page == "MAINT":
         html_content = f"""
         <html>
         <head>
+            <meta charset="utf-8">
             <style>
                 body {{ font-family: Arial, sans-serif; padding: 30px; color: #2C3E50; }}
                 .header {{ border-bottom: 3px solid #2980B9; padding-bottom: 10px; margin-bottom: 20px; }}
@@ -1032,20 +835,20 @@ if st.session_state.page == "MAINT":
         """
         components.html(js, height=45)
 
-    # --- 2. CHARGEMENT DES DONNÉES ---
+    # --- 2. CHARGEMENT DES DONNÉES SÉCURISÉES ---
     df_m = charger_data_safe('maintenance.json')
     df_log = charger_data_safe('logbook.json')
     releve_h = pd.to_numeric(df_log['MotArr'], errors='coerce').max() if not df_log.empty else 0.0
     
     params = charger_params()
     if 'prochaine_vidange' not in params:
-        params['prochaine_vidange'] = 2450.0
+        params['prochaine_vidange'] = 2500.0
         sauvegarder_params(params)
 
     if 'maint_edit_id' not in st.session_state:
         st.session_state.maint_edit_id = None
 
-    st.title("🛠️ MAINTENANCE & VIDANGE")
+    st.markdown('<h2 style="text-align:center;">🛠️ Maintenance & Vidange</h2>', unsafe_allow_html=True)
 
     # --- 3. TABLEAU DE BORD VIDANGE ---
     heures_restantes = params['prochaine_vidange'] - releve_h
@@ -1068,40 +871,45 @@ if st.session_state.page == "MAINT":
 
     st.divider()
     
-    # --- 7. DASHBOARD CARBURANT (Plus visible) ---
+    # --- 4. DASHBOARD CARBURANT ---
     st.markdown("### ⛽ Suivi Carburant")
     df_carb = charger_data_safe('carburant.json')
     
     col_c1, col_c2, col_c3 = st.columns(3)
     if not df_carb.empty:
-        total_l = df_carb['Litres'].sum()
-        total_e = df_carb['Prix'].sum()
-        dernier_pu = df_carb['PU'].iloc[-1] if 'PU' in df_carb.columns else 0
+        total_l = to_f(df_carb['Litres'].sum())
+        total_e = to_f(df_carb['Prix'].sum())
+        dernier_pu = to_f(df_carb['PU'].iloc[-1]) if 'PU' in df_carb.columns else 0.0
+        
         col_c1.metric("Total Litres", f"{total_l:.0f} L")
         col_c2.metric("Total Dépensé", f"{total_e:.2f} €")
         col_c3.metric("Dernier Prix/L", f"{dernier_pu:.3f} €")
 
     with st.expander("➕ Enregistrer un plein / Voir l'historique", expanded=False):
-        with st.form("form_fuel"):
+        with st.form("form_fuel_v2026"):
             c1, c2, c3 = st.columns(3)
             d_f = c1.date_input("Date du plein")
-            l_f = c2.number_input("Litres", min_value=0.0)
-            p_f = c3.number_input("Total TTC (€)", min_value=0.0)
+            l_f = c2.number_input("Litres", min_value=0.0, step=10.0)
+            p_f = c3.number_input("Total TTC (€)", min_value=0.0, step=10.0)
         
-            if st.form_submit_button("Enregistrer le plein"):
-                new_f = {"Date": d_f.strftime("%d/%m/%Y"), "Litres": l_f, "Prix": p_f, "PU": p_f/l_f if l_f > 0 else 0}
-                df_carb = pd.concat([df_carb, pd.DataFrame([new_f])], ignore_index=True)
-                sauvegarder_data(df_carb, 'carburant.json')
-                st.rerun()
+            if st.form_submit_button("Enregistrer le plein", use_container_width=True):
+                if l_f > 0:
+                    new_f = {"Date": d_f.strftime("%d/%m/%Y"), "Litres": l_f, "Prix": p_f, "PU": round(p_f / l_f, 3)}
+                    df_carb = pd.concat([df_carb, pd.DataFrame([new_f])], ignore_index=True)
+                    sauvegarder_data(df_carb, 'carburant.json')
+                    st.success("Plein enregistré !")
+                    st.rerun()
+                else:
+                    st.error("Le nombre de litres doit être supérieur à 0.")
 
         if not df_carb.empty:
-            st.table(df_carb.tail(5)) # Affiche les 5 derniers pleins
+            st.dataframe(df_carb.tail(5), use_container_width=True, hide_index=True)
             
-    # --- INITIALISATION DES ÉTATS DE VISIBILITÉ ---
+    # --- INITIALISATION DES ÉTATS ---
     if 'show_form_classique' not in st.session_state: st.session_state.show_form_classique = False
     if 'show_form_vidange' not in st.session_state: st.session_state.show_form_vidange = False
 
-    # --- 4. BOUTONS D'APPEL ---
+    # --- 5. BOUTONS D'APPEL ---
     col_btn1, col_btn2 = st.columns(2)
     if col_btn1.button("🔧 NOUVELLE INTERVENTION", use_container_width=True):
         st.session_state.show_form_classique = True
@@ -1113,14 +921,14 @@ if st.session_state.page == "MAINT":
         st.session_state.show_form_classique = False
         st.rerun()
 
-    # --- 5. FORMULAIRE CLASSIQUE ---
+    # --- 6. FORMULAIRE CLASSIQUE ---
     if st.session_state.show_form_classique:
         with st.form("form_new_maint"):
             st.subheader("🔧 Nouvelle Intervention")
             f_obj = st.text_input("Désignation")
             c1, c2, c3 = st.columns(3)
             f_d = c1.date_input("Date", datetime.now())
-            f_m = c2.number_input("Montant (€)", min_value=0.0)
+            f_m = c2.number_input("Montant (€)", min_value=0.0, step=10.0)
             f_t = c3.selectbox("Catégorie", ["Maintenance", "Sécurité", "Port", "Assurances", "Autres"])
             f_notes = st.text_area("Notes détaillées")
             f_statut = st.selectbox("Statut", ["À prévoir", "Fait"])
@@ -1134,18 +942,18 @@ if st.session_state.page == "MAINT":
                 st.rerun()
             
             if b_col2.form_submit_button("❌ FERMER", use_container_width=True):
-                st.session_state.show_form_classique = False # On force la fermeture ici
+                st.session_state.show_form_classique = False
                 st.rerun()
 
-    # --- 6. FORMULAIRE VIDANGE ---
+    # --- 7. FORMULAIRE VIDANGE ---
     if st.session_state.show_form_vidange:
         with st.form("form_vidange_moteur"):
             st.subheader("🛢️ Révision Moteur")
             c_v1, c_v2 = st.columns(2)
             v_date = c_v1.date_input("Date", datetime.now())
-            v_heures = c_v2.number_input("Heures moteur", value=float(releve_h))
+            v_heures = c_v2.number_input("Heures moteur actualisées", value=float(releve_h))
             
-            st.markdown("**Check-list :**")
+            st.markdown("**Check-list révision :**")
             col_c1, col_c2, col_c3 = st.columns(3)
             chk_huile = col_c1.checkbox("Vidange Huile")
             chk_f_huile = col_c1.checkbox("Filtre Huile")
@@ -1154,35 +962,36 @@ if st.session_state.page == "MAINT":
             chk_courroie = col_c3.checkbox("Courroies")
             chk_impeller = col_c3.checkbox("Impeller")
             
-            v_cout = st.number_input("Coût fournitures (€)", min_value=0.0)
-            v_notes = st.text_area("Observations")
-            inc_h = st.selectbox("Prochaine vidange (+h)", [50, 100, 150, 200], index=1)
+            v_cout = st.number_input("Coût fournitures (€)", min_value=0.0, step=5.0)
+            v_notes = st.text_area("Observations additionnelles")
+            inc_h = st.selectbox("Échéance prochaine vidange (+h)", [50, 100, 150, 200], index=1)
             
             bv_col1, bv_col2 = st.columns(2)
-            if bv_col1.form_submit_button("✅ VALIDER RÉVISION", use_container_width=True, type="primary"):
+            if bv_col1.form_submit_button("✅ VALIDER LA RÉVISION", use_container_width=True, type="primary"):
                 travaux = [t for t, c in zip(["Huile", "F-Huile", "F-Gasoil", "Pré-filtre", "Courroies", "Impeller"], 
                                              [chk_huile, chk_f_huile, chk_f_gasoil, chk_f_pre, chk_courroie, chk_impeller]) if c]
-                details = f"Révision à {v_heures}h. Travaux : {', '.join(travaux)}. Notes : {v_notes}"
+                details = f"Révision à {v_heures}h. Travaux validés : {', '.join(travaux)}. Obs : {v_notes}"
+                
                 new_row = {"Date": v_date.strftime("%d/%m/%Y"), "Objet": f"RÉVISION MOTEUR ({v_heures}h)", "M_Num": v_cout, "Statut": "Fait", "Type": "Maintenance", "Notes": details}
+                
                 params['prochaine_vidange'] = round(v_heures + inc_h, 1)
                 sauvegarder_params(params)
+                
                 df_m = pd.concat([df_m, pd.DataFrame([new_row])], ignore_index=True)
                 sauvegarder_data(df_m, 'maintenance.json')
                 st.session_state.show_form_vidange = False
                 st.rerun()
 
             if bv_col2.form_submit_button("❌ FERMER", use_container_width=True):
-                st.session_state.show_form_vidange = False # On force la fermeture ici
+                st.session_state.show_form_vidange = False
                 st.rerun()
 
-
-
-    # --- 7. SYSTÈME DE FILTRES ---
+    # --- 8. FILTRES & AFFICHAGE LOGS ---
     st.divider()
     col_menu1, col_menu2, col_menu3 = st.columns([2, 1.2, 1.2])
-    filter_statut = col_menu1.radio("Afficher :", ["Tout", "⏳ À faire", "✅ Fait"], horizontal=True)
-    mode_m = col_menu2.radio("Période :", ["À ce jour", "Année complète"], horizontal=True)
-    sel_y = col_menu3.selectbox("Année :", [2025, 2026, 2027], index=1)
+    filter_statut = col_menu1.radio("Filtre statut :", ["Tout", "⏳ À faire", "✅ Fait"], horizontal=True)
+    mode_m = col_menu2.radio("Fenêtre :", ["À ce jour", "Année complète"], horizontal=True)
+    sel_y = col_menu3.selectbox("Sélection année :", [2025, 2026, 2027], index=1)
 
     if not df_m.empty:
         df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
@@ -1200,7 +1009,7 @@ if st.session_state.page == "MAINT":
         df_filtre = df_filtre.sort_values('dt_maint', ascending=False)
 
         if df_filtre.empty:
-            st.info("Aucune fiche pour ces filtres.")
+            st.info("Aucune fiche de maintenance ne correspond aux critères.")
         else:
             for idx, row in df_filtre.iterrows():
                 est_fait = (row['Statut'] == "Fait")
@@ -1213,7 +1022,7 @@ if st.session_state.page == "MAINT":
                         e_obj = st.text_input("Désignation", value=row['Objet'])
                         c1, c2 = st.columns(2)
                         e_dat = c1.text_input("Date", value=row['Date'])
-                        e_mon = c2.number_input("Montant (€)", value=float(row['M_Num']))
+                        e_mon = c2.number_input("Montant (€)", value=float(to_f(row['M_Num'])))
                         e_not = st.text_area("Notes", value=row.get('Notes', ''))
                         e_sta = st.selectbox("Statut", ["À prévoir", "Fait"], index=1 if est_fait else 0)
                         
@@ -1224,9 +1033,12 @@ if st.session_state.page == "MAINT":
                             df_m.at[idx, 'M_Num'] = e_mon
                             df_m.at[idx, 'Notes'] = e_not
                             df_m.at[idx, 'Statut'] = e_sta
-                            sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
+                            
+                            df_sauve = df_m.drop(columns=['dt_maint'], errors='ignore')
+                            sauvegarder_data(df_sauve, 'maintenance.json')
                             st.session_state.maint_edit_id = None
                             st.rerun()
+                            
                         if cb2.form_submit_button("❌ ANNULER"):
                             st.session_state.maint_edit_id = None
                             st.rerun()
@@ -1238,7 +1050,7 @@ if st.session_state.page == "MAINT":
                                 <span style="color: #555;">📅 {row['Date']}</span>
                             </div>
                             <div style="display: flex; justify-content: space-between; margin-top: 5px;">
-                                <small>Catégorie : <b>{row['Type']}</b></small>
+                                <small>Catégorie : <b>{row.get('Type', 'Maintenance')}</b></small>
                                 <small>Coût : <b>{row['M_Num']} €</b></small>
                             </div>
                         </div>
@@ -1248,23 +1060,29 @@ if st.session_state.page == "MAINT":
                     bc1, bc2, bc3, bc4 = st.columns(4)
                     if bc1.button("✏️ Modif", key=f"ed_m_{idx}"):
                         st.session_state.maint_edit_id = idx
+                        st.session_state.show_form_classique = False
+                        st.session_state.show_form_vidange = False
                         st.rerun()
+                        
                     with bc2:
                         bouton_imprimer_fiche_maint(row['Objet'], row['Date'], row.get('Notes', 'N/A'), row['Statut'])
                     
                     label_toggle = "⏳ À prévoir" if est_fait else "✅ Marquer FAIT"
                     if bc3.button(label_toggle, key=f"st_m_{idx}"):
                         df_m.at[idx, 'Statut'] = "À prévoir" if est_fait else "Fait"
-                        sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
+                        df_sauve = df_m.drop(columns=['dt_maint'], errors='ignore')
+                        sauvegarder_data(df_sauve, 'maintenance.json')
                         st.rerun()
 
                     if bc4.button("🗑️ Suppr", key=f"pre_m_{idx}"):
                         df_m = df_m.drop(idx)
-                        sauvegarder_data(df_m.drop(columns=['dt_maint']), 'maintenance.json')
+                        df_sauve = df_m.drop(columns=['dt_maint'], errors='ignore')
+                        sauvegarder_data(df_sauve, 'maintenance.json')
                         st.rerun()
                         
-     # --- 8. EXPORT EXCEL ---
+    # --- 9. EXPORT EXCEL SÉCURISÉ ---
     if not df_m.empty:
+        st.divider()
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             df_m.drop(columns=['dt_maint'], errors='ignore').to_excel(writer, index=False)
@@ -1281,31 +1099,31 @@ if st.session_state.page == "FACT":
     df_fact = charger_data_safe('contacts.json')
 
     if df_fact.empty:
-        st.info("Aucune donnée de facturation.")
+        st.info("Aucune donnée de facturation disponible.")
     else:
         # --- CALCULS SÉCURISÉS ---
         total_ca = sum(df_fact['Prix'].apply(to_f))
         total_enc = sum(df_fact['Acompte'].apply(to_f))
-        reste_a_percevoir = max(0, total_ca - total_enc)
+        reste_a_percevoir = max(0.0, total_ca - total_enc)
 
         m1, m2, m3 = st.columns(3)
-        # Formatage avec espace pour les milliers
-        m1.metric("Total CA", f"{total_ca:,.0f} €".replace(",", " "))
-        m2.metric("Encaissé", f"{total_enc:,.0f} €".replace(",", " "))
-        m3.metric("Reste à percevoir", f"{reste_a_percevoir:,.0f} €".replace(",", " "), 
-                  delta=f"-{reste_a_percevoir:,.0f}" if reste_a_percevoir > 0 else None, 
+        # Formatage standardisé sans crash d'espace
+        m1.metric("Total CA", f"{total_ca:,.2f} €".replace(",", " "))
+        m2.metric("Encaissé", f"{total_enc:,.2f} €".replace(",", " "))
+        m3.metric("Reste à percevoir", f"{reste_a_percevoir:,.2f} €".replace(",", " "), 
+                  delta=f"-{reste_a_percevoir:,.2f} €" if reste_a_percevoir > 0 else None, 
                   delta_color="inverse")
 
         st.divider()
 
-        # --- FILTRAGE ET TRI CHRONOLOGIQUE (MAI AVANT JUIN) ---
+        # --- FILTRAGE ET TRI CHRONOLOGIQUE ---
         if 'Paiement' not in df_fact.columns: 
             df_fact['Paiement'] = "Unpaid"
         
-        # On utilise une colonne temporaire pour le tri réel
+        # Tri chronologique sécurisé
         df_fact['dt_temp'] = pd.to_datetime(df_fact['DateNav'], dayfirst=True, errors='coerce')
-        # ascending=True pour l'ordre normal (chronologique)
-        df_fact = df_fact.sort_values(by='dt_temp', ascending=True).drop(columns=['dt_temp'])
+        df_fact = df_fact.sort_values(by='dt_temp', ascending=True)
+        df_fact = df_fact.drop(columns=['dt_temp'], errors='ignore')
 
         t1, t2 = st.tabs(["⏳ À ENCAISSER", "✅ PAYÉ"])
 
@@ -1313,31 +1131,28 @@ if st.session_state.page == "FACT":
             df_vue = df_fact[df_fact['Paiement'] == status_filtre]
             
             if df_vue.empty:
-                st.write(f"Rien à afficher dans '{status_filtre}'.")
+                st.info(f"Aucune fiche dans la catégorie '{status_filtre}'.")
             else:
-                # Date du jour pour comparer les retards
                 aujourdhui = pd.Timestamp.now().normalize()
 
                 for idx, row in df_vue.iterrows():
-                    # Infos société
                     soc = str(row.get('Société', 'PERSO')).upper()
                     is_cmn = "CMN" in soc
                     
-                    # Logique de détection du retard
+                    # Détection du retard de paiement
                     date_nav = pd.to_datetime(row.get('DateNav',''), dayfirst=True, errors='coerce')
-                    retard = (status_filtre == "Unpaid") and (date_nav < aujourdhui)
+                    retard = (status_filtre == "Unpaid") and (pd.notna(date_nav) and date_nav < aujourdhui)
                     
-                    # Préparation des styles
+                    # Styles visuels
                     label_retard = "<span style='color:#E74C3C; font-weight:bold; font-size:0.8rem;'>⚠️ RETARD</span>" if retard else ""
                     card_bg = "#E3F2FD" if is_cmn else "#F9F9F9"
                     border_color = "#E74C3C" if retard else ("#3498db" if is_cmn else "#7F8C8D")
                     
-                    # Rendu de la fiche
                     st.markdown(f"""
                         <div style="background:{card_bg}; border-left:10px solid {border_color}; padding:15px; border-radius:8px; margin-bottom:10px; color:black; border: 1px solid #ddd;">
                             <div style="display:flex; justify-content:space-between;">
                                 <b>{row.get('Nom','')} {row.get('Prénom','')}</b>
-                                <span style="font-size:1.1rem; font-weight:bold;">{to_f(row.get('Prix',0)):.0f} €</span>
+                                <span style="font-size:1.1rem; font-weight:bold;">{to_f(row.get('Prix',0)):.2f} €</span>
                             </div>
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <small>📅 {row.get('DateNav','')} | 🏢 {soc}</small>
@@ -1353,8 +1168,7 @@ if st.session_state.page == "FACT":
                             df_fact.at[idx, 'Paiement'] = "Paid"
                             df_fact.at[idx, 'Acompte'] = df_fact.at[idx, 'Prix']
                             sauvegarder_data(df_fact, 'contacts.json')
-                            st.success("Encaissé !")
-                            time.sleep(0.5)
+                            st.toast("Paiement enregistré !", icon="💰")
                             st.rerun()
 
                     if c2.button(f"✏️ Voir", key=f"edit_f_{idx}"):
@@ -1366,19 +1180,21 @@ if st.session_state.page == "FACT":
             afficher_onglet("Unpaid")
         with t2: 
             afficher_onglet("Paid")
+
+
 # =================================================================
-# --- 11. PAGE ARCHIVES & SÉCURITÉ ---
+# --- 11. PAGE ARCHIVES & SÉCURITÉ (VERSION UNIFIÉE & FIXÉE) ---
 # =================================================================
 if st.session_state.page == "ARCHIVES":
-    st.title("📂 Archives & Sécurité")
+    st.markdown("<h2 style='text-align: center;'>📂 Archives & Clôture de Saison</h2>", unsafe_allow_html=True)
     
-    if st.button("⬅️ Retour au Planning"):
+    if st.button("⬅️ Retour au Planning", use_container_width=True):
         st.session_state.page = "PLANNING"
         st.rerun()
 
     # --- SECTION 1 : CONSULTATION DES HISTORIQUES ---
     st.markdown("### 🔍 Consultation des historiques")
-    t1, t2, t3 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook"])
+    t1, t2, t3, t4 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook", "👤 Contacts"])
     
     with t1: 
         st.subheader("Archives Maintenance")
@@ -1392,14 +1208,17 @@ if st.session_state.page == "ARCHIVES":
         st.subheader("Archives Logbook")
         st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
 
+    with t4:
+        st.subheader("Archives Contacts (Saisons passées - Statut Inclus)")
+        st.dataframe(charger_data_safe('archives_contacts_2026.json'), use_container_width=True)
+
     st.divider()
 
-    # --- SECTION 2 : COFFRE-FORT (SAUVEGARDE LOCALE) ---
+    # --- SECTION 2 : COFFRE-FORT (SAUVEGARDE MANUELLE) ---
     st.markdown("### 🛡️ Coffre-fort de sauvegarde")
-    with st.expander("💾 Télécharger les données sur mon ordinateur", expanded=True):
-        st.write("Cliquez sur les boutons ci-dessous pour exporter vos données actuelles au format Excel (CSV).")
+    with st.expander("💾 Exporter les données actives (.CSV)", expanded=False):
+        st.write("Téléchargez vos fichiers de données actuels pour les sauvegarder localement.")
         
-        # Liste des fichiers critiques à sauvegarder
         fichiers_cible = {
             "Contacts & Facturation": "contacts.json",
             "Maintenance & Frais": "maintenance.json",
@@ -1411,13 +1230,9 @@ if st.session_state.page == "ARCHIVES":
 
         for i, (nom_affichage, nom_fichier) in enumerate(fichiers_cible.items()):
             df_bak = charger_data_safe(nom_fichier)
-            
             if not df_bak.empty:
-                # Encodage utf-8-sig pour que Excel gère bien les accents (Ex: Prénom, Confirmé)
                 csv_data = df_bak.to_csv(index=False).encode('utf-8-sig')
-                
-                # Nom du fichier avec date du jour pour un meilleur classement
-                date_str = datetime.now().strftime("%d_%m_%Y")
+                date_str = pd.Timestamp.now().strftime("%d_%m_%Y")
                 file_final = f"VESTA_{nom_fichier.replace('.json', '')}_{date_str}.csv"
                 
                 cols[i].download_button(
@@ -1428,35 +1243,67 @@ if st.session_state.page == "ARCHIVES":
                     use_container_width=True
                 )
             else:
-                cols[i].caption(f"⚠️ {nom_affichage} est vide.")
+                cols[i].caption(f"⚠️ {nom_affichage} vide.")
 
-    st.caption("Note : Il est conseillé de faire une sauvegarde manuelle après chaque grosse mise à jour de vos données.")
+    st.divider()
+
+    # --- SECTION 3 : OUTILS DE FIN DE SAISON ---
+    st.markdown("### 🏁 Clôture de Saison 2026")
+    with st.expander("🚨 ZONE DE DANGER : Archiver les dossiers réglés", expanded=False):
+        st.warning("""
+            **Action irréversible :** Cela va basculer définitivement toutes les fiches marquées comme **'Paid'** 
+            vers le fichier d'archive. Les dossiers restés en 'Unpaid' resteront dans le tableau de bord actif.
+        """)
+        
+        if st.button("🔒 EXÉCUTER L'ARCHIVAGE DES CONTACTS RÉGLÉS", use_container_width=True, type="primary"):
+            df_f = charger_data_safe('contacts.json')
+            
+            if not df_f.empty:
+                if 'Paiement' not in df_f.columns:
+                    df_f['Paiement'] = "Unpaid"
+                
+                df_paid = df_f[df_f['Paiement'] == "Paid"].copy()
+                df_unpaid = df_f[df_f['Paiement'] != "Paid"].copy()
+                
+                if not df_paid.empty:
+                    # Rétention stricte du statut Paid dans les archives
+                    df_hist = charger_data_safe('archives_contacts_2026.json')
+                    df_new_hist = pd.concat([df_hist, df_paid], ignore_index=True)
+                    sauvegarder_data(df_new_hist, 'archives_contacts_2026.json')
+                    
+                    # Nettoyage du fichier actif
+                    sauvegarder_data(df_unpaid, 'contacts.json')
+                    st.success(f"✅ {len(df_paid)} fiches traitées et sécurisées dans 'archives_contacts_2026.json'.")
+                    st.rerun()
+                else:
+                    st.info("Aucun contact marqué 'Paid' à archiver pour le moment.")
+            else:
+                st.error("Le fichier de contacts actif est vide.")
+
 
 # =================================================================
-# --- 12. PAGE LIVRE DE BORD (LOG) - VERSION SÉCURISÉE & PRÉCISE ---
+# --- 12. PAGE LIVRE DE BORD (LOG) ---
 # =================================================================
 if st.session_state.page == "LOG":
     st.markdown('<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;"><h1>📖 Livre de Bord & Statistiques</h1></div>', unsafe_allow_html=True)
 
     df_log = charger_data_safe('logbook.json')
     
-    # Initialisation des états
     if 'saisie_ouverte' not in st.session_state: st.session_state.saisie_ouverte = False
     if 'edit_idx' not in st.session_state: st.session_state.edit_idx = None
 
-    # --- A. FONCTION DE SUPPRESSION ---
+    # --- A. SUPPRESSION SECURISEE ---
     def supprimer_entree(idx_to_remove):
         df_now = charger_data_safe('logbook.json')
         df_now = df_now.drop(idx_to_remove).reset_index(drop=True)
         sauvegarder_data(df_now, 'logbook.json')
-        st.toast("Entrée supprimée avec succès", icon="🗑️")
+        st.toast("Entrée supprimée", icon="🗑️")
         st.rerun()
 
-    # --- B. FORMULAIRE UNIQUE (CRÉATION OU ÉDITION) ---
+    # --- B. FORMULAIRE UNIQUE ---
     def formulaire_fiche(mode="creation", index=None):
         title = "➕ NOUVELLE ÉTAPE QUOTIDIENNE" if mode == "creation" else "📝 MODIFIER L'ÉTAPE"
         
-        # Initialisation des valeurs par défaut
         if mode == "edition" and index is not None:
             r = df_log.iloc[index]
             val_date = r['Date']
@@ -1470,10 +1317,9 @@ if st.session_state.page == "LOG":
             val_mil_arr = float(r.get('MilArr', 0.0))
             val_voile = float(r.get('H_Voile', 0.0))
         else:
-            # Mode Création : on récupère le max des compteurs existants
             last_mot = df_log['MotArr'].max() if not df_log.empty else 0.0
             last_mil = df_log['MilArr'].max() if not df_log.empty else 0.0
-            val_date = datetime.now()
+            val_date = pd.Timestamp.now().to_pydatetime()
             val_nav = ""
             val_equi = ""
             val_meteo = ""
@@ -1488,33 +1334,33 @@ if st.session_state.page == "LOG":
             with st.form(key=f"form_log_{mode}"):
                 c1, c2 = st.columns(2)
                 f_date = c1.date_input("Date", val_date) if mode=="creation" else c1.text_input("Date", value=val_date)
-                f_but = c2.text_input("Nom du Voyage / Croisière", value=val_nav, placeholder="ex: Corse 2026")
+                f_but = c2.text_input("Nom du Voyage / Croisière", value=val_nav, placeholder="ex: Gijón 2026")
                 
-                f_equipage = st.text_area("Équipage", value=val_equi, height=60)
+                f_equipage = st.text_area("Équipage / Rôle", value=val_equi, height=60)
                 
                 cm1, cm2 = st.columns(2)
-                f_meteo = cm1.text_input("Météo", value=val_meteo)
+                f_meteo = cm1.text_input("Météo (Vent/Mer)", value=val_meteo)
                 f_notes = cm2.text_area("Observations / Escale", value=val_notes, height=60)
                 
-                st.markdown("---")
+                st.divider()
                 col1, col2, col3 = st.columns(3)
-                m_dep = col1.number_input("Moteur Départ", value=val_mot_dep, format="%.2f")
-                m_arr = col2.number_input("Moteur Arrivée", value=val_mot_arr, format="%.2f")
-                h_voile = col3.number_input("Heures Voile", value=val_voile, format="%.2f")
+                m_dep = col1.number_input("Moteur Départ (h)", value=val_mot_dep, format="%.1f", step=0.5)
+                m_arr = col2.number_input("Moteur Arrivée (h)", value=val_mot_arr, format="%.1f", step=0.5)
+                h_voile = col3.number_input("Heures Voile (h)", value=val_voile, format="%.1f", step=0.5)
                 
                 ck1, ck2 = st.columns(2)
-                k_dep = ck1.number_input("Milles Départ", value=val_mil_dep, format="%.2f")
-                k_arr = ck2.number_input("Milles Arrivée", value=val_mil_arr, format="%.2f")
+                k_dep = ck1.number_input("Milles Départ (Log)", value=val_mil_dep, format="%.1f", step=1.0)
+                k_arr = ck2.number_input("Milles Arrivée (Log)", value=val_mil_arr, format="%.1f", step=1.0)
 
                 b1, b2 = st.columns(2)
-                if b1.form_submit_button("💾 ENREGISTRER", use_container_width=True, type="primary"):
+                if b1.form_submit_button("💾 ENREGISTRER L'ÉTAPE", use_container_width=True, type="primary"):
                     new_entry = {
                         "Date": f_date.strftime("%d/%m/%Y") if mode=="creation" else f_date,
                         "Navigation": f_but,
                         "Coéquipiers": f_equipage,
                         "Meteo": f_meteo, "Notes": f_notes,
-                        "MotDep": m_dep, "MotArr": m_arr, "TotalMot": round(m_arr - m_dep, 2),
-                        "MilDep": k_dep, "MilArr": k_arr, "TotalMil": round(k_arr - k_dep, 2),
+                        "MotDep": m_dep, "MotArr": m_arr, "TotalMot": round(max(0.0, m_arr - m_dep), 2),
+                        "MilDep": k_dep, "MilArr": k_arr, "TotalMil": round(max(0.0, k_arr - k_dep), 2),
                         "H_Voile": h_voile
                     }
                     
@@ -1534,15 +1380,14 @@ if st.session_state.page == "LOG":
                     st.session_state.edit_idx = None
                     st.rerun()
 
-    # Logique d'affichage des formulaires
     if st.session_state.edit_idx is not None:
         formulaire_fiche(mode="edition", index=st.session_state.edit_idx)
     elif st.session_state.saisie_ouverte:
         formulaire_fiche(mode="creation")
     else:
-        st.button("➕ NOUVELLE ÉTAPE QUOTIDIENNE", on_click=lambda: st.session_state.update({"saisie_ouverte": True}), use_container_width=True)
+        st.button("➕ NOUVELLE ÉTAPE QUOTIENNE", on_click=lambda: st.session_state.update({"saisie_ouverte": True}), use_container_width=True)
 
-    # --- C. AFFICHAGE DE LA LISTE ---
+    # --- C. VUE EN LISTE CHRONOLOGIQUE PAR CRUISE ---
     if not df_log.empty:
         st.divider()
         df_v = df_log.copy()
@@ -1554,7 +1399,7 @@ if st.session_state.page == "LOG":
             t_mil = group['TotalMil'].sum()
             st.markdown(f"""
                 <div style="background:#2c3e50; color:white; padding:10px; border-radius:8px; margin-top:15px; border-left: 5px solid #3498db;">
-                    <b>🚢 {nav_name or "Navigation isolée"}</b> | Cumul Voyage : {t_mil:.1f} NM
+                    <b>🚢 {nav_name or "Navigation Hors-Croisière"}</b> | Distance Totale Voyage : {t_mil:.1f} NM
                 </div>
             """, unsafe_allow_html=True)
             
@@ -1564,13 +1409,12 @@ if st.session_state.page == "LOG":
                     c_txt, c_btn = st.columns([0.7, 0.3])
                     with c_txt:
                         st.markdown(f"""
-                            <div style="background:white; border-left:4px solid #bdc3c7; padding:8px 15px; border-bottom:1px solid #eee;">
-                                <b>📅 {row['Date']}</b> | ⚙️ {row['TotalMot']:.1f}h | ⛵ {row['H_Voile']:.1f}h | <b>{row['TotalMil']:.1f} NM</b><br>
-                                <small style="color:#34495e;">📍 {row.get('Meteo','-')} | {row.get('Notes','')}</small>
+                            <div style="background:white; border-left:4px solid #bdc3c7; padding:8px 15px; border-bottom:1px solid #eee; color: black;">
+                                <b>📅 {row['Date']}</b> | ⚙️ {row['TotalMot']:.1f}h Mot. | ⛵ {row['H_Voile']:.1f}h Voile | <b>{row['TotalMil']:.1f} NM</b><br>
+                                <small style="color:#34495e;">📍 Cond. Météo : {row.get('Meteo','-')} | {row.get('Notes','')}</small>
                             </div>
                         """, unsafe_allow_html=True)
                     with c_btn:
-                        # Colonnes pour Editer / Supprimer / Confirmer
                         ce, cd, cc = st.columns([1, 1, 2])
                         
                         if ce.button("✏️", key=f"e_{idx_orig}"):
@@ -1590,89 +1434,11 @@ if st.session_state.page == "LOG":
                                 st.session_state[confirm_key] = False
                                 st.rerun()
 
-    # --- D. EXPORT ---
+    # --- D. EXPORT EXCEL/CSV ---
     if not df_log.empty:
         st.divider()
-        csv = df_log.to_csv(index=False).encode('utf-8')
-        st.download_button(label="📥 Télécharger Livre de Bord (CSV)", data=csv, file_name='livre_de_bord_vesta.csv', mime='text/csv', use_container_width=True)
-
-    # =================================================================
-# --- 11. PAGE ARCHIVES (VERSION CORRIGÉE & COMPLÈTE) ---
-# =================================================================
-if st.session_state.page == "ARCHIVES":
-    st.title("📂 Archives & Historique")
-    
-    # Bouton de retour rapide
-    if st.button("⬅️ Retour au Planning"):
-        st.session_state.page = "PLANNING"
-        st.rerun()
-
-    # --- SECTION 1 : CONSULTATION DES DONNÉES ARCHIVÉES ---
-    st.markdown("### 🔍 Consultation des historiques")
-    t1, t2, t3, t4 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook", "👤 Contacts"])
-    
-    with t1: 
-        st.subheader("Archives Maintenance")
-        st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
-    
-    with t2: 
-        st.subheader("Archives Planning")
-        st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
-    
-    with t3: 
-        st.subheader("Archives Logbook")
-        st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
-
-    with t4:
-        st.subheader("Archives Contacts (Saisons passées)")
-        # On tente de charger l'archive spécifique 2026 créée par la clôture
-        st.dataframe(charger_data_safe('archives_contacts_2026.json'), use_container_width=True)
-
-    st.divider()
-
-    # --- SECTION 2 : OUTILS DE FIN DE SAISON ---
-    st.markdown("### 🏁 Clôture de Saison 2026")
-    
-    with st.expander("🚨 ZONE DE DANGER : Archiver la saison en cours", expanded=False):
-        st.warning("""
-            **Attention :** Cette action va déplacer toutes les fiches marquées comme **'Paid'** depuis ta liste de contacts active vers le fichier des archives 2026. 
-            Cela permet de vider ton menu Facturation pour la saison suivante.
-        """)
-        
-        if st.button("🔒 EXÉCUTER L'ARCHIVAGE DES CONTACTS RÉGLÉS", use_container_width=True, type="primary"):
-            # 1. Chargement des contacts actuels
-            df_f = charger_data_safe('contacts.json')
-            
-            if not df_f.empty:
-                # 2. Séparation Payé / Non Payé
-                # On s'assure que la colonne Paiement existe
-                if 'Paiement' not in df_f.columns:
-                    df_f['Paiement'] = "Unpaid"
-                
-                df_paid = df_f[df_f['Paiement'] == "Paid"]
-                df_unpaid = df_f[df_f['Paiement'] != "Paid"]
-                
-                if not df_paid.empty:
-                    # 3. Sauvegarde dans l'archive 2026
-                    # On récupère l'archive existante pour ne pas écraser si on clique plusieurs fois
-                    df_hist = charger_data_safe('archives_contacts_2026.json')
-                    df_new_hist = pd.concat([df_hist, df_paid], ignore_index=True)
-                    sauvegarder_data(df_new_hist, 'archives_contacts_2026.json')
-                    
-                    # 4. Mise à jour du fichier actif (on ne garde que les impayés)
-                    sauvegarder_data(df_unpaid, 'contacts.json')
-                    
-                    st.success(f"✅ {len(df_paid)} fiches archivées avec succès dans 'archives_contacts_2026.json'.")
-                    st.rerun()
-                else:
-                    st.info("Aucune fiche marquée comme 'Paid' (Payée) n'a été trouvée.")
-            else:
-                st.error("Le fichier de contacts est vide.")
-
-    # Petit rappel de sécurité en bas de page
-    st.caption("Note : Les fichiers d'archives sont stockés au format JSON sur votre dépôt GitHub.")
-
-# --- FIN DU FICHIER ---
+        csv = df_log.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(label="📥 Télécharger le Livre de Bord complet (.CSV)", data=csv, file_name='livre_de_bord_vesta.csv', mime='text/csv', use_container_width=True)
 
 
 
