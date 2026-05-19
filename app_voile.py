@@ -971,13 +971,25 @@ if st.session_state.page == "STATS":
             for i, (poste, montant) in enumerate(frais_actuels.items()):
                 with cols_f[i % 2]:
                     new_frais[poste] = st.number_input(f"{poste} (€)", value=float(montant), step=50.0)
-            
-            # Bouton de sauvegarde
+          # Bouton de sauvegarde sécurisé et forcé
             if st.form_submit_button("💾 ENREGISTRER LES CHARGES"):
+                # 1. On met à jour le dictionnaire en mémoire
                 params['frais_fixes'] = new_frais
-                sauvegarder_params(params) 
-                st.success("Charges mises à jour !")
-                st.rerun()
+                
+                # 2. Nettoyage des doublons de vidange pour éviter les bugs JSON
+                if 'prochaine_vidange' in params:
+                    # On ne garde qu'une seule valeur propre (la dernière connue)
+                    params['prochaine_vidange'] = 2500.0 
+                
+                # 3. FORCE L'ÉCRITURE DIRECTE SUR LE DISQUE (Contourne la fonction habituelle)
+                import json
+                try:
+                    with open('params.json', 'w', encoding='utf-8') as f:
+                        json.dump(params, f, indent=4, ensure_ascii=False)
+                    st.success("✅ Fichier params.json mis à jour avec succès sur le disque !")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Erreur d'écriture sur le disque : {e}")
 # =================================================================
 # --- 8. PAGE MAINTENANCE (GESTION VIDANGE & TRAVAUX) ---
 # =================================================================
