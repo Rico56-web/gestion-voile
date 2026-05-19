@@ -731,6 +731,7 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
+
 # =================================================================
 # --- 8. PAGE STATS : SOURCE DE VÉRITÉ UNIQUE HARMONISÉE ---
 # =================================================================
@@ -878,31 +879,44 @@ if st.session_state.page == "STATS":
     fig.update_layout(height=350, barmode='group', margin=dict(l=0,r=0,t=20,b=0), legend=dict(orientation="h", y=1.2))
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- 4. TABLEAU DES DÉPENSES DE MAINTENANCE CORRIGÉ, TRIÉ & TOTALISÉ ---
+    # --- 4. TABLEAUX SÉPARÉS : MAINTENANCE TECHNIQUE VS FRAIS FIXES RÉELS ---
     st.divider()
-    st.markdown(f"### 🔧 Détail des Dépenses de Maintenance ({etat_flux_maint})")
+    
+    # Filtrage des deux univers
     if not df_m_y.empty:
-        df_m_trié = df_m_y.sort_values('dt_maint', ascending=True)
-        colonnes_souhaitees = ['Date', 'Type', 'Objet', 'M_Num']
-        colonnes_valibles = [c for c in colonnes_souhaitees if c in df_m_trié.columns]
-        
-        mapping_renom = {
-            'Type': 'Catégorie',
-            'Objet': 'Désignation',
-            'M_Num': 'Montant (€)'
-        }
-        
-        df_m_affichage = df_m_trié[colonnes_valibles].rename(columns=mapping_renom)
-        st.dataframe(df_m_affichage, use_container_width=True, hide_index=True)
-        
-        st.markdown(
-            f"<div style='text-align:right; background:#f8d7da; padding:10px; border-radius:5px; color:#721c24; font-weight:bold; margin-top:10px;'> "
-            f"TOTAL MAINTENANCE ({etat_flux_maint.upper()}) : {total_dep:,.2f} €"
-            f"</div>", 
-            unsafe_allow_html=True
-        )
+        mask_frais_fixes = df_m_y['Type'].fillna('').str.lower().str.contains('port|assur', na=False)
+        df_pure_maint = df_m_y[~mask_frais_fixes].copy()
+        df_reels_fixes = df_m_y[mask_frais_fixes].copy()
     else:
-        st.info("Aucun frais enregistré pour cette catégorie de maintenance cette saison.")
+        df_pure_maint = pd.DataFrame()
+        df_reels_fixes = pd.DataFrame()
+
+    colonnes_souhaitees = ['Date', 'Type', 'Objet', 'M_Num']
+    mapping_renom = {'Type': 'Catégorie', 'Objet': 'Désignation', 'M_Num': 'Montant (€)'}
+
+    # TABLEAU A : MAINTENANCE TECHNIQUE UNIQUEMENT
+    st.markdown(f"### 🔧 Détail des Dépenses de Maintenance Pure ({etat_flux_maint})")
+    if not df_pure_maint.empty:
+        df_pm_trié = df_pure_maint.sort_values('dt_maint', ascending=True)
+        col_val_pm = [c for c in colonnes_souhaitees if c in df_pm_trié.columns]
+        st.dataframe(df_pm_trié[col_val_pm].rename(columns=mapping_renom), use_container_width=True, hide_index=True)
+        
+        total_pure_maint = sum(to_f(x) for x in df_pure_maint['M_Num'])
+        st.markdown(f"<div style='text-align:right; background:#e8f4fd; padding:10px; border-radius:5px; color:#1d6fa5; font-weight:bold; margin-top:5px; margin-bottom:25px;'>TOTAL MAINTENANCE TECHNIQUE : {total_pure_maint:,.2f} €</div>", unsafe_allow_html=True)
+    else:
+        st.info("Aucune dépense de maintenance technique enregistrée cette saison.")
+
+    # TABLEAU B : FRAIS FIXES RÉELS (PORT & ASSURANCES)
+    st.markdown(f"### 📋 Suivi Réel des Frais Fixes du Journal ({etat_flux_maint})")
+    if not df_reels_fixes.empty:
+        df_rf_trié = df_reels_fixes.sort_values('dt_maint', ascending=True)
+        col_val_rf = [c for c in colonnes_souhaitees if c in df_rf_trié.columns]
+        st.dataframe(df_rf_trié[col_val_rf].rename(columns=mapping_renom), use_container_width=True, hide_index=True)
+        
+        total_reels_fixes = sum(to_f(x) for x in df_reels_fixes['M_Num'])
+        st.markdown(f"<div style='text-align:right; background:#fef5d1; padding:10px; border-radius:5px; color:#856404; font-weight:bold; margin-top:5px;'>TOTAL FRAIS FIXES RÉELS RELEVÉS : {total_reels_fixes:,.2f} €</div>", unsafe_allow_html=True)
+    else:
+        st.info("Aucun paiement de type Port ou Assurance relevé dans cette sélection.")
 
     # --- 5. TABLEAU DES SOMMES RESTANT À PERCEVOIR ---
     st.divider()
@@ -917,43 +931,31 @@ if st.session_state.page == "STATS":
         else:
             st.success("✅ Aucune somme en attente.")
 
-    # --- 6. SEUIL DE RENTABILITÉ SÉPARÉ (DÉDOUBLONNAGE PORT/ASSURANCE) ---
+    # --- 6. SEUIL DE RENTABILITÉ CALIBRÉ SUR LES CHARGES ANNUELLES ---
     st.divider()
-    st.markdown("### ⚓ Seuil de Rentabilité Réel (Point Mort Corrigé)")
+    st.markdown("### ⚓ Seuil de Rentabilité (Point Mort Annuel)")
     frais_params = params['frais_fixes']
     total_frais_fixes = sum(to_f(v) for v in frais_params.values())
-    
-    # ISOLATION : On extrait du fichier maintenance uniquement ce qui n'est NI du Port NI de l'Assurance
-    if not df_m_y.empty:
-        # On exclut les lignes dont la colonne 'Type' contient "port" ou "assur" (insensible à la casse)
-        mask_vraie_maint = ~df_m_y['Type'].fillna('').str.lower().str.contains('port|assur|fixe', na=False)
-        frais_pure_maintenance = sum(to_f(x) for x in df_m_y[mask_vraie_maint]['M_Num'])
-    else:
-        frais_pure_maintenance = 0.0
-
-    # Le vrai Point Mort : Vos Charges Fixes + la Vraie Maintenance imprévue/technique
-    point_mort_absolu = total_frais_fixes + frais_pure_maintenance
 
     ca_actuel = total_encaisse_reel 
-    progression = min(1.0, ca_actuel / point_mort_absolu) if point_mort_absolu > 0 else 0
-    manque_a_gagner = max(0.0, point_mort_absolu - ca_actuel)
+    progression = min(1.0, ca_actuel / total_frais_fixes) if total_frais_fixes > 0 else 0
+    manque_a_gagner = max(0.0, total_frais_fixes - ca_actuel)
 
     c_pm1, c_pm2 = st.columns([2, 1])
     with c_pm1:
-        st.write(f"**Objectif Réel Épuré : Charges fixes + Maintenance technique pure ({int(point_mort_absolu):,} €)**")
+        st.write(f"**Objectif : Couvrir les charges prévisionnelles de l'année ({int(total_frais_fixes):,} €)**")
         st.progress(progression)
         if progression >= 1:
-            st.success(f"🎉 **Seuil de rentabilité atteint !** Les coûts réels épurés de doublons sont couverts pour {sel_y}.")
+            st.success(f"🎉 **Seuil de rentabilité atteint !** Le prévisionnel des charges annuelles est couvert pour {sel_y}.")
         else:
-            st.info(f"Il manque encore **{int(manque_a_gagner):,} €** pour amortir les frais annuels et techniques.")
+            st.info(f"Il manque encore **{int(manque_a_gagner):,} €** pour équilibrer le budget annuel théorique.")
 
     with c_pm2:
-        with st.expander("Détail du calcul épuré"):
-            st.write(f"💼 Charges fixes formulaires : {int(total_frais_fixes):,} €")
-            st.write(f"🔧 Maintenance technique pure : {int(frais_pure_maintenance):,} €")
-            st.caption("(Frais de Port & Assurances du JSON ignorés ici car déjà inclus dans les charges fixes)")
+        with st.expander("Détail des charges de référence"):
+            for poste, montant in frais_params.items():
+                st.write(f"{poste} : {int(montant):,} €")
             st.write(f"---")
-            st.write(f"**VRAI TOTAL REQUIS : {int(point_mort_absolu):,} €**")
+            st.write(f"**TOTAL : {int(total_frais_fixes):,} €**")
 
     # --- 7. CONFIGURATION ET MODIFICATION DES CHARGES ---
     st.divider()
@@ -973,7 +975,6 @@ if st.session_state.page == "STATS":
                 sauvegarder_params(params)
                 st.success("Configuration sauvegardée à distance !")
                 st.rerun()
-
 # =================================================================
 # --- 8. PAGE MAINTENANCE : GESTION SÉCURISÉE (V2026) ---
 # =================================================================
