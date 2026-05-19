@@ -731,7 +731,6 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
-
 # =================================================================
 # --- 8. PAGE STATS : SOURCE DE VÉRITÉ UNIQUE HARMONISÉE ---
 # =================================================================
@@ -879,19 +878,22 @@ if st.session_state.page == "STATS":
     fig.update_layout(height=350, barmode='group', margin=dict(l=0,r=0,t=20,b=0), legend=dict(orientation="h", y=1.2))
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- 4. TABLEAU DES DÉPENSES DE MAINTENANCE (AVEC DÉSIGNATION INTÉGRÉE) ---
+    # --- 4. TABLEAU DES DÉPENSES DE MAINTENANCE CORRIGÉ (Clés: Objet & Type) ---
     st.divider()
     st.markdown(f"### 🔧 Détail des Dépenses de Maintenance ({etat_flux_maint})")
     if not df_m_y.empty:
-        # On définit les colonnes cibles incluant Désignation et sa variante sans accent
-        colonnes_souhaitees = ['Date', 'Categorie', 'Titre', 'Designation', 'Désignation', 'M_Num']
-        colonnes_valibles = [c for c in colonnes_souhaitees if c in df_m_y.columns]
+        # Correspondance exacte avec les colonnes réelles de votre JSON
+        colonnes_souhaitees = ['Date', 'Type', 'Objet', 'M_Num']
+        colonnes_valides = [c for c in colonnes_souhaitees if c in df_m_y.columns]
         
-        # Mapping propre pour l'affichage utilisateur
-        mapping_renom = {'M_Num': 'Montant (€)'}
-        if 'Designation' in colonnes_valibles: mapping_renom['Designation'] = 'Désignation'
+        # Renommage propre pour l'interface Streamlit
+        mapping_renom = {
+            'Type': 'Catégorie',
+            'Objet': 'Désignation',
+            'M_Num': 'Montant (€)'
+        }
         
-        df_m_affichage = df_m_y[colonnes_valibles].rename(columns=mapping_renom)
+        df_m_affichage = df_m_y[colonnes_valides].rename(columns=mapping_renom)
         st.dataframe(df_m_affichage, use_container_width=True, hide_index=True)
     else:
         st.info("Aucun frais enregistré pour cette catégorie de maintenance cette saison.")
