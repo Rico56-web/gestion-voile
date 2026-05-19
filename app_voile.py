@@ -917,14 +917,22 @@ if st.session_state.page == "STATS":
         else:
             st.success("✅ Aucune somme en attente.")
 
-    # --- 6. SEUIL DE RENTABILITÉ HARMONISÉ (POINT MORT ABSOLU ACCORDÉ) ---
+    # --- 6. SEUIL DE RENTABILITÉ SÉPARÉ (DÉDOUBLONNAGE PORT/ASSURANCE) ---
     st.divider()
-    st.markdown("### ⚓ Seuil de Rentabilité Réel (Point Mort Absolu)")
+    st.markdown("### ⚓ Seuil de Rentabilité Réel (Point Mort Corrigé)")
     frais_params = params['frais_fixes']
     total_frais_fixes = sum(to_f(v) for v in frais_params.values())
     
-    # CALCUL DU POINT MORT ABSOLU : Charges Fixes Annuelles + Dépenses Maintenance Courantes
-    point_mort_absolu = total_frais_fixes + total_dep
+    # ISOLATION : On extrait du fichier maintenance uniquement ce qui n'est NI du Port NI de l'Assurance
+    if not df_m_y.empty:
+        # On exclut les lignes dont la colonne 'Type' contient "port" ou "assur" (insensible à la casse)
+        mask_vraie_maint = ~df_m_y['Type'].fillna('').str.lower().str.contains('port|assur|fixe', na=False)
+        frais_pure_maintenance = sum(to_f(x) for x in df_m_y[mask_vraie_maint]['M_Num'])
+    else:
+        frais_pure_maintenance = 0.0
+
+    # Le vrai Point Mort : Vos Charges Fixes + la Vraie Maintenance imprévue/technique
+    point_mort_absolu = total_frais_fixes + frais_pure_maintenance
 
     ca_actuel = total_encaisse_reel 
     progression = min(1.0, ca_actuel / point_mort_absolu) if point_mort_absolu > 0 else 0
@@ -932,19 +940,20 @@ if st.session_state.page == "STATS":
 
     c_pm1, c_pm2 = st.columns([2, 1])
     with c_pm1:
-        st.write(f"**Objectif Réel : Couvrir charges fixes + maintenance courante ({int(point_mort_absolu):,} €)**")
+        st.write(f"**Objectif Réel Épuré : Charges fixes + Maintenance technique pure ({int(point_mort_absolu):,} €)**")
         st.progress(progression)
         if progression >= 1:
-            st.success(f"🎉 **Seuil de rentabilité absolue atteint !** Vesta couvre l'intégralité de ses coûts pour {sel_y}.")
+            st.success(f"🎉 **Seuil de rentabilité atteint !** Les coûts réels épurés de doublons sont couverts pour {sel_y}.")
         else:
-            st.info(f"Il manque encore **{int(manque_a_gagner):,} €** pour amortir les frais fixes et la maintenance de cette saison.")
+            st.info(f"Il manque encore **{int(manque_a_gagner):,} €** pour amortir les frais annuels et techniques.")
 
     with c_pm2:
-        with st.expander("Détail du calcul du Point Mort"):
-            st.write(f"💼 Charges fixes : {int(total_frais_fixes):,} €")
-            st.write(f"🔧 Maintenance ({etat_flux_maint}) : {int(total_dep):,} €")
+        with st.expander("Détail du calcul épuré"):
+            st.write(f"💼 Charges fixes formulaires : {int(total_frais_fixes):,} €")
+            st.write(f"🔧 Maintenance technique pure : {int(frais_pure_maintenance):,} €")
+            st.caption("(Frais de Port & Assurances du JSON ignorés ici car déjà inclus dans les charges fixes)")
             st.write(f"---")
-            st.write(f"**TOTAL REQUIS : {int(point_mort_absolu):,} €**")
+            st.write(f"**VRAI TOTAL REQUIS : {int(point_mort_absolu):,} €**")
 
     # --- 7. CONFIGURATION ET MODIFICATION DES CHARGES ---
     st.divider()
