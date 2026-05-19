@@ -166,7 +166,106 @@ for i, name in enumerate(menu):
         st.session_state.page = target
         st.rerun()
 st.divider()
+# =================================================================
+# --- 5. SIDEBAR & LOGIQUE DE NAVIGATION MAÎTRESSE (V2026) ---
+# =================================================================
+import streamlit as st
 
+# --- INITIALISATION DE LA PAGE PAR DÉFAUT ---
+if 'page' not in st.session_state:
+    st.session_state.page = "PLANNING"
+
+# --- NETTOYAGE DES ÉTATS TEMPORAIRES LORS D'UN CHANGEMENT DE PAGE ---
+def changer_page(nom_page):
+    """Bascule de page en réinitialisant les formulaires et modes édition"""
+    st.session_state.page = nom_page
+    
+    # Nettoyage Maintenance
+    st.session_state.maint_edit_id = None
+    st.session_state.show_form_classique = False
+    st.session_state.show_form_vidange = False
+    
+    # Nettoyage Contacts / Facturation
+    st.session_state.edit_idx = None
+    st.session_state.saisie_ouverte = False
+    
+    st.rerun()
+
+# --- DESIGN DE LA SIDEBAR ---
+with st.sidebar:
+    # En-tête de l'application
+    st.markdown("""
+        <div style="text-align: center; padding: 10px; background-color: #2c3e50; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="color: white; margin: 0; font-size: 1.3rem;">🚢 Vesta Skipper</h2>
+            <small style="color: #bdc3c7;">Gestion de Bord v2026</small>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("### 🗺️ Navigation")
+    
+    # Système de boutons exclusifs pour remplacer le selectbox (effet "Application Native")
+    if st.button("📅 Planning & Engagements", use_container_width=True, 
+                 type="primary" if st.session_state.page == "PLANNING" else "secondary"):
+        changer_page("PLANNING")
+        
+    if st.button("👤 Fiches Contacts", use_container_width=True, 
+                 type="primary" if st.session_state.page in ["CONTACTS", "MODIFIER_CONTACT"] else "secondary"):
+        changer_page("CONTACTS")
+        
+    if st.button("📑 Suivi Facturation", use_container_width=True, 
+                 type="primary" if st.session_state.page == "FACT" else "secondary"):
+        changer_page("FACT")
+        
+    if st.button("🛠️ Maintenance & Moteur", use_container_width=True, 
+                 type="primary" if st.session_state.page == "MAINT" else "secondary"):
+        changer_page("MAINT")
+        
+    if st.button("📖 Livre de Bord (Log)", use_container_width=True, 
+                 type="primary" if st.session_state.page == "LOG" else "secondary"):
+        changer_page("LOG")
+        
+    if st.button("📊 Statistiques Saison", use_container_width=True, 
+                 type="primary" if st.session_state.page == "STATS" else "secondary"):
+        changer_page("STATS")
+        
+    st.divider()
+    st.markdown("### ⚙️ Paramètres")
+    
+    if st.button("📂 Archives & Coffre-Fort", use_container_width=True, 
+                 type="primary" if st.session_state.page == "ARCHIVES" else "secondary"):
+        changer_page("ARCHIVES")
+
+    # Rappel du contexte en bas de Sidebar
+    st.markdown("---")
+    st.caption("⚓ Enregistré sur GitHub : Rico56-web")
+
+# =================================================================
+# --- 6. AIGUILLAGE DE L'AFFICHAGE CENTRAL ---
+# =================================================================
+# C'est ici que s'exécutent vos différents blocs de code de pages
+if st.session_state.page == "PLANNING":
+    pass # Votre code existant pour le Planning (avec couleur Bleue pour CMN !)
+
+elif st.session_state.page == "CONTACTS":
+    pass # Votre code existant pour la liste des Contacts
+
+elif st.session_state.page == "MODIFIER_CONTACT":
+    pass # Votre formulaire d'édition de contact (appelé depuis Contacts ou Facture)
+
+elif st.session_state.page == "FACT":
+    pass # Le code Facturation validé juste avant
+
+elif st.session_state.page == "MAINT":
+    pass # Le code Maintenance avec check-list mécanique validé juste avant
+
+elif st.session_state.page == "LOG":
+    pass # Le code Livre de Bord validé juste avant
+
+elif st.session_state.page == "STATS":
+    pass # Le module Statistiques (que nous allons caler ensuite)
+
+elif st.session_state.page == "ARCHIVES":
+    pass # Le code Archives & Clôture validé juste avant
 # =================================================================
 # --- 2. MENU MÉMOS (VERSION FINALE SECURISEE) ---
 # =================================================================
