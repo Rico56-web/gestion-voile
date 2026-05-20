@@ -1370,7 +1370,6 @@ def envoyer_email_facturation_cmn(corps_texte, mois_annee):
         st.error(f"Erreur d'envoi de l'email : {e}")
         return False
 
-
 # =================================================================
 # --- 7. PAGE FACTURATION (FACT) ---
 # =================================================================
@@ -1397,69 +1396,136 @@ if st.session_state.page == "FACT":
 
         st.divider()
 
-        # --- MODULE AUTOMATIQUE : ENVOI MENSUEL CMN ---
-        st.subheader("📬 Envoi groupé CMN")
+        # --- MODULE D'ENVOI CONFIGURABLE CMN ---
+        st.subheader("📬 Envoi groupé CMN (Vérification & Signature)")
         
-        # Identification des prestations CMN non encaissées du mois précédent / en cours
+        # Initialisation des états de révision dans la session Streamlit
+        if 'preparer_mail_cmn' not in st.session_state: st.session_state.preparer_mail_cmn = False
+
         df_fact['dt_temp'] = pd.to_datetime(df_fact['DateNav'], dayfirst=True, errors='coerce')
-        
-        # On filtre : Société contient CMN ET statut est Unpaid
-        df_cmn_attente = df_fact[(df_fact['Société'].str.upper().str.contains('CMN', na=False)) & (df_fact['Paiement'] == "Unpaid")]
+        df_cmn_attente = df_fact[(df_fact['Société'].str.upper().str.contains('CMN', na=False)) & (df_fact['Paiement'] == "Unpaid")].copy()
         
         if not df_cmn_attente.empty:
             mois_actuel = pd.Timestamp.now().strftime("%B %Y")
             st.info(f"Il y a **{len(df_cmn_attente)}** prestation(s) CMN en attente de règlement.")
             
-            if st.button("📧 Générer et envoyer le relevé mensuel à CMN", type="primary"):
-                # Construction du tableau HTML pour le corps du mail
-                lignes_tableau = ""
-                total_cmn = 0.0
-                
-                for _, row in df_cmn_attente.iterrows():
-                    valeur = to_f(row.get('Prix', 0))
-                    total_cmn += valeur
-                    lignes_tableau += f"""
-                    <tr>
-                        <td style='padding:8px; border:1px solid #ddd;'>{row.get('DateNav','')}</td>
-                        <td style='padding:8px; border:1px solid #ddd;'>{row.get('Nom','')} {row.get('Prénom','')}</td>
-                        <td style='padding:8px; border:1px solid #ddd; text-align:right;'>{valeur:.2f} €</td>
-                    </tr>
-                    """
-                
-                corps_html = f"""
-                <html>
-                <body style="font-family: Arial, sans-serif; color: #333;">
-                    <p>Bonjour,</p>
-                    <p>Veuillez trouver ci-dessous le récapitulatif des prestations maritimes effectuées pour le compte de CMN au titre du mois de <b>{mois_actuel}</b>.</p>
+            # Bouton d'ouverture de l'espace de révision
+            if not st.session_state.preparer_mail_cmn:
+                if st.button("📝 Préparer et réviser le relevé mensuel CMN", use_container_width=True):
+                    st.session_state.preparer_mail_cmn = True
+                    st.rerun()
+            
+            # --- ESPACE DE RÉVISION ACTIF ---
+            if st.session_state.preparer_mail_cmn:
+                with st.expander("🔍 CONFIGURATION DE L'EMAIL AVANT ENVOI", expanded=True):
                     
-                    <table style="border-collapse: collapse; width: 100%; max-width: 600px; margin: 20px 0;">
-                        <thead>
-                            <tr style="background-color: #3498db; color: white;">
-                                <th style="padding:10px; border:1px solid #ddd; text-align:left;">Date</th>
-                                <th style="padding:10px; border:1px solid #ddd; text-align:left;">Skipper / Contact</th>
-                                <th style="padding:10px; border:1px solid #ddd; text-align:right;">Montant</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {lignes_tableau}
-                            <tr style="font-weight: bold; background-color: #f9f9f9;">
-                                <td colspan="2" style="padding:10px; border:1px solid #ddd; text-align:right;">Total à régler :</td>
-                                <td style="padding:10px; border:1px solid #ddd; text-align:right; color:#2c3e50;">{total_cmn:.2f} €</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    st.markdown("### 1. Sélectionner les prestations à inclure")
+                    # Dictionnaire pour stocker l'état des cases à cocher (Toutes cochées par défaut)
+                    prestations_choisies = {}
+                    for idx, row in df_cmn_attente.iterrows():
+                        label_presta = f"📅 {row.get('DateNav','')} - {row.get('Nom','')} {row.get('Prénom','')} ({to_f(row.get('Prix',0)):.2f} €)"
+                        prestations_choisies[idx] = st.checkbox(label_presta, value=True, key=f"chk_mail_{idx}")
                     
-                    <p>Cordialement,<br><b>L'équipage de Vesta</b></p>
-                </body>
-                </html>
-                """
-                
-                # Exécution de l'envoi
-                with st.spinner("Envoi de l'email à la comptabilité..."):
-                    succes = envoyer_email_facturation_cmn(corps_html, mois_actuel)
-                    if succes:
-                        st.success("Le relevé mensuel a été envoyé avec succès par email !")
-                        st.balloons()
+                    # Filtrage des lignes retenues par l'utilisateur
+                    indices_retenus = [k for k, v in prestations_choisies.items() if v]
+                    df_cmn_filtre = df_cmn_attente.loc[indices_retenus]
+                    
+                    st.markdown("### 2. Personnaliser le message d'accompagnement")
+                    texte_defaut = f"Bonjour,\n\nVeuillez trouver ci-dessous le récapitulatif des prestations maritimes effectuées pour le compte de CMN au titre du mois de {mois_actuel}."
+                    corps_texte_user = st.text_area("Message d'introduction", value=texte_defaut, height=120)
+                    
+                    st.markdown("### 3. Signature électronique & Certification")
+                    col_sig1, col_sig2 = st.columns([6, 4])
+                    with col_sig1:
+                        signataire = st.text_input("Nom du signataire", value="Le Skipper de Vesta")
+                        certif_signature = st.checkbox("✍️ Certifier l'exactitude des prestations et apposer ma signature numérique", value=False)
+                    with col_sig2:
+                        # Génération visuelle d'un bloc de signature électronique
+                        date_signature = pd.Timestamp.now().strftime("%d/%m/%Y %H:%M")
+                        if certif_signature:
+                            st.markdown(f"""
+                            <div style="border: 2px dashed #27ae60; background-color: #f2f9f4; padding: 10px; border-radius: 5px; text-align: center; color: #27ae60;">
+                                <small style="text-transform: uppercase; font-weight: bold; letter-spacing: 1px;">Signé Électriquement</small><br>
+                                <b>{signataire}</b><br>
+                                <small>Horodatage : {date_signature}</small><br>
+                                <small style="font-size: 0.6rem; color: #7f8c8d;">ID: SECURE-LOG-{pd.Timestamp.now().strftime('%Y%m%d')}</small>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        else:
+                            st.markdown("""
+                            <div style="border: 2px dashed #bdc3c7; background-color: #f9f9f9; padding: 10px; border-radius: 5px; text-align: center; color: #7f8c8d; height: 85px; display: flex; align-items: center; justify-content: center;">
+                                <small>En attente de signature...</small>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                    st.divider()
+                    
+                    # --- ACTION D'ENVOI ET CONFIRMATION DÉFINITIVE ---
+                    c_btn1, c_btn2 = st.columns(2)
+                    
+                    if c_btn1.button("❌ Annuler / Masquer la préparation", use_container_width=True):
+                        st.session_state.preparer_mail_cmn = False
+                        st.rerun()
+                        
+                    if c_btn2.button("🚀 CONFIRMER ET ENVOYER LE MAIL", type="primary", use_container_width=True, disabled=not certif_signature):
+                        if df_cmn_filtre.empty:
+                            st.warning("Veuillez sélectionner au moins une prestation à inclure dans le tableau.")
+                        else:
+                            # Construction dynamique du tableau HTML des prestations validées
+                            lignes_tableau = ""
+                            total_cmn = 0.0
+                            for _, row in df_cmn_filtre.iterrows():
+                                valeur = to_f(row.get('Prix', 0))
+                                total_cmn += valeur
+                                lignes_tableau += f"""
+                                <tr>
+                                    <td style='padding:8px; border:1px solid #ddd;'>{row.get('DateNav','')}</td>
+                                    <td style='padding:8px; border:1px solid #ddd;'>{row.get('Nom','')} {row.get('Prénom','')}</td>
+                                    <td style='padding:8px; border:1px solid #ddd; text-align:right;'>{valeur:.2f} €</td>
+                                </tr>
+                                """
+                            
+                            # Corps de l'email HTML final avec mise en forme de la signature
+                            corps_html_final = f"""
+                            <html>
+                            <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
+                                <p>{corps_texte_user.replace('\n', '<br>')}</p>
+                                
+                                <table style="border-collapse: collapse; width: 100%; max-width: 600px; margin: 20px 0;">
+                                    <thead>
+                                        <tr style="background-color: #3498db; color: white;">
+                                            <th style="padding:10px; border:1px solid #ddd; text-align:left;">Date</th>
+                                            <th style="padding:10px; border:1px solid #ddd; text-align:left;">Skipper / Contact</th>
+                                            <th style="padding:10px; border:1px solid #ddd; text-align:right;">Montant</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {lignes_tableau}
+                                        <tr style="font-weight: bold; background-color: #f9f9f9;">
+                                            <td colspan="2" style="padding:10px; border:1px solid #ddd; text-align:right;">Total à régler :</td>
+                                            <td style="padding:10px; border:1px solid #ddd; text-align:right; color:#2c3e50;">{total_cmn:.2f} €</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                
+                                <br>
+                                <div style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 30px;">
+                                    <p style="margin: 0; font-size: 0.9rem; color: #7f8c8d;"><i>Message certifié et signé numériquement par l'expéditeur :</i></p>
+                                    <p style="margin: 5px 0 0 0; font-weight: bold; color: #27ae60; font-size: 1.1rem;">✍️ {signataire}</p>
+                                    <p style="margin: 0; font-size: 0.8rem; color: #95a5a6;">Horodatage de certification : {date_signature}</p>
+                                    <p style="margin: 0; font-size: 0.7rem; color: #bdc3c7;">ID Traçabilité Vesta : SECURE-LOG-{pd.Timestamp.now().strftime('%Y%m%d')}</p>
+                                </div>
+                            </body>
+                            </html>
+                            """
+                            
+                            with st.spinner("Envoi sécurisé du relevé à la CMN..."):
+                                succes = envoyer_email_facturation_cmn(corps_html_final, mois_actuel)
+                                if succes:
+                                    st.success("Le relevé de facturation révisé et signé a été envoyé !")
+                                    st.session_state.preparer_mail_cmn = False
+                                    st.balloons()
+                                    st.rerun()
         else:
             st.write("✨ Aucune facture CMN en attente d'envoi ce mois-ci.")
             
@@ -1529,6 +1595,7 @@ if st.session_state.page == "FACT":
             afficher_onglet("Unpaid")
         with t2: 
             afficher_onglet("Paid")
+
 # =================================================================
 # --- 11. PAGE ARCHIVES & SÉCURITÉ (VERSION UNIFIÉE & FIXÉE) ---
 # =================================================================
