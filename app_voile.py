@@ -1529,7 +1529,6 @@ if st.session_state.page == "ARCHIVES":
             else:
                 st.error("Le fichier de contacts actif est vide.")
 
-
 # =================================================================
 # --- 12. PAGE LIVRE DE BORD (LOG) ---
 # =================================================================
@@ -1569,7 +1568,28 @@ if st.session_state.page == "LOG":
             last_mot = df_log['MotArr'].max() if not df_log.empty else 0.0
             last_mil = df_log['MilArr'].max() if not df_log.empty else 0.0
             val_date = pd.Timestamp.now().to_pydatetime()
+            
+            # --- Suggestion automatique du nom selon la date ---
             val_nav = ""
+            if not df_log.empty:
+                try:
+                    # Copie pour isoler le calcul de la date la plus récente
+                    df_calc = df_log.copy()
+                    df_calc['dt_temp'] = pd.to_datetime(df_calc['Date'], dayfirst=True, errors='coerce')
+                    df_calc = df_calc.dropna(subset=['dt_temp'])
+                    
+                    if not df_calc.empty:
+                        # On récupère la ligne de l'étape la plus récente chronologiquement
+                        derniere_etape = df_calc.loc[df_calc['dt_temp'].idxmax()]
+                        date_derniere = Row_date =拉 = derniere_etape['dt_temp']
+                        date_actuelle = pd.Timestamp.now().normalize()
+                        
+                        # Si l'écart est strictement inférieur à 5 jours, on conserve le nom
+                        if (date_actuelle - date_derniere).days < 5:
+                            val_nav = derniere_etape.get('Navigation', '')
+                except:
+                    val_nav = "" # Sécurité en cas d'erreur de parsing des dates
+            
             val_equi = ""
             val_meteo = ""
             val_notes = ""
@@ -1582,7 +1602,7 @@ if st.session_state.page == "LOG":
         with st.expander(title, expanded=True):
             with st.form(key=f"form_log_{mode}"):
                 c1, c2 = st.columns(2)
-                f_date = c1.date_input("Date", val_date) if mode=="creation" else c1.text_input("Date", value=val_date)
+                f_date = c1.date_input("Date", val_date) if mode=="creation" else c2.text_input("Date", value=val_date)
                 f_but = c2.text_input("Nom du Voyage / Croisière", value=val_nav, placeholder="ex: Gijón 2026")
                 
                 f_equipage = st.text_area("Équipage / Rôle", value=val_equi, height=60)
@@ -1634,7 +1654,7 @@ if st.session_state.page == "LOG":
     elif st.session_state.saisie_ouverte:
         formulaire_fiche(mode="creation")
     else:
-        st.button("➕ NOUVELLE ÉTAPE QUOTIENNE", on_click=lambda: st.session_state.update({"saisie_ouverte": True}), use_container_width=True)
+        st.button("➕ NOUVELLE ÉTAPE QUOTIDIENNE", on_click=lambda: st.session_state.update({"saisie_ouverte": True}), use_container_width=True)
 
     # --- C. VUE EN LISTE CHRONOLOGIQUE PAR CRUISE ---
     if not df_log.empty:
@@ -1688,8 +1708,6 @@ if st.session_state.page == "LOG":
         st.divider()
         csv = df_log.to_csv(index=False).encode('utf-8-sig')
         st.download_button(label="📥 Télécharger le Livre de Bord complet (.CSV)", data=csv, file_name='livre_de_bord_vesta.csv', mime='text/csv', use_container_width=True)
-
-
 
 
 
