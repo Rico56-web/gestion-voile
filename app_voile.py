@@ -1445,7 +1445,7 @@ if st.session_state.page == "FACT":
                         help="Par défaut celle des secrets. Modifie-la pour faire un test (ex: eric.clavreul@gmail.com)"
                     )
                     
-                    texte_defaut = f"Bonjour,\n\nVeuillez trouver ci-dessous le récapitulatif des prestations maritimes effectuées sur le voilier VESTA pour le compte de CMN au titre du mois de {mois_actuel}.\n\ Bonne reception"
+                    texte_defaut = f"Bonjour,\n\nVeuillez trouver ci-dessous le récapitulatif des prestations maritimes effectuées sur le voilier VESTA pour le compte de CMN au titre du mois de {mois_actuel}.\n Bonne reception"
                     corps_texte_user = st.text_area("Message d'introduction", value=texte_defaut, height=120)
                     
                     st.markdown("### 3. Signature électronique & Certification")
