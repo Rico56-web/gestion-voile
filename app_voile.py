@@ -1338,6 +1338,39 @@ if st.session_state.page == "MAINT":
         st.download_button("📥 Télécharger Historique Complet (Excel)", data=buffer.getvalue(), 
                            file_name=f"Maintenance_Vesta_Skipper.xlsx", use_container_width=True)
 
+# facturation
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+# =================================================================
+# --- FONCTION COMPLÉMENTAIRE D'ENVOI DE MAIL ---
+# =================================================================
+def envoyer_email_facturation_cmn(corps_texte, mois_annee):
+    """Gère l'envoi de l'email via le protocole sécurisé TLS."""
+    try:
+        # Récupération sécurisée des accès dans les secrets Streamlit
+        cfg = st.secrets["email"]
+        
+        msg = MIMEMultipart()
+        msg['From'] = cfg["smtp_user"]
+        msg['To'] = cfg["email_destinataire"]
+        msg['Subject'] = f"🧾 Facturation Vesta Skipper - Prestations CMN ({mois_annee})"
+        
+        msg.attach(MIMEText(corps_texte, 'html'))
+        
+        # Connexion sécurisée au serveur
+        server = smtplib.SMTP(cfg["smtp_server"], int(cfg["smtp_port"]))
+        server.starttls()  # Chiffrement de la connexion
+        server.login(cfg["smtp_user"], cfg["smtp_password"])
+        server.sendmail(cfg["smtp_user"], cfg["email_destinataire"], msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Erreur d'envoi de l'email : {e}")
+        return False
+
+
 # =================================================================
 # --- 7. PAGE FACTURATION (FACT) ---
 # =================================================================
@@ -1356,7 +1389,6 @@ if st.session_state.page == "FACT":
         reste_a_percevoir = max(0.0, total_ca - total_enc)
 
         m1, m2, m3 = st.columns(3)
-        # Formatage standardisé sans crash d'espace
         m1.metric("Total CA", f"{total_ca:,.2f} €".replace(",", " "))
         m2.metric("Encaissé", f"{total_enc:,.2f} €".replace(",", " "))
         m3.metric("Reste à percevoir", f"{reste_a_percevoir:,.2f} €".replace(",", " "), 
@@ -1365,12 +1397,75 @@ if st.session_state.page == "FACT":
 
         st.divider()
 
-        # --- FILTRAGE ET TRI CHRONOLOGIQUE ---
-        if 'Paiement' not in df_fact.columns: 
-            df_fact['Paiement'] = "Unpaid"
+        # --- MODULE AUTOMATIQUE : ENVOI MENSUEL CMN ---
+        st.subheader("📬 Envoi groupé CMN")
         
-        # Tri chronologique sécurisé
+        # Identification des prestations CMN non encaissées du mois précédent / en cours
         df_fact['dt_temp'] = pd.to_datetime(df_fact['DateNav'], dayfirst=True, errors='coerce')
+        
+        # On filtre : Société contient CMN ET statut est Unpaid
+        df_cmn_attente = df_fact[(df_fact['Société'].str.upper().str.contains('CMN', na=False)) & (df_fact['Paiement'] == "Unpaid")]
+        
+        if not df_cmn_attente.empty:
+            mois_actuel = pd.Timestamp.now().strftime("%B %Y")
+            st.info(f"Il y a **{len(df_cmn_attente)}** prestation(s) CMN en attente de règlement.")
+            
+            if st.button("📧 Générer et envoyer le relevé mensuel à CMN", type="primary"):
+                # Construction du tableau HTML pour le corps du mail
+                lignes_tableau = ""
+                total_cmn = 0.0
+                
+                for _, row in df_cmn_attente.iterrows():
+                    valeur = to_f(row.get('Prix', 0))
+                    total_cmn += valeur
+                    lignes_tableau += f"""
+                    <tr>
+                        <td style='padding:8px; border:1px solid #ddd;'>{row.get('DateNav','')}</td>
+                        <td style='padding:8px; border:1px solid #ddd;'>{row.get('Nom','')} {row.get('Prénom','')}</td>
+                        <td style='padding:8px; border:1px solid #ddd; text-align:right;'>{valeur:.2f} €</td>
+                    </tr>
+                    """
+                
+                corps_html = f"""
+                <html>
+                <body style="font-family: Arial, sans-serif; color: #333;">
+                    <p>Bonjour,</p>
+                    <p>Veuillez trouver ci-dessous le récapitulatif des prestations maritimes effectuées pour le compte de CMN au titre du mois de <b>{mois_actuel}</b>.</p>
+                    
+                    <table style="border-collapse: collapse; width: 100%; max-width: 600px; margin: 20px 0;">
+                        <thead>
+                            <tr style="background-color: #3498db; color: white;">
+                                <th style="padding:10px; border:1px solid #ddd; text-align:left;">Date</th>
+                                <th style="padding:10px; border:1px solid #ddd; text-align:left;">Skipper / Contact</th>
+                                <th style="padding:10px; border:1px solid #ddd; text-align:right;">Montant</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {lignes_tableau}
+                            <tr style="font-weight: bold; background-color: #f9f9f9;">
+                                <td colspan="2" style="padding:10px; border:1px solid #ddd; text-align:right;">Total à régler :</td>
+                                <td style="padding:10px; border:1px solid #ddd; text-align:right; color:#2c3e50;">{total_cmn:.2f} €</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <p>Cordialement,<br><b>L'équipage de Vesta</b></p>
+                </body>
+                </html>
+                """
+                
+                # Exécution de l'envoi
+                with st.spinner("Envoi de l'email à la comptabilité..."):
+                    succes = envoyer_email_facturation_cmn(corps_html, mois_actuel)
+                    if succes:
+                        st.success("Le relevé mensuel a été envoyé avec succès par email !")
+                        st.balloons()
+        else:
+            st.write("✨ Aucune facture CMN en attente d'envoi ce mois-ci.")
+            
+        st.divider()
+
+        # --- FILTRAGE ET TRI CHRONOLOGIQUE DES ONGLETS ---
         df_fact = df_fact.sort_values(by='dt_temp', ascending=True)
         df_fact = df_fact.drop(columns=['dt_temp'], errors='ignore')
 
@@ -1388,17 +1483,15 @@ if st.session_state.page == "FACT":
                     soc = str(row.get('Société', 'PERSO')).upper()
                     is_cmn = "CMN" in soc
                     
-                    # Détection du retard de paiement
                     date_nav = pd.to_datetime(row.get('DateNav',''), dayfirst=True, errors='coerce')
                     retard = (status_filtre == "Unpaid") and (pd.notna(date_nav) and date_nav < aujourdhui)
                     
-                    # Styles visuels
                     label_retard = "<span style='color:#E74C3C; font-weight:bold; font-size:0.8rem;'>⚠️ RETARD</span>" if retard else ""
                     card_bg = "#E3F2FD" if is_cmn else "#F9F9F9"
                     border_color = "#E74C3C" if retard else ("#3498db" if is_cmn else "#7F8C8D")
                     
                     st.markdown(f"""
-                        <div style="background:{card_bg}; border-left:10px solid {border_color}; padding:15px; border-radius:8px; margin-bottom:10px; color:black; border: 1px solid #ddd;">
+                        <div style="background:{card_bg}; border: 1px solid #ddd; border-left:10px solid {border_color}; padding:15px; border-radius:8px; margin-bottom:10px; color:black;">
                             <div style="display:flex; justify-content:space-between;">
                                 <b>{row.get('Nom','')} {row.get('Prénom','')}</b>
                                 <span style="font-size:1.1rem; font-weight:bold;">{to_f(row.get('Prix',0)):.2f} €</span>
@@ -1410,7 +1503,7 @@ if st.session_state.page == "FACT":
                         </div>
                     """, unsafe_allow_html=True)
 
-                    c1, c2, _ = st.columns([2, 2, 6])
+                    c1, c2, _ = st.columns([2.5, 2.5, 5])
                     
                     if status_filtre == "Unpaid":
                         if c1.button(f"💰 Encaisser", key=f"pay_btn_{idx}"):
@@ -1418,6 +1511,13 @@ if st.session_state.page == "FACT":
                             df_fact.at[idx, 'Acompte'] = df_fact.at[idx, 'Prix']
                             sauvegarder_data(df_fact, 'contacts.json')
                             st.toast("Paiement enregistré !", icon="💰")
+                            st.rerun()
+                    else:
+                        if c1.button(f"↩️ Annuler", key=f"unpay_btn_{idx}"):
+                            df_fact.at[idx, 'Paiement'] = "Unpaid"
+                            df_fact.at[idx, 'Acompte'] = 0.0
+                            sauvegarder_data(df_fact, 'contacts.json')
+                            st.toast("Paiement annulé et remis en attente", icon="↩️")
                             st.rerun()
 
                     if c2.button(f"✏️ Voir", key=f"edit_f_{idx}"):
@@ -1429,8 +1529,6 @@ if st.session_state.page == "FACT":
             afficher_onglet("Unpaid")
         with t2: 
             afficher_onglet("Paid")
-
-
 # =================================================================
 # --- 11. PAGE ARCHIVES & SÉCURITÉ (VERSION UNIFIÉE & FIXÉE) ---
 # =================================================================
