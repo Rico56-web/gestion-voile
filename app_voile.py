@@ -1346,15 +1346,19 @@ from email.mime.multipart import MIMEMultipart
 # =================================================================
 # --- FONCTION COMPLÉMENTAIRE D'ENVOI DE MAIL ---
 # =================================================================
-def envoyer_email_facturation_cmn(corps_texte, mois_annee):
+def envoyer_email_facturation_cmn(corps_texte, mois_annee, destinataire=None):
     """Gère l'envoi de l'email via le protocole sécurisé TLS."""
     try:
         # Récupération sécurisée des accès dans les secrets Streamlit
         cfg = st.secrets["email"]
         
+        # Si aucun destinataire n'est spécifié, on prend l'officiel des secrets
+        if destinataire is None:
+            destinataire = cfg["email_destinataire"]
+        
         msg = MIMEMultipart()
         msg['From'] = cfg["smtp_user"]
-        msg['To'] = cfg["email_destinataire"]
+        msg['To'] = destinataire
         msg['Subject'] = f"🧾 Facturation Vesta Skipper - Prestations CMN ({mois_annee})"
         
         msg.attach(MIMEText(corps_texte, 'html'))
@@ -1363,12 +1367,13 @@ def envoyer_email_facturation_cmn(corps_texte, mois_annee):
         server = smtplib.SMTP(cfg["smtp_server"], int(cfg["smtp_port"]))
         server.starttls()  # Chiffrement de la connexion
         server.login(cfg["smtp_user"], cfg["smtp_password"])
-        server.sendmail(cfg["smtp_user"], cfg["email_destinataire"], msg.as_string())
+        server.sendmail(cfg["smtp_user"], destinataire, msg.as_string())
         server.quit()
         return True
     except Exception as e:
         st.error(f"Erreur d'envoi de l'email : {e}")
         return False
+
 
 # =================================================================
 # --- 7. PAGE FACTURATION (FACT) ---
@@ -1420,7 +1425,6 @@ if st.session_state.page == "FACT":
                 with st.expander("🔍 CONFIGURATION DE L'EMAIL AVANT ENVOI", expanded=True):
                     
                     st.markdown("### 1. Sélectionner les prestations à inclure")
-                    # Dictionnaire pour stocker l'état des cases à cocher (Toutes cochées par défaut)
                     prestations_choisies = {}
                     for idx, row in df_cmn_attente.iterrows():
                         label_presta = f"📅 {row.get('DateNav','')} - {row.get('Nom','')} {row.get('Prénom','')} ({to_f(row.get('Prix',0)):.2f} €)"
@@ -1430,7 +1434,17 @@ if st.session_state.page == "FACT":
                     indices_retenus = [k for k, v in prestations_choisies.items() if v]
                     df_cmn_filtre = df_cmn_attente.loc[indices_retenus]
                     
-                    st.markdown("### 2. Personnaliser le message d'accompagnement")
+                    st.markdown("### 2. Destinataire et Message d'accompagnement")
+                    # Récupération de l'adresse par défaut depuis les secrets
+                    email_defaut_cmn = st.secrets["email"].get("email_destinataire", "compta.cmn@exemple.com")
+                    
+                    # Champ modifiable pour faire des essais (ex: eric.clavreul@gmail.com)
+                    email_destinataire_actif = st.text_input(
+                        "Adresse email du destinataire", 
+                        value=email_defaut_cmn,
+                        help="Par défaut celle des secrets. Modifie-la pour faire un test (ex: eric.clavreul@gmail.com)"
+                    )
+                    
                     texte_defaut = f"Bonjour,\n\nVeuillez trouver ci-dessous le récapitulatif des prestations maritimes effectuées pour le compte de CMN au titre du mois de {mois_actuel}."
                     corps_texte_user = st.text_area("Message d'introduction", value=texte_defaut, height=120)
                     
@@ -1519,10 +1533,10 @@ if st.session_state.page == "FACT":
                             </html>
                             """
                             
-                            with st.spinner("Envoi sécurisé du relevé à la CMN..."):
-                                succes = envoyer_email_facturation_cmn(corps_html_final, mois_actuel)
+                            with st.spinner(f"Envoi sécurisé du relevé à {email_destinataire_actif}..."):
+                                succes = envoyer_email_facturation_cmn(corps_html_final, mois_actuel, destinataire=email_destinataire_actif)
                                 if succes:
-                                    st.success("Le relevé de facturation révisé et signé a été envoyé !")
+                                    st.success(f"Le relevé de facturation révisé et signé a été envoyé à {email_destinataire_actif} !")
                                     st.session_state.preparer_mail_cmn = False
                                     st.balloons()
                                     st.rerun()
