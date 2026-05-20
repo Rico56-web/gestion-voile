@@ -1451,7 +1451,7 @@ if st.session_state.page == "FACT":
                     st.markdown("### 3. Signature électronique & Certification")
                     col_sig1, col_sig2 = st.columns([6, 4])
                     with col_sig1:
-                        signataire = st.text_input("Nom du signataire", value="Le Skipper de Vesta")
+                        signataire = st.text_input("Nom du signataire", value="Le propiétaire de Vesta: Eric CLAVREUL")
                         certif_signature = st.checkbox("✍️ Certifier l'exactitude des prestations et apposer ma signature numérique", value=False)
                     with col_sig2:
                         # Génération visuelle d'un bloc de signature électronique
