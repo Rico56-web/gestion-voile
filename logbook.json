@@ -253,5 +253,22 @@
         "PortDep":"Escale",
         "Co\u00e9quipiers":"dominique et florence Vasselin\nSonia et sa copine Claire ",
         "Meteo":""
+    },
+    {
+        "Date":"22\/05\/2026",
+        "Navigation":"avec Franck",
+        "PortArr":null,
+        "MotDep":2457.4,
+        "MotArr":2459.4,
+        "TotalMot":2.0,
+        "MilDep":3200.0,
+        "MilArr":3200.0,
+        "TotalMil":0.0,
+        "H_Voile":6.0,
+        "Notes":"stop au port de Houat sur Cateway pour casser la croute ",
+        "Group_ID":null,
+        "PortDep":null,
+        "Co\u00e9quipiers":"Franck martin ",
+        "Meteo":"tres beau temps , soleil et vent de 10 a 12noeuds"
     }
 ]
