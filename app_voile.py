@@ -755,14 +755,14 @@ if st.session_state.page == "STATS":
     mode_bilan = c_sel1.radio("Mode de calcul :", ["Réel (Encaissé)", "Prévisionnel (Saison)"], horizontal=True)
     sel_y = c_sel2.selectbox("Saison :", [2025, 2026, 2027], index=1)
 
-    # 2. TRAITEMENT DES RECETTES & CONTRATS
+    # 2. NETTOYAGE ET CONVERSION SÉCURISÉE EN AMONT
     if not df_actif.empty:
         df_actif['dt_vrai'] = pd.to_datetime(df_actif['DateNav'], dayfirst=True, errors='coerce')
+        df_actif['Prix'] = pd.to_numeric(df_actif['Prix'], errors='coerce').fillna(0.0)
+        df_actif['Acompte'] = pd.to_numeric(df_actif['Acompte'], errors='coerce').fillna(0.0)
+        
         mask_f = (df_actif['dt_vrai'].dt.year == sel_y) & (~df_actif['Statut'].str.lower().str.contains("annule|refuse", na=False))
         df_f = df_actif[mask_f].copy()
-        
-        for col in ['Prix', 'Acompte']: 
-            df_f[col] = df_f[col].apply(to_f)
         
         # EXCLUSION STRUCTURELLE DES UNPAID DANS LE MODE REEL
         df_f['Montant_Encaisse'] = df_f.apply(
@@ -773,15 +773,16 @@ if st.session_state.page == "STATS":
         total_encaisse_reel = df_f['Montant_Encaisse'].sum()
         reste_a_percevoir = total_ca_saison - total_encaisse_reel
     else:
-        df_f = pd.DataFrame()
+        df_f = pd.DataFrame(columns=['dt_vrai', 'Prix', 'Acompte', 'Montant_Encaisse', 'Société', 'Statut'])
         total_ca_saison = total_encaisse_reel = reste_a_percevoir = 0.0
 
     total_ca_display = total_encaisse_reel if mode_bilan == "Réel (Encaissé)" else total_ca_saison
     df_rec_f = df_f[df_f['Montant_Encaisse'] > 0].copy() if mode_bilan == "Réel (Encaissé)" else df_f.copy()
 
-    # 3. TRAITEMENT AUTOMATISÉ DU JOURNAL DE MAINTENANCE & FRAIS REELS
+    # 3. TRAITEMENT AUTOMATISÉ DU JOURNAL DE MAINTENANCE
     if not df_m.empty:
         df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
+        df_m['M_Num'] = pd.to_numeric(df_m['M_Num'], errors='coerce').fillna(0.0)
         
         if mode_bilan == "Réel (Encaissé)":
             mask_maint_mode = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")
@@ -792,25 +793,26 @@ if st.session_state.page == "STATS":
             
         df_m_y = df_m[mask_maint_mode].copy()
     else:
-        df_m_y = pd.DataFrame()
+        df_m_y = pd.DataFrame(columns=['dt_maint', 'M_Num', 'Type', 'Objet'])
         titre_tableaux = "Aucune donnée"
 
-    total_dep = sum(to_f(x) for x in df_m_y['M_Num']) if not df_m_y.empty else 0.0
+    total_dep = df_m_y['M_Num'].sum()
 
     if not df_m_y.empty:
         mask_frais_fixes = df_m_y['Type'].fillna('').str.lower().str.contains('port|assur', na=False)
-        total_pure_maint = sum(to_f(x) for x in df_m_y[~mask_frais_fixes]['M_Num'])
-        total_reels_fixes = sum(to_f(x) for x in df_m_y[mask_frais_fixes]['M_Num'])
+        total_pure_maint = df_m_y[~mask_frais_fixes]['M_Num'].sum()
+        total_reels_fixes = df_m_y[mask_frais_fixes]['M_Num'].sum()
     else:
         total_pure_maint = 0.0
         total_reels_fixes = 0.0
 
-    # 4. TRAITEMENT DU LOGBOOK (HEURES, GAZOLE & NAVIGATION)
+    # 4. TRAITEMENT DU LOGBOOK
     if not df_log.empty:
         df_log['dt_log'] = pd.to_datetime(df_log['Date'], dayfirst=True, errors='coerce')
         df_log_y = df_log[df_log['dt_log'].dt.year == sel_y].copy()
-        total_h_moteur = df_log_y['TotalMot'].sum() if 'TotalMot' in df_log_y.columns else 0.0
-        total_gazole = df_log_y['VolumeGazole'].sum() if 'VolumeGazole' in df_log_y.columns else 0.0
+        
+        total_h_moteur = pd.to_numeric(df_log_y['TotalMot'], errors='coerce').sum() if 'TotalMot' in df_log_y.columns else 0.0
+        total_gazole = pd.to_numeric(df_log_y['VolumeGazole'], errors='coerce').sum() if 'VolumeGazole' in df_log_y.columns else 0.0
         h_moteur_abs = pd.to_numeric(df_log['MotArr'], errors='coerce').max()
         
         total_milles = pd.to_numeric(df_log_y['TotalMil'], errors='coerce').sum() if 'TotalMil' in df_log_y.columns else 0.0
@@ -820,7 +822,7 @@ if st.session_state.page == "STATS":
     else:
         total_h_moteur = total_gazole = h_moteur_abs = total_milles = total_h_voile = ratio_voile = 0.0
 
-    # --- CALCULS DES COMPLÉMENTS FINANCIERS ---
+    # CALCULS DES COMPLÉMENTS FINANCIERS
     total_sommes_percues = total_encaisse_reel
     solde_net_calculé = total_ca_display - total_dep
 
@@ -924,49 +926,61 @@ if st.session_state.page == "STATS":
             use_container_width=True, hide_index=True
         )
 
-    # --- 3. GRAPHIQUE CHRONOLOGIQUE ET SUIVI DE RENTABILITÉ ---
+    # --- 3. GRAPHIQUE CHRONOLOGIQUE ET SUIVI DE RENTABILITÉ DYNAMIQUE ---
     st.divider()
-    st.markdown("### 📈 Chronologie des Recettes & Seuil de Rentabilité")
+    st.markdown(f"### 📈 Chronologie des Recettes ({mode_bilan}) & Seuil de Rentabilité")
     
     ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
     df_graph = pd.DataFrame({'Mois': range(1, 13), 'NomMois': ordre_mois})
     
+    # Choix dynamique de la colonne à cumuler selon le mode de calcul sélectionné
+    val_col_graph = 'Montant_Encaisse' if mode_bilan == "Réel (Encaissé)" else 'Prix'
+    
     if not df_f.empty:
-        val_col = 'Montant_Encaisse' if mode_bilan == "Réel (Encaissé)" else 'Prix'
-        r_m = df_f.groupby(df_f['dt_vrai'].dt.month)[val_col].sum()
+        r_m = df_f.groupby(df_f['dt_vrai'].dt.month)[val_col_graph].sum()
         df_graph = df_graph.merge(r_m.rename('Recettes'), left_on='Mois', right_index=True, how='left')
         act_m = df_f.groupby(df_f['dt_vrai'].dt.month).size()
         df_graph = df_graph.merge(act_m.rename('Sorties'), left_on='Mois', right_index=True, how='left')
     if not df_m_y.empty:
-        d_m = df_m_y.groupby(df_m_y['dt_maint'].dt.month)['M_Num'].apply(lambda x: sum(to_f(v) for v in x))
+        d_m = df_m_y.groupby(df_m_y['dt_maint'].dt.month)['M_Num'].sum()
         df_graph = df_graph.merge(d_m.rename('Dépenses'), left_on='Mois', right_index=True, how='left')
     
     df_graph = df_graph.fillna(0)
     
-    # Calcul du cumulatif des sommes perçues (Recettes) au cours de l'année
+    # Calcul du cumulatif dynamique
     df_graph['Recettes_Cumulees'] = df_graph['Recettes'].cumsum()
+
+    # AMÉLIORATION CLÉ : Tronquer la ligne pour ne pas étirer la courbe sur les mois futurs sans données
+    current_month = datetime.now().month
+    current_year = datetime.now().year
+    
+    if sel_y == current_year:
+        # On ne garde les étiquettes de texte et la courbe que jusqu'au mois en cours
+        df_graph['Recettes_Cumulees_Visuel'] = df_graph.apply(lambda x: x['Recettes_Cumulees'] if x['Mois'] <= current_month else None, axis=1)
+    else:
+        df_graph['Recettes_Cumulees_Visuel'] = df_graph['Recettes_Cumulees']
 
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
     
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     
-    # 1. Histogrammes mensuels (Dépenses & Recettes brutes du mois)
-    fig.add_trace(go.Bar(x=df_graph['NomMois'], y=df_graph['Recettes'], name='Recettes du Mois (€)', marker_color='#a3e4d7', opacity=0.6), secondary_y=False)
-    fig.add_trace(go.Bar(x=df_graph['NomMois'], y=df_graph['Dépenses'], name='Dépenses du Mois (€)', marker_color='#f5b7b1', opacity=0.6), secondary_y=False)
+    # Histogrammes mensuels (Dépenses & Recettes du mois)
+    fig.add_trace(go.Bar(x=df_graph['NomMois'], y=df_graph['Recettes'], name='Recettes du Mois (€)', marker_color='#a3e4d7', opacity=0.5), secondary_y=False)
+    fig.add_trace(go.Bar(x=df_graph['NomMois'], y=df_graph['Dépenses'], name='Dépenses du Mois (€)', marker_color='#f5b7b1', opacity=0.5), secondary_y=False)
     
-    # 2. Courbe d'évolution cumulée de la caisse (Sommes perçues au fil de l'eau)
+    # Courbe d'évolution cumulée réactive et tronquée
     fig.add_trace(go.Scatter(
         x=df_graph['NomMois'], 
-        y=df_graph['Recettes_Cumulees'], 
-        name='Sommes Perçues Cumulées (€)', 
+        y=df_graph['Recettes_Cumulees_Visuel'], 
+        name='Cumul de la Saison (€)', 
         line=dict(color='#2ecc71', width=4, shape='spline'),
         mode='lines+markers+text',
-        text=[f"{v:,.0f}€" if v > 0 else "" for v in df_graph['Recettes_Cumulees']],
+        text=[f"{v:,.0f}€" if (not pd.isna(v) and v > 0) else "" for v in df_graph['Recettes_Cumulees_Visuel']],
         textposition="top center"
     ), secondary_y=False)
     
-    # 3. Ligne de Seuil de Rentabilité (Trait plat horizontal basé sur le formulaire des charges)
+    # Ligne de Seuil de Rentabilité
     fig.add_trace(go.Scatter(
         x=df_graph['NomMois'], 
         y=[total_frais_fixes] * 12, 
@@ -975,7 +989,7 @@ if st.session_state.page == "STATS":
         mode='lines'
     ), secondary_y=False)
     
-    # 4. Courbe secondaire : Nombre de sorties
+    # Courbe secondaire : Nombre de sorties
     fig.add_trace(go.Scatter(x=df_graph['NomMois'], y=df_graph['Sorties'], name='Nb Sorties', line=dict(color='#3498db', width=2, dash='dot')), secondary_y=True)
     
     fig.update_layout(
@@ -1065,7 +1079,7 @@ if st.session_state.page == "STATS":
         else:
             st.success("✅ Aucune somme en attente.")
 
-    # --- 7. SEUIL DE RENTABILITÉ CALIBRÉ SUR LE FORMULAIRE DES CHARGES ANNUELLES ---
+    # --- 7. SEUIL DE RENTABILITÉ CALIBRÉ ---
     st.divider()
     st.markdown("### ⚓ Seuil de Rentabilité (Point Mort Annuel)")
     
