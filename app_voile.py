@@ -747,6 +747,9 @@ if st.session_state.page == "STATS":
     if 'frais_fixes' not in params or not params['frais_fixes']:
         params['frais_fixes'] = frais_defaut
     
+    frais_params = params['frais_fixes']
+    total_frais_fixes = sum(to_f(v) for v in frais_params.values())
+    
     # FILTRES DE LA PAGE
     c_sel1, c_sel2 = st.columns([3, 1])
     mode_bilan = c_sel1.radio("Mode de calcul :", ["Réel (Encaissé)", "Prévisionnel (Saison)"], horizontal=True)
@@ -921,10 +924,13 @@ if st.session_state.page == "STATS":
             use_container_width=True, hide_index=True
         )
 
-    # --- 3. GRAPHIQUE HISTOGRAMME EVOLUTION ---
+    # --- 3. GRAPHIQUE CHRONOLOGIQUE ET SUIVI DE RENTABILITÉ ---
     st.divider()
+    st.markdown("### 📈 Chronologie des Recettes & Seuil de Rentabilité")
+    
     ordre_mois = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
     df_graph = pd.DataFrame({'Mois': range(1, 13), 'NomMois': ordre_mois})
+    
     if not df_f.empty:
         val_col = 'Montant_Encaisse' if mode_bilan == "Réel (Encaissé)" else 'Prix'
         r_m = df_f.groupby(df_f['dt_vrai'].dt.month)[val_col].sum()
@@ -936,13 +942,50 @@ if st.session_state.page == "STATS":
         df_graph = df_graph.merge(d_m.rename('Dépenses'), left_on='Mois', right_index=True, how='left')
     
     df_graph = df_graph.fillna(0)
+    
+    # Calcul du cumulatif des sommes perçues (Recettes) au cours de l'année
+    df_graph['Recettes_Cumulees'] = df_graph['Recettes'].cumsum()
+
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
+    
     fig = make_subplots(specs=[[{"secondary_y": True}]])
-    fig.add_trace(go.Bar(x=df_graph['NomMois'], y=df_graph['Recettes'], name='Recettes (€)', marker_color='#2ecc71'), secondary_y=False)
-    fig.add_trace(go.Bar(x=df_graph['NomMois'], y=df_graph['Dépenses'], name='Dépenses (€)', marker_color='#e74c3c'), secondary_y=False)
-    fig.add_trace(go.Scatter(x=df_graph['NomMois'], y=df_graph['Sorties'], name='Nb Sorties', line=dict(color='#3498db', width=3)), secondary_y=True)
-    fig.update_layout(height=350, barmode='group', margin=dict(l=0,r=0,t=20,b=0), legend=dict(orientation="h", y=1.2))
+    
+    # 1. Histogrammes mensuels (Dépenses & Recettes brutes du mois)
+    fig.add_trace(go.Bar(x=df_graph['NomMois'], y=df_graph['Recettes'], name='Recettes du Mois (€)', marker_color='#a3e4d7', opacity=0.6), secondary_y=False)
+    fig.add_trace(go.Bar(x=df_graph['NomMois'], y=df_graph['Dépenses'], name='Dépenses du Mois (€)', marker_color='#f5b7b1', opacity=0.6), secondary_y=False)
+    
+    # 2. Courbe d'évolution cumulée de la caisse (Sommes perçues au fil de l'eau)
+    fig.add_trace(go.Scatter(
+        x=df_graph['NomMois'], 
+        y=df_graph['Recettes_Cumulees'], 
+        name='Sommes Perçues Cumulées (€)', 
+        line=dict(color='#2ecc71', width=4, shape='spline'),
+        mode='lines+markers+text',
+        text=[f"{v:,.0f}€" if v > 0 else "" for v in df_graph['Recettes_Cumulees']],
+        textposition="top center"
+    ), secondary_y=False)
+    
+    # 3. Ligne de Seuil de Rentabilité (Trait plat horizontal basé sur le formulaire des charges)
+    fig.add_trace(go.Scatter(
+        x=df_graph['NomMois'], 
+        y=[total_frais_fixes] * 12, 
+        name='Seuil de Rentabilité', 
+        line=dict(color='#e74c3c', width=2, dash='dash'),
+        mode='lines'
+    ), secondary_y=False)
+    
+    # 4. Courbe secondaire : Nombre de sorties
+    fig.add_trace(go.Scatter(x=df_graph['NomMois'], y=df_graph['Sorties'], name='Nb Sorties', line=dict(color='#3498db', width=2, dash='dot')), secondary_y=True)
+    
+    fig.update_layout(
+        height=400, 
+        barmode='group', 
+        margin=dict(l=0, r=0, t=20, b=0), 
+        legend=dict(orientation="h", y=1.2, x=0),
+        yaxis=dict(title="Montants (€)", gridcolor="#eee"),
+        yaxis2=dict(title="Nombre de Sorties", showgrid=False)
+    )
     st.plotly_chart(fig, use_container_width=True)
 
     # --- 4. TABLEAUX SÉPARÉS : MAINTENANCE TECHNIQUE VS FRAIS FIXES RÉELS ---
@@ -1025,9 +1068,7 @@ if st.session_state.page == "STATS":
     # --- 7. SEUIL DE RENTABILITÉ CALIBRÉ SUR LE FORMULAIRE DES CHARGES ANNUELLES ---
     st.divider()
     st.markdown("### ⚓ Seuil de Rentabilité (Point Mort Annuel)")
-    frais_params = params['frais_fixes']
-    total_frais_fixes = sum(to_f(v) for v in frais_params.values())
-
+    
     ca_actuel = total_encaisse_reel 
     progression = min(1.0, ca_actuel / total_frais_fixes) if total_frais_fixes > 0 else 0
     manque_a_gagner = max(0.0, total_frais_fixes - ca_actuel)
