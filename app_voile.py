@@ -731,7 +731,6 @@ if st.session_state.page == "PLANNING":
         st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_mois:,.0f} €**".replace(",", " "))
     else:
         st.info("Aucune mission ce mois-ci.")
-
 ## =================================================================
 # --- 8. PAGE STATS : SOURCE DE VÉRITÉ UNIQUE HARMONISÉE ---
 # =================================================================
@@ -748,7 +747,7 @@ if st.session_state.page == "STATS":
     if 'frais_fixes' not in params or not params['frais_fixes']:
         params['frais_fixes'] = frais_defaut
     
-    # FILTRES DE LA PAGE (Sélecteur d'état supprimé car automatisé par le mode de calcul)
+    # FILTRES DE LA PAGE
     c_sel1, c_sel2 = st.columns([3, 1])
     mode_bilan = c_sel1.radio("Mode de calcul :", ["Réel (Encaissé)", "Prévisionnel (Saison)"], horizontal=True)
     sel_y = c_sel2.selectbox("Saison :", [2025, 2026, 2027], index=1)
@@ -781,7 +780,6 @@ if st.session_state.page == "STATS":
     if not df_m.empty:
         df_m['dt_maint'] = pd.to_datetime(df_m['Date'], dayfirst=True, errors='coerce')
         
-        # Application du filtre dynamique selon le mode choisi
         if mode_bilan == "Réel (Encaissé)":
             mask_maint_mode = (df_m['dt_maint'].dt.year == sel_y) & (df_m['Statut'] == "Fait")
             titre_tableaux = "Réelles Encaissées / Faites"
@@ -848,7 +846,7 @@ if st.session_state.page == "STATS":
 
     st.write("")
 
-    # LIGNE 3 : SOMMES DÉPENSÉES (AUTOMATISÉES AVEC LE MODE DE CALCUL)
+    # LIGNE 3 : SOMMES DÉPENSÉES
     st.markdown(f"##### 💸 Sommes Dépensées ({mode_bilan})")
     d1, d2, d3 = st.columns(3)
     d1.metric("🔧 Dépenses Maint.", f"{total_pure_maint:,.0f} €")
@@ -980,7 +978,29 @@ if st.session_state.page == "STATS":
     else:
         st.info("Aucun paiement de type Port ou Assurance relevé sur cette sélection.")
 
-    # --- 5. TABLEAU DES SOMMES RESTANT À PERCEVOIR ---
+    # --- 5. TABLEAU DES SOMMES PERÇUES ---
+    st.divider()
+    st.markdown("### 📥 Détail des sommes perçues")
+    if not df_f.empty:
+        df_percues = df_f[df_f['Montant_Encaisse'] > 0.01].sort_values('dt_vrai').copy()
+        if not df_percues.empty:
+            df_percues_display = df_percues[['DateNav', 'Nom', 'Prénom', 'Prix', 'Acompte', 'Paiement', 'Montant_Encaisse']].copy()
+            df_percues_display.columns = ['Date Nav.', 'Nom', 'Prénom', 'Prix Contrat', 'Acompte', 'Statut Paiement', 'Somme Perçue (€)']
+            st.dataframe(
+                df_percues_display.style.format({
+                    'Prix Contrat': '{:,.2f} €',
+                    'Acompte': '{:,.2f} €',
+                    'Somme Perçue (€)': '{:,.2f} €'
+                }),
+                use_container_width=True, hide_index=True
+            )
+            st.markdown(f"<div style='text-align:right; background:#d4edda; padding:10px; border-radius:5px; color:#155724; font-weight:bold;'>TOTAL ENCAISSÉ : {total_encaisse_reel:,.2f} €</div>", unsafe_allow_html=True)
+        else:
+            st.info("Aucun encaissement enregistré pour cette sélection.")
+    else:
+        st.info("Aucune donnée disponible.")
+
+    # --- 6. TABLEAU DES SOMMES RESTANT À PERCEVOIR ---
     st.divider()
     st.markdown("### 🔍 Détail des sommes restant à percevoir")
     if not df_f.empty:
@@ -988,12 +1008,21 @@ if st.session_state.page == "STATS":
         df_reste['Reste'] = df_reste['Prix'] - df_reste['Montant_Encaisse']
         df_a_percevoir = df_reste[df_reste['Reste'] > 0.01].sort_values('dt_vrai')
         if not df_a_percevoir.empty:
-            st.dataframe(df_a_percevoir[['DateNav', 'Nom', 'Prénom', 'Prix', 'Montant_Encaisse', 'Reste']], use_container_width=True, hide_index=True)
+            df_a_percevoir_display = df_a_percevoir[['DateNav', 'Nom', 'Prénom', 'Prix', 'Montant_Encaisse', 'Reste']].copy()
+            df_a_percevoir_display.columns = ['Date Nav.', 'Nom', 'Prénom', 'Prix Contrat', 'Déjà Encaissé', 'Reste à Percevoir (€)']
+            st.dataframe(
+                df_a_percevoir_display.style.format({
+                    'Prix Contrat': '{:,.2f} €',
+                    'Déjà Encaissé': '{:,.2f} €',
+                    'Reste à Percevoir (€)': '{:,.2f} €'
+                }),
+                use_container_width=True, hide_index=True
+            )
             st.markdown(f"<div style='text-align:right; background:#f8d7da; padding:10px; border-radius:5px; color:#721c24; font-weight:bold;'>TOTAL À RÉCUPÉRER : {reste_a_percevoir:,.2f} €</div>", unsafe_allow_html=True)
         else:
             st.success("✅ Aucune somme en attente.")
 
-    # --- 6. SEUIL DE RENTABILITÉ CALIBRÉ SUR LE FORMULAIRE DES CHARGES ANNUELLES ---
+    # --- 7. SEUIL DE RENTABILITÉ CALIBRÉ SUR LE FORMULAIRE DES CHARGES ANNUELLES ---
     st.divider()
     st.markdown("### ⚓ Seuil de Rentabilité (Point Mort Annuel)")
     frais_params = params['frais_fixes']
@@ -1019,7 +1048,7 @@ if st.session_state.page == "STATS":
             st.write(f"---")
             st.write(f"**TOTAL : {int(total_frais_fixes):,} €**")
 
-    # --- 7. CONFIGURATION ET MODIFICATION DES CHARGES ---
+    # --- 8. CONFIGURATION ET MODIFICATION DES CHARGES ---
     st.divider()
     with st.expander("⚙️ Modifier les charges fixes annuelles"):
         st.info("Modifiez les montants ci-dessous et cliquez sur 'Enregistrer'.")
@@ -1037,6 +1066,7 @@ if st.session_state.page == "STATS":
                 sauvegarder_params(params)
                 st.success("Configuration sauvegardée à distance !")
                 st.rerun()
+
 # =================================================================
 # --- 8. PAGE MAINTENANCE : GESTION SÉCURISÉE (V2026) ---
 # =================================================================
