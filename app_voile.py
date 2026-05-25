@@ -1845,7 +1845,7 @@ if st.session_state.page == "LOG":
                     if not df_calc.empty:
                         # On récupère la ligne de l'étape la plus récente chronologiquement
                         derniere_etape = df_calc.loc[df_calc['dt_temp'].idxmax()]
-                        date_derniere = Row_date =拉 = derniere_etape['dt_temp']
+                        date_derniere = derniere_etape['dt_temp']
                         date_actuelle = pd.Timestamp.now().normalize()
                         
                         # Si l'écart est strictement inférieur à 5 jours, on conserve le nom
