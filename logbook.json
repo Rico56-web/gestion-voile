@@ -304,5 +304,22 @@
         "PortDep":null,
         "Co\u00e9quipiers":"idem a hier",
         "Meteo":""
+    },
+    {
+        "Date":"25\/05\/2026",
+        "Navigation":"nav aurelien",
+        "PortArr":null,
+        "MotDep":2466.4,
+        "MotArr":2466.4,
+        "TotalMot":0.0,
+        "MilDep":3200.0,
+        "MilArr":3200.0,
+        "TotalMil":0.0,
+        "H_Voile":0.0,
+        "Notes":"",
+        "Group_ID":null,
+        "PortDep":null,
+        "Co\u00e9quipiers":"",
+        "Meteo":""
     }
 ]
