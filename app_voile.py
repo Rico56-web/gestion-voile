@@ -737,26 +737,28 @@ if st.session_state.page == "PLANNING":
 if st.session_state.page == "STATS":
     st.markdown('<h2 style="text-align:center;">📊 Dashboard Intégral Vesta</h2>', unsafe_allow_html=True)
     
-    # 1. CHARGEMENT SÉCURISÉ DES DONNÉES
+# 1. CHARGEMENT SÉCURISÉ DES DONNÉES
     df_actif = charger_data_safe('contacts.json')
     df_m = charger_data_safe('maintenance.json') 
     df_log = charger_data_safe('logbook.json')
     
     params = charger_params()
     frais_defaut = {"Port Arzon": 3800, "Assurance": 1200, "Entretien": 1500, "Divers": 500}
-    if 'frais_fixes' not in params or not params['frais_fixes']:
+    
+    # --- SÉCURISATION CRUCIALE : On vérifie que c'est bien un dictionnaire ---
+    if 'frais_fixes' not in params or not isinstance(params['frais_fixes'], dict) or not params['frais_fixes']:
         params['frais_fixes'] = frais_defaut
     
     frais_params = params['frais_fixes']
-    # --- CORRECTION LIGNE 751 ---
+    
+    # Calcul sécurisé de la somme
     total_frais_fixes = 0.0
     for v in frais_params.values():
         try:
-            # Nettoie la valeur (supprime les espaces, remplace la virgule, vire le "€")
             clean_v = str(v).replace('€', '').replace(' ', '').replace(',', '.').strip()
             total_frais_fixes += float(clean_v)
         except (ValueError, TypeError):
-            total_frais_fixes += 0.0  # Ignore proprement la valeur si elle est invalide
+            continue
     # ----------------------------
     
     # FILTRES DE LA PAGE
