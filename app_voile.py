@@ -748,7 +748,16 @@ if st.session_state.page == "STATS":
         params['frais_fixes'] = frais_defaut
     
     frais_params = params['frais_fixes']
-    total_frais_fixes = sum(to_f(v) for v in frais_params.values())
+    # --- CORRECTION LIGNE 751 ---
+    total_frais_fixes = 0.0
+    for v in frais_params.values():
+        try:
+            # Nettoie la valeur (supprime les espaces, remplace la virgule, vire le "€")
+            clean_v = str(v).replace('€', '').replace(' ', '').replace(',', '.').strip()
+            total_frais_fixes += float(clean_v)
+        except (ValueError, TypeError):
+            total_frais_fixes += 0.0  # Ignore proprement la valeur si elle est invalide
+    # ----------------------------
     
     # FILTRES DE LA PAGE
     c_sel1, c_sel2 = st.columns([3, 1])
