@@ -270,5 +270,22 @@
         "PortDep":null,
         "Co\u00e9quipiers":"Franck martin ",
         "Meteo":"tres beau temps , soleil et vent de 10 a 12noeuds"
+    },
+    {
+        "Date":"23\/05\/2026",
+        "Navigation":"nav aurelien",
+        "PortArr":null,
+        "MotDep":2459.4,
+        "MotArr":2466.4,
+        "TotalMot":7.0,
+        "MilDep":3200.0,
+        "MilArr":3200.0,
+        "TotalMil":0.0,
+        "H_Voile":6.0,
+        "Notes":"peu de vent",
+        "Group_ID":null,
+        "PortDep":null,
+        "Co\u00e9quipiers":"aurelein et sa famille ( 4 personnes )",
+        "Meteo":"tres beau tempschaus et ensoleill\u00e9"
     }
 ]
