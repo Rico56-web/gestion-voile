@@ -287,5 +287,22 @@
         "PortDep":null,
         "Co\u00e9quipiers":"aurelein et sa famille ( 4 personnes )",
         "Meteo":"tres beau tempschaus et ensoleill\u00e9"
+    },
+    {
+        "Date":"24\/05\/2026",
+        "Navigation":"nav aurelien",
+        "PortArr":null,
+        "MotDep":2459.4,
+        "MotArr":2464.4,
+        "TotalMot":5.0,
+        "MilDep":3200.0,
+        "MilArr":3200.0,
+        "TotalMil":0.0,
+        "H_Voile":0.0,
+        "Notes":"",
+        "Group_ID":null,
+        "PortDep":null,
+        "Co\u00e9quipiers":"idem a hier",
+        "Meteo":""
     }
 ]
