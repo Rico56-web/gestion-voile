@@ -15,9 +15,10 @@ st.set_page_config(page_title="Vesta Skipper 2026", layout="wide")
 # --- INITIALISATION DU SESSION STATE ---
 if 'log_edit_idx' not in st.session_state: st.session_state.log_edit_idx = None
 if 'edit_mode' not in st.session_state: st.session_state.edit_mode = False
-if 'page' not in st.session_state: st.session_state.page = "CONTACTS"
+if 'page' not in st.session_state: st.session_state.page = "PLANNING"
 if 'vue_contact' not in st.session_state: st.session_state.vue_contact = "En cours"
 if 'authenticated' not in st.session_state: st.session_state.authenticated = False
+if 'memo_edit_id' not in st.session_state: st.session_state.memo_edit_id = None
 
 # =================================================================
 # --- FONCTIONS UTILITAIRES GLOBALES & IMPRESSION ---
@@ -69,7 +70,7 @@ def bouton_export_excel(df, nom_fichier):
     )
 
 # =================================================================
-# --- 1. FONCTIONS DE SÉCURITÉ, GITHUB & PARAMS INTERNATIONAUX ---
+# --- 1. FONCTIONS DE SÉCURITÉ, GITHUB & PARAMS ---
 # =================================================================
 def charger_data(file):
     try:
@@ -98,7 +99,6 @@ def charger_data_safe(fichier):
     df = charger_data(fichier)
     return df if not df.empty else pd.DataFrame()
 
-# --- CORRECTION DE LA GESTION DES PARAMS (ALIGNÉE GITHUB + SESSION STATE) ---
 def charger_params():
     if 'params_vesta' in st.session_state:
         return st.session_state.params_vesta
@@ -116,11 +116,10 @@ def charger_params():
 def sauvegarder_params(dict_params):
     st.session_state.params_vesta = dict_params
     df_params = pd.DataFrame([dict_params])
-    sauvegarder_data(df_params, 'params.json')
+    generer_data = sauvegarder_data(df_params, 'params.json')
 
 def executer_backup_auto():
-    """Sauvegarde locale uniquement pour sécurité instantanée du serveur"""
-    fichiers_a_sauver = ['contacts.json', 'maintenance.json', 'logbook.json', 'params.json']
+    fichiers_a_sauver = ['contacts.json', 'maintenance.json', 'logbook.json', 'params.json', 'memos.json']
     if not os.path.exists('backups'): os.makedirs('backups')
     for fichier in fichiers_a_sauver:
         if os.path.exists(fichier):
@@ -128,8 +127,19 @@ def executer_backup_auto():
 
 executer_backup_auto()
 
+# --- FONCTION UNIQUE DE CHANGEMENT DE PAGE (ÉVITE LES CONFLITS) ---
+def changer_page(nom_page):
+    st.session_state.page = nom_page
+    st.session_state.maint_edit_id = None
+    st.session_state.show_form_classique = False
+    st.session_state.show_form_vidange = False
+    st.session_state.edit_idx = None
+    st.session_state.saisie_ouverte = False
+    st.session_state.memo_edit_id = None
+    st.rerun()
+
 # =================================================================
-# --- BANDEAU TEMPOREL & LOG-IN ---
+# --- BANDEAU TEMPOREL & ÉCRAN DE CONNEXION ---
 # =================================================================
 now = datetime.now()
 jours_fr = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
@@ -154,46 +164,21 @@ if not st.session_state.authenticated:
 st.markdown('<div class="main-header">⚓ VESTA 2026</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=True)
 
-# --- NAV BAR ---
-menu = ["PLANNING", "CONTACTS", "STATS", "MAINT", "LOG", "NOTES", "FACT"]
-icones = {"PLANNING": "📅", "CONTACTS": "👤", "STATS": "📊", "MAINT": "🛠️", "LOG": "📖", "NOTES": "📝", "FACT": "📑"}
+# =================================================================
+# --- SYSTEME DE NAVIGATION HARMONISÉ (HAUT ET SIDEBAR) ---
+# =================================================================
+menu = ["PLANNING", "CONTACTS", "STATS", "MAINT", "LOG", "MEMOS", "FACT"]
+icones = {"PLANNING": "📅", "CONTACTS": "👤", "STATS": "📊", "MAINT": "🛠️", "LOG": "📖", "MEMOS": "📝", "FACT": "📑"}
 
+# 1. Barre de navigation horizontale (Haut)
 cols_nav = st.columns(len(menu))
 for i, name in enumerate(menu):
-    target = "MEMOS" if name == "NOTES" else name
-    is_active = st.session_state.page == target
+    is_active = st.session_state.page == name
     if cols_nav[i].button(f"{icones[name]}\n{name}", key=f"nav_{name}", use_container_width=True, type="primary" if is_active else "secondary"):
-        st.session_state.page = target
-        st.rerun()
-st.divider()
-# =================================================================
-# --- 5. SIDEBAR & LOGIQUE DE NAVIGATION MAÎTRESSE (V2026) ---
-# =================================================================
-import streamlit as st
+        changer_page(name)
 
-# --- INITIALISATION DE LA PAGE PAR DÉFAUT ---
-if 'page' not in st.session_state:
-    st.session_state.page = "PLANNING"
-
-# --- NETTOYAGE DES ÉTATS TEMPORAIRES LORS D'UN CHANGEMENT DE PAGE ---
-def changer_page(nom_page):
-    """Bascule de page en réinitialisant les formulaires et modes édition"""
-    st.session_state.page = nom_page
-    
-    # Nettoyage Maintenance
-    st.session_state.maint_edit_id = None
-    st.session_state.show_form_classique = False
-    st.session_state.show_form_vidange = False
-    
-    # Nettoyage Contacts / Facturation
-    st.session_state.edit_idx = None
-    st.session_state.saisie_ouverte = False
-    
-    st.rerun()
-
-# --- DESIGN DE LA SIDEBAR ---
+# 2. Barre de navigation latérale (Sidebar)
 with st.sidebar:
-    # En-tête de l'application
     st.markdown("""
         <div style="text-align: center; padding: 10px; background-color: #2c3e50; border-radius: 8px; margin-bottom: 20px;">
             <h2 style="color: white; margin: 0; font-size: 1.3rem;">🚢 Vesta Skipper</h2>
@@ -201,79 +186,61 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("### 🗺️ Navigation")
-    
-    # Système de boutons exclusifs pour remplacer le selectbox (effet "Application Native")
-    if st.button("📅 Planning & Engagements", use_container_width=True, 
-                 type="primary" if st.session_state.page == "PLANNING" else "secondary"):
-        changer_page("PLANNING")
-        
-    if st.button("👤 Fiches Contacts", use_container_width=True, 
-                 type="primary" if st.session_state.page in ["CONTACTS", "MODIFIER_CONTACT"] else "secondary"):
-        changer_page("CONTACTS")
-        
-    if st.button("📑 Suivi Facturation", use_container_width=True, 
-                 type="primary" if st.session_state.page == "FACT" else "secondary"):
-        changer_page("FACT")
-        
-    if st.button("🛠️ Maintenance & Moteur", use_container_width=True, 
-                 type="primary" if st.session_state.page == "MAINT" else "secondary"):
-        changer_page("MAINT")
-        
-    if st.button("📖 Livre de Bord (Log)", use_container_width=True, 
-                 type="primary" if st.session_state.page == "LOG" else "secondary"):
-        changer_page("LOG")
-        
-    if st.button("📊 Statistiques Saison", use_container_width=True, 
-                 type="primary" if st.session_state.page == "STATS" else "secondary"):
-        changer_page("STATS")
-        
+    st.markdown("### 🗺️ Navigation rapide")
+    for name in menu:
+        if st.button(f"{icones[name]} {name}", key=f"side_{name}", use_container_width=True, type="primary" if st.session_state.page == name else "secondary"):
+            changer_page(name)
+            
     st.divider()
     st.markdown("### ⚙️ Paramètres")
-    
-    if st.button("📂 Archives & Coffre-Fort", use_container_width=True, 
-                 type="primary" if st.session_state.page == "ARCHIVES" else "secondary"):
+    if st.button("📂 Archives & Coffre-Fort", use_container_width=True, type="primary" if st.session_state.page == "ARCHIVES" else "secondary"):
         changer_page("ARCHIVES")
 
-    # Rappel du contexte en bas de Sidebar
     st.markdown("---")
     st.caption("⚓ Enregistré sur GitHub : Rico56-web")
+
+st.divider()
 
 # =================================================================
 # --- 6. AIGUILLAGE DE L'AFFICHAGE CENTRAL ---
 # =================================================================
-# C'est ici que s'exécutent vos différents blocs de code de pages
 if st.session_state.page == "PLANNING":
-    pass # Votre code existant pour le Planning (avec couleur Bleue pour CMN !)
+    st.subheader("📅 Planning & Engagements")
+    pass # Votre code existant (avec couleur Bleue pour CMN !)
 
 elif st.session_state.page == "CONTACTS":
-    pass # Votre code existant pour la liste des Contacts
+    st.subheader("👤 Fiches Contacts")
+    df_raw = charger_data_safe('contacts.json')
+    pass # Votre suite du code contacts ici...
 
 elif st.session_state.page == "MODIFIER_CONTACT":
-    pass # Votre formulaire d'édition de contact (appelé depuis Contacts ou Facture)
+    st.subheader("✏️ Modifier le contact")
+    pass 
 
 elif st.session_state.page == "FACT":
-    pass # Le code Facturation validé juste avant
+    st.subheader("📑 Suivi Facturation")
+    pass 
 
 elif st.session_state.page == "MAINT":
-    pass # Le code Maintenance avec check-list mécanique validé juste avant
+    st.subheader("🛠️ Maintenance & Moteur")
+    pass 
 
 elif st.session_state.page == "LOG":
-    pass # Le code Livre de Bord validé juste avant
+    st.subheader("📖 Livre de Bord (Log)")
+    pass 
 
 elif st.session_state.page == "STATS":
-    pass # Le module Statistiques (que nous allons caler ensuite)
+    st.subheader("📊 Statistiques Saison")
+    pass 
 
 elif st.session_state.page == "ARCHIVES":
-    pass # Le code Archives & Clôture validé juste avant
-# =================================================================
-# --- 2. MENU MÉMOS (VERSION FINALE SECURISEE) ---
-# =================================================================
-if st.session_state.page == "MEMOS":
+    st.subheader("📂 Archives & Clôtures")
+    pass
+
+# --- BLOC MEMOS INTEGRÉ DANS L'AIGUILLAGE GLOBAL ---
+elif st.session_state.page == "MEMOS":
     st.markdown("<h2 style='text-align: center; color: #34495E;'>⚓ Mémos & Check-lists de Bord</h2>", unsafe_allow_html=True)
     df_memos = charger_data_safe('memos.json')
-
-    if 'memo_edit_id' not in st.session_state: st.session_state.memo_edit_id = None
 
     with st.expander("➕ CRÉER UNE NOUVELLE CHECK-LIST", expanded=df_memos.empty):
         with st.form("new_memo_form"):
