@@ -320,12 +320,21 @@ elif st.session_state.page == "MEMOS":
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
                 st.divider()
-
 # =================================================================
 # --- 5. BLOC CONTACTS (LOGIQUE FINANCIÈRE SECURISEE & SANS CONFLIT) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
     df_raw = charger_data_safe('contacts.json')
+    
+    # 🚨 SÉCURITÉ ABSOLUE : Initialisation des colonnes si le fichier GitHub est vide
+    colonnes_requises = ['Prénom', 'Nom', 'Statut', 'Paiement', 'Relancer', 'DateNav', 'Société', 'Jours', 'Prix', 'Acompte', 'Notes', 'Téléphone', 'Email', 'Pers']
+    if df_raw.empty:
+        df_raw = pd.DataFrame(columns=colonnes_requises)
+    else:
+        # Si le fichier existe mais qu'il manque certaines colonnes suite à une mise à jour
+        for col in colonnes_requises:
+            if col not in df_raw.columns:
+                df_raw[col] = ""
     
     n1, n2, n3, n4, n5 = st.columns([1, 1, 1, 1, 1.5])
     if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
@@ -340,61 +349,67 @@ if st.session_state.page == "CONTACTS":
 
     st.divider()
 
-    if not df_raw.empty:
-        df_c = df_raw.copy().fillna("")
-        df_c['orig_idx'] = df_c.index  # CONSERVATION STRICTE DE L'INDEX ORIGINAL
-        df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
-        
-        c_search, c_yr, c_new = st.columns([2, 1, 1])
-        search = c_search.text_input("🔍 Rechercher...", "", key="search_bar_contacts").upper()
-        annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
-        
-        # --- DASHBOARD FINANCIER HARMONISÉ ---
-        mask_ca = (df_c['dt_sort'].dt.year == annee_sel) & (~df_c['Statut'].str.lower().str.contains("annule|refuse", na=False))
-        df_ca = df_c[mask_ca].copy()
+    df_c = df_raw.copy().fillna("")
+    df_c['orig_idx'] = df_c.index  # CONSERVATION STRICTE DE L'INDEX ORIGINAL
+    df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+    
+    c_search, c_yr, c_new = st.columns([2, 1, 1])
+    search = c_search.text_input("🔍 Rechercher...", "", key="search_bar_contacts").upper()
+    annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
+    
+    # --- DASHBOARD FINANCIER HARMONISÉ ---
+    mask_ca = (df_c['dt_sort'].dt.year == annee_sel) & (~df_c['Statut'].str.lower().str.contains("annule|refuse", na=False))
+    df_ca = df_c[mask_ca].copy()
 
-        def get_reel_encaisse(row):
-            p = to_f(row.get('Prix', 0))
-            a = to_f(row.get('Acompte', 0))
-            return p if str(row.get('Paiement', '')).strip().upper() == "PAID" else a
+    def get_reel_encaisse(row):
+        p = to_f(row.get('Prix', 0))
+        a = to_f(row.get('Acompte', 0))
+        return p if str(row.get('Paiement', '')).strip().upper() == "PAID" else a
 
-        if not df_ca.empty:
-            total_prevu = df_ca['Prix'].apply(to_f).sum()
-            total_encaisse = df_ca.apply(get_reel_encaisse, axis=1).sum()
-            reste_percevoir = max(0, total_prevu - total_encaisse)
-        else:
-            total_prevu = total_encaisse = reste_percevoir = 0
+    if not df_ca.empty:
+        total_prevu = df_ca['Prix'].apply(to_f).sum()
+        total_encaisse = df_ca.apply(get_reel_encaisse, axis=1).sum()
+        reste_percevoir = max(0, total_prevu - total_encaisse)
+    else:
+        total_prevu = total_encaisse = reste_percevoir = 0
 
-        col_f1, col_f2, col_f3 = st.columns(3)
-        col_f1.metric(f"CA Prévu {annee_sel}", f"{int(total_prevu)} €")
-        col_f2.metric("Encaissé (Réel)", f"{int(total_encaisse)} €")
-        col_f3.metric("Reste à percevoir", f"{int(reste_percevoir)} €")
-        st.divider()
+    col_f1, col_f2, col_f3 = st.columns(3)
+    col_f1.metric(f"CA Prévu {annee_sel}", f"{int(total_prevu)} €")
+    col_f2.metric("Encaissé (Réel)", f"{int(total_encaisse)} €")
+    col_f3.metric("Reste à percevoir", f"{int(reste_percevoir)} €")
+    st.divider()
 
-        if c_new.button("➕ NOUVEAU CLIENT", use_container_width=True):
-            new_r = {"Prénom": "NOUVEAU", "Nom": "CLIENT", "Statut": "En attente", "Paiement": "Unpaid", "Relancer": "Non", "DateNav": f"01/06/{annee_sel}", "Société": "PERSO", "Jours": 1, "Prix": 0, "Acompte": 0, "Notes": "", "Téléphone": "", "Email": "", "Pers": 1}
-            df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
-            sauvegarder_data(df_new, 'contacts.json')
-            st.session_state.edit_idx = 0  # C'est bien le premier élément car inséré en haut
-            st.session_state.page = "MODIFIER_CONTACT"
-            st.rerun()
+    if c_new.button("➕ NOUVEAU CLIENT", use_container_width=True):
+        new_r = {"Prénom": "NOUVEAU", "Nom": "CLIENT", "Statut": "En attente", "Paiement": "Unpaid", "Relancer": "Non", "DateNav": f"01/06/{annee_sel}", "Société": "PERSO", "Jours": 1, "Prix": 0, "Acompte": 0, "Notes": "", "Téléphone": "", "Email": "", "Pers": 1}
+        df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
+        sauvegarder_data(df_new, 'contacts.json')
+        st.session_state.edit_idx = 0  # Placé au sommet de la pile
+        st.session_state.page = "MODIFIER_CONTACT"
+        st.rerun()
 
-        statut_clean = df_c['Statut'].str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
-        rel_clean = df_c['Relancer'].fillna("Non").str.upper()
-        
-        if st.session_state.vue_contact == "Archives": mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (rel_clean != "OUI")
-        elif st.session_state.vue_contact == "Relances": mask_aff = (rel_clean == "OUI")
-        elif st.session_state.vue_contact == "Attente": mask_aff = (statut_clean == "liste d'attente")
-        else: mask_aff = ~(statut_clean.str.contains("termine|annule|refuse")) & (statut_clean != "liste d'attente")
+    # Nettoyage et préparation des filtres
+    statut_clean = df_c['Statut'].astype(str).str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
+    rel_clean = df_c['Relancer'].fillna("Non").astype(str).str.upper()
+    
+    if st.session_state.vue_contact == "Archives": 
+        mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (rel_clean != "OUI")
+    elif st.session_state.vue_contact == "Relances": 
+        mask_aff = (rel_clean == "OUI")
+    elif st.session_state.vue_contact == "Attente": 
+        mask_aff = (statut_clean == "liste d'attente")
+    else: 
+        mask_aff = ~(statut_clean.str.contains("termine|annule|refuse")) & (statut_clean != "liste d'attente")
 
-        df_aff = df_c[mask_aff & ((df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna()))].copy()
-        if search: df_aff = df_aff[df_aff['Nom'].str.contains(search) | df_aff['Prénom'].str.contains(search) | df_aff['Société'].str.contains(search)]
-        
-        # Tri d'affichage chronologique (N'impacte pas l'index d'origine grâce à orig_idx)
+    df_aff = df_c[mask_aff & ((df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna()))].copy()
+    if search: 
+        df_aff = df_aff[df_aff['Nom'].astype(str).str.contains(search) | df_aff['Prénom'].astype(str).str.contains(search) | df_aff['Société'].astype(str).str.contains(search)]
+    
+    # Tri d'affichage chronologique
+    if not df_aff.empty:
         df_aff = df_aff.sort_values(by='dt_sort', ascending=True)
 
         for _, row in df_aff.iterrows():
-            idx = row['orig_idx']  # UTILISATION DE L'INDEX D'ORIGINE POUR MODIFIER LE FICHIER
+            idx = row['orig_idx']  
             p_tot = to_f(row.get('Prix', 0))
             p_enc = p_tot if str(row.get('Paiement', '')).strip().upper() == "PAID" else to_f(row.get('Acompte', 0))
             
@@ -419,7 +434,7 @@ if st.session_state.page == "CONTACTS":
             
             c1, c2, c3 = st.columns(3)
             if c1.button("✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
-                st.session_state.edit_idx = idx  # On transmet l'index réel de la base
+                st.session_state.edit_idx = idx  
                 st.session_state.page = "MODIFIER_CONTACT"
                 st.rerun()
 
@@ -440,7 +455,7 @@ if st.session_state.page == "CONTACTS":
                         st.session_state[f"confirm_del_{idx}"] = True
                         st.rerun()
                 else:
-                    st.warning("Confirmer ?")
+                    st.warning("Confirmer la suppression ?")
                     cx, cy = st.columns(2)
                     if cx.button("✅ OUI", key=f"y_{idx}", use_container_width=True):
                         df_db = charger_data('contacts.json').drop(idx).reset_index(drop=True)
@@ -456,10 +471,13 @@ if st.session_state.page == "CONTACTS":
                 df_all.loc[idx, ['Statut', 'Paiement']] = ["Terminé", "Paid"]
                 sauvegarder_data(df_all, 'contacts.json')
                 st.rerun()
+    else:
+        st.info("💡 Aucun contact enregistré pour cette catégorie ou cette saison. Utilisez le bouton '➕ NOUVEAU CLIENT' ci-dessus pour commencer.")
+
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT : VERSION SÉCURISÉE (V110) ---
 # =================================================================
-if st.session_state.page == "MODIFIER_CONTACT":
+elif st.session_state.page == "MODIFIER_CONTACT":
     st.markdown('<h3 style="text-align:center;">✏️ Modifier le Contact</h3>', unsafe_allow_html=True)
     
     idx_to_edit = st.session_state.get('edit_idx')
@@ -544,11 +562,12 @@ if st.session_state.page == "MODIFIER_CONTACT":
                 st.session_state.page = "CONTACTS"
                 st.rerun()
     else:
-        st.error("Erreur de chargement du contact.")
+        st.error("Erreur de chargement ou contact introuvable.")
 
     if st.button("⬅️ ANNULER ET RETOUR", key="back_mod_contact"):
         st.session_state.page = "CONTACTS"
         st.rerun()
+
 
 # =================================================================
 # --- 7. PAGE PLANNING (V19.2 - CALIBRÉ SÉCURITÉ) ---
