@@ -496,7 +496,6 @@ if st.session_state.page == "CONTACTS":
 # =================================================================
 # --- PAGE SUIVANTE (BIEN ALIGNÉE TOUT À GAUCHE SANS CONFLIT) ---
 # =================================================================
-elif st.session_state.page == "MODIFIER_CONTACT":
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT : VERSION SÉCURISÉE (V110) ---
 # =================================================================
