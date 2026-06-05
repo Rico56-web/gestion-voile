@@ -323,6 +323,9 @@ elif st.session_state.page == "MEMOS":
 # =================================================================
 # --- 5. BLOC CONTACTS (VERSION IMMUNISÉE & AFFICHAGE FORCÉ) ---
 # =================================================================
+# =================================================================
+# --- 5. BLOC CONTACTS (VERSION IMMUNISÉE & AFFICHAGE FORCÉ) ---
+# =================================================================
 if st.session_state.page == "CONTACTS":
     # 🔄 Nettoyage du cache pour forcer la lecture réelle sur GitHub
     st.cache_data.clear()
@@ -331,19 +334,16 @@ if st.session_state.page == "CONTACTS":
         st.session_state.vue_contact = "En cours"
 
     # Chargement brut
-df_raw = charger_data_safe('contacts.json')
-
-# 🔍 LIGNE DE TEST TEMPORAIRE :
-st.write("Nombre de lignes lues dans le fichier :", len(df_raw) if df_raw is not None else "Fichier non trouvé/vide")
+    df_raw = charger_data_safe('contacts.json')
     
-# Sécurité d'initialisation des colonnes
-colonnes_requises = ['Prénom', 'Nom', 'Statut', 'Paiement', 'Relancer', 'DateNav', 'Société', 'Jours', 'Prix', 'Acompte', 'Notes', 'Téléphone', 'Email', 'Pers']
-if df_raw is None or not hasattr(df_raw, "empty") or df_raw.empty:
-    df_raw = pd.DataFrame(columns=colonnes_requises)
-else:
-    for col in colonnes_requises:
-        if col not in df_raw.columns:
-            df_raw[col] = ""
+    # Sécurité d'initialisation des colonnes
+    colonnes_requises = ['Prénom', 'Nom', 'Statut', 'Paiement', 'Relancer', 'DateNav', 'Société', 'Jours', 'Prix', 'Acompte', 'Notes', 'Téléphone', 'Email', 'Pers']
+    if df_raw is None or not hasattr(df_raw, "empty") or df_raw.empty:
+        df_raw = pd.DataFrame(columns=colonnes_requises)
+    else:
+        for col in colonnes_requises:
+            if col not in df_raw.columns:
+                df_raw[col] = ""
     
     # Boutons de navigation des vues
     n1, n2, n3, n4, n5 = st.columns([1, 1, 1, 1, 1.5])
@@ -366,8 +366,9 @@ else:
     search = c_search.text_input("🔍 Rechercher...", "", key="search_bar_contacts").upper()
     annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
     
-    # Extraction ultra-sécurisée de l'année (cherche 4 chiffres n'importe où dans le texte de la date)
+    # Extraction ultra-sécurisée de l'année
     def extraire_annee_safe(date_val):
+        import re
         match = re.search(r'(\d{4})', str(date_val))
         return int(match.group(1)) if match else 2026
 
@@ -423,7 +424,7 @@ else:
     if search: 
         df_aff = df_aff[df_aff['Nom'].astype(str).str.contains(search) | df_aff['Prénom'].astype(str).str.contains(search) | df_aff['Société'].astype(str).str.contains(search)]
     
-    # Affichage des fiches
+    # Affichage des fiches (imbriqué sous le "if st.session_state.page == 'CONTACTS':")
     if not df_aff.empty:
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']  
@@ -489,8 +490,13 @@ else:
                 df_all.loc[idx, ['Statut', 'Paiement']] = ["Terminé", "Paid"]
                 sauvegarder_data(df_all, 'contacts.json')
                 st.rerun()
-else:
-    st.info("💡 Aucun contact enregistré pour cette catégorie ou cette saison. Utilisez le bouton '➕ NOUVEAU CLIENT' ci-dessus pour commencer ou basculez d'onglet (En cours / Demandes / Archives).")
+    else:
+        st.info("💡 Aucun contact enregistré pour cette catégorie ou cette saison. Utilisez le bouton '➕ NOUVEAU CLIENT' ci-dessus pour commencer ou basculez d'onglet (En cours / Demandes / Archives).")
+
+# =================================================================
+# --- PAGE SUIVANTE (BIEN ALIGNÉE TOUT À GAUCHE SANS CONFLIT) ---
+# =================================================================
+elif st.session_state.page == "MODIFIER_CONTACT":
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT : VERSION SÉCURISÉE (V110) ---
 # =================================================================
