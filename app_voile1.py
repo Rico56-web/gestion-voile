@@ -341,9 +341,9 @@ colonnes_requises = ['Prénom', 'Nom', 'Statut', 'Paiement', 'Relancer', 'DateNa
 if df_raw is None or not hasattr(df_raw, "empty") or df_raw.empty:
     df_raw = pd.DataFrame(columns=colonnes_requises)
 else:
-        for col in colonnes_requises:
-            if col not in df_raw.columns:
-                df_raw[col] = ""
+    for col in colonnes_requises:
+        if col not in df_raw.columns:
+            df_raw[col] = ""
     
     # Boutons de navigation des vues
     n1, n2, n3, n4, n5 = st.columns([1, 1, 1, 1, 1.5])
