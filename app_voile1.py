@@ -337,10 +337,10 @@ df_raw = charger_data_safe('contacts.json')
 st.write("Nombre de lignes lues dans le fichier :", len(df_raw) if df_raw is not None else "Fichier non trouvé/vide")
     
 # Sécurité d'initialisation des colonnes
-    colonnes_requises = ['Prénom', 'Nom', 'Statut', 'Paiement', 'Relancer', 'DateNav', 'Société', 'Jours', 'Prix', 'Acompte', 'Notes', 'Téléphone', 'Email', 'Pers']
-    if df_raw is None or not hasattr(df_raw, "empty") or df_raw.empty:
-        df_raw = pd.DataFrame(columns=colonnes_requises)
-    else:
+colonnes_requises = ['Prénom', 'Nom', 'Statut', 'Paiement', 'Relancer', 'DateNav', 'Société', 'Jours', 'Prix', 'Acompte', 'Notes', 'Téléphone', 'Email', 'Pers']
+if df_raw is None or not hasattr(df_raw, "empty") or df_raw.empty:
+    df_raw = pd.DataFrame(columns=colonnes_requises)
+else:
         for col in colonnes_requises:
             if col not in df_raw.columns:
                 df_raw[col] = ""
