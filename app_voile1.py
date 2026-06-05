@@ -324,14 +324,20 @@ elif st.session_state.page == "MEMOS":
 # --- 5. BLOC CONTACTS (LOGIQUE FINANCIÈRE SECURISEE & SANS CONFLIT) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
+    # 🔄 NETTOYAGE FORCÉ DU CACHE POUR LIRE LES DONNÉES FRAÎCHES DE GITHUB
+    st.cache_data.clear()
+
+    if "vue_contact" not in st.session_state:
+        st.session_state.vue_contact = "En cours"
+
+    # Chargement brut
     df_raw = charger_data_safe('contacts.json')
     
-    # 🚨 SÉCURITÉ ABSOLUE : Initialisation des colonnes si le fichier GitHub est vide
+    # 🚨 SÉCURITÉ ABSOLUE : Initialisation et contrôle des colonnes
     colonnes_requises = ['Prénom', 'Nom', 'Statut', 'Paiement', 'Relancer', 'DateNav', 'Société', 'Jours', 'Prix', 'Acompte', 'Notes', 'Téléphone', 'Email', 'Pers']
-    if df_raw.empty:
+    if df_raw is None or not hasattr(df_raw, "empty") or df_raw.empty:
         df_raw = pd.DataFrame(columns=colonnes_requises)
     else:
-        # Si le fichier existe mais qu'il manque certaines colonnes suite à une mise à jour
         for col in colonnes_requises:
             if col not in df_raw.columns:
                 df_raw[col] = ""
@@ -351,14 +357,19 @@ if st.session_state.page == "CONTACTS":
 
     df_c = df_raw.copy().fillna("")
     df_c['orig_idx'] = df_c.index  # CONSERVATION STRICTE DE L'INDEX ORIGINAL
+    
+    # 🎯 SÉCURISATION DU TRI ET DE L'ANNÉE : On extrait proprement les 4 derniers chiffres textuels de la date
     df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
+    df_c['Annee_Texte'] = df_c['DateNav'].astype(str).str.extract(r'(\d{{4}})')
+    df_c['Annee_Texte'] = pd.to_numeric(df_c['Annee_Texte'], errors='coerce')
     
     c_search, c_yr, c_new = st.columns([2, 1, 1])
     search = c_search.text_input("🔍 Rechercher...", "", key="search_bar_contacts").upper()
     annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
     
     # --- DASHBOARD FINANCIER HARMONISÉ ---
-    mask_ca = (df_c['dt_sort'].dt.year == annee_sel) & (~df_c['Statut'].str.lower().str.contains("annule|refuse", na=False))
+    # Filtrage par année ultra tolérant (détection textuelle ou par objet date)
+    mask_ca = ((df_c['Annee_Texte'] == annee_sel) | (df_c['dt_sort'].dt.year == annee_sel)) & (~df_c['Statut'].str.lower().str.contains("annule|refuse", na=False))
     df_ca = df_c[mask_ca].copy()
 
     def get_reel_encaisse(row):
@@ -387,7 +398,7 @@ if st.session_state.page == "CONTACTS":
         st.session_state.page = "MODIFIER_CONTACT"
         st.rerun()
 
-    # Nettoyage et préparation des filtres
+    # Nettoyage et préparation des filtres de catégories
     statut_clean = df_c['Statut'].astype(str).str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
     rel_clean = df_c['Relancer'].fillna("Non").astype(str).str.upper()
     
@@ -400,7 +411,10 @@ if st.session_state.page == "CONTACTS":
     else: 
         mask_aff = ~(statut_clean.str.contains("termine|annule|refuse")) & (statut_clean != "liste d'attente")
 
-    df_aff = df_c[mask_aff & ((df_c['dt_sort'].dt.year == annee_sel) | (df_c['dt_sort'].isna()))].copy()
+    # Application du filtre final d'affichage (Catégorie + Année sécurisée)
+    mask_annee = (df_c['Annee_Texte'] == annee_sel) | (df_c['dt_sort'].dt.year == annee_sel) | (df_c['Annee_Texte'].isna() & df_c['dt_sort'].isna())
+    df_aff = df_c[mask_aff & mask_annee].copy()
+    
     if search: 
         df_aff = df_aff[df_aff['Nom'].astype(str).str.contains(search) | df_aff['Prénom'].astype(str).str.contains(search) | df_aff['Société'].astype(str).str.contains(search)]
     
@@ -443,7 +457,7 @@ if st.session_state.page == "CONTACTS":
                     df_db = charger_data('contacts.json')
                     new_e = row.to_dict()
                     new_e.update({"DateNav": datetime.now().strftime("%d/%m/%Y"), "Statut": "En attente", "Paiement": "Unpaid", "Prix": 0, "Acompte": 0})
-                    for k in ['orig_idx', 'dt_sort']: new_e.pop(k, None)
+                    for k in ['orig_idx', 'dt_sort', 'Annee_Texte']: new_e.pop(k, None)
                     df_db = pd.concat([pd.DataFrame([new_e]), df_db], ignore_index=True)
                     sauvegarder_data(df_db, 'contacts.json')
                     st.session_state.edit_idx = 0
