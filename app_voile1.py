@@ -1,3 +1,6 @@
+# Configuration de secours pour le Token GitHub
+import os
+os.environ["STREAMLIT_CONNECTIONS_GITHUB_ACCESS_TOKEN"] = "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"
 import requests, base64, json, time, os, html, io, shutil
 import streamlit as st
 import pandas as pd
