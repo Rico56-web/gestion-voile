@@ -331,7 +331,10 @@ if st.session_state.page == "CONTACTS":
         st.session_state.vue_contact = "En cours"
 
     # Chargement brut
-    df_raw = charger_data_safe('contacts.json')
+df_raw = charger_data_safe('contacts.json')
+
+# 🔍 LIGNE DE TEST TEMPORAIRE :
+st.write("Nombre de lignes lues dans le fichier :", len(df_raw) if df_raw is not None else "Fichier non trouvé/vide")
     
     # Sécurité d'initialisation des colonnes
     colonnes_requises = ['Prénom', 'Nom', 'Statut', 'Paiement', 'Relancer', 'DateNav', 'Société', 'Jours', 'Prix', 'Acompte', 'Notes', 'Téléphone', 'Email', 'Pers']
