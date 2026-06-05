@@ -321,10 +321,10 @@ elif st.session_state.page == "MEMOS":
                     st.rerun()
                 st.divider()
 # =================================================================
-# --- 5. BLOC CONTACTS (LOGIQUE FINANCIÈRE SECURISEE & SANS CONFLIT) ---
+# --- 5. BLOC CONTACTS (VERSION IMMUNISÉE & AFFICHAGE FORCÉ) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    # 🔄 NETTOYAGE FORCÉ DU CACHE POUR LIRE LES DONNÉES FRAÎCHES DE GITHUB
+    # 🔄 Nettoyage du cache pour forcer la lecture réelle sur GitHub
     st.cache_data.clear()
 
     if "vue_contact" not in st.session_state:
@@ -333,7 +333,7 @@ if st.session_state.page == "CONTACTS":
     # Chargement brut
     df_raw = charger_data_safe('contacts.json')
     
-    # 🚨 SÉCURITÉ ABSOLUE : Initialisation et contrôle des colonnes
+    # Sécurité d'initialisation des colonnes
     colonnes_requises = ['Prénom', 'Nom', 'Statut', 'Paiement', 'Relancer', 'DateNav', 'Société', 'Jours', 'Prix', 'Acompte', 'Notes', 'Téléphone', 'Email', 'Pers']
     if df_raw is None or not hasattr(df_raw, "empty") or df_raw.empty:
         df_raw = pd.DataFrame(columns=colonnes_requises)
@@ -342,6 +342,7 @@ if st.session_state.page == "CONTACTS":
             if col not in df_raw.columns:
                 df_raw[col] = ""
     
+    # Boutons de navigation des vues
     n1, n2, n3, n4, n5 = st.columns([1, 1, 1, 1, 1.5])
     if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
         st.session_state.vue_contact = "En cours"; st.rerun()
@@ -356,30 +357,33 @@ if st.session_state.page == "CONTACTS":
     st.divider()
 
     df_c = df_raw.copy().fillna("")
-    df_c['orig_idx'] = df_c.index  # CONSERVATION STRICTE DE L'INDEX ORIGINAL
-    
-    # 🎯 SÉCURISATION DU TRI ET DE L'ANNÉE : Extraction textuelle pour éviter les plantages
-    df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
-    df_c['Annee_Texte'] = df_c['DateNav'].astype(str).str.extract(r'(\d{4})')
-    df_c['Annee_Texte'] = pd.to_numeric(df_c['Annee_Texte'], errors='coerce')
+    df_c['orig_idx'] = df_c.index  # Conservation de l'index original
     
     c_search, c_yr, c_new = st.columns([2, 1, 1])
     search = c_search.text_input("🔍 Rechercher...", "", key="search_bar_contacts").upper()
     annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
     
-    # --- DASHBOARD FINANCIER HARMONISÉ ---
-    mask_ca = ((df_c['Annee_Texte'] == annee_sel) | (df_c['dt_sort'].dt.year == annee_sel)) & (~df_c['Statut'].str.lower().str.contains("annule|refuse", na=False))
-    df_ca = df_c[mask_ca].copy()
+    # Extraction ultra-sécurisée de l'année (cherche 4 chiffres n'importe où dans le texte de la date)
+    def extraire_annee_safe(date_val):
+        match = re.search(r'(\d{4})', str(date_val))
+        return int(match.group(1)) if match else 2026
+
+    df_c['Annee_Calculee'] = df_c['DateNav'].apply(extraire_annee_safe)
+    
+    # --- DASHBOARD FINANCIER COMPLET ---
+    df_ca = df_c[(df_c['Annee_Calculee'] == annee_sel) & (~df_c['Statut'].str.lower().str.contains("annule|refuse", na=False))].copy()
 
     def get_reel_encaisse(row):
-        p = to_f(row.get('Prix', 0))
-        a = to_f(row.get('Acompte', 0))
+        try: p = float(row.get('Prix', 0))
+        except: p = 0.0
+        try: a = float(row.get('Acompte', 0))
+        except: a = 0.0
         return p if str(row.get('Paiement', '')).strip().upper() == "PAID" else a
 
     if not df_ca.empty:
-        total_prevu = df_ca['Prix'].apply(to_f).sum()
+        total_prevu = sum([float(x) if str(x).replace('.','',1).isdigit() else 0.0 for x in df_ca['Prix']])
         total_encaisse = df_ca.apply(get_reel_encaisse, axis=1).sum()
-        reste_percevoir = max(0, total_prevu - total_encaisse)
+        reste_percevoir = max(0.0, total_prevu - total_encaisse)
     else:
         total_prevu = total_encaisse = reste_percevoir = 0
 
@@ -397,7 +401,7 @@ if st.session_state.page == "CONTACTS":
         st.session_state.page = "MODIFIER_CONTACT"
         st.rerun()
 
-    # Nettoyage des filtres de catégories
+    # Nettoyage et préparation des filtres
     statut_clean = df_c['Statut'].astype(str).str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
     rel_clean = df_c['Relancer'].fillna("Non").astype(str).str.upper()
     
@@ -410,21 +414,19 @@ if st.session_state.page == "CONTACTS":
     else: 
         mask_aff = ~(statut_clean.str.contains("termine|annule|refuse")) & (statut_clean != "liste d'attente")
 
-    # Application du filtre final d'affichage (Catégorie + Année sécurisée)
-    mask_annee = (df_c['Annee_Texte'] == annee_sel) | (df_c['dt_sort'].dt.year == annee_sel) | (df_c['Annee_Texte'].isna() & df_c['dt_sort'].isna())
-    df_aff = df_c[mask_aff & mask_annee].copy()
+    # Filtrage final strict
+    df_aff = df_c[mask_aff & (df_c['Annee_Calculee'] == annee_sel)].copy()
     
     if search: 
         df_aff = df_aff[df_aff['Nom'].astype(str).str.contains(search) | df_aff['Prénom'].astype(str).str.contains(search) | df_aff['Société'].astype(str).str.contains(search)]
     
-    # Tri d'affichage chronologique
+    # Affichage des fiches
     if not df_aff.empty:
-        df_aff = df_aff.sort_values(by='dt_sort', ascending=True)
-
         for _, row in df_aff.iterrows():
             idx = row['orig_idx']  
-            p_tot = to_f(row.get('Prix', 0))
-            p_enc = p_tot if str(row.get('Paiement', '')).strip().upper() == "PAID" else to_f(row.get('Acompte', 0))
+            try: p_tot = float(row.get('Prix', 0))
+            except: p_tot = 0.0
+            p_enc = p_tot if str(row.get('Paiement', '')).strip().upper() == "PAID" else get_reel_encaisse(row)
             
             soc = str(row.get('Société', 'PERSO')).upper()
             colors = {"CMN": ("#2980B9", "#EBF5FB"), "CLICK": ("#27AE60", "#EAFAF1"), "VOG": ("#8E44AD", "#F5EEF8"), "PERSO": ("#F1C40F", "#FEF9E7")}
@@ -438,7 +440,7 @@ if st.session_state.page == "CONTACTS":
                     <span style="font-size:0.8rem; font-weight:bold; color:{border_col};">{soc}</span>
                 </div>
                 <div style="margin-top:5px; font-size:0.9rem;">
-                    📅 {row['DateNav'] if row['DateNav'] else 'Date à définir'} | 👥 {int(to_f(row.get('Pers', 1)))} pers. | ⏱️ {row.get('Jours', 1)} j.<br>
+                    📅 {row['DateNav'] if row['DateNav'] else 'Date à définir'} | 👥 {row.get('Pers', 1)} pers. | ⏱️ {row.get('Jours', 1)} j.<br>
                     💰 <b>Total: {int(p_tot)}€</b> | 💳 Reçu: {int(p_enc)}€ | 📉 <b>Reste: {int(max(0, p_tot-p_enc))}€</b>
                 </div>
                 <div style="font-style:italic; font-size:0.8rem; color:gray; margin-top:5px;">Statut: {row['Statut']} | Paiement: {row['Paiement']}</div>
@@ -456,7 +458,7 @@ if st.session_state.page == "CONTACTS":
                     df_db = charger_data('contacts.json')
                     new_e = row.to_dict()
                     new_e.update({"DateNav": datetime.now().strftime("%d/%m/%Y"), "Statut": "En attente", "Paiement": "Unpaid", "Prix": 0, "Acompte": 0})
-                    for k in ['orig_idx', 'dt_sort', 'Annee_Texte']: new_e.pop(k, None)
+                    for k in ['orig_idx', 'Annee_Calculee']: new_e.pop(k, None)
                     df_db = pd.concat([pd.DataFrame([new_e]), df_db], ignore_index=True)
                     sauvegarder_data(df_db, 'contacts.json')
                     st.session_state.edit_idx = 0
@@ -485,7 +487,7 @@ if st.session_state.page == "CONTACTS":
                 sauvegarder_data(df_all, 'contacts.json')
                 st.rerun()
     else:
-        st.info("💡 Aucun contact enregistré pour cette catégorie ou cette saison. Utilisez le bouton '➕ NOUVEAU CLIENT' ci-dessus pour commencer.")
+        st.info("💡 Aucun contact enregistré pour cette catégorie ou cette saison. Utilisez le bouton '➕ NOUVEAU CLIENT' ci-dessus pour commencer ou basculez d'onglet (En cours / Demandes / Archives).")
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT : VERSION SÉCURISÉE (V110) ---
 # =================================================================
