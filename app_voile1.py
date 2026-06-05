@@ -489,8 +489,8 @@ else:
                 df_all.loc[idx, ['Statut', 'Paiement']] = ["Terminé", "Paid"]
                 sauvegarder_data(df_all, 'contacts.json')
                 st.rerun()
-    else:
-        st.info("💡 Aucun contact enregistré pour cette catégorie ou cette saison. Utilisez le bouton '➕ NOUVEAU CLIENT' ci-dessus pour commencer ou basculez d'onglet (En cours / Demandes / Archives).")
+else:
+    st.info("💡 Aucun contact enregistré pour cette catégorie ou cette saison. Utilisez le bouton '➕ NOUVEAU CLIENT' ci-dessus pour commencer ou basculez d'onglet (En cours / Demandes / Archives).")
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT : VERSION SÉCURISÉE (V110) ---
 # =================================================================
