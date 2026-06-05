@@ -77,8 +77,8 @@ def bouton_export_excel(df, nom_fichier):
 # =================================================================
 def charger_data(file):
     try:
-       repo = "rico56-web/gestion-voile"
-        token = os.environ["STREAMLIT_CONNECTIONS_GITHUB_ACCESS_TOKEN"]
+    repo = "rico56-web/gestion-voile"
+    token = os.environ["STREAMLIT_CONNECTIONS_GITHUB_ACCESS_TOKEN"]
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
         res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
         if res.status_code == 200:
