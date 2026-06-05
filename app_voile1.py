@@ -358,9 +358,9 @@ if st.session_state.page == "CONTACTS":
     df_c = df_raw.copy().fillna("")
     df_c['orig_idx'] = df_c.index  # CONSERVATION STRICTE DE L'INDEX ORIGINAL
     
-    # 🎯 SÉCURISATION DU TRI ET DE L'ANNÉE : On extrait proprement les 4 derniers chiffres textuels de la date
+    # 🎯 SÉCURISATION DU TRI ET DE L'ANNÉE : Extraction textuelle pour éviter les plantages
     df_c['dt_sort'] = pd.to_datetime(df_c['DateNav'], dayfirst=True, errors='coerce')
-    df_c['Annee_Texte'] = df_c['DateNav'].astype(str).str.extract(r'(\d{{4}})')
+    df_c['Annee_Texte'] = df_c['DateNav'].astype(str).str.extract(r'(\d{4})')
     df_c['Annee_Texte'] = pd.to_numeric(df_c['Annee_Texte'], errors='coerce')
     
     c_search, c_yr, c_new = st.columns([2, 1, 1])
@@ -368,7 +368,6 @@ if st.session_state.page == "CONTACTS":
     annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
     
     # --- DASHBOARD FINANCIER HARMONISÉ ---
-    # Filtrage par année ultra tolérant (détection textuelle ou par objet date)
     mask_ca = ((df_c['Annee_Texte'] == annee_sel) | (df_c['dt_sort'].dt.year == annee_sel)) & (~df_c['Statut'].str.lower().str.contains("annule|refuse", na=False))
     df_ca = df_c[mask_ca].copy()
 
@@ -394,11 +393,11 @@ if st.session_state.page == "CONTACTS":
         new_r = {"Prénom": "NOUVEAU", "Nom": "CLIENT", "Statut": "En attente", "Paiement": "Unpaid", "Relancer": "Non", "DateNav": f"01/06/{annee_sel}", "Société": "PERSO", "Jours": 1, "Prix": 0, "Acompte": 0, "Notes": "", "Téléphone": "", "Email": "", "Pers": 1}
         df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
         sauvegarder_data(df_new, 'contacts.json')
-        st.session_state.edit_idx = 0  # Placé au sommet de la pile
+        st.session_state.edit_idx = 0  
         st.session_state.page = "MODIFIER_CONTACT"
         st.rerun()
 
-    # Nettoyage et préparation des filtres de catégories
+    # Nettoyage des filtres de catégories
     statut_clean = df_c['Statut'].astype(str).str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
     rel_clean = df_c['Relancer'].fillna("Non").astype(str).str.upper()
     
@@ -487,7 +486,6 @@ if st.session_state.page == "CONTACTS":
                 st.rerun()
     else:
         st.info("💡 Aucun contact enregistré pour cette catégorie ou cette saison. Utilisez le bouton '➕ NOUVEAU CLIENT' ci-dessus pour commencer.")
-
 # =================================================================
 # --- 6. PAGE MODIFIER CONTACT : VERSION SÉCURISÉE (V110) ---
 # =================================================================
