@@ -78,16 +78,8 @@ def bouton_export_excel(df, nom_fichier):
 # --- 1. FONCTIONS DE SÉCURITÉ, GITHUB & PARAMS ---
 # =================================================================
 def charger_data(file):
-    try:
         repo = "rico56-web/gestion-voile"
-        token = os.environ["STREAMLIT_CONNECTIONS_GITHUB_ACCESS_TOKEN"]
-        url = f"https://api.github.com/repos/{repo}/contents/{file}"
-        res = requests.get(url, headers={"Authorization": f"token {token}"}, params={"v": time.time()})
-        if res.status_code == 200:
-            content = base64.b64decode(res.json()['content']).decode('utf-8')
-            return pd.DataFrame(json.loads(content))
-        return pd.DataFrame()
-    except: return pd.DataFrame()
+        token = "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"
 
 def sauvegarder_data(df, file):
     try:
