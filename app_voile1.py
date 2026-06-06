@@ -9,6 +9,9 @@ import urllib.parse
 from datetime import datetime, date, timedelta
 import calendar
 import streamlit.components.v1 as components
+import streamlit as st
+st.secrets["GITHUB_TOKEN"] = os.environ["STREAMLIT_CONNECTIONS_GITHUB_ACCESS_TOKEN"]
+st.secrets["GITHUB_REPO"] = "rico56-web/gestion-voile"
 
 # =================================================================
 # --- CONFIGURATION & STYLE REGROUPÉS ---
