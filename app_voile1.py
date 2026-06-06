@@ -78,12 +78,28 @@ def bouton_export_excel(df, nom_fichier):
 # --- 1. FONCTIONS DE SÉCURITÉ, GITHUB & PARAMS ---
 # =================================================================
 def charger_data(file):
-        repo = "rico56-web/gestion-voile"
-        token = "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"
+    repo = "rico56-web/gestion-voile"
+    token = "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"
+    try:
+        url = f"https://api.github.com/repos/{repo}/contents/{file}"
+        res = requests.get(url, headers={"Authorization": f"token {token}"})
+        if res.status_code == 200:
+            content_b64 = res.json().get('content', '')
+            content_str = base64.b64encode(b"[]").decode('utf-8') if not content_b64 else content_b64
+            decoded_bytes = base64.b64decode(content_str)
+            import io
+            df = pd.read_json(io.BytesIO(decoded_bytes), orient="records")
+            return df
+        else:
+            return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Erreur chargement {file} : {e}")
+        return pd.DataFrame()
 
 def sauvegarder_data(df, file):
     try:
-        repo, token = st.secrets["GITHUB_REPO"], st.secrets["GITHUB_TOKEN"]
+        repo = "rico56-web/gestion-voile"
+        token = "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"
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
         res = requests.get(url, headers={"Authorization": f"token {token}"})
         sha = res.json().get('sha') if res.status_code == 200 else None
@@ -91,7 +107,8 @@ def sauvegarder_data(df, file):
         content_b64 = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
         requests.put(url, headers={"Authorization": f"token {token}"}, 
                      json={"message": f"Update {file}", "content": content_b64, "sha": sha})
-    except Exception as e: st.error(f"Erreur sauvegarde {file} : {e}")
+    except Exception as e: 
+        st.error(f"Erreur sauvegarde {file} : {e}")
 
 def charger_data_safe(fichier):
     df = charger_data(fichier)
