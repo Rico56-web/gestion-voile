@@ -674,7 +674,7 @@ if st.session_state.page == "PLANNING":
     total_mois = 0
     missions_list = []
 
-   if df_f is not None and not df_f.empty:
+    if df_f is not None and not df_f.empty:
         df_p = df_f.fillna("")
         for idx, r in df_p.iterrows():
             try:
