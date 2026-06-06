@@ -639,7 +639,7 @@ if st.session_state.page == "PLANNING":
 
     # --- B. FACTURATION EN ATTENTE ---
     df_f = charger_data_safe('contacts.json')
-    nb_unpaid = len(df_f[df_f['Paiement'] == "Unpaid"]) if not df_f.empty else 0
+    nb_unpaid = len(df_f[df_f['Paiement'] == "Unpaid"]) if (df_f is not None and not df_f.empty) else 0
     col_v2.metric("Factures Unpaid", f"{nb_unpaid}", delta=f"{nb_unpaid}" if nb_unpaid > 0 else "OK", delta_color="inverse")
 
     # --- C. MARÉES ---
