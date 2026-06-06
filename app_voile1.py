@@ -95,7 +95,9 @@ def sauvegarder_data(df, file):
 
 def charger_data_safe(fichier):
     df = charger_data(fichier)
-    return df if not df.empty else pd.DataFrame()
+    if df is not None and not df.empty:
+     return df
+     return pd.DataFrame()
 
 def charger_params():
     if 'params_vesta' in st.session_state:
