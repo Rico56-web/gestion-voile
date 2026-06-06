@@ -505,7 +505,7 @@ elif st.session_state.page == "MODIFIER_CONTACT":
     idx_to_edit = st.session_state.get('edit_idx')
     df_m = charger_data_safe('contacts.json')
 
-    if idx_to_edit is not None and not df_m.empty and idx_to_edit in df_m.index:
+    if idx_to_edit is not None and df_m is not None and not df_m.empty and idx_to_edit in df_m.index:
         row = df_m.loc[idx_to_edit]
         
         with st.form("form_edit_v2026"):
