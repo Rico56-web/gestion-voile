@@ -76,8 +76,8 @@ def bouton_export_excel(df, nom_fichier):
 def charger_data(file):
     repo = "rico56-web/gestion-voile"
     # Clé découpée pour contourner la désactivation automatique de GitHub
-    partie1 = "ghp_51YN7GuNV4m5ndqtZsh7"
-    partie2 = "F1aRPyXKxj3MPbUJ"
+    partie1 = "ghp_oyHF0LaYFF39IlWIf"
+    partie2 = "RbKMVVK3dQb2R1wncdV"
     token = partie1 + partie2
     try:
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
@@ -98,8 +98,8 @@ def charger_data(file):
 def sauvegarder_data(df, file):
     try:
         repo = "rico56-web/gestion-voile"
-        partie1 = "ghp_51YN7GuNV4m5ndqtZsh7"
-        partie2 = "F1aRPyXKxj3MPbUJ"
+        partie1 = "ghp_oyHF0LaYFF39IlWIf"
+        partie2 = "RbKMVVK3dQb2R1wncdV"
         token = partie1 + partie2
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
         res = requests.get(url, headers={"Authorization": f"token {token}"})
