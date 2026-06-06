@@ -624,7 +624,7 @@ if st.session_state.page == "PLANNING":
     # --- A. ALERTE MAINTENANCE (HARMONISÉE ABSOLUE) ---
     df_log = charger_data_safe('logbook.json')
     derniere_heure = 0.0
-    if not df_log.empty:
+    if df_log is not None and not df_log.empty:
         df_valid = df_log[df_log['MotArr'] > 0]
         derniere_heure = to_f(df_valid['MotArr'].max()) if not df_valid.empty else to_f(df_log['MotArr'].max())
     
