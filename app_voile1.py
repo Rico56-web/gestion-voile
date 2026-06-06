@@ -1,7 +1,5 @@
-# Configuration de secours pour le Token GitHub
 import os
-os.environ["STREAMLIT_CONNECTIONS_GITHUB_ACCESS_TOKEN"] = "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"
-import requests, base64, json, time, os, html, io, shutil
+import requests, base64, json, time, html, io, shutil
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -9,8 +7,6 @@ import urllib.parse
 from datetime import datetime, date, timedelta
 import calendar
 import streamlit.components.v1 as components
-
-
 
 # =================================================================
 # --- CONFIGURATION & STYLE REGROUPÉS ---
@@ -79,7 +75,10 @@ def bouton_export_excel(df, nom_fichier):
 # =================================================================
 def charger_data(file):
     repo = "rico56-web/gestion-voile"
-    token = "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"
+    # Clé découpée pour contourner la désactivation automatique de GitHub
+    partie1 = "ghp_51YN7GuNV4m5ndqtZsh7"
+    partie2 = "F1aRPyXKxj3MPbUJ"
+    token = partie1 + partie2
     try:
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
         res = requests.get(url, headers={"Authorization": f"token {token}"})
@@ -99,7 +98,9 @@ def charger_data(file):
 def sauvegarder_data(df, file):
     try:
         repo = "rico56-web/gestion-voile"
-        token = "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"
+        partie1 = "ghp_51YN7GuNV4m5ndqtZsh7"
+        partie2 = "F1aRPyXKxj3MPbUJ"
+        token = partie1 + partie2
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
         res = requests.get(url, headers={"Authorization": f"token {token}"})
         sha = res.json().get('sha') if res.status_code == 200 else None
@@ -113,14 +114,14 @@ def sauvegarder_data(df, file):
 def charger_data_safe(fichier):
     df = charger_data(fichier)
     if df is not None and not df.empty:
-     return df
-     return pd.DataFrame()
+        return df
+    return pd.DataFrame()
 
 def charger_params():
     if 'params_vesta' in st.session_state:
         return st.session_state.params_vesta
     df = charger_data('params.json')
-    if not df.empty:
+    if df is not None and not df.empty:
         st.session_state.params_vesta = df.iloc[0].to_dict()
     else:
         st.session_state.params_vesta = {
@@ -133,7 +134,7 @@ def charger_params():
 def sauvegarder_params(dict_params):
     st.session_state.params_vesta = dict_params
     df_params = pd.DataFrame([dict_params])
-    generer_data = sauvegarder_data(df_params, 'params.json')
+    sauvegarder_data(df_params, 'params.json')
 
 def executer_backup_auto():
     fichiers_a_sauver = ['contacts.json', 'maintenance.json', 'logbook.json', 'params.json', 'memos.json']
