@@ -688,10 +688,10 @@
         "dt_sort":null
     },
     {
-        "Pr\u00e9nom":"GROUPE ESPAGNE ",
+        "Pr\u00e9nom":"GROUPE ESPAGNE",
         "Nom":"4 PERSONNES",
-        "Statut":"Confirm\u00e9",
-        "Paiement":"Unpaid",
+        "Statut":"Termin\u00e9",
+        "Paiement":"Paid",
         "Relancer":"Oui",
         "DateNav":"12\/06\/2026",
         "Soci\u00e9t\u00e9":"PERSO",
