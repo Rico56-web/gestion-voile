@@ -1,6 +1,6 @@
 [
     {
-        "Date":"01\/03\/2026",
+        "Date":1767398400000,
         "Navigation":"Nav click",
         "PortArr":"PORT HALIGUEN",
         "MotDep":2411.0,
@@ -17,7 +17,7 @@
         "Meteo":null
     },
     {
-        "Date":"02\/03\/2026",
+        "Date":1770076800000,
         "Navigation":"Nav click",
         "PortArr":"HOUAT Port st Gildas",
         "MotDep":2415.8,
@@ -34,7 +34,7 @@
         "Meteo":null
     },
     {
-        "Date":"03\/03\/2026",
+        "Date":1772496000000,
         "Navigation":"Nav click",
         "PortArr":"LE PALAIS",
         "MotDep":2419.5,
@@ -51,7 +51,7 @@
         "Meteo":null
     },
     {
-        "Date":"14\/03\/2026",
+        "Date":1773446400000,
         "Navigation":"vers belle ile",
         "PortArr":"LE PALAIS",
         "MotDep":2422.6,
@@ -68,7 +68,7 @@
         "Meteo":null
     },
     {
-        "Date":"15\/03\/2026",
+        "Date":1773532800000,
         "Navigation":"vers belle ile",
         "PortArr":"Arzon",
         "MotDep":2428.7,
@@ -85,7 +85,7 @@
         "Meteo":null
     },
     {
-        "Date":"12\/04\/2026",
+        "Date":1796342400000,
         "Navigation":"sortie vers les iles locales",
         "PortArr":"Port haliguen",
         "MotDep":2432.7,
@@ -102,7 +102,7 @@
         "Meteo":null
     },
     {
-        "Date":"13\/04\/2026",
+        "Date":1776038400000,
         "Navigation":"sortie vers les iles locales",
         "PortArr":"Arzon",
         "MotDep":2433.7,
@@ -119,7 +119,7 @@
         "Meteo":null
     },
     {
-        "Date":"21\/04\/2026",
+        "Date":1776729600000,
         "Navigation":"test \u00e9quipe espagne ",
         "PortArr":"Escale",
         "MotDep":0.0,
@@ -136,7 +136,7 @@
         "Meteo":null
     },
     {
-        "Date":"20\/04\/2026",
+        "Date":1776643200000,
         "Navigation":"test \u00e9quipe espagne ",
         "PortArr":"port tudy , Arzon",
         "MotDep":2441.1,
@@ -153,7 +153,7 @@
         "Meteo":null
     },
     {
-        "Date":"25\/04\/2026",
+        "Date":1777075200000,
         "Navigation":"location CMN",
         "PortArr":"Escale",
         "MotDep":2436.1,
@@ -170,7 +170,7 @@
         "Meteo":""
     },
     {
-        "Date":"26\/04\/2026",
+        "Date":1777161600000,
         "Navigation":"location CMN",
         "PortArr":"Escale",
         "MotDep":2436.1,
@@ -187,7 +187,7 @@
         "Meteo":""
     },
     {
-        "Date":"02\/05\/2026",
+        "Date":1770249600000,
         "Navigation":"location 5 CMN",
         "PortArr":"Escale",
         "MotDep":2446.7,
@@ -204,7 +204,7 @@
         "Meteo":""
     },
     {
-        "Date":"03\/05\/2026",
+        "Date":1772668800000,
         "Navigation":"location 5 CMN",
         "PortArr":"Escale",
         "MotDep":2464.45,
@@ -221,7 +221,7 @@
         "Meteo":""
     },
     {
-        "Date":"08\/05\/2026",
+        "Date":1785888000000,
         "Navigation":"location perso mai 2026",
         "PortArr":"Escale",
         "MotDep":2452.2,
@@ -238,7 +238,7 @@
         "Meteo":""
     },
     {
-        "Date":"09\/05\/2026",
+        "Date":1788566400000,
         "Navigation":"location perso mai 2026",
         "PortArr":"Escale",
         "MotDep":2452.2,
@@ -255,7 +255,7 @@
         "Meteo":""
     },
     {
-        "Date":"22\/05\/2026",
+        "Date":1779408000000,
         "Navigation":"avec Franck",
         "PortArr":null,
         "MotDep":2457.4,
@@ -272,7 +272,7 @@
         "Meteo":"tres beau temps , soleil et vent de 10 a 12noeuds"
     },
     {
-        "Date":"23\/05\/2026",
+        "Date":1779494400000,
         "Navigation":"nav aurelien",
         "PortArr":null,
         "MotDep":2459.4,
@@ -289,7 +289,7 @@
         "Meteo":"tres beau tempschaus et ensoleill\u00e9"
     },
     {
-        "Date":"24\/05\/2026",
+        "Date":1779580800000,
         "Navigation":"nav aurelien",
         "PortArr":null,
         "MotDep":2459.4,
@@ -306,7 +306,7 @@
         "Meteo":""
     },
     {
-        "Date":"25\/05\/2026",
+        "Date":1779667200000,
         "Navigation":"nav aurelien",
         "PortArr":null,
         "MotDep":2466.4,
@@ -321,5 +321,22 @@
         "PortDep":null,
         "Co\u00e9quipiers":"",
         "Meteo":""
+    },
+    {
+        "Date":"12\/06\/2026",
+        "Navigation":"sortie a 5 (Espagne)",
+        "PortArr":null,
+        "MotDep":2466.4,
+        "MotArr":2469.9,
+        "TotalMot":3.5,
+        "MilDep":3354.0,
+        "MilArr":3398.0,
+        "TotalMil":44.0,
+        "H_Voile":7.0,
+        "Notes":"Cap vers port tudy puis port Louis puis kernevel",
+        "Group_ID":null,
+        "PortDep":null,
+        "Co\u00e9quipiers":"Philippe DESGAGNY\nFran\u00e7oise Riou\nJean Louis Dugave\nJannick bailly",
+        "Meteo":"Nuageux vent 10 noeuds"
     }
 ]
