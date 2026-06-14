@@ -340,7 +340,7 @@
         "Meteo":"Nuageux vent 10 noeuds"
     },
     {
-        "Date":"14\/06\/2026",
+        "Date":1781395200000,
         "Navigation":"sortie a 5 (Espagne)",
         "PortArr":null,
         "MotDep":2469.9,
@@ -355,5 +355,22 @@
         "PortDep":null,
         "Co\u00e9quipiers":"",
         "Meteo":""
+    },
+    {
+        "Date":"13\/06\/2026",
+        "Navigation":"sortie a 5 (Espagne)",
+        "PortArr":null,
+        "MotDep":2469.9,
+        "MotArr":2492.0,
+        "TotalMot":22.1,
+        "MilDep":3398.0,
+        "MilArr":3425.0,
+        "TotalMil":27.0,
+        "H_Voile":0.0,
+        "Notes":"Vers jernevel",
+        "Group_ID":null,
+        "PortDep":null,
+        "Co\u00e9quipiers":"Idem",
+        "Meteo":"Soleil,chaud"
     }
 ]
