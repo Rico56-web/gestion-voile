@@ -1496,7 +1496,6 @@ def envoyer_email_facturation_cmn(corps_texte, mois_annee, destinataire=None):
         st.error(f"Erreur d'envoi de l'email : {e}")
         return False
 
-
 # =================================================================
 # --- 7. PAGE FACTURATION (FACT) ---
 # =================================================================
@@ -1557,10 +1556,14 @@ if st.session_state.page == "FACT":
                     df_cmn_filtre = df_cmn_attente.loc[indices_retenus]
                     
                     st.markdown("### 2. Destinataire et Message d'accompagnement")
-                    # Récupération de l'adresse par défaut depuis les secrets
-                    email_defaut_cmn = st.secrets["email"].get("email_destinataire", "compta.cmn@exemple.com")
                     
-                    # Champ modifiable pour faire des essais (ex: eric.clavreul@gmail.com)
+                    # FIX DE SÉCURITÉ : Vérification de la présence de la clé 'email' dans les secrets
+                    if "email" in st.secrets and "email_destinataire" in st.secrets["email"]:
+                        email_defaut_cmn = st.secrets["email"]["email_destinataire"]
+                    else:
+                        email_defaut_cmn = "compta.cmn@exemple.com"
+                    
+                    # Champ modifiable pour faire des essais
                     email_destinataire_actif = st.text_input(
                         "Adresse email du destinataire", 
                         value=email_defaut_cmn,
@@ -1801,8 +1804,7 @@ if st.session_state.page == "ARCHIVES":
     st.markdown("### 🏁 Clôture de Saison 2026")
     with st.expander("🚨 ZONE DE DANGER : Archiver les dossiers réglés", expanded=False):
         st.warning("""
-            **Action irréversible :** Cela va basculer définitivement toutes les fiches marquées comme **'Paid'** 
-            vers le fichier d'archive. Les dossiers restés en 'Unpaid' resteront dans le tableau de bord actif.
+            **Action irréversible :** Cela va basculer définitivement toutes les fiches marquées comme **'Paid'** vers le fichier d'archive. Les dossiers restés en 'Unpaid' resteront dans le tableau de bord actif.
         """)
         
         if st.button("🔒 EXÉCUTER L'ARCHIVAGE DES CONTACTS RÉGLÉS", use_container_width=True, type="primary"):
@@ -1874,22 +1876,19 @@ if st.session_state.page == "LOG":
             val_nav = ""
             if not df_log.empty:
                 try:
-                    # Copie pour isoler le calcul de la date la plus récente
                     df_calc = df_log.copy()
                     df_calc['dt_temp'] = pd.to_datetime(df_calc['Date'], dayfirst=True, errors='coerce')
                     df_calc = df_calc.dropna(subset=['dt_temp'])
                     
                     if not df_calc.empty:
-                        # On récupère la ligne de l'étape la plus récente chronologiquement
                         derniere_etape = df_calc.loc[df_calc['dt_temp'].idxmax()]
                         date_derniere = derniere_etape['dt_temp']
                         date_actuelle = pd.Timestamp.now().normalize()
                         
-                        # Si l'écart est strictement inférieur à 5 jours, on conserve le nom
                         if (date_actuelle - date_derniere).days < 5:
                             val_nav = derniere_etape.get('Navigation', '')
                 except:
-                    val_nav = "" # Sécurité en cas d'erreur de parsing des dates
+                    val_nav = ""
             
             val_equi = ""
             val_meteo = ""
@@ -2009,7 +2008,6 @@ if st.session_state.page == "LOG":
         st.divider()
         csv = df_log.to_csv(index=False).encode('utf-8-sig')
         st.download_button(label="📥 Télécharger le Livre de Bord complet (.CSV)", data=csv, file_name='livre_de_bord_vesta.csv', mime='text/csv', use_container_width=True)
-
 
 
 
