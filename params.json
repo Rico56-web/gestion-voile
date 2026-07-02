@@ -1,7 +1,12 @@
 [
     {
         "prochaine_vidange":2568.4,
-        "cible_vidange":250,
-        "frais_fixes":3800
+        "cible_vidange":250.0,
+        "frais_fixes":{
+            "Port Arzon":3800.0,
+            "Assurance":1200.0,
+            "Entretien":4500.0,
+            "Divers":500.0
+        }
     }
 ]
