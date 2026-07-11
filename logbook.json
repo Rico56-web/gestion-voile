@@ -391,7 +391,7 @@
         "Meteo":""
     },
     {
-        "Date":"16\/06\/2026",
+        "Date":1781568000000,
         "Navigation":"sortie a 5 (Espagne)",
         "PortArr":null,
         "MotDep":2480.5,
@@ -405,6 +405,23 @@
         "Group_ID":null,
         "PortDep":null,
         "Co\u00e9quipiers":"idem",
+        "Meteo":""
+    },
+    {
+        "Date":"18\/06\/2026",
+        "Navigation":"sortie a 5 (Espagne)",
+        "PortArr":null,
+        "MotDep":2481.2,
+        "MotArr":2491.4,
+        "TotalMot":10.2,
+        "MilDep":3508.0,
+        "MilArr":3532.0,
+        "TotalMil":24.0,
+        "H_Voile":0.0,
+        "Notes":"escale d'une journ\u00e9e au palis puis route au crouesty",
+        "Group_ID":null,
+        "PortDep":null,
+        "Co\u00e9quipiers":"",
         "Meteo":""
     }
 ]
