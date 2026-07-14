@@ -408,7 +408,7 @@
         "Meteo":""
     },
     {
-        "Date":"18\/06\/2026",
+        "Date":1781740800000,
         "Navigation":"sortie a 5 (Espagne)",
         "PortArr":null,
         "MotDep":2481.2,
@@ -423,5 +423,22 @@
         "PortDep":null,
         "Co\u00e9quipiers":"",
         "Meteo":""
+    },
+    {
+        "Date":"12\/07\/2026",
+        "Navigation":"Sortie 2 jours vers belle \u00eele",
+        "PortArr":null,
+        "MotDep":2491.4,
+        "MotArr":2492.5,
+        "TotalMot":1.1,
+        "MilDep":3532.0,
+        "MilArr":3587.0,
+        "TotalMil":55.0,
+        "H_Voile":6.0,
+        "Notes":"Au palais gros coup de vent \u00e0 4 h00 dans la nuit de mouillage \u00e0 l\u2019avant port\n",
+        "Group_ID":null,
+        "PortDep":null,
+        "Co\u00e9quipiers":"Perre( resp sociale \u00e0 la ville de bordeaux\nXavier( m\u00e9decin a paris) ",
+        "Meteo":"Bon soleil et tr\u00e8s chaud"
     }
 ]
