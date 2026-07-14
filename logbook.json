@@ -442,7 +442,7 @@
         "Meteo":"Bon soleil et tr\u00e8s chaud"
     },
     {
-        "Date":"13\/07\/2026",
+        "Date":1783900800000,
         "Navigation":"Sortie 2 jours vers belle \u00eele",
         "PortArr":null,
         "MotDep":2492.5,
@@ -457,5 +457,22 @@
         "PortDep":null,
         "Co\u00e9quipiers":"Idem \u00e0 la veille",
         "Meteo":"Frais le matin Chaud ml\u2019am"
+    },
+    {
+        "Date":"13\/07\/2026",
+        "Navigation":"Sortie 2 jours vers belle \u00eele",
+        "PortArr":null,
+        "MotDep":2492.5,
+        "MotArr":2493.7,
+        "TotalMot":1.2,
+        "MilDep":3587.0,
+        "MilArr":3610.0,
+        "TotalMil":23.0,
+        "H_Voile":5.0,
+        "Notes":"",
+        "Group_ID":null,
+        "PortDep":null,
+        "Co\u00e9quipiers":"Idem \u00e0 la veille ",
+        "Meteo":"Frais le matin car orage la nuit puis chaud l\u2019am."
     }
 ]
