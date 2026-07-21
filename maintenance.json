@@ -248,11 +248,19 @@
         "Notes":"j'ai sorti vesta malgr\u00e9 ma grosse intervention de cet hiver dernier car taches blanches sur la carene: en effet l'antifouling ne tient pas, il se decolle . Pourquoi?? donc intervention du prestatire pour \n__pon\u00e7age complet\n--1 couche de primaire\n-- 1couche d'antifouling dure\n-- 1 couche d'antifouling semi erodable "
     },
     {
-        "Date":"29\/06\/2026",
+        "Date":1782691200000,
         "Objet":"nettoyage int\u00e9rieur de VESTA ( 2 jours) par moi m\u00eame ",
         "M_Num":0.0,
         "Statut":"Fait",
         "Type":"Maintenance",
         "Notes":"d\u00e9montage du plancher : nettoyage a la brosse + eau +lave vaisselle, puis s\u00e9chage\nNettoyage complet et a fond du fond de coque  "
+    },
+    {
+        "Date":"21\/07\/2026",
+        "Objet":"nettoyage moteur annexe",
+        "M_Num":135.0,
+        "Statut":"Fait",
+        "Type":"Maintenance",
+        "Notes":"suite a un renversement avec l'annexe "
     }
 ]
