@@ -476,8 +476,25 @@
         "Meteo":"beau soleil et bonne temp\u00e9rature. Vent avec fortes rafales de 25, n\u0153uds ."
     },
     {
-        "Date":"20\/07\/2026",
+        "Date":1784505600000,
         "Navigation":"Sortievers houat",
+        "PortArr":null,
+        "MotDep":2496.2,
+        "MotArr":2496.2,
+        "TotalMot":0.0,
+        "MilDep":3640.0,
+        "MilArr":3640.0,
+        "TotalMil":0.0,
+        "H_Voile":0.0,
+        "Notes":"",
+        "Group_ID":null,
+        "PortDep":null,
+        "Co\u00e9quipiers":"",
+        "Meteo":""
+    },
+    {
+        "Date":"20\/07\/2026",
+        "Navigation":"Sortie 1jours vers HOUAT",
         "PortArr":null,
         "MotDep":2496.2,
         "MotArr":2496.2,
