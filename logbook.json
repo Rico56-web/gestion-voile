@@ -493,7 +493,7 @@
         "Meteo":""
     },
     {
-        "Date":"20\/07\/2026",
+        "Date":1784505600000,
         "Navigation":"Sortie 1jours vers HOUAT",
         "PortArr":null,
         "MotDep":2496.2,
@@ -508,5 +508,22 @@
         "PortDep":null,
         "Co\u00e9quipiers":"",
         "Meteo":""
+    },
+    {
+        "Date":"20\/07\/2026",
+        "Navigation":"Sortie 1jours vers houat",
+        "PortArr":null,
+        "MotDep":2496.2,
+        "MotArr":2498.2,
+        "TotalMot":2.0,
+        "MilDep":3640.0,
+        "MilArr":36500.0,
+        "TotalMil":32860.0,
+        "H_Voile":8.0,
+        "Notes":"mouillage derri\u00e8re la grande plage ",
+        "Group_ID":null,
+        "PortDep":null,
+        "Co\u00e9quipiers":"FAMILLE MASSON",
+        "Meteo":"vent en rafales "
     }
 ]
