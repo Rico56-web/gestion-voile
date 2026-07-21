@@ -459,7 +459,7 @@
         "Meteo":"Frais le matin car orage la nuit puis chaud l\u2019am."
     },
     {
-        "Date":"19\/07\/2026",
+        "Date":1784419200000,
         "Navigation":"Sortie  jours vers houat",
         "PortArr":null,
         "MotDep":2493.7,
@@ -474,5 +474,22 @@
         "PortDep":null,
         "Co\u00e9quipiers":"Sandrine Masson avec Ronan son mari et ses deux enfants: tr\u00e8s sympas et cool. un peu d'exp\u00e9rience . somme all\u00e9s a houtat. mouillage derri\u00e8re la grande plage pour baignade et pour manger . vent avec fortes rafales de 25, n\u0153uds . ",
         "Meteo":"beau soleil et bonne temp\u00e9rature. Vent avec fortes rafales de 25, n\u0153uds ."
+    },
+    {
+        "Date":"20\/07\/2026",
+        "Navigation":"Sortievers houat",
+        "PortArr":null,
+        "MotDep":2496.2,
+        "MotArr":2496.2,
+        "TotalMot":0.0,
+        "MilDep":3640.0,
+        "MilArr":3640.0,
+        "TotalMil":0.0,
+        "H_Voile":0.0,
+        "Notes":"",
+        "Group_ID":null,
+        "PortDep":null,
+        "Co\u00e9quipiers":"",
+        "Meteo":""
     }
 ]
