@@ -108,8 +108,12 @@ def sauvegarder_data(df, file):
         sha = res.json().get('sha') if res.status_code == 200 else None
         content_str = df.to_json(orient="records", indent=4)
         content_b64 = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
-        requests.put(url, headers={"Authorization": f"token {token}"}, 
+        res_put = requests.put(url, headers={"Authorization": f"token {token}"}, 
                      json={"message": f"Update {file}", "content": content_b64, "sha": sha})
+        if res_put.status_code not in (200, 201):
+            st.error(f"Échec de la sauvegarde de {file} (code {res_put.status_code}) : {res_put.json().get('message', res_put.text)}")
+            return False
+        return True
     except Exception as e: 
         st.error(f"Erreur sauvegarde {file} : {e}")
 
@@ -2010,6 +2014,7 @@ if st.session_state.page == "LOG":
         st.divider()
         csv = df_log.to_csv(index=False).encode('utf-8-sig')
         st.download_button(label="📥 Télécharger le Livre de Bord complet (.CSV)", data=csv, file_name='livre_de_bord_vesta.csv', mime='text/csv', use_container_width=True)
+
 
 
 
