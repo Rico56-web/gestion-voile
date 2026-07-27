@@ -75,10 +75,10 @@ def bouton_export_excel(df, nom_fichier):
 # =================================================================
 def charger_data(file):
     repo = "rico56-web/gestion-voile"
-    # Clé découpée pour contourner la désactivation automatique de GitHub
-    partie1 = "ghp_oyHF0LaYFF39IlWIf"
-    partie2 = "RbKMVVK3dQb2R1wncdV"
-    token = partie1 + partie2
+    token = st.secrets.get("github", {}).get("token")
+    if not token:
+        st.error("Token GitHub manquant : configure-le dans .streamlit/secrets.toml (voir README).")
+        return pd.DataFrame()
     try:
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
         res = requests.get(url, headers={"Authorization": f"token {token}"})
@@ -90,6 +90,7 @@ def charger_data(file):
             df = pd.read_json(io.BytesIO(decoded_bytes), orient="records")
             return df
         else:
+            st.error(f"Erreur GitHub ({res.status_code}) en chargeant {file} : {res.json().get('message', res.text)}")
             return pd.DataFrame()
     except Exception as e:
         st.error(f"Erreur chargement {file} : {e}")
@@ -98,9 +99,10 @@ def charger_data(file):
 def sauvegarder_data(df, file):
     try:
         repo = "rico56-web/gestion-voile"
-        partie1 = "ghp_oyHF0LaYFF39IlWIf"
-        partie2 = "RbKMVVK3dQb2R1wncdV"
-        token = partie1 + partie2
+        token = st.secrets.get("github", {}).get("token")
+        if not token:
+            st.error("Token GitHub manquant : configure-le dans .streamlit/secrets.toml (voir README).")
+            return
         url = f"https://api.github.com/repos/{repo}/contents/{file}"
         res = requests.get(url, headers={"Authorization": f"token {token}"})
         sha = res.json().get('sha') if res.status_code == 200 else None
@@ -2008,7 +2010,6 @@ if st.session_state.page == "LOG":
         st.divider()
         csv = df_log.to_csv(index=False).encode('utf-8-sig')
         st.download_button(label="📥 Télécharger le Livre de Bord complet (.CSV)", data=csv, file_name='livre_de_bord_vesta.csv', mime='text/csv', use_container_width=True)
-
 
 
 
