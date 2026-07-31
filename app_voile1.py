@@ -10,6 +10,9 @@ import streamlit.components.v1 as components
 from page_contacts import afficher_page_contacts
 from page_modifier_contact import afficher_page_modifier_contact
 from page_planning import afficher_page_planning
+from page_croisieres import afficher_page_croisieres
+from page_modifier_croisiere import afficher_page_modifier_croisiere
+
 # =================================================================
 # --- CONFIGURATION & STYLE REGROUPÉS ---
 # =================================================================
