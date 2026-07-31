@@ -120,12 +120,21 @@ def filtres_contact(croisieres_contact, interets_contact):
 # 6. Tri alphabétique des fiches contact
 # ---------------------------------------------------------------------
 
-def tri_alphabetique(contacts):
+def tri_alphabetique(contacts, critere="nom"):
+    """Trie les contacts par ordre alphabétique.
+
+    critere="nom" (par défaut, comportement historique) : tri par nom de
+    famille, prénom en critère secondaire en cas d'égalité. Si le nom est
+    vide, on retombe sur le prénom pour ne pas perdre la fiche en tête de
+    liste.
+
+    critere="prenom" : même logique mais inversée (prénom en premier,
+    nom en secondaire)."""
     def cle(c):
         nom = (c.get("nom") or "").strip().upper()
         prenom = (c.get("prenom") or "").strip().upper()
-        # Si le nom de famille est vide, on trie sur le prénom à la place
-        # (évite que les fiches incomplètes se retrouvent toutes en tête)
+        if critere == "prenom":
+            return (prenom or nom, nom)
         return (nom or prenom, prenom)
     return sorted(contacts, key=cle)
 
