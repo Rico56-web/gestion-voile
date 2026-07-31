@@ -789,5 +789,25 @@
                 ]
             }
         ]
+    },
+    {
+        "id":"cr-543b40f5",
+        "nom_croisiere":"",
+        "date_debut":"",
+        "jours":1,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-7237a374",
+                "societe":"PERSO",
+                "prix":0.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
     }
 ]
