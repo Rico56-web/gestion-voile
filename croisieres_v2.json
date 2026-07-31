@@ -1,713 +1,793 @@
 [
-  {
-    "id": "cr-e8113e5f",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "28/11/2026",
-    "jours": 2,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-4d757fd3",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": false,
-        "payee": false,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-2f935d4e",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "14/11/2026",
-    "jours": 2,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-4d757fd3",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": false,
-        "payee": false,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-b6a99b2d",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "31/10/2026",
-    "jours": 2,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-4d757fd3",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": false,
-        "payee": false,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-54117819",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "12/09/2026",
-    "jours": 2,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-94eac341",
-        "societe": "PERSO",
-        "prix": 380.0,
-        "terminee": false,
-        "payee": false,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-786c9102",
-    "nom_croisiere": "Sortievers houat",
-    "date_debut": "20/07/2026",
-    "jours": 1,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-70a741c8",
-        "societe": "VOG",
-        "prix": 274.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-41bc138b",
-    "nom_croisiere": "Sortie  jours vers houat",
-    "date_debut": "19/07/2026",
-    "jours": 1,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-ddf1d566",
-        "societe": "VOG",
-        "prix": 274.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-b16edb7f",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "22/07/2026",
-    "jours": 4,
-    "notes": "Resa faite le 26/06/26",
-    "participants": [
-      {
-        "contact_id": "c-686f91a9",
-        "societe": "CLICK",
-        "prix": 660.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-8ab11990",
-    "nom_croisiere": "location 5 CMN",
-    "date_debut": "05/02/2026",
-    "jours": 2,
-    "notes": "ok",
-    "participants": [
-      {
-        "contact_id": "c-4d757fd3",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-56835d19",
-    "nom_croisiere": "Nav click",
-    "date_debut": "03/03/2026",
-    "jours": 2,
-    "notes": "Sympa et cool  . Elle est venue avec sa fille de 15ans",
-    "participants": [
-      {
-        "contact_id": "c-a522b29d",
-        "societe": "CLICK",
-        "prix": 479.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-56102bd8",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "07/03/2026",
-    "jours": 2,
-    "notes": "ras",
-    "participants": [
-      {
-        "contact_id": "c-4d757fd3",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-ed9a242d",
-    "nom_croisiere": "vers belle ile",
-    "date_debut": "14/03/2026",
-    "jours": 2,
-    "notes": "Habite la Sarthe et à une maison de famille à La Baule",
-    "participants": [
-      {
-        "contact_id": "c-c9144892",
-        "societe": "VOG",
-        "prix": 70.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      },
-      {
-        "contact_id": "c-4de86f06",
-        "societe": "VOG",
-        "prix": 70.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-706bcf63",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "21/03/2026",
-    "jours": 2,
-    "notes": "ras",
-    "participants": [
-      {
-        "contact_id": "c-4d757fd3",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-6844fed5",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "04/04/2026",
-    "jours": 1,
-    "notes": "ras",
-    "participants": [
-      {
-        "contact_id": "c-94eac341",
-        "societe": "PERSO",
-        "prix": 540.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-7448d956",
-    "nom_croisiere": "sortie vers les iles locales",
-    "date_debut": "12/04/2026",
-    "jours": 2,
-    "notes": "couple cuistot très sympa",
-    "participants": [
-      {
-        "contact_id": "c-bac994a7",
-        "societe": "CLICK",
-        "prix": 281.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-0538241a",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "18/04/2026",
-    "jours": 2,
-    "notes": "ras",
-    "participants": [
-      {
-        "contact_id": "c-1566ce6f",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-f3a82eac",
-    "nom_croisiere": "test équipe espagne",
-    "date_debut": "20/04/2026",
-    "jours": 2,
-    "notes": "Nav de 3 jours raccourci à 2 cause mauvais temps\naccrochage avec 2 voiliers en quittant ma place à Port Tudy\nAvc Fransoice Riou; Philippe desgagny, Yannick Bailly et Jean Louis Dugave",
-    "participants": [
-      {
-        "contact_id": "c-5e819ba4",
-        "societe": "PERSO",
-        "prix": 0.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-6dc5f11f",
-    "nom_croisiere": "location CMN",
-    "date_debut": "25/04/2026",
-    "jours": 2,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-4d757fd3",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-6856d82a",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "02/05/2026",
-    "jours": 2,
-    "notes": "ras",
-    "participants": [
-      {
-        "contact_id": "c-ffcde16c",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-0d21c7da",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "09/05/2026",
-    "jours": 2,
-    "notes": "ras",
-    "participants": [
-      {
-        "contact_id": "c-4f2a1792",
-        "societe": "VOG",
-        "prix": 280.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-228e4062",
-    "nom_croisiere": "nav aurelien",
-    "date_debut": "23/05/2026",
-    "jours": 3,
-    "notes": "Habitué - Nouvelle résa",
-    "participants": [
-      {
-        "contact_id": "c-94eac341",
-        "societe": "PERSO",
-        "prix": 540.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-2ba5f856",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "01/06/2026",
-    "jours": 1,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-5bc6fb92",
-        "societe": "CLICK",
-        "prix": 178.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-72bdfe85",
-    "nom_croisiere": "sortie a 5 (Espagne)",
-    "date_debut": "12/06/2026",
-    "jours": 7,
-    "notes": "Habitué - Nouvelle résa",
-    "participants": [
-      {
-        "contact_id": "c-5e819ba4",
-        "societe": "PERSO",
-        "prix": 1000.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-0e153fe0",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "20/06/2026",
-    "jours": 2,
-    "notes": "message  d'Aurélien  18/05/2026",
-    "participants": [
-      {
-        "contact_id": "c-4d757fd3",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-b31c5aba",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "23/06/2026",
-    "jours": 1,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-f4c4445e",
-        "societe": "VOG",
-        "prix": 35.0,
-        "terminee": false,
-        "payee": false,
-        "annulee": true,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-0d5534d9",
-    "nom_croisiere": "Sortie 2 jours vers belle île",
-    "date_debut": "12/07/2026",
-    "jours": 2,
-    "notes": "a deja navigué avec moi en avril 2025\nResponsable sociale à la marie de bordeaux\nSon copain Xavier , toubib à Paris est un peu le sachant \nTous deux sont sympas",
-    "participants": [
-      {
-        "contact_id": "c-c0488e7c",
-        "societe": "PERSO",
-        "prix": 90.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-03e06661",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "28/07/2026",
-    "jours": 1,
-    "notes": "Avec sa fille et sa correspondante canadienne",
-    "participants": [
-      {
-        "contact_id": "c-a522b29d",
-        "societe": "PERSO",
-        "prix": 175.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-17795204",
-    "nom_croisiere": "location perso mai 2026",
-    "date_debut": "01/08/2026",
-    "jours": 15,
-    "notes": "Acompte le 17/07/2026\nJe fournirai pass mobilhan et la clé du batea",
-    "participants": [
-      {
-        "contact_id": "c-94eac341",
-        "societe": "PERSO",
-        "prix": 2400.0,
-        "terminee": false,
-        "payee": false,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-9af8cf73",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "17/08/2026",
-    "jours": 5,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-67f29042",
-        "societe": "CLICK",
-        "prix": 676.0,
-        "terminee": false,
-        "payee": false,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-a67aca2d",
-    "nom_croisiere": "location perso mai 2026",
-    "date_debut": "05/09/2026",
-    "jours": 2,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-4d757fd3",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": false,
-        "payee": false,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-a98b8b0c",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "18/09/2026",
-    "jours": 1,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-4df23144",
-        "societe": "CLICK",
-        "prix": 170.0,
-        "terminee": false,
-        "payee": false,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-61bb5fd4",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "19/09/2026",
-    "jours": 2,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-4d757fd3",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": false,
-        "payee": false,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-282ce6b2",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "03/10/2026",
-    "jours": 2,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-4d757fd3",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": false,
-        "payee": false,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-923ce683",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "10/10/2026",
-    "jours": 2,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-4d757fd3",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": false,
-        "payee": false,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-a2a13b89",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "17/10/2026",
-    "jours": 2,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-4d757fd3",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-0d7d1aca",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "31/10/2026",
-    "jours": 2,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-4d757fd3",
-        "societe": "CMN",
-        "prix": 450.0,
-        "terminee": false,
-        "payee": false,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-4ac25729",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "",
-    "jours": 1,
-    "notes": "",
-    "participants": [
-      {
-        "contact_id": "c-681c5692",
-        "societe": "PERSO",
-        "prix": 0.0,
-        "terminee": true,
-        "payee": true,
-        "annulee": false,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-5864aa52",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "",
-    "jours": 1,
-    "notes": "1er contact le 09/04/2026. il a un appartement à Arzon",
-    "participants": [
-      {
-        "contact_id": "c-44246254",
-        "societe": "PERSO",
-        "prix": 35.0,
-        "terminee": false,
-        "payee": true,
-        "annulee": true,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-94f12ae8",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "",
-    "jours": 1,
-    "notes": "ras",
-    "participants": [
-      {
-        "contact_id": "c-8e3ae684",
-        "societe": "PERSO",
-        "prix": 70.0,
-        "terminee": false,
-        "payee": true,
-        "annulee": true,
-        "accompagnants": []
-      }
-    ]
-  },
-  {
-    "id": "cr-e8682eba",
-    "nom_croisiere": "(à définir)",
-    "date_debut": "",
-    "jours": 1,
-    "notes": "ras",
-    "participants": [
-      {
-        "contact_id": "c-6728ea3e",
-        "societe": "PERSO",
-        "prix": 30.0,
-        "terminee": false,
-        "payee": true,
-        "annulee": true,
-        "accompagnants": []
-      }
-    ]
-  }
+    {
+        "id":"cr-2f935d4e",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"14\/11\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-b6a99b2d",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"31\/10\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-54117819",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"12\/09\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-94eac341",
+                "societe":"PERSO",
+                "prix":380.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-786c9102",
+        "nom_croisiere":"Sortievers houat",
+        "date_debut":"20\/07\/2026",
+        "jours":1,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-70a741c8",
+                "societe":"VOG",
+                "prix":274.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-41bc138b",
+        "nom_croisiere":"Sortie  jours vers houat",
+        "date_debut":"19\/07\/2026",
+        "jours":1,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-ddf1d566",
+                "societe":"VOG",
+                "prix":274.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-b16edb7f",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"22\/07\/2026",
+        "jours":4,
+        "notes":"Resa faite le 26\/06\/26",
+        "participants":[
+            {
+                "contact_id":"c-686f91a9",
+                "societe":"CLICK",
+                "prix":660.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-8ab11990",
+        "nom_croisiere":"location 5 CMN",
+        "date_debut":"05\/02\/2026",
+        "jours":2,
+        "notes":"ok",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-56835d19",
+        "nom_croisiere":"Nav click",
+        "date_debut":"03\/03\/2026",
+        "jours":2,
+        "notes":"Sympa et cool  . Elle est venue avec sa fille de 15ans",
+        "participants":[
+            {
+                "contact_id":"c-a522b29d",
+                "societe":"CLICK",
+                "prix":479.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-56102bd8",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"07\/03\/2026",
+        "jours":2,
+        "notes":"ras",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-ed9a242d",
+        "nom_croisiere":"vers belle ile",
+        "date_debut":"14\/03\/2026",
+        "jours":2,
+        "notes":"Habite la Sarthe et \u00e0 une maison de famille \u00e0 La Baule",
+        "participants":[
+            {
+                "contact_id":"c-c9144892",
+                "societe":"VOG",
+                "prix":70.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            },
+            {
+                "contact_id":"c-4de86f06",
+                "societe":"VOG",
+                "prix":70.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-706bcf63",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"21\/03\/2026",
+        "jours":2,
+        "notes":"ras",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-6844fed5",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"04\/04\/2026",
+        "jours":1,
+        "notes":"ras",
+        "participants":[
+            {
+                "contact_id":"c-94eac341",
+                "societe":"PERSO",
+                "prix":540.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-7448d956",
+        "nom_croisiere":"sortie vers les iles locales",
+        "date_debut":"12\/04\/2026",
+        "jours":2,
+        "notes":"couple cuistot tr\u00e8s sympa",
+        "participants":[
+            {
+                "contact_id":"c-bac994a7",
+                "societe":"CLICK",
+                "prix":281.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-0538241a",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"18\/04\/2026",
+        "jours":2,
+        "notes":"ras",
+        "participants":[
+            {
+                "contact_id":"c-1566ce6f",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-f3a82eac",
+        "nom_croisiere":"test \u00e9quipe espagne",
+        "date_debut":"20\/04\/2026",
+        "jours":2,
+        "notes":"Nav de 3 jours raccourci \u00e0 2 cause mauvais temps\naccrochage avec 2 voiliers en quittant ma place \u00e0 Port Tudy\nAvc Fransoice Riou; Philippe desgagny, Yannick Bailly et Jean Louis Dugave",
+        "participants":[
+            {
+                "contact_id":"c-5e819ba4",
+                "societe":"PERSO",
+                "prix":0.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-6dc5f11f",
+        "nom_croisiere":"location CMN",
+        "date_debut":"25\/04\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-6856d82a",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"02\/05\/2026",
+        "jours":2,
+        "notes":"ras",
+        "participants":[
+            {
+                "contact_id":"c-ffcde16c",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-0d21c7da",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"09\/05\/2026",
+        "jours":2,
+        "notes":"ras",
+        "participants":[
+            {
+                "contact_id":"c-4f2a1792",
+                "societe":"VOG",
+                "prix":280.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-228e4062",
+        "nom_croisiere":"nav aurelien",
+        "date_debut":"23\/05\/2026",
+        "jours":3,
+        "notes":"Habitu\u00e9 - Nouvelle r\u00e9sa",
+        "participants":[
+            {
+                "contact_id":"c-94eac341",
+                "societe":"PERSO",
+                "prix":540.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-2ba5f856",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"01\/06\/2026",
+        "jours":1,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-5bc6fb92",
+                "societe":"CLICK",
+                "prix":178.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-72bdfe85",
+        "nom_croisiere":"sortie a 5 (Espagne)",
+        "date_debut":"12\/06\/2026",
+        "jours":7,
+        "notes":"Habitu\u00e9 - Nouvelle r\u00e9sa",
+        "participants":[
+            {
+                "contact_id":"c-5e819ba4",
+                "societe":"PERSO",
+                "prix":1000.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-0e153fe0",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"20\/06\/2026",
+        "jours":2,
+        "notes":"message  d'Aur\u00e9lien  18\/05\/2026",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-b31c5aba",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"23\/06\/2026",
+        "jours":1,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-f4c4445e",
+                "societe":"VOG",
+                "prix":35.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":true,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-0d5534d9",
+        "nom_croisiere":"Sortie 2 jours vers belle \u00eele",
+        "date_debut":"12\/07\/2026",
+        "jours":2,
+        "notes":"a deja navigu\u00e9 avec moi en avril 2025\nResponsable sociale \u00e0 la marie de bordeaux\nSon copain Xavier , toubib \u00e0 Paris est un peu le sachant \nTous deux sont sympas",
+        "participants":[
+            {
+                "contact_id":"c-c0488e7c",
+                "societe":"PERSO",
+                "prix":90.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-03e06661",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"28\/07\/2026",
+        "jours":1,
+        "notes":"Avec sa fille et sa correspondante canadienne",
+        "participants":[
+            {
+                "contact_id":"c-a522b29d",
+                "societe":"PERSO",
+                "prix":175.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-17795204",
+        "nom_croisiere":"location perso mai 2026",
+        "date_debut":"01\/08\/2026",
+        "jours":15,
+        "notes":"Acompte le 17\/07\/2026\nJe fournirai pass mobilhan et la cl\u00e9 du batea",
+        "participants":[
+            {
+                "contact_id":"c-94eac341",
+                "societe":"PERSO",
+                "prix":2400.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-9af8cf73",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"17\/08\/2026",
+        "jours":5,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-67f29042",
+                "societe":"CLICK",
+                "prix":676.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-a67aca2d",
+        "nom_croisiere":"location perso mai 2026",
+        "date_debut":"05\/09\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-a98b8b0c",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"18\/09\/2026",
+        "jours":1,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4df23144",
+                "societe":"CLICK",
+                "prix":170.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-61bb5fd4",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"19\/09\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-282ce6b2",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"03\/10\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-923ce683",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"10\/10\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-a2a13b89",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"17\/10\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-0d7d1aca",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"31\/10\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-4ac25729",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"",
+        "jours":1,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-681c5692",
+                "societe":"PERSO",
+                "prix":0.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-5864aa52",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"",
+        "jours":1,
+        "notes":"1er contact le 09\/04\/2026. il a un appartement \u00e0 Arzon",
+        "participants":[
+            {
+                "contact_id":"c-44246254",
+                "societe":"PERSO",
+                "prix":35.0,
+                "terminee":false,
+                "payee":true,
+                "annulee":true,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-94f12ae8",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"",
+        "jours":1,
+        "notes":"ras",
+        "participants":[
+            {
+                "contact_id":"c-8e3ae684",
+                "societe":"PERSO",
+                "prix":70.0,
+                "terminee":false,
+                "payee":true,
+                "annulee":true,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-e8682eba",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"",
+        "jours":1,
+        "notes":"ras",
+        "participants":[
+            {
+                "contact_id":"c-6728ea3e",
+                "societe":"PERSO",
+                "prix":30.0,
+                "terminee":false,
+                "payee":true,
+                "annulee":true,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-e8113e5f",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"28\/11\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-94eac341",
+                "societe":"CMN",
+                "prix":450.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    }
 ]
