@@ -809,5 +809,25 @@
                 ]
             }
         ]
+    },
+    {
+        "id":"cr-d40a85b0",
+        "nom_croisiere":"test croisiere",
+        "date_debut":"01\/08\/2027",
+        "jours":1,
+        "notes":"ceci est un test",
+        "participants":[
+            {
+                "contact_id":"c-7237a374",
+                "societe":"PERSO",
+                "prix":100.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
     }
 ]
