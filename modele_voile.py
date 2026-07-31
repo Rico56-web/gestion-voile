@@ -10,7 +10,7 @@ source de vérité pour tout ce qui concerne une navigation (statut, prix,
 paiement). `contacts.json` ne stocke JAMAIS de somme perçue ni d'historique
 — ces valeurs sont toujours calculées ici, à partir de croisieres.json.
 """
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import uuid
 
 
@@ -183,3 +183,99 @@ def generer_nom_fichier_photo(contact_id, index):
     utilisent TOUJOURS la même convention de nommage (évite les bugs de
     photos "orphelines" ou introuvables)."""
     return f"photos/{contact_id}_{index}.jpg"
+
+
+# ---------------------------------------------------------------------
+# 9. Fonctions pour la page PLANNING (AJOUTÉ le 31/07/2026)
+# ---------------------------------------------------------------------
+
+def derniere_lecture_compteur(etapes):
+    """Dernière lecture connue du compteur moteur cumulé (comme un
+    compteur kilométrique), utilisée pour l'alerte vidange.
+
+    IMPORTANT : on prend le MAX de 'compteur_moteur' sur toutes les
+    étapes, jamais une somme. Une somme serait faussée par les anomalies
+    de saisie du journal d'origine (ex: une étape avec une durée
+    négative). Le compteur cumulé, lui, ne ment pas : c'est une lecture
+    directe, pas un calcul."""
+    valeurs = [e.get("compteur_moteur", 0) or 0 for e in etapes]
+    return max(valeurs) if valeurs else 0.0
+
+
+def date_fin_croisiere(croisiere):
+    """Renvoie la date de fin (date object) d'une croisière, ou None si
+    la date de début est manquante/invalide."""
+    d_debut = parse_date_eu(croisiere.get("date_debut"))
+    if not d_debut:
+        return None
+    jours = croisiere.get("jours") or 1
+    return d_debut + timedelta(days=max(jours - 1, 0))
+
+
+def croisieres_du_mois(croisieres, annee, mois):
+    """Renvoie les croisières qui touchent le mois/année donnés (une
+    croisière à cheval sur 2 mois apparaît dans les deux), triées par
+    date de début."""
+    resultat = []
+    for cr in croisieres:
+        d_debut = parse_date_eu(cr.get("date_debut"))
+        if not d_debut:
+            continue
+        d_fin = date_fin_croisiere(cr)
+        # Ce mois est concerné si l'intervalle [d_debut, d_fin] touche
+        # le 1er ou le dernier jour du mois demandé
+        premier_jour_mois = date(annee, mois, 1)
+        dernier_jour_mois = date(annee, mois, calendar_dernier_jour(annee, mois))
+        if d_debut <= dernier_jour_mois and d_fin >= premier_jour_mois:
+            resultat.append(cr)
+    resultat.sort(key=lambda cr: parse_date_eu(cr.get("date_debut")) or date.min)
+    return resultat
+
+
+def calendar_dernier_jour(annee, mois):
+    """Nombre de jours dans le mois (évite d'importer le module calendar
+    dans modele_voile.py juste pour ça)."""
+    if mois == 12:
+        return 31
+    return (date(annee, mois + 1, 1) - timedelta(days=1)).day
+
+
+def nb_participants_impayes(croisieres):
+    """Nombre de participations non annulées et non payées, toutes
+    croisières confondues (sert à l'alerte 'factures en attente')."""
+    return sum(
+        1 for cr in croisieres for p in cr.get("participants", [])
+        if not p.get("annulee") and not p.get("payee")
+    )
+
+
+COULEURS_SOCIETE = {
+    "CMN": "#3498db",
+    "CLICK": "#27AE60",
+    "VOG": "#8E44AD",
+    "PERSO": "#F1C40F",
+}
+
+
+def couleur_croisiere(croisiere):
+    """Couleur d'affichage d'une croisière dans le calendrier : grise si
+    annulée, sinon couleur de la première société trouvée parmi les
+    participants (ou gris par défaut si société inconnue)."""
+    participants = croisiere.get("participants", [])
+    if participants and all(p.get("annulee") for p in participants):
+        return "#BDC3C7"
+    societe = (participants[0].get("societe") if participants else "") or "PERSO"
+    return COULEURS_SOCIETE.get(societe.upper(), "#7F8C8D")
+
+
+def noms_participants(croisiere, contacts_par_id):
+    """Construit un texte lisible des participants d'une croisière, ex.
+    'BENOIT COURONNE + 1' pour l'afficher dans la liste des missions."""
+    participants = croisiere.get("participants", [])
+    if not participants:
+        return "(sans participant)"
+    premier = contacts_par_id.get(participants[0]["contact_id"])
+    nom = f"{premier['prenom']} {premier['nom']}".strip() if premier else "?"
+    if len(participants) > 1:
+        nom += f" + {len(participants) - 1}"
+    return nom
