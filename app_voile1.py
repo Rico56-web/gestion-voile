@@ -376,7 +376,19 @@ if st.session_state.page == "PLANNING":
         charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
         charger_params=charger_params,
     )
+elif st.session_state.page == "CROISIERES":
+    afficher_page_croisieres(
+        charger_croisieres=lambda: charger_data_safe('croisieres_v2.json').to_dict('records'),
+        charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
+    )
 
+elif st.session_state.page == "MODIFIER_CROISIERE":
+    afficher_page_modifier_croisiere(
+        charger_croisieres=lambda: charger_data_safe('croisieres_v2.json').to_dict('records'),
+        sauvegarder_croisieres=lambda c: sauvegarder_data(pd.DataFrame(c), 'croisieres_v2.json'),
+        charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
+        sauvegarder_contacts=lambda c: sauvegarder_data(pd.DataFrame(c), 'contacts_v2.json'),
+    )
 ## =================================================================
 # --- 8. PAGE STATS : SOURCE DE VÉRITÉ UNIQUE HARMONISÉE ---
 # =================================================================
