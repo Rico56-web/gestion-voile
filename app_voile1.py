@@ -196,9 +196,8 @@ st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=
 # =================================================================
 # --- SYSTEME DE NAVIGATION HARMONISÉ (HAUT ET SIDEBAR) ---
 # =================================================================
-menu = ["PLANNING", "CONTACTS", "STATS", "MAINT", "LOG", "MEMOS", "FACT"]
-icones = {"PLANNING": "📅", "CONTACTS": "👤", "STATS": "📊", "MAINT": "🛠️", "LOG": "📖", "MEMOS": "📝", "FACT": "📑"}
-
+menu = ["PLANNING","CROISIERES","CONTACTS", "STATS", "MAINT", "LOG", "MEMOS", "FACT"]
+icones = {"PLANNING": "📅", "CROISIERES": "⛵", "CONTACTS": "👤", "STATS": "📊", "MAINT": "🛠️", "LOG": "📖", "MEMOS": "📝", "FACT": "📑"}
 # 1. Barre de navigation horizontale (Haut)
 cols_nav = st.columns(len(menu))
 for i, name in enumerate(menu):
