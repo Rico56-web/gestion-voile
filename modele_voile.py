@@ -279,3 +279,56 @@ def noms_participants(croisiere, contacts_par_id):
     if len(participants) > 1:
         nom += f" + {len(participants) - 1}"
     return nom
+
+
+# ---------------------------------------------------------------------
+# 10. Fonctions pour la page CROISIÈRE (AJOUTÉ le 31/07/2026)
+# ---------------------------------------------------------------------
+
+def generer_id_croisiere():
+    """ID aléatoire pour une nouvelle croisière créée depuis l'app (même
+    principe que generer_id_contact : pas de collision possible)."""
+    return f"cr-{uuid.uuid4().hex[:8]}"
+
+
+def rechercher_contacts(contacts, texte_recherche, max_resultats=8):
+    """Recherche de contacts par nom/prénom, pour choisir un participant
+    à la création d'une croisière. Renvoie une liste (courte, limitée à
+    max_resultats) plutôt qu'un menu déroulant géant avec les 39+ noms."""
+    if not texte_recherche or not texte_recherche.strip():
+        return []
+    t = texte_recherche.strip().upper()
+    resultats = [
+        c for c in contacts
+        if t in (c.get("nom") or "").upper() or t in (c.get("prenom") or "").upper()
+    ]
+    return resultats[:max_resultats]
+
+
+def croisieres_depuis(croisieres, date_min):
+    """Filtre les croisières dont la date de début est >= date_min (objet
+    date). Les croisières sans date valide sont exclues (pas de sens à
+    les classer dans une plage de dates)."""
+    resultat = []
+    for cr in croisieres:
+        d = parse_date_eu(cr.get("date_debut"))
+        if d and d >= date_min:
+            resultat.append(cr)
+    resultat.sort(key=lambda cr: parse_date_eu(cr.get("date_debut")) or date.min, reverse=True)
+    return resultat
+
+
+def valider_croisiere(croisiere):
+    """Vérifie qu'une croisière est valide avant sauvegarde. Renvoie une
+    liste de messages d'erreur (vide = valide)."""
+    erreurs = []
+    if not croisiere.get("participants"):
+        erreurs.append("Il faut au moins un participant.")
+    for p in croisiere.get("participants", []):
+        if not p.get("contact_id"):
+            erreurs.append("Un participant n'a pas de contact associé.")
+    if croisiere.get("date_debut") and not parse_date_eu(croisiere["date_debut"]):
+        erreurs.append("La date de début n'est pas au format jj/mm/aaaa.")
+    if not croisiere.get("jours") or croisiere["jours"] < 1:
+        erreurs.append("Le nombre de jours doit être au moins 1.")
+    return erreurs
