@@ -7,6 +7,8 @@ import urllib.parse
 from datetime import datetime, date, timedelta
 import calendar
 import streamlit.components.v1 as components
+from page_contacts import afficher_page_contacts
+from page_modifier_contact import afficher_page_modifier_contact
 
 # =================================================================
 # --- CONFIGURATION & STYLE REGROUPÉS ---
@@ -344,276 +346,23 @@ elif st.session_state.page == "MEMOS":
                     sauvegarder_data(df_memos, 'memos.json')
                     st.rerun()
                 st.divider()
+
 # =================================================================
-# --- 5. BLOC CONTACTS (VERSION IMMUNISÉE & AFFICHAGE FORCÉ) ---
-# =================================================================
-# =================================================================
-# --- 5. BLOC CONTACTS (VERSION IMMUNISÉE & AFFICHAGE FORCÉ) ---
+# --- 5. BLOC CONTACTS (NOUVEAU MODÈLE — contacts_v2 / croisieres_v2 / interets_v2) ---
 # =================================================================
 if st.session_state.page == "CONTACTS":
-    # 🔄 Nettoyage du cache pour forcer la lecture réelle sur GitHub
-    st.cache_data.clear()
+    afficher_page_contacts(
+        charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
+        charger_croisieres=lambda: charger_data_safe('croisieres_v2.json').to_dict('records'),
+        charger_interets=lambda: charger_data_safe('interets_v2.json').to_dict('records'),
+        sauvegarder_contacts=lambda c: sauvegarder_data(pd.DataFrame(c), 'contacts_v2.json'),
+    )
 
-    if "vue_contact" not in st.session_state:
-        st.session_state.vue_contact = "En cours"
-
-    # Chargement brut
-    df_raw = charger_data_safe('contacts.json')
-    
-    # Sécurité d'initialisation des colonnes
-    colonnes_requises = ['Prénom', 'Nom', 'Statut', 'Paiement', 'Relancer', 'DateNav', 'Société', 'Jours', 'Prix', 'Acompte', 'Notes', 'Téléphone', 'Email', 'Pers']
-    if df_raw is None or not hasattr(df_raw, "empty") or df_raw.empty:
-        df_raw = pd.DataFrame(columns=colonnes_requises)
-    else:
-        for col in colonnes_requises:
-            if col not in df_raw.columns:
-                df_raw[col] = ""
-    
-    # Boutons de navigation des vues
-    n1, n2, n3, n4, n5 = st.columns([1, 1, 1, 1, 1.5])
-    if n1.button("🟢 EN COURS", use_container_width=True, type="primary" if st.session_state.vue_contact == "En cours" else "secondary"): 
-        st.session_state.vue_contact = "En cours"; st.rerun()
-    if n2.button("⏳ DEMANDES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Attente" else "secondary"): 
-        st.session_state.vue_contact = "Attente"; st.rerun()
-    if n3.button("⭐ HABITUÉS", use_container_width=True, type="primary" if st.session_state.vue_contact == "Relances" else "secondary"): 
-        st.session_state.vue_contact = "Relances"; st.rerun()
-    if n4.button("✅ ARCHIVES", use_container_width=True, type="primary" if st.session_state.vue_contact == "Archives" else "secondary"): 
-        st.session_state.vue_contact = "Archives"; st.rerun()
-    with n5: bouton_export_excel(df_raw, "Planning_Vesta_2026")
-
-    st.divider()
-
-    df_c = df_raw.copy().fillna("")
-    df_c['orig_idx'] = df_c.index  # Conservation de l'index original
-    
-    c_search, c_yr, c_new = st.columns([2, 1, 1])
-    search = c_search.text_input("🔍 Rechercher...", "", key="search_bar_contacts").upper()
-    annee_sel = c_yr.selectbox("Saison", [2025, 2026, 2027], index=1)
-    
-    # Extraction ultra-sécurisée de l'année
-    def extraire_annee_safe(date_val):
-        import re
-        match = re.search(r'(\d{4})', str(date_val))
-        return int(match.group(1)) if match else 2026
-
-    df_c['Annee_Calculee'] = df_c['DateNav'].apply(extraire_annee_safe)
-    
-    # --- DASHBOARD FINANCIER COMPLET ---
-    df_ca = df_c[(df_c['Annee_Calculee'] == annee_sel) & (~df_c['Statut'].str.lower().str.contains("annule|refuse", na=False))].copy()
-
-    def get_reel_encaisse(row):
-        try: p = float(row.get('Prix', 0))
-        except: p = 0.0
-        try: a = float(row.get('Acompte', 0))
-        except: a = 0.0
-        return p if str(row.get('Paiement', '')).strip().upper() == "PAID" else a
-
-    if not df_ca.empty:
-        total_prevu = sum([float(x) if str(x).replace('.','',1).isdigit() else 0.0 for x in df_ca['Prix']])
-        total_encaisse = df_ca.apply(get_reel_encaisse, axis=1).sum()
-        reste_percevoir = max(0.0, total_prevu - total_encaisse)
-    else:
-        total_prevu = total_encaisse = reste_percevoir = 0
-
-    col_f1, col_f2, col_f3 = st.columns(3)
-    col_f1.metric(f"CA Prévu {annee_sel}", f"{int(total_prevu)} €")
-    col_f2.metric("Encaissé (Réel)", f"{int(total_encaisse)} €")
-    col_f3.metric("Reste à percevoir", f"{int(reste_percevoir)} €")
-    st.divider()
-
-    if c_new.button("➕ NOUVEAU CLIENT", use_container_width=True):
-        new_r = {"Prénom": "NOUVEAU", "Nom": "CLIENT", "Statut": "En attente", "Paiement": "Unpaid", "Relancer": "Non", "DateNav": f"01/06/{annee_sel}", "Société": "PERSO", "Jours": 1, "Prix": 0, "Acompte": 0, "Notes": "", "Téléphone": "", "Email": "", "Pers": 1}
-        df_new = pd.concat([pd.DataFrame([new_r]), df_raw], ignore_index=True)
-        sauvegarder_data(df_new, 'contacts.json')
-        st.session_state.edit_idx = 0  
-        st.session_state.page = "MODIFIER_CONTACT"
-        st.rerun()
-
-    # Nettoyage et préparation des filtres
-    statut_clean = df_c['Statut'].astype(str).str.lower().str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8')
-    rel_clean = df_c['Relancer'].fillna("Non").astype(str).str.upper()
-    
-    if st.session_state.vue_contact == "Archives": 
-        mask_aff = (statut_clean.str.contains("termine|annule|refuse")) & (rel_clean != "OUI")
-    elif st.session_state.vue_contact == "Relances": 
-        mask_aff = (rel_clean == "OUI")
-    elif st.session_state.vue_contact == "Attente": 
-        mask_aff = (statut_clean == "liste d'attente")
-    else: 
-        mask_aff = ~(statut_clean.str.contains("termine|annule|refuse")) & (statut_clean != "liste d'attente")
-
-    # Filtrage final strict
-    df_aff = df_c[mask_aff & (df_c['Annee_Calculee'] == annee_sel)].copy()
-    
-    if search: 
-        df_aff = df_aff[df_aff['Nom'].astype(str).str.contains(search) | df_aff['Prénom'].astype(str).str.contains(search) | df_aff['Société'].astype(str).str.contains(search)]
-    
-    # Affichage des fiches (imbriqué sous le "if st.session_state.page == 'CONTACTS':")
-    if not df_aff.empty:
-        for _, row in df_aff.iterrows():
-            idx = row['orig_idx']  
-            try: p_tot = float(row.get('Prix', 0))
-            except: p_tot = 0.0
-            p_enc = p_tot if str(row.get('Paiement', '')).strip().upper() == "PAID" else get_reel_encaisse(row)
-            
-            soc = str(row.get('Société', 'PERSO')).upper()
-            colors = {"CMN": ("#2980B9", "#EBF5FB"), "CLICK": ("#27AE60", "#EAFAF1"), "VOG": ("#8E44AD", "#F5EEF8"), "PERSO": ("#F1C40F", "#FEF9E7")}
-            border_col, bg_card = colors.get(soc, ("#7F8C8D", "#FDFEFE"))
-            badge_vip = "⭐ " if str(row.get('Relancer', 'Non')).upper() == "OUI" else ""
-
-            st.markdown(f"""
-            <div style="background:{bg_card}; padding:15px; border-radius:12px; border-left:10px solid {border_col}; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); margin-bottom:10px; color: black;">
-                <div style="display:flex; justify-content:space-between;">
-                    <b>{badge_vip}{row['Prénom']} {row['Nom']}</b>
-                    <span style="font-size:0.8rem; font-weight:bold; color:{border_col};">{soc}</span>
-                </div>
-                <div style="margin-top:5px; font-size:0.9rem;">
-                    📅 {row['DateNav'] if row['DateNav'] else 'Date à définir'} | 👥 {row.get('Pers', 1)} pers. | ⏱️ {row.get('Jours', 1)} j.<br>
-                    💰 <b>Total: {int(p_tot)}€</b> | 💳 Reçu: {int(p_enc)}€ | 📉 <b>Reste: {int(max(0, p_tot-p_enc))}€</b>
-                </div>
-                <div style="font-style:italic; font-size:0.8rem; color:gray; margin-top:5px;">Statut: {row['Statut']} | Paiement: {row['Paiement']}</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            c1, c2, c3 = st.columns(3)
-            if c1.button("✏️ ÉDITER", key=f"ed_{idx}", use_container_width=True):
-                st.session_state.edit_idx = idx  
-                st.session_state.page = "MODIFIER_CONTACT"
-                st.rerun()
-
-            if st.session_state.vue_contact == "Relances":
-                if c2.button("🔄 RE-RÉSERVER", key=f"dup_{idx}", use_container_width=True):
-                    df_db = charger_data('contacts.json')
-                    new_e = row.to_dict()
-                    new_e.update({"DateNav": datetime.now().strftime("%d/%m/%Y"), "Statut": "En attente", "Paiement": "Unpaid", "Prix": 0, "Acompte": 0})
-                    for k in ['orig_idx', 'Annee_Calculee']: new_e.pop(k, None)
-                    df_db = pd.concat([pd.DataFrame([new_e]), df_db], ignore_index=True)
-                    sauvegarder_data(df_db, 'contacts.json')
-                    st.session_state.edit_idx = 0
-                    st.session_state.page = "MODIFIER_CONTACT"
-                    st.rerun()
-            else:
-                if f"confirm_del_{idx}" not in st.session_state:
-                    if c2.button("🗑️ SUPPRIMER", key=f"del_{idx}", use_container_width=True):
-                        st.session_state[f"confirm_del_{idx}"] = True
-                        st.rerun()
-                else:
-                    st.warning("Confirmer la suppression ?")
-                    cx, cy = st.columns(2)
-                    if cx.button("✅ OUI", key=f"y_{idx}", use_container_width=True):
-                        df_db = charger_data('contacts.json').drop(idx).reset_index(drop=True)
-                        sauvegarder_data(df_db, 'contacts.json')
-                        del st.session_state[f"confirm_del_{idx}"]
-                        st.rerun()
-                    if cy.button("❌ NON", key=f"n_{idx}", use_container_width=True):
-                        del st.session_state[f"confirm_del_{idx}"]
-                        st.rerun()
-
-            if st.session_state.vue_contact == "En cours" and c3.button("🏁 FINIR", key=f"fin_{idx}", use_container_width=True):
-                df_all = charger_data('contacts.json')
-                df_all.loc[idx, ['Statut', 'Paiement']] = ["Terminé", "Paid"]
-                sauvegarder_data(df_all, 'contacts.json')
-                st.rerun()
-    else:
-        st.info("💡 Aucun contact enregistré pour cette catégorie ou cette saison. Utilisez le bouton '➕ NOUVEAU CLIENT' ci-dessus pour commencer ou basculez d'onglet (En cours / Demandes / Archives).")
-
-# =================================================================
-# --- PAGE SUIVANTE (BIEN ALIGNÉE TOUT À GAUCHE SANS CONFLIT) ---
-# =================================================================
-# =================================================================
-# --- 6. PAGE MODIFIER CONTACT : VERSION SÉCURISÉE (V110) ---
-# =================================================================
 elif st.session_state.page == "MODIFIER_CONTACT":
-    st.markdown('<h3 style="text-align:center;">✏️ Modifier le Contact</h3>', unsafe_allow_html=True)
-    
-    idx_to_edit = st.session_state.get('edit_idx')
-    df_m = charger_data_safe('contacts.json')
-
-    if idx_to_edit is not None and df_m is not None and not df_m.empty and idx_to_edit in df_m.index:
-        row = df_m.loc[idx_to_edit]
-        
-        with st.form("form_edit_v2026"):
-            # --- Ligne 1 : Identité ---
-            c1, c2 = st.columns(2)
-            new_pre = c1.text_input("Prénom", value=str(row.get('Prénom', '')))
-            new_nom = c2.text_input("Nom", value=str(row.get('Nom', '')))
-            
-            # --- Ligne 2 : Logistique ---
-            c3, c4, c5, c6 = st.columns([2, 1, 1, 1])
-            new_date = c3.text_input("Date (JJ/MM/AAAA)", value=str(row.get('DateNav', '')))
-            
-            val_jours = to_f(row.get('Jours', 1.0))
-            try: val_pers = int(float(row.get('Pers', 1.0)))
-            except: val_pers = 1
-                
-            new_jours = c4.number_input("Jours", value=val_jours, step=0.5)
-            new_pers = c5.number_input("Pers.", value=val_pers, step=1)
-            
-            liste_soc = ["PERSO", "CLICK", "CMN", "VOG"]
-            curr_soc = str(row.get('Société', 'PERSO')).upper().strip()
-            soc_idx = liste_soc.index(curr_soc) if curr_soc in liste_soc else 0
-            new_soc = c6.selectbox("Société", liste_soc, index=soc_idx)
-            
-            # --- Ligne 3 : Statuts ---
-            s1, s2, s3 = st.columns([2, 1, 1])
-            s_list = ["En attente", "Confirmé", "Liste d'attente", "Terminé", "Annulé", "Refusé"]
-            curr_s = str(row.get('Statut', 'En attente')).strip()
-            
-            if curr_s in s_list: s_idx = s_list.index(curr_s)
-            else: s_idx = next((i for i, s in enumerate(s_list) if s.lower() in curr_s.lower()), 0)
-            
-            new_statut = s1.selectbox("Statut Mission", s_list, index=s_idx)
-            
-            p_list = ["Unpaid", "Paid", "Acompte OK"]
-            curr_p = str(row.get('Paiement', 'Unpaid'))
-            p_idx = p_list.index(curr_p) if curr_p in p_list else 0
-            new_pay = s2.selectbox("Paiement", p_list, index=p_idx)
-            
-            val_r = str(row.get('Relancer', 'Non')).strip().capitalize()
-            new_relance = s3.selectbox("Habitué ?", ["Non", "Oui"], index=1 if val_r == "Oui" else 0)
-
-            # --- Ligne 4 : Finances ---
-            f1, f2, f3 = st.columns(3)
-            val_prix = int(to_f(row.get('Prix', 0)))
-            val_acompte = int(to_f(row.get('Acompte', 0)))
-                
-            new_prix = f1.number_input("Prix Total (€)", value=val_prix)
-            new_acompte = f2.number_input("Acompte encaissé (€)", value=val_acompte)
-            f3.markdown(f"<br><b style='color:gray;'>Reste : {new_prix - new_acompte} €</b>", unsafe_allow_html=True)
-
-            # --- Ligne 5 : Contact & Notes ---
-            new_tel = st.text_input("Téléphone", value=str(row.get('Téléphone', '')))
-            new_mail = st.text_input("Email", value=str(row.get('Email', '')))
-            new_notes = st.text_area("Notes", value=str(row.get('Notes', '')))
-
-            # --- Validation Sécurisée ---
-            if st.form_submit_button("💾 ENREGISTRER LES MODIFICATIONS", use_container_width=True):
-                df_m.at[idx_to_edit, 'Prénom'] = str(new_pre).upper().strip()
-                df_m.at[idx_to_edit, 'Nom'] = str(new_nom).upper().strip()
-                df_m.at[idx_to_edit, 'DateNav'] = new_date
-                df_m.at[idx_to_edit, 'Jours'] = new_jours
-                df_m.at[idx_to_edit, 'Pers'] = new_pers
-                df_m.at[idx_to_edit, 'Société'] = new_soc
-                df_m.at[idx_to_edit, 'Statut'] = new_statut
-                df_m.at[idx_to_edit, 'Paiement'] = new_pay
-                df_m.at[idx_to_edit, 'Relancer'] = new_relance
-                df_m.at[idx_to_edit, 'Prix'] = new_prix
-                df_m.at[idx_to_edit, 'Acompte'] = new_acompte
-                df_m.at[idx_to_edit, 'Téléphone'] = new_tel
-                df_m.at[idx_to_edit, 'Email'] = new_mail
-                df_m.at[idx_to_edit, 'Notes'] = new_notes
-                
-                sauvegarder_data(df_m, 'contacts.json')
-                st.success("✅ Modifications enregistrées !")
-                st.session_state.page = "CONTACTS"
-                st.rerun()
-    else:
-        st.error("Erreur de chargement ou contact introuvable.")
-
-    if st.button("⬅️ ANNULER ET RETOUR", key="back_mod_contact"):
-        st.session_state.page = "CONTACTS"
-        st.rerun()
-
+    afficher_page_modifier_contact(
+        charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
+        sauvegarder_contacts=lambda c: sauvegarder_data(pd.DataFrame(c), 'contacts_v2.json'),
+    )
 
 # =================================================================
 # --- 7. PAGE PLANNING (V19.2 - CALIBRÉ SÉCURITÉ) ---
@@ -4814,7 +4563,6 @@ if st.session_state.page == "LOG":
 
 
         
-
 
 
 
