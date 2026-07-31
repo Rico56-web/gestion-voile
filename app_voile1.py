@@ -378,6 +378,7 @@ if st.session_state.page == "PLANNING":
 elif st.session_state.page == "CROISIERES":
     afficher_page_croisieres(
         charger_croisieres=lambda: charger_data_safe('croisieres_v2.json').to_dict('records'),
+        sauvegarder_croisieres=lambda c: sauvegarder_data(pd.DataFrame(c), 'croisieres_v2.json'),
         charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
     )
 
