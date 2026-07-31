@@ -11,6 +11,7 @@ paiement). `contacts.json` ne stocke JAMAIS de somme perçue ni d'historique
 — ces valeurs sont toujours calculées ici, à partir de croisieres.json.
 """
 from datetime import datetime, date
+import uuid
 
 
 # ---------------------------------------------------------------------
@@ -143,3 +144,33 @@ def contact_correspond_recherche(contact, croisieres_contact, texte_recherche):
         if t in c["ma_participation"].get("societe", "").upper():
             return True
     return False
+
+
+# ---------------------------------------------------------------------
+# 8. Génération d'ID pour un NOUVEAU contact créé depuis l'app
+#    (AJOUTÉ le 31/07/2026 — manquait par rapport au récap de session)
+# ---------------------------------------------------------------------
+
+def generer_id_contact():
+    """Génère un identifiant unique pour un nouveau contact.
+
+    Pourquoi un ID ALÉATOIRE et pas dérivé du nom (comme dans la
+    migration) ? Parce que deux personnes différentes peuvent porter
+    le même nom (ex: deux 'Martin Dupont'). Un ID basé sur le nom
+    créerait un risque de collision. uuid4() génère un nombre quasi
+    impossible à obtenir deux fois par hasard.
+
+    Format : 'c-' + 8 caractères hexadécimaux, ex. 'c-4f3a9b21'.
+    Le préfixe 'c-' garde la cohérence visuelle avec les IDs générés
+    par le script de migration (voir contacts_v2.json).
+    """
+    return f"c-{uuid.uuid4().hex[:8]}"
+
+
+def generer_nom_fichier_photo(contact_id, index):
+    """Construit le nom de fichier d'une photo de contact.
+    Ex: generer_nom_fichier_photo('c-4f3a9b21', 1) -> 'photos/c-4f3a9b21_1.jpg'
+    Centralisé ici pour que stockage_photos.py et page_modifier_contact.py
+    utilisent TOUJOURS la même convention de nommage (évite les bugs de
+    photos "orphelines" ou introuvables)."""
+    return f"photos/{contact_id}_{index}.jpg"
