@@ -44,10 +44,18 @@ def _choisir_participant(contacts, participant_actuel, sauvegarder_contacts, cha
     Renvoie le contact_id choisi (ou celui déjà en place si rien ne change)."""
     contact_id_actuel = participant_actuel.get("contact_id")
     contacts_par_id = {c["id"]: c for c in contacts}
-    contact_actuel = contacts_par_id.get(contact_id_actuel)
 
-    if contact_actuel:
-        st.info(f"👤 Participant actuel : **{contact_actuel['prenom']} {contact_actuel['nom']}**")
+    # Le choix fait dans l'expander (recherche ou création) prend le pas
+    # sur l'ancien participant. On calcule ÇA D'ABORD, pour que le message
+    # "Participant actuel" affiche tout de suite le bon nom — avant, il
+    # affichait encore l'ancien tant qu'on n'avait pas cliqué "Enregistrer".
+    contact_id_effectif = st.session_state.get("participant_contact_id_temp") or contact_id_actuel
+    contact_effectif = contacts_par_id.get(contact_id_effectif)
+
+    if contact_effectif:
+        st.success(f"👤 Participant sélectionné : **{contact_effectif['prenom']} {contact_effectif['nom']}**")
+    else:
+        st.warning("👤 Aucun participant sélectionné pour l'instant.")
 
     with st.expander("🔍 Changer / choisir le participant"):
         recherche = st.text_input("Rechercher un contact existant (nom ou prénom)", key="recherche_participant")
@@ -57,7 +65,9 @@ def _choisir_participant(contacts, participant_actuel, sauvegarder_contacts, cha
             st.warning("Aucun contact trouvé.")
 
         for c in resultats:
-            if st.button(f"✅ Choisir {c['prenom']} {c['nom']}", key=f"choisir_{c['id']}"):
+            deja_choisi = c["id"] == contact_id_effectif
+            libelle = f"✅ Déjà sélectionné : {c['prenom']} {c['nom']}" if deja_choisi else f"Choisir {c['prenom']} {c['nom']}"
+            if st.button(libelle, key=f"choisir_{c['id']}", disabled=deja_choisi):
                 st.session_state["participant_contact_id_temp"] = c["id"]
                 st.rerun()
 
@@ -82,9 +92,7 @@ def _choisir_participant(contacts, participant_actuel, sauvegarder_contacts, cha
                 st.success(f"Contact {np_prenom} {np_nom} créé.")
                 st.rerun()
 
-    # Le choix temporaire (via recherche ou création) prend le pas sur
-    # l'ancien participant, une fois qu'un choix a été fait
-    return st.session_state.get("participant_contact_id_temp") or contact_id_actuel
+    return contact_id_effectif
 
 
 def afficher_page_modifier_croisiere(charger_croisieres, sauvegarder_croisieres,
