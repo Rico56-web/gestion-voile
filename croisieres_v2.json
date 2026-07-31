@@ -827,6 +827,17 @@
                 "accompagnants":[
 
                 ]
+            },
+            {
+                "contact_id":"c-686f91a9",
+                "societe":"PERSO",
+                "prix":0.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
             }
         ]
     }
