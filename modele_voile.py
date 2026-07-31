@@ -318,6 +318,19 @@ def croisieres_depuis(croisieres, date_min):
     return resultat
 
 
+CAPACITE_MAX_BATEAU = 6  # skipper compris
+
+
+def nb_personnes_a_bord(croisiere):
+    """Compte le nombre total de personnes prévues pour cette croisière,
+    SKIPPER COMPRIS : toi + chaque participant + ses accompagnants."""
+    total = 1  # le skipper
+    for p in croisiere.get("participants", []):
+        total += 1
+        total += len(p.get("accompagnants", []) or [])
+    return total
+
+
 def valider_croisiere(croisiere):
     """Vérifie qu'une croisière est valide avant sauvegarde. Renvoie une
     liste de messages d'erreur (vide = valide)."""
@@ -331,4 +344,10 @@ def valider_croisiere(croisiere):
         erreurs.append("La date de début n'est pas au format jj/mm/aaaa.")
     if not croisiere.get("jours") or croisiere["jours"] < 1:
         erreurs.append("Le nombre de jours doit être au moins 1.")
+    nb_total = nb_personnes_a_bord(croisiere)
+    if nb_total > CAPACITE_MAX_BATEAU:
+        erreurs.append(
+            f"Trop de monde à bord : {nb_total} personnes (skipper compris), "
+            f"maximum {CAPACITE_MAX_BATEAU}."
+        )
     return erreurs
