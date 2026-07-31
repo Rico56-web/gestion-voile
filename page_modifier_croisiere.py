@@ -29,6 +29,27 @@ from modele_voile import (
 
 SOCIETES = ["PERSO", "CLICK", "CMN", "VOG"]
 
+COULEURS_PARTICIPANT = ["#2980B9", "#27AE60", "#8E44AD", "#D35400", "#C0392B", "#16A085"]
+
+
+def _injecter_style_cartes():
+    """Renforce visuellement les cartes participants : le contour par
+    défaut de st.container(border=True) est trop fin (1px gris clair,
+    à peine visible). On l'épaissit et on l'arrondit."""
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            border: 3px solid #2980B9 !important;
+            border-radius: 12px !important;
+            padding: 6px !important;
+            margin-bottom: 14px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
 def _trouver_croisiere(croisieres, croisiere_id):
     for cr in croisieres:
@@ -70,8 +91,14 @@ def _initialiser_liste_participants(croisiere_existante):
 def _zone_choix_contact(index, p, contacts, sauvegarder_contacts, charger_contacts):
     """Zone de recherche/création de contact pour LE participant numéro
     `index`. Modifie p['contact_id'] directement (p est déjà l'élément de
-    la liste en session_state, donc la modification est conservée)."""
-    with st.expander("🔍 Rechercher ou créer un contact pour ce participant"):
+    la liste en session_state, donc la modification est conservée).
+
+    Ouverte AUTOMATIQUEMENT tant qu'aucun contact n'est choisi (sinon ce
+    participant ressemble à une ligne vide sans rien à cliquer, facile à
+    manquer — c'est ce qui rendait la page confuse)."""
+    deja_un_contact = bool(p.get("contact_id"))
+    titre = "🔍 Changer le contact" if deja_un_contact else "🔍 Choisis ou crée un contact pour ce participant"
+    with st.expander(titre, expanded=not deja_un_contact):
         recherche = st.text_input("Nom ou prénom", key=f"recherche_part_{index}")
         resultats = rechercher_contacts(contacts, recherche)
         if recherche and not resultats:
@@ -109,11 +136,18 @@ def _carte_participant(index, p, contacts_par_id, contacts, sauvegarder_contacts
     """Affiche et édite un participant : contact, société, prix, statut,
     bouton de retrait."""
     contact = contacts_par_id.get(p.get("contact_id"))
+    couleur = COULEURS_PARTICIPANT[index % len(COULEURS_PARTICIPANT)]
     with st.container(border=True):
+        st.markdown(
+            f"""<div style="background:{couleur}; color:white; padding:6px 14px;
+            border-radius:8px; font-weight:bold; margin-bottom:10px; display:inline-block;">
+            👤 Participant {index + 1}</div>""",
+            unsafe_allow_html=True,
+        )
         if contact:
-            st.success(f"👤 **{contact['prenom']} {contact['nom']}**")
+            st.success(f"**{contact['prenom']} {contact['nom']}**")
         else:
-            st.warning("👤 Aucun contact choisi pour ce participant.")
+            st.warning("Pas encore de contact choisi — utilise la recherche ci-dessous ⬇️")
 
         _zone_choix_contact(index, p, contacts, sauvegarder_contacts, charger_contacts)
 
@@ -149,6 +183,7 @@ def afficher_page_modifier_croisiere(charger_croisieres, sauvegarder_croisieres,
     mode_creation = croisiere_id is None
 
     st.markdown("## ⛵ Nouvelle croisière" if mode_creation else "## ✏️ Modifier la croisière")
+    _injecter_style_cartes()
 
     if mode_creation:
         croisiere_existante = {"id": None, "nom_croisiere": "", "date_debut": "", "jours": 1, "notes": "", "participants": []}
