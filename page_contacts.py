@@ -167,6 +167,20 @@ def afficher_page_contacts(charger_contacts, charger_croisieres, charger_interet
         st.session_state.page = "MODIFIER_CONTACT"
         st.rerun()
 
+    # --- Tri : par nom ou par prénom, au choix ---
+    if "tri_contacts" not in st.session_state:
+        st.session_state.tri_contacts = "nom"  # comportement par défaut, inchangé
+
+    c_tri1, c_tri2, _ = st.columns([1, 1, 3])
+    if c_tri1.button("🔤 Trier par NOM", use_container_width=True,
+                      type="primary" if st.session_state.tri_contacts == "nom" else "secondary"):
+        st.session_state.tri_contacts = "nom"
+        st.rerun()
+    if c_tri2.button("🔤 Trier par PRÉNOM", use_container_width=True,
+                      type="primary" if st.session_state.tri_contacts == "prenom" else "secondary"):
+        st.session_state.tri_contacts = "prenom"
+        st.rerun()
+
     st.caption("Filtres (cumulables — clique pour activer/désactiver) :")
     noms_filtres = [("en_cours", "🟢 En cours"), ("habitue_auto", "⭐ Habitué"),
                      ("passe", "⚪ Passé"), ("sans_suite", "👻 Sans suite")]
@@ -188,8 +202,8 @@ def afficher_page_contacts(charger_contacts, charger_croisieres, charger_interet
 
     st.divider()
 
-    # --- Application des filtres + recherche ---
-    contacts_tries = tri_alphabetique(contacts)
+    # --- Application du tri, des filtres et de la recherche ---
+    contacts_tries = tri_alphabetique(contacts, critere=st.session_state.tri_contacts)
     contacts_affiches = []
     for c in contacts_tries:
         cr_c = croisieres_du_contact(croisieres, c["id"])
