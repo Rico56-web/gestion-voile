@@ -13,7 +13,14 @@ from datetime import date
 
 import streamlit as st
 
-from modele_voile import croisieres_depuis, noms_participants, couleur_croisiere
+from modele_voile import filtrer_temporel, trier_croisieres, noms_participants, couleur_croisiere
+
+OPTIONS_TRI = {
+    "date_desc": "🗓️ Date (récent → ancien)",
+    "date_asc": "🗓️ Date (ancien → récent)",
+    "nom": "🔤 Nom",
+    "prenom": "🔤 Prénom",
+}
 
 
 def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger_contacts):
@@ -34,33 +41,51 @@ def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger
         st.success("Croisière supprimée.")
         st.rerun()
 
-    if "voir_tout_historique" not in st.session_state:
-        st.session_state.voir_tout_historique = False
-
-    c_nouveau, c_toggle = st.columns([1, 1])
-    if c_nouveau.button("➕ Nouvelle croisière", use_container_width=True):
+    if st.button("➕ Nouvelle croisière", use_container_width=True):
         st.session_state.edit_croisiere_id = None
         st.session_state.page = "MODIFIER_CROISIERE"
         st.rerun()
 
-    label_toggle = "📅 Voir tout l'historique" if not st.session_state.voir_tout_historique else "📅 Revenir à cette année"
-    if c_toggle.button(label_toggle, use_container_width=True):
-        st.session_state.voir_tout_historique = not st.session_state.voir_tout_historique
-        st.rerun()
+    st.divider()
 
-    if st.session_state.voir_tout_historique:
-        croisieres_affichees = croisieres_depuis(croisieres, date(2000, 1, 1))
-        st.caption("Tout l'historique des croisières.")
-    else:
-        annee_courante = date.today().year
-        croisieres_affichees = croisieres_depuis(croisieres, date(annee_courante, 1, 1))
-        st.caption(f"Croisières depuis le 01/01/{annee_courante}. Les croisières sans date valide ne sont pas listées ici.")
+    # --- Filtre temporel : Toutes / Passées / À venir ---
+    if "filtre_temporel_cr" not in st.session_state:
+        st.session_state.filtre_temporel_cr = "toutes"
+
+    st.caption("Filtrer :")
+    c1, c2, c3 = st.columns(3)
+    options_filtre = [("toutes", "📋 Toutes", c1), ("passees", "📅 Passées", c2), ("futures", "🔜 À venir", c3)]
+    for cle, label, col in options_filtre:
+        actif = st.session_state.filtre_temporel_cr == cle
+        if col.button(label, key=f"filtre_temp_{cle}", use_container_width=True,
+                      type="primary" if actif else "secondary"):
+            st.session_state.filtre_temporel_cr = cle
+            st.rerun()
+
+    # --- Tri ---
+    if "tri_croisieres" not in st.session_state:
+        st.session_state.tri_croisieres = "date_desc"
+
+    tri_choisi = st.selectbox(
+        "Trier par",
+        options=list(OPTIONS_TRI.keys()),
+        format_func=lambda cle: OPTIONS_TRI[cle],
+        index=list(OPTIONS_TRI.keys()).index(st.session_state.tri_croisieres),
+        key="selectbox_tri_croisieres",
+    )
+    st.session_state.tri_croisieres = tri_choisi
 
     st.divider()
 
+    aujourdhui = date.today()
+    croisieres_filtrees = filtrer_temporel(croisieres, st.session_state.filtre_temporel_cr, aujourdhui)
+    croisieres_affichees = trier_croisieres(croisieres_filtrees, contacts_par_id, st.session_state.tri_croisieres)
+
     if not croisieres_affichees:
-        st.info("Aucune croisière à afficher pour cette période.")
+        st.info("Aucune croisière à afficher pour ce filtre.")
         return
+
+    st.caption(f"{len(croisieres_affichees)} croisière(s) affichée(s).")
 
     for cr in croisieres_affichees:
         couleur = couleur_croisiere(cr)
