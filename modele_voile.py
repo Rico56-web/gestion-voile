@@ -407,4 +407,111 @@ def trier_croisieres(croisieres, contacts_par_id, critere="date_desc"):
         return sorted(croisieres, key=lambda cr: cle_nom_prenom(cr, "prenom"))
     # date_desc par défaut : plus récent en premier (ordre chronologique inversé, comme le reste de l'app)
     return sorted(croisieres, key=lambda cr: parse_date_eu(cr.get("date_debut")) or date.min, reverse=True)
-    
+
+
+# ---------------------------------------------------------------------
+# 11. Fonctions pour la page STATS (AJOUTÉ le 01/08/2026)
+# ---------------------------------------------------------------------
+
+def participations_annee(croisieres, annee):
+    """Renvoie une liste 'à plat' : une entrée par PARTICIPANT (pas par
+    croisière), pour toutes les croisières qui démarrent dans l'année
+    donnée. Les participations ANNULÉES sont exclues (comme l'ancien
+    code qui excluait 'annule/refuse' du calcul financier)."""
+    resultat = []
+    for cr in croisieres:
+        d = parse_date_eu(cr.get("date_debut"))
+        if not d or d.year != annee:
+            continue
+        for p in cr.get("participants", []):
+            if p.get("annulee"):
+                continue
+            resultat.append({
+                **p,
+                "date_debut": cr.get("date_debut"),
+                "jours": cr.get("jours", 1),
+                "nom_croisiere": cr.get("nom_croisiere"),
+                "croisiere_id": cr["id"],
+            })
+    return resultat
+
+
+def bilan_financier_annee(croisieres, annee, mode="reel"):
+    """Calcule les indicateurs financiers de l'année.
+    mode='reel' (Réel Encaissé) ou 'previsionnel' (CA prévu total)."""
+    participations = participations_annee(croisieres, annee)
+    total_ca = sum(p.get("prix", 0) or 0 for p in participations)
+    total_encaisse = sum(montant_encaisse(p) for p in participations)
+    reste = total_ca - total_encaisse
+    nb_sorties = sum(1 for p in participations if (p.get("prix", 0) or 0) > 0)
+
+    # Participations "retenues" pour la répartition par société : en mode
+    # réel, uniquement celles avec un montant encaissé > 0 (comme l'ancien
+    # code, qui ne comptait que Montant_Encaisse > 0)
+    participations_retenues = (
+        [p for p in participations if montant_encaisse(p) > 0]
+        if mode == "reel" else participations
+    )
+
+    return {
+        "total_ca": total_ca,
+        "total_encaisse": total_encaisse,
+        "reste_a_percevoir": reste,
+        "nb_sorties": nb_sorties,
+        "participations": participations,
+        "participations_retenues": participations_retenues,
+    }
+
+
+def repartition_par_societe(participations, mode="reel"):
+    """Regroupe le montant (encaissé en mode réel, prix en mode
+    prévisionnel) par société. Renvoie une liste [(société, montant), ...]
+    triée du plus gros au plus petit."""
+    totaux = {}
+    for p in participations:
+        soc = (p.get("societe") or "PERSO").strip().upper()
+        valeur = montant_encaisse(p) if mode == "reel" else (p.get("prix", 0) or 0)
+        totaux[soc] = totaux.get(soc, 0) + valeur
+    return sorted(totaux.items(), key=lambda x: x[1], reverse=True)
+
+
+def etapes_annee(etapes, annee):
+    """Étapes du livre de bord dont la date tombe dans l'année donnée."""
+    resultat = []
+    for e in etapes:
+        d = parse_date_eu(e.get("date"))
+        if d and d.year == annee:
+            resultat.append(e)
+    return resultat
+
+
+def bilan_navigation_annee(etapes, annee):
+    """Milles, heures moteur/voile et ratio voile/total pour l'année."""
+    etapes_y = etapes_annee(etapes, annee)
+    total_milles = sum(e.get("milles", 0) or 0 for e in etapes_y)
+    total_h_moteur = sum(e.get("heures_moteur", 0) or 0 for e in etapes_y)
+    total_h_voile = sum(e.get("heures_voile", 0) or 0 for e in etapes_y)
+    total_heures_mer = total_h_moteur + total_h_voile
+    ratio_voile = (total_h_voile / total_heures_mer * 100) if total_heures_mer > 0 else 0.0
+    return {
+        "total_milles": total_milles,
+        "total_h_moteur": total_h_moteur,
+        "total_h_voile": total_h_voile,
+        "ratio_voile": ratio_voile,
+    }
+
+
+def recettes_par_mois(croisieres, annee, mode="reel"):
+    """Renvoie une liste de 12 montants (janvier à décembre) : les
+    recettes du mois, pour tracer le graphique chronologique."""
+    montants = [0.0] * 12
+    for cr in croisieres:
+        d = parse_date_eu(cr.get("date_debut"))
+        if not d or d.year != annee:
+            continue
+        for p in cr.get("participants", []):
+            if p.get("annulee"):
+                continue
+            valeur = montant_encaisse(p) if mode == "reel" else (p.get("prix", 0) or 0)
+            montants[d.month - 1] += valeur
+    return montants
