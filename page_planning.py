@@ -8,10 +8,8 @@ séparé (croisieres_v2.json / etapes_v2.json / contacts_v2.json).
     if st.session_state.page == "PLANNING": ...
 par un appel à afficher_page_planning().
 
-LECTURE SEULE pour cette version : cliquer sur une mission n'ouvre pas
-encore d'édition (la page MODIFIER_CROISIERE n'existe pas encore, ce sera
-une prochaine étape). Le calendrier et la liste sont donc uniquement
-consultatifs pour l'instant.
+Les missions du calendrier sont cliquables : cliquer sur une mission ouvre
+MODIFIER_CROISIERE pour l'éditer directement.
 
 NE TOUCHE PAS à CONTACTS, MODIFIER_CONTACT, FACT, STATS, ARCHIVES.
 """
@@ -125,9 +123,10 @@ def _afficher_missions(croisieres_mois, contacts_par_id, sel_m_nom, aujourdhui):
         with col2:
             nom_aff = noms_participants(cr, contacts_par_id)
             nom_nav = cr.get("nom_croisiere") or "(sans nom)"
-            # Lecture seule pour l'instant : simple affichage, pas de bouton cliquable
-            # (la page MODIFIER_CROISIERE n'existe pas encore)
-            st.markdown(f"**{nom_aff}** — {nom_nav}")
+            if st.button(f"{nom_aff} — {nom_nav}", key=f"mission_{cr['id']}", use_container_width=True):
+                st.session_state.edit_croisiere_id = cr["id"]
+                st.session_state.page = "MODIFIER_CROISIERE"
+                st.rerun()
 
     st.success(f"**💰 Total prévisionnel {sel_m_nom} : {total_prevu:,.0f} €**".replace(",", " "))
 
