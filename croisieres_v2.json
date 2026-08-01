@@ -491,26 +491,6 @@
         ]
     },
     {
-        "id":"cr-03e06661",
-        "nom_croisiere":"(\u00e0 d\u00e9finir)",
-        "date_debut":"28\/07\/2026",
-        "jours":1,
-        "notes":"Avec sa fille et sa correspondante canadienne",
-        "participants":[
-            {
-                "contact_id":"c-a522b29d",
-                "societe":"PERSO",
-                "prix":175.0,
-                "terminee":true,
-                "payee":true,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-17795204",
         "nom_croisiere":"location perso mai 2026",
         "date_debut":"01\/08\/2026",
@@ -803,6 +783,26 @@
                 "prix":0.0,
                 "terminee":false,
                 "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-03e06661",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"28\/07\/2026",
+        "jours":1,
+        "notes":"Avec sa fille et sa correspondante canadienne",
+        "participants":[
+            {
+                "contact_id":"c-a522b29d",
+                "societe":"PERSO",
+                "prix":175.0,
+                "terminee":true,
+                "payee":true,
                 "annulee":false,
                 "accompagnants":[
 
