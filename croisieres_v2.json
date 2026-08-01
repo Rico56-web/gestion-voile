@@ -491,26 +491,6 @@
         ]
     },
     {
-        "id":"cr-17795204",
-        "nom_croisiere":"location perso mai 2026",
-        "date_debut":"01\/08\/2026",
-        "jours":15,
-        "notes":"Acompte le 17\/07\/2026\nJe fournirai pass mobilhan et la cl\u00e9 du batea",
-        "participants":[
-            {
-                "contact_id":"c-94eac341",
-                "societe":"PERSO",
-                "prix":2400.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-9af8cf73",
         "nom_croisiere":"(\u00e0 d\u00e9finir)",
         "date_debut":"17\/08\/2026",
@@ -801,6 +781,26 @@
                 "contact_id":"c-a522b29d",
                 "societe":"PERSO",
                 "prix":175.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-17795204",
+        "nom_croisiere":"location perso mai 2026",
+        "date_debut":"01\/08\/2026",
+        "jours":15,
+        "notes":"Acompte le 17\/07\/2026\nJe fournirai pass mobilhan et la cl\u00e9 du batea",
+        "participants":[
+            {
+                "contact_id":"c-94eac341",
+                "societe":"PERSO",
+                "prix":2400.0,
                 "terminee":true,
                 "payee":true,
                 "annulee":false,
