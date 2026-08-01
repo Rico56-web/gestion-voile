@@ -351,3 +351,46 @@ def valider_croisiere(croisiere):
             f"maximum {CAPACITE_MAX_BATEAU}."
         )
     return erreurs
+
+
+def filtrer_temporel(croisieres, mode, aujourdhui):
+    """Filtre les croisières selon leur position dans le temps.
+    mode : 'toutes', 'passees' (déjà terminées à la date du jour) ou
+    'futures' (à venir, y compris aujourd'hui même).
+    Les croisières sans date valide sont exclues des filtres 'passees' et
+    'futures' (impossible de savoir où les classer), mais gardées dans 'toutes'."""
+    if mode == "toutes":
+        return list(croisieres)
+    resultat = []
+    for cr in croisieres:
+        d_fin = date_fin_croisiere(cr)
+        if not d_fin:
+            continue
+        if mode == "passees" and d_fin < aujourdhui:
+            resultat.append(cr)
+        elif mode == "futures" and d_fin >= aujourdhui:
+            resultat.append(cr)
+    return resultat
+
+
+def trier_croisieres(croisieres, contacts_par_id, critere="date_desc"):
+    """Trie une liste de croisières.
+    critere : 'date_desc' (plus récent d'abord, défaut), 'date_asc',
+    'nom' (nom de famille du 1er participant), 'prenom' (idem, prénom)."""
+    def cle_nom_prenom(cr, champ):
+        participants = cr.get("participants", [])
+        if not participants:
+            return ""
+        contact = contacts_par_id.get(participants[0].get("contact_id"))
+        if not contact:
+            return ""
+        return (contact.get(champ) or "").strip().upper()
+
+    if critere == "date_asc":
+        return sorted(croisieres, key=lambda cr: parse_date_eu(cr.get("date_debut")) or date.min)
+    if critere == "nom":
+        return sorted(croisieres, key=lambda cr: cle_nom_prenom(cr, "nom"))
+    if critere == "prenom":
+        return sorted(croisieres, key=lambda cr: cle_nom_prenom(cr, "prenom"))
+    # date_desc par défaut : plus récent en premier (ordre chronologique inversé, comme le reste de l'app)
+    return sorted(croisieres, key=lambda cr: parse_date_eu(cr.get("date_debut")) or date.min, reverse=True)
