@@ -69,7 +69,7 @@ def _sauvegarder_une_croisiere(croisieres, croisiere_modifiee):
 
 def _participant_vide():
     return {
-        "contact_id": None, "societe": "PERSO", "prix": 0.0,
+        "contact_id": None, "societe": "PERSO", "prix": 0.0, "acompte": 0.0,
         "terminee": False, "payee": False, "annulee": False, "accompagnants": [],
     }
 
@@ -151,7 +151,7 @@ def _carte_participant(index, p, contacts_par_id, contacts, sauvegarder_contacts
 
         _zone_choix_contact(index, p, contacts, sauvegarder_contacts, charger_contacts)
 
-        c1, c2 = st.columns(2)
+        c1, c2, c3 = st.columns(3)
         p["societe"] = c1.selectbox(
             "Société", SOCIETES,
             index=SOCIETES.index(p["societe"]) if p.get("societe") in SOCIETES else 0,
@@ -159,11 +159,16 @@ def _carte_participant(index, p, contacts_par_id, contacts, sauvegarder_contacts
         )
         p["prix"] = c2.number_input("Prix (€)", min_value=0.0, value=float(p.get("prix", 0.0)),
                                      step=10.0, key=f"prix_{index}")
+        p["acompte"] = c3.number_input(
+            "Acompte versé (€)", min_value=0.0, value=float(p.get("acompte", 0.0)),
+            step=10.0, key=f"acompte_{index}",
+            help="Montant déjà reçu si la case 'Payée' n'est pas cochée. Une fois 'Payée' cochée, c'est le prix entier qui compte, pas l'acompte.",
+        )
 
-        c3, c4, c5 = st.columns(3)
-        p["terminee"] = c3.checkbox("✅ Terminée", value=bool(p.get("terminee")), key=f"terminee_{index}")
-        p["payee"] = c4.checkbox("💰 Payée", value=bool(p.get("payee")), key=f"payee_{index}")
-        p["annulee"] = c5.checkbox("❌ Annulée", value=bool(p.get("annulee")), key=f"annulee_{index}")
+        c4, c5, c6 = st.columns(3)
+        p["terminee"] = c4.checkbox("✅ Terminée", value=bool(p.get("terminee")), key=f"terminee_{index}")
+        p["payee"] = c5.checkbox("💰 Payée", value=bool(p.get("payee")), key=f"payee_{index}")
+        p["annulee"] = c6.checkbox("❌ Annulée", value=bool(p.get("annulee")), key=f"annulee_{index}")
 
         if autoriser_retrait:
             if st.button("🗑️ Retirer ce participant", key=f"retirer_{index}"):
@@ -260,3 +265,4 @@ def afficher_page_modifier_croisiere(charger_croisieres, sauvegarder_croisieres,
         st.session_state.pop("participants_liste", None)
         st.session_state.page = "PLANNING"
         st.rerun()
+        
