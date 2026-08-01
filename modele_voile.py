@@ -62,13 +62,24 @@ def croisieres_du_contact(croisieres, contact_id):
     return resultat
 
 
+def montant_encaisse(participation):
+    """Montant réellement encaissé pour UNE participation :
+    - si payée intégralement : le prix en entier
+    - sinon : l'acompte versé (0€ si aucun acompte)
+    Centralisé ici pour que CONTACTS et STATS calculent ce montant de la
+    MÊME façon (évite d'avoir deux logiques différentes qui divergent)."""
+    if participation.get("payee"):
+        return participation.get("prix", 0) or 0
+    return participation.get("acompte", 0) or 0
+
+
 def sommes_percues(croisieres_contact):
-    """Total des sommes payées par ce contact, toutes croisières confondues.
+    """Total des sommes réellement encaissées par ce contact, toutes
+    croisières confondues (prix si payée, sinon acompte versé).
     Jamais stocké : toujours recalculé à partir de croisieres.json."""
     return sum(
-        c["ma_participation"].get("prix", 0) or 0
+        montant_encaisse(c["ma_participation"])
         for c in croisieres_contact
-        if c["ma_participation"].get("payee")
     )
 
 
@@ -340,6 +351,8 @@ def valider_croisiere(croisiere):
     for p in croisiere.get("participants", []):
         if not p.get("contact_id"):
             erreurs.append("Un participant n'a pas de contact associé.")
+        if (p.get("acompte", 0) or 0) > (p.get("prix", 0) or 0):
+            erreurs.append("L'acompte d'un participant ne peut pas dépasser son prix.")
     if croisiere.get("date_debut") and not parse_date_eu(croisiere["date_debut"]):
         erreurs.append("La date de début n'est pas au format jj/mm/aaaa.")
     if not croisiere.get("jours") or croisiere["jours"] < 1:
@@ -394,3 +407,4 @@ def trier_croisieres(croisieres, contacts_par_id, critere="date_desc"):
         return sorted(croisieres, key=lambda cr: cle_nom_prenom(cr, "prenom"))
     # date_desc par défaut : plus récent en premier (ordre chronologique inversé, comme le reste de l'app)
     return sorted(croisieres, key=lambda cr: parse_date_eu(cr.get("date_debut")) or date.min, reverse=True)
+    
