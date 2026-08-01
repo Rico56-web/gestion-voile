@@ -60,6 +60,11 @@ def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger
         if col.button(label, key=f"filtre_temp_{cle}", use_container_width=True,
                       type="primary" if actif else "secondary"):
             st.session_state.filtre_temporel_cr = cle
+            # Tri par défaut adapté au filtre : pour "à venir", la sortie la
+            # plus proche est ce qu'on veut voir en premier (pas la plus
+            # lointaine) ; pour "passées"/"toutes", on garde la convention
+            # habituelle de l'appli (le plus récent en tête).
+            st.session_state.tri_croisieres = "date_asc" if cle == "futures" else "date_desc"
             st.rerun()
 
     # --- Tri ---
