@@ -235,7 +235,7 @@ st.divider()
 # =================================================================
 
 # --- BLOC MEMOS INTEGRÉ DANS L'AIGUILLAGE GLOBAL ---
-  if st.session_state.page == "MEMOS":
+    if st.session_state.page == "MEMOS":
     st.markdown("<h2 style='text-align: center; color: #34495E;'>⚓ Mémos & Check-lists de Bord</h2>", unsafe_allow_html=True)
     df_memos = charger_data_safe('memos.json')
 
