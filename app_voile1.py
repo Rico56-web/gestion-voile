@@ -14,6 +14,7 @@ from page_croisieres import afficher_page_croisieres
 from page_modifier_croisiere import afficher_page_modifier_croisiere
 from page_stats import afficher_page_stats
 from page_fact import afficher_page_fact
+from page_relances import afficher_page_relances
 # =================================================================
 # --- CONFIGURATION & STYLE REGROUPÉS ---
 # =================================================================
