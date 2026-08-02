@@ -654,3 +654,4 @@ def reporter_relance(interets, interet_id, nouvelle_date_str):
             i["prochaine_relance"] = nouvelle_date_str
         resultat.append(i)
     return resultat
+    
