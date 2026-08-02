@@ -515,3 +515,80 @@ def recettes_par_mois(croisieres, annee, mode="reel"):
             valeur = montant_encaisse(p) if mode == "reel" else (p.get("prix", 0) or 0)
             montants[d.month - 1] += valeur
     return montants
+
+
+# ---------------------------------------------------------------------
+# 12. Fonctions pour la page FACT (AJOUTÉ le 02/08/2026)
+# ---------------------------------------------------------------------
+
+def toutes_participations(croisieres, exclure_annulees=True):
+    """Liste 'à plat' de toutes les participations, toutes croisières et
+    toutes années confondues (contrairement à participations_annee, qui
+    filtre sur une saison). Utile pour FACT : une facture impayée d'une
+    année passée reste due, elle ne doit pas disparaître.
+    Chaque entrée garde 'croisiere_id' et 'participant_index', pour
+    pouvoir la retrouver et la modifier plus tard (marquer_participant_paye)."""
+    resultat = []
+    for cr in croisieres:
+        for i, p in enumerate(cr.get("participants", [])):
+            if exclure_annulees and p.get("annulee"):
+                continue
+            resultat.append({
+                **p,
+                "croisiere_id": cr["id"],
+                "participant_index": i,
+                "date_debut": cr.get("date_debut"),
+                "nom_croisiere": cr.get("nom_croisiere"),
+            })
+    return resultat
+
+
+def bilan_facturation(croisieres):
+    """Bilan de facturation TOUTES ANNÉES CONFONDUES (une facture
+    impayée ne doit pas disparaître au changement de saison). Les
+    croisières annulées ne comptent pas (rien à facturer)."""
+    participations = toutes_participations(croisieres, exclure_annulees=True)
+    total_ca = sum(p.get("prix", 0) or 0 for p in participations)
+    total_encaisse = sum(montant_encaisse(p) for p in participations)
+    reste = total_ca - total_encaisse
+
+    a_encaisser = [p for p in participations if not p.get("payee")]
+    payees = [p for p in participations if p.get("payee")]
+
+    # "À encaisser" : les plus anciennes en premier (les plus en retard
+    # sont donc en tête, ce qui attire l'œil en premier)
+    a_encaisser.sort(key=lambda p: parse_date_eu(p.get("date_debut")) or date.min)
+    # "Payées" : ordre chronologique inversé, comme partout ailleurs
+    payees.sort(key=lambda p: parse_date_eu(p.get("date_debut")) or date.min, reverse=True)
+
+    return {
+        "total_ca": total_ca,
+        "total_encaisse": total_encaisse,
+        "reste_a_percevoir": reste,
+        "a_encaisser": a_encaisser,
+        "payees": payees,
+    }
+
+
+def marquer_participant_paye(croisieres, croisiere_id, participant_index, payee):
+    """Marque UN participant comme payé/non payé, en modifiant SEULEMENT
+    la croisière concernée (aucune autre touchée). Cohérent avec l'ancien
+    comportement de FACT : encaisser = acompte mis au niveau du prix ;
+    annuler le paiement = acompte remis à 0."""
+    resultat = []
+    for cr in croisieres:
+        if cr["id"] == croisiere_id:
+            cr = dict(cr)
+            cr["participants"] = [dict(p) for p in cr["participants"]]
+            participant = cr["participants"][participant_index]
+            participant["payee"] = payee
+            participant["acompte"] = participant.get("prix", 0) if payee else 0.0
+        resultat.append(cr)
+    return resultat
+
+
+def est_en_retard(participation, aujourdhui):
+    """Une participation est en retard si sa date de début est passée et
+    qu'elle n'est toujours pas payée."""
+    d = parse_date_eu(participation.get("date_debut"))
+    return bool(d and d < aujourdhui and not participation.get("payee"))
