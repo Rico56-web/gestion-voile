@@ -601,3 +601,56 @@ def participations_cmn_impayees(croisieres):
         p for p in toutes_participations(croisieres)
         if "CMN" in (p.get("societe") or "").upper() and not p.get("payee")
     ]
+
+
+# ---------------------------------------------------------------------
+# 13. Fonctions pour l'onglet "À relancer" (AJOUTÉ le 02/08/2026)
+# ---------------------------------------------------------------------
+
+def prospects_actifs(interets):
+    """Prospects qui ne sont PAS marqués 'sans suite' (champ 100% manuel)."""
+    return [i for i in interets if not i.get("sans_suite")]
+
+
+def trier_relances(interets):
+    """Trie les prospects actifs par date de relance croissante : les
+    plus urgents (en retard, donc date la plus ancienne) en premier.
+    Les prospects sans date de relance renseignée sont mis en toute fin."""
+    actifs = prospects_actifs(interets)
+    return sorted(actifs, key=lambda i: parse_date_eu(i.get("prochaine_relance")) or date.max)
+
+
+def relance_en_retard(interet, aujourdhui):
+    d = parse_date_eu(interet.get("prochaine_relance"))
+    return bool(d and d < aujourdhui)
+
+
+def relance_proche(interet, aujourdhui, fenetre_jours=7):
+    """Relance prévue dans les prochains jours (mais pas encore en retard)."""
+    d = parse_date_eu(interet.get("prochaine_relance"))
+    if not d:
+        return False
+    return aujourdhui <= d <= aujourdhui + timedelta(days=fenetre_jours)
+
+
+def marquer_sans_suite(interets, interet_id):
+    """Marque un prospect comme 'sans suite'. Ne touche à aucun autre
+    prospect (réécriture complète de interets.json à chaque fois)."""
+    resultat = []
+    for i in interets:
+        i = dict(i)
+        if i["id"] == interet_id:
+            i["sans_suite"] = True
+        resultat.append(i)
+    return resultat
+
+
+def reporter_relance(interets, interet_id, nouvelle_date_str):
+    """Change la date de prochaine relance d'un prospect."""
+    resultat = []
+    for i in interets:
+        i = dict(i)
+        if i["id"] == interet_id:
+            i["prochaine_relance"] = nouvelle_date_str
+        resultat.append(i)
+    return resultat
