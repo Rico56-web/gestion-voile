@@ -589,9 +589,9 @@
                 "contact_id":"c-67f29042",
                 "societe":"CLICK",
                 "prix":676.0,
-                "acompte":0.0,
+                "acompte":676.0,
                 "terminee":false,
-                "payee":false,
+                "payee":true,
                 "annulee":false,
                 "accompagnants":[
 
