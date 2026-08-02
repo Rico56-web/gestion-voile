@@ -676,6 +676,16 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # =================================================================
+# RELANCES
+# =================================================================
+elif st.session_state.page == "RELANCES":
+    afficher_page_relances(
+        charger_interets=lambda: charger_data_safe('interets_v2.json').to_dict('records'),
+        sauvegarder_interets=lambda i: sauvegarder_data(pd.DataFrame(i), 'interets_v2.json'),
+        charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
+    )
+
+# =================================================================
 # --- FONCTION COMPLÉMENTAIRE D'ENVOI DE MAIL ---
 # =================================================================
 def envoyer_email_facturation_cmn(corps_texte, mois_annee, destinataire=None):
