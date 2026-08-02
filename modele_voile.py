@@ -592,3 +592,12 @@ def est_en_retard(participation, aujourdhui):
     qu'elle n'est toujours pas payée."""
     d = parse_date_eu(participation.get("date_debut"))
     return bool(d and d < aujourdhui and not participation.get("payee"))
+
+
+def participations_cmn_impayees(croisieres):
+    """Participations CMN non payées (hors annulées), toutes années
+    confondues — sert au module d'envoi groupé du relevé mensuel CMN."""
+    return [
+        p for p in toutes_participations(croisieres)
+        if "CMN" in (p.get("societe") or "").upper() and not p.get("payee")
+    ]
