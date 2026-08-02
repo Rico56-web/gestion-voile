@@ -714,6 +714,7 @@ if st.session_state.page == "FACT":
         charger_croisieres=lambda: charger_data_safe('croisieres_v2.json').to_dict('records'),
         sauvegarder_croisieres=lambda c: sauvegarder_data(pd.DataFrame(c), 'croisieres_v2.json'),
         charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
+        envoyer_email=envoyer_email_facturation_cmn,
     )
 # =================================================================
 # --- 11. PAGE ARCHIVES & SÉCURITÉ (VERSION UNIFIÉE & FIXÉE) ---
