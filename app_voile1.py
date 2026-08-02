@@ -679,7 +679,7 @@ from email.mime.multipart import MIMEMultipart
 # =================================================================
 # RELANCES
 # =================================================================
-elif st.session_state.page == "RELANCES":
+if st.session_state.page == "RELANCES":
     afficher_page_relances(
         charger_interets=lambda: charger_data_safe('interets_v2.json').to_dict('records'),
         sauvegarder_interets=lambda i: sauvegarder_data(pd.DataFrame(i), 'interets_v2.json'),
