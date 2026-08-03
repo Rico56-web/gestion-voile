@@ -779,3 +779,12 @@ def parser_date_flexible(valeur):
         except (ValueError, OverflowError):
             return None
     return parse_date_eu(valeur)
+
+
+def fond_clair(couleur_hex):
+    """Convertit une couleur hexadécimale (#3498db) en version très
+    claire (rgba, faible opacité), pour servir de fond de carte sans que
+    ce soit criard, tout en gardant le bord bien coloré et lisible."""
+    couleur_hex = couleur_hex.lstrip("#")
+    r, g, b = int(couleur_hex[0:2], 16), int(couleur_hex[2:4], 16), int(couleur_hex[4:6], 16)
+    return f"rgba({r}, {g}, {b}, 0.12)"
