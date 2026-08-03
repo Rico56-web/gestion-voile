@@ -20,7 +20,7 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-from modele_voile import derniere_lecture_compteur
+from modele_voile import derniere_lecture_compteur, parser_date_flexible
 
 
 def to_f(v):
@@ -78,6 +78,15 @@ def afficher_page_maint(charger_maintenance, sauvegarder_maintenance,
     """Point d'entrée de la page. Fonctions injectées depuis app_voile1.py."""
 
     df_m = charger_maintenance()
+    if not df_m.empty:
+        # Normalise le format de date (anciennes fiches en millisecondes,
+        # nouvelles en texte jj/mm/aaaa) vers du texte jj/mm/aaaa partout.
+        # Comme conséquence positive : le prochain enregistrement (même un
+        # simple changement de statut) réécrit le fichier avec ce format
+        # propre, donc le fichier s'auto-corrige progressivement.
+        df_m["Date"] = df_m["Date"].apply(
+            lambda v: d.strftime("%d/%m/%Y") if (d := parser_date_flexible(v)) else str(v)
+        )
     etapes = charger_etapes()
     releve_h = derniere_lecture_compteur(etapes)
 
