@@ -13,6 +13,7 @@ from page_fact import afficher_page_fact
 from page_relances import afficher_page_relances
 from page_maint import afficher_page_maint
 from page_log import afficher_page_log
+from page_archives import afficher_page_archives
 # =================================================================
 # --- CONFIGURATION & STYLE REGROUPÉS ---
 # =================================================================
@@ -407,102 +408,17 @@ if st.session_state.page == "FACT":
         charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
         envoyer_email=envoyer_email_facturation_cmn,
     )
+
 # =================================================================
-# --- 11. PAGE ARCHIVES & SÉCURITÉ (VERSION UNIFIÉE & FIXÉE) ---
+# --- 11. PAGE ARCHIVES (consultation par période, rien n'est déplacé) ---
 # =================================================================
 if st.session_state.page == "ARCHIVES":
-    st.markdown("<h2 style='text-align: center;'>📂 Archives & Clôture de Saison</h2>", unsafe_allow_html=True)
-    
-    if st.button("⬅️ Retour au Planning", use_container_width=True):
-        st.session_state.page = "PLANNING"
-        st.rerun()
-
-    # --- SECTION 1 : CONSULTATION DES HISTORIQUES ---
-    st.markdown("### 🔍 Consultation des historiques")
-    t1, t2, t3, t4 = st.tabs(["🛠️ Frais", "📅 Planning", "📖 Logbook", "👤 Contacts"])
-    
-    with t1: 
-        st.subheader("Archives Maintenance")
-        st.dataframe(charger_data_safe('archives_maintenance.json'), use_container_width=True)
-    
-    with t2: 
-        st.subheader("Archives Planning")
-        st.dataframe(charger_data_safe('archives_planning.json'), use_container_width=True)
-    
-    with t3: 
-        st.subheader("Archives Logbook")
-        st.dataframe(charger_data_safe('archives_logbook.json'), use_container_width=True)
-
-    with t4:
-        st.subheader("Archives Contacts (Saisons passées - Statut Inclus)")
-        st.dataframe(charger_data_safe('archives_contacts_2026.json'), use_container_width=True)
-
-    st.divider()
-
-    # --- SECTION 2 : COFFRE-FORT (SAUVEGARDE MANUELLE) ---
-    st.markdown("### 🛡️ Coffre-fort de sauvegarde")
-    with st.expander("💾 Exporter les données actives (.CSV)", expanded=False):
-        st.write("Téléchargez vos fichiers de données actuels pour les sauvegarder localement.")
-        
-        fichiers_cible = {
-            "Contacts & Facturation": "contacts.json",
-            "Maintenance & Frais": "maintenance.json",
-            "Livre de Bord (Logbook)": "logbook.json"
-        }
-        
-        col_bak1, col_bak2, col_bak3 = st.columns(3)
-        cols = [col_bak1, col_bak2, col_bak3]
-
-        for i, (nom_affichage, nom_fichier) in enumerate(fichiers_cible.items()):
-            df_bak = charger_data_safe(nom_fichier)
-            if not df_bak.empty:
-                csv_data = df_bak.to_csv(index=False).encode('utf-8-sig')
-                date_str = pd.Timestamp.now().strftime("%d_%m_%Y")
-                file_final = f"VESTA_{nom_fichier.replace('.json', '')}_{date_str}.csv"
-                
-                cols[i].download_button(
-                    label=f"📥 {nom_affichage}",
-                    data=csv_data,
-                    file_name=file_final,
-                    mime='text/csv',
-                    use_container_width=True
-                )
-            else:
-                cols[i].caption(f"⚠️ {nom_affichage} vide.")
-
-    st.divider()
-
-    # --- SECTION 3 : OUTILS DE FIN DE SAISON ---
-    st.markdown("### 🏁 Clôture de Saison 2026")
-    with st.expander("🚨 ZONE DE DANGER : Archiver les dossiers réglés", expanded=False):
-        st.warning("""
-            **Action irréversible :** Cela va basculer définitivement toutes les fiches marquées comme **'Paid'** vers le fichier d'archive. Les dossiers restés en 'Unpaid' resteront dans le tableau de bord actif.
-        """)
-        
-        if st.button("🔒 EXÉCUTER L'ARCHIVAGE DES CONTACTS RÉGLÉS", use_container_width=True, type="primary"):
-            df_f = charger_data_safe('contacts.json')
-            
-            if not df_f.empty:
-                if 'Paiement' not in df_f.columns:
-                    df_f['Paiement'] = "Unpaid"
-                
-                df_paid = df_f[df_f['Paiement'] == "Paid"].copy()
-                df_unpaid = df_f[df_f['Paiement'] != "Paid"].copy()
-                
-                if not df_paid.empty:
-                    # Rétention stricte du statut Paid dans les archives
-                    df_hist = charger_data_safe('archives_contacts_2026.json')
-                    df_new_hist = pd.concat([df_hist, df_paid], ignore_index=True)
-                    sauvegarder_data(df_new_hist, 'archives_contacts_2026.json')
-                    
-                    # Nettoyage du fichier actif
-                    sauvegarder_data(df_unpaid, 'contacts.json')
-                    st.success(f"✅ {len(df_paid)} fiches traitées et sécurisées dans 'archives_contacts_2026.json'.")
-                    st.rerun()
-                else:
-                    st.info("Aucun contact marqué 'Paid' à archiver pour le moment.")
-            else:
-                st.error("Le fichier de contacts actif est vide.")
+    afficher_page_archives(
+        charger_croisieres=lambda: charger_data_safe('croisieres_v2.json').to_dict('records'),
+        charger_etapes=lambda: charger_data_safe('etapes_v2.json').to_dict('records'),
+        charger_maintenance=lambda: charger_data_safe('maintenance.json'),
+        charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
+    )
 # =================================================================
 # --- 10. PAGE LOG (NOUVEAU MODÈLE — etapes_v2 / croisieres_v2) ---
 # =================================================================
