@@ -55,7 +55,8 @@ def _carte_prospect(interet, contacts_par_id, aujourdhui):
         if interet.get("notes"):
             st.caption(f"📝 {interet['notes']}")
 
-        c1, c2, c3 = st.columns([2, 1.3, 1.3])
+        c_label, c1, c2, c3 = st.columns([0.6, 1.6, 1.3, 1.3])
+        c_label.markdown("<div style='padding-top:8px;'>Date :</div>", unsafe_allow_html=True)
         nouvelle_date = c1.text_input(
             "Nouvelle date de relance (jj/mm/aaaa)",
             value=interet.get("prochaine_relance") or "",
