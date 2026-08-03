@@ -16,7 +16,7 @@ import streamlit as st
 from modele_voile import (
     croisieres_du_contact, interets_du_contact, sommes_percues,
     filtres_contact, tri_alphabetique, contact_correspond_recherche,
-    est_en_cours, est_classee,
+    est_en_cours, est_classee, fond_clair,
 )
 
 
@@ -28,10 +28,19 @@ def _initiales_couleur(contact):
     return palette[hash(cle) % len(palette)]
 
 
+COULEURS_BADGES_CONTACT = {
+    "🟢 En cours": "#2980B9",
+    "⭐ Habitué": "#F1C40F",
+    "⚪ Passé": "#7F8C8D",
+    "👻 Sans suite": "#95A5A6",
+}
+
+
 def _carte_contact(numero, contact, croisieres_c, interets_c):
     """Affiche une fiche contact dans un cadre épais (5px), avec toutes
     les infos et actions demandées."""
     couleur = _initiales_couleur(contact)
+    fond = fond_clair(couleur)
     badge_pref = "⭐ " if str(contact.get("habitue", "")).strip().lower() in ("oui", "true", "1") else ""
 
     filtres = filtres_contact(croisieres_c, interets_c)
@@ -45,19 +54,25 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
     if filtres["sans_suite"]:
         badges_auto.append("👻 Sans suite")
 
+    badges_html = "".join(
+        f'<span style="background:{COULEURS_BADGES_CONTACT.get(b, "#BDC3C7")}; color:white; '
+        f'border-radius:12px; padding:2px 10px; font-size:0.72rem; font-weight:bold; margin-right:5px;">{b}</span>'
+        for b in badges_auto
+    )
+
     total_percu = sommes_percues(croisieres_c)
 
     with st.container(border=False):
         st.markdown(
             f"""
-            <div style="border:5px solid {couleur}; border-radius:12px; padding:14px; margin-bottom:12px;">
+            <div style="border:5px solid {couleur}; border-radius:12px; padding:14px; margin-bottom:12px; background:{fond};">
                 <div style="display:flex; justify-content:space-between; align-items:baseline;">
-                    <b style="font-size:1.05rem;">#{numero} — {badge_pref}{contact.get('prenom','')} {contact.get('nom','')}</b>
+                    <b style="font-size:1.05rem; color:#2c3e50;">#{numero} — {badge_pref}{contact.get('prenom','')} {contact.get('nom','')}</b>
                 </div>
                 <div style="margin-top:4px; font-size:0.9rem; color:#555;">
                     📞 {contact.get('telephone') or '—'} &nbsp;|&nbsp; ✉️ {contact.get('email') or '—'}
                 </div>
-                <div style="margin-top:6px;">{' '.join(f'<span style="background:#eee; border-radius:6px; padding:2px 8px; font-size:0.75rem; margin-right:4px;">{b}</span>' for b in badges_auto)}</div>
+                <div style="margin-top:8px;">{badges_html}</div>
                 <div style="margin-top:8px; font-size:0.9rem;">
                     💰 <b>Total perçu : {total_percu:.0f} €</b> &nbsp;|&nbsp; 🧭 {len(croisieres_c)} navigation(s)
                 </div>
