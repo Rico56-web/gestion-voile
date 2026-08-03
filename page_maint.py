@@ -256,6 +256,11 @@ def afficher_page_maint(charger_maintenance, sauvegarder_maintenance,
                 border_color = "#27AE60" if est_fait else "#F39C12"
                 bg_color = "#EAFAF1" if est_fait else "#FEF5E7"
                 icon_stat = "✅" if est_fait else "⏳"
+                couleurs_type = {
+                    "Maintenance": "#3498DB", "Sécurité": "#E74C3C", "Port": "#9B59B6",
+                    "Assurances": "#16A085", "Autres": "#7F8C8D",
+                }
+                couleur_type = couleurs_type.get(row.get("Type", "Maintenance"), "#7F8C8D")
 
                 if st.session_state.maint_edit_id == idx:
                     with st.form(key=f"edit_maint_{idx}"):
@@ -282,13 +287,14 @@ def afficher_page_maint(charger_maintenance, sauvegarder_maintenance,
                     st.markdown(f"""
                         <div style="background-color:{bg_color}; border-left: 10px solid {border_color}; padding: 15px; border-radius: 10px; margin-bottom: 5px;">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-weight: bold; font-size: 1.1em;">{icon_stat} {row['Objet']}</span>
-                                <span style="color: #555;">📅 {row['Date']}</span>
+                                <span style="font-weight: bold; font-size: 1.1em;">{row['Objet']}</span>
+                                <span style="background:{border_color}; color:white; border-radius:12px; padding:2px 10px; font-size:0.75rem; font-weight:bold;">{icon_stat} {row['Statut']}</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; margin-top: 5px;">
-                                <small>Catégorie : <b>{row.get('Type', 'Maintenance')}</b></small>
-                                <small>Coût : <b>{row['M_Num']} €</b></small>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                                <span style="background:{couleur_type}; color:white; border-radius:10px; padding:2px 10px; font-size:0.75rem;">{row.get('Type', 'Maintenance')}</span>
+                                <span style="color: #555; font-size:0.85rem;">📅 {row['Date']}</span>
                             </div>
+                            <div style="margin-top:8px; font-size:1.05rem; font-weight:bold; color:#2c3e50;">💰 {row['M_Num']} €</div>
                         </div>
                     """, unsafe_allow_html=True)
                     if row.get("Notes"):
