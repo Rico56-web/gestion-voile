@@ -13,7 +13,7 @@ from datetime import date
 
 import streamlit as st
 
-from modele_voile import filtrer_temporel, trier_croisieres, noms_participants, couleur_croisiere
+from modele_voile import filtrer_temporel, trier_croisieres, noms_participants, couleur_croisiere, fond_clair
 
 OPTIONS_TRI = {
     "date_desc": "🗓️ Date (récent → ancien)",
@@ -21,6 +21,32 @@ OPTIONS_TRI = {
     "nom": "🔤 Nom",
     "prenom": "🔤 Prénom",
 }
+
+
+def _badges_statut(cr):
+    """Construit les badges colorés (Terminée/Payée/Annulée) pour une
+    croisière, en se basant sur le 1er participant (cas le plus courant)."""
+    participants = cr.get("participants", [])
+    if not participants:
+        return ""
+    p = participants[0]
+    badges = []
+    if p.get("annulee"):
+        badges.append(("❌ Annulée", "#C0392B"))
+    else:
+        if p.get("terminee"):
+            badges.append(("✅ Terminée", "#27AE60"))
+        else:
+            badges.append(("🟢 En cours", "#2980B9"))
+        if p.get("payee"):
+            badges.append(("💰 Payée", "#16A085"))
+        else:
+            badges.append(("⏳ À encaisser", "#F39C12"))
+    return "".join(
+        f'<span style="background:{c}; color:white; border-radius:12px; padding:2px 10px; '
+        f'font-size:0.72rem; font-weight:bold; margin-right:5px;">{txt}</span>'
+        for txt, c in badges
+    )
 
 
 def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger_contacts):
@@ -94,16 +120,20 @@ def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger
 
     for cr in croisieres_affichees:
         couleur = couleur_croisiere(cr)
+        fond = fond_clair(couleur)
         prix_total = sum(p.get("prix", 0) or 0 for p in cr.get("participants", []))
         nom_participants = noms_participants(cr, contacts_par_id)
         nom_croisiere = cr.get("nom_croisiere") or "(sans nom)"
+        badges = _badges_statut(cr)
 
         with st.container(border=False):
             st.markdown(
                 f"""
-                <div style="border-left:8px solid {couleur}; border-radius:8px; padding:10px 14px; margin-bottom:8px; background:#fafafa;">
-                    <b>{cr.get('date_debut','?')}</b> — {nom_participants} — {nom_croisiere}
-                    <br><span style="font-size:0.85rem; color:#555;">{cr.get('jours',1)} jour(s) · {prix_total:.0f} €</span>
+                <div style="border-left:10px solid {couleur}; border-radius:10px; padding:14px 16px; margin-bottom:10px; background:{fond};">
+                    <div style="font-size:1.05rem; font-weight:bold; color:#2c3e50;">📅 {cr.get('date_debut','?')}</div>
+                    <div style="font-size:0.95rem; margin-top:2px;">👤 {nom_participants}</div>
+                    <div style="font-size:0.9rem; color:#555; margin-top:2px;">⛵ {nom_croisiere} · {cr.get('jours',1)} jour(s) · <b>{prix_total:.0f} €</b></div>
+                    <div style="margin-top:8px;">{badges}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
