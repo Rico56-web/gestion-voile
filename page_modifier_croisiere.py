@@ -170,6 +170,12 @@ def _carte_participant(index, p, contacts_par_id, contacts, sauvegarder_contacts
         p["payee"] = c5.checkbox("💰 Payée", value=bool(p.get("payee")), key=f"payee_{index}")
         p["annulee"] = c6.checkbox("❌ Annulée", value=bool(p.get("annulee")), key=f"annulee_{index}")
 
+        if not p["payee"] and p["prix"] > 0 and p["acompte"] >= p["prix"]:
+            st.warning(
+                "⚠️ L'acompte versé couvre déjà tout le prix, mais 'Payée' n'est pas cochée. "
+                "Si c'est réglé, coche 'Payée'. Sinon, vérifie le montant de l'acompte."
+            )
+
         if autoriser_retrait:
             if st.button("🗑️ Retirer ce participant", key=f"retirer_{index}"):
                 st.session_state["participants_liste"].pop(index)
@@ -265,4 +271,3 @@ def afficher_page_modifier_croisiere(charger_croisieres, sauvegarder_croisieres,
         st.session_state.pop("participants_liste", None)
         st.session_state.page = "PLANNING"
         st.rerun()
-        
