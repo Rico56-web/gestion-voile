@@ -62,7 +62,7 @@ def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", e
         with st.form(key=f"form_log_{mode}"):
             c1, c2 = st.columns(2)
             if mode == "creation":
-                f_date = c1.date_input("Date", val_date)
+                f_date = c1.date_input("Date", val_date, format="DD/MM/YYYY")
             else:
                 f_date = c2.text_input("Date", value=val_date)
             f_nav = c2.text_input("Nom du Voyage / Croisière", value=val_nav, placeholder="ex: Gijón 2026")
