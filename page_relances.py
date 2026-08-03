@@ -88,11 +88,11 @@ def afficher_page_relances(charger_interets, sauvegarder_interets, charger_conta
         if action == "reporter":
             interets = reporter_relance(interets, interet_id, valeur)
             sauvegarder_interets(interets)
-            st.success("Relance reportée.")
+            st.toast(f"Relance reportée au {valeur}.", icon="🔄")
         elif action == "sans_suite":
             interets = marquer_sans_suite(interets, interet_id)
             sauvegarder_interets(interets)
-            st.success("Marqué sans suite.")
+            st.toast("Marqué sans suite.", icon="👻")
         st.rerun()
 
     aujourdhui = date.today()
