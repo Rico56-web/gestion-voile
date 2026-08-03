@@ -16,7 +16,7 @@ import streamlit as st
 
 from modele_voile import (
     trier_relances, relance_en_retard, relance_proche,
-    marquer_sans_suite, reporter_relance, parse_date_eu,
+    marquer_sans_suite, reporter_relance, parse_date_eu, fond_clair,
 )
 
 
@@ -29,19 +29,25 @@ def _carte_prospect(interet, contacts_par_id, aujourdhui):
     if en_retard:
         couleur, badge = "#E74C3C", "⚠️ EN RETARD"
     elif proche:
-        couleur, badge = "#F39C12", "🔔 Bientôt"
+        couleur, badge = "#F39C12", "🔔 BIENTÔT"
     else:
-        couleur, badge = "#7F8C8D", ""
+        couleur, badge = "#27AE60", "✅ À JOUR"
+
+    fond = fond_clair(couleur)
 
     with st.container(border=True):
         st.markdown(
             f"""
-            <div style="border-left:6px solid {couleur}; padding:4px 12px;">
-                <b style="font-size:1.05rem;">{nom_aff}</b>
-                <span style="float:right; color:{couleur}; font-weight:bold; font-size:0.85rem;">{badge}</span>
-                <br><small>🏢 {interet.get('societe','') or '—'} &nbsp;|&nbsp;
-                📅 Demande du {interet.get('date_demande') or '—'} &nbsp;|&nbsp;
-                🔔 Relance prévue le {interet.get('prochaine_relance') or '(non définie)'}</small>
+            <div style="border-left:8px solid {couleur}; border-radius:8px; padding:10px 14px; background:{fond};">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <b style="font-size:1.05rem; color:#2c3e50;">{nom_aff}</b>
+                    <span style="background:{couleur}; color:white; border-radius:12px; padding:3px 12px; font-size:0.72rem; font-weight:bold;">{badge}</span>
+                </div>
+                <div style="margin-top:6px; font-size:0.85rem; color:#555;">
+                    🏢 {interet.get('societe','') or '—'} &nbsp;|&nbsp;
+                    📅 Demande du {interet.get('date_demande') or '—'} &nbsp;|&nbsp;
+                    🔔 Relance prévue le {interet.get('prochaine_relance') or '(non définie)'}
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
