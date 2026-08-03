@@ -788,3 +788,39 @@ def fond_clair(couleur_hex):
     couleur_hex = couleur_hex.lstrip("#")
     r, g, b = int(couleur_hex[0:2], 16), int(couleur_hex[2:4], 16), int(couleur_hex[4:6], 16)
     return f"rgba({r}, {g}, {b}, 0.12)"
+
+
+# ---------------------------------------------------------------------
+# 16. Échéancier annuel des charges fixes (AJOUTÉ le 03/08/2026)
+# ---------------------------------------------------------------------
+
+def ajouter_mois(d, nb_mois):
+    """Ajoute nb_mois à une date, en gérant le changement d'année et les
+    fins de mois (ex: 31/01 + 1 mois -> 28/02, pas un jour invalide)."""
+    mois_total = d.month - 1 + nb_mois
+    annee = d.year + mois_total // 12
+    mois = mois_total % 12 + 1
+    dernier_jour_du_mois = calendar_dernier_jour(annee, mois)
+    jour = min(d.day, dernier_jour_du_mois)
+    return date(annee, mois, jour)
+
+
+def generer_echeancier(libelle, montant, frequence, date_depart, nb_echeances, type_charge="Port"):
+    """Génère une liste de fiches de charges fixes espacées dans le temps.
+    frequence : 'mensuelle' (+1 mois), 'trimestrielle' (+3 mois),
+    'annuelle' (+12 mois). Toutes les fiches sont créées avec le statut
+    'À prévoir' — à cocher 'Fait' au fur et à mesure, comme n'importe
+    quelle fiche MAINT existante."""
+    pas_mois = {"mensuelle": 1, "trimestrielle": 3, "annuelle": 12}.get(frequence, 1)
+    fiches = []
+    for i in range(nb_echeances):
+        d = ajouter_mois(date_depart, i * pas_mois)
+        fiches.append({
+            "Date": d.strftime("%d/%m/%Y"),
+            "Objet": f"{libelle} ({i + 1}/{nb_echeances})",
+            "M_Num": montant,
+            "Statut": "À prévoir",
+            "Type": type_charge,
+            "Notes": None,
+        })
+    return fiches
