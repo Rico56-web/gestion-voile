@@ -16,6 +16,7 @@ from page_stats import afficher_page_stats
 from page_fact import afficher_page_fact
 from page_relances import afficher_page_relances
 from page_maint import afficher_page_maint
+from page_log import afficher_page_log
 # =================================================================
 # --- CONFIGURATION & STYLE REGROUPÉS ---
 # =================================================================
