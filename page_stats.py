@@ -119,9 +119,10 @@ def _lignes_etapes(etapes_y):
     return pd.DataFrame(lignes)
 
 
-def _afficher_tableau_detail(cle, titre, df):
+def _afficher_tableau_detail(cle, titre, df, colonnes_total=None):
     """Affiche le tableau détaillé correspondant au pavé cliqué, avec un
-    bouton pour le refermer."""
+    bouton pour le refermer et une ligne de total en bas (sur les
+    colonnes numériques indiquées dans colonnes_total)."""
     st.divider()
     col_titre, col_fermer = st.columns([5, 1])
     col_titre.markdown(f"### 🔍 Détail — {titre}")
@@ -130,8 +131,23 @@ def _afficher_tableau_detail(cle, titre, df):
         st.rerun()
     if df.empty:
         st.info("Aucune donnée pour cette sélection.")
-    else:
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        return
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    if colonnes_total:
+        morceaux = []
+        for col in colonnes_total:
+            if col in df.columns:
+                total = pd.to_numeric(df[col], errors="coerce").sum()
+                unite = "NM" if col == "Milles" else ("h" if "H." in col or col.startswith("Heures") else "€")
+                morceaux.append(f"{col} : <b>{total:,.1f} {unite}</b>".replace(",", " "))
+        if morceaux:
+            st.markdown(
+                f"""<div style="text-align:right; background:#EBF5FB; padding:10px 16px;
+                border-radius:8px; margin-top:6px; color:#1a2a6c;">
+                {' &nbsp;|&nbsp; '.join(morceaux)}</div>""",
+                unsafe_allow_html=True,
+            )
 
 
 def afficher_page_stats(charger_croisieres, charger_etapes, charger_maintenance, charger_params, charger_contacts):
@@ -227,26 +243,26 @@ def afficher_page_stats(charger_croisieres, charger_etapes, charger_maintenance,
         participations = bilan["participations"]
         if tableau_actif == "sorties":
             df_detail = _lignes_participations([p for p in participations if (p.get("prix", 0) or 0) > 0], contacts_par_id)
-            _afficher_tableau_detail(tableau_actif, "Sorties de la saison", df_detail)
+            _afficher_tableau_detail(tableau_actif, "Sorties de la saison", df_detail, ["Prix (€)", "Encaissé (€)"])
         elif tableau_actif in ("h_moteur", "milles", "voile"):
             titres = {"h_moteur": "Heures moteur (livre de bord)", "milles": "Milles parcourus (livre de bord)", "voile": "Répartition voile/moteur (livre de bord)"}
-            _afficher_tableau_detail(tableau_actif, titres[tableau_actif], _lignes_etapes(etapes_y))
+            _afficher_tableau_detail(tableau_actif, titres[tableau_actif], _lignes_etapes(etapes_y), ["Milles", "H. Moteur", "H. Voile"])
         elif tableau_actif == "ca_prevu":
-            _afficher_tableau_detail(tableau_actif, "CA prévu — toutes les réservations", _lignes_participations(participations, contacts_par_id))
+            _afficher_tableau_detail(tableau_actif, "CA prévu — toutes les réservations", _lignes_participations(participations, contacts_par_id), ["Prix (€)"])
         elif tableau_actif == "percues":
             df_detail = _lignes_participations([p for p in participations if montant_encaisse(p) > 0], contacts_par_id)
-            _afficher_tableau_detail(tableau_actif, "Sommes perçues", df_detail)
+            _afficher_tableau_detail(tableau_actif, "Sommes perçues", df_detail, ["Encaissé (€)"])
         elif tableau_actif == "reste":
             df_detail = _lignes_participations(
                 [p for p in participations if (p.get("prix", 0) or 0) - montant_encaisse(p) > 0.01], contacts_par_id)
-            _afficher_tableau_detail(tableau_actif, "Reste à percevoir", df_detail)
+            _afficher_tableau_detail(tableau_actif, "Reste à percevoir", df_detail, ["Reste (€)"])
         elif tableau_actif == "dep_maint":
-            _afficher_tableau_detail(tableau_actif, "Dépenses de maintenance pure", df_pure_maint)
+            _afficher_tableau_detail(tableau_actif, "Dépenses de maintenance pure", df_pure_maint, ["M_Num"])
         elif tableau_actif == "charges_fixes":
-            _afficher_tableau_detail(tableau_actif, "Charges fixes réelles (Port, Assurance)", df_fixes_maint)
+            _afficher_tableau_detail(tableau_actif, "Charges fixes réelles (Port, Assurance)", df_fixes_maint, ["M_Num"])
         elif tableau_actif == "total_dep":
             df_total = pd.concat([df_pure_maint, df_fixes_maint], ignore_index=True) if not df_pure_maint.empty or not df_fixes_maint.empty else pd.DataFrame()
-            _afficher_tableau_detail(tableau_actif, "Toutes les dépenses de la saison", df_total)
+            _afficher_tableau_detail(tableau_actif, "Toutes les dépenses de la saison", df_total, ["M_Num"])
         elif tableau_actif == "solde_net":
             df_solde = pd.DataFrame([
                 {"Ligne": "Recettes", "Montant (€)": total_ca_display},
