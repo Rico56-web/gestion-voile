@@ -764,3 +764,18 @@ def etapes_entre_dates(etapes, date_min, date_max):
     ]
     resultat.sort(key=lambda e: parse_date_eu(e.get("date")) or date.min, reverse=True)
     return resultat
+
+
+def parser_date_flexible(valeur):
+    """Convertit une date qui peut être soit en millisecondes depuis 1970
+    (ancien format de maintenance.json/logbook.json, jamais migré), soit
+    en texte jj/mm/aaaa (format utilisé par les nouvelles fiches créées
+    depuis l'app). Renvoie un objet date, ou None si invalide/vide."""
+    if valeur is None:
+        return None
+    if isinstance(valeur, (int, float)):
+        try:
+            return (datetime(1970, 1, 1) + timedelta(milliseconds=valeur)).date()
+        except (ValueError, OverflowError):
+            return None
+    return parse_date_eu(valeur)
