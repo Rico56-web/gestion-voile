@@ -336,6 +336,7 @@ if st.session_state.page == "STATS":
         charger_etapes=lambda: charger_data_safe('etapes_v2.json').to_dict('records'),
         charger_maintenance=lambda: charger_data_safe('maintenance.json'),
         charger_params=charger_params,
+        charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
     )
 # =================================================================
 # --- 9. PAGE MAINT (heures moteur depuis etapes_v2) ---
