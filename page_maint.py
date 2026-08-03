@@ -20,7 +20,7 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-from modele_voile import derniere_lecture_compteur, parser_date_flexible
+from modele_voile import derniere_lecture_compteur, parser_date_flexible, generer_echeancier
 
 
 def to_f(v):
@@ -72,6 +72,56 @@ def _bouton_imprimer_fiche_maint(titre, date_str, details, statut):
     components.html(js, height=45)
 
 
+FREQUENCES = {"mensuelle": "Mensuelle", "trimestrielle": "Trimestrielle", "annuelle": "Annuelle"}
+
+
+def _section_echeancier(df_m, sauvegarder_maintenance):
+    """Génère d'un coup toutes les fiches d'une charge fixe récurrente
+    pour l'année (ex: 12 mensualités de port), avec aperçu avant
+    confirmation. Les fiches générées sont 'À prévoir', à cocher 'Fait'
+    au fur et à mesure comme n'importe quelle fiche MAINT existante."""
+    with st.expander("📅 Générer un échéancier annuel (charges fixes)"):
+        st.caption("Génère d'un coup toutes les échéances de l'année pour une charge récurrente (port, assurance...).")
+
+        with st.form("form_echeancier"):
+            c1, c2 = st.columns(2)
+            libelle = c1.text_input("Libellé", placeholder="ex: Place de port Crouesty")
+            type_charge = c2.selectbox("Catégorie", ["Port", "Assurances", "Maintenance", "Sécurité", "Autres"])
+
+            c3, c4, c5 = st.columns(3)
+            montant = c3.number_input("Montant par échéance (€)", min_value=0.0, step=10.0)
+            frequence = c4.selectbox("Fréquence", list(FREQUENCES.keys()), format_func=lambda f: FREQUENCES[f])
+            nb_echeances = c5.number_input("Nombre d'échéances", min_value=1, max_value=36, value=12, step=1)
+
+            date_depart = st.date_input("Date de la 1ère échéance", format="DD/MM/YYYY")
+
+            previsualiser = st.form_submit_button("👁️ Prévisualiser", use_container_width=True)
+
+        if previsualiser:
+            if not libelle.strip() or montant <= 0:
+                st.error("Merci de renseigner un libellé et un montant supérieur à 0.")
+            else:
+                st.session_state["echeancier_preview"] = generer_echeancier(
+                    libelle.strip(), montant, frequence, date_depart, int(nb_echeances), type_charge,
+                )
+                st.rerun()
+
+        preview = st.session_state.get("echeancier_preview")
+        if preview:
+            st.markdown(f"**Aperçu : {len(preview)} fiche(s) seront créées**")
+            st.dataframe(pd.DataFrame(preview), use_container_width=True, hide_index=True)
+            cb1, cb2 = st.columns(2)
+            if cb1.button("✅ Confirmer et créer ces fiches", use_container_width=True, type="primary"):
+                df_maj = pd.concat([df_m, pd.DataFrame(preview)], ignore_index=True)
+                sauvegarder_maintenance(df_maj)
+                st.session_state.pop("echeancier_preview")
+                st.toast(f"{len(preview)} fiche(s) créée(s) !", icon="📅")
+                st.rerun()
+            if cb2.button("❌ Annuler", use_container_width=True):
+                st.session_state.pop("echeancier_preview")
+                st.rerun()
+
+
 def afficher_page_maint(charger_maintenance, sauvegarder_maintenance,
                          charger_carburant, sauvegarder_carburant,
                          charger_etapes, charger_params, sauvegarder_params):
@@ -103,6 +153,8 @@ def afficher_page_maint(charger_maintenance, sauvegarder_maintenance,
         st.session_state.show_form_vidange = False
 
     st.markdown('<h2 style="text-align:center;">🛠️ Maintenance & Vidange</h2>', unsafe_allow_html=True)
+
+    _section_echeancier(df_m, sauvegarder_maintenance)
 
     # --- Tableau de bord vidange ---
     heures_restantes = params["prochaine_vidange"] - releve_h
