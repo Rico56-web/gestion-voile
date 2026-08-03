@@ -23,7 +23,7 @@ from datetime import date, timedelta
 import pandas as pd
 import streamlit as st
 
-from modele_voile import croisieres_entre_dates, etapes_entre_dates, noms_participants
+from modele_voile import croisieres_entre_dates, etapes_entre_dates, noms_participants, parser_date_flexible
 
 
 def _construire_excel(df_croisieres, df_etapes, df_maintenance):
@@ -83,10 +83,11 @@ def afficher_page_archives(charger_croisieres, charger_etapes, charger_maintenan
 
     if not df_maintenance.empty:
         df_maint_copy = df_maintenance.copy()
-        df_maint_copy["_dt"] = pd.to_datetime(df_maint_copy["Date"], dayfirst=True, errors="coerce")
+        df_maint_copy["_dt"] = df_maint_copy["Date"].apply(parser_date_flexible)
         df_maint_periode = df_maint_copy[
-            (df_maint_copy["_dt"].dt.date >= date_min) & (df_maint_copy["_dt"].dt.date <= date_max)
-        ].drop(columns=["_dt"])
+            df_maint_copy["_dt"].apply(lambda d: d is not None and date_min <= d <= date_max)
+        ].sort_values("_dt", ascending=False, key=lambda col: col.map(lambda d: d or date.min))
+        df_maint_periode = df_maint_periode.assign(Date=df_maint_periode["_dt"].apply(lambda d: d.strftime("%d/%m/%Y"))).drop(columns=["_dt"])
     else:
         df_maint_periode = pd.DataFrame()
 
