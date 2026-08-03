@@ -132,7 +132,7 @@ def afficher_page_maint(charger_maintenance, sauvegarder_maintenance,
     with st.expander("➕ Enregistrer un plein / Voir l'historique", expanded=False):
         with st.form("form_fuel_v2026"):
             c1, c2, c3 = st.columns(3)
-            d_f = c1.date_input("Date du plein")
+            d_f = c1.date_input("Date du plein", format="DD/MM/YYYY")
             l_f = c2.number_input("Litres", min_value=0.0, step=10.0)
             p_f = c3.number_input("Total TTC (€)", min_value=0.0, step=10.0)
             if st.form_submit_button("Enregistrer le plein", use_container_width=True):
@@ -164,7 +164,7 @@ def afficher_page_maint(charger_maintenance, sauvegarder_maintenance,
             st.subheader("🔧 Nouvelle Intervention")
             f_obj = st.text_input("Désignation")
             c1, c2, c3 = st.columns(3)
-            f_d = c1.date_input("Date", datetime.now())
+            f_d = c1.date_input("Date", datetime.now(), format="DD/MM/YYYY")
             f_m = c2.number_input("Montant (€)", min_value=0.0, step=10.0)
             f_t = c3.selectbox("Catégorie", ["Maintenance", "Sécurité", "Port", "Assurances", "Autres"])
             f_notes = st.text_area("Notes détaillées")
@@ -186,7 +186,7 @@ def afficher_page_maint(charger_maintenance, sauvegarder_maintenance,
         with st.form("form_vidange_moteur"):
             st.subheader("🛢️ Révision Moteur")
             c_v1, c_v2 = st.columns(2)
-            v_date = c_v1.date_input("Date", datetime.now())
+            v_date = c_v1.date_input("Date", datetime.now(), format="DD/MM/YYYY")
             v_heures = c_v2.number_input("Heures moteur actualisées", value=float(releve_h))
             st.markdown("**Check-list révision :**")
             col_c1, col_c2, col_c3 = st.columns(3)
