@@ -17,7 +17,7 @@ Sources de données :
 NE TOUCHE PAS à CONTACTS, MODIFIER_CONTACT, PLANNING, CROISIERES,
 MODIFIER_CROISIERE, MAINT, LOG, MEMOS, FACT, ARCHIVES.
 """
-from datetime import datetime
+from datetime import date, datetime
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -27,7 +27,7 @@ import streamlit as st
 from modele_voile import (
     bilan_financier_annee, repartition_par_societe, bilan_navigation_annee,
     recettes_par_mois, derniere_lecture_compteur, etapes_annee, fond_clair,
-    montant_encaisse,
+    montant_encaisse, parse_date_eu, parser_date_flexible,
 )
 
 ORDRE_MOIS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
@@ -45,20 +45,21 @@ def _depenses_maintenance_par_mois(df_maintenance, annee):
         return montants, df_vide, df_vide
 
     df = df_maintenance.copy()
-    df["dt_maint"] = pd.to_datetime(df.get("Date"), dayfirst=True, errors="coerce")
+    df["_date_obj"] = df.get("Date").apply(parser_date_flexible)
     df["M_Num"] = pd.to_numeric(df.get("M_Num"), errors="coerce").fillna(0.0)
-    df_y = df[df["dt_maint"].dt.year == annee].sort_values("dt_maint", ascending=False)
+    df_y = df[df["_date_obj"].apply(lambda d: d is not None and d.year == annee)]
+    df_y = df_y.sort_values("_date_obj", ascending=False, key=lambda col: col.map(lambda d: d or date.min))
 
     if df_y.empty:
         return montants, df_vide, df_vide
 
     for _, row in df_y.iterrows():
-        mois = row["dt_maint"].month
+        mois = row["_date_obj"].month
         montants[mois - 1] += row["M_Num"]
 
     mask_fixes = df_y.get("Type", pd.Series(dtype=str)).fillna("").str.lower().str.contains("port|assur", na=False)
-    df_pure = df_y[~mask_fixes].drop(columns=["dt_maint"])
-    df_fixes = df_y[mask_fixes].drop(columns=["dt_maint"])
+    df_pure = df_y[~mask_fixes].assign(Date=df_y["_date_obj"].apply(lambda d: d.strftime("%d/%m/%Y"))).drop(columns=["_date_obj"])
+    df_fixes = df_y[mask_fixes].assign(Date=df_y["_date_obj"].apply(lambda d: d.strftime("%d/%m/%Y"))).drop(columns=["_date_obj"])
 
     return montants, df_pure, df_fixes
 
@@ -86,9 +87,15 @@ def _pave_metrique(col, cle, emoji, label, valeur_str, couleur):
 
 def _lignes_participations(participations, contacts_par_id):
     """Transforme la liste de participations (dicts bruts) en lignes
-    lisibles pour un tableau, avec le nom du contact et le reste dû."""
+    lisibles pour un tableau, avec le nom du contact et le reste dû.
+    Triées par date décroissante (le plus récent en premier)."""
+    participations_triees = sorted(
+        participations,
+        key=lambda p: parse_date_eu(p.get("date_debut")) or date.min,
+        reverse=True,
+    )
     lignes = []
-    for p in participations:
+    for p in participations_triees:
         contact = contacts_par_id.get(p.get("contact_id"))
         nom_aff = f"{contact['prenom']} {contact['nom']}" if contact else "?"
         prix = p.get("prix", 0) or 0
@@ -107,7 +114,9 @@ def _lignes_participations(participations, contacts_par_id):
 
 
 def _lignes_etapes(etapes_y):
-    """Transforme la liste d'étapes de l'année en lignes lisibles."""
+    """Transforme la liste d'étapes de l'année en lignes lisibles,
+    triées par date décroissante (le plus récent en premier)."""
+    etapes_triees = sorted(etapes_y, key=lambda e: parse_date_eu(e.get("date")) or date.min, reverse=True)
     lignes = [{
         "Date": e.get("date", ""),
         "Navigation": e.get("navigation", ""),
@@ -115,7 +124,7 @@ def _lignes_etapes(etapes_y):
         "H. Moteur": e.get("heures_moteur", 0),
         "H. Voile": e.get("heures_voile", 0),
         "Météo": e.get("meteo", ""),
-    } for e in etapes_y]
+    } for e in etapes_triees]
     return pd.DataFrame(lignes)
 
 
