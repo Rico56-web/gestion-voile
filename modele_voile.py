@@ -654,4 +654,83 @@ def reporter_relance(interets, interet_id, nouvelle_date_str):
             i["prochaine_relance"] = nouvelle_date_str
         resultat.append(i)
     return resultat
-    
+
+
+# ---------------------------------------------------------------------
+# 14. Fonctions pour la page LOG (AJOUTÉ le 03/08/2026)
+# ---------------------------------------------------------------------
+
+def generer_id_etape():
+    """ID aléatoire pour une nouvelle étape créée depuis l'app (même
+    principe que generer_id_contact / generer_id_croisiere)."""
+    return f"e-{uuid.uuid4().hex[:8]}"
+
+
+def trouver_croisiere_id_pour_date(croisieres, d):
+    """Cherche une croisière dont la plage [date_debut, date_fin] couvre
+    la date donnée. Renvoie son id, ou None si aucune (= sortie perso,
+    comme pour les étapes #0, #1, #15 de la migration d'origine)."""
+    for cr in croisieres:
+        d_debut = parse_date_eu(cr.get("date_debut"))
+        if not d_debut:
+            continue
+        d_fin = date_fin_croisiere(cr)
+        if d_fin and d_debut <= d <= d_fin:
+            return cr["id"]
+    return None
+
+
+def suggestion_nom_navigation(etapes, aujourdhui, fenetre_jours=5):
+    """Propose le nom de la dernière étape enregistrée SI elle date de
+    moins de `fenetre_jours` jours (continuité probable de la même
+    croisière). Renvoie une chaîne vide sinon."""
+    if not etapes:
+        return ""
+    etapes_datees = [(parse_date_eu(e.get("date")), e) for e in etapes]
+    etapes_datees = [(d, e) for d, e in etapes_datees if d and d <= aujourdhui]
+    if not etapes_datees:
+        return ""
+    d_derniere, derniere = max(etapes_datees, key=lambda x: x[0])
+    ecart = (aujourdhui - d_derniere).days
+    if 0 <= ecart < fenetre_jours:
+        return derniere.get("navigation", "")
+    return ""
+
+
+def ajouter_etape(etapes, nouvelle_etape):
+    """Ajoute une étape à la liste (ne touche à aucune autre)."""
+    return list(etapes) + [nouvelle_etape]
+
+
+def modifier_etape(etapes, etape_id, champs_maj):
+    """Met à jour UNE étape (par id) avec les champs fournis, sans
+    toucher aux autres."""
+    resultat = []
+    for e in etapes:
+        if e["id"] == etape_id:
+            e = {**e, **champs_maj}
+        resultat.append(e)
+    return resultat
+
+
+def supprimer_etape(etapes, etape_id):
+    return [e for e in etapes if e["id"] != etape_id]
+
+
+def etapes_groupees_par_navigation(etapes):
+    """Groupe les étapes par nom de navigation, chaque groupe trié par
+    date décroissante ; les groupes eux-mêmes triés par date de la plus
+    récente étape du groupe (ordre chronologique inversé global)."""
+    groupes = {}
+    for e in etapes:
+        nom = e.get("navigation") or "Navigation Hors-Croisière"
+        groupes.setdefault(nom, []).append(e)
+
+    resultat = []
+    for nom, liste in groupes.items():
+        liste_triee = sorted(liste, key=lambda e: parse_date_eu(e.get("date")) or date.min, reverse=True)
+        date_max = max((parse_date_eu(e.get("date")) or date.min) for e in liste_triee)
+        resultat.append((nom, liste_triee, date_max))
+
+    resultat.sort(key=lambda x: x[2], reverse=True)
+    return [(nom, liste) for nom, liste, _ in resultat]
