@@ -734,3 +734,33 @@ def etapes_groupees_par_navigation(etapes):
 
     resultat.sort(key=lambda x: x[2], reverse=True)
     return [(nom, liste) for nom, liste, _ in resultat]
+
+
+# ---------------------------------------------------------------------
+# 15. Fonctions pour la page ARCHIVES (AJOUTÉ le 03/08/2026)
+# ---------------------------------------------------------------------
+# Principe : on ne déplace JAMAIS rien. "Archiver" = juste filtrer et
+# consulter par période (année ou plage de dates), et pouvoir exporter
+# en Excel. Les contacts ne sont jamais filtrés ici : ce sont des
+# identités permanentes, pas des éléments d'une saison.
+
+def croisieres_entre_dates(croisieres, date_min, date_max):
+    """Croisières dont la date de début tombe dans [date_min, date_max]
+    (inclus). Triées de la plus récente à la plus ancienne."""
+    resultat = [
+        cr for cr in croisieres
+        if (d := parse_date_eu(cr.get("date_debut"))) and date_min <= d <= date_max
+    ]
+    resultat.sort(key=lambda cr: parse_date_eu(cr.get("date_debut")) or date.min, reverse=True)
+    return resultat
+
+
+def etapes_entre_dates(etapes, date_min, date_max):
+    """Étapes du livre de bord dans [date_min, date_max] (inclus),
+    triées de la plus récente à la plus ancienne."""
+    resultat = [
+        e for e in etapes
+        if (d := parse_date_eu(e.get("date"))) and date_min <= d <= date_max
+    ]
+    resultat.sort(key=lambda e: parse_date_eu(e.get("date")) or date.min, reverse=True)
+    return resultat
