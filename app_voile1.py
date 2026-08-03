@@ -71,7 +71,7 @@ def charger_data(file):
             content_str = base64.b64encode(b"[]").decode('utf-8') if not content_b64 else content_b64
             decoded_bytes = base64.b64decode(content_str)
             import io
-            df = pd.read_json(io.BytesIO(decoded_bytes), orient="records")
+            df = pd.read_json(io.BytesIO(decoded_bytes), orient="records", convert_dates=False)
             return df
         else:
             st.error(f"Erreur GitHub ({res.status_code}) en chargeant {file} : {res.json().get('message', res.text)}")
