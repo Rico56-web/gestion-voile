@@ -579,27 +579,6 @@
         ]
     },
     {
-        "id":"cr-9af8cf73",
-        "nom_croisiere":"(\u00e0 d\u00e9finir)",
-        "date_debut":"17\/08\/2026",
-        "jours":5,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-67f29042",
-                "societe":"CLICK",
-                "prix":676.0,
-                "acompte":676.0,
-                "terminee":false,
-                "payee":true,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-a67aca2d",
         "nom_croisiere":"location perso mai 2026",
         "date_debut":"05\/09\/2026",
@@ -842,6 +821,27 @@
                 "societe":"PERSO",
                 "prix":666.0,
                 "acompte":0.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-9af8cf73",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"17\/08\/2026",
+        "jours":5,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-67f29042",
+                "societe":"CLICK",
+                "prix":676.0,
+                "acompte":676.0,
                 "terminee":false,
                 "payee":false,
                 "annulee":false,
