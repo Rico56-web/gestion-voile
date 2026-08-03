@@ -549,14 +549,6 @@ if st.session_state.page == "LOG":
     )
 
 
-    # --- D. EXPORT EXCEL/CSV ---
-    if not df_log.empty:
-        st.divider()
-        csv = df_log.to_csv(index=False).encode('utf-8-sig')
-        st.download_button(label="📥 Télécharger le Livre de Bord complet (.CSV)", data=csv, file_name='livre_de_bord_vesta.csv', mime='text/csv', use_container_width=True)
-
-
-
 
 
 
