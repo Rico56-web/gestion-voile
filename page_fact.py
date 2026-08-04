@@ -214,7 +214,7 @@ def _module_envoi_cmn(croisieres, contacts_par_id, envoyer_email):
                 with st.spinner(f"Envoi sécurisé du relevé à {email_destinataire}..."):
                     succes = envoyer_email(corps_html, mois_actuel, destinataire=email_destinataire)
                     if succes:
-                        st.success(f"Le relevé a été envoyé à {email_destinataire} !")
+                        st.toast(f"Le relevé a été envoyé à {email_destinataire} !", icon="📬")
                         st.session_state.preparer_mail_cmn = False
                         st.balloons()
                         st.rerun()
