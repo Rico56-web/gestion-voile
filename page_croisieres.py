@@ -64,7 +64,7 @@ def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger
         cid = st.session_state.pop("croisiere_id_a_supprimer")
         croisieres = [cr for cr in croisieres if cr["id"] != cid]
         sauvegarder_croisieres(croisieres)
-        st.success("Croisière supprimée.")
+        st.toast("Croisière supprimée.", icon="🗑️")
         st.rerun()
 
     if st.button("➕ Nouvelle croisière", use_container_width=True):
