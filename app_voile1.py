@@ -168,7 +168,7 @@ st.markdown("""<style>
 </style>""", unsafe_allow_html=True)
 
 if not st.session_state.authenticated:
-    st.markdown('<div class="main-header">⚓ VESTA 2026</div>', unsafe_allow_html=True)
+ st.markdown('<div class="main-header">⚓ VESTA Gestion</div>', unsafe_allow_html=True)
     pw = st.text_input("Code d'accès :", type="password")
     if st.button("ACCÉDER", use_container_width=True):
         if pw == "Skipper2026":
@@ -177,7 +177,7 @@ if not st.session_state.authenticated:
         else: st.error("Code incorrect.")
     st.stop()
 
-st.markdown('<div class="main-header">⚓ VESTA 2026</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">⚓ VESTA Gestion</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=True)
 
 # =================================================================
