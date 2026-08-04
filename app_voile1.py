@@ -401,27 +401,27 @@ if st.session_state.page == "RELANCES":
 # --- FONCTION COMPLÉMENTAIRE D'ENVOI DE MAIL ---
 # =================================================================
 def envoyer_email_facturation_cmn(corps_texte, mois_annee, destinataire=None):
-    """Gère l'envoi de l'email via le protocole sécurisé TLS."""
+    """Gère l'envoi de l'email via le protocole sécurisé TLS, avec une copie automatique."""
     try:
-        # Récupération sécurisée des accès dans les secrets Streamlit
         cfg = st.secrets["email"]
         
-        # Si aucun destinataire n'est spécifié, on prend l'officiel des secrets
         if destinataire is None:
             destinataire = cfg["email_destinataire"]
+        
+        copie_auto = "eric.clavreul@gmail.com"
         
         msg = MIMEMultipart()
         msg['From'] = cfg["smtp_user"]
         msg['To'] = destinataire
+        msg['Cc'] = copie_auto
         msg['Subject'] = f"🧾 Facturation Vesta Skipper - Prestations CMN ({mois_annee})"
         
         msg.attach(MIMEText(corps_texte, 'html'))
         
-        # Connexion sécurisée au serveur
         server = smtplib.SMTP(cfg["smtp_server"], int(cfg["smtp_port"]))
-        server.starttls()  # Chiffrement de la connexion
+        server.starttls()
         server.login(cfg["smtp_user"], cfg["smtp_password"])
-        server.sendmail(cfg["smtp_user"], destinataire, msg.as_string())
+        server.sendmail(cfg["smtp_user"], [destinataire, copie_auto], msg.as_string())
         server.quit()
         return True
     except Exception as e:
