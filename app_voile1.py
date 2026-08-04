@@ -195,7 +195,15 @@ page_choisie = col_page.selectbox(
 )
 if page_choisie != st.session_state.page:
     changer_page(page_choisie)
-
+    
+THEME_COULEURS = {"🧭 Navigation": "#2980B9", "👥 Gestion": "#27AE60", "🛠️ Bord": "#E67E22"}
+couleur_theme = THEME_COULEURS[theme_choisi]
+st.markdown(
+    f"""<div style="background:{couleur_theme}; color:white; padding:8px 16px; border-radius:8px;
+    margin-top:6px; text-align:center; font-weight:bold;">
+    {theme_choisi} &nbsp;→&nbsp; {icones[st.session_state.page]} {st.session_state.page}</div>""",
+    unsafe_allow_html=True,
+)
 # 2. Barre de navigation latérale (Sidebar)
 with st.sidebar:
     st.markdown("""
