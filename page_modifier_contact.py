@@ -57,7 +57,7 @@ def _section_photos(contact, sauvegarder_contacts, charger_contacts):
                     c = _trouver_contact(contacts, contact["id"])
                     c["photos"] = [p for p in c.get("photos", []) if p != chemin]
                     sauvegarder_contacts(_sauvegarder_un_contact(contacts, c))
-                    st.success("Photo supprimée.")
+                    st.toast("Photo supprimée.", icon="🗑️")
                     st.rerun()
 
     if len(photos) < MAX_PHOTOS:
@@ -75,7 +75,7 @@ def _section_photos(contact, sauvegarder_contacts, charger_contacts):
                     c = _trouver_contact(contacts, contact["id"])
                     c.setdefault("photos", []).append(nouveau_chemin)
                     sauvegarder_contacts(_sauvegarder_un_contact(contacts, c))
-                    st.success("Photo envoyée. Elle apparaîtra après le redéploiement automatique de l'app (~1 minute).")
+                    st.toast("Photo envoyée. Elle apparaîtra après le redéploiement automatique de l'app (~1 minute).", icon="📸")
                     st.rerun()
     else:
         st.caption(f"Maximum {MAX_PHOTOS} photos atteint. Supprime-en une pour en ajouter une autre.")
@@ -141,7 +141,7 @@ def afficher_page_modifier_contact(charger_contacts, sauvegarder_contacts):
             contacts_mis_a_jour = _sauvegarder_un_contact(contacts, contact_a_sauver)
             sauvegarder_contacts(contacts_mis_a_jour)
             st.session_state.edit_contact_id = contact_a_sauver["id"]
-            st.success("Contact enregistré.")
+            st.toast("Contact enregistré.", icon="💾")
             st.rerun()
 
     st.divider()
