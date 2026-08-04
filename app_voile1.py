@@ -193,8 +193,6 @@ for i, name in enumerate(pages_du_theme):
     if cols_pages[i].button(f"{icones[name]} {name}", key=f"nav_{name}", use_container_width=True, type="primary" if is_active else "secondary"):
         changer_page(name)
 
-</parameter>
-
 # 2. Barre de navigation latérale (Sidebar)
 with st.sidebar:
     st.markdown("""
