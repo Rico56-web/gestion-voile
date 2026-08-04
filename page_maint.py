@@ -201,7 +201,7 @@ def afficher_page_maint(charger_maintenance, sauvegarder_maintenance,
                     new_f = {"Date": d_f.strftime("%d/%m/%Y"), "Litres": l_f, "Prix": p_f, "PU": round(p_f / l_f, 3)}
                     df_carb = pd.concat([df_carb, pd.DataFrame([new_f])], ignore_index=True)
                     sauvegarder_carburant(df_carb)
-                    st.success("Plein enregistré !")
+                    st.toast("Plein enregistré !", icon="⛽")
                     st.rerun()
                 else:
                     st.error("Le nombre de litres doit être supérieur à 0.")
