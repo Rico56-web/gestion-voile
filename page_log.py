@@ -26,8 +26,16 @@ import streamlit as st
 from modele_voile import (
     generer_id_etape, trouver_croisiere_id_pour_date, suggestion_nom_navigation,
     ajouter_etape, modifier_etape, supprimer_etape, etapes_groupees_par_navigation,
-    derniere_lecture_compteur, parse_date_eu,
+    derniere_lecture_compteur, parse_date_eu, fond_clair,
 )
+
+PALETTE_NAVIGATION = ["#2980B9", "#27AE60", "#8E44AD", "#D35400", "#16A085", "#C0392B", "#2C3E50", "#E67E22"]
+
+
+def _couleur_navigation(nom_nav):
+    """Couleur stable par nom de navigation (même principe que pour les
+    contacts), pour distinguer visuellement chaque voyage d'un coup d'œil."""
+    return PALETTE_NAVIGATION[hash(nom_nav) % len(PALETTE_NAVIGATION)]
 
 
 def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", etape_id=None):
@@ -149,11 +157,13 @@ def afficher_page_log(charger_etapes, sauvegarder_etapes, charger_croisieres):
         groupes = etapes_groupees_par_navigation(etapes)
 
         for nom_nav, liste in groupes:
+            couleur_nav = _couleur_navigation(nom_nav)
+            fond_nav = fond_clair(couleur_nav)
             t_mil = sum(e.get("milles", 0) or 0 for e in liste)
             st.markdown(
                 f"""
-                <div style="background:#2c3e50; color:white; padding:10px; border-radius:8px; margin-top:15px; border-left: 5px solid #3498db;">
-                    <b>🚢 {nom_nav}</b> | Distance Totale Voyage : {t_mil:.1f} NM
+                <div style="background:{couleur_nav}; color:white; padding:10px 14px; border-radius:8px; margin-top:15px;">
+                    <b>🚢 {nom_nav}</b> &nbsp;|&nbsp; Distance Totale Voyage : {t_mil:.1f} NM &nbsp;|&nbsp; {len(liste)} étape(s)
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -165,7 +175,7 @@ def afficher_page_log(charger_etapes, sauvegarder_etapes, charger_croisieres):
                     with c_txt:
                         st.markdown(
                             f"""
-                            <div style="background:white; border-left:4px solid #bdc3c7; padding:8px 15px; border-bottom:1px solid #eee; color: black;">
+                            <div style="background:{fond_nav}; border-left:6px solid {couleur_nav}; padding:8px 15px; border-radius:0 8px 8px 0; margin-bottom:2px; color: black;">
                                 <b>📅 {e.get('date','')}</b> | ⚙️ {e.get('heures_moteur',0):.1f}h Mot. | ⛵ {e.get('heures_voile',0):.1f}h Voile | <b>{e.get('milles',0):.1f} NM</b><br>
                                 <small style="color:#34495e;">📍 Cond. Météo : {e.get('meteo') or '-'} | {e.get('notes') or ''}</small>
                             </div>
