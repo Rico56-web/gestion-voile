@@ -824,3 +824,16 @@ def generer_echeancier(libelle, montant, frequence, date_depart, nb_echeances, t
             "Notes": None,
         })
     return fiches
+
+
+def contact_existant_similaire(contacts, prenom, nom):
+    """Cherche un contact dont le prénom ET le nom correspondent EXACTEMENT
+    (à la casse et aux espaces près) à ceux fournis. Renvoie ce contact,
+    ou None si aucun ne correspond. Sert à avertir avant de créer un
+    doublon involontaire — sans jamais bloquer, puisque deux personnes
+    différentes peuvent légitimement porter le même nom."""
+    p, n = prenom.strip().upper(), nom.strip().upper()
+    for c in contacts:
+        if (c.get("prenom") or "").strip().upper() == p and (c.get("nom") or "").strip().upper() == n:
+            return c
+    return None
