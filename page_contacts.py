@@ -178,11 +178,11 @@ def afficher_page_contacts(charger_contacts, charger_croisieres, charger_interet
         # on ne fait jamais confiance uniquement à l'interface) : on
         # n'autorise la suppression que si ce contact n'a AUCUNE croisière.
         if croisieres_du_contact(croisieres, cid):
-            st.error("Suppression refusée : ce contact a déjà navigué.")
+            st.toast("Suppression refusée : ce contact a déjà navigué.", icon="🔒")
         else:
             contacts = [c for c in contacts if c["id"] != cid]
             sauvegarder_contacts(contacts)
-            st.success("Contact supprimé.")
+            st.toast("Contact supprimé.", icon="🗑️")
         st.rerun()
 
     # --- Barre de recherche + filtres + nouveau contact ---
