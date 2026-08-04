@@ -135,7 +135,16 @@ def afficher_page_planning(charger_croisieres, charger_etapes, charger_contacts,
     """Point d'entrée de la page. Les fonctions de chargement sont
     injectées depuis app_voile1.py, comme pour les autres pages migrées."""
 
-    st.markdown("## ⚓ Tableau de Bord - Port Crouesty")
+    st.markdown(
+        """
+        <div style="background: linear-gradient(135deg, #1a2a6c, #2980B9); color:white; padding:22px 24px;
+        border-radius:14px; margin-bottom:16px; text-align:center; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
+            <div style="font-size:1.7rem; font-weight:bold;">⚓ Tableau de Bord VESTA</div>
+            <div style="font-size:0.95rem; color:#dbe4ff; margin-top:4px;">Port Crouesty — Bonne navigation !</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     _widget_meteo()
 
     croisieres = charger_croisieres()
