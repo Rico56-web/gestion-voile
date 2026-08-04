@@ -495,27 +495,6 @@
         ]
     },
     {
-        "id":"cr-b31c5aba",
-        "nom_croisiere":"(\u00e0 d\u00e9finir)",
-        "date_debut":"23\/06\/2026",
-        "jours":1,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-f4c4445e",
-                "societe":"VOG",
-                "prix":35.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":true,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-0d5534d9",
         "nom_croisiere":"Sortie 2 jours vers belle \u00eele",
         "date_debut":"12\/07\/2026",
