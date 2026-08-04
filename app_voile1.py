@@ -147,17 +147,17 @@ date_bandeau = f"&#128197; {jours_fr[now.weekday()]} {now.day} {mois_fr[now.mont
 
 st.markdown("""<style>
 .main-header {
-    font-size: 2.1rem;
+    font-size: 1.9rem;
     font-weight: 800;
     text-align: center;
-    margin-bottom: 5px;
-    background: linear-gradient(270deg, #1a2a6c, #2980B9, #16A085, #2980B9, #1a2a6c);
+    color: white;
+    padding: 14px 20px;
+    border-radius: 14px;
+    margin-bottom: 8px;
+    background: linear-gradient(270deg, #1a2a6c, #16A085, #F39C12, #1a2a6c);
     background-size: 400% 400%;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    animation: degradeVesta 8s ease infinite;
-    text-shadow: 0 2px 8px rgba(26,42,108,0.15);
+    animation: degradeVesta 10s ease infinite;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 @keyframes degradeVesta {
     0% { background-position: 0% 50%; }
