@@ -168,12 +168,32 @@ st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=
 # =================================================================
 menu = ["PLANNING","CROISIERES","CONTACTS","RELANCES","STATS", "MAINT", "LOG", "MEMOS", "FACT"]
 icones = {"PLANNING": "📅", "CROISIERES": "⛵", "RELANCES": "🔔", "CONTACTS": "👤", "STATS": "📊", "MAINT": "🛠️", "LOG": "📖", "MEMOS": "📝", "FACT": "📑"}
-# 1. Barre de navigation horizontale (Haut)
-cols_nav = st.columns(len(menu))
-for i, name in enumerate(menu):
+# 1. Barre de navigation horizontale (Haut) — 2 niveaux, pensée mobile
+THEMES = {
+    "🧭 Navigation": ["PLANNING", "CROISIERES", "LOG"],
+    "👥 Gestion": ["CONTACTS", "RELANCES", "FACT"],
+    "🛠️ Bord": ["MAINT", "STATS", "MEMOS"],
+}
+
+theme_de_la_page_active = next((t for t, pages in THEMES.items() if st.session_state.page in pages), "🧭 Navigation")
+if "theme_selectionne" not in st.session_state or st.session_state.page in sum(THEMES.values(), []):
+    st.session_state.theme_selectionne = theme_de_la_page_active
+
+cols_theme = st.columns(3)
+for i, theme in enumerate(THEMES):
+    actif = st.session_state.theme_selectionne == theme
+    if cols_theme[i].button(theme, key=f"theme_{theme}", use_container_width=True, type="primary" if actif else "secondary"):
+        st.session_state.theme_selectionne = theme
+        st.rerun()
+
+pages_du_theme = THEMES[st.session_state.theme_selectionne]
+cols_pages = st.columns(len(pages_du_theme))
+for i, name in enumerate(pages_du_theme):
     is_active = st.session_state.page == name
-    if cols_nav[i].button(f"{icones[name]}\n{name}", key=f"nav_{name}", use_container_width=True, type="primary" if is_active else "secondary"):
+    if cols_pages[i].button(f"{icones[name]} {name}", key=f"nav_{name}", use_container_width=True, type="primary" if is_active else "secondary"):
         changer_page(name)
+
+</parameter>
 
 # 2. Barre de navigation latérale (Sidebar)
 with st.sidebar:
