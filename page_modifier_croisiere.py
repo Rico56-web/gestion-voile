@@ -102,7 +102,7 @@ def _creer_et_choisir_contact(index, p, prenom, nom, sauvegarder_contacts, charg
     tous_contacts.append(nouveau)
     sauvegarder_contacts(tous_contacts)
     p["contact_id"] = nouveau["id"]
-    st.success(f"Contact {prenom} {nom} créé et choisi.")
+    st.toast(f"Contact {prenom} {nom} créé et choisi.", icon="👤")
     st.rerun()
 
 
@@ -295,7 +295,7 @@ def afficher_page_modifier_croisiere(charger_croisieres, sauvegarder_croisieres,
             sauvegarder_croisieres(croisieres_mises_a_jour)
             st.session_state.pop("participants_source_id", None)
             st.session_state.pop("participants_liste", None)
-            st.success("Croisière enregistrée.")
+            st.toast("Croisière enregistrée.", icon="💾")
             st.session_state.page = "PLANNING"
             st.rerun()
 
