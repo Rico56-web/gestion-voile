@@ -135,21 +135,29 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
             st.session_state.page = "MODIFIER_CONTACT"
             st.rerun()
 
-        cle_confirm = f"confirm_del_{contact['id']}"
-        if cle_confirm not in st.session_state:
-            if cb2.button(f"🗑️ Supprimer #{numero}", key=f"del_{contact['id']}", use_container_width=True):
-                st.session_state[cle_confirm] = True
-                st.rerun()
+        a_navigue = len(croisieres_c) > 0
+        if a_navigue:
+            cb2.button(
+                f"🔒 A navigué ({len(croisieres_c)}) — suppr. impossible",
+                key=f"del_bloque_{contact['id']}", use_container_width=True, disabled=True,
+            )
+            st.caption("ℹ️ Ce contact a déjà navigué avec toi — pour préserver l'historique (croisières, livre de bord, statistiques), sa fiche ne peut pas être supprimée.")
         else:
-            st.warning(f"Confirmer la suppression de {contact.get('prenom')} {contact.get('nom')} ?")
-            cx, cy = st.columns(2)
-            if cx.button("✅ Oui, supprimer", key=f"y_{contact['id']}", use_container_width=True):
-                st.session_state.pop(cle_confirm)
-                st.session_state.contact_id_a_supprimer = contact["id"]
-                st.rerun()
-            if cy.button("❌ Annuler", key=f"n_{contact['id']}", use_container_width=True):
-                st.session_state.pop(cle_confirm)
-                st.rerun()
+            cle_confirm = f"confirm_del_{contact['id']}"
+            if cle_confirm not in st.session_state:
+                if cb2.button(f"🗑️ Supprimer #{numero}", key=f"del_{contact['id']}", use_container_width=True):
+                    st.session_state[cle_confirm] = True
+                    st.rerun()
+            else:
+                st.warning(f"Confirmer la suppression de {contact.get('prenom')} {contact.get('nom')} ?")
+                cx, cy = st.columns(2)
+                if cx.button("✅ Oui, supprimer", key=f"y_{contact['id']}", use_container_width=True):
+                    st.session_state.pop(cle_confirm)
+                    st.session_state.contact_id_a_supprimer = contact["id"]
+                    st.rerun()
+                if cy.button("❌ Annuler", key=f"n_{contact['id']}", use_container_width=True):
+                    st.session_state.pop(cle_confirm)
+                    st.rerun()
 
 
 def afficher_page_contacts(charger_contacts, charger_croisieres, charger_interets, sauvegarder_contacts):
@@ -166,9 +174,15 @@ def afficher_page_contacts(charger_contacts, charger_croisieres, charger_interet
     # --- Suppression différée (demandée au tour précédent) ---
     if st.session_state.get("contact_id_a_supprimer"):
         cid = st.session_state.pop("contact_id_a_supprimer")
-        contacts = [c for c in contacts if c["id"] != cid]
-        sauvegarder_contacts(contacts)
-        st.success("Contact supprimé.")
+        # Double vérification (le bouton est déjà désactivé côté fiche, mais
+        # on ne fait jamais confiance uniquement à l'interface) : on
+        # n'autorise la suppression que si ce contact n'a AUCUNE croisière.
+        if croisieres_du_contact(croisieres, cid):
+            st.error("Suppression refusée : ce contact a déjà navigué.")
+        else:
+            contacts = [c for c in contacts if c["id"] != cid]
+            sauvegarder_contacts(contacts)
+            st.success("Contact supprimé.")
         st.rerun()
 
     # --- Barre de recherche + filtres + nouveau contact ---
