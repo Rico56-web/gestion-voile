@@ -168,7 +168,7 @@ st.markdown(f'<div class="date-header">{date_bandeau}</div>', unsafe_allow_html=
 # =================================================================
 menu = ["PLANNING","CROISIERES","CONTACTS","RELANCES","STATS", "MAINT", "LOG", "MEMOS", "FACT"]
 icones = {"PLANNING": "📅", "CROISIERES": "⛵", "RELANCES": "🔔", "CONTACTS": "👤", "STATS": "📊", "MAINT": "🛠️", "LOG": "📖", "MEMOS": "📝", "FACT": "📑"}
-# 1. Barre de navigation horizontale (Haut) — 2 niveaux, pensée mobile
+# 1. Barre de navigation horizontale (Haut) — menus déroulants, compacts sur mobile
 THEMES = {
     "🧭 Navigation": ["PLANNING", "CROISIERES", "LOG"],
     "👥 Gestion": ["CONTACTS", "RELANCES", "FACT"],
@@ -179,19 +179,22 @@ theme_de_la_page_active = next((t for t, pages in THEMES.items() if st.session_s
 if "theme_selectionne" not in st.session_state or st.session_state.page in sum(THEMES.values(), []):
     st.session_state.theme_selectionne = theme_de_la_page_active
 
-cols_theme = st.columns(3)
-for i, theme in enumerate(THEMES):
-    actif = st.session_state.theme_selectionne == theme
-    if cols_theme[i].button(theme, key=f"theme_{theme}", use_container_width=True, type="primary" if actif else "secondary"):
-        st.session_state.theme_selectionne = theme
-        st.rerun()
+col_theme, col_page = st.columns(2)
+theme_choisi = col_theme.selectbox("Thème", list(THEMES.keys()),
+                                    index=list(THEMES.keys()).index(st.session_state.theme_selectionne),
+                                    key="select_theme", label_visibility="collapsed")
+st.session_state.theme_selectionne = theme_choisi
 
-pages_du_theme = THEMES[st.session_state.theme_selectionne]
-cols_pages = st.columns(len(pages_du_theme))
-for i, name in enumerate(pages_du_theme):
-    is_active = st.session_state.page == name
-    if cols_pages[i].button(f"{icones[name]} {name}", key=f"nav_{name}", use_container_width=True, type="primary" if is_active else "secondary"):
-        changer_page(name)
+pages_du_theme = THEMES[theme_choisi]
+page_par_defaut = st.session_state.page if st.session_state.page in pages_du_theme else pages_du_theme[0]
+page_choisie = col_page.selectbox(
+    "Page", pages_du_theme,
+    index=pages_du_theme.index(page_par_defaut),
+    format_func=lambda name: f"{icones[name]} {name}",
+    key="select_page", label_visibility="collapsed",
+)
+if page_choisie != st.session_state.page:
+    changer_page(page_choisie)
 
 # 2. Barre de navigation latérale (Sidebar)
 with st.sidebar:
