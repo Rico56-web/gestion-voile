@@ -25,6 +25,7 @@ import streamlit as st
 from modele_voile import (
     generer_id_croisiere, generer_id_contact, rechercher_contacts,
     valider_croisiere, nb_personnes_a_bord, CAPACITE_MAX_BATEAU,
+    contact_existant_similaire,
 )
 
 SOCIETES = ["PERSO", "CLICK", "CMN", "VOG"]
@@ -88,6 +89,23 @@ def _initialiser_liste_participants(croisiere_existante):
     return st.session_state["participants_liste"]
 
 
+def _creer_et_choisir_contact(index, p, prenom, nom, sauvegarder_contacts, charger_contacts):
+    """Crée un nouveau contact et le choisit pour ce participant. Centralisé
+    ici car appelé depuis 2 endroits : création directe (pas de doublon
+    détecté) et création forcée après confirmation d'un doublon."""
+    nouveau = {
+        "id": generer_id_contact(), "prenom": prenom.strip(), "nom": nom.strip(),
+        "telephone": "", "email": "", "adresse": "", "notes": "",
+        "habitue": "Non", "photos": [],
+    }
+    tous_contacts = charger_contacts()
+    tous_contacts.append(nouveau)
+    sauvegarder_contacts(tous_contacts)
+    p["contact_id"] = nouveau["id"]
+    st.success(f"Contact {prenom} {nom} créé et choisi.")
+    st.rerun()
+
+
 def _zone_choix_contact(index, p, contacts, sauvegarder_contacts, charger_contacts):
     """Zone de recherche/création de contact pour LE participant numéro
     `index`. Modifie p['contact_id'] directement (p est déjà l'élément de
@@ -115,21 +133,36 @@ def _zone_choix_contact(index, p, contacts, sauvegarder_contacts, charger_contac
             np_prenom = st.text_input("Prénom", key=f"np_prenom_{index}")
             np_nom = st.text_input("Nom", key=f"np_nom_{index}")
             creer = st.form_submit_button("➕ Créer et choisir")
+
         if creer:
             if not np_prenom.strip() or not np_nom.strip():
                 st.error("Prénom et nom obligatoires.")
             else:
-                nouveau = {
-                    "id": generer_id_contact(), "prenom": np_prenom.strip(), "nom": np_nom.strip(),
-                    "telephone": "", "email": "", "adresse": "", "notes": "",
-                    "habitue": "Non", "photos": [],
-                }
-                tous_contacts = charger_contacts()
-                tous_contacts.append(nouveau)
-                sauvegarder_contacts(tous_contacts)
-                p["contact_id"] = nouveau["id"]
-                st.success(f"Contact {np_prenom} {np_nom} créé et choisi.")
+                doublon = contact_existant_similaire(contacts, np_prenom, np_nom)
+                if doublon:
+                    st.session_state[f"doublon_en_attente_{index}"] = {
+                        "prenom": np_prenom.strip(), "nom": np_nom.strip(), "existant": doublon,
+                    }
+                    st.rerun()
+                else:
+                    _creer_et_choisir_contact(index, p, np_prenom, np_nom, sauvegarder_contacts, charger_contacts)
+
+        # --- Avertissement de doublon, en attente de confirmation ---
+        attente = st.session_state.get(f"doublon_en_attente_{index}")
+        if attente:
+            existant = attente["existant"]
+            st.warning(
+                f"⚠️ Un contact nommé **{existant['prenom']} {existant['nom']}** existe déjà "
+                f"(tél: {existant.get('telephone') or '—'}). Est-ce la même personne ?"
+            )
+            cb1, cb2 = st.columns(2)
+            if cb1.button("✅ C'est lui, je le choisis", key=f"choisir_existant_{index}"):
+                p["contact_id"] = existant["id"]
+                st.session_state.pop(f"doublon_en_attente_{index}")
                 st.rerun()
+            if cb2.button("➕ Non, créer quand même", key=f"forcer_creation_{index}"):
+                _creer_et_choisir_contact(index, p, attente["prenom"], attente["nom"], sauvegarder_contacts, charger_contacts)
+                st.session_state.pop(f"doublon_en_attente_{index}")
 
 
 def _carte_participant(index, p, contacts_par_id, contacts, sauvegarder_contacts, charger_contacts, autoriser_retrait):
