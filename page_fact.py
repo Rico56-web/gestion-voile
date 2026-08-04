@@ -25,7 +25,7 @@ import streamlit as st
 
 from modele_voile import (
     bilan_facturation, marquer_participant_paye, est_en_retard,
-    participations_cmn_impayees,
+    participations_cmn_impayees, COULEURS_SOCIETE, fond_clair,
 )
 
 
@@ -35,27 +35,34 @@ def _carte_participation(p, contacts_par_id, aujourdhui, statut):
     contact = contacts_par_id.get(p.get("contact_id"))
     nom_aff = f"{contact['prenom']} {contact['nom']}" if contact else "(contact inconnu)"
     soc = (p.get("societe") or "PERSO").upper()
-    is_cmn = "CMN" in soc
     retard = statut == "a_encaisser" and est_en_retard(p, aujourdhui)
 
-    label_retard = (
-        "<span style='color:#E74C3C; font-weight:bold; font-size:0.8rem;'>⚠️ RETARD</span>"
-        if retard else ""
+    if retard:
+        couleur = "#E74C3C"
+    else:
+        couleur = COULEURS_SOCIETE.get(soc, "#7F8C8D")
+    fond = fond_clair(couleur)
+
+    badge_statut = (
+        '<span style="background:#E74C3C; color:white; border-radius:12px; padding:2px 10px; font-size:0.72rem; font-weight:bold;">⚠️ RETARD</span>'
+        if retard else (
+            '<span style="background:#27AE60; color:white; border-radius:12px; padding:2px 10px; font-size:0.72rem; font-weight:bold;">✅ PAYÉ</span>'
+            if statut == "payees" else
+            '<span style="background:#F39C12; color:white; border-radius:12px; padding:2px 10px; font-size:0.72rem; font-weight:bold;">⏳ À ENCAISSER</span>'
+        )
     )
-    card_bg = "#E3F2FD" if is_cmn else "#F9F9F9"
-    border_color = "#E74C3C" if retard else ("#3498db" if is_cmn else "#7F8C8D")
 
     st.markdown(
         f"""
-        <div style="background:{card_bg}; border:1px solid #ddd; border-left:10px solid {border_color};
-        padding:15px; border-radius:8px; margin-bottom:10px; color:black;">
-            <div style="display:flex; justify-content:space-between;">
-                <b>{nom_aff}</b>
-                <span style="font-size:1.1rem; font-weight:bold;">{p.get('prix', 0):.2f} €</span>
-            </div>
+        <div style="background:{fond}; border-left:10px solid {couleur};
+        padding:15px; border-radius:10px; margin-bottom:10px; color:black;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <small>📅 {p.get('date_debut', '?')} | 🏢 {soc} | {p.get('nom_croisiere') or '(sans nom)'}</small>
-                {label_retard}
+                <b style="font-size:1.05rem;">{nom_aff}</b>
+                <span style="font-size:1.15rem; font-weight:bold; color:{couleur};">{p.get('prix', 0):.2f} €</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                <small style="color:#555;">📅 {p.get('date_debut', '?')} &nbsp;|&nbsp; 🏢 {soc} &nbsp;|&nbsp; {p.get('nom_croisiere') or '(sans nom)'}</small>
+                {badge_statut}
             </div>
         </div>
         """,
