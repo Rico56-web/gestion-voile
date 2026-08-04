@@ -146,7 +146,24 @@ mois_fr = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Ao
 date_bandeau = f"&#128197; {jours_fr[now.weekday()]} {now.day} {mois_fr[now.month-1]} {now.year}"
 
 st.markdown("""<style>
-    .main-header { font-size: 1.8rem; font-weight: bold; color: #1a2a6c; text-align: center; margin-bottom: 5px; }
+.main-header {
+    font-size: 2.1rem;
+    font-weight: 800;
+    text-align: center;
+    margin-bottom: 5px;
+    background: linear-gradient(270deg, #1a2a6c, #2980B9, #16A085, #2980B9, #1a2a6c);
+    background-size: 400% 400%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: degradeVesta 8s ease infinite;
+    text-shadow: 0 2px 8px rgba(26,42,108,0.15);
+}
+@keyframes degradeVesta {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
     .date-header { text-align: center; color: #7f8c8d; font-weight: bold; margin-bottom: 20px; border-bottom: 3px solid #1a2a6c; padding-bottom: 10px; }
 </style>""", unsafe_allow_html=True)
 
