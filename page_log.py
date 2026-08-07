@@ -2,7 +2,7 @@
 page_log.py
 ============
 Livre de bord (LOG) : saisie/modification/suppression d'étapes, vue
-groupée par navigation, export CSV.
+synthétique par navigation avec "zoom" pour le détail, export CSV.
 
 Différences par rapport à l'ancien code :
 - Lit/écrit etapes_v2.json (au lieu de logbook.json)
@@ -15,12 +15,17 @@ Différences par rapport à l'ancien code :
   (même logique que la migration d'origine)
 - Le nom de navigation suggéré par défaut reprend la dernière étape
   PASSÉE si elle date de moins de 5 jours (continuité probable)
+- NOUVEAU (07/08/2026) : la liste des navigations est maintenant affichée
+  sous forme de TABLEAU SYNTHÉTIQUE (date, équipage, site, nb de jours).
+  Cliquer sur une ligne "zoome" et affiche le détail jour par jour
+  (météo, milles, moteur, etc.) juste en dessous.
 
 NE TOUCHE PAS à CONTACTS, MODIFIER_CONTACT, PLANNING, CROISIERES,
 MODIFIER_CROISIERE, STATS, FACT, RELANCES, MAINT, MEMOS, ARCHIVES.
 """
 from datetime import date, datetime
 
+import pandas as pd
 import streamlit as st
 
 from modele_voile import (
@@ -36,6 +41,71 @@ def _couleur_navigation(nom_nav):
     """Couleur stable par nom de navigation (même principe que pour les
     contacts), pour distinguer visuellement chaque voyage d'un coup d'œil."""
     return PALETTE_NAVIGATION[hash(nom_nav) % len(PALETTE_NAVIGATION)]
+
+
+def _site_croisiere(croisieres, croisiere_id):
+    """Retrouve le 'site' (plateforme de contact : CMN, CLICK, VOG, PERSO...)
+    d'une croisière à partir de son id. Ce champ s'appelle 'societe' et se
+    trouve sur chaque participant (une croisière peut avoir plusieurs
+    participants) — on prend celui du premier participant."""
+    if not croisiere_id:
+        return "-"
+    croisiere = next((c for c in croisieres if c.get("id") == croisiere_id), None)
+    if not croisiere:
+        return "-"
+    participants = croisiere.get("participants") or []
+    if participants:
+        return participants[0].get("societe") or "-"
+    return "-"
+
+
+def _noms_equipage(liste_etapes):
+    """Rassemble les noms d'équipage cités sur les étapes d'une navigation,
+    sans doublons, dans l'ordre d'apparition."""
+    noms_vus = []
+    for e in liste_etapes:
+        texte = (e.get("coequipiers_texte") or "").strip()
+        if not texte:
+            continue
+        # Le texte peut contenir plusieurs noms séparés par des virgules
+        for nom in texte.split(","):
+            nom = nom.strip()
+            if nom and nom not in noms_vus:
+                noms_vus.append(nom)
+    return ", ".join(noms_vus) if noms_vus else "-"
+
+
+def _construire_tableau_synthese(groupes, croisieres):
+    """Construit le DataFrame résumé : 1 ligne par navigation.
+
+    'groupes' est la liste (nom_navigation, liste_etapes) déjà triée par
+    etapes_groupees_par_navigation. On calcule pour chaque navigation :
+    - Date : la date de la première étape (début du voyage)
+    - Équipage : noms uniques trouvés sur les étapes
+    - Site : déduit de la croisière liée (via croisiere_id)
+    - Jours : nombre d'étapes (= nombre de jours saisis pour ce voyage)
+    """
+    lignes = []
+    for nom_nav, liste in groupes:
+        # On trie les étapes par date réelle (pas par texte) pour trouver
+        # la première de manière fiable, même si la saisie n'était pas
+        # dans l'ordre chronologique.
+        liste_triee = sorted(
+            liste,
+            key=lambda e: parse_date_eu(e.get("date", "")) or date.min,
+        )
+        premiere = liste_triee[0]
+        croisiere_id = next((e.get("croisiere_id") for e in liste if e.get("croisiere_id")), None)
+
+        lignes.append({
+            "Navigation": nom_nav,
+            "Date": premiere.get("date", "-"),
+            "Équipage": _noms_equipage(liste),
+            "Site": _site_croisiere(croisieres, croisiere_id),
+            "Jours": len(liste),
+            "Milles": sum(e.get("milles", 0) or 0 for e in liste),
+        })
+    return pd.DataFrame(lignes)
 
 
 def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", etape_id=None):
@@ -125,6 +195,58 @@ def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", e
                 st.rerun()
 
 
+def _afficher_detail_navigation(nom_nav, liste, etapes, sauvegarder_etapes):
+    """Affiche le détail jour par jour d'UNE navigation (le 'zoom').
+    C'est exactement l'ancien affichage carte par carte, mais appelé
+    uniquement pour la navigation sélectionnée dans le tableau."""
+    couleur_nav = _couleur_navigation(nom_nav)
+    fond_nav = fond_clair(couleur_nav)
+    t_mil = sum(e.get("milles", 0) or 0 for e in liste)
+
+    st.markdown(
+        f"""
+        <div style="background:{couleur_nav}; color:white; padding:10px 14px; border-radius:8px; margin-top:15px;">
+            <b>🔍 Détail — {nom_nav}</b> &nbsp;|&nbsp; Distance Totale : {t_mil:.1f} NM &nbsp;|&nbsp; {len(liste)} étape(s)
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    for e in liste:
+        with st.container():
+            c_txt, c_btn = st.columns([0.7, 0.3])
+            with c_txt:
+                st.markdown(
+                    f"""
+                    <div style="background:{fond_nav}; border-left:6px solid {couleur_nav}; padding:8px 15px; border-radius:0 8px 8px 0; margin-bottom:2px; color: black;">
+                        <b>📅 {e.get('date','')}</b> | ⚙️ {e.get('heures_moteur',0):.1f}h Mot. | ⛵ {e.get('heures_voile',0):.1f}h Voile | <b>{e.get('milles',0):.1f} NM</b><br>
+                        <small style="color:#34495e;">📍 Cond. Météo : {e.get('meteo') or '-'} | {e.get('notes') or ''}</small>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with c_btn:
+                ce, cd, cc = st.columns([1, 1, 2])
+                if ce.button("✏️", key=f"e_{e['id']}"):
+                    st.session_state.log_edit_id = e["id"]
+                    st.rerun()
+
+                confirm_key = f"confirm_del_log_{e['id']}"
+                if not st.session_state.get(confirm_key, False):
+                    if cd.button("🗑️", key=f"d_{e['id']}"):
+                        st.session_state[confirm_key] = True
+                        st.rerun()
+                else:
+                    if cc.button("✅ OUI", key=f"ok_{e['id']}", type="primary"):
+                        st.session_state[confirm_key] = False
+                        sauvegarder_etapes(supprimer_etape(etapes, e["id"]))
+                        st.toast("Étape supprimée", icon="🗑️")
+                        st.rerun()
+                    if cc.button("❌", key=f"no_{e['id']}"):
+                        st.session_state[confirm_key] = False
+                        st.rerun()
+
+
 def afficher_page_log(charger_etapes, sauvegarder_etapes, charger_croisieres):
     """Point d'entrée de la page. Fonctions injectées depuis app_voile1.py."""
 
@@ -151,62 +273,42 @@ def afficher_page_log(charger_etapes, sauvegarder_etapes, charger_croisieres):
             st.session_state.log_saisie_ouverte = True
             st.rerun()
 
-    # --- Vue groupée par navigation ---
+    # --- Vue synthétique (1 ligne = 1 navigation) + zoom ---
     if etapes:
         st.divider()
         groupes = etapes_groupees_par_navigation(etapes)
+        # dict pratique pour retrouver la liste d'étapes à partir du nom
+        # de navigation (utilisé après la sélection dans le tableau)
+        groupes_par_nom = dict(groupes)
 
-        for nom_nav, liste in groupes:
-            couleur_nav = _couleur_navigation(nom_nav)
-            fond_nav = fond_clair(couleur_nav)
-            t_mil = sum(e.get("milles", 0) or 0 for e in liste)
-            st.markdown(
-                f"""
-                <div style="background:{couleur_nav}; color:white; padding:10px 14px; border-radius:8px; margin-top:15px;">
-                    <b>🚢 {nom_nav}</b> &nbsp;|&nbsp; Distance Totale Voyage : {t_mil:.1f} NM &nbsp;|&nbsp; {len(liste)} étape(s)
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+        df_synthese = _construire_tableau_synthese(groupes, croisieres)
 
-            for e in liste:
-                with st.container():
-                    c_txt, c_btn = st.columns([0.7, 0.3])
-                    with c_txt:
-                        st.markdown(
-                            f"""
-                            <div style="background:{fond_nav}; border-left:6px solid {couleur_nav}; padding:8px 15px; border-radius:0 8px 8px 0; margin-bottom:2px; color: black;">
-                                <b>📅 {e.get('date','')}</b> | ⚙️ {e.get('heures_moteur',0):.1f}h Mot. | ⛵ {e.get('heures_voile',0):.1f}h Voile | <b>{e.get('milles',0):.1f} NM</b><br>
-                                <small style="color:#34495e;">📍 Cond. Météo : {e.get('meteo') or '-'} | {e.get('notes') or ''}</small>
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                    with c_btn:
-                        ce, cd, cc = st.columns([1, 1, 2])
-                        if ce.button("✏️", key=f"e_{e['id']}"):
-                            st.session_state.log_edit_id = e["id"]
-                            st.rerun()
+        st.markdown("#### 🗂️ Vue d'ensemble des navigations")
+        st.caption("Clique sur une ligne du tableau pour afficher le détail jour par jour.")
 
-                        confirm_key = f"confirm_del_log_{e['id']}"
-                        if not st.session_state.get(confirm_key, False):
-                            if cd.button("🗑️", key=f"d_{e['id']}"):
-                                st.session_state[confirm_key] = True
-                                st.rerun()
-                        else:
-                            if cc.button("✅ OUI", key=f"ok_{e['id']}", type="primary"):
-                                st.session_state[confirm_key] = False
-                                sauvegarder_etapes(supprimer_etape(etapes, e["id"]))
-                                st.toast("Étape supprimée", icon="🗑️")
-                                st.rerun()
-                            if cc.button("❌", key=f"no_{e['id']}"):
-                                st.session_state[confirm_key] = False
-                                st.rerun()
+        selection = st.dataframe(
+            df_synthese,
+            on_select="rerun",
+            selection_mode="single-row",
+            hide_index=True,
+            use_container_width=True,
+            column_config={
+                "Milles": st.column_config.NumberColumn(format="%.1f NM"),
+            },
+        )
+
+        lignes_selectionnees = selection.selection.rows
+        if lignes_selectionnees:
+            idx = lignes_selectionnees[0]
+            nom_nav_choisi = df_synthese.iloc[idx]["Navigation"]
+            liste_choisie = groupes_par_nom[nom_nav_choisi]
+            _afficher_detail_navigation(nom_nav_choisi, liste_choisie, etapes, sauvegarder_etapes)
+        else:
+            st.info("Aucune navigation sélectionnée — clique sur une ligne ci-dessus pour voir le détail.")
 
     # --- Export CSV ---
     if etapes:
         st.divider()
-        import pandas as pd
         df_export = pd.DataFrame(etapes)
         csv = df_export.to_csv(index=False).encode("utf-8-sig")
         st.download_button(
