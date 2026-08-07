@@ -222,8 +222,8 @@
     },
     {
         "id":"e-198cb332",
-        "croisiere_id":"cr-17795204",
-        "date":"05\/08\/2026",
+        "croisiere_id":"cr-0d21c7da",
+        "date":"09\/05\/2026",
         "navigation":"location perso mai 2026",
         "port_depart":"Escale",
         "port_arrivee":"Escale",
@@ -235,7 +235,7 @@
         "coequipiers_texte":"dominique et florence Vasselin\nSonia et sa copine Claire",
         "carburant":null,
         "notes":"baignage a l'ile Dumet \nescale la nuit a Piriac\nrepas le lendemain au mouillage a a la bou\u00e9e a Ho\u00ebdic",
-        "date_fin":null
+        "date_fin":"nan"
     },
     {
         "id":"e-8e6fd69a",
