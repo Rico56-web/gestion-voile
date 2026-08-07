@@ -491,22 +491,5 @@
         "carburant":null,
         "notes":"",
         "date_fin":null
-    },
-    {
-        "id":"e-06a91885",
-        "croisiere_id":"cr-786c9102",
-        "date":"20\/07\/2026",
-        "navigation":"Sortie 1jours vers houat",
-        "port_depart":"",
-        "port_arrivee":"",
-        "milles":32860.0,
-        "heures_moteur":2.0,
-        "heures_voile":8,
-        "compteur_moteur":2498.2,
-        "meteo":"vent en rafales",
-        "coequipiers_texte":"FAMILLE MASSON",
-        "carburant":null,
-        "notes":"mouillage derri\u00e8re la grande plage",
-        "date_fin":null
     }
 ]
