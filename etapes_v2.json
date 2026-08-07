@@ -13,7 +13,8 @@
         "meteo":"",
         "coequipiers_texte":"Elisabeth Philippe et sa fille",
         "carburant":null,
-        "notes":""
+        "notes":"",
+        "date_fin":null
     },
     {
         "id":"e-5d8543d5",
@@ -29,7 +30,8 @@
         "meteo":"",
         "coequipiers_texte":"Elisabeth Philippe et sa fille",
         "carburant":null,
-        "notes":""
+        "notes":"",
+        "date_fin":null
     },
     {
         "id":"e-363969ba",
@@ -45,7 +47,8 @@
         "meteo":"",
         "coequipiers_texte":"Elisabeth Philippe et sa fille",
         "carburant":null,
-        "notes":""
+        "notes":"",
+        "date_fin":null
     },
     {
         "id":"e-1aae4ae8",
@@ -61,7 +64,8 @@
         "meteo":"",
         "coequipiers_texte":"Pedro et Benoit",
         "carburant":null,
-        "notes":"avec Pedro et Benoit Couronne"
+        "notes":"avec Pedro et Benoit Couronne",
+        "date_fin":null
     },
     {
         "id":"e-a38f2ceb",
@@ -77,7 +81,8 @@
         "meteo":"",
         "coequipiers_texte":"Pedro et Benoit",
         "carburant":null,
-        "notes":"avec Pedro et Benoit Couronne"
+        "notes":"avec Pedro et Benoit Couronne",
+        "date_fin":null
     },
     {
         "id":"e-d34a5fda",
@@ -93,7 +98,8 @@
         "meteo":"",
         "coequipiers_texte":"camille Varrel et sacha(cuistot)",
         "carburant":null,
-        "notes":"avec Camile et Sacha (Cuistot)"
+        "notes":"avec Camile et Sacha (Cuistot)",
+        "date_fin":null
     },
     {
         "id":"e-19a46080",
@@ -109,7 +115,8 @@
         "meteo":"",
         "coequipiers_texte":"camille Varrel et sacha(cuistot)",
         "carburant":null,
-        "notes":"avec Camile et Sacha (Cuistot)"
+        "notes":"avec Camile et Sacha (Cuistot)",
+        "date_fin":null
     },
     {
         "id":"e-2192e34e",
@@ -125,7 +132,8 @@
         "meteo":"",
         "coequipiers_texte":"",
         "carburant":null,
-        "notes":""
+        "notes":"",
+        "date_fin":null
     },
     {
         "id":"e-a8ee8764",
@@ -141,7 +149,8 @@
         "meteo":"",
         "coequipiers_texte":"Philippe Desgagny, Francoise Riou, jean louis Dugave et Yannick Bailly",
         "carburant":null,
-        "notes":""
+        "notes":"",
+        "date_fin":null
     },
     {
         "id":"e-5564b3d7",
@@ -157,7 +166,8 @@
         "meteo":"",
         "coequipiers_texte":"",
         "carburant":null,
-        "notes":""
+        "notes":"",
+        "date_fin":null
     },
     {
         "id":"e-a2afd7e0",
@@ -173,7 +183,8 @@
         "meteo":"",
         "coequipiers_texte":"",
         "carburant":null,
-        "notes":""
+        "notes":"",
+        "date_fin":null
     },
     {
         "id":"e-b79ef67d",
@@ -189,7 +200,8 @@
         "meteo":"",
         "coequipiers_texte":"",
         "carburant":null,
-        "notes":""
+        "notes":"",
+        "date_fin":null
     },
     {
         "id":"e-335bcdc5",
@@ -205,7 +217,8 @@
         "meteo":"",
         "coequipiers_texte":"",
         "carburant":null,
-        "notes":""
+        "notes":"",
+        "date_fin":null
     },
     {
         "id":"e-198cb332",
@@ -221,12 +234,13 @@
         "meteo":"",
         "coequipiers_texte":"dominique et florence Vasselin\nSonia et sa copine Claire",
         "carburant":null,
-        "notes":"baignage a l'ile Dumet \nescale la nuit a Piriac\nrepas le lendemain au mouillage a a la bou\u00e9e a Ho\u00ebdic"
+        "notes":"baignage a l'ile Dumet \nescale la nuit a Piriac\nrepas le lendemain au mouillage a a la bou\u00e9e a Ho\u00ebdic",
+        "date_fin":null
     },
     {
         "id":"e-8e6fd69a",
-        "croisiere_id":"cr-a67aca2d",
-        "date":"05\/09\/2026",
+        "croisiere_id":null,
+        "date":"08\/05\/2026",
         "navigation":"location perso mai 2026",
         "port_depart":"Escale",
         "port_arrivee":"Escale",
@@ -237,7 +251,8 @@
         "meteo":"",
         "coequipiers_texte":"dominique et florence Vasselin\nSonia et sa copine Claire",
         "carburant":null,
-        "notes":"baignage a l'ile Dumet \nescale la nuit a Piriac\nrepas le lendemain au mouillage a a la bou\u00e9e a Ho\u00ebdic"
+        "notes":"baignage a l'ile Dumet \nescale la nuit a Piriac\nrepas le lendemain au mouillage a a la bou\u00e9e a Ho\u00ebdic",
+        "date_fin":null
     },
     {
         "id":"e-ccdca14b",
@@ -253,7 +268,8 @@
         "meteo":"tres beau temps , soleil et vent de 10 a 12noeuds",
         "coequipiers_texte":"Franck martin",
         "carburant":null,
-        "notes":"stop au port de Houat sur Cateway pour casser la croute"
+        "notes":"stop au port de Houat sur Cateway pour casser la croute",
+        "date_fin":null
     },
     {
         "id":"e-764b2b01",
@@ -269,7 +285,8 @@
         "meteo":"tres beau tempschaus et ensoleill\u00e9",
         "coequipiers_texte":"aurelein et sa famille ( 4 personnes )",
         "carburant":null,
-        "notes":"peu de vent"
+        "notes":"peu de vent",
+        "date_fin":null
     },
     {
         "id":"e-d80ea054",
@@ -285,7 +302,8 @@
         "meteo":"",
         "coequipiers_texte":"idem a hier",
         "carburant":null,
-        "notes":""
+        "notes":"",
+        "date_fin":null
     },
     {
         "id":"e-ad4e9fdc",
@@ -301,7 +319,8 @@
         "meteo":"",
         "coequipiers_texte":"",
         "carburant":null,
-        "notes":""
+        "notes":"",
+        "date_fin":null
     },
     {
         "id":"e-2af8583d",
@@ -317,7 +336,8 @@
         "meteo":"Nuageux vent 10 noeuds",
         "coequipiers_texte":"Philippe DESGAGNY\nFran\u00e7oise Riou\nJean Louis Dugave\nJannick bailly",
         "carburant":null,
-        "notes":"Cap vers port tudy puis port Louis puis kernevel"
+        "notes":"Cap vers port tudy puis port Louis puis kernevel",
+        "date_fin":null
     },
     {
         "id":"e-21a3e954",
@@ -333,7 +353,8 @@
         "meteo":"",
         "coequipiers_texte":"idem",
         "carburant":null,
-        "notes":"depart des glenans pour port Louis"
+        "notes":"depart des glenans pour port Louis",
+        "date_fin":null
     },
     {
         "id":"e-cb4fe0fb",
@@ -349,7 +370,8 @@
         "meteo":"Soleil,chaud",
         "coequipiers_texte":"Idem",
         "carburant":null,
-        "notes":"Vers kernevel puis les glenans"
+        "notes":"Vers kernevel puis les glenans",
+        "date_fin":null
     },
     {
         "id":"e-6a35e167",
@@ -365,7 +387,8 @@
         "meteo":"",
         "coequipiers_texte":"idem",
         "carburant":null,
-        "notes":"d\u00e9part des gl\u00e9nans vers port louis"
+        "notes":"d\u00e9part des gl\u00e9nans vers port louis",
+        "date_fin":null
     },
     {
         "id":"e-f5cde0c7",
@@ -381,7 +404,8 @@
         "meteo":"",
         "coequipiers_texte":"idem",
         "carburant":null,
-        "notes":"de port louis a le palais"
+        "notes":"de port louis a le palais",
+        "date_fin":null
     },
     {
         "id":"e-6a55504a",
@@ -397,7 +421,8 @@
         "meteo":"",
         "coequipiers_texte":"",
         "carburant":null,
-        "notes":"escale d'une journ\u00e9e au palis puis route au crouesty"
+        "notes":"escale d'une journ\u00e9e au palis puis route au crouesty",
+        "date_fin":null
     },
     {
         "id":"e-4b724cf4",
@@ -413,7 +438,8 @@
         "meteo":"Bon soleil et tr\u00e8s chaud",
         "coequipiers_texte":"Perre( resp sociale \u00e0 la ville de bordeaux\nXavier( m\u00e9decin a paris)",
         "carburant":null,
-        "notes":"Au palais gros coup de vent \u00e0 4 h00 dans la nuit de mouillage \u00e0 l'avant port"
+        "notes":"Au palais gros coup de vent \u00e0 4 h00 dans la nuit de mouillage \u00e0 l'avant port",
+        "date_fin":null
     },
     {
         "id":"e-422a4b8b",
@@ -429,7 +455,8 @@
         "meteo":"Frais le matin car orage la nuit puis chaud l'am.",
         "coequipiers_texte":"Idem \u00e0 la veille",
         "carburant":null,
-        "notes":""
+        "notes":"",
+        "date_fin":null
     },
     {
         "id":"e-26aadc06",
@@ -445,7 +472,8 @@
         "meteo":"beau soleil et bonne temp\u00e9rature. Vent avec fortes rafales de 25, n\u0153uds .",
         "coequipiers_texte":"Sandrine Masson avec Ronan son mari et ses deux enfants: tr\u00e8s sympas et cool. un peu d'exp\u00e9rience . somme all\u00e9s a houtat. mouillage derri\u00e8re la grande plage pour baignade et pour manger . vent avec fortes rafales de 25, n\u0153uds .",
         "carburant":null,
-        "notes":"famille Masson bien sympa"
+        "notes":"famille Masson bien sympa",
+        "date_fin":null
     },
     {
         "id":"e-e81db331",
@@ -461,7 +489,8 @@
         "meteo":"",
         "coequipiers_texte":"Dominique sa femme son fils et sa fille ",
         "carburant":null,
-        "notes":""
+        "notes":"",
+        "date_fin":null
     },
     {
         "id":"e-f83879c4",
@@ -477,7 +506,8 @@
         "meteo":"",
         "coequipiers_texte":"",
         "carburant":null,
-        "notes":""
+        "notes":"",
+        "date_fin":null
     },
     {
         "id":"e-06a91885",
@@ -493,6 +523,7 @@
         "meteo":"vent en rafales",
         "coequipiers_texte":"FAMILLE MASSON",
         "carburant":null,
-        "notes":"mouillage derri\u00e8re la grande plage"
+        "notes":"mouillage derri\u00e8re la grande plage",
+        "date_fin":null
     }
 ]
