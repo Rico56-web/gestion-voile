@@ -75,15 +75,35 @@ def _noms_equipage(liste_etapes):
     return ", ".join(noms_vus) if noms_vus else "-"
 
 
+def _nb_jours_etape(e):
+    """Nombre de jours couverts par UNE étape.
+    - Cas normal (saisie quotidienne) : 1 jour.
+    - Cas 'multi-jours' (une seule ligne pour toute une navigation) : on
+      calcule la différence entre 'date' (départ) et 'date_fin' (arrivée),
+      +1 pour compter le jour de départ lui-même.
+    Si les dates sont incohérentes ou manquantes, on retombe sur 1 par
+    sécurité (on ne veut jamais afficher 0 ou une valeur négative)."""
+    date_fin_str = e.get("date_fin")
+    if not date_fin_str:
+        return 1
+    d_debut = parse_date_eu(e.get("date", ""))
+    d_fin = parse_date_eu(date_fin_str)
+    if d_debut and d_fin and d_fin >= d_debut:
+        return (d_fin - d_debut).days + 1
+    return 1
+
+
 def _construire_tableau_synthese(groupes, croisieres):
     """Construit le DataFrame résumé : 1 ligne par navigation.
 
     'groupes' est la liste (nom_navigation, liste_etapes) déjà triée par
     etapes_groupees_par_navigation. On calcule pour chaque navigation :
     - Date : la date de la première étape (début du voyage)
+    - Navigation : le nom du voyage
     - Équipage : noms uniques trouvés sur les étapes
     - Site : déduit de la croisière liée (via croisiere_id)
-    - Jours : nombre d'étapes (= nombre de jours saisis pour ce voyage)
+    - Jours : somme des jours couverts par chaque étape (une étape
+      'multi-jours' compte pour plusieurs jours d'un coup)
     """
     lignes = []
     for nom_nav, liste in groupes:
@@ -97,12 +117,14 @@ def _construire_tableau_synthese(groupes, croisieres):
         premiere = liste_triee[0]
         croisiere_id = next((e.get("croisiere_id") for e in liste if e.get("croisiere_id")), None)
 
+        # Ordre des colonnes = ordre d'affichage voulu : Date, Navigation,
+        # Équipage en premier, puis le reste.
         lignes.append({
-            "Navigation": nom_nav,
             "Date": premiere.get("date", "-"),
+            "Navigation": nom_nav,
             "Équipage": _noms_equipage(liste),
             "Site": _site_croisiere(croisieres, croisiere_id),
-            "Jours": len(liste),
+            "Jours": sum(_nb_jours_etape(e) for e in liste),
             "Milles": sum(e.get("milles", 0) or 0 for e in liste),
         })
     return pd.DataFrame(lignes)
@@ -115,6 +137,7 @@ def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", e
     if mode == "edition" and etape_id is not None:
         e = next(x for x in etapes if x["id"] == etape_id)
         val_date = e.get("date", "")
+        val_date_fin = e.get("date_fin", "") or val_date
         val_nav = e.get("navigation", "")
         val_equi = e.get("coequipiers_texte", "")
         val_meteo = e.get("meteo", "")
@@ -123,10 +146,14 @@ def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", e
         val_mot_arr = float(e.get("compteur_moteur", 0.0))
         val_milles = float(e.get("milles", 0.0))
         val_voile = float(e.get("heures_voile", 0.0))
+        # Si l'étape en édition a déjà une date_fin, c'était une saisie
+        # multi-jours : la case à cocher démarre donc pré-cochée.
+        multi_jours_par_defaut = bool(e.get("date_fin"))
     else:
         aujourdhui = date.today()
         last_mot = derniere_lecture_compteur(etapes)
         val_date = datetime.now()
+        val_date_fin = val_date
         val_nav = suggestion_nom_navigation(etapes, aujourdhui)
         val_equi = ""
         val_meteo = ""
@@ -135,15 +162,39 @@ def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", e
         val_mot_arr = last_mot
         val_milles = 0.0
         val_voile = 0.0
+        multi_jours_par_defaut = False
 
     with st.expander(title, expanded=True):
+        # La case à cocher est VOLONTAIREMENT en dehors du st.form : dans
+        # Streamlit, les widgets à l'intérieur d'un formulaire ne
+        # déclenchent pas de rafraîchissement immédiat de la page (il faut
+        # attendre le bouton "Enregistrer"). Or on a besoin de savoir tout
+        # de suite si on doit afficher UNE date ou DEUX (départ/arrivée)
+        # pour construire le formulaire juste après.
+        multi_jours = st.checkbox(
+            "🗓️ Navigation de plusieurs jours (une seule ligne pour toute la période, "
+            "avec les totaux météo/milles/moteur)",
+            value=multi_jours_par_defaut,
+            key=f"chk_multi_jours_{mode}_{etape_id}",
+        )
+
         with st.form(key=f"form_log_{mode}"):
-            c1, c2 = st.columns(2)
-            if mode == "creation":
-                f_date = c1.date_input("Date", val_date, format="DD/MM/YYYY")
+            f_nav = st.text_input("Nom du Voyage / Croisière", value=val_nav, placeholder="ex: Gijón 2026")
+
+            if multi_jours:
+                c1, c2 = st.columns(2)
+                if mode == "creation":
+                    f_date_debut_in = c1.date_input("Date de départ", val_date, format="DD/MM/YYYY")
+                    f_date_fin_in = c2.date_input("Date d'arrivée", val_date, format="DD/MM/YYYY")
+                else:
+                    f_date_debut_in = c1.text_input("Date de départ", value=val_date)
+                    f_date_fin_in = c2.text_input("Date d'arrivée", value=val_date_fin)
             else:
-                f_date = c2.text_input("Date", value=val_date)
-            f_nav = c2.text_input("Nom du Voyage / Croisière", value=val_nav, placeholder="ex: Gijón 2026")
+                if mode == "creation":
+                    f_date_debut_in = st.date_input("Date", val_date, format="DD/MM/YYYY")
+                else:
+                    f_date_debut_in = st.text_input("Date", value=val_date)
+                f_date_fin_in = None
 
             f_equipage = st.text_area("Équipage / Rôle", value=val_equi, height=60)
 
@@ -161,12 +212,24 @@ def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", e
 
             b1, b2 = st.columns(2)
             if b1.form_submit_button("💾 ENREGISTRER L'ÉTAPE", use_container_width=True, type="primary"):
-                date_str = f_date.strftime("%d/%m/%Y") if mode == "creation" else f_date
+                # 'date' = toujours la date de DÉPART (utilisée pour le tri,
+                # le regroupement par navigation, et pour retrouver la
+                # croisière liée). 'date_fin' n'est renseignée qu'en mode
+                # multi-jours ; sinon on la met à None pour bien indiquer
+                # "étape d'un seul jour" (utile si on décoche la case en
+                # modifiant une étape qui était multi-jours avant).
+                date_str = f_date_debut_in.strftime("%d/%m/%Y") if mode == "creation" else f_date_debut_in
+                if multi_jours:
+                    date_fin_str = f_date_fin_in.strftime("%d/%m/%Y") if mode == "creation" else f_date_fin_in
+                else:
+                    date_fin_str = None
+
                 d_obj = parse_date_eu(date_str)
                 croisiere_id = trouver_croisiere_id_pour_date(croisieres, d_obj) if d_obj else None
 
                 champs = {
                     "date": date_str,
+                    "date_fin": date_fin_str,
                     "navigation": f_nav,
                     "coequipiers_texte": f_equipage,
                     "meteo": f_meteo,
@@ -216,10 +279,18 @@ def _afficher_detail_navigation(nom_nav, liste, etapes, sauvegarder_etapes):
         with st.container():
             c_txt, c_btn = st.columns([0.7, 0.3])
             with c_txt:
+                # Si l'étape a une date_fin, on affiche la période complète
+                # avec le nombre de jours couverts ; sinon, juste la date.
+                if e.get("date_fin"):
+                    nb_j = _nb_jours_etape(e)
+                    label_date = f"📅 {e.get('date','')} → {e.get('date_fin','')} ({nb_j} j)"
+                else:
+                    label_date = f"📅 {e.get('date','')}"
+
                 st.markdown(
                     f"""
                     <div style="background:{fond_nav}; border-left:6px solid {couleur_nav}; padding:8px 15px; border-radius:0 8px 8px 0; margin-bottom:2px; color: black;">
-                        <b>📅 {e.get('date','')}</b> | ⚙️ {e.get('heures_moteur',0):.1f}h Mot. | ⛵ {e.get('heures_voile',0):.1f}h Voile | <b>{e.get('milles',0):.1f} NM</b><br>
+                        <b>{label_date}</b> | ⚙️ {e.get('heures_moteur',0):.1f}h Mot. | ⛵ {e.get('heures_voile',0):.1f}h Voile | <b>{e.get('milles',0):.1f} NM</b><br>
                         <small style="color:#34495e;">📍 Cond. Météo : {e.get('meteo') or '-'} | {e.get('notes') or ''}</small>
                     </div>
                     """,
