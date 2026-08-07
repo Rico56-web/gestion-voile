@@ -181,19 +181,29 @@ def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", e
         with st.form(key=f"form_log_{mode}"):
             f_nav = st.text_input("Nom du Voyage / Croisière", value=val_nav, placeholder="ex: Gijón 2026")
 
+            # IMPORTANT : on donne une 'key' FIXE à chaque champ de date,
+            # qui ne dépend PAS de multi_jours. Sans ça, comme le libellé
+            # passe de "Date" à "Date de départ" selon la case cochée,
+            # Streamlit considère qu'il s'agit d'un champ différent à
+            # chaque bascule de la case — et donc oublie la date déjà
+            # tapée, en revenant à sa valeur par défaut (aujourd'hui).
+            # Avec une clé stable, la valeur saisie est conservée.
+            key_date_debut = f"log_date_debut_{mode}_{etape_id}"
+            key_date_fin = f"log_date_fin_{mode}_{etape_id}"
+
             if multi_jours:
                 c1, c2 = st.columns(2)
                 if mode == "creation":
-                    f_date_debut_in = c1.date_input("Date de départ", val_date, format="DD/MM/YYYY")
-                    f_date_fin_in = c2.date_input("Date d'arrivée", val_date, format="DD/MM/YYYY")
+                    f_date_debut_in = c1.date_input("Date de départ", val_date, format="DD/MM/YYYY", key=key_date_debut)
+                    f_date_fin_in = c2.date_input("Date d'arrivée", val_date, format="DD/MM/YYYY", key=key_date_fin)
                 else:
-                    f_date_debut_in = c1.text_input("Date de départ", value=val_date)
-                    f_date_fin_in = c2.text_input("Date d'arrivée", value=val_date_fin)
+                    f_date_debut_in = c1.text_input("Date de départ", value=val_date, key=key_date_debut)
+                    f_date_fin_in = c2.text_input("Date d'arrivée", value=val_date_fin, key=key_date_fin)
             else:
                 if mode == "creation":
-                    f_date_debut_in = st.date_input("Date", val_date, format="DD/MM/YYYY")
+                    f_date_debut_in = st.date_input("Date", val_date, format="DD/MM/YYYY", key=key_date_debut)
                 else:
-                    f_date_debut_in = st.text_input("Date", value=val_date)
+                    f_date_debut_in = st.text_input("Date", value=val_date, key=key_date_debut)
                 f_date_fin_in = None
 
             f_equipage = st.text_area("Équipage / Rôle", value=val_equi, height=60)
@@ -248,11 +258,20 @@ def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", e
                     etapes_maj = modifier_etape(etapes, etape_id, champs)
                     st.session_state.log_edit_id = None
 
+                # On "oublie" volontairement les valeurs saisies pour la
+                # date et la case multi-jours, sinon la prochaine ouverture
+                # du formulaire "Nouvelle étape" réutiliserait par erreur
+                # la dernière date tapée au lieu de repartir à zéro.
+                for cle in (key_date_debut, key_date_fin, f"chk_multi_jours_{mode}_{etape_id}"):
+                    st.session_state.pop(cle, None)
+
                 sauvegarder_etapes(etapes_maj)
                 st.session_state.log_saisie_ouverte = False
                 st.rerun()
 
             if b2.form_submit_button("❌ ANNULER", use_container_width=True):
+                for cle in (key_date_debut, key_date_fin, f"chk_multi_jours_{mode}_{etape_id}"):
+                    st.session_state.pop(cle, None)
                 st.session_state.log_saisie_ouverte = False
                 st.session_state.log_edit_id = None
                 st.rerun()
