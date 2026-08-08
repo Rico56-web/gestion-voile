@@ -168,27 +168,6 @@
         ]
     },
     {
-        "id":"cr-56835d19",
-        "nom_croisiere":"Nav click",
-        "date_debut":"03\/03\/2026",
-        "jours":2,
-        "notes":"Sympa et cool  . Elle est venue avec sa fille de 15ans",
-        "participants":[
-            {
-                "contact_id":"c-a522b29d",
-                "societe":"CLICK",
-                "prix":479.0,
-                "acompte":479.0,
-                "terminee":true,
-                "payee":true,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-56102bd8",
         "nom_croisiere":"(\u00e0 d\u00e9finir)",
         "date_debut":"07\/03\/2026",
@@ -821,6 +800,27 @@
                 "societe":"PERSO",
                 "prix":540.0,
                 "acompte":540.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-56835d19",
+        "nom_croisiere":"Nav click",
+        "date_debut":"03\/03\/2026",
+        "jours":2,
+        "notes":"Sympa et cool  . Elle est venue avec sa fille de 15ans",
+        "participants":[
+            {
+                "contact_id":"c-a522b29d",
+                "societe":"CLICK",
+                "prix":479.0,
+                "acompte":479.0,
                 "terminee":true,
                 "payee":true,
                 "annulee":false,
