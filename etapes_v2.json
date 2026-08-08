@@ -593,5 +593,22 @@
         "carburant":null,
         "notes":"soir a port haliguen",
         "date_fin":null
+    },
+    {
+        "id":"e-6246bea2",
+        "croisiere_id":"cr-b16edb7f",
+        "date":"25\/07\/2026",
+        "navigation":"sortie avec Freddy (click)",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":0.0,
+        "heures_moteur":3.5,
+        "heures_voile":0.0,
+        "compteur_moteur":2506.5,
+        "meteo":"tres beau soleil",
+        "coequipiers_texte":"idem",
+        "carburant":null,
+        "notes":"",
+        "date_fin":null
     }
 ]
