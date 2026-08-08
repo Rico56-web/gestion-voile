@@ -264,27 +264,6 @@
         ]
     },
     {
-        "id":"cr-6844fed5",
-        "nom_croisiere":"(\u00e0 d\u00e9finir)",
-        "date_debut":"04\/04\/2026",
-        "jours":1,
-        "notes":"ras",
-        "participants":[
-            {
-                "contact_id":"c-94eac341",
-                "societe":"PERSO",
-                "prix":540.0,
-                "acompte":540.0,
-                "terminee":true,
-                "payee":true,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-f3a82eac",
         "nom_croisiere":"test \u00e9quipe espagne",
         "date_debut":"20\/04\/2026",
@@ -821,6 +800,27 @@
                 "societe":"CLICK",
                 "prix":281.0,
                 "acompte":0.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-6844fed5",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"04\/04\/2026",
+        "jours":1,
+        "notes":"ras",
+        "participants":[
+            {
+                "contact_id":"c-94eac341",
+                "societe":"PERSO",
+                "prix":540.0,
+                "acompte":540.0,
                 "terminee":true,
                 "payee":true,
                 "annulee":false,
