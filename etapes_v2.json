@@ -559,5 +559,22 @@
         "carburant":null,
         "notes":"Freddy habite a THEIX il est eleveur de bovins charolais et aussi conducteur de travaux sur la peninsule ",
         "date_fin":null
+    },
+    {
+        "id":"e-620ca99c",
+        "croisiere_id":"cr-b16edb7f",
+        "date":"23\/07\/2026",
+        "navigation":"sortie avec Freddy (click)",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":0.0,
+        "heures_moteur":2.0,
+        "heures_voile":0.0,
+        "compteur_moteur":2502.0,
+        "meteo":"",
+        "coequipiers_texte":"idem a la veille . ",
+        "carburant":null,
+        "notes":"mouillage a a la grande plage puis Ster Vraz. affichage compteur moteur HS",
+        "date_fin":null
     }
 ]
