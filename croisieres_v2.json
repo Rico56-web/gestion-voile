@@ -306,27 +306,6 @@
         ]
     },
     {
-        "id":"cr-0d21c7da",
-        "nom_croisiere":"(\u00e0 d\u00e9finir)",
-        "date_debut":"09\/05\/2026",
-        "jours":2,
-        "notes":"ras",
-        "participants":[
-            {
-                "contact_id":"c-4f2a1792",
-                "societe":"VOG",
-                "prix":280.0,
-                "acompte":0.0,
-                "terminee":true,
-                "payee":true,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-228e4062",
         "nom_croisiere":"nav aurelien",
         "date_debut":"23\/05\/2026",
@@ -821,6 +800,27 @@
                 "societe":"PERSO",
                 "prix":540.0,
                 "acompte":540.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-0d21c7da",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"08\/05\/2026",
+        "jours":2,
+        "notes":"ras",
+        "participants":[
+            {
+                "contact_id":"c-4f2a1792",
+                "societe":"VOG",
+                "prix":280.0,
+                "acompte":0.0,
                 "terminee":true,
                 "payee":true,
                 "annulee":false,
