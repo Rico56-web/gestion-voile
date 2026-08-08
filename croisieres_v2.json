@@ -474,27 +474,6 @@
         ]
     },
     {
-        "id":"cr-a98b8b0c",
-        "nom_croisiere":"(\u00e0 d\u00e9finir)",
-        "date_debut":"18\/09\/2026",
-        "jours":1,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-4df23144",
-                "societe":"CLICK",
-                "prix":170.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-61bb5fd4",
         "nom_croisiere":"(\u00e0 d\u00e9finir)",
         "date_debut":"19\/09\/2026",
@@ -841,6 +820,27 @@
                 "contact_id":"c-1360fcc1",
                 "societe":"CLICK",
                 "prix":274.0,
+                "acompte":0.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-a98b8b0c",
+        "nom_croisiere":"Click avec Daniel,",
+        "date_debut":"18\/09\/2026",
+        "jours":1,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4df23144",
+                "societe":"CLICK",
+                "prix":170.0,
                 "acompte":0.0,
                 "terminee":false,
                 "payee":false,
