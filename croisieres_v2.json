@@ -684,27 +684,6 @@
         ]
     },
     {
-        "id":"cr-9af8cf73",
-        "nom_croisiere":"(\u00e0 d\u00e9finir)",
-        "date_debut":"17\/08\/2026",
-        "jours":5,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-b286d800",
-                "societe":"CLICK",
-                "prix":676.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-0538241a",
         "nom_croisiere":"(\u00e0 d\u00e9finir)",
         "date_debut":"18\/04\/2026",
@@ -820,6 +799,27 @@
                 "contact_id":"c-4d757fd3",
                 "societe":"CMN",
                 "prix":450.0,
+                "acompte":0.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-9af8cf73",
+        "nom_croisiere":"Sortie Click avec Thomas",
+        "date_debut":"17\/08\/2026",
+        "jours":5,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-b286d800",
+                "societe":"CLICK",
+                "prix":676.0,
                 "acompte":0.0,
                 "terminee":false,
                 "payee":false,
