@@ -839,8 +839,8 @@
         "participants":[
             {
                 "contact_id":"c-1360fcc1",
-                "societe":"PERSO",
-                "prix":0.0,
+                "societe":"CLICK",
+                "prix":274.0,
                 "acompte":0.0,
                 "terminee":false,
                 "payee":false,
