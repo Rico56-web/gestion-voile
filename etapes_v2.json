@@ -610,5 +610,22 @@
         "carburant":null,
         "notes":"",
         "date_fin":null
+    },
+    {
+        "id":"e-3925cb00",
+        "croisiere_id":"cr-03e06661",
+        "date":"28\/07\/2026",
+        "navigation":"journ\u00e9e avec Elisabeth , sa fille Maelys et sa correspondante canadienne Maelys \u00e9galement ",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":0.0,
+        "heures_moteur":1.5,
+        "heures_voile":0.0,
+        "compteur_moteur":2508.0,
+        "meteo":"tr\u00e8s beau soleil ",
+        "coequipiers_texte":"",
+        "carburant":null,
+        "notes":"moteur car peu de vent en AM",
+        "date_fin":null
     }
 ]
