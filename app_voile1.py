@@ -210,7 +210,13 @@ page_choisie = col_page.selectbox(
     format_func=lambda name: f"{icones[name]} {name}",
     key="select_page", label_visibility="collapsed",
 )
-if page_choisie != st.session_state.page:
+# On ne "corrige" le menu du haut que si la page actuelle fait partie
+# des pages listées dans THEMES. Sinon (ex: MODIFIER_CROISIERE,
+# MODIFIER_CONTACT, ARCHIVES — des pages "enfant" volontairement absentes
+# du menu), on laisserait ce menu annuler la navigation vers ces pages
+# juste après y être arrivé.
+toutes_pages_menu = sum(THEMES.values(), [])
+if st.session_state.page in toutes_pages_menu and page_choisie != st.session_state.page:
     changer_page(page_choisie)
     
 THEME_COULEURS = {"🧭 Navigation": "#2980B9", "👥 Gestion": "#27AE60", "🛠️ Bord": "#E67E22"}
