@@ -14,7 +14,7 @@
         "coequipiers_texte":"Elisabeth Philippe et sa fille",
         "carburant":null,
         "notes":"",
-        "date_fin":"nan"
+        "date_fin":null
     },
     {
         "id":"e-5d8543d5",
@@ -37,7 +37,7 @@
         "id":"e-363969ba",
         "croisiere_id":"cr-56835d19",
         "date":"03\/03\/2026",
-        "navigation":"Nav click",
+        "navigation":"Nav click avec Elisabeth Philippe",
         "port_depart":"nan",
         "port_arrivee":"LE PALAIS",
         "milles":37.0,
@@ -48,7 +48,7 @@
         "coequipiers_texte":"Elisabeth Philippe et sa fille",
         "carburant":null,
         "notes":"",
-        "date_fin":null
+        "date_fin":"nan"
     },
     {
         "id":"e-1aae4ae8",
