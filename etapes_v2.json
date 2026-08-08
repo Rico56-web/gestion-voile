@@ -2,7 +2,7 @@
     {
         "id":"e-7819a39d",
         "croisiere_id":null,
-        "date":"03\/01\/2026",
+        "date":"01\/03\/2026",
         "navigation":"Nav click",
         "port_depart":"Arzon",
         "port_arrivee":"PORT HALIGUEN",
@@ -14,7 +14,7 @@
         "coequipiers_texte":"Elisabeth Philippe et sa fille",
         "carburant":null,
         "notes":"",
-        "date_fin":null
+        "date_fin":"nan"
     },
     {
         "id":"e-5d8543d5",
@@ -31,7 +31,7 @@
         "coequipiers_texte":"Elisabeth Philippe et sa fille",
         "carburant":null,
         "notes":"",
-        "date_fin":"nan"
+        "date_fin":null
     },
     {
         "id":"e-363969ba",
