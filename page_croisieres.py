@@ -17,7 +17,7 @@ import pandas as pd
 import streamlit as st
 from openpyxl.utils import get_column_letter
 
-from modele_voile import filtrer_temporel, trier_croisieres, noms_participants, couleur_croisiere, fond_clair
+from modele_voile import filtrer_temporel, trier_croisieres, noms_participants, couleur_croisiere, fond_clair, parse_date_eu
 
 OPTIONS_TRI = {
     "date_desc": "🗓️ Date (récent → ancien)",
@@ -84,6 +84,27 @@ def _etapes_liees(etapes, croisiere_id):
     return [e for e in etapes if e.get("croisiere_id") == croisiere_id]
 
 
+def _nb_jours_etape(e):
+    """Nombre de jours couverts par UNE étape du LOG (même logique que
+    dans page_log.py) : 1 jour normalement, ou plus si 'date_fin' est
+    renseignée (saisie 'multi-jours' — une seule ligne pour toute une
+    période)."""
+    date_fin_str = e.get("date_fin")
+    if not date_fin_str:
+        return 1
+    d_debut = parse_date_eu(e.get("date", ""))
+    d_fin = parse_date_eu(date_fin_str)
+    if d_debut and d_fin and d_fin >= d_debut:
+        return (d_fin - d_debut).days + 1
+    return 1
+
+
+def _jours_reels(etapes_cr):
+    """Total des jours réellement couverts par les étapes du LOG liées à
+    une croisière (somme de _nb_jours_etape pour chacune)."""
+    return sum(_nb_jours_etape(e) for e in etapes_cr)
+
+
 def _construire_tableau_synthese(croisieres_affichees, contacts_par_id, etapes):
     """Construit le DataFrame résumé : 1 ligne par croisière, dans le même
     ordre que 'croisieres_affichees' (utile pour retrouver la bonne
@@ -91,19 +112,36 @@ def _construire_tableau_synthese(croisieres_affichees, contacts_par_id, etapes):
     lignes = []
     for cr in croisieres_affichees:
         prix_total = sum(p.get("prix", 0) or 0 for p in cr.get("participants", []))
-        # "Journalisé" : est-ce qu'au moins une étape du LOG est déjà liée
+        etapes_cr = _etapes_liees(etapes, cr.get("id"))
+        jours_prevus = cr.get("jours", 1)
+        jours_reel = _jours_reels(etapes_cr)
+
+        # "LOG rempli" : est-ce qu'au moins une étape du LOG est déjà liée
         # à cette croisière ? Répond à la question "ai-je déjà rempli le
         # livre de bord pour cette sortie ?".
-        journalise = "✅ Oui" if _etapes_liees(etapes, cr.get("id")) else "⏳ Pas encore"
+        log_rempli = "✅ Oui" if etapes_cr else "⏳ Pas encore"
+
+        # "Écart" : compare les jours prévus (réservation) aux jours
+        # réellement saisis dans le LOG. On n'affiche une alerte que si
+        # le LOG a déjà été rempli au moins une fois — sinon "Pas encore"
+        # (colonne précédente) suffit à le dire, pas besoin de doublon.
+        if not etapes_cr:
+            ecart = "-"
+        elif jours_reel == jours_prevus:
+            ecart = "✅ OK"
+        else:
+            ecart = f"⚠️ {jours_reel}/{jours_prevus} j"
+
         lignes.append({
             "Date": cr.get("date_debut") or "-",
             "Nom": cr.get("nom_croisiere") or "(sans nom)",
             "Participant(s)": noms_participants(cr, contacts_par_id),
             "Site": _site_participant(cr),
-            "Jours": cr.get("jours", 1),
+            "Jours": jours_prevus,
             "Prix (€)": prix_total,
             "Statut": _statut_texte(cr),
-            "Journalisé": journalise,
+            "LOG rempli": log_rempli,
+            "Écart": ecart,
         })
     return pd.DataFrame(lignes)
 
@@ -161,6 +199,17 @@ def _afficher_detail_croisiere(cr, sauvegarder_croisieres, contacts_par_id, etap
         if not etapes_cr:
             st.info("Aucune étape saisie dans le LOG pour cette croisière pour le moment.")
         else:
+            jours_prevus = cr.get("jours", 1)
+            jours_reel = _jours_reels(etapes_cr)
+            if jours_reel != jours_prevus:
+                st.warning(
+                    f"⚠️ {jours_prevus} jour(s) prévu(s) à la réservation, "
+                    f"mais {jours_reel} jour(s) saisi(s) dans le LOG — vérifie "
+                    f"qu'il ne manque pas une étape (ou qu'il n'y en a pas une en trop)."
+                )
+            else:
+                st.success(f"✅ Nombre de jours cohérent avec la réservation ({jours_reel} j).")
+
             for e in etapes_cr:
                 if e.get("date_fin"):
                     label_date = f"📅 {e.get('date','')} → {e.get('date_fin','')}"
