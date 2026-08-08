@@ -33,7 +33,7 @@ from openpyxl.utils import get_column_letter
 from modele_voile import (
     generer_id_etape, trouver_croisiere_id_pour_date, suggestion_nom_navigation,
     ajouter_etape, modifier_etape, supprimer_etape, etapes_groupees_par_navigation,
-    derniere_lecture_compteur, parse_date_eu, fond_clair,
+    derniere_lecture_compteur, parse_date_eu, fond_clair, noms_participants,
 )
 
 PALETTE_NAVIGATION = ["#2980B9", "#27AE60", "#8E44AD", "#D35400", "#16A085", "#C0392B", "#2C3E50", "#E67E22"]
@@ -43,6 +43,40 @@ def _couleur_navigation(nom_nav):
     """Couleur stable par nom de navigation (même principe que pour les
     contacts), pour distinguer visuellement chaque voyage d'un coup d'œil."""
     return PALETTE_NAVIGATION[hash(nom_nav) % len(PALETTE_NAVIGATION)]
+
+
+def _suggestion_pour_date(croisieres, contacts_par_id, date_str):
+    """À partir d'une date de départ saisie dans le LOG, cherche s'il
+    existe une croisière déjà planifiée pour cette date, et prépare une
+    suggestion de nom de navigation + équipage à partir de cette
+    croisière. Renvoie (nom_suggere, equipage_suggere) — chacun peut être
+    une chaîne vide si rien de pertinent n'a été trouvé.
+
+    Séparée de l'affichage (aucun st.xxx ici) pour pouvoir être testée
+    facilement sans lancer l'application."""
+    d_obj = parse_date_eu(date_str)
+    if not d_obj:
+        return "", ""
+
+    croisiere_id = trouver_croisiere_id_pour_date(croisieres, d_obj)
+    if not croisiere_id:
+        return "", ""
+
+    croisiere = next((c for c in croisieres if c.get("id") == croisiere_id), None)
+    if not croisiere:
+        return "", ""
+
+    nom_croisiere = (croisiere.get("nom_croisiere") or "").strip()
+    # "(à définir)" est un nom encore vide côté croisière (pas un vrai nom
+    # de voyage) : pas la peine de le proposer comme suggestion, autant
+    # laisser le champ vide pour que tu tapes le vrai nom.
+    nom_suggere = nom_croisiere if nom_croisiere and nom_croisiere != "(à définir)" else ""
+
+    equipage_suggere = noms_participants(croisiere, contacts_par_id)
+    if equipage_suggere in ("(sans participant)", "?"):
+        equipage_suggere = ""
+
+    return nom_suggere, equipage_suggere
 
 
 def _site_croisiere(croisieres, croisiere_id):
@@ -132,7 +166,7 @@ def _construire_tableau_synthese(groupes, croisieres):
     return pd.DataFrame(lignes)
 
 
-def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", etape_id=None):
+def _formulaire_etape(etapes, croisieres, contacts_par_id, sauvegarder_etapes, mode="creation", etape_id=None):
     """Formulaire unique pour créer ou modifier une étape."""
     title = "➕ NOUVELLE ÉTAPE QUOTIDIENNE" if mode == "creation" else "📝 MODIFIER L'ÉTAPE"
 
@@ -166,6 +200,11 @@ def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", e
         val_voile = 0.0
         multi_jours_par_defaut = False
 
+    key_date_debut = f"log_date_debut_{mode}_{etape_id}"
+    key_date_fin = f"log_date_fin_{mode}_{etape_id}"
+    key_nav = f"log_nav_{mode}_{etape_id}"
+    key_equipage = f"log_equipage_{mode}_{etape_id}"
+
     with st.expander(title, expanded=True):
         # La case à cocher est VOLONTAIREMENT en dehors du st.form : dans
         # Streamlit, les widgets à l'intérieur d'un formulaire ne
@@ -180,35 +219,58 @@ def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", e
             key=f"chk_multi_jours_{mode}_{etape_id}",
         )
 
-        with st.form(key=f"form_log_{mode}"):
-            f_nav = st.text_input("Nom du Voyage / Croisière", value=val_nav, placeholder="ex: Gijón 2026")
+        if mode == "creation":
+            # NOUVEAU : en création, la date de départ est ELLE AUSSI en
+            # dehors du formulaire, pour la même raison que la case
+            # multi-jours — dès que tu la changes, on veut réagir tout de
+            # suite : chercher s'il existe une croisière déjà planifiée à
+            # cette date, et si oui, pré-remplir le nom du voyage et
+            # l'équipage avant que tu voies ces champs.
+            label_date_debut = "Date de départ" if multi_jours else "Date"
+            f_date_debut_in = st.date_input(label_date_debut, val_date, format="DD/MM/YYYY", key=key_date_debut)
+            date_str_actuelle = f_date_debut_in.strftime("%d/%m/%Y")
 
-            # IMPORTANT : on donne une 'key' FIXE à chaque champ de date,
-            # qui ne dépend PAS de multi_jours. Sans ça, comme le libellé
-            # passe de "Date" à "Date de départ" selon la case cochée,
-            # Streamlit considère qu'il s'agit d'un champ différent à
-            # chaque bascule de la case — et donc oublie la date déjà
-            # tapée, en revenant à sa valeur par défaut (aujourd'hui).
-            # Avec une clé stable, la valeur saisie est conservée.
-            key_date_debut = f"log_date_debut_{mode}_{etape_id}"
-            key_date_fin = f"log_date_fin_{mode}_{etape_id}"
+            # On ne recalcule la suggestion QUE quand la date vient de
+            # changer depuis le dernier passage (pas à chaque clic sur un
+            # autre bouton) — sinon, si tu as déjà corrigé le nom à la
+            # main, on l'écraserait sans arrêt à chaque interaction.
+            cle_derniere_date = f"log_derniere_date_suggeree_{mode}_{etape_id}"
+            if st.session_state.get(cle_derniere_date) != date_str_actuelle:
+                st.session_state[cle_derniere_date] = date_str_actuelle
+                nom_suggere, equipage_suggere = _suggestion_pour_date(croisieres, contacts_par_id, date_str_actuelle)
+                st.session_state[key_nav] = nom_suggere or val_nav
+                st.session_state[key_equipage] = equipage_suggere or val_equi
+                if nom_suggere or equipage_suggere:
+                    st.caption("💡 Nom et équipage pré-remplis à partir d'une croisière planifiée à cette date — modifiables ci-dessous.")
+        else:
+            f_date_debut_in = None  # saisie DANS le formulaire, comme avant (pas de pré-remplissage en édition)
+
+        # Valeurs de secours : si la clé n'a encore jamais été définie
+        # (premier affichage, ou mode édition où on ne pré-remplit pas
+        # automatiquement), on repart sur la valeur existante de l'étape.
+        st.session_state.setdefault(key_nav, val_nav)
+        st.session_state.setdefault(key_equipage, val_equi)
+
+        with st.form(key=f"form_log_{mode}"):
+            f_nav = st.text_input("Nom du Voyage / Croisière", key=key_nav, placeholder="ex: Gijón 2026")
 
             if multi_jours:
                 c1, c2 = st.columns(2)
                 if mode == "creation":
-                    f_date_debut_in = c1.date_input("Date de départ", val_date, format="DD/MM/YYYY", key=key_date_debut)
+                    # La date de départ a déjà été saisie plus haut (hors
+                    # formulaire) ; on ne l'affiche qu'une fois — ici on ne
+                    # montre donc que la date d'arrivée.
+                    c1.text_input("Date de départ (déjà saisie ci-dessus)", value=date_str_actuelle, disabled=True)
                     f_date_fin_in = c2.date_input("Date d'arrivée", val_date, format="DD/MM/YYYY", key=key_date_fin)
                 else:
                     f_date_debut_in = c1.text_input("Date de départ", value=val_date, key=key_date_debut)
                     f_date_fin_in = c2.text_input("Date d'arrivée", value=val_date_fin, key=key_date_fin)
             else:
-                if mode == "creation":
-                    f_date_debut_in = st.date_input("Date", val_date, format="DD/MM/YYYY", key=key_date_debut)
-                else:
+                if mode == "edition":
                     f_date_debut_in = st.text_input("Date", value=val_date, key=key_date_debut)
                 f_date_fin_in = None
 
-            f_equipage = st.text_area("Équipage / Rôle", value=val_equi, height=60)
+            f_equipage = st.text_area("Équipage / Rôle", key=key_equipage, height=60)
 
             cm1, cm2 = st.columns(2)
             f_meteo = cm1.text_input("Météo (Vent/Mer)", value=val_meteo)
@@ -232,7 +294,8 @@ def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", e
                 # modifiant une étape qui était multi-jours avant).
                 date_str = f_date_debut_in.strftime("%d/%m/%Y") if mode == "creation" else f_date_debut_in
                 if multi_jours:
-                    date_fin_str = f_date_fin_in.strftime("%d/%m/%Y") if mode == "creation" else f_date_fin_in
+                    f_date_fin_valeur = f_date_fin_in.strftime("%d/%m/%Y") if mode == "creation" else f_date_fin_in
+                    date_fin_str = f_date_fin_valeur
                 else:
                     date_fin_str = None
 
@@ -278,10 +341,13 @@ def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", e
                     st.session_state.log_edit_id = None
 
                 # On "oublie" volontairement les valeurs saisies pour la
-                # date et la case multi-jours, sinon la prochaine ouverture
-                # du formulaire "Nouvelle étape" réutiliserait par erreur
-                # la dernière date tapée au lieu de repartir à zéro.
-                for cle in (key_date_debut, key_date_fin, f"chk_multi_jours_{mode}_{etape_id}"):
+                # date, la case multi-jours, le nom et l'équipage (y
+                # compris ceux pré-remplis automatiquement), sinon la
+                # prochaine ouverture du formulaire "Nouvelle étape"
+                # réutiliserait par erreur les dernières valeurs tapées
+                # au lieu de repartir à zéro.
+                for cle in (key_date_debut, key_date_fin, f"chk_multi_jours_{mode}_{etape_id}",
+                            key_nav, key_equipage, f"log_derniere_date_suggeree_{mode}_{etape_id}"):
                     st.session_state.pop(cle, None)
 
                 sauvegarder_etapes(etapes_maj)
@@ -289,7 +355,8 @@ def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", e
                 st.rerun()
 
             if b2.form_submit_button("❌ ANNULER", use_container_width=True):
-                for cle in (key_date_debut, key_date_fin, f"chk_multi_jours_{mode}_{etape_id}"):
+                for cle in (key_date_debut, key_date_fin, f"chk_multi_jours_{mode}_{etape_id}",
+                            key_nav, key_equipage, f"log_derniere_date_suggeree_{mode}_{etape_id}"):
                     st.session_state.pop(cle, None)
                 st.session_state.log_saisie_ouverte = False
                 st.session_state.log_edit_id = None
@@ -356,8 +423,11 @@ def _afficher_detail_navigation(nom_nav, liste, etapes, sauvegarder_etapes):
                         st.rerun()
 
 
-def afficher_page_log(charger_etapes, sauvegarder_etapes, charger_croisieres):
-    """Point d'entrée de la page. Fonctions injectées depuis app_voile1.py."""
+def afficher_page_log(charger_etapes, sauvegarder_etapes, charger_croisieres, charger_contacts):
+    """Point d'entrée de la page. Fonctions injectées depuis app_voile1.py.
+    charger_contacts est nécessaire pour transformer les participants
+    d'une croisière (contact_id) en noms lisibles, utilisé pour
+    pré-remplir automatiquement l'équipage à partir de la date saisie."""
 
     st.markdown(
         '<div style="text-align:center; background-color:#2c3e50; color:white; padding:10px; border-radius:10px;">'
@@ -367,6 +437,7 @@ def afficher_page_log(charger_etapes, sauvegarder_etapes, charger_croisieres):
 
     etapes = charger_etapes()
     croisieres = charger_croisieres()
+    contacts_par_id = {c["id"]: c for c in charger_contacts()}
 
     # Mémorise le plus grand nombre d'étapes qu'on a déjà vu chargé avec
     # succès. Sert de référence au garde-fou anti-perte-de-données au
@@ -382,9 +453,9 @@ def afficher_page_log(charger_etapes, sauvegarder_etapes, charger_croisieres):
         st.session_state.log_edit_id = None
 
     if st.session_state.log_edit_id is not None:
-        _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="edition", etape_id=st.session_state.log_edit_id)
+        _formulaire_etape(etapes, croisieres, contacts_par_id, sauvegarder_etapes, mode="edition", etape_id=st.session_state.log_edit_id)
     elif st.session_state.log_saisie_ouverte:
-        _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation")
+        _formulaire_etape(etapes, croisieres, contacts_par_id, sauvegarder_etapes, mode="creation")
     else:
         if st.button("➕ NOUVELLE ÉTAPE QUOTIDIENNE", use_container_width=True):
             st.session_state.log_saisie_ouverte = True
