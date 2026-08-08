@@ -253,6 +253,23 @@ def _formulaire_etape(etapes, croisieres, sauvegarder_etapes, mode="creation", e
                     "croisiere_id": croisiere_id,
                 }
 
+                # GARDE-FOU anti-perte-de-données : si 'etapes' (chargé en
+                # début de page) est vide alors qu'on est en train d'AJOUTER
+                # une étape (pas de créer le tout premier livre de bord),
+                # c'est le signe d'un chargement GitHub qui a échoué
+                # silencieusement. On refuse d'enregistrer plutôt que
+                # d'écraser tout le livre de bord avec une seule ligne.
+                if mode == "creation" and len(etapes) == 0 and st.session_state.get("log_dernier_total", 0) > 1:
+                    st.error(
+                        "⚠️ Sauvegarde annulée par sécurité : la liste des étapes "
+                        "semblait vide au moment d'enregistrer (probablement un "
+                        "problème de connexion à GitHub juste avant), alors qu'il "
+                        "y en avait plusieurs juste avant. Pour éviter d'écraser "
+                        "ton livre de bord existant, rien n'a été sauvegardé. "
+                        "Recharge la page et réessaie."
+                    )
+                    st.stop()
+
                 if mode == "creation":
                     nouvelle = {"id": generer_id_etape(), "carburant": None, **champs}
                     etapes_maj = ajouter_etape(etapes, nouvelle)
@@ -351,6 +368,14 @@ def afficher_page_log(charger_etapes, sauvegarder_etapes, charger_croisieres):
     etapes = charger_etapes()
     croisieres = charger_croisieres()
 
+    # Mémorise le plus grand nombre d'étapes qu'on a déjà vu chargé avec
+    # succès. Sert de référence au garde-fou anti-perte-de-données au
+    # moment de la sauvegarde (voir _formulaire_etape) : si on tente
+    # d'enregistrer alors que 'etapes' est vide MAIS qu'on sait qu'il y en
+    # avait beaucoup avant, c'est le signe d'un chargement raté.
+    if len(etapes) > 0:
+        st.session_state.log_dernier_total = max(len(etapes), st.session_state.get("log_dernier_total", 0))
+
     if "log_saisie_ouverte" not in st.session_state:
         st.session_state.log_saisie_ouverte = False
     if "log_edit_id" not in st.session_state:
@@ -434,3 +459,43 @@ def afficher_page_log(charger_etapes, sauvegarder_etapes, charger_croisieres):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
+
+    # --- Outil de maintenance : recalculer les liens avec les croisières ---
+    if etapes:
+        st.divider()
+        with st.expander("🔧 Outils de maintenance"):
+            st.caption(
+                "Le lien entre une étape du LOG et une croisière (utilisé sur la "
+                "page Croisières) est calculé au moment où tu enregistres l'étape. "
+                "Si tu crées ou modifies la fiche d'une croisière APRÈS avoir déjà "
+                "saisi les étapes correspondantes dans le LOG, ce lien peut manquer "
+                "sur les anciennes étapes. Ce bouton recalcule tous les liens à "
+                "partir des croisières actuelles, sans rien modifier d'autre "
+                "(dates, météo, milles... restent inchangés)."
+            )
+            if st.button("🔄 Recalculer les liens avec les croisières", use_container_width=True):
+                # GARDE-FOU (même principe que pour l'ajout d'étape) :
+                # si 'etapes' semble vide au moment de recalculer alors
+                # qu'on sait qu'il y en avait beaucoup, on refuse plutôt
+                # que d'écraser le livre de bord avec presque rien.
+                if len(etapes) == 0 and st.session_state.get("log_dernier_total", 0) > 1:
+                    st.error(
+                        "⚠️ Recalcul annulé par sécurité : la liste des étapes "
+                        "semblait vide (probablement un problème de connexion à "
+                        "GitHub). Recharge la page et réessaie."
+                    )
+                    st.stop()
+
+                nb_changements = 0
+                etapes_recalculees = []
+                for e in etapes:
+                    d_obj = parse_date_eu(e.get("date", ""))
+                    nouveau_croisiere_id = trouver_croisiere_id_pour_date(croisieres, d_obj) if d_obj else None
+                    if nouveau_croisiere_id != e.get("croisiere_id"):
+                        nb_changements += 1
+                    e_maj = {**e, "croisiere_id": nouveau_croisiere_id}
+                    etapes_recalculees.append(e_maj)
+
+                sauvegarder_etapes(etapes_recalculees)
+                st.success(f"✅ Terminé : {nb_changements} étape(s) mise(s) à jour sur {len(etapes)}.")
+                st.rerun()
