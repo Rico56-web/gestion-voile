@@ -384,6 +384,7 @@ def afficher_page_log(charger_etapes, sauvegarder_etapes, charger_croisieres):
             selection_mode="single-row",
             hide_index=True,
             use_container_width=True,
+            key="tableau_synthese_log",
             column_config={
                 "Milles": st.column_config.NumberColumn(format="%.1f NM"),
             },
