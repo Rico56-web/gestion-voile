@@ -14,7 +14,7 @@
         "coequipiers_texte":"Elisabeth Philippe et sa fille",
         "carburant":null,
         "notes":"",
-        "date_fin":"nan"
+        "date_fin":null
     },
     {
         "id":"e-5d8543d5",
@@ -491,5 +491,22 @@
         "carburant":null,
         "notes":"",
         "date_fin":null
+    },
+    {
+        "id":"e-c9b18db5",
+        "croisiere_id":"cr-6844fed5",
+        "date":"04\/04\/2026",
+        "navigation":"Nav Aurelien ",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":0.0,
+        "heures_moteur":0.0,
+        "heures_voile":0.0,
+        "compteur_moteur":2496.2,
+        "meteo":"",
+        "coequipiers_texte":"famille Faucheux",
+        "carburant":null,
+        "notes":"",
+        "date_fin":"06\/04\/2026"
     }
 ]
