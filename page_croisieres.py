@@ -11,9 +11,11 @@ voir le détail complet et accéder à la modification/suppression.
 NE TOUCHE PAS à CONTACTS, MODIFIER_CONTACT, PLANNING, FACT, STATS, ARCHIVES.
 """
 from datetime import date
+import io
 
 import pandas as pd
 import streamlit as st
+from openpyxl.utils import get_column_letter
 
 from modele_voile import filtrer_temporel, trier_croisieres, noms_participants, couleur_croisiere, fond_clair
 
@@ -235,3 +237,35 @@ def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger
         _afficher_detail_croisiere(cr_choisie, sauvegarder_croisieres, contacts_par_id)
     else:
         st.info("Aucune croisière sélectionnée — clique sur une ligne ci-dessus pour voir le détail.")
+
+    # --- Export XLSX (Excel) ---
+    # On exporte le TABLEAU DE SYNTHÈSE (df_synthese), pas les données
+    # brutes : une croisière contient une liste imbriquée "participants",
+    # qui donnerait des cellules illisibles (du texte Python brut) dans
+    # Excel. Le tableau de synthèse est déjà "aplati" et propre.
+    st.divider()
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df_synthese.to_excel(writer, index=False, sheet_name="Croisières")
+        feuille = writer.sheets["Croisières"]
+
+        # Auto-largeur : pour chaque colonne, on mesure la longueur du
+        # texte le plus long (valeur ou en-tête), et on règle la largeur
+        # en conséquence (+2 pour un peu de marge visuelle).
+        for i, colonne in enumerate(df_synthese.columns, start=1):
+            if df_synthese.empty:
+                longueur_max = len(str(colonne))
+            else:
+                longueur_max = max(
+                    df_synthese[colonne].astype(str).map(len).max(),
+                    len(str(colonne)),
+                )
+            feuille.column_dimensions[get_column_letter(i)].width = longueur_max + 2
+
+    st.download_button(
+        label="📥 Télécharger les Croisières (.XLSX)",
+        data=buffer.getvalue(),
+        file_name="croisieres_vesta.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
