@@ -1,7 +1,7 @@
 [
     {
         "id":"e-7819a39d",
-        "croisiere_id":null,
+        "croisiere_id":"cr-282ce6b2",
         "date":"01\/03\/2026",
         "navigation":"Nav click avec Elisabeth Philippe",
         "port_depart":"Arzon",
@@ -18,7 +18,7 @@
     },
     {
         "id":"e-5d8543d5",
-        "croisiere_id":null,
+        "croisiere_id":"cr-282ce6b2",
         "date":"02\/03\/2026",
         "navigation":"Nav click avec Elisabeth Philippe",
         "port_depart":"",
