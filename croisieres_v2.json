@@ -285,27 +285,6 @@
         ]
     },
     {
-        "id":"cr-7448d956",
-        "nom_croisiere":"sortie vers les iles locales",
-        "date_debut":"12\/04\/2026",
-        "jours":2,
-        "notes":"couple cuistot tr\u00e8s sympa",
-        "participants":[
-            {
-                "contact_id":"c-bac994a7",
-                "societe":"CLICK",
-                "prix":281.0,
-                "acompte":0.0,
-                "terminee":true,
-                "payee":true,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-f3a82eac",
         "nom_croisiere":"test \u00e9quipe espagne",
         "date_debut":"20\/04\/2026",
@@ -820,6 +799,27 @@
                 "contact_id":"c-1566ce6f",
                 "societe":"CMN",
                 "prix":450.0,
+                "acompte":0.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-7448d956",
+        "nom_croisiere":"sortie vers les iles locales avec Camille",
+        "date_debut":"12\/04\/2026",
+        "jours":2,
+        "notes":"couple cuistot tr\u00e8s sympa",
+        "participants":[
+            {
+                "contact_id":"c-bac994a7",
+                "societe":"CLICK",
+                "prix":281.0,
                 "acompte":0.0,
                 "terminee":true,
                 "payee":true,
