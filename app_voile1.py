@@ -129,6 +129,14 @@ def sauvegarder_params(dict_params):
 # --- FONCTION UNIQUE DE CHANGEMENT DE PAGE (ÉVITE LES CONFLITS) ---
 def changer_page(nom_page):
     st.session_state.page = nom_page
+    # On synchronise aussi la mémoire du menu déroulant du haut, pour que
+    # peu importe le moyen utilisé pour changer de page (barre latérale,
+    # bouton "Modifier"...), le menu du haut ne tente pas de "corriger"
+    # la navigation en revenant sur son ancienne valeur.
+    theme_correspondant = next((t for t, pages in THEMES.items() if nom_page in pages), None)
+    if theme_correspondant is not None:
+        st.session_state.select_theme = theme_correspondant
+        st.session_state.select_page = nom_page
     st.session_state.maint_edit_id = None
     st.session_state.show_form_classique = False
     st.session_state.show_form_vidange = False
@@ -191,33 +199,34 @@ THEMES = {
     "👥 Gestion": ["CONTACTS", "RELANCES", "FACT"],
     "🛠️ Bord": ["MAINT", "STATS", "MEMOS"],
 }
-
-theme_de_la_page_active = next((t for t, pages in THEMES.items() if st.session_state.page in pages), "🧭 Navigation")
-if "theme_selectionne" not in st.session_state or st.session_state.page in sum(THEMES.values(), []):
-    st.session_state.theme_selectionne = theme_de_la_page_active
+# Valeurs de secours au tout premier chargement de l'appli (avant toute
+# navigation), pour que le menu ait quelque chose à afficher.
+if "select_theme" not in st.session_state:
+    st.session_state.select_theme = "🧭 Navigation"
+if "select_page" not in st.session_state:
+    st.session_state.select_page = "PLANNING"
 
 col_theme, col_page = st.columns(2)
 theme_choisi = col_theme.selectbox("Thème", list(THEMES.keys()),
-                                    index=list(THEMES.keys()).index(st.session_state.theme_selectionne),
                                     key="select_theme", label_visibility="collapsed")
-st.session_state.theme_selectionne = theme_choisi
 
 pages_du_theme = THEMES[theme_choisi]
-page_par_defaut = st.session_state.page if st.session_state.page in pages_du_theme else pages_du_theme[0]
+# Si on vient de changer de thème, l'ancienne page mémorisée peut ne plus
+# faire partie de ce thème : on la remet sur la première page du thème
+# pour éviter une erreur ("valeur absente de la liste").
+if st.session_state.select_page not in pages_du_theme:
+    st.session_state.select_page = pages_du_theme[0]
+
 page_choisie = col_page.selectbox(
     "Page", pages_du_theme,
-    index=pages_du_theme.index(page_par_defaut),
     format_func=lambda name: f"{icones[name]} {name}",
     key="select_page", label_visibility="collapsed",
 )
-# On ne "corrige" le menu du haut que si la page actuelle fait partie
-# des pages listées dans THEMES. Sinon (ex: MODIFIER_CROISIERE,
-# MODIFIER_CONTACT, ARCHIVES — des pages "enfant" volontairement absentes
-# du menu), on laisserait ce menu annuler la navigation vers ces pages
-# juste après y être arrivé.
+
 toutes_pages_menu = sum(THEMES.values(), [])
 if st.session_state.page in toutes_pages_menu and page_choisie != st.session_state.page:
     changer_page(page_choisie)
+
     
 THEME_COULEURS = {"🧭 Navigation": "#2980B9", "👥 Gestion": "#27AE60", "🛠️ Bord": "#E67E22"}
 couleur_theme = THEME_COULEURS[theme_choisi]
