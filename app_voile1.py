@@ -482,4 +482,5 @@ if st.session_state.page == "LOG":
         charger_etapes=lambda: charger_data_safe('etapes_v2.json').to_dict('records'),
         sauvegarder_etapes=lambda e: sauvegarder_data(pd.DataFrame(e), 'etapes_v2.json'),
         charger_croisieres=lambda: charger_data_safe('croisieres_v2.json').to_dict('records'),
+        charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
     )
