@@ -2,8 +2,9 @@
 page_croisieres.py
 ===================
 Liste des croisières, filtrée depuis le début de l'année en cours par
-défaut (avec option pour voir tout l'historique). Donne accès à la
-création d'une nouvelle croisière et à la modification d'une existante.
+défaut (avec option pour voir tout l'historique). Vue synthétique sous
+forme de tableau (1 ligne = 1 croisière), avec "zoom" sur une ligne pour
+voir le détail complet et accéder à la modification/suppression.
 
 À intégrer dans app_voile1.py via afficher_page_croisieres().
 
@@ -11,6 +12,7 @@ NE TOUCHE PAS à CONTACTS, MODIFIER_CONTACT, PLANNING, FACT, STATS, ARCHIVES.
 """
 from datetime import date
 
+import pandas as pd
 import streamlit as st
 
 from modele_voile import filtrer_temporel, trier_croisieres, noms_participants, couleur_croisiere, fond_clair
@@ -47,6 +49,96 @@ def _badges_statut(cr):
         f'font-size:0.72rem; font-weight:bold; margin-right:5px;">{txt}</span>'
         for txt, c in badges
     )
+
+
+def _statut_texte(cr):
+    """Version texte simple (sans HTML) du statut, pour l'afficher comme
+    une cellule normale dans le tableau de synthèse — les badges colorés
+    HTML ne s'affichent pas correctement dans un st.dataframe."""
+    participants = cr.get("participants", [])
+    if not participants:
+        return "-"
+    p = participants[0]
+    if p.get("annulee"):
+        return "❌ Annulée"
+    morceaux = ["✅ Terminée" if p.get("terminee") else "🟢 En cours"]
+    morceaux.append("💰 Payée" if p.get("payee") else "⏳ À encaisser")
+    return " · ".join(morceaux)
+
+
+def _site_participant(cr):
+    """Le 'site' (plateforme : CMN, CLICK, VOG, PERSO...) du 1er participant,
+    même logique que pour le tableau de synthèse du LOG."""
+    participants = cr.get("participants", [])
+    if participants:
+        return participants[0].get("societe") or "-"
+    return "-"
+
+
+def _construire_tableau_synthese(croisieres_affichees, contacts_par_id):
+    """Construit le DataFrame résumé : 1 ligne par croisière, dans le même
+    ordre que 'croisieres_affichees' (utile pour retrouver la bonne
+    croisière après une sélection dans le tableau, via son index)."""
+    lignes = []
+    for cr in croisieres_affichees:
+        prix_total = sum(p.get("prix", 0) or 0 for p in cr.get("participants", []))
+        lignes.append({
+            "Date": cr.get("date_debut") or "-",
+            "Nom": cr.get("nom_croisiere") or "(sans nom)",
+            "Participant(s)": noms_participants(cr, contacts_par_id),
+            "Site": _site_participant(cr),
+            "Jours": cr.get("jours", 1),
+            "Prix (€)": prix_total,
+            "Statut": _statut_texte(cr),
+        })
+    return pd.DataFrame(lignes)
+
+
+def _afficher_detail_croisiere(cr, sauvegarder_croisieres, contacts_par_id):
+    """Affiche le détail complet d'UNE croisière (le 'zoom') : la carte
+    HTML avec badges colorés, et les boutons Modifier / Supprimer.
+    C'est l'ancien affichage carte par carte, appelé uniquement pour la
+    croisière sélectionnée dans le tableau."""
+    couleur = couleur_croisiere(cr)
+    fond = fond_clair(couleur)
+    prix_total = sum(p.get("prix", 0) or 0 for p in cr.get("participants", []))
+    nom_participants = noms_participants(cr, contacts_par_id)
+    nom_croisiere = cr.get("nom_croisiere") or "(sans nom)"
+    badges = _badges_statut(cr)
+
+    with st.container(border=False):
+        st.markdown(
+            f"""
+            <div style="border-left:10px solid {couleur}; border-radius:10px; padding:14px 16px; margin-bottom:10px; background:{fond};">
+                <div style="font-size:1.05rem; font-weight:bold; color:#2c3e50;">📅 {cr.get('date_debut','?')}</div>
+                <div style="font-size:0.95rem; margin-top:2px;">👤 {nom_participants}</div>
+                <div style="font-size:0.9rem; color:#555; margin-top:2px;">⛵ {nom_croisiere} · {cr.get('jours',1)} jour(s) · <b>{prix_total:.0f} €</b></div>
+                <div style="margin-top:8px;">{badges}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        c_mod, c_sup = st.columns(2)
+        if c_mod.button("✏️ Modifier", key=f"ed_cr_{cr['id']}", use_container_width=True):
+            st.session_state.edit_croisiere_id = cr["id"]
+            st.session_state.page = "MODIFIER_CROISIERE"
+            st.rerun()
+
+        cle_confirm = f"confirm_del_cr_{cr['id']}"
+        if cle_confirm not in st.session_state:
+            if c_sup.button("🗑️ Supprimer", key=f"del_cr_{cr['id']}", use_container_width=True):
+                st.session_state[cle_confirm] = True
+                st.rerun()
+        else:
+            st.warning(f"Confirmer la suppression de la croisière du {cr.get('date_debut','?')} ({nom_participants}) ?")
+            cx, cy = st.columns(2)
+            if cx.button("✅ Oui, supprimer", key=f"y_cr_{cr['id']}", use_container_width=True):
+                st.session_state.pop(cle_confirm)
+                st.session_state.croisiere_id_a_supprimer = cr["id"]
+                st.rerun()
+            if cy.button("❌ Annuler", key=f"n_cr_{cr['id']}", use_container_width=True):
+                st.session_state.pop(cle_confirm)
+                st.rerun()
 
 
 def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger_contacts):
@@ -118,44 +210,28 @@ def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger
 
     st.caption(f"{len(croisieres_affichees)} croisière(s) affichée(s).")
 
-    for cr in croisieres_affichees:
-        couleur = couleur_croisiere(cr)
-        fond = fond_clair(couleur)
-        prix_total = sum(p.get("prix", 0) or 0 for p in cr.get("participants", []))
-        nom_participants = noms_participants(cr, contacts_par_id)
-        nom_croisiere = cr.get("nom_croisiere") or "(sans nom)"
-        badges = _badges_statut(cr)
+    # --- Vue synthétique (1 ligne = 1 croisière) + zoom ---
+    df_synthese = _construire_tableau_synthese(croisieres_affichees, contacts_par_id)
 
-        with st.container(border=False):
-            st.markdown(
-                f"""
-                <div style="border-left:10px solid {couleur}; border-radius:10px; padding:14px 16px; margin-bottom:10px; background:{fond};">
-                    <div style="font-size:1.05rem; font-weight:bold; color:#2c3e50;">📅 {cr.get('date_debut','?')}</div>
-                    <div style="font-size:0.95rem; margin-top:2px;">👤 {nom_participants}</div>
-                    <div style="font-size:0.9rem; color:#555; margin-top:2px;">⛵ {nom_croisiere} · {cr.get('jours',1)} jour(s) · <b>{prix_total:.0f} €</b></div>
-                    <div style="margin-top:8px;">{badges}</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            c_mod, c_sup = st.columns(2)
-            if c_mod.button("✏️ Modifier", key=f"ed_cr_{cr['id']}", use_container_width=True):
-                st.session_state.edit_croisiere_id = cr["id"]
-                st.session_state.page = "MODIFIER_CROISIERE"
-                st.rerun()
+    st.markdown("#### 🗂️ Vue d'ensemble")
+    st.caption("Clique sur une ligne du tableau pour afficher le détail et pouvoir la modifier/supprimer.")
 
-            cle_confirm = f"confirm_del_cr_{cr['id']}"
-            if cle_confirm not in st.session_state:
-                if c_sup.button("🗑️ Supprimer", key=f"del_cr_{cr['id']}", use_container_width=True):
-                    st.session_state[cle_confirm] = True
-                    st.rerun()
-            else:
-                st.warning(f"Confirmer la suppression de la croisière du {cr.get('date_debut','?')} ({nom_participants}) ?")
-                cx, cy = st.columns(2)
-                if cx.button("✅ Oui, supprimer", key=f"y_cr_{cr['id']}", use_container_width=True):
-                    st.session_state.pop(cle_confirm)
-                    st.session_state.croisiere_id_a_supprimer = cr["id"]
-                    st.rerun()
-                if cy.button("❌ Annuler", key=f"n_cr_{cr['id']}", use_container_width=True):
-                    st.session_state.pop(cle_confirm)
-                    st.rerun()
+    selection = st.dataframe(
+        df_synthese,
+        on_select="rerun",
+        selection_mode="single-row",
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            "Prix (€)": st.column_config.NumberColumn(format="%.0f €"),
+        },
+    )
+
+    lignes_selectionnees = selection.selection.rows
+    if lignes_selectionnees:
+        idx = lignes_selectionnees[0]
+        cr_choisie = croisieres_affichees[idx]
+        st.divider()
+        _afficher_detail_croisiere(cr_choisie, sauvegarder_croisieres, contacts_par_id)
+    else:
+        st.info("Aucune croisière sélectionnée — clique sur une ligne ci-dessus pour voir le détail.")
