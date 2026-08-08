@@ -24,9 +24,11 @@ NE TOUCHE PAS à CONTACTS, MODIFIER_CONTACT, PLANNING, CROISIERES,
 MODIFIER_CROISIERE, STATS, FACT, RELANCES, MAINT, MEMOS, ARCHIVES.
 """
 from datetime import date, datetime
+import io
 
 import pandas as pd
 import streamlit as st
+from openpyxl.utils import get_column_letter
 
 from modele_voile import (
     generer_id_etape, trouver_croisiere_id_pour_date, suggestion_nom_navigation,
@@ -396,13 +398,38 @@ def afficher_page_log(charger_etapes, sauvegarder_etapes, charger_croisieres):
         else:
             st.info("Aucune navigation sélectionnée — clique sur une ligne ci-dessus pour voir le détail.")
 
-    # --- Export CSV ---
+    # --- Export XLSX (Excel) ---
     if etapes:
         st.divider()
         df_export = pd.DataFrame(etapes)
-        csv = df_export.to_csv(index=False).encode("utf-8-sig")
+
+        # On écrit le fichier Excel en mémoire (pas sur le disque), dans un
+        # "buffer" — c'est l'équivalent d'un fichier temporaire mais qui
+        # reste en RAM, plus simple à donner ensuite au bouton de
+        # téléchargement de Streamlit.
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+            df_export.to_excel(writer, index=False, sheet_name="Livre de bord")
+            feuille = writer.sheets["Livre de bord"]
+
+            # Auto-largeur : pour chaque colonne, on mesure la longueur du
+            # texte le plus long (soit une valeur de la colonne, soit son
+            # en-tête si les valeurs sont plus courtes), et on règle la
+            # largeur en conséquence (+2 pour un peu de marge visuelle).
+            for i, colonne in enumerate(df_export.columns, start=1):
+                if df_export.empty:
+                    longueur_max = len(str(colonne))
+                else:
+                    longueur_max = max(
+                        df_export[colonne].astype(str).map(len).max(),
+                        len(str(colonne)),
+                    )
+                feuille.column_dimensions[get_column_letter(i)].width = longueur_max + 2
+
         st.download_button(
-            label="📥 Télécharger le Livre de Bord complet (.CSV)",
-            data=csv, file_name="livre_de_bord_vesta.csv", mime="text/csv",
+            label="📥 Télécharger le Livre de Bord complet (.XLSX)",
+            data=buffer.getvalue(),
+            file_name="livre_de_bord_vesta.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
