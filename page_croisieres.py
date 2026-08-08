@@ -224,6 +224,7 @@ def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger
         selection_mode="single-row",
         hide_index=True,
         use_container_width=True,
+        key="tableau_synthese_croisieres",
         column_config={
             "Prix (€)": st.column_config.NumberColumn(format="%.0f €"),
         },
