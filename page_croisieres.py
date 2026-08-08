@@ -77,13 +77,24 @@ def _site_participant(cr):
     return "-"
 
 
-def _construire_tableau_synthese(croisieres_affichees, contacts_par_id):
+def _etapes_liees(etapes, croisiere_id):
+    """Retourne la liste des étapes du LOG (etapes_v2.json) qui sont liées
+    à cette croisière — c'est-à-dire dont le champ 'croisiere_id' (posé
+    automatiquement par la page LOG en comparant les dates) correspond."""
+    return [e for e in etapes if e.get("croisiere_id") == croisiere_id]
+
+
+def _construire_tableau_synthese(croisieres_affichees, contacts_par_id, etapes):
     """Construit le DataFrame résumé : 1 ligne par croisière, dans le même
     ordre que 'croisieres_affichees' (utile pour retrouver la bonne
     croisière après une sélection dans le tableau, via son index)."""
     lignes = []
     for cr in croisieres_affichees:
         prix_total = sum(p.get("prix", 0) or 0 for p in cr.get("participants", []))
+        # "Journalisé" : est-ce qu'au moins une étape du LOG est déjà liée
+        # à cette croisière ? Répond à la question "ai-je déjà rempli le
+        # livre de bord pour cette sortie ?".
+        journalise = "✅ Oui" if _etapes_liees(etapes, cr.get("id")) else "⏳ Pas encore"
         lignes.append({
             "Date": cr.get("date_debut") or "-",
             "Nom": cr.get("nom_croisiere") or "(sans nom)",
@@ -92,13 +103,15 @@ def _construire_tableau_synthese(croisieres_affichees, contacts_par_id):
             "Jours": cr.get("jours", 1),
             "Prix (€)": prix_total,
             "Statut": _statut_texte(cr),
+            "Journalisé": journalise,
         })
     return pd.DataFrame(lignes)
 
 
-def _afficher_detail_croisiere(cr, sauvegarder_croisieres, contacts_par_id):
+def _afficher_detail_croisiere(cr, sauvegarder_croisieres, contacts_par_id, etapes):
     """Affiche le détail complet d'UNE croisière (le 'zoom') : la carte
-    HTML avec badges colorés, et les boutons Modifier / Supprimer.
+    HTML avec badges colorés, les boutons Modifier / Supprimer, et — si
+    elles existent — les étapes du LOG déjà saisies pour cette croisière.
     C'est l'ancien affichage carte par carte, appelé uniquement pour la
     croisière sélectionnée dans le tableau."""
     couleur = couleur_croisiere(cr)
@@ -142,16 +155,40 @@ def _afficher_detail_croisiere(cr, sauvegarder_croisieres, contacts_par_id):
                 st.session_state.pop(cle_confirm)
                 st.rerun()
 
+        # --- Étapes du LOG liées à cette croisière ---
+        etapes_cr = _etapes_liees(etapes, cr.get("id"))
+        st.markdown("##### 📖 Livre de bord pour cette croisière")
+        if not etapes_cr:
+            st.info("Aucune étape saisie dans le LOG pour cette croisière pour le moment.")
+        else:
+            for e in etapes_cr:
+                if e.get("date_fin"):
+                    label_date = f"📅 {e.get('date','')} → {e.get('date_fin','')}"
+                else:
+                    label_date = f"📅 {e.get('date','')}"
+                st.markdown(
+                    f"""
+                    <div style="background:{fond}; border-left:6px solid {couleur}; padding:8px 15px; border-radius:0 8px 8px 0; margin-bottom:4px; color: black;">
+                        <b>{label_date}</b> | ⚙️ {e.get('heures_moteur',0):.1f}h Mot. | ⛵ {e.get('heures_voile',0):.1f}h Voile | <b>{e.get('milles',0):.1f} NM</b><br>
+                        <small style="color:#34495e;">📍 Cond. Météo : {e.get('meteo') or '-'} | {e.get('notes') or ''}</small>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
-def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger_contacts):
+
+def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger_contacts, charger_etapes):
     """Point d'entrée de la page. charger_croisieres / sauvegarder_croisieres
-    / charger_contacts injectées depuis app_voile1.py."""
+    / charger_contacts / charger_etapes injectées depuis app_voile1.py.
+    charger_etapes (etapes_v2.json) est nécessaire pour savoir, croisière
+    par croisière, si le livre de bord (LOG) a déjà été rempli ou non."""
 
     st.markdown("## ⛵ Croisières")
 
     croisieres = charger_croisieres()
     contacts = charger_contacts()
     contacts_par_id = {c["id"]: c for c in contacts}
+    etapes = charger_etapes()
 
     # --- Suppression différée (demandée au tour précédent) ---
     if st.session_state.get("croisiere_id_a_supprimer"):
@@ -213,7 +250,7 @@ def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger
     st.caption(f"{len(croisieres_affichees)} croisière(s) affichée(s).")
 
     # --- Vue synthétique (1 ligne = 1 croisière) + zoom ---
-    df_synthese = _construire_tableau_synthese(croisieres_affichees, contacts_par_id)
+    df_synthese = _construire_tableau_synthese(croisieres_affichees, contacts_par_id, etapes)
 
     st.markdown("#### 🗂️ Vue d'ensemble")
     st.caption("Clique sur une ligne du tableau pour afficher le détail et pouvoir la modifier/supprimer.")
@@ -235,7 +272,7 @@ def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger
         idx = lignes_selectionnees[0]
         cr_choisie = croisieres_affichees[idx]
         st.divider()
-        _afficher_detail_croisiere(cr_choisie, sauvegarder_croisieres, contacts_par_id)
+        _afficher_detail_croisiere(cr_choisie, sauvegarder_croisieres, contacts_par_id, etapes)
     else:
         st.info("Aucune croisière sélectionnée — clique sur une ligne ci-dessus pour voir le détail.")
 
