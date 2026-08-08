@@ -525,5 +525,22 @@
         "carburant":null,
         "notes":"",
         "date_fin":"03\/05\/2026"
+    },
+    {
+        "id":"e-233a4a84",
+        "croisiere_id":"cr-0e153fe0",
+        "date":"20\/06\/2026",
+        "navigation":"sortie CMN b",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":0.0,
+        "heures_moteur":0.0,
+        "heures_voile":0.0,
+        "compteur_moteur":2496.2,
+        "meteo":"",
+        "coequipiers_texte":"",
+        "carburant":null,
+        "notes":"",
+        "date_fin":"21\/06\/2026"
     }
 ]
