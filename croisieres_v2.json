@@ -829,5 +829,26 @@
                 ]
             }
         ]
+    },
+    {
+        "id":"cr-e8c0bd06",
+        "nom_croisiere":"click avec Caroline",
+        "date_debut":"25\/08\/2026",
+        "jours":1,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-1360fcc1",
+                "societe":"PERSO",
+                "prix":0.0,
+                "acompte":0.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
     }
 ]
