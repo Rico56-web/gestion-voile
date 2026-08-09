@@ -86,7 +86,7 @@
         "societe":"PERSO",
         "date_demande":"",
         "prochaine_relance":"",
-        "sans_suite":false,
+        "sans_suite":true,
         "notes":"Habite Lorient . M\u00e9decin g\u00e9n\u00e9raliste . 1 \u00e8re sortie le 22\/06\/2024"
     },
     {
