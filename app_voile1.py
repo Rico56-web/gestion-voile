@@ -191,6 +191,7 @@ THEMES = {
     "👥 Gestion": ["CONTACTS", "RELANCES", "FACT"],
     "🛠️ Bord": ["MAINT", "STATS", "MEMOS"],
 }
+
 theme_de_la_page_active = next((t for t, pages in THEMES.items() if st.session_state.page in pages), "🧭 Navigation")
 
 col_theme, col_page = st.columns(2)
@@ -219,7 +220,6 @@ page_choisie = col_page.selectbox(
 toutes_pages_menu = sum(THEMES.values(), [])
 if st.session_state.page in toutes_pages_menu and page_choisie != st.session_state.page:
     changer_page(page_choisie)
-
     
 THEME_COULEURS = {"🧭 Navigation": "#2980B9", "👥 Gestion": "#27AE60", "🛠️ Bord": "#E67E22"}
 couleur_theme = THEME_COULEURS[theme_choisi]
@@ -260,6 +260,58 @@ st.divider()
 # --- BLOC MEMOS INTEGRÉ DANS L'AIGUILLAGE GLOBAL ---
 if st.session_state.page == "MEMOS":
     st.markdown("<h2 style='text-align: center; color: #34495E;'>⚓ Mémos & Check-lists de Bord</h2>", unsafe_allow_html=True)
+
+    # --- Liens utiles & Modèles de mail (AJOUTÉ le 09/08/2026) ---
+    with st.expander("🔗 Liens utiles & Modèles de mail"):
+        st.markdown("##### 📋 Formulaires (Google Forms, questionnaires...)")
+        df_liens = charger_data_safe('liens_utiles.json')
+        liens = df_liens.to_dict('records') if not df_liens.empty else []
+
+        if liens:
+            for i, lien in enumerate(liens):
+                c1, c2, c3 = st.columns([3, 5, 1])
+                c1.write(f"**{lien.get('nom', '')}**")
+                c2.markdown(f"[{lien.get('url', '')}]({lien.get('url', '')})")
+                if c3.button("🗑️", key=f"del_lien_{i}"):
+                    liens.pop(i)
+                    sauvegarder_data(pd.DataFrame(liens), 'liens_utiles.json')
+                    st.rerun()
+        else:
+            st.caption("Aucun lien enregistré pour le moment.")
+
+        with st.form("ajout_lien_utile"):
+            nom_lien = st.text_input("Nom du lien (ex: Questionnaire préparation navigation)")
+            url_lien = st.text_input("URL (ex: https://forms.gle/xxxxx)")
+            if st.form_submit_button("➕ Ajouter ce lien"):
+                if nom_lien.strip() and url_lien.strip():
+                    liens.append({"nom": nom_lien.strip(), "url": url_lien.strip()})
+                    sauvegarder_data(pd.DataFrame(liens), 'liens_utiles.json')
+                    st.rerun()
+                else:
+                    st.warning("Le nom et l'URL sont obligatoires.")
+
+        st.divider()
+        st.markdown("##### ✉️ Mail de remerciement type")
+        modele_defaut = (
+            "Bonjour,\n\n"
+            "Merci beaucoup pour cette belle navigation, j'espère que vous avez "
+            "passé un aussi bon moment que moi !\n\n"
+            "N'hésitez pas à me recontacter pour une prochaine sortie.\n\n"
+            "Belle continuation,\n"
+            "[Ton prénom]"
+        )
+        texte_mail = st.text_area(
+            "Modèle (modifiable, non sauvegardé — repart sur ce texte par défaut à chaque visite)",
+            value=modele_defaut, height=200, key="modele_mail_remerciement",
+        )
+
+        import urllib.parse
+        sujet_encode = urllib.parse.quote("Merci pour cette belle navigation !")
+        corps_encode = urllib.parse.quote(texte_mail)
+        lien_mailto = f"mailto:?subject={sujet_encode}&body={corps_encode}"
+        st.markdown(f"[✉️ Ouvrir dans mon client mail (pré-rempli)]({lien_mailto})")
+        st.caption("Ou sélectionne le texte ci-dessus (Ctrl+A puis Ctrl+C) pour le copier ailleurs.")
+
     df_memos = charger_data_safe('memos.json')
 
     with st.expander("➕ CRÉER UNE NOUVELLE CHECK-LIST", expanded=df_memos.empty):
@@ -374,6 +426,7 @@ elif st.session_state.page == "CROISIERES":
         charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
         charger_etapes=lambda: charger_data_safe('etapes_v2.json').to_dict('records'),
     )
+
 elif st.session_state.page == "MODIFIER_CROISIERE":
     afficher_page_modifier_croisiere(
         charger_croisieres=lambda: charger_data_safe('croisieres_v2.json').to_dict('records'),
