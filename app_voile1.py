@@ -324,6 +324,7 @@ if st.session_state.page == "MEMOS":
         lien_choisi_nom = st.selectbox(
             "Lien à inclure dans le SMS (optionnel)",
             options=["(aucun)"] + noms_liens,
+            key="sms_lien_choisi",
         )
         url_a_inserer = ""
         if lien_choisi_nom != "(aucun)":
@@ -336,9 +337,21 @@ if st.session_state.page == "MEMOS":
             "Bonjour, merci pour cette belle navigation ! Belle continuation, [Ton prénom]"
         )
 
+        # CORRECTIF : sans cette vérification, le champ "Message" gardait son
+        # ancien texte quand on changeait de lien sélectionné — car une fois
+        # qu'un widget a une 'key', Streamlit ignore le 'value=' passé au
+        # code sur les passages suivants (il se fie à la valeur déjà stockée
+        # dans session_state pour cette clé). On détecte donc nous-mêmes le
+        # changement de sélection, et on met à jour explicitement le texte
+        # AVANT de créer le widget, uniquement quand la sélection a changé
+        # (pour ne pas écraser un texte que tu aurais déjà corrigé à la main).
+        if st.session_state.get("sms_dernier_lien_choisi") != lien_choisi_nom:
+            st.session_state["sms_dernier_lien_choisi"] = lien_choisi_nom
+            st.session_state["modele_sms"] = modele_sms_defaut
+
         c_tel, c_msg = st.columns([1, 2])
         numero_tel = c_tel.text_input("Numéro de téléphone", placeholder="ex: 0612345678")
-        texte_sms = c_msg.text_area("Message (modifiable)", value=modele_sms_defaut, height=100, key="modele_sms")
+        texte_sms = c_msg.text_area("Message (modifiable)", height=100, key="modele_sms")
 
         if numero_tel.strip():
             numero_propre = numero_tel.strip().replace(" ", "").replace(".", "")
