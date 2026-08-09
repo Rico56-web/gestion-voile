@@ -747,27 +747,6 @@
         ]
     },
     {
-        "id":"cr-282ce6b2",
-        "nom_croisiere":"(\u00e0 d\u00e9finir)",
-        "date_debut":"01\/02\/2026",
-        "jours":2,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-4d757fd3",
-                "societe":"CMN",
-                "prix":450.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-9af8cf73",
         "nom_croisiere":"Sortie Click avec Thomas",
         "date_debut":"17\/08\/2026",
