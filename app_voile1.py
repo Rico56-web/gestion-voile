@@ -312,6 +312,47 @@ if st.session_state.page == "MEMOS":
         st.markdown(f"[✉️ Ouvrir dans mon client mail (pré-rempli)]({lien_mailto})")
         st.caption("Ou sélectionne le texte ci-dessus (Ctrl+A puis Ctrl+C) pour le copier ailleurs.")
 
+        st.divider()
+        st.markdown("##### 📱 Envoyer un SMS (questionnaire ou rappel)")
+        st.caption(
+            "Ce bouton ouvre l'appli SMS de TON téléphone (pas un envoi automatique "
+            "depuis l'appli) — le message est déjà prêt, il ne reste qu'à appuyer sur "
+            "Envoyer. Fonctionne seulement si tu ouvres Vesta depuis ton téléphone."
+        )
+
+        noms_liens = [lien.get("nom", "") for lien in liens]
+        lien_choisi_nom = st.selectbox(
+            "Lien à inclure dans le SMS (optionnel)",
+            options=["(aucun)"] + noms_liens,
+        )
+        url_a_inserer = ""
+        if lien_choisi_nom != "(aucun)":
+            url_a_inserer = next((l.get("url", "") for l in liens if l.get("nom") == lien_choisi_nom), "")
+
+        modele_sms_defaut = (
+            f"Bonjour, avant notre navigation pourriez-vous remplir ce questionnaire "
+            f"rapide : {url_a_inserer}\nMerci et à bientôt !"
+            if url_a_inserer else
+            "Bonjour, merci pour cette belle navigation ! Belle continuation, [Ton prénom]"
+        )
+
+        c_tel, c_msg = st.columns([1, 2])
+        numero_tel = c_tel.text_input("Numéro de téléphone", placeholder="ex: 0612345678")
+        texte_sms = c_msg.text_area("Message (modifiable)", value=modele_sms_defaut, height=100, key="modele_sms")
+
+        if numero_tel.strip():
+            numero_propre = numero_tel.strip().replace(" ", "").replace(".", "")
+            corps_sms_encode = urllib.parse.quote(texte_sms)
+            lien_sms = f"sms:{numero_propre}?body={corps_sms_encode}"
+            st.markdown(f"[📱 Ouvrir dans mon appli SMS (pré-rempli)]({lien_sms})")
+            st.caption(
+                "⚠️ Sur iPhone, si le bouton n'ouvre pas Messages correctement, "
+                "c'est un souci connu du format d'iOS — copie-colle le message "
+                "manuellement dans ce cas."
+            )
+        else:
+            st.caption("Renseigne un numéro de téléphone pour activer le bouton.")
+
     df_memos = charger_data_safe('memos.json')
 
     with st.expander("➕ CRÉER UNE NOUVELLE CHECK-LIST", expanded=df_memos.empty):
