@@ -12,6 +12,7 @@ NE TOUCHE PAS à CONTACTS, MODIFIER_CONTACT, PLANNING, FACT, STATS, ARCHIVES.
 """
 from datetime import date
 import io
+import urllib.parse
 
 import pandas as pd
 import streamlit as st
@@ -233,7 +234,19 @@ def _afficher_detail_croisiere(cr, sauvegarder_croisieres, contacts_par_id, etap
                     nom_p = f"{contact.get('prenom','')} {contact.get('nom','')}".strip()
                     lien_perso = _lien_personnalise(lien_questionnaire, p.get("contact_id"))
                     if lien_perso:
-                        st.markdown(f"- **{nom_p}** : [Ouvrir son questionnaire]({lien_perso})")
+                        numero_tel = (contact.get("telephone") or "").strip()
+                        ligne = f"- **{nom_p}** : [Ouvrir son questionnaire]({lien_perso})"
+                        if numero_tel:
+                            message_sms = (
+                                f"Bonjour, avant notre navigation pourriez-vous remplir ce "
+                                f"questionnaire rapide : {lien_perso}\nMerci et à bientôt !"
+                            )
+                            numero_propre = numero_tel.replace(" ", "").replace(".", "")
+                            lien_sms = f"sms:{numero_propre}?body={urllib.parse.quote(message_sms)}"
+                            ligne += f" · [📱 Envoyer par SMS]({lien_sms})"
+                        else:
+                            ligne += " · *(pas de numéro de téléphone enregistré)*"
+                        st.markdown(ligne)
 
         # --- Étapes du LOG liées à cette croisière ---
         etapes_cr = _etapes_liees(etapes, cr.get("id"))
