@@ -467,6 +467,35 @@ elif st.session_state.page == "MODIFIER_CONTACT":
 # --- 7. PAGE PLANNING (NOUVEAU MODÈLE — croisieres_v2 / etapes_v2) ---
 # =================================================================
 if st.session_state.page == "PLANNING":
+    # --- Pense-bête : croisières proches, pour penser à vérifier les
+    # réponses du questionnaire de préparation (AJOUTÉ le 11/08/2026) ---
+    from datetime import date as _date, timedelta as _timedelta
+
+    FENETRE_RAPPEL_JOURS = 14
+    croisieres_pour_rappel = charger_data_safe('croisieres_v2.json').to_dict('records')
+    aujourdhui_rappel = _date.today()
+    croisieres_proches = []
+    for cr in croisieres_pour_rappel:
+        try:
+            d_debut = datetime.strptime(cr.get("date_debut", ""), "%d/%m/%Y").date()
+        except (ValueError, TypeError):
+            continue
+        if aujourdhui_rappel <= d_debut <= aujourdhui_rappel + _timedelta(days=FENETRE_RAPPEL_JOURS):
+            croisieres_proches.append(cr)
+
+    if croisieres_proches:
+        # Tri par date la plus proche en premier, plus utile qu'un ordre
+        # aléatoire pour savoir laquelle traiter en priorité.
+        croisieres_proches.sort(key=lambda c: datetime.strptime(c["date_debut"], "%d/%m/%Y").date())
+        noms_croisieres_proches = ", ".join(
+            f"{c.get('nom_croisiere') or '(sans nom)'} ({c.get('date_debut')})" for c in croisieres_proches
+        )
+        st.warning(
+            f"🔔 **{len(croisieres_proches)} croisière(s) dans les {FENETRE_RAPPEL_JOURS} prochains jours** "
+            f"— {noms_croisieres_proches}. Pense à vérifier les réponses du questionnaire de "
+            f"préparation et à les reporter dans les fiches contact concernées."
+        )
+
     afficher_page_planning(
         charger_croisieres=lambda: charger_data_safe('croisieres_v2.json').to_dict('records'),
         charger_etapes=lambda: charger_data_safe('etapes_v2.json').to_dict('records'),
@@ -479,7 +508,6 @@ elif st.session_state.page == "CROISIERES":
         sauvegarder_croisieres=lambda c: sauvegarder_data(pd.DataFrame(c), 'croisieres_v2.json'),
         charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
         charger_etapes=lambda: charger_data_safe('etapes_v2.json').to_dict('records'),
-        charger_liens=lambda: charger_data_safe('liens_utiles.json').to_dict('records'),
     )
 
 elif st.session_state.page == "MODIFIER_CROISIERE":
