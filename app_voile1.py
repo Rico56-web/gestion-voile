@@ -479,6 +479,7 @@ elif st.session_state.page == "CROISIERES":
         sauvegarder_croisieres=lambda c: sauvegarder_data(pd.DataFrame(c), 'croisieres_v2.json'),
         charger_contacts=lambda: charger_data_safe('contacts_v2.json').to_dict('records'),
         charger_etapes=lambda: charger_data_safe('etapes_v2.json').to_dict('records'),
+        charger_liens=lambda: charger_data_safe('liens_utiles.json').to_dict('records'),
     )
 
 elif st.session_state.page == "MODIFIER_CROISIERE":
