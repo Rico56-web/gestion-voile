@@ -84,6 +84,25 @@ def _etapes_liees(etapes, croisiere_id):
     return [e for e in etapes if e.get("croisiere_id") == croisiere_id]
 
 
+# Le nom technique du champ "Identifiant" dans le Google Form, récupéré
+# via "Préremplir le formulaire" (voir l'URL générée : le morceau
+# 'entry.XXXXXXXXX' juste avant le signe '=').
+ENTRY_ID_IDENTIFIANT_CONTACT = "entry.775952758"
+
+
+def _lien_personnalise(url_base, contact_id):
+    """Construit un lien vers le questionnaire, pré-rempli avec
+    l'identifiant du contact caché dedans (champ 'Identifiant' du
+    formulaire). Renvoie None si le paramètre technique n'a pas encore
+    été renseigné (ENTRY_ID_IDENTIFIANT_CONTACT), ou si les infos de
+    base manquent — dans ce cas, on n'affiche simplement pas le lien
+    personnalisé plutôt que de planter."""
+    if not url_base or not contact_id or not ENTRY_ID_IDENTIFIANT_CONTACT:
+        return None
+    separateur = "&" if "?" in url_base else "?"
+    return f"{url_base}{separateur}{ENTRY_ID_IDENTIFIANT_CONTACT}={contact_id}"
+
+
 def _nb_jours_etape(e):
     """Nombre de jours couverts par UNE étape du LOG (même logique que
     dans page_log.py) : 1 jour normalement, ou plus si 'date_fin' est
@@ -146,12 +165,12 @@ def _construire_tableau_synthese(croisieres_affichees, contacts_par_id, etapes):
     return pd.DataFrame(lignes)
 
 
-def _afficher_detail_croisiere(cr, sauvegarder_croisieres, contacts_par_id, etapes):
+def _afficher_detail_croisiere(cr, sauvegarder_croisieres, contacts_par_id, etapes, liens):
     """Affiche le détail complet d'UNE croisière (le 'zoom') : la carte
-    HTML avec badges colorés, les boutons Modifier / Supprimer, et — si
-    elles existent — les étapes du LOG déjà saisies pour cette croisière.
-    C'est l'ancien affichage carte par carte, appelé uniquement pour la
-    croisière sélectionnée dans le tableau."""
+    HTML avec badges colorés, les boutons Modifier / Supprimer, les
+    étapes du LOG déjà saisies, et — si le lien du questionnaire est
+    enregistré et le paramètre technique renseigné — un lien
+    personnalisé par participant vers le questionnaire de préparation."""
     couleur = couleur_croisiere(cr)
     fond = fond_clair(couleur)
     prix_total = sum(p.get("prix", 0) or 0 for p in cr.get("participants", []))
@@ -193,6 +212,29 @@ def _afficher_detail_croisiere(cr, sauvegarder_croisieres, contacts_par_id, etap
                 st.session_state.pop(cle_confirm)
                 st.rerun()
 
+        # --- Lien personnalisé vers le questionnaire, par participant ---
+        lien_questionnaire = next(
+            (l.get("url") for l in liens if "questionnaire" in (l.get("nom") or "").lower()),
+            None,
+        )
+        if lien_questionnaire:
+            st.markdown("##### 🔗 Questionnaire personnalisé")
+            if not ENTRY_ID_IDENTIFIANT_CONTACT:
+                st.caption(
+                    "⚙️ Configuration à terminer : le paramètre technique du champ "
+                    "'Identifiant' n'a pas encore été renseigné dans le code "
+                    "(ENTRY_ID_IDENTIFIANT_CONTACT)."
+                )
+            else:
+                for p in cr.get("participants", []):
+                    contact = contacts_par_id.get(p.get("contact_id"))
+                    if not contact:
+                        continue
+                    nom_p = f"{contact.get('prenom','')} {contact.get('nom','')}".strip()
+                    lien_perso = _lien_personnalise(lien_questionnaire, p.get("contact_id"))
+                    if lien_perso:
+                        st.markdown(f"- **{nom_p}** : [Ouvrir son questionnaire]({lien_perso})")
+
         # --- Étapes du LOG liées à cette croisière ---
         etapes_cr = _etapes_liees(etapes, cr.get("id"))
         st.markdown("##### 📖 Livre de bord pour cette croisière")
@@ -226,11 +268,12 @@ def _afficher_detail_croisiere(cr, sauvegarder_croisieres, contacts_par_id, etap
                 )
 
 
-def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger_contacts, charger_etapes):
+def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger_contacts, charger_etapes, charger_liens):
     """Point d'entrée de la page. charger_croisieres / sauvegarder_croisieres
-    / charger_contacts / charger_etapes injectées depuis app_voile1.py.
-    charger_etapes (etapes_v2.json) est nécessaire pour savoir, croisière
-    par croisière, si le livre de bord (LOG) a déjà été rempli ou non."""
+    / charger_contacts / charger_etapes / charger_liens injectées depuis
+    app_voile1.py. charger_liens (liens_utiles.json) est nécessaire pour
+    retrouver le lien du questionnaire et générer les liens personnalisés
+    par participant."""
 
     st.markdown("## ⛵ Croisières")
 
@@ -238,6 +281,7 @@ def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger
     contacts = charger_contacts()
     contacts_par_id = {c["id"]: c for c in contacts}
     etapes = charger_etapes()
+    liens = charger_liens()
 
     # --- Suppression différée (demandée au tour précédent) ---
     if st.session_state.get("croisiere_id_a_supprimer"):
@@ -321,7 +365,7 @@ def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger
         idx = lignes_selectionnees[0]
         cr_choisie = croisieres_affichees[idx]
         st.divider()
-        _afficher_detail_croisiere(cr_choisie, sauvegarder_croisieres, contacts_par_id, etapes)
+        _afficher_detail_croisiere(cr_choisie, sauvegarder_croisieres, contacts_par_id, etapes, liens)
     else:
         st.info("Aucune croisière sélectionnée — clique sur une ligne ci-dessus pour voir le détail.")
 
