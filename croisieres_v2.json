@@ -808,38 +808,5 @@
                 ]
             }
         ]
-    },
-    {
-        "id":"cr-dcde6c9d",
-        "nom_croisiere":"Nav du 23 ao\u00fbt",
-        "date_debut":"23\/08\/2026",
-        "jours":2,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-8d084bf1",
-                "societe":"PERSO",
-                "prix":60.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            },
-            {
-                "contact_id":"c-afb961d8",
-                "societe":"VOG",
-                "prix":60.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
     }
 ]
