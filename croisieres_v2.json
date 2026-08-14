@@ -579,27 +579,6 @@
         ]
     },
     {
-        "id":"cr-19384443",
-        "nom_croisiere":"Nav avec Olivia",
-        "date_debut":"27\/08\/2026",
-        "jours":4,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-1aad6886",
-                "societe":"PERSO",
-                "prix":666.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-a2a13b89",
         "nom_croisiere":"(\u00e0 d\u00e9finir)",
         "date_debut":"17\/10\/2026",
@@ -799,6 +778,27 @@
                 "contact_id":"c-4d757fd3",
                 "societe":"CMN",
                 "prix":450.0,
+                "acompte":0.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-19384443",
+        "nom_croisiere":"Nav avec Olivia",
+        "date_debut":"27\/08\/2026",
+        "jours":4,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-1aad6886",
+                "societe":"CLICK",
+                "prix":666.0,
                 "acompte":0.0,
                 "terminee":false,
                 "payee":false,
