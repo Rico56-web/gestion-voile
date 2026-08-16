@@ -797,5 +797,22 @@
         "carburant":null,
         "notes":"Sauzon",
         "date_fin":null
+    },
+    {
+        "id":"e-77444a17",
+        "croisiere_id":"cr-17795204",
+        "date":"11\/08\/2026",
+        "navigation":"Vacances d'Aur\u00e9lien et Axelle FAUCHEUX (location )",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":0.0,
+        "heures_moteur":0.0,
+        "heures_voile":0.0,
+        "compteur_moteur":2518.3,
+        "meteo":"",
+        "coequipiers_texte":"AURELIEN FAUCHEUX",
+        "carburant":null,
+        "notes":"Sauzon",
+        "date_fin":null
     }
 ]
