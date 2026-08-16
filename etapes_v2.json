@@ -746,5 +746,22 @@
         "carburant":null,
         "notes":"",
         "date_fin":null
+    },
+    {
+        "id":"e-e282a74c",
+        "croisiere_id":"cr-17795204",
+        "date":"08\/08\/2026",
+        "navigation":"Vacances d'Aur\u00e9lien et Axelle FAUCHEUX (location )",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":1.0,
+        "heures_moteur":1.5,
+        "heures_voile":0.0,
+        "compteur_moteur":2516.8,
+        "meteo":"",
+        "coequipiers_texte":"AURELIEN FAUCHEUX",
+        "carburant":null,
+        "notes":"midi : mouillage a Penfret (les gl\u00e9nant)\nsoi : mouillage est de Penfret",
+        "date_fin":null
     }
 ]
