@@ -814,5 +814,22 @@
         "carburant":null,
         "notes":"Sauzon",
         "date_fin":null
+    },
+    {
+        "id":"e-779c1807",
+        "croisiere_id":"cr-17795204",
+        "date":"12\/08\/2026",
+        "navigation":"Vacances d'Aur\u00e9lien et Axelle FAUCHEUX (location )",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":13.0,
+        "heures_moteur":1.2,
+        "heures_voile":0.0,
+        "compteur_moteur":2519.5,
+        "meteo":"",
+        "coequipiers_texte":"AURELIEN FAUCHEUX",
+        "carburant":null,
+        "notes":"Mouillage a port Kerel",
+        "date_fin":null
     }
 ]
