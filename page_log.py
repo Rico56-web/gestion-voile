@@ -235,11 +235,28 @@ def _formulaire_etape(etapes, croisieres, contacts_par_id, sauvegarder_etapes, m
             # autre bouton) — sinon, si tu as déjà corrigé le nom à la
             # main, on l'écraserait sans arrêt à chaque interaction.
             cle_derniere_date = f"log_derniere_date_suggeree_{mode}_{etape_id}"
+            cle_dernier_nav_suggere = f"log_dernier_nav_suggere_{mode}_{etape_id}"
+            cle_dernier_equipage_suggere = f"log_dernier_equipage_suggere_{mode}_{etape_id}"
             if st.session_state.get(cle_derniere_date) != date_str_actuelle:
                 st.session_state[cle_derniere_date] = date_str_actuelle
                 nom_suggere, equipage_suggere = _suggestion_pour_date(croisieres, contacts_par_id, date_str_actuelle)
-                st.session_state[key_nav] = nom_suggere or val_nav
-                st.session_state[key_equipage] = equipage_suggere or val_equi
+
+                # CORRECTIF : on n'écrase le champ "Nom" que si sa valeur
+                # actuelle est encore EXACTEMENT celle de la dernière
+                # suggestion automatique (ou vide) — c'est-à-dire si tu
+                # n'y as toi-même rien changé depuis. Si tu as tapé un nom
+                # personnalisé, on ne le touche plus, même si tu modifies
+                # encore la date ensuite. Même principe pour l'équipage.
+                nav_actuel = st.session_state.get(key_nav, val_nav)
+                if nav_actuel == st.session_state.get(cle_dernier_nav_suggere, val_nav):
+                    st.session_state[key_nav] = nom_suggere or val_nav
+                st.session_state[cle_dernier_nav_suggere] = nom_suggere or val_nav
+
+                equipage_actuel = st.session_state.get(key_equipage, val_equi)
+                if equipage_actuel == st.session_state.get(cle_dernier_equipage_suggere, val_equi):
+                    st.session_state[key_equipage] = equipage_suggere or val_equi
+                st.session_state[cle_dernier_equipage_suggere] = equipage_suggere or val_equi
+
                 if nom_suggere or equipage_suggere:
                     st.caption("💡 Nom et équipage pré-remplis à partir d'une croisière planifiée à cette date — modifiables ci-dessous.")
         else:
@@ -347,7 +364,8 @@ def _formulaire_etape(etapes, croisieres, contacts_par_id, sauvegarder_etapes, m
                 # réutiliserait par erreur les dernières valeurs tapées
                 # au lieu de repartir à zéro.
                 for cle in (key_date_debut, key_date_fin, f"chk_multi_jours_{mode}_{etape_id}",
-                            key_nav, key_equipage, f"log_derniere_date_suggeree_{mode}_{etape_id}"):
+                            key_nav, key_equipage, f"log_derniere_date_suggeree_{mode}_{etape_id}",
+                            f"log_dernier_nav_suggere_{mode}_{etape_id}", f"log_dernier_equipage_suggere_{mode}_{etape_id}"):
                     st.session_state.pop(cle, None)
 
                 sauvegarder_etapes(etapes_maj)
@@ -356,7 +374,8 @@ def _formulaire_etape(etapes, croisieres, contacts_par_id, sauvegarder_etapes, m
 
             if b2.form_submit_button("❌ ANNULER", use_container_width=True):
                 for cle in (key_date_debut, key_date_fin, f"chk_multi_jours_{mode}_{etape_id}",
-                            key_nav, key_equipage, f"log_derniere_date_suggeree_{mode}_{etape_id}"):
+                            key_nav, key_equipage, f"log_derniere_date_suggeree_{mode}_{etape_id}",
+                            f"log_dernier_nav_suggere_{mode}_{etape_id}", f"log_dernier_equipage_suggere_{mode}_{etape_id}"):
                     st.session_state.pop(cle, None)
                 st.session_state.log_saisie_ouverte = False
                 st.session_state.log_edit_id = None
