@@ -848,5 +848,22 @@
         "carburant":null,
         "notes":"midi port Haliguen et soir grande plage de Houat",
         "date_fin":null
+    },
+    {
+        "id":"e-87dd5eb4",
+        "croisiere_id":"cr-17795204",
+        "date":"14\/08\/2026",
+        "navigation":"Vacances d'Aur\u00e9lien et Axelle FAUCHEUX (location )",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":27.0,
+        "heures_moteur":1.6,
+        "heures_voile":0.0,
+        "compteur_moteur":2522.6,
+        "meteo":"",
+        "coequipiers_texte":"AURELIEN FAUCHEUX",
+        "carburant":null,
+        "notes":"midi port Haliguen et soir le palais ",
+        "date_fin":null
     }
 ]
