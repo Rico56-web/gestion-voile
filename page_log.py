@@ -129,12 +129,29 @@ def _nb_jours_etape(e):
     return 1
 
 
+def _date_fin_navigation(liste):
+    """Renvoie la date de fin réelle d'une navigation : la plus tardive
+    parmi toutes les étapes du groupe, en tenant compte des étapes
+    multi-jours (on regarde alors leur 'date_fin', pas juste 'date').
+    Renvoie une chaîne 'jj/mm/aaaa', ou '-' si aucune date valide."""
+    dates_fin = []
+    for e in liste:
+        d = parse_date_eu(e.get("date_fin") or e.get("date", ""))
+        if d:
+            dates_fin.append(d)
+    if not dates_fin:
+        return "-"
+    return max(dates_fin).strftime("%d/%m/%Y")
+
+
 def _construire_tableau_synthese(groupes, croisieres):
     """Construit le DataFrame résumé : 1 ligne par navigation.
 
     'groupes' est la liste (nom_navigation, liste_etapes) déjà triée par
     etapes_groupees_par_navigation. On calcule pour chaque navigation :
     - Date : la date de la première étape (début du voyage)
+    - Date fin : la date la plus tardive couverte par le groupe (fin du
+      voyage), en tenant compte des étapes multi-jours
     - Navigation : le nom du voyage
     - Équipage : noms uniques trouvés sur les étapes
     - Site : déduit de la croisière liée (via croisiere_id)
@@ -153,10 +170,11 @@ def _construire_tableau_synthese(groupes, croisieres):
         premiere = liste_triee[0]
         croisiere_id = next((e.get("croisiere_id") for e in liste if e.get("croisiere_id")), None)
 
-        # Ordre des colonnes = ordre d'affichage voulu : Date, Navigation,
-        # Équipage en premier, puis le reste.
+        # Ordre des colonnes = ordre d'affichage voulu : Date, Date fin,
+        # Navigation, Équipage en premier, puis le reste.
         lignes.append({
             "Date": premiere.get("date", "-"),
+            "Date fin": _date_fin_navigation(liste),
             "Navigation": nom_nav,
             "Équipage": _noms_equipage(liste),
             "Site": _site_croisiere(croisieres, croisiere_id),
@@ -360,6 +378,18 @@ def _formulaire_etape(etapes, croisieres, contacts_par_id, sauvegarder_etapes, m
                         f"une erreur de saisie sur le compteur Départ ou Arrivée (ex: un chiffre "
                         f"en trop, ou l'ancien relevé pas mis à jour). Corrige les champs "
                         f"'Moteur Départ' / 'Moteur Arrivée' ci-dessus avant d'enregistrer."
+                    )
+                    st.stop()
+
+                # Même garde-fou pour les heures de voile (limite identique,
+                # même raisonnement — une journée ne peut pas dépasser 24h,
+                # que ce soit du temps moteur ou du temps voile).
+                if champs["heures_voile"] > limite_heures_moteur:
+                    st.error(
+                        f"⚠️ Heures de voile impossibles : {champs['heures_voile']:.1f}h pour "
+                        f"{nb_jours_verif} jour(s) couvert(s) par cette étape (maximum "
+                        f"physiquement possible : {limite_heures_moteur}h). Corrige le champ "
+                        f"'Heures Voile' ci-dessus avant d'enregistrer."
                     )
                     st.stop()
 
