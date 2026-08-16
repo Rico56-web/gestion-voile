@@ -695,5 +695,22 @@
         "carburant":null,
         "notes":"",
         "date_fin":null
+    },
+    {
+        "id":"e-02887704",
+        "croisiere_id":"cr-17795204",
+        "date":"04\/08\/2026",
+        "navigation":"Vacances d'Aur\u00e9lien et Axelle FAUCHEUX (location )",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":0.0,
+        "heures_moteur":0.9,
+        "heures_voile":0.0,
+        "compteur_moteur":25013.0,
+        "meteo":"tres beau temps",
+        "coequipiers_texte":"AURELIEN FAUCHEUX",
+        "carburant":null,
+        "notes":"",
+        "date_fin":null
     }
 ]
