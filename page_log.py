@@ -333,6 +333,36 @@ def _formulaire_etape(etapes, croisieres, contacts_par_id, sauvegarder_etapes, m
                     "croisiere_id": croisiere_id,
                 }
 
+                # GARDE-FOU anti-erreur de saisie : un moteur ne peut
+                # physiquement pas tourner plus de 24h par jour couvert
+                # par l'étape (24h pour une étape normale, 24h × nombre
+                # de jours pour une étape multi-jours). Si la valeur
+                # saisie dépasse cette limite, c'est presque toujours une
+                # faute de frappe sur le compteur Départ ou Arrivée (ex:
+                # un chiffre en trop) — comme celle qu'on avait dû
+                # corriger à la main un peu plus tôt cette semaine.
+                if multi_jours:
+                    d_debut_verif = parse_date_eu(date_str)
+                    d_fin_verif = parse_date_eu(date_fin_str)
+                    if d_debut_verif and d_fin_verif and d_fin_verif >= d_debut_verif:
+                        nb_jours_verif = (d_fin_verif - d_debut_verif).days + 1
+                    else:
+                        nb_jours_verif = 1
+                else:
+                    nb_jours_verif = 1
+                limite_heures_moteur = 24 * nb_jours_verif
+
+                if champs["heures_moteur"] > limite_heures_moteur:
+                    st.error(
+                        f"⚠️ Heures moteur impossibles : {champs['heures_moteur']:.1f}h pour "
+                        f"{nb_jours_verif} jour(s) couvert(s) par cette étape (maximum "
+                        f"physiquement possible : {limite_heures_moteur}h). C'est probablement "
+                        f"une erreur de saisie sur le compteur Départ ou Arrivée (ex: un chiffre "
+                        f"en trop, ou l'ancien relevé pas mis à jour). Corrige les champs "
+                        f"'Moteur Départ' / 'Moteur Arrivée' ci-dessus avant d'enregistrer."
+                    )
+                    st.stop()
+
                 # GARDE-FOU anti-perte-de-données : si 'etapes' (chargé en
                 # début de page) est vide alors qu'on est en train d'AJOUTER
                 # une étape (pas de créer le tout premier livre de bord),
