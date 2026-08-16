@@ -262,5 +262,13 @@
         "Statut":"Fait",
         "Type":"Maintenance",
         "Notes":"suite a un renversement avec l'annexe "
+    },
+    {
+        "Date":"10\/08\/2026",
+        "Objet":"moteur annexe encrass\u00e9 par le sel",
+        "M_Num":133.35,
+        "Statut":"Fait",
+        "Type":"Maintenance",
+        "Notes":"Aur\u00e9lien a lou\u00e9 mon bateau 15 jours a Lorient en voulant faire de l'annexe, impossible de d\u00e9marrer le moteur\/ r\u00e9paration chez  Franck Lauferon  (LELU Marine ) a Lorient "
     }
 ]
