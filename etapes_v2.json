@@ -865,5 +865,22 @@
         "carburant":null,
         "notes":"midi port Haliguen et soir le palais ",
         "date_fin":null
+    },
+    {
+        "id":"e-b0a974cd",
+        "croisiere_id":"cr-17795204",
+        "date":"15\/08\/2026",
+        "navigation":"Vacances d'Aur\u00e9lien et Axelle FAUCHEUX (location )",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":23.0,
+        "heures_moteur":1.0,
+        "heures_voile":0.0,
+        "compteur_moteur":2523.6,
+        "meteo":"",
+        "coequipiers_texte":"AURELIEN FAUCHEUX",
+        "carburant":null,
+        "notes":"am port Haliguen et soir retour au crouesty",
+        "date_fin":null
     }
 ]
