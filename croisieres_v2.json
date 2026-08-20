@@ -792,13 +792,13 @@
         "id":"cr-9af8cf73",
         "nom_croisiere":"Sortie Click avec Thomas",
         "date_debut":"17\/08\/2026",
-        "jours":5,
-        "notes":"",
+        "jours":4,
+        "notes":"Thomas est tr\u00e8s sympa et discret. Sa compagne Justine est plus causante et curieuse avec ses \u00e9critures sur ce qui est fait et comment c\u2019est fait . Un peu pointilleuse sur les bords mais sympa",
         "participants":[
             {
                 "contact_id":"c-b286d800",
                 "societe":"CLICK",
-                "prix":676.0,
+                "prix":500.0,
                 "acompte":0.0,
                 "terminee":true,
                 "payee":false,
