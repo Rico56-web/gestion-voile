@@ -684,27 +684,6 @@
         ]
     },
     {
-        "id":"cr-9af8cf73",
-        "nom_croisiere":"Sortie Click avec Thomas",
-        "date_debut":"17\/08\/2026",
-        "jours":5,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-b286d800",
-                "societe":"CLICK",
-                "prix":676.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-e8c0bd06",
         "nom_croisiere":"click avec Caroline",
         "date_debut":"25\/08\/2026",
@@ -802,6 +781,27 @@
                 "acompte":2400.0,
                 "terminee":true,
                 "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-9af8cf73",
+        "nom_croisiere":"Sortie Click avec Thomas",
+        "date_debut":"17\/08\/2026",
+        "jours":5,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-b286d800",
+                "societe":"CLICK",
+                "prix":676.0,
+                "acompte":0.0,
+                "terminee":true,
+                "payee":false,
                 "annulee":false,
                 "accompagnants":[
 
