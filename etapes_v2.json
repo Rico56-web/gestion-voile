@@ -890,14 +890,14 @@
         "navigation":"Sortie Click avec Thomas",
         "port_depart":null,
         "port_arrivee":null,
-        "milles":0.0,
-        "heures_moteur":0.0,
+        "milles":24.0,
+        "heures_moteur":0.9,
         "heures_voile":0.0,
-        "compteur_moteur":2523.6,
-        "meteo":"",
+        "compteur_moteur":2524.5,
+        "meteo":"beau temps ",
         "coequipiers_texte":"thomas VINOT",
         "carburant":null,
-        "notes":"",
+        "notes":"Thomas et Justine sont tr\u00e8s d\u00e9butants et veulent faire le tour du monde par une ann\u00e9e sabbatique. il veulent traverser l'atlantique en voilier car sont tr\u00e8s \u00e9cologiques ",
         "date_fin":null
     }
 ]
