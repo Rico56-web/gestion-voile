@@ -882,5 +882,22 @@
         "carburant":null,
         "notes":"am port Haliguen et soir retour au crouesty",
         "date_fin":null
+    },
+    {
+        "id":"e-fd828ddb",
+        "croisiere_id":"cr-9af8cf73",
+        "date":"17\/08\/2026",
+        "navigation":"Sortie Click avec Thomas",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":0.0,
+        "heures_moteur":0.0,
+        "heures_voile":0.0,
+        "compteur_moteur":2523.6,
+        "meteo":"",
+        "coequipiers_texte":"thomas VINOT",
+        "carburant":null,
+        "notes":"",
+        "date_fin":null
     }
 ]
