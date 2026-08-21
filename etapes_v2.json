@@ -899,5 +899,22 @@
         "carburant":null,
         "notes":"Thomas et Justine sont tr\u00e8s d\u00e9butants et veulent faire le tour du monde par une ann\u00e9e sabbatique. il veulent traverser l'atlantique en voilier car sont tr\u00e8s \u00e9cologiques ",
         "date_fin":null
+    },
+    {
+        "id":"e-f3d95dfe",
+        "croisiere_id":"cr-9af8cf73",
+        "date":"18\/08\/2026",
+        "navigation":"Sortie Click avec Thomas",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":26.0,
+        "heures_moteur":1.0,
+        "heures_voile":0.0,
+        "compteur_moteur":2525.5,
+        "meteo":"am: vent a 15nds et rafales \u00e0 25",
+        "coequipiers_texte":"thomas VINOT",
+        "carburant":null,
+        "notes":"sauzon -->Do\u00e9lan: arriv\u00e9e a marr\u00e9e basse et talonnage a l'entr\u00e9e du port , d\u00e9t\u00e9rioration du safran et de la quille. sinistre d\u00e9clar\u00e9 a mon assurances (MAIF)",
+        "date_fin":null
     }
 ]
