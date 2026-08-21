@@ -916,5 +916,22 @@
         "carburant":null,
         "notes":"sauzon -->Do\u00e9lan: arriv\u00e9e a marr\u00e9e basse et talonnage a l'entr\u00e9e du port , d\u00e9t\u00e9rioration du safran et de la quille. sinistre d\u00e9clar\u00e9 a mon assurances (MAIF)",
         "date_fin":null
+    },
+    {
+        "id":"e-bebca919",
+        "croisiere_id":"cr-9af8cf73",
+        "date":"19\/08\/2026",
+        "navigation":"Sortie Click avec Thomas",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":16.5,
+        "heures_moteur":0.5,
+        "heures_voile":0.0,
+        "compteur_moteur":2526.0,
+        "meteo":"vent \u00e0 270\u00b0 de 12nds. nuageux le matin et soleil am. mer agit\u00e9e",
+        "coequipiers_texte":"thomas VINOT",
+        "carburant":null,
+        "notes":"Do\u00e9lan --> Port Louis. fort vent arri\u00e8re et houle importante . d\u00e9part a 9h00 et arriv\u00e9e a12h30",
+        "date_fin":null
     }
 ]
