@@ -933,5 +933,22 @@
         "carburant":null,
         "notes":"Do\u00e9lan --> Port Louis. fort vent arri\u00e8re et houle importante . d\u00e9part a 9h00 et arriv\u00e9e a12h30",
         "date_fin":null
+    },
+    {
+        "id":"e-5009869a",
+        "croisiere_id":null,
+        "date":"21\/08\/2026",
+        "navigation":"Sortie Click avec Thomas",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":22.0,
+        "heures_moteur":1.0,
+        "heures_voile":0.0,
+        "compteur_moteur":2527.0,
+        "meteo":"petite pluie le matin et midi a notre arriv\u00e9e",
+        "coequipiers_texte":"thomas vinot et Justine Byrka",
+        "carburant":null,
+        "notes":"Port Louis -->Crouesty",
+        "date_fin":null
     }
 ]
