@@ -726,27 +726,6 @@
         ]
     },
     {
-        "id":"cr-a67aca2d",
-        "nom_croisiere":"location CMN",
-        "date_debut":"05\/09\/2026",
-        "jours":2,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-4d757fd3",
-                "societe":"CMN",
-                "prix":450.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-19384443",
         "nom_croisiere":"Nav avec Olivia",
         "date_debut":"27\/08\/2026",
