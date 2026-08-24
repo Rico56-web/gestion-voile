@@ -726,27 +726,6 @@
         ]
     },
     {
-        "id":"cr-19384443",
-        "nom_croisiere":"Nav avec Olivia",
-        "date_debut":"27\/08\/2026",
-        "jours":4,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-1aad6886",
-                "societe":"CLICK",
-                "prix":666.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-17795204",
         "nom_croisiere":"location perso mai 2026",
         "date_debut":"01\/08\/2026",
