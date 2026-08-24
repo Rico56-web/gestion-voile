@@ -950,5 +950,22 @@
         "carburant":null,
         "notes":"Port Louis -->Crouesty",
         "date_fin":null
+    },
+    {
+        "id":"e-d375cf44",
+        "croisiere_id":null,
+        "date":"23\/08\/2026",
+        "navigation":"Sortie test",
+        "port_depart":null,
+        "port_arrivee":null,
+        "milles":10.0,
+        "heures_moteur":0.0,
+        "heures_voile":0.0,
+        "compteur_moteur":2527.0,
+        "meteo":"Venteux",
+        "coequipiers_texte":"Test",
+        "carburant":null,
+        "notes":"Essai alarme temps moteur",
+        "date_fin":null
     }
 ]
