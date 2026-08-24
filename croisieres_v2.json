@@ -105,27 +105,6 @@
         ]
     },
     {
-        "id":"cr-b16edb7f",
-        "nom_croisiere":"(\u00e0 d\u00e9finir)",
-        "date_debut":"22\/07\/2026",
-        "jours":4,
-        "notes":"Resa faite le 26\/06\/26",
-        "participants":[
-            {
-                "contact_id":"c-686f91a9",
-                "societe":"CLICK",
-                "prix":660.0,
-                "acompte":0.0,
-                "terminee":true,
-                "payee":true,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-8ab11990",
         "nom_croisiere":"location 5 CMN",
         "date_debut":"05\/02\/2026",
@@ -757,6 +736,27 @@
                 "contact_id":"c-b286d800",
                 "societe":"CLICK",
                 "prix":666.0,
+                "acompte":0.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-b16edb7f",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"22\/07\/2026",
+        "jours":4,
+        "notes":"Resa faite le 26\/06\/26",
+        "participants":[
+            {
+                "contact_id":"c-686f91a9",
+                "societe":"CLICK",
+                "prix":676.0,
                 "acompte":0.0,
                 "terminee":true,
                 "payee":true,
