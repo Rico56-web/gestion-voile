@@ -756,10 +756,10 @@
             {
                 "contact_id":"c-b286d800",
                 "societe":"CLICK",
-                "prix":500.0,
+                "prix":666.0,
                 "acompte":0.0,
                 "terminee":true,
-                "payee":false,
+                "payee":true,
                 "annulee":false,
                 "accompagnants":[
 
