@@ -663,27 +663,6 @@
         ]
     },
     {
-        "id":"cr-e8c0bd06",
-        "nom_croisiere":"click avec Caroline",
-        "date_debut":"25\/08\/2026",
-        "jours":1,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-1360fcc1",
-                "societe":"CLICK",
-                "prix":274.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-a98b8b0c",
         "nom_croisiere":"Click avec Daniel,",
         "date_debut":"18\/09\/2026",
@@ -757,6 +736,27 @@
                 "contact_id":"c-686f91a9",
                 "societe":"CLICK",
                 "prix":676.0,
+                "acompte":0.0,
+                "terminee":true,
+                "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-e8c0bd06",
+        "nom_croisiere":"click avec Caroline",
+        "date_debut":"25\/08\/2026",
+        "jours":1,
+        "notes":"Caroline et Claude et leurs deux enfants de 5 et 12 ans sont adorables . Ils me rappelle le couple Aurelien et Axelle. Elle est docteur en pharmacie , lui est doctieur en biologie . Il travaille au CHU de Rennes et aussi \u00e0 l\u2019universit\u00e9 comme enseignants. \nTr\u00e8s sympa et cool. Elle d\u00e9bute et Claude a fait 2 fois les acores bre tagne",
+        "participants":[
+            {
+                "contact_id":"c-1360fcc1",
+                "societe":"CLICK",
+                "prix":274.0,
                 "acompte":0.0,
                 "terminee":true,
                 "payee":true,
