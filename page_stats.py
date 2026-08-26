@@ -270,8 +270,16 @@ def afficher_page_stats(charger_croisieres, charger_etapes, charger_maintenance,
         elif tableau_actif == "charges_fixes":
             _afficher_tableau_detail(tableau_actif, "Charges fixes réelles (Port, Assurance)", df_fixes_maint, ["M_Num"])
         elif tableau_actif == "total_dep":
-            df_total = pd.concat([df_pure_maint, df_fixes_maint], ignore_index=True) if not df_pure_maint.empty or not df_fixes_maint.empty else pd.DataFrame()
-            _afficher_tableau_detail(tableau_actif, "Toutes les dépenses de la saison", df_total, ["M_Num"])
+        df_total = pd.concat([df_pure_maint, df_fixes_maint], ignore_index=True) if not df_pure_maint.empty or not df_fixes_maint.empty else pd.DataFrame()
+        if not df_total.empty:
+        # pd.concat empile les deux tableaux l'un après l'autre sans les
+        # remélanger — chacun était trié individuellement, mais pas
+        # l'ensemble. On re-trie ici par date décroissante (le plus
+        # récent en premier, comme partout ailleurs dans l'appli).
+        df_total = df_total.sort_values(
+            "Date", ascending=False, key=lambda col: col.map(parse_date_eu)
+        ).reset_index(drop=True)
+        _afficher_tableau_detail(tableau_actif, "Toutes les dépenses de la saison", df_total, ["M_Num"])
         elif tableau_actif == "solde_net":
             df_solde = pd.DataFrame([
                 {"Ligne": "Recettes", "Montant (€)": total_ca_display},
