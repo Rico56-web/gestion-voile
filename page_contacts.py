@@ -3,14 +3,19 @@ page_contacts.py
 =================
 Page CONTACTS (liste + recherche + filtres + fiches), nouveau modèle
 séparé (contacts.json / croisieres.json / interets.json).
-
 À intégrer dans app_voile1.py : remplace le bloc actuel
     if st.session_state.page == "CONTACTS": ...
 par un appel à afficher_page_contacts().
-
 NE TOUCHE PAS à MODIFIER_CONTACT, PLANNING, FACT, STATS, ARCHIVES :
 ces pages restent à migrer dans de prochains échanges (chacune sera
 signalée avec ses propres risques de régression avant modification).
+
+--- Modif du 28/08/2026 ---
+Ajout d'un DOUBLE encadrement sur chaque fiche contact : un nouveau
+cadre extérieur, plus clair, qui entoure maintenant toute la fiche
+(photos, boutons d'appel, historique, modifier/supprimer inclus), en
+plus du cadre intérieur épais (5px) déjà existant qui reste inchangé
+autour du bloc identité. Aucune autre logique n'a été touchée.
 """
 import streamlit as st
 from modele_voile import (
@@ -28,6 +33,22 @@ def _initiales_couleur(contact):
     return palette[hash(cle) % len(palette)]
 
 
+def _couleur_eclaircie(hex_couleur, taux=0.45):
+    """Mélange une couleur hexadécimale avec du blanc pour l'éclaircir,
+    afin d'obtenir la couleur du cadre EXTÉRIEUR à partir de la couleur
+    du cadre intérieur existant.
+    taux=0   -> couleur inchangée
+    taux=1   -> blanc pur
+    taux=0.45 -> nettement plus clair, mais encore visible comme cadre.
+    """
+    hex_couleur = hex_couleur.lstrip("#")
+    r, g, b = int(hex_couleur[0:2], 16), int(hex_couleur[2:4], 16), int(hex_couleur[4:6], 16)
+    r = round(r + (255 - r) * taux)
+    g = round(g + (255 - g) * taux)
+    b = round(b + (255 - b) * taux)
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
 COULEURS_BADGES_CONTACT = {
     "🟢 En cours": "#2980B9",
     "⭐ Habitué": "#F1C40F",
@@ -37,12 +58,16 @@ COULEURS_BADGES_CONTACT = {
 
 
 def _carte_contact(numero, contact, croisieres_c, interets_c):
-    """Affiche une fiche contact dans un cadre épais (5px), avec toutes
-    les infos et actions demandées."""
+    """Affiche une fiche contact avec un DOUBLE cadre :
+    - cadre EXTÉRIEUR (nouveau) : couleur éclaircie, entoure toute la
+      fiche (photos, boutons d'appel, historique, modifier/supprimer).
+    - cadre INTÉRIEUR (existant, inchangé) : épais (5px), autour du
+      bloc identité (nom, téléphone, email, badges, total perçu).
+    """
     couleur = _initiales_couleur(contact)
+    couleur_claire = _couleur_eclaircie(couleur)
     fond = fond_clair(couleur)
     badge_pref = "⭐ " if str(contact.get("habitue", "")).strip().lower() in ("oui", "true", "1") else ""
-
     filtres = filtres_contact(croisieres_c, interets_c)
     badges_auto = []
     if filtres["en_cours"]:
@@ -53,16 +78,31 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
         badges_auto.append("⚪ Passé")
     if filtres["sans_suite"]:
         badges_auto.append("👻 Sans suite")
-
     badges_html = "".join(
         f'<span style="background:{COULEURS_BADGES_CONTACT.get(b, "#BDC3C7")}; color:white; '
         f'border-radius:12px; padding:2px 10px; font-size:0.72rem; font-weight:bold; margin-right:5px;">{b}</span>'
         for b in badges_auto
     )
-
     total_percu = sommes_percues(croisieres_c)
 
-    with st.container(border=False):
+    # --- Clé unique de cette fiche, utilisée pour cibler le cadre
+    # extérieur en CSS (un contact -> une couleur -> un cadre) ---
+    cle_carte = f"carte_{contact['id']}"
+    st.markdown(
+        f"""
+        <style>
+        .st-key-{cle_carte} {{
+            border: 3px solid {couleur_claire} !important;
+            border-radius: 16px !important;
+            padding: 10px !important;
+            margin-bottom: 14px !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.container(key=cle_carte, border=True):
         st.markdown(
             f"""
             <div style="border:5px solid {couleur}; border-radius:12px; padding:14px; margin-bottom:12px; background:{fond};">
@@ -80,7 +120,6 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
             """,
             unsafe_allow_html=True,
         )
-
         # --- Photos (1 à 2 max) ---
         photos = contact.get("photos") or []
         if photos:
@@ -90,7 +129,6 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
                     col.image(chemin, use_container_width=True)
                 except Exception:
                     pass
-
         # --- 3 boutons d'appel direct ---
         tel = (contact.get("telephone") or "").replace(" ", "")
         email = contact.get("email") or ""
@@ -107,11 +145,9 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
             c3.link_button("💬 WhatsApp", f"https://wa.me/{tel.lstrip('0').lstrip('+')}", use_container_width=True)
         else:
             c3.button("💬 WhatsApp", use_container_width=True, disabled=True, key=f"wa_off_{contact['id']}")
-
         # --- Notes ---
         if contact.get("notes"):
             st.caption(f"📝 {contact['notes']}")
-
         # --- Historique des navigations (calculé, jamais stocké) ---
         if croisieres_c:
             with st.expander(f"🧭 Historique des navigations ({len(croisieres_c)})"):
@@ -127,14 +163,12 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
                         etat = "—"
                     nom_nav = c.get("nom_croisiere") or "(sans nom)"
                     st.write(f"**{c.get('date_debut','?')}** — {nom_nav} — {p.get('societe','')} — {p.get('prix',0):.0f}€ — {etat}")
-
         # --- Modifier / Supprimer (numéro de fiche intégré aux boutons) ---
         cb1, cb2 = st.columns(2)
         if cb1.button(f"✏️ Modifier #{numero}", key=f"ed_{contact['id']}", use_container_width=True):
             st.session_state.edit_contact_id = contact["id"]
             st.session_state.page = "MODIFIER_CONTACT"
             st.rerun()
-
         a_navigue = len(croisieres_c) > 0
         if a_navigue:
             cb2.button(
@@ -164,9 +198,7 @@ def afficher_page_contacts(charger_contacts, charger_croisieres, charger_interet
     """Point d'entrée de la page. Les 3 fonctions de chargement et la
     fonction de sauvegarde sont injectées depuis app_voile1.py pour
     réutiliser telles quelles tes fonctions GitHub existantes."""
-
     st.markdown("## 👥 Contacts")
-
     contacts = charger_contacts()
     croisieres = charger_croisieres()
     interets = charger_interets()
@@ -188,7 +220,6 @@ def afficher_page_contacts(charger_contacts, charger_croisieres, charger_interet
     # --- Barre de recherche + filtres + nouveau contact ---
     if "filtres_actifs" not in st.session_state:
         st.session_state.filtres_actifs = set()  # filtres combinables, aucun par défaut = "tous"
-
     c_recherche, c_nouveau = st.columns([3, 1])
     recherche = c_recherche.text_input("🔍 Rechercher (nom, prénom, société)", "", key="recherche_contacts")
     if c_nouveau.button("➕ Nouveau contact", use_container_width=True):
@@ -199,7 +230,6 @@ def afficher_page_contacts(charger_contacts, charger_croisieres, charger_interet
     # --- Tri : par nom ou par prénom, au choix ---
     if "tri_contacts" not in st.session_state:
         st.session_state.tri_contacts = "nom"  # comportement par défaut, inchangé
-
     c_tri1, c_tri2, _ = st.columns([1, 1, 3])
     if c_tri1.button("🔤 Trier par NOM", use_container_width=True,
                       type="primary" if st.session_state.tri_contacts == "nom" else "secondary"):
@@ -237,15 +267,12 @@ def afficher_page_contacts(charger_contacts, charger_croisieres, charger_interet
     for c in contacts_tries:
         cr_c = croisieres_du_contact(croisieres, c["id"])
         int_c = interets_du_contact(interets, c["id"])
-
         if not contact_correspond_recherche(c, cr_c, recherche):
             continue
-
         if st.session_state.filtres_actifs:
             f = filtres_contact(cr_c, int_c)
             if not any(f.get(cle) for cle in st.session_state.filtres_actifs):
                 continue
-
         contacts_affiches.append((c, cr_c, int_c))
 
     if not contacts_affiches:
