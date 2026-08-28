@@ -87,11 +87,17 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
 
     # --- Clé unique de cette fiche, utilisée pour cibler le cadre
     # extérieur en CSS (un contact -> une couleur -> un cadre) ---
+    # NB : Streamlit peut placer la classe "st-key-..." soit directement
+    # sur le div qui a la bordure, soit sur un div parent qui contient un
+    # enfant avec le bord (data-testid="stVerticalBlockBorderWrapper").
+    # On cible donc les deux cas possibles pour être sûr que ça s'applique.
     cle_carte = f"carte_{contact['id']}"
     st.markdown(
         f"""
         <style>
-        .st-key-{cle_carte} {{
+        div.st-key-{cle_carte},
+        div.st-key-{cle_carte}[data-testid="stVerticalBlockBorderWrapper"],
+        div.st-key-{cle_carte} > div[data-testid="stVerticalBlockBorderWrapper"] {{
             border: 3px solid {couleur_claire} !important;
             border-radius: 16px !important;
             padding: 10px !important;
