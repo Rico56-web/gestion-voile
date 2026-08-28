@@ -751,12 +751,12 @@
         "nom_croisiere":"click avec Caroline",
         "date_debut":"25\/08\/2026",
         "jours":1,
-        "notes":"Caroline et Claude et leurs deux enfants de 5 et 12 ans sont adorables . Ils me rappelle le couple Aurelien et Axelle. Elle est docteur en pharmacie , lui est doctieur en biologie . Il travaille au CHU de Rennes et aussi \u00e0 l\u2019universit\u00e9 comme enseignants. \nTr\u00e8s sympa et cool. Elle d\u00e9bute et Claude a fait 2 fois les acores bre tagne",
+        "notes":"Caroline et Claude et leurs deux enfants de 5 et 12 ans sont adorables . Ils me rappelle le couple Aurelien et Axelle. Elle est docteur en pharmacie , lui est doctieur en biologie . Il travaille au CHU de Rennes et aussi \u00e0 l\u2019universit\u00e9 comme enseignants. \nTr\u00e8s sympa et cool. Elle d\u00e9bute et Claude a fait 2 fois les acores bre tagne\nLa journ\u00e9e \u00e9tait \u00e0 274 \u20ac mais Arte d\u00e9duite de 1 jours(135\u20ac)pour la journ\u00e9e en moins de la croisiereprecedente(Thomas)",
         "participants":[
             {
                 "contact_id":"c-1360fcc1",
                 "societe":"CLICK",
-                "prix":274.0,
+                "prix":140.0,
                 "acompte":0.0,
                 "terminee":true,
                 "payee":true,
