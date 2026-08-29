@@ -54,6 +54,12 @@ def _couleur_eclaircie(hex_couleur, taux=0.45):
     return f"#{r:02X}{g:02X}{b:02X}"
 
 
+# Fond des boutons : version adoucie (mélangée à 40% de blanc) de
+# COULEUR_BOUTONS, pour un mauve moins soutenu. Le contour du bouton,
+# lui, reste dans la couleur pleine COULEUR_BOUTONS.
+COULEUR_BOUTONS_FOND = _couleur_eclaircie(COULEUR_BOUTONS, taux=0.4)
+
+
 COULEURS_BADGES_CONTACT = {
     "🟢 En cours": "#2980B9",
     "⭐ Habitué": "#F1C40F",
@@ -114,7 +120,7 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
            pas besoin de passer par les classes "st-emotion-cache-..." */
         div.st-key-{cle_carte} .stButton button,
         div.st-key-{cle_carte} .stLinkButton a {{
-            background-color: {COULEUR_BOUTONS} !important;
+            background-color: {COULEUR_BOUTONS_FOND} !important;
             border: 2px solid {COULEUR_BOUTONS} !important;
             color: #2c3e50 !important;
         }}
