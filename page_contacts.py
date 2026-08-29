@@ -252,9 +252,58 @@ def afficher_page_contacts(charger_contacts, charger_croisieres, charger_interet
     # --- Barre de recherche + filtres + nouveau contact ---
     if "filtres_actifs" not in st.session_state:
         st.session_state.filtres_actifs = set()  # filtres combinables, aucun par défaut = "tous"
+
+    # --- Couleurs du menu du haut (recherche, tri, filtres, retour) ---
+    # Une couleur fixe par bouton, pleine quand actif ("primary"), en
+    # contour quand inactif ("secondary") — même principe que pour les
+    # boutons des fiches, voir claude/technique-double-cadre-streamlit.md.
+    st.markdown(
+        """
+        <style>
+        .st-key-recherche_contacts input {
+            border: 2px solid #B4ACC9 !important;
+        }
+        .st-key-btn_nouveau_contact button {
+            background-color: #27AE60 !important;
+            border-color: #27AE60 !important;
+            color: white !important;
+        }
+        .st-key-btn_tri_nom button, .st-key-btn_tri_prenom button {
+            border: 2px solid #16A085 !important;
+        }
+        .st-key-btn_tri_nom button[kind="primary"], .st-key-btn_tri_prenom button[kind="primary"] {
+            background-color: #16A085 !important;
+            color: white !important;
+        }
+        .st-key-btn_tri_nom button[kind="secondary"], .st-key-btn_tri_prenom button[kind="secondary"] {
+            background-color: white !important;
+            color: #16A085 !important;
+        }
+        .st-key-filtre_en_cours button { border: 2px solid #27AE60 !important; }
+        .st-key-filtre_en_cours button[kind="primary"] { background-color: #27AE60 !important; color: white !important; }
+        .st-key-filtre_en_cours button[kind="secondary"] { background-color: white !important; color: #27AE60 !important; }
+        .st-key-filtre_habitue_auto button { border: 2px solid #F39C12 !important; }
+        .st-key-filtre_habitue_auto button[kind="primary"] { background-color: #F39C12 !important; color: white !important; }
+        .st-key-filtre_habitue_auto button[kind="secondary"] { background-color: white !important; color: #F39C12 !important; }
+        .st-key-filtre_passe button { border: 2px solid #5DADE2 !important; }
+        .st-key-filtre_passe button[kind="primary"] { background-color: #5DADE2 !important; color: white !important; }
+        .st-key-filtre_passe button[kind="secondary"] { background-color: white !important; color: #5DADE2 !important; }
+        .st-key-filtre_sans_suite button { border: 2px solid #AF7AC5 !important; }
+        .st-key-filtre_sans_suite button[kind="primary"] { background-color: #AF7AC5 !important; color: white !important; }
+        .st-key-filtre_sans_suite button[kind="secondary"] { background-color: white !important; color: #AF7AC5 !important; }
+        .st-key-retour_contacts button {
+            background-color: white !important;
+            border: 2px solid #7F8C8D !important;
+            color: #7F8C8D !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     c_recherche, c_nouveau = st.columns([3, 1])
     recherche = c_recherche.text_input("🔍 Rechercher (nom, prénom, société)", "", key="recherche_contacts")
-    if c_nouveau.button("➕ Nouveau contact", use_container_width=True):
+    if c_nouveau.button("➕ Nouveau contact", key="btn_nouveau_contact", use_container_width=True):
         st.session_state.edit_contact_id = None  # None = création
         st.session_state.page = "MODIFIER_CONTACT"
         st.rerun()
@@ -263,11 +312,11 @@ def afficher_page_contacts(charger_contacts, charger_croisieres, charger_interet
     if "tri_contacts" not in st.session_state:
         st.session_state.tri_contacts = "nom"  # comportement par défaut, inchangé
     c_tri1, c_tri2, _ = st.columns([1, 1, 3])
-    if c_tri1.button("🔤 Trier par NOM", use_container_width=True,
+    if c_tri1.button("🔤 Trier par NOM", key="btn_tri_nom", use_container_width=True,
                       type="primary" if st.session_state.tri_contacts == "nom" else "secondary"):
         st.session_state.tri_contacts = "nom"
         st.rerun()
-    if c_tri2.button("🔤 Trier par PRÉNOM", use_container_width=True,
+    if c_tri2.button("🔤 Trier par PRÉNOM", key="btn_tri_prenom", use_container_width=True,
                       type="primary" if st.session_state.tri_contacts == "prenom" else "secondary"):
         st.session_state.tri_contacts = "prenom"
         st.rerun()
