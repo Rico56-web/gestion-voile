@@ -27,17 +27,15 @@ from modele_voile import (
 
 def _initiales_couleur(contact):
     """Couleur de cadre stable par contact (pas par société, puisqu'un
-    contact peut naviguer avec plusieurs sociétés différentes).
-
-    --- ESSAI du 28/08/2026 : une seule teinte (bleu pourpré) pour TOUTES
-    les fiches, à la place de la palette multicolore, pour un rendu plus
-    sobre. Pour revenir à la palette d'origine, remettre la ligne
-    "palette = [...]" commentée juste en dessous. ---
-    """
-    palette = ["#B4ACC9"]  # essai : une seule couleur pour toutes les fiches
-    # palette = ["#2980B9", "#27AE60", "#8E44AD", "#D35400", "#16A085", "#C0392B"]  # palette d'origine
+    contact peut naviguer avec plusieurs sociétés différentes)."""
+    palette = ["#2980B9", "#27AE60", "#8E44AD", "#D35400", "#16A085", "#C0392B"]
     cle = (contact.get("nom", "") + contact.get("prenom", ""))
     return palette[hash(cle) % len(palette)]
+
+
+# Couleur unique et fixe pour TOUS les boutons de toutes les fiches
+# (indépendante de la couleur propre à chaque contact).
+COULEUR_BOUTONS = "#B4ACC9"
 
 
 def _couleur_eclaircie(hex_couleur, taux=0.45):
@@ -117,7 +115,7 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
         div.st-key-{cle_carte} .stButton button,
         div.st-key-{cle_carte} .stLinkButton a {{
             background-color: white !important;
-            border: 2px solid {couleur} !important;
+            border: 2px solid {COULEUR_BOUTONS} !important;
             color: #2c3e50 !important;
         }}
         div.st-key-{cle_carte} .stButton button:disabled {{
