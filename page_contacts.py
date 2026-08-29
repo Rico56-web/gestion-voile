@@ -89,15 +89,14 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
     # extérieur en CSS (un contact -> une couleur -> un cadre) ---
     # NB (trouvé via l'inspecteur du navigateur le 28/08) : Streamlit place
     # la classe "st-key-..." sur le div de CONTENU (stVerticalBlock), pas
-    # sur son PARENT qui porte réellement la bordure visible
-    # (data-testid="stVerticalBlockBorderWrapper"). On utilise donc le
-    # sélecteur CSS ":has()" pour cibler ce parent "qui contient" notre
-    # div de contenu marqué par la clé unique.
+    # sur son PARENT qui porte réellement la bordure visible. On utilise
+    # ":has()" pour cibler CE parent direct (confirmé dans l'inspecteur),
+    # sans présumer de son nom de classe ou attribut exact.
     cle_carte = f"carte_{contact['id']}"
     st.markdown(
         f"""
         <style>
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(> div.st-key-{cle_carte}) {{
+        div:has(> div.st-key-{cle_carte}) {{
             border: 3px solid {couleur_claire} !important;
             border-radius: 16px !important;
             padding: 10px !important;
