@@ -65,8 +65,9 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
       bloc identité (nom, téléphone, email, badges, total perçu).
     """
     couleur = _initiales_couleur(contact)
-    couleur_claire = _couleur_eclaircie(couleur)
-    fond = fond_clair(couleur)
+    couleur_claire = _couleur_eclaircie(couleur, taux=0.45)  # couleur du TRAIT du cadre extérieur
+    fond_exterieur = _couleur_eclaircie(couleur, taux=0.85)  # fond (très pâle) du cadre extérieur
+    fond = fond_clair(couleur)  # fond du bloc identité (existant, inchangé)
     badge_pref = "⭐ " if str(contact.get("habitue", "")).strip().lower() in ("oui", "true", "1") else ""
     filtres = filtres_contact(croisieres_c, interets_c)
     badges_auto = []
@@ -101,6 +102,7 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
             border-radius: 16px !important;
             padding: 10px !important;
             margin-bottom: 14px !important;
+            background: {fond_exterieur} !important;
         }}
         </style>
         """,
