@@ -271,26 +271,28 @@ def afficher_page_contacts(charger_contacts, charger_croisieres, charger_interet
         .st-key-btn_tri_nom button, .st-key-btn_tri_prenom button {
             border: 2px solid #16A085 !important;
         }
-        .st-key-btn_tri_nom button[kind="primary"], .st-key-btn_tri_prenom button[kind="primary"] {
+        .st-key-btn_tri_nom button[kind="primary"], .st-key-btn_tri_prenom button[kind="primary"],
+        .st-key-btn_tri_nom button[data-testid="stBaseButton-primary"], .st-key-btn_tri_prenom button[data-testid="stBaseButton-primary"] {
             background-color: #16A085 !important;
             color: white !important;
         }
-        .st-key-btn_tri_nom button[kind="secondary"], .st-key-btn_tri_prenom button[kind="secondary"] {
+        .st-key-btn_tri_nom button[kind="secondary"], .st-key-btn_tri_prenom button[kind="secondary"],
+        .st-key-btn_tri_nom button[data-testid="stBaseButton-secondary"], .st-key-btn_tri_prenom button[data-testid="stBaseButton-secondary"] {
             background-color: white !important;
             color: #16A085 !important;
         }
         .st-key-filtre_en_cours button { border: 2px solid #27AE60 !important; }
-        .st-key-filtre_en_cours button[kind="primary"] { background-color: #27AE60 !important; color: white !important; }
-        .st-key-filtre_en_cours button[kind="secondary"] { background-color: white !important; color: #27AE60 !important; }
+        .st-key-filtre_en_cours button[kind="primary"], .st-key-filtre_en_cours button[data-testid="stBaseButton-primary"] { background-color: #27AE60 !important; color: white !important; }
+        .st-key-filtre_en_cours button[kind="secondary"], .st-key-filtre_en_cours button[data-testid="stBaseButton-secondary"] { background-color: white !important; color: #27AE60 !important; }
         .st-key-filtre_habitue_auto button { border: 2px solid #F39C12 !important; }
-        .st-key-filtre_habitue_auto button[kind="primary"] { background-color: #F39C12 !important; color: white !important; }
-        .st-key-filtre_habitue_auto button[kind="secondary"] { background-color: white !important; color: #F39C12 !important; }
+        .st-key-filtre_habitue_auto button[kind="primary"], .st-key-filtre_habitue_auto button[data-testid="stBaseButton-primary"] { background-color: #F39C12 !important; color: white !important; }
+        .st-key-filtre_habitue_auto button[kind="secondary"], .st-key-filtre_habitue_auto button[data-testid="stBaseButton-secondary"] { background-color: white !important; color: #F39C12 !important; }
         .st-key-filtre_passe button { border: 2px solid #5DADE2 !important; }
-        .st-key-filtre_passe button[kind="primary"] { background-color: #5DADE2 !important; color: white !important; }
-        .st-key-filtre_passe button[kind="secondary"] { background-color: white !important; color: #5DADE2 !important; }
+        .st-key-filtre_passe button[kind="primary"], .st-key-filtre_passe button[data-testid="stBaseButton-primary"] { background-color: #5DADE2 !important; color: white !important; }
+        .st-key-filtre_passe button[kind="secondary"], .st-key-filtre_passe button[data-testid="stBaseButton-secondary"] { background-color: white !important; color: #5DADE2 !important; }
         .st-key-filtre_sans_suite button { border: 2px solid #AF7AC5 !important; }
-        .st-key-filtre_sans_suite button[kind="primary"] { background-color: #AF7AC5 !important; color: white !important; }
-        .st-key-filtre_sans_suite button[kind="secondary"] { background-color: white !important; color: #AF7AC5 !important; }
+        .st-key-filtre_sans_suite button[kind="primary"], .st-key-filtre_sans_suite button[data-testid="stBaseButton-primary"] { background-color: #AF7AC5 !important; color: white !important; }
+        .st-key-filtre_sans_suite button[kind="secondary"], .st-key-filtre_sans_suite button[data-testid="stBaseButton-secondary"] { background-color: white !important; color: #AF7AC5 !important; }
         .st-key-retour_contacts button {
             background-color: white !important;
             border: 2px solid #7F8C8D !important;
@@ -337,7 +339,13 @@ def afficher_page_contacts(charger_contacts, charger_croisieres, charger_interet
 
     if st.button("↩️ Retour", key="retour_contacts"):
         st.session_state.filtres_actifs = set()
-        st.session_state.recherche_contacts = ""
+        # On ne peut pas faire "st.session_state.recherche_contacts = ''"
+        # ici : Streamlit l'interdit une fois que le champ text_input lié
+        # à cette clé a déjà été affiché dans le run en cours. On supprime
+        # donc la clé à la place — le champ repart avec sa valeur par
+        # défaut (chaîne vide) au prochain rechargement.
+        if "recherche_contacts" in st.session_state:
+            del st.session_state["recherche_contacts"]
         st.rerun()
 
     st.divider()
