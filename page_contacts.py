@@ -114,7 +114,7 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
            pas besoin de passer par les classes "st-emotion-cache-..." */
         div.st-key-{cle_carte} .stButton button,
         div.st-key-{cle_carte} .stLinkButton a {{
-            background-color: white !important;
+            background-color: {COULEUR_BOUTONS} !important;
             border: 2px solid {COULEUR_BOUTONS} !important;
             color: #2c3e50 !important;
         }}
