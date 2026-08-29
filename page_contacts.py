@@ -104,6 +104,20 @@ def _carte_contact(numero, contact, croisieres_c, interets_c):
             margin-bottom: 14px !important;
             background: {fond_exterieur} !important;
         }}
+        /* Boutons de cette fiche (Appeler/Email/WhatsApp, Modifier/Supprimer) :
+           .stButton et .stLinkButton sont des classes Streamlit stables,
+           pas besoin de passer par les classes "st-emotion-cache-..." */
+        div.st-key-{cle_carte} .stButton button,
+        div.st-key-{cle_carte} .stLinkButton a {{
+            background-color: {couleur_claire} !important;
+            border: 1.5px solid {couleur} !important;
+            color: #2c3e50 !important;
+        }}
+        div.st-key-{cle_carte} .stButton button:disabled {{
+            background-color: #f0f0f0 !important;
+            border-color: #d8d8d8 !important;
+            color: #a0a0a0 !important;
+        }}
         </style>
         """,
         unsafe_allow_html=True,
