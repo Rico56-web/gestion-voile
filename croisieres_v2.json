@@ -663,27 +663,6 @@
         ]
     },
     {
-        "id":"cr-a98b8b0c",
-        "nom_croisiere":"Click avec Daniel,",
-        "date_debut":"18\/09\/2026",
-        "jours":1,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-4df23144",
-                "societe":"CLICK",
-                "prix":170.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-17795204",
         "nom_croisiere":"location perso mai 2026",
         "date_debut":"01\/08\/2026",
