@@ -411,27 +411,6 @@
         ]
     },
     {
-        "id":"cr-0d7d1aca",
-        "nom_croisiere":"(\u00e0 d\u00e9finir)",
-        "date_debut":"31\/10\/2026",
-        "jours":2,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-4d757fd3",
-                "societe":"CMN",
-                "prix":450.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-4ac25729",
         "nom_croisiere":"(\u00e0 d\u00e9finir)",
         "date_debut":"",
@@ -719,6 +698,27 @@
                 "terminee":true,
                 "payee":true,
                 "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-0d7d1aca",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"31\/10\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "acompte":0.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":true,
                 "accompagnants":[
 
                 ]
