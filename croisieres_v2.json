@@ -705,27 +705,6 @@
         ]
     },
     {
-        "id":"cr-cf1fc1e1",
-        "nom_croisiere":"Location CMN du 5 d\u00e9cembre 2026",
-        "date_debut":"05\/12\/2026",
-        "jours":2,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-4d757fd3",
-                "societe":"PERSO",
-                "prix":450.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-1bb50f8f",
         "nom_croisiere":"Navigation du 22 octobre 2026 avec Click & boat",
         "date_debut":"22\/10\/2026",
@@ -750,6 +729,27 @@
         "id":"cr-255ba0a6",
         "nom_croisiere":"Location du 13 d\u00e9cembre 2026",
         "date_debut":"12\/12\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "acompte":0.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-cf1fc1e1",
+        "nom_croisiere":"Location CMN du 5 d\u00e9cembre 2026",
+        "date_debut":"05\/12\/2026",
         "jours":2,
         "notes":"",
         "participants":[
