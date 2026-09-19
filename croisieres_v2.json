@@ -42,27 +42,6 @@
         ]
     },
     {
-        "id":"cr-b6a99b2d",
-        "nom_croisiere":"(\u00e0 d\u00e9finir)",
-        "date_debut":"31\/10\/2026",
-        "jours":2,
-        "notes":"",
-        "participants":[
-            {
-                "contact_id":"c-4d757fd3",
-                "societe":"CMN",
-                "prix":450.0,
-                "acompte":0.0,
-                "terminee":false,
-                "payee":false,
-                "annulee":false,
-                "accompagnants":[
-
-                ]
-            }
-        ]
-    },
-    {
         "id":"cr-786c9102",
         "nom_croisiere":"Sortievers houat",
         "date_debut":"20\/07\/2026",
@@ -697,6 +676,27 @@
                 "acompte":0.0,
                 "terminee":true,
                 "payee":true,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
+    },
+    {
+        "id":"cr-b6a99b2d",
+        "nom_croisiere":"(\u00e0 d\u00e9finir)",
+        "date_debut":"28\/10\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "acompte":0.0,
+                "terminee":false,
+                "payee":false,
                 "annulee":false,
                 "accompagnants":[
 
