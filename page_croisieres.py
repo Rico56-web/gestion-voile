@@ -18,7 +18,10 @@ import pandas as pd
 import streamlit as st
 from openpyxl.utils import get_column_letter
 
-from modele_voile import filtrer_temporel, trier_croisieres, noms_participants, couleur_croisiere, fond_clair, parse_date_eu
+from modele_voile import (
+    filtrer_temporel, trier_croisieres, noms_participants, couleur_croisiere,
+    fond_clair, parse_date_eu, dupliquer_croisiere, valider_croisiere,
+)
 
 OPTIONS_TRI = {
     "date_desc": "🗓️ Date (récent → ancien)",
@@ -213,6 +216,30 @@ def _afficher_detail_croisiere(cr, sauvegarder_croisieres, contacts_par_id, etap
                 st.session_state.pop(cle_confirm)
                 st.rerun()
 
+        # --- Duplication : même croisière (participants, prix, durée) à une autre date ---
+        with st.expander("📋 Dupliquer cette croisière à une autre date"):
+            st.caption(
+                "Copie les participants, la société, le prix et la durée. "
+                "L'acompte, les statuts (terminée / payée / annulée) et les notes repartent à zéro."
+            )
+            cle_date_dup = f"dup_date_{cr['id']}"
+            nouvelle_date = st.text_input("Date de la nouvelle croisière (jj/mm/aaaa)", key=cle_date_dup)
+            if st.button("📋 Créer la copie", key=f"dup_btn_{cr['id']}", use_container_width=True):
+                if not parse_date_eu(nouvelle_date):
+                    st.error("Date invalide : écris-la sous la forme jj/mm/aaaa (ex: 12/12/2026).")
+                else:
+                    copie = dupliquer_croisiere(cr, nouvelle_date)
+                    erreurs = valider_croisiere(copie)
+                    if erreurs:
+                        for e in erreurs:
+                            st.error(e)
+                    else:
+                        # La sauvegarde se fait plus haut (au tour suivant),
+                        # comme pour la suppression : ici on n'a pas la liste complète.
+                        st.session_state["croisiere_a_ajouter"] = copie
+                        st.session_state["dup_date_a_vider"] = cle_date_dup
+                        st.rerun()
+
         # --- Lien personnalisé vers le questionnaire, par participant ---
         lien_questionnaire = next(
             (l.get("url") for l in liens if "questionnaire" in (l.get("nom") or "").lower()),
@@ -302,6 +329,17 @@ def afficher_page_croisieres(charger_croisieres, sauvegarder_croisieres, charger
         croisieres = [cr for cr in croisieres if cr["id"] != cid]
         sauvegarder_croisieres(croisieres)
         st.toast("Croisière supprimée.", icon="🗑️")
+        st.rerun()
+
+    # --- Ajout différé d'une copie (demandé au tour précédent) ---
+    if st.session_state.get("croisiere_a_ajouter"):
+        nouvelle = st.session_state.pop("croisiere_a_ajouter")
+        # On vide le champ date de la copie qui vient d'être faite, pour
+        # éviter de créer deux fois la même croisière par un second clic.
+        st.session_state.pop(st.session_state.pop("dup_date_a_vider", None), None)
+        croisieres.append(nouvelle)
+        sauvegarder_croisieres(croisieres)
+        st.toast(f"Croisière dupliquée au {nouvelle['date_debut']}.", icon="📋")
         st.rerun()
 
     if st.button("➕ Nouvelle croisière", use_container_width=True):
