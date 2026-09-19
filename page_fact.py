@@ -1,23 +1,24 @@
 """
 page_fact.py
 =============
-Suivi de facturation — PARTIE A (indicateurs, onglets À encaisser / Payé
-avec actions Encaisser/Annuler/Voir).
+Suivi de facturation.
 
-La PARTIE B (module d'envoi groupé d'email CMN avec signature
-électronique) sera ajoutée dans une prochaine étape.
+Contenu de la page :
+- Indicateurs : Total CA, Encaissé, Reste à percevoir.
+- Module d'envoi groupé du relevé CMN par email (avec signature).
+  Il n'influence PAS le statut payé/non payé : c'est juste un envoi.
+- Onglets À ENCAISSER / PAYÉ, avec les actions Encaisser / Annuler.
 
-Correction importante par rapport à l'ancien FACT : l'ancien calculait
-le CA en sommant TOUS les prix de contacts.json sans aucun filtre — y
-compris les réservations annulées et les prospects en liste d'attente,
-toutes années confondues. Le nouveau calcul (bilan_facturation) exclut
-les annulées, comme le fait STATS.
+Note sur le calcul du CA : il exclut les réservations annulées (comme
+STATS). L'ancien FACT sommait tous les prix sans filtre, y compris les
+annulées et les prospects en liste d'attente.
 
-À la différence de STATS, FACT ne filtre PAS par année : une facture
+FACT ne filtre PAS par année, à la différence de STATS : une facture
 impayée d'une saison passée reste due et doit continuer à apparaître.
 
-NE TOUCHE PAS à CONTACTS, MODIFIER_CONTACT, PLANNING, CROISIERES,
-MODIFIER_CROISIERE, STATS, MAINT, LOG, MEMOS, ARCHIVES.
+Données : croisieres_v2.json (lecture + écriture du statut payé) et
+contacts_v2.json (lecture seule). Les fonctions de chargement et de
+sauvegarde sont injectées depuis app_voile1.py.
 """
 from datetime import date, datetime
 
