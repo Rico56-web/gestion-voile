@@ -14,6 +14,7 @@ from page_relances import afficher_page_relances
 from page_maint import afficher_page_maint
 from page_log import afficher_page_log
 from page_archives import afficher_page_archives
+from sauvegarde import preparer_sauvegarde, nom_fichier_zip
 # =================================================================
 # --- CONFIGURATION & STYLE REGROUPÉS ---
 # =================================================================
@@ -254,6 +255,36 @@ with st.sidebar:
     st.markdown("### ⚙️ Paramètres")
     if st.button("📂 Archives & Coffre-Fort", use_container_width=True, type="primary" if st.session_state.page == "ARCHIVES" else "secondary"):
         changer_page("ARCHIVES")
+
+    # --- Sauvegarde groupée de tous les .json (zip daté) ---
+    st.divider()
+    st.markdown("### 💾 Sauvegarde")
+    if st.button("🗂️ Préparer la sauvegarde des JSON", use_container_width=True, key="btn_prep_sauvegarde"):
+        token_github = st.secrets.get("github", {}).get("token")
+        if not token_github:
+            st.error("Token GitHub manquant.")
+        else:
+            with st.spinner("Téléchargement des fichiers depuis GitHub..."):
+                try:
+                    zip_octets, noms_ok, erreurs = preparer_sauvegarde("rico56-web/gestion-voile", token_github)
+                    st.session_state["sauvegarde_prete"] = {
+                        "zip": zip_octets, "noms": noms_ok, "erreurs": erreurs,
+                        "nom_zip": nom_fichier_zip(),
+                    }
+                except Exception as e:
+                    st.session_state.pop("sauvegarde_prete", None)
+                    st.error(f"Sauvegarde impossible : {e}")
+
+    sauvegarde_prete = st.session_state.get("sauvegarde_prete")
+    if sauvegarde_prete:
+        st.download_button(
+            f"📥 Télécharger ({len(sauvegarde_prete['noms'])} fichiers)",
+            data=sauvegarde_prete["zip"], file_name=sauvegarde_prete["nom_zip"],
+            mime="application/zip", use_container_width=True, key="btn_dl_sauvegarde",
+        )
+        st.caption(", ".join(sauvegarde_prete["noms"]))
+        for e in sauvegarde_prete["erreurs"]:
+            st.error(f"⚠️ Non sauvegardé : {e}")
 
     st.markdown("---")
     st.caption("⚓ Enregistré sur GitHub : Rico56-web")
