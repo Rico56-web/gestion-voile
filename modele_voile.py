@@ -12,6 +12,7 @@ paiement). `contacts.json` ne stocke JAMAIS de somme perçue ni d'historique
 """
 from datetime import datetime, date, timedelta
 import uuid
+import copy
 
 
 # ---------------------------------------------------------------------
@@ -340,6 +341,45 @@ def nb_personnes_a_bord(croisiere):
         total += 1
         total += len(p.get("accompagnants", []) or [])
     return total
+
+
+def dupliquer_croisiere(croisiere, nouvelle_date_str):
+    """Crée une COPIE d'une croisière pour une nouvelle date (ex: les
+    nombreuses locations CMN identiques). Ne modifie PAS l'original et ne
+    sauvegarde rien : renvoie simplement un nouveau dictionnaire, prêt à
+    être validé puis ajouté à la liste.
+
+    Ce qui est COPIÉ (c'est ce qui se répète d'une fois à l'autre) :
+      - la durée (jours), les participants (contact, société, prix),
+        leurs accompagnants.
+    Ce qui est REMIS À ZÉRO (propre à chaque sortie) :
+      - nouvel identifiant, nouvelle date, nom "(à définir)" (il se
+        remplit tout seul depuis le livre de bord), notes vides,
+        acompte à 0, et statuts terminée / payée / annulée décochés.
+    """
+    copie = {
+        "id": generer_id_croisiere(),
+        "nom_croisiere": "(à définir)",
+        "date_debut": nouvelle_date_str.strip(),
+        "jours": croisiere.get("jours", 1),
+        "notes": "",
+        "participants": [],
+    }
+    for p in croisiere.get("participants", []):
+        copie["participants"].append({
+            "contact_id": p.get("contact_id"),
+            "societe": p.get("societe", "PERSO"),
+            "prix": p.get("prix", 0.0),
+            "acompte": 0.0,
+            "terminee": False,
+            "payee": False,
+            "annulee": False,
+            # deepcopy : les accompagnants sont une liste, on veut une
+            # vraie copie indépendante (sinon modifier l'une changerait
+            # aussi l'autre).
+            "accompagnants": copy.deepcopy(p.get("accompagnants", [])),
+        })
+    return copie
 
 
 def valider_croisiere(croisiere):
