@@ -724,5 +724,26 @@
                 ]
             }
         ]
+    },
+    {
+        "id":"cr-1bb50f8f",
+        "nom_croisiere":"Navigation du 22 octobre 2026 avec Click & boat",
+        "date_debut":"22\/10\/2026",
+        "jours":3,
+        "notes":"Olivia et Tom arriveront la veille au soir",
+        "participants":[
+            {
+                "contact_id":"c-1aad6886",
+                "societe":"CLICK",
+                "prix":444.0,
+                "acompte":0.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
     }
 ]
