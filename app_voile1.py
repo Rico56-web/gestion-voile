@@ -1,4 +1,4 @@
-import requests, base64, io
+import requests, base64, io, hmac
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -169,9 +169,16 @@ st.markdown("""<style>
 
 if not st.session_state.authenticated:
     st.markdown('<div class="main-header">⚓ VESTA Gestion</div>', unsafe_allow_html=True)
+    # Le code d'accès n'est plus écrit dans le code : il est lu dans les
+    # "Secrets" de Streamlit Cloud, section [app], clé password.
+    code_attendu = st.secrets.get("app", {}).get("password")
+    if not code_attendu:
+        st.error("Code d'accès non configuré : ajoute [app] password = \"...\" dans les Secrets Streamlit.")
+        st.stop()
     pw = st.text_input("Code d'accès :", type="password")
     if st.button("ACCÉDER", use_container_width=True):
-        if pw == "Skipper2026":
+        # compare_digest = comparaison sûre (évite certaines attaques par timing)
+        if hmac.compare_digest(pw.encode(), str(code_attendu).encode()):
             st.session_state.authenticated = True
             st.rerun()
         else: st.error("Code incorrect.")
