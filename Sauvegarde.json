@@ -1,0 +1,33 @@
+"""
+sauvegarde_json.py
+===================
+Copie TOUS les fichiers .json du dossier dans un sous-dossier daté,
+par exemple :  sauvegardes/sauvegarde_2026-09-21_16h30min05s/
+
+Utilisation (sur ton PC, dans le dossier où se trouvent tes fichiers) :
+    python sauvegarde_json.py
+
+Ce script ne modifie, ne supprime et n'écrase JAMAIS tes fichiers : il
+ne fait que des copies. On peut donc le lancer sans risque.
+"""
+import shutil
+from datetime import datetime
+from pathlib import Path
+
+# Le dossier où se trouve ce script (= le dossier du projet)
+dossier_projet = Path(__file__).resolve().parent
+
+# Nom du dossier de sauvegarde : date et heure, ex: sauvegarde_2026-09-21_16h30min05s
+horodatage = datetime.now().strftime("%Y-%m-%d_%Hh%Mmin%Ss")
+dossier_sauvegarde = dossier_projet / "sauvegardes" / f"sauvegarde_{horodatage}"
+dossier_sauvegarde.mkdir(parents=True, exist_ok=False)  # refuse d'écraser un dossier existant
+
+# On prend tous les .json du dossier du projet (pas ceux des sous-dossiers,
+# donc pas ceux des anciennes sauvegardes)
+fichiers = sorted(dossier_projet.glob("*.json"))
+
+for fichier in fichiers:
+    shutil.copy2(fichier, dossier_sauvegarde / fichier.name)  # copy2 garde aussi la date du fichier
+    print(f"  copié : {fichier.name}")
+
+print(f"\n{len(fichiers)} fichier(s) sauvegardé(s) dans :\n{dossier_sauvegarde}")
