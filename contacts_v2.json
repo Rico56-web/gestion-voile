@@ -52,19 +52,6 @@
         ]
     },
     {
-        "id":"c-a522b29d",
-        "prenom":"ELISABETH",
-        "nom":"PHILIPPE",
-        "telephone":"0602468634",
-        "email":"sgfsgsg@gmail.com",
-        "adresse":"",
-        "notes":"Sympa et cool  . Elle est venue avec sa fille de 15ans",
-        "habitue":"Non",
-        "photos":[
-
-        ]
-    },
-    {
         "id":"c-c9144892",
         "prenom":"BENOIT",
         "nom":"COURONNE",
@@ -541,6 +528,19 @@
         "adresse":"",
         "notes":"tres sympa . chercheuse en pharmacie au CHU de rennes et enseignante a l'universit\u00e9 avec son ami Claude (claude.bendavid@chu-rennes.fr) lui est chercheur en biologie. tr\u00e8s sympa \u00e9galement avec leurs 2 enfants",
         "habitue":"Oui",
+        "photos":[
+
+        ]
+    },
+    {
+        "id":"c-a522b29d",
+        "prenom":"ELISABETH",
+        "nom":"PHILIPPE",
+        "telephone":"0602468634",
+        "email":"sgfsgsg@gmail.com",
+        "adresse":"",
+        "notes":"Sympa et cool  . Elle est venue avec sa fille de 15ans. tres bien a renouveler",
+        "habitue":"Non",
         "photos":[
 
         ]
