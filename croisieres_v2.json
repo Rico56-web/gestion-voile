@@ -766,5 +766,26 @@
                 ]
             }
         ]
+    },
+    {
+        "id":"cr-5c7add02",
+        "nom_croisiere":"location du 19\/12\/2026",
+        "date_debut":"19\/12\/2026",
+        "jours":2,
+        "notes":"",
+        "participants":[
+            {
+                "contact_id":"c-4d757fd3",
+                "societe":"CMN",
+                "prix":450.0,
+                "acompte":0.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
     }
 ]
