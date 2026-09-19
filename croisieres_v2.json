@@ -787,5 +787,26 @@
                 ]
             }
         ]
+    },
+    {
+        "id":"cr-0158f28c",
+        "nom_croisiere":"nav du 27 octobre 2026",
+        "date_debut":"27\/10\/2026",
+        "jours":3,
+        "notes":"Elisabeth et son ami Franck\nMaelys et Ma\u00eflys",
+        "participants":[
+            {
+                "contact_id":"c-a522b29d",
+                "societe":"PERSO",
+                "prix":360.0,
+                "acompte":0.0,
+                "terminee":false,
+                "payee":false,
+                "annulee":false,
+                "accompagnants":[
+
+                ]
+            }
+        ]
     }
 ]
