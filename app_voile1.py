@@ -15,7 +15,6 @@ from page_maint import afficher_page_maint
 from page_log import afficher_page_log
 from page_archives import afficher_page_archives
 from sauvegarde import preparer_sauvegarde, nom_fichier_zip
-from calendrier_ics import generer_ics, url_abonnement, publier_dans_gist
 # =================================================================
 # --- CONFIGURATION & STYLE REGROUPÉS ---
 # =================================================================
@@ -271,14 +270,6 @@ with st.sidebar:
                     st.session_state["sauvegarde_prete"] = {
                         "zip": zip_octets, "noms": noms_ok, "erreurs": erreurs,
                         "nom_zip": nom_fichier_zip(),
-                                            }
-                except Exception as e:
-                    st.session_state.pop("sauvegarde_prete", None)
-                    st.error(f"Sauvegarde impossible : {e}")
-
-    sauvegarde_prete =                     st.session_state["sauvegarde_prete"] = {
-                        "zip": zip_octets, "noms": noms_ok, "erreurs": erreurs,
-                        "nom_zip": nom_fichier_zip(),
                     }
                 except Exception as e:
                     st.session_state.pop("sauvegarde_prete", None)
@@ -295,31 +286,11 @@ with st.sidebar:
         for e in sauvegarde_prete["erreurs"]:
             st.error(f"⚠️ Non sauvegardé : {e}")
 
-    # --- Calendrier Outlook (abonnement .ics via Gist) ---
-    st.divider()
-    st.markdown("### 📅 Calendrier Outlook")
-    if st.button("🔄 Mettre à jour le calendrier", use_container_width=True, key="btn_maj_calendrier"):
-        cal_conf = st.secrets.get("calendrier", {})
-        gist_id = cal_conf.get("gist_id")
-        token_gist = cal_conf.get("token")
-        utilisateur = cal_conf.get("utilisateur")
-        if not (gist_id and token_gist and utilisateur):
-            st.error("Configuration [calendrier] incomplète dans les Secrets (gist_id, token, utilisateur).")
-        else:
-            with st.spinner("Génération et publication du calendrier..."):
-                try:
-                    croisieres_cal = charger_data_safe('croisieres_v2.json').to_dict('records')
-                    contenu_ics = generer_ics(croisieres_cal)
-                    publier_dans_gist(contenu_ics, gist_id, token_gist)
-                    st.session_state["calendrier_url"] = url_abonnement(utilisateur, gist_id)
-                    st.success("Calendrier mis à jour !")
-                except Exception as e:
-                    st.error(f"Mise à jour impossible : {e}")
+    st.markdown("---")
+    st.caption("⚓ Enregistré sur GitHub : Rico56-web")
 
-    calendrier_url = st.session_state.get("calendrier_url")
-    if calendrier_url:
-        st.caption("Lien d'abonnement (à coller dans Outlook) :")
-        st.code(calendrier_url, language=None)
+st.divider()
+
 # =================================================================
 # --- 6. AIGUILLAGE DE L'AFFICHAGE CENTRAL ---
 # =================================================================
