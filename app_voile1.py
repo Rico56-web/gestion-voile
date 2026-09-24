@@ -276,6 +276,14 @@ with st.sidebar:
                     st.session_state.pop("sauvegarde_prete", None)
                     st.error(f"Sauvegarde impossible : {e}")
 
+    sauvegarde_prete =                     st.session_state["sauvegarde_prete"] = {
+                        "zip": zip_octets, "noms": noms_ok, "erreurs": erreurs,
+                        "nom_zip": nom_fichier_zip(),
+                    }
+                except Exception as e:
+                    st.session_state.pop("sauvegarde_prete", None)
+                    st.error(f"Sauvegarde impossible : {e}")
+
     sauvegarde_prete = st.session_state.get("sauvegarde_prete")
     if sauvegarde_prete:
         st.download_button(
@@ -283,10 +291,11 @@ with st.sidebar:
             data=sauvegarde_prete["zip"], file_name=sauvegarde_prete["nom_zip"],
             mime="application/zip", use_container_width=True, key="btn_dl_sauvegarde",
         )
-                        st.caption(", ".join(sauvegarde_prete["noms"]))
+        st.caption(", ".join(sauvegarde_prete["noms"]))
         for e in sauvegarde_prete["erreurs"]:
             st.error(f"⚠️ Non sauvegardé : {e}")
-      # --- Calendrier Outlook (abonnement .ics via Gist) ---
+
+    # --- Calendrier Outlook (abonnement .ics via Gist) ---
     st.divider()
     st.markdown("### 📅 Calendrier Outlook")
     if st.button("🔄 Mettre à jour le calendrier", use_container_width=True, key="btn_maj_calendrier"):
